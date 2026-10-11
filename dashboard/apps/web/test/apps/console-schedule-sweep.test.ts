@@ -3,8 +3,9 @@
  *
  * Pinned: a due command goes through the console's own path, as the person who
  * scheduled it, with its values filled in; a server that did not answer has
- * the moment skipped and written down, never queued; and a schedule stopped
- * while the sweep was running stays stopped.
+ * the moment skipped and written down, never queued; a schedule stopped
+ * while the sweep was running stays stopped; and one whose author has lost the
+ * console ends instead of running in their name.
  */
 
 import { english } from "../setup/game-english";
@@ -19,6 +20,8 @@ let config: Record<string, unknown> = {};
 /** What the sweep reads before it writes, so a test can change it in between. */
 let beforeWrite: () => void = () => undefined;
 const sent: { actor: string; line: string }[] = [];
+/** Who still has the console on the server. */
+let consoleUsers = new Set<string>();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -45,6 +48,15 @@ vi.mock("@polaris/app-host", () => ({
             patchInstallConfig: async (_id: string, patch: Record<string, unknown>) => {
                 config = { ...config, ...patch };
             }
+        },
+        mcp: {
+            actingUser: async (id: string) => (id === "u-gone" ? null : { id })
+        },
+        appsInstallAccess: {
+            gameServerAccess: async (user: { id: string }, id: string, permission: string) =>
+                id === INSTALL && permission === "games.console" && consoleUsers.has(user.id)
+                    ? { install: { id } }
+                    : null
         }
     }
 }));
@@ -92,6 +104,7 @@ const stored = () => config.consoleSchedules as ConsoleSchedule[];
 beforeEach(() => {
     sent.length = 0;
     beforeWrite = () => undefined;
+    consoleUsers = new Set(["u-ada"]);
     config = { consoleSchedules: [schedule()] };
 });
 
@@ -130,5 +143,22 @@ describe("the sweep", () => {
         };
         await runConsoleSchedules(OWNER, INSTALL, true, NOW);
         expect(stored()).toEqual([]);
+    });
+
+    it("ends a schedule whose author no longer has the console, without running it", async () => {
+        consoleUsers = new Set();
+        expect(await runConsoleSchedules(OWNER, INSTALL, true, NOW)).toBe(0);
+        expect(sent).toEqual([]);
+        expect(stored()[0]).toMatchObject({ nextAt: null, last: { outcome: "failed" } });
+        expect(english(stored()[0]?.last?.detail)).toBe(
+            "Whoever set it up can no longer use the console"
+        );
+    });
+
+    it("ends a schedule whose author's account is gone", async () => {
+        config = { consoleSchedules: [schedule({ createdBy: "u-gone" })] };
+        await runConsoleSchedules(OWNER, INSTALL, false, NOW);
+        expect(sent).toEqual([]);
+        expect(stored()[0]).toMatchObject({ nextAt: null, last: { outcome: "failed" } });
     });
 });

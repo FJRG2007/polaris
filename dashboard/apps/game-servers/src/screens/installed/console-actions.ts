@@ -42,7 +42,7 @@ import {
     type ConsoleSchedule,
     type ScheduleRepeat
 } from "../../lib/console-schedule";
-import { runKeptCommand } from "../../lib/console-run-service";
+import { keptRunProblem, runKeptCommand } from "../../lib/console-run-service";
 import {
     MAX_SAVED_COMMAND,
     MAX_SAVED_LABEL,
@@ -193,17 +193,15 @@ async function keptRun(input: RunKeptCommandInput) {
         const why = (await issueText(issue?.message)) ?? words("errors.checkTheCommandAndTry");
         return { error: label ? `${label}: ${why}` : why } as const;
     }
-    return {
-        user,
-        access,
-        entry,
-        run: {
-            command: entry.command,
-            variables,
-            values: values.data,
-            target: parsed.data.target
-        }
-    } as const;
+    const run = {
+        command: entry.command,
+        variables,
+        values: values.data,
+        target: parsed.data.target
+    };
+    const problem = keptRunProblem(access, run);
+    if (problem) return { error: await messageText(problem) } as const;
+    return { user, access, entry, run } as const;
 }
 
 /** Run a kept command that carries variables, with the values the person gave. */

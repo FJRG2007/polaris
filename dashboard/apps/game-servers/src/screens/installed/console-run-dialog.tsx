@@ -203,11 +203,6 @@ export function RunCommandDialog({
                                         aria-invalid={playerProblem ? true : undefined}
                                         onChange={(event) => setPlayer(event.target.value)}
                                     />
-                                    <datalist id="console-run-players">
-                                        {players.map((name) => (
-                                            <option key={name} value={name} />
-                                        ))}
-                                    </datalist>
                                     {playerProblem && (
                                         <span role="alert" className="text-xs text-danger">
                                             {schemaText(playerProblem)}
@@ -251,14 +246,11 @@ export function RunCommandDialog({
                             )}
                         </label>
                     ))}
-                    {uses.custom.some((declared) => declared.type === "player") &&
-                        !uses.perPlayer && (
-                            <datalist id="console-run-players">
-                                {players.map((name) => (
-                                    <option key={name} value={name} />
-                                ))}
-                            </datalist>
-                        )}
+                    <datalist id="console-run-players">
+                        {players.map((name) => (
+                            <option key={name} value={name} />
+                        ))}
+                    </datalist>
 
                     {mode === "schedule" && (
                         <div className="flex flex-col gap-3 border-t border-border pt-3">

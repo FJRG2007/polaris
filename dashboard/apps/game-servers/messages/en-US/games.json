@@ -1167,6 +1167,7 @@
             "tooMany": "{count} schedules at most on one server. Stop one first."
         },
         "missed": "Polaris was not running then",
+        "noAccess": "Whoever set it up can no longer use the console",
         "offline": "The server was offline",
         "schedule": "Schedule",
         "scheduleIt": "Schedule",

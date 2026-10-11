@@ -1167,6 +1167,7 @@
             "tooMany": "{count} programaciones como máximo por servidor. Detén una primero."
         },
         "missed": "Polaris estaba parado",
+        "noAccess": "Quien lo programó ya no puede usar la consola",
         "offline": "El servidor estaba apagado",
         "schedule": "Programar",
         "scheduleIt": "Programar",

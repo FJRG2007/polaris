@@ -48,20 +48,31 @@ export interface RunServer {
     };
 }
 
+function editionFor(server: RunServer) {
+    return gameOfServer(server.install.catalogId)?.id === "minecraft"
+        ? editionOf(server.install.catalogId)
+        : null;
+}
+
+/** What keeps a run from being sent at all, as a carried message, or null: a
+ *  per-player command with nobody chosen to write it for. */
+export function keptRunProblem(server: RunServer, run: KeptRun): string | null {
+    const uses = commandUses(run.command, editionFor(server), run.variables);
+    return uses.perPlayer && !run.target
+        ? gameMessage("games", "consoleVars.errors.whichPlayer")
+        : null;
+}
+
 /** The lines one run sends, with every variable filled in. Throws a carried
  *  message when there is nobody to write a per-player line for. */
 export async function keptCommandLines(server: RunServer, run: KeptRun): Promise<string[]> {
-    const edition =
-        gameOfServer(server.install.catalogId)?.id === "minecraft"
-            ? editionOf(server.install.catalogId)
-            : null;
+    const edition = editionFor(server);
     const uses = commandUses(run.command, edition, run.variables);
     const fill = { edition, custom: run.variables, values: run.values, server: {} };
     if (!uses.catalogue) return commandLines(run.command, fill, []);
 
-    if (uses.perPlayer && !run.target) {
-        throw new Error(gameMessage("games", "consoleVars.errors.whichPlayer"));
-    }
+    const problem = keptRunProblem(server, run);
+    if (problem) throw new Error(problem);
     const players = await shownPlayers(server.ownerId, server.install.id).catch(() => null);
     const context = await liveContext(server.install.id, [run.command], players, null);
     const filled = { ...fill, server: context.values };
@@ -138,18 +149,27 @@ export async function runConsoleSchedules(
         const step = advance(schedule, now);
         if (step.next === schedule) continue;
         let last: ScheduleRun | null = step.next.last;
+        let revoked = false;
         if (step.fire) {
-            last = answering
-                ? await fire({ ownerId, install }, schedule, now)
-                : {
+            revoked = !(await mayStillRun(schedule.createdBy, installedAppId));
+            last = revoked
+                ? {
                       at: now.toISOString(),
-                      outcome: "skipped",
-                      detail: gameMessage("games", "consoleSchedule.offline")
-                  };
+                      outcome: "failed",
+                      detail: gameMessage("games", "consoleSchedule.noAccess")
+                  }
+                : answering
+                  ? await fire({ ownerId, install }, schedule, now)
+                  : {
+                        at: now.toISOString(),
+                        outcome: "skipped",
+                        detail: gameMessage("games", "consoleSchedule.offline")
+                    };
             if (last.outcome === "ran") ran += 1;
         }
         moved.set(schedule.id, {
             ...step.next,
+            nextAt: revoked ? null : step.next.nextAt,
             skipped: step.next.skipped + (last?.outcome === "skipped" && step.fire ? 1 : 0),
             last
         });
@@ -164,6 +184,23 @@ export async function runConsoleSchedules(
         [CONSOLE_SCHEDULES_KEY]: list.map((entry) => moved.get(entry.id) ?? entry)
     }).catch(() => undefined);
     return ran;
+}
+
+/** Whether whoever set a schedule up still has the console on this server: a
+ *  grant taken away, a share revoked or an account switched off ends it. */
+async function mayStillRun(userId: string, installedAppId: string): Promise<boolean> {
+    try {
+        const user = await host.mcp.actingUser(userId);
+        if (!user) return false;
+        const access = await host.appsInstallAccess.gameServerAccess(
+            user,
+            installedAppId,
+            "games.console"
+        );
+        return access !== null;
+    } catch {
+        return false;
+    }
 }
 
 async function fire(server: RunServer, schedule: ConsoleSchedule, now: Date): Promise<ScheduleRun> {
