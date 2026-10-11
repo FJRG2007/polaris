@@ -681,7 +681,7 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
                 ? downhillMessages.readySubtitle(language)
                 : boatMessages.readySubtitle(language);
         case "nether-maze":
-            return mazeMessages.readySubtitle(language);
+            return mazeMessages.readySubtitle(language, layout.maze.plan.levels.length);
         case "acid-rain":
             return acidMessages.readySubtitle(language);
         case "elytra-race":
@@ -985,7 +985,7 @@ async function sendHome(
     // A parkour racer off its team, whose push the others no longer need kept off.
     const after =
         kind === "nether-maze"
-            ? radarBack
+            ? (one: string) => [...radarBack(one), netherMaze.leaveTeam(one)]
             : kind === "parkour"
               ? (one: string) => [parkour.leaveTeam(one)]
               : undefined;
@@ -1296,7 +1296,7 @@ async function holdTick(
                 stage.moveLine(racer.name, places[index]!),
                 ...netherMaze.racerScores(racer.name),
                 `title ${racer.name} times 5 40 10`,
-                `title ${racer.name} subtitle ${commands.text(mazeMessages.goSubtitle(language))}`,
+                `title ${racer.name} subtitle ${commands.text(mazeMessages.goSubtitle(language, layout.maze.plan.levels.length))}`,
                 `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
                 soundFor(racer.name, commands.SOUNDS.start)
             )
@@ -2460,7 +2460,9 @@ export async function settle(
         );
         const here = saved.filter((one) => online.has(one.name.toLowerCase()));
         // A maze's racers' minimaps given back too, whenever they come home.
-        const after = netherMaze.isMaze(leftover.boxes) ? radarBack : undefined;
+        const after = netherMaze.isMaze(leftover.boxes)
+            ? (one: string) => [...radarBack(one), netherMaze.leaveTeam(one)]
+            : undefined;
         const owed = await returnAll(server, here, flavour.items, language, undefined, after);
         // Kept in the order they were, offline or not.
         saved = saved.flatMap((one) =>

@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import {
     COMMAND_BYTES_MAX,
     commandBytes
@@ -36,32 +37,65 @@ function blocksOf(boxes: readonly stage.Box[]): Map<string, string> {
     return blocks;
 }
 
+/** Blocks a player passes through: air, the door once open, a jet between flames. */
+function passable(
+    built: maze.Maze,
+    blocks: ReadonlyMap<string, string>,
+    x: number,
+    y: number,
+    z: number
+) {
+    const block = blocks.get(`${x},${y},${z}`);
+    if (block === undefined || block === "minecraft:glass") return true;
+    return (
+        block === "minecraft:fire" &&
+        built.jets.some((jet) => jet.x === x && jet.y === y && jet.z === z)
+    );
+}
+
 /**
  * A walk through the world the boxes build, knowing nothing of the plan: a
- * player stands on a column whose floor is solid and not magma, with two
- * blocks of air (not fire) over it; they step to a side's column, or jump one
- * column of lava onto the one beyond it. Answers whether the middle room is
- * reached from the spawn, and every hazard walked onto.
+ * player stands with their feet in a block whose block under is solid and not
+ * magma, lava or fire, with two passable blocks for them. They step to a side
+ * at the same height, jump a block up when there is head room for the jump,
+ * drop off an edge to whatever is under it, or jump one block of lava. Answers
+ * whether the goal is reached from the spawn.
  */
 function walk(built: maze.Maze, blocks: ReadonlyMap<string, string>): boolean {
-    const floor = built.floor;
-    const at = (x: number, y: number, z: number) => blocks.get(`${x},${y},${z}`);
-    const stands = (x: number, z: number) => {
-        const under = at(x, floor, z);
+    const v = built.volume;
+    const free = (x: number, y: number, z: number) => passable(built, blocks, x, y, z);
+    const footing = (x: number, y: number, z: number) => {
+        const under = blocks.get(`${x},${y - 1},${z}`);
         return (
             under !== undefined &&
             under !== "minecraft:magma_block" &&
             under !== "minecraft:lava" &&
-            (at(x, floor + 1, z) === undefined || at(x, floor + 1, z) === "minecraft:glass") &&
-            (at(x, floor + 2, z) === undefined || at(x, floor + 2, z) === "minecraft:glass")
+            under !== "minecraft:fire" &&
+            under !== "minecraft:glass"
         );
     };
-    const start = [Math.floor(built.spawn.x), Math.floor(built.spawn.z)] as const;
+    const stands = (x: number, y: number, z: number) =>
+        footing(x, y, z) && free(x, y, z) && free(x, y + 1, z);
+    /** Where somebody stepping into a column at `y` ends: down to the first footing. */
+    const land = (x: number, y: number, z: number): number | null => {
+        for (let h = y; h > v.y1; h -= 1) {
+            if (!free(x, h, z) || !free(x, h + 1, z)) return null;
+            if (blocks.get(`${x},${h},${z}`) === "minecraft:fire") return null;
+            if (footing(x, h, z)) return h;
+        }
+        return null;
+    };
+    const start: [number, number, number] = [
+        Math.floor(built.spawn.x),
+        built.floor + 1,
+        Math.floor(built.spawn.z)
+    ];
     const seen = new Set<string>([start.join(",")]);
-    const queue: (readonly [number, number])[] = [start];
+    const queue: [number, number, number][] = [start];
+    const g = built.goal;
     for (let head = 0; head < queue.length; head += 1) {
-        const [x, z] = queue[head]!;
-        if (x >= built.goal.x1 && x <= built.goal.x2 && z >= built.goal.z1 && z <= built.goal.z2)
+        const [x, y, z] = queue[head]!;
+        if (x >= g.x1 && x <= g.x2 && z >= g.z1 && z <= g.z2 && y === built.goalFloor + 1)
             return true;
         for (const [dx, dz] of [
             [1, 0],
@@ -69,20 +103,28 @@ function walk(built: maze.Maze, blocks: ReadonlyMap<string, string>): boolean {
             [0, 1],
             [0, -1]
         ] as const) {
-            // The door is open once the race is on: glass counts as air here.
-            const near = [x + dx, z + dz] as const;
-            const beyond = [x + 2 * dx, z + 2 * dz] as const;
-            const next = stands(...near)
-                ? near
-                : at(...([near[0], floor, near[1]] as [number, number, number])) ===
-                        "minecraft:lava" &&
-                    at(near[0], floor + 1, near[1]) === undefined &&
-                    stands(...beyond)
-                  ? beyond
-                  : null;
-            if (!next || seen.has(next.join(","))) continue;
-            seen.add(next.join(","));
-            queue.push(next);
+            const nx = x + dx;
+            const nz = z + dz;
+            const next: [number, number, number][] = [];
+            if (stands(nx, y, nz)) next.push([nx, y, nz]);
+            else if (free(x, y + 2, z) && stands(nx, y + 1, nz)) next.push([nx, y + 1, nz]);
+            else if (free(nx, y, nz) && free(nx, y + 1, nz)) {
+                const at = land(nx, y, nz);
+                if (at !== null) next.push([nx, at, nz]);
+            }
+            // One block of lava, jumped in a straight line.
+            if (
+                blocks.get(`${nx},${y - 1},${nz}`) === "minecraft:lava" &&
+                free(nx, y, nz) &&
+                free(nx, y + 1, nz) &&
+                stands(x + 2 * dx, y, z + 2 * dz)
+            )
+                next.push([x + 2 * dx, y, z + 2 * dz]);
+            for (const one of next) {
+                if (seen.has(one.join(","))) continue;
+                seen.add(one.join(","));
+                queue.push(one);
+            }
         }
     }
     return false;
@@ -159,13 +201,19 @@ describe("a deadly nether maze", () => {
                         return `${x},${z}`;
                     })
                 );
+                const tops = new Map<string, number>();
+                for (const at of blocks.keys()) {
+                    const [x, y, z] = at.split(",");
+                    tops.set(`${x},${z}`, Math.max(tops.get(`${x},${z}`) ?? -Infinity, Number(y)));
+                }
                 for (const column of columns) {
                     const [x, z] = column.split(",");
-                    expect(blocks.get(`${x},${v.y2},${z}`), column).toMatch(
+                    expect(blocks.get(`${x},${tops.get(column)},${z}`), column).toMatch(
                         /netherrack|glowstone|sea_lantern/
                     );
                     expect(blocks.get(`${x},${Y - 1},${z}`), column).toBe("minecraft:netherrack");
                 }
+                expect(Math.max(...tops.values())).toBe(v.y2);
                 // Lava and fire only ever over netherrack, never beside anything
                 // that burns: everything round them is netherrack, lava, a light
                 // or air in the maze.
@@ -179,13 +227,14 @@ describe("a deadly nether maze", () => {
                 // and white under light too, and the wall round it chequered -
                 // and nowhere else is gold, chequered or lit like that.
                 const g = built.goal;
+                const G = built.goalFloor;
                 const goalBlocks = (g.x2 - g.x1 + 1) * (g.z2 - g.z1 + 1);
                 for (let x = g.x1; x <= g.x2; x += 1)
                     for (let z = g.z1; z <= g.z2; z += 1) {
-                        expect(blocks.get(`${x},${Y},${z}`)).toMatch(/gold_block|black_concrete/);
+                        expect(blocks.get(`${x},${G},${z}`)).toMatch(/gold_block|black_concrete/);
                         expect(blocks.get(`${x},${v.y2},${z}`)).toBe("minecraft:sea_lantern");
                     }
-                const goldAndBlack = [g.x1, g.x1 + 1].map((x) => blocks.get(`${x},${Y},${g.z1}`));
+                const goldAndBlack = [g.x1, g.x1 + 1].map((x) => blocks.get(`${x},${G},${g.z1}`));
                 expect(new Set(goldAndBlack).size).toBe(2);
                 const lanterns = [...blocks.entries()].filter(
                     ([, block]) => block === "minecraft:sea_lantern"
@@ -206,13 +255,13 @@ describe("a deadly nether maze", () => {
                         const inside = x >= g.x1 && x <= g.x2 && z >= g.z1 && z <= g.z2;
                         const corner = (x < g.x1 || x > g.x2) && (z < g.z1 || z > g.z2);
                         if (inside || corner) continue;
-                        if (blocks.has(`${x},${Y + 1},${z}`)) {
+                        if (blocks.has(`${x},${G + 1},${z}`)) {
                             for (let up = 1; up <= maze.HEADROOM; up += 1)
-                                expect(blocks.get(`${x},${Y + up},${z}`)).toMatch(
+                                expect(blocks.get(`${x},${G + up},${z}`)).toMatch(
                                     /black_concrete|white_concrete/
                                 );
                         } else
-                            expect(blocks.get(`${x},${Y},${z}`)).toMatch(
+                            expect(blocks.get(`${x},${G},${z}`)).toMatch(
                                 /black_concrete|white_concrete/
                             );
                     }
@@ -238,14 +287,106 @@ describe("a deadly nether maze", () => {
         expect(gold).toBe((g.x2 - g.x1 + 1) * (g.z2 - g.z1 + 1));
     });
 
+    it("builds a maze of an older design exactly as it was built then", () => {
+        // What a run on design 1 or 2 built before floors and traps came in.
+        const before: Record<string, string> = {
+            "1 small": "c03d11865fe9273f",
+            "1 medium": "150dc3fce4b4952e",
+            "1 large": "3d2c99db2688b507",
+            "2 small": "7cc63ac7a3a1ad8c",
+            "2 medium": "b306d7af9bd8479f",
+            "2 large": "b92ba43eacd3e877"
+        };
+        for (const design of [1, 2])
+            for (const size of SIZES) {
+                const built = maze.maze({ size, hazards: "many" }, "a", SITE, Y, design);
+                const hash = createHash("sha256")
+                    .update(JSON.stringify([built.boxes, built.goal, built.spawn, built.volume]))
+                    .digest("hex")
+                    .slice(0, 16);
+                expect(hash, `${design} ${size}`).toBe(before[`${design} ${size}`]);
+                expect(built.plan.levels).toHaveLength(1);
+                expect(built.jets).toEqual([]);
+                expect(built.landings).toEqual([]);
+            }
+    });
+
+    it("stacks its floors, joined by a stair from a dead end, with the goal on top", () => {
+        for (const size of SIZES)
+            for (let seed = 0; seed < 30; seed += 1) {
+                const built = maze.maze({ size, hazards: "some" }, `f-${seed}`, SITE, Y);
+                const { levels, stairs } = built.plan;
+                expect(levels).toHaveLength(maze.LEVELS[size]);
+                expect(stairs).toHaveLength(levels.length - 1);
+                expect(built.goalFloor).toBe(Y + (levels.length - 1) * maze.LEVEL_PITCH);
+                expect(built.landings).toHaveLength(stairs.length);
+                const blocks = blocksOf(built.boxes);
+                stairs.forEach((stair, index) => {
+                    // Its steps a block higher each, the top level with the next floor.
+                    const base = Y + stair.level * maze.LEVEL_PITCH;
+                    maze.stepsOf(stair).forEach(([x, z], step) => {
+                        const wx = x + built.origin.x;
+                        const wz = z + built.origin.z;
+                        if (step > 0)
+                            expect(blocks.get(`${wx},${base + step},${wz}`)).toBe(
+                                "minecraft:nether_bricks"
+                            );
+                        expect(blocks.get(`${wx},${base + step + 1},${wz}`)).toBeUndefined();
+                        expect(blocks.get(`${wx},${base + step + 2},${wz}`)).toBeUndefined();
+                    });
+                    // The landing is the top of the stair, on the floor over it.
+                    const landing = built.landings[index]!;
+                    expect(landing.y).toBe(base + maze.LEVEL_PITCH + 1);
+                    expect(maze.levelAt(built, landing.y)).toBe(stair.level + 1);
+                });
+            }
+    }, 180_000);
+
+    it("sets traps: jets across doorways and soul sand, never a hazard round a stair", () => {
+        let jets = 0;
+        let soul = 0;
+        for (let seed = 0; seed < 40; seed += 1) {
+            const built = maze.maze({ size: "large", hazards: "many" }, `t-${seed}`, SITE, Y);
+            jets += built.jets.length;
+            soul += built.boxes.filter((box) => box.block === "minecraft:soul_sand").length;
+            const blocks = blocksOf(built.boxes);
+            // A jet's flame is put down with the maze, over netherrack, where
+            // the pack lights it again.
+            for (const jet of built.jets) {
+                expect(blocks.get(`${jet.x},${jet.y},${jet.z}`)).toBe("minecraft:fire");
+                expect(blocks.get(`${jet.x},${jet.y - 1},${jet.z}`)).toBe("minecraft:netherrack");
+            }
+        }
+        expect(jets).toBeGreaterThan(0);
+        expect(soul).toBeGreaterThan(0);
+        // Every rule broken by a hazard in the room a stair comes up into.
+        const plan = maze.plan({ size: "medium", hazards: "some" }, "stairs");
+        const stair = plan.stairs[0]!;
+        const tiles = new Map(plan.levels[1]!.tiles);
+        tiles.set(`${maze.roomStart(stair.cx) + 1},${maze.roomStart(stair.cz) + 1}`, "fire");
+        const levels = [plan.levels[0]!, { ...plan.levels[1]!, tiles }, ...plan.levels.slice(2)];
+        expect(maze.mazeProblems({ ...plan, levels }).join("\n")).toMatch(
+            /by the stairs|by the start/
+        );
+    });
+
     it("can be walked from the starting room to the middle on the blocks it is built of", () => {
         for (const size of SIZES)
             for (const level of HAZARDS)
                 for (let seed = 0; seed < 40; seed += 1) {
-                    const built = maze.maze({ size, hazards: level }, `w-${seed}`, SITE, Y);
-                    expect(walk(built, blocksOf(built.boxes)), `${size} ${level} ${seed}`).toBe(
-                        true
-                    );
+                    for (const design of [2, maze.DESIGN]) {
+                        const built = maze.maze(
+                            { size, hazards: level },
+                            `w-${seed}`,
+                            SITE,
+                            Y,
+                            design
+                        );
+                        expect(
+                            walk(built, blocksOf(built.boxes)),
+                            `${size} ${level} ${seed} ${design}`
+                        ).toBe(true);
+                    }
                 }
     }, 180_000);
 
@@ -261,9 +402,17 @@ describe("a deadly nether maze", () => {
         expect(maze.doorGone(built)).toMatch(/ minecraft:air replace minecraft:glass$/);
         // Progress: nothing in the starting room, all of it in the middle.
         expect(maze.progressAt(built, spots[0]!)).toBeNull();
-        expect(maze.progressAt(built, { x: built.goal.x1 + 1.5, z: built.goal.z1 + 1.5 })).toBe(
-            maze.roomsToGo(built)
-        );
+        expect(
+            maze.progressAt(built, {
+                x: built.goal.x1 + 1.5,
+                y: built.goalFloor + 1,
+                z: built.goal.z1 + 1.5
+            })
+        ).toBe(maze.roomsToGo(built));
+        // The middle of the ground floor is not the goal of a maze of floors.
+        expect(
+            maze.progressAt(built, { x: built.goal.x1 + 1.5, y: Y + 1, z: built.goal.z1 + 1.5 })
+        ).toBeLessThan(maze.roomsToGo(built));
         expect(maze.roomsToGo(built)).toBeGreaterThanOrEqual(3);
     });
 });
@@ -291,6 +440,35 @@ describe("the maze's data pack", () => {
             `tp @s @e[type=minecraft:armor_stand,tag=${maze.START_TAG},limit=1]`
         );
         expect(fn("done")[0]).toContain("time query gametime");
+        // On a floor over the ground one, back to the top of its stair.
+        expect(fn("back")[1]).toBe(
+            `execute if score #py polaris_maze >= #up1 polaris_maze run tp @s @e[type=minecraft:armor_stand,tag=${maze.LANDING_TAG}1,limit=1]`
+        );
+    });
+
+    it("lights the jets on a beat, warns before they light, and only where nothing stands", () => {
+        expect(fn("tick")[1]).toContain(`tag=${maze.JET_TAG}`);
+        const jets = fn("jets").join("\n");
+        expect(jets).toContain("%= #jp polaris_maze");
+        expect(jets).toContain(
+            "matches 0 as @e[type=minecraft:armor_stand,tag=polaris_maze_jet] at @s run setblock ~ ~ ~ minecraft:fire keep"
+        );
+        expect(jets).toContain(`matches ${maze.JET_PERIOD / 2} as`);
+        expect(jets).toContain("particle minecraft:flame");
+    });
+
+    it("hides every racer's name tag and keeps them from pushing, on a team of their own", () => {
+        expect(maze.SCORES_ADDED).toContain(
+            `team modify ${maze.RACERS_TEAM} nametagVisibility never`
+        );
+        expect(maze.SCORES_ADDED).toContain(`team modify ${maze.RACERS_TEAM} collisionRule never`);
+        expect(maze.SCORES_REMOVED).toContain(`team remove ${maze.RACERS_TEAM}`);
+        expect(maze.racerScores("Ana")).toContain(
+            `execute if entity @a[name=Ana,team=] run team join ${maze.RACERS_TEAM} Ana`
+        );
+        expect(maze.leaveTeam("Ana")).toBe(
+            `execute if entity @a[name=Ana,team=${maze.RACERS_TEAM}] run team leave Ana`
+        );
     });
 
     it("is armed for one maze, switch last, and only that maze's end switches it off", () => {
@@ -306,6 +484,29 @@ describe("the maze's data pack", () => {
             `if score #sx1 polaris_maze matches ${one.volume.x1 * 64}`
         );
         expect(maze.stopLines([])).toEqual([]);
+        // Its stands: the start, a landing a floor, a jet a doorway - every
+        // one taken away at the end.
+        const big = maze.maze({ size: "large", hazards: "many" }, "arm-1", SITE, Y);
+        const armed = maze.armLines(big);
+        const summoned = armed.filter((line) => line.includes("summon"));
+        expect(summoned).toHaveLength(1 + big.landings.length + big.jets.length);
+        expect(armed).toContain(
+            `scoreboard players set #up1 polaris_maze ${big.landings[0]!.y * 64 - 16}`
+        );
+        // Two floors: no third to go back to.
+        expect(maze.armLines(one)).toContain("scoreboard players set #up2 polaris_maze 2147483647");
+        expect(armed).toContain(
+            `scoreboard players set #gy1 polaris_maze ${(big.goalFloor + 1) * 64 - 16}`
+        );
+        for (const tag of [
+            maze.START_TAG,
+            maze.JET_TAG,
+            `${maze.LANDING_TAG}1`,
+            `${maze.LANDING_TAG}2`
+        ])
+            expect(maze.stopLines(big.boxes).some((line) => line.endsWith(`tag=${tag}]`))).toBe(
+                true
+            );
         expect(maze.isMaze(one.boxes)).toBe(true);
         expect(maze.isMaze([{ block: "minecraft:packed_ice" }])).toBe(false);
     });
@@ -316,7 +517,9 @@ describe("what a maze says", () => {
         for (const language of ["en", "es"] as const) {
             for (const line of [
                 said.readySubtitle(language),
+                said.readySubtitle(language, 3),
                 said.goSubtitle(language),
+                said.goSubtitle(language, 2),
                 said.bar(3, 9, language),
                 said.burned(language),
                 said.radarOff(language),
