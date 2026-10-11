@@ -359,6 +359,27 @@ describe("a deadly nether maze", () => {
         }
         expect(jets).toBeGreaterThan(0);
         expect(soul).toBeGreaterThan(0);
+        // Soul sand is short of a block: whoever stands on it upstairs is
+        // still on that floor, and measured on it.
+        let upstairs = 0;
+        for (let seed = 0; seed < 40; seed += 1) {
+            const built = maze.maze({ size: "large", hazards: "many" }, `t-${seed}`, SITE, Y);
+            for (const box of built.boxes) {
+                if (box.block !== "minecraft:soul_sand" || box.y1 === Y) continue;
+                const level = (box.y1 - Y) / maze.LEVEL_PITCH;
+                const on = {
+                    x: Math.min(box.x1, box.x2) + 0.5,
+                    y: box.y1 + 0.875,
+                    z: Math.min(box.z1, box.z2) + 0.5
+                };
+                expect(maze.levelAt(built, on.y)).toBe(level);
+                expect(maze.progressAt(built, on)).toBe(
+                    maze.progressAt(built, { ...on, y: box.y1 + 1 })
+                );
+                upstairs += 1;
+            }
+        }
+        expect(upstairs).toBeGreaterThan(0);
         // Every rule broken by a hazard in the room a stair comes up into.
         const plan = maze.plan({ size: "medium", hazards: "some" }, "stairs");
         const stair = plan.stairs[0]!;

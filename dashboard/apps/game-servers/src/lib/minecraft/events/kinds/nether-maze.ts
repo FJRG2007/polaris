@@ -1186,27 +1186,36 @@ export function inStart(built: Maze, at: { x: number; y: number; z: number }): b
  *  from - or the ground floor when the height is not known. */
 export function levelAt(built: Maze, y?: number): number {
     if (y === undefined) return 0;
-    const level = Math.floor((Math.floor(y) - 1 - built.floor) / LEVEL_PITCH);
+    const level = Math.floor((Math.floor(y + 0.5) - 1 - built.floor) / LEVEL_PITCH);
     return Math.min(Math.max(level, 0), built.plan.levels.length - 1);
+}
+
+const routes = new WeakMap<Plan, { far: number[][]; rest: number[] }>();
+
+/** Each floor's rooms to its way up, and the rooms from each floor's way up
+ *  to the goal: a run's plan never changes, so worked out once. */
+function routeOf(made: Plan): { far: number[][]; rest: number[] } {
+    const known = routes.get(made);
+    if (known) return known;
+    const far = made.levels.map((floor) => distances(floor.maze, floor.exit));
+    const rest = new Array<number>(made.levels.length).fill(0);
+    for (let level = made.levels.length - 2; level >= 0; level -= 1) {
+        const floor = made.levels[level + 1]!;
+        const across = far[level + 1]![floor.arrival.cz * made.cells + floor.arrival.cx]!;
+        rest[level] = rest[level + 1]! + 1 + Math.max(0, across);
+    }
+    const route = { far, rest };
+    routes.set(made, route);
+    return route;
 }
 
 /** Rooms still to go from a room of a floor to the goal: to the floor's way
  *  up, a room for each stair, and every floor over it from stair to stair. */
 function toGo(made: Plan, level: number, room: Room): number | null {
-    const cells = made.cells;
-    const here = distances(made.levels[level]!.maze, made.levels[level]!.exit)[
-        room.cz * cells + room.cx
-    ]!;
+    const route = routeOf(made);
+    const here = route.far[level]![room.cz * made.cells + room.cx]!;
     if (here < 0) return null;
-    let rest = 0;
-    for (let above = level + 1; above < made.levels.length; above += 1) {
-        const floor = made.levels[above]!;
-        const across = distances(floor.maze, floor.exit)[
-            floor.arrival.cz * cells + floor.arrival.cx
-        ]!;
-        rest += 1 + Math.max(0, across);
-    }
-    return here + rest;
+    return here + route.rest[level]!;
 }
 
 /**
