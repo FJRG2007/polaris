@@ -218,6 +218,7 @@ export const serverHost = {
     appsInstallDuplicate: {
         copyInstallData: later(load.appsInstallDuplicate, "copyInstallData"),
         createInstallCopy: later(load.appsInstallDuplicate, "createInstallCopy"),
+        discardInstallCopy: later(load.appsInstallDuplicate, "discardInstallCopy"),
         measureInstallData: later(load.appsInstallDuplicate, "measureInstallData"),
         readInstallCopySource: later(load.appsInstallDuplicate, "readInstallCopySource"),
         verifyInstallCopy: later(load.appsInstallDuplicate, "verifyInstallCopy")

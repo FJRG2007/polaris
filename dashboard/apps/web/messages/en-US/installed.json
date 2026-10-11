@@ -41,7 +41,8 @@
         "checkDetails": "Check the details and try again",
         "give": "Could not give access",
         "notAccess": "That is not access on this server",
-        "remove": "Could not remove that access"
+        "remove": "Could not remove that access",
+        "copying": "This server is being copied. It can be started once the copy is done."
     },
     "deployGap": {
         "none": "Redeploy has no downtime: the new version takes over once it answers.",

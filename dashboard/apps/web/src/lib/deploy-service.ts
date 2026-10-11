@@ -84,6 +84,7 @@ import {
 import * as deployReleases from "./deploy/releases";
 import { ROLLBACK_WINDOW, sweepReleaseImagesFor } from "./deploy/release-retention";
 import { forgetVolumeNotice } from "./deploy/volume-watch";
+import { refuseWhileCopying } from "./apps/install-copy-hold";
 import { notifyVolumeHealth } from "./notifications/volume-events";
 import {
     appEdgeConfigSchema,
@@ -2204,6 +2205,7 @@ export async function restartApplication(applicationId: string, ownerId: string)
     // A restart bounces the running container in place - it must NOT rebuild or
     // create a new deployment (which would mislabel a manual restart as a fresh
     // git build and leave the card stuck "deploying").
+    await refuseWhileCopying(applicationId);
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
@@ -2237,6 +2239,7 @@ export async function setApplicationRunning(
     // from the live release's kept image, not a fresh build of today's source;
     // stopping just halts the container while keeping the deployment record.
     if (running) {
+        await refuseWhileCopying(applicationId);
         await restartFromKeptImage(applicationId, ownerId, actorId, "settings", audit);
         await prisma.application.update({
             where: { id: applicationId },
@@ -2278,6 +2281,7 @@ export async function setApplicationAsleep(
     ownerId: string,
     asleep: boolean
 ): Promise<void> {
+    if (!asleep) await refuseWhileCopying(applicationId);
     const { container, target } = await appRuntime(applicationId, ownerId);
     const ports = await getPorts(target, ownerId);
     try {
@@ -3238,6 +3242,7 @@ export async function deployApplication(
      *  release started again with changed variables. */
     rollback?: RollbackSource
 ): Promise<string> {
+    await refuseWhileCopying(applicationId);
     const built = await buildAppPlan(applicationId, ownerId);
     const { plan, target, buildCommands, keepsHistory } = built;
     // A kept image was made from the image the service ran before, so a service

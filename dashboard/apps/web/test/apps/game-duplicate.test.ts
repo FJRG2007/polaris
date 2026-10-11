@@ -222,6 +222,7 @@ describe("how far a copy has got", () => {
     it("turns the copy service's refusals into the failures the list explains", () => {
         expect(plan.failureFor("no-space")).toBe("noSpace");
         expect(plan.failureFor("wrong-volume")).toBe("wrongVolume");
+        expect(plan.failureFor("not-mounted")).toBe("notMounted");
         expect(plan.failureFor("anything-else")).toBe("copyFailed");
     });
 

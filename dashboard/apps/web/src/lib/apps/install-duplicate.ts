@@ -25,6 +25,7 @@ import { prisma } from "@polaris/db";
 import { revealEnvVar, setEnvVars } from "@/lib/env-var-service";
 import { publishAccessChange } from "@/lib/access-live";
 import { createVolume } from "@/lib/deploy-volume-service";
+import { holdWhileCopying } from "@/lib/apps/install-copy-hold";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import type { ComposeSpec, ComposeSpecVolume } from "@polaris/deploy";
 import { currentReleaseRef, serviceRef } from "@/lib/deploy/releases";
@@ -41,7 +42,8 @@ export type InstallCopyRefusalCode =
     | "no-space"
     | "copy-failed"
     | "timed-out"
-    | "wrong-volume";
+    | "wrong-volume"
+    | "not-mounted";
 
 /**
  * A refusal the caller is meant to show. Matched by `name` and `code` rather than
@@ -245,20 +247,41 @@ export async function createInstallCopy(
         await copyGrants(install.id, input.installedAppId, actorId);
         await copyProtection(ownerId, install.id, input.installedAppId, input.name);
     } catch (error) {
-        await prisma.installedApp.deleteMany({ where: { id: input.installedAppId } }).catch(() => undefined);
-        await prisma.resourceGrant
-            .deleteMany({ where: { resourceKind: "install", resourceId: input.installedAppId } })
-            .catch(() => undefined);
-        await prisma.protectedResource
-            .deleteMany({ where: { ownerId, selector: { endsWith: `:${input.installedAppId}` } } })
-            .catch(() => undefined);
-        await deleteApplication(application.id, ownerId).catch(() => undefined);
+        await discardCopy(ownerId, input.installedAppId, application.id);
         throw error;
     }
 
     invalidateInstallPresence(install.catalogId);
     publishAccessChange();
     return { installedAppId: input.installedAppId, applicationId: application.id };
+}
+
+/**
+ * Take back a copy that was created but never filled - its records, grants,
+ * backup protection and service - for a caller whose own part of making it
+ * failed after `createInstallCopy` answered. Owner-checked; anything else is
+ * left alone.
+ */
+export async function discardInstallCopy(ownerId: string, installedAppId: string): Promise<void> {
+    const install = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, ownerId },
+        select: { catalogId: true, applicationId: true }
+    });
+    if (!install) return;
+    await discardCopy(ownerId, installedAppId, install.applicationId);
+    invalidateInstallPresence(install.catalogId);
+    publishAccessChange();
+}
+
+async function discardCopy(ownerId: string, installedAppId: string, applicationId: string | null): Promise<void> {
+    await prisma.installedApp.deleteMany({ where: { id: installedAppId } }).catch(() => undefined);
+    await prisma.resourceGrant
+        .deleteMany({ where: { resourceKind: "install", resourceId: installedAppId } })
+        .catch(() => undefined);
+    await prisma.protectedResource
+        .deleteMany({ where: { ownerId, selector: { endsWith: `:${installedAppId}` } } })
+        .catch(() => undefined);
+    if (applicationId) await deleteApplication(applicationId, ownerId).catch(() => undefined);
 }
 
 /** The source's image and settings, published on the copy's own ports. */
@@ -340,17 +363,39 @@ export interface InstallDataFigures {
     readonly fits: boolean;
 }
 
+/** How long a measure stands, so opening the dialog and pressing Duplicate walk
+ *  the world once rather than twice. */
+const MEASURE_KEEP_MS = 2 * 60_000;
+/** How long the walk may take inside a server that is being played on. */
+const MEASURE_LIMIT_S = 30;
+
+const measured = new Map<string, { at: number; figures: Promise<InstallDataFigures | null> }>();
+
 /**
  * How much the install's files take, and how much room its machine has left -
  * asked through the running container, before anything is created, so a copy
  * that cannot fit is refused while nothing has happened yet. Null where it cannot
- * be asked (stopped, or an image with no `du`); the copy itself checks again, and
- * that check is the one that holds.
+ * be asked (stopped, an image with no `du`, or a world too large to walk in the
+ * time allowed); the copy itself checks again, and that check is the one that
+ * holds.
  */
 export async function measureInstallData(
     ownerId: string,
     installedAppId: string
 ): Promise<InstallDataFigures | null> {
+    const key = `${ownerId}:${installedAppId}`;
+    const now = Date.now();
+    for (const [entry, kept] of measured) if (now - kept.at > MEASURE_KEEP_MS) measured.delete(entry);
+    const kept = measured.get(key);
+    if (kept) return kept.figures;
+    const figures = measureNow(ownerId, installedAppId);
+    measured.set(key, { at: now, figures });
+    const settled = await figures;
+    if (!settled) measured.delete(key);
+    return settled;
+}
+
+async function measureNow(ownerId: string, installedAppId: string): Promise<InstallDataFigures | null> {
     const app = await installApplication(ownerId, installedAppId).catch(() => null);
     if (!app?.currentDeploymentId || app.volumes.length === 0) return null;
     const ports = await getPorts(app.target as TargetRow, ownerId);
@@ -361,10 +406,11 @@ export async function measureInstallData(
         let used = 0;
         let free = Number.POSITIVE_INFINITY;
         for (const volume of app.volumes) {
+            const path = shellPath(volume.mountPath);
             const said = await ports.runIn(container, [
                 "sh",
                 "-c",
-                `du -sk ${shellPath(volume.mountPath)} | awk '{print $1}'; df -Pk ${shellPath(volume.mountPath)} | awk 'NR==2 {print $4}'`
+                `if command -v timeout >/dev/null 2>&1; then limit="timeout ${MEASURE_LIMIT_S}"; else limit=""; fi; u=$($limit du -sk ${path} | awk '{print $1}'); f=$(df -Pk ${path} | awk 'NR==2 {print $4}'); [ -n "$u" ] && [ -n "$f" ] && echo "$u $f"`
             ]);
             const [usedKb, freeKb] = said.output.trim().split(/\s+/).map(Number);
             if (said.code !== 0 || !Number.isFinite(usedKb) || !Number.isFinite(freeKb)) return null;
@@ -458,7 +504,16 @@ export async function copyInstallData(
     const copy = await installApplication(ownerId, copyInstalledAppId);
     if (!source.currentDeploymentId) throw new InstallCopyRefusal("never-deployed");
     if (source.targetId !== copy.targetId) throw new InstallCopyRefusal("copy-failed");
+    await holdWhileCopying([source.id, copy.id], () => copyVolumes(ownerId, source, copy, onProgress));
+}
 
+/** The copy itself, with both services held so nothing starts either meanwhile. */
+async function copyVolumes(
+    ownerId: string,
+    source: InstallApplication,
+    copy: InstallApplication,
+    onProgress: (progress: InstallCopyProgress) => Promise<void> | void
+): Promise<void> {
     const ports = await getPorts(source.target as TargetRow, ownerId);
     try {
         const container = (await currentReleaseRef(source)).name;
@@ -543,7 +598,7 @@ function mountedSource(volume: VolumeRow, inspect: unknown): ComposeSpecVolume {
     // Read off the container rather than derived: a service that changed over
     // between releases mounts its volume under the project that first made it.
     const name = volumeAt(inspect, volume.mountPath);
-    if (!name) throw new InstallCopyRefusal("never-deployed");
+    if (!name) throw new InstallCopyRefusal("not-mounted");
     return { kind: "volume", source: name, target: "" };
 }
 
@@ -626,6 +681,8 @@ export async function verifyInstallCopy(ownerId: string, copyInstalledAppId: str
         await ports.dispose();
     }
 }
+
+type InstallApplication = Awaited<ReturnType<typeof installApplication>>;
 
 /** An install's service, with what reaching its container takes. Owner-checked. */
 async function installApplication(ownerId: string, installedAppId: string) {

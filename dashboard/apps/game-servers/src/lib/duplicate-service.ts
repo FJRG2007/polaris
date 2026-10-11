@@ -47,6 +47,9 @@ const duplicates = host.appsInstallDuplicate;
 /** How often progress is written while bytes move. */
 const PROGRESS_EVERY_MS = 3_000;
 
+/** Sources a copy is being started or retried from in this process right now. */
+const claiming = new Set<string>();
+
 /** A published port of the source, as its service config records it. */
 interface PublishedPort {
     readonly host: number;
@@ -67,7 +70,15 @@ export async function startDuplicate(
     const parsed = plan.duplicateServerSchema.safeParse(raw);
     if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? gameMessage("games", "duplicate.nameRequired"));
     const { installedAppId: sourceId, name } = parsed.data;
+    return claimSource(sourceId, () => recordDuplicate(ownerId, actorId, sourceId, name));
+}
 
+async function recordDuplicate(
+    ownerId: string,
+    actorId: string,
+    sourceId: string,
+    name: string
+): Promise<{ installedAppId: string }> {
     const source = await duplicates.readInstallCopySource(ownerId, sourceId).catch(() => null);
     if (!source || !gameServerCatalogIds().includes(source.catalogId))
         throw new Error(gameMessage("games", "lib.noSuchServer"));
@@ -135,7 +146,14 @@ export async function startDuplicate(
             throw new Error(gameMessage("games", "duplicate.nameTaken", { name }));
         throw error;
     }
-    await copyGameRows(sourceId, copyId, substitutions);
+    try {
+        await copyGameRows(sourceId, copyId, substitutions);
+    } catch (error) {
+        await duplicates.discardInstallCopy(ownerId, copyId).catch((discardError: unknown) =>
+            console.error(`games: duplicate ${copyId} could not be taken back:`, discardError)
+        );
+        throw error;
+    }
     return { installedAppId: copyId };
 }
 
@@ -145,6 +163,13 @@ export async function startDuplicate(
  * show, and the source is started again whatever happened to the copy.
  */
 export async function runDuplicate(ownerId: string, actorId: string | null, copyId: string): Promise<void> {
+    await copyThrough(ownerId, actorId, copyId).catch(async (error: unknown) => {
+        console.error(`games: duplicate ${copyId} failed:`, error);
+        await markFailed(copyId, "copyFailed").catch(() => undefined);
+    });
+}
+
+async function copyThrough(ownerId: string, actorId: string | null, copyId: string): Promise<void> {
     const copy = await prisma.installedApp.findFirst({
         where: { id: copyId, ownerId, status: { not: "removed" } },
         select: { applicationId: true, catalogId: true, config: true, name: true }
@@ -169,12 +194,12 @@ export async function runDuplicate(ownerId: string, actorId: string | null, copy
         return;
     }
     const sourceApplicationId = source.applicationId;
-    // Read now, not when the copy was asked for: a retry comes after the source
-    // was started again or switched off, and only what it is doing now says
-    // whether it has to be stopped and brought back.
-    await write({ sourceWasRunning: await desiredRunning(sourceApplicationId) });
 
     try {
+        // Read now, not when the copy was asked for: a retry comes after the source
+        // was started again or switched off, and only what it is doing now says
+        // whether it has to be stopped and brought back.
+        await write({ sourceWasRunning: await desiredRunning(sourceApplicationId) });
         await write({ stage: "stopping" });
         if (state.sourceWasRunning && (await desiredRunning(sourceApplicationId))) {
             // Written out first: a stop that is not graceful is killed, and a
@@ -249,10 +274,7 @@ export async function recoverInterruptedCopies(): Promise<number> {
     for (const row of rows) {
         const state = plan.readDuplicateState(readInstallConfig(row.config));
         if (!state || state.stage === "failed") continue;
-        await patchInstallConfig(row.id, {
-            [plan.DUPLICATE_KEY]: { ...state, stage: "failed", failure: "interrupted" satisfies DuplicateFailure }
-        }).catch(() => undefined);
-        await prisma.installedApp.update({ where: { id: row.id }, data: { status: "failed" } }).catch(() => undefined);
+        await markFailed(row.id, "interrupted", state);
         if (state.sourceWasRunning) {
             const source = await prisma.installedApp.findFirst({
                 where: { id: state.from, ownerId: row.ownerId },
@@ -266,16 +288,56 @@ export async function recoverInterruptedCopies(): Promise<number> {
     return recovered;
 }
 
-/** Whether a copy that failed can be tried again: it is a copy, and it failed. */
-export async function retryableCopy(ownerId: string, copyId: string): Promise<boolean> {
+/**
+ * Take a copy that failed for one more try, if it is one: it is a copy, it
+ * failed, and nothing has taken it since. The claim is the switch from failed to
+ * installing, so of two presses only one wins and only one copy runs.
+ */
+export async function claimRetry(ownerId: string, copyId: string): Promise<boolean> {
     const row = await prisma.installedApp.findFirst({
         where: { id: copyId, ownerId, status: { not: "removed" } },
         select: { config: true }
     });
     const state = plan.readDuplicateState(readInstallConfig(row?.config));
     if (state?.stage !== "failed") return false;
-    // Its source may be held by another copy started since this one failed.
-    return !(await heldByCopies()).has(state.from);
+    return claimSource(state.from, async () => {
+        // Its source may be held by another copy started since this one failed.
+        if ((await heldByCopies()).has(state.from)) return false;
+        const claimed = await prisma.installedApp.updateMany({
+            where: { id: copyId, ownerId, status: "failed" },
+            data: { status: "installing" }
+        });
+        if (claimed.count !== 1) return false;
+        await patchInstallConfig(copyId, {
+            [plan.DUPLICATE_KEY]: { ...state, stage: "preparing", failure: null } satisfies DuplicateState
+        });
+        return true;
+    });
+}
+
+/** Run `work` as the only start or retry of a copy of this source in flight. */
+async function claimSource<T>(sourceId: string, work: () => Promise<T>): Promise<T> {
+    if (claiming.has(sourceId)) throw new Error(gameMessage("games", "duplicate.alreadyCopying"));
+    claiming.add(sourceId);
+    try {
+        return await work();
+    } finally {
+        claiming.delete(sourceId);
+    }
+}
+
+/** Write a copy as failed from outside its run, from what its config says. */
+async function markFailed(copyId: string, failure: DuplicateFailure, known?: DuplicateState): Promise<void> {
+    const row = known
+        ? null
+        : await prisma.installedApp.findUnique({ where: { id: copyId }, select: { config: true } });
+    const state = known ?? plan.readDuplicateState(readInstallConfig(row?.config));
+    if (state) {
+        await patchInstallConfig(copyId, {
+            [plan.DUPLICATE_KEY]: { ...state, stage: "failed", failure } satisfies DuplicateState
+        }).catch(() => undefined);
+    }
+    await prisma.installedApp.update({ where: { id: copyId }, data: { status: "failed" } }).catch(() => undefined);
 }
 
 async function fail(

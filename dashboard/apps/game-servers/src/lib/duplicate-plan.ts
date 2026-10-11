@@ -207,7 +207,8 @@ export const DUPLICATE_FAILURES = [
     "wrongVolume",
     "startFailed",
     "interrupted",
-    "neverDeployed"
+    "neverDeployed",
+    "notMounted"
 ] as const;
 export type DuplicateFailure = (typeof DUPLICATE_FAILURES)[number];
 
@@ -276,6 +277,8 @@ export function failureFor(code: string): DuplicateFailure {
             return "wrongVolume";
         case "never-deployed":
             return "neverDeployed";
+        case "not-mounted":
+            return "notMounted";
         default:
             return "copyFailed";
     }

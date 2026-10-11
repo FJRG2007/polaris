@@ -573,7 +573,7 @@ export async function duplicateGameServerAction(
 export async function retryDuplicateAction(copyId: string): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireDuplicate(copyId);
-        if (!(await duplicateService.retryableCopy(access.ownerId, copyId)))
+        if (!(await duplicateService.claimRetry(access.ownerId, copyId)))
             throw new Error((await gameWords("games"))("duplicate.nothingToRetry"));
         after(() => duplicateService.runDuplicate(access.ownerId, user.id, copyId));
         revalidatePath("/apps/games");

@@ -1264,7 +1264,8 @@
             "wrongVolume": "The copy started on empty storage instead of the copied files. Delete this copy and duplicate again.",
             "startFailed": "The files were copied but the server didn't start. Open it to see its log, or try again.",
             "interrupted": "Polaris restarted during the copy. {name} was started again. Try again, or delete this copy.",
-            "neverDeployed": "This server has never started, so it has no files to copy. Start it once first."
+            "neverDeployed": "This server has never started, so it has no files to copy. Start it once first.",
+            "notMounted": "{name} isn't using its storage yet. Redeploy it once, then try again."
         }
     }
 }

@@ -41,7 +41,8 @@
         "checkDetails": "Revisa los datos y vuelve a intentarlo",
         "give": "No se ha podido dar acceso",
         "notAccess": "Eso no es un acceso de este servidor",
-        "remove": "No se ha podido quitar ese acceso"
+        "remove": "No se ha podido quitar ese acceso",
+        "copying": "Este servidor se está copiando. Podrás arrancarlo cuando termine la copia."
     },
     "deployGap": {
         "none": "Redesplegar no corta el servicio: la versión nueva entra cuando responde.",

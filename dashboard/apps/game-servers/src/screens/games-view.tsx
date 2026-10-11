@@ -1027,7 +1027,7 @@ function ServerRow({
                     <ContextMenuItem disabled>
                         <CopyPlus className="size-4" /> {t("duplicate.duplicate")}
                         <span className="ml-auto min-w-0 max-w-48 truncate pl-3 text-xs">
-                            {server.copy ? t("duplicate.stillCopying") : duplicateReason}
+                            {server.copy && !failedCopy ? t("duplicate.stillCopying") : duplicateReason}
                         </span>
                     </ContextMenuItem>
                 )}

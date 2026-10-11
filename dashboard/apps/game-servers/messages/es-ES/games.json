@@ -1264,7 +1264,8 @@
             "wrongVolume": "La copia arrancó con un almacenamiento vacío en lugar de los archivos copiados. Borra esta copia y vuelve a duplicar.",
             "startFailed": "Los archivos se copiaron pero el servidor no arrancó. Ábrelo para ver su registro o inténtalo de nuevo.",
             "interrupted": "Polaris se reinició durante la copia. {name} se volvió a arrancar. Inténtalo de nuevo o borra esta copia.",
-            "neverDeployed": "Este servidor nunca ha arrancado, así que no tiene archivos que copiar. Arráncalo una vez primero."
+            "neverDeployed": "Este servidor nunca ha arrancado, así que no tiene archivos que copiar. Arráncalo una vez primero.",
+            "notMounted": "{name} aún no usa su almacenamiento. Vuelve a desplegarlo una vez e inténtalo de nuevo."
         }
     }
 }
