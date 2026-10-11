@@ -15,7 +15,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clearCrashLoop } from "../../lib/games-health";
-import { loaderReleasedBy } from "../../lib/minecraft/loader-pin";
+import { VERSION_SHAPE, loaderReleasedBy } from "../../lib/minecraft/loader-pin";
 import { isModListKey } from "../../lib/minecraft/mods-restart";
 import { markModsChanged } from "../../lib/minecraft/mods-restart-service";
 import {
@@ -2201,7 +2201,7 @@ const loaderChoiceSchema = z.object({
     version: z
         .string()
         .trim()
-        .regex(/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/)
+        .regex(VERSION_SHAPE)
 });
 
 /**

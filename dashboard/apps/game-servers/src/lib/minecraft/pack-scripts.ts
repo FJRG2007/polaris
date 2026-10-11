@@ -17,6 +17,8 @@
  * Pure: it only builds the text.
  */
 
+import { neoforgePrefix } from "./loader-versions";
+
 /** The file the installers keep beside the jars, naming what they put there. */
 export const PACK_RECORD = ".polaris-pack.txt";
 
@@ -116,13 +118,6 @@ const CLIENT_LOADERS: Readonly<Record<string, { family: string; name: string }>>
 /** A release named exactly, which is all a version folder can be matched on. */
 const RELEASE = /^\d+(?:\.\d+){1,2}$/;
 
-/** NeoForge's number for a release (1.21.4 is 21.4, 26.3 is 26.3.0). */
-function neoforgeNumber(minecraft: string): string {
-    const parts = minecraft.split(".");
-    if (parts[0] === "1") return `${parts[1]}.${parts[2] ?? "0"}.`;
-    return `${[...parts, "0", "0"].slice(0, 3).join(".")}.`;
-}
-
 /** The folder name under `versions` each loader's installer creates, as a glob. */
 function versionGlobOf(family: string, minecraft: string): string {
     const release = RELEASE.test(minecraft) ? minecraft : "";
@@ -133,8 +128,10 @@ function versionGlobOf(family: string, minecraft: string): string {
             return release ? `quilt-loader-*-${release}` : "quilt-loader-*";
         case "forge":
             return release ? `${release}-forge-*` : "*-forge-*";
-        default:
-            return release ? `neoforge-${neoforgeNumber(release)}*` : "neoforge-*";
+        default: {
+            const prefix = release ? neoforgePrefix(release) : null;
+            return prefix ? `neoforge-${prefix}*` : "neoforge-*";
+        }
     }
 }
 
@@ -211,24 +208,6 @@ mkdir -p "$dir" || die "could not make $dir"
 record="$dir/${PACK_RECORD}"
 tmp=$(mktemp -d) || die "could not make a temporary folder"
 trap 'rm -rf "$tmp"' EXIT
-
-# A pack an earlier run installed into the shared mods folder, where every
-# server's mods ended up together. Moved aside, not deleted, and only the jars
-# that run recorded as its own.
-shared="$root/mods"
-if [ "$own" = "1" ] && [ -f "$shared/${PACK_RECORD}" ]; then
-    away="$root/${SET_ASIDE}"
-    moved=0
-    while IFS= read -r old; do
-        case "$old" in ""|*/*) continue ;; esac
-        if [ -f "$shared/$old" ]; then
-            mkdir -p "$away" || die "could not make $away"
-            mv "$shared/$old" "$away/$old" && moved=$((moved + 1))
-        fi
-    done < "$shared/${PACK_RECORD}"
-    rm -f "$shared/${PACK_RECORD}"
-    say "polaris: moved $moved mods an earlier run put in $shared to $away"
-fi
 
 curl -fsSL "$manifest" -o "$tmp/pack.tsv" || die "could not reach Polaris for the mod list"
 [ -s "$tmp/pack.tsv" ] || die "the mod list came back empty"
@@ -340,6 +319,34 @@ else
     cp "$tmp/wanted" "$record"
 fi
 
+# A pack an earlier run installed into the shared mods folder, where every
+# server's mods ended up together. Moved aside, not deleted, only the jars that
+# run recorded as its own, and only once this server's own folder is in place.
+# A jar that could not be moved stays on that record for the next run.
+shared="$root/mods"
+if [ "$own" = "1" ] && [ -f "$shared/${PACK_RECORD}" ]; then
+    away="$root/${SET_ASIDE}"
+    moved=0
+    : > "$tmp/left"
+    while IFS= read -r old; do
+        case "$old" in ""|*/*) continue ;; esac
+        if [ -f "$shared/$old" ]; then
+            if mkdir -p "$away" && mv "$shared/$old" "$away/$old"; then
+                moved=$((moved + 1))
+            else
+                printf '%s\\n' "$old" >> "$tmp/left"
+            fi
+        fi
+    done < "$shared/${PACK_RECORD}"
+    if [ -s "$tmp/left" ]; then
+        cp "$tmp/left" "$shared/${PACK_RECORD}"
+        say "polaris: moved $moved mods an earlier run put in $shared to $away; the rest are still there"
+    else
+        rm -f "$shared/${PACK_RECORD}"
+        say "polaris: moved $moved mods an earlier run put in $shared to $away"
+    fi
+fi
+
 # The launcher profile that plays from this server's folder. Written with a
 # JSON tool the system already has - JavaScript for Automation on a Mac,
 # Python elsewhere - and left to the player to add by hand without one.
@@ -431,27 +438,6 @@ $own = $false
 if (-not $dir) { $dir = Join-Path $game "mods"; $own = $true }
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $record = Join-Path $dir "${PACK_RECORD}"
-
-# A pack an earlier run installed into the shared mods folder, where every
-# server's mods ended up together. Moved aside, not deleted, and only the jars
-# that run recorded as its own.
-$shared = Join-Path $root "mods"
-$sharedRecord = Join-Path $shared "${PACK_RECORD}"
-if ($own -and (Test-Path -LiteralPath $sharedRecord)) {
-    $away = Join-Path $root "${SET_ASIDE}"
-    $moved = 0
-    foreach ($old in (Get-Content -LiteralPath $sharedRecord)) {
-        if (-not $old -or $old.Contains("/") -or $old.Contains("\\")) { continue }
-        $source = Join-Path $shared $old
-        if (Test-Path -LiteralPath $source -PathType Leaf) {
-            New-Item -ItemType Directory -Force -Path $away | Out-Null
-            Move-Item -LiteralPath $source -Destination (Join-Path $away $old) -Force
-            $moved++
-        }
-    }
-    Remove-Item -LiteralPath $sharedRecord -Force
-    Write-Host "polaris: moved $moved mods an earlier run put in $shared to $away"
-}
 
 try { $list = (Invoke-WebRequest -UseBasicParsing -Uri $manifest).Content }
 catch { throw "polaris: could not reach Polaris for the mod list" }
@@ -560,9 +546,44 @@ if ($partial -and (Test-Path -LiteralPath $record)) {
 }
 Set-Content -LiteralPath $record -Value $keep -Encoding utf8
 
+# A pack an earlier run installed into the shared mods folder, where every
+# server's mods ended up together. Moved aside, not deleted, only the jars that
+# run recorded as its own, and only once this server's own folder is in place.
+# A jar that could not be moved stays on that record for the next run.
+$shared = Join-Path $root "mods"
+$sharedRecord = Join-Path $shared "${PACK_RECORD}"
+if ($own -and (Test-Path -LiteralPath $sharedRecord)) {
+    $away = Join-Path $root "${SET_ASIDE}"
+    $moved = 0
+    $left = New-Object System.Collections.Generic.List[string]
+    foreach ($old in (Get-Content -LiteralPath $sharedRecord)) {
+        if (-not $old -or $old.Contains("/") -or $old.Contains("\\")) { continue }
+        $source = Join-Path $shared $old
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            try {
+                New-Item -ItemType Directory -Force -Path $away | Out-Null
+                Move-Item -LiteralPath $source -Destination (Join-Path $away $old) -Force
+                $moved++
+            } catch {
+                $left.Add($old) | Out-Null
+            }
+        }
+    }
+    if ($left.Count -gt 0) {
+        Set-Content -LiteralPath $sharedRecord -Value $left -Encoding utf8
+        Write-Host "polaris: moved $moved mods an earlier run put in $shared to $away; the rest are still there"
+    } else {
+        Remove-Item -LiteralPath $sharedRecord -Force
+        Write-Host "polaris: moved $moved mods an earlier run put in $shared to $away"
+    }
+}
+
 # The launcher profile that plays from this server's folder.
 if ($own) {
-    $profiles = Join-Path $root "launcher_profiles.json"
+    $profiles = @(
+        (Join-Path $root "launcher_profiles.json"),
+        (Join-Path $root "launcher_profiles_microsoft_store.json")
+    ) | Where-Object { Test-Path -LiteralPath $_ }
     $pattern = "${profile.versionGlob ?? ""}"
     $name = "${scriptName(server)} (Polaris)"
     $version = $null
@@ -575,33 +596,41 @@ if ($own) {
         Write-Host "polaris: point a launcher profile's game directory at $game to play with these mods"
     } elseif (-not $version) {
         Write-Host "polaris: install ${loaderAdvice(profile)} first, then run this line again to add the profile $name"
-    } elseif (-not (Test-Path -LiteralPath $profiles)) {
+    } elseif (-not $profiles) {
         Write-Host "polaris: open the Minecraft Launcher once, then run this line again to add the profile $name"
     } else {
-        try {
-            $data = [System.IO.File]::ReadAllText($profiles) | ConvertFrom-Json
-            if (-not ($data.PSObject.Properties.Name -contains "profiles") -or $null -eq $data.profiles) {
-                $data | Add-Member -NotePropertyName "profiles" -NotePropertyValue ([pscustomobject]@{}) -Force
+        $wrote = 0
+        foreach ($file in $profiles) {
+            try {
+                $data = [System.IO.File]::ReadAllText($file) | ConvertFrom-Json
+                if (-not ($data.PSObject.Properties.Name -contains "profiles") -or $null -eq $data.profiles) {
+                    $data | Add-Member -NotePropertyName "profiles" -NotePropertyValue ([pscustomobject]@{}) -Force
+                }
+                $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                $created = $now
+                $existing = $data.profiles.PSObject.Properties["${profile.key}"]
+                if ($existing -and $existing.Value.created) { $created = $existing.Value.created }
+                $entry = [pscustomobject]@{
+                    name = $name
+                    type = "custom"
+                    created = $created
+                    lastUsed = $now
+                    lastVersionId = $version
+                    gameDir = $game
+                }
+                $data.profiles | Add-Member -NotePropertyName "${profile.key}" -NotePropertyValue $entry -Force
+                $json = $data | ConvertTo-Json -Depth 32
+                $temp = "$file.polaris"
+                [System.IO.File]::WriteAllText($temp, $json, (New-Object System.Text.UTF8Encoding $false))
+                Move-Item -LiteralPath $temp -Destination $file -Force
+                $wrote++
+            } catch {
+                Write-Host "polaris: could not add the profile to $file"
             }
-            $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-            $created = $now
-            $existing = $data.profiles.PSObject.Properties["${profile.key}"]
-            if ($existing -and $existing.Value.created) { $created = $existing.Value.created }
-            $entry = [pscustomobject]@{
-                name = $name
-                type = "custom"
-                created = $created
-                lastUsed = $now
-                lastVersionId = $version
-                gameDir = $game
-            }
-            $data.profiles | Add-Member -NotePropertyName "${profile.key}" -NotePropertyValue $entry -Force
-            $json = $data | ConvertTo-Json -Depth 32
-            $temp = "$profiles.polaris"
-            [System.IO.File]::WriteAllText($temp, $json, (New-Object System.Text.UTF8Encoding $false))
-            Move-Item -LiteralPath $temp -Destination $profiles -Force
+        }
+        if ($wrote -gt 0) {
             Write-Host "polaris: the profile $name plays $version with only this server's mods - restart the Minecraft Launcher to see it"
-        } catch {
+        } else {
             Write-Host "polaris: could not add the profile; make one with the game directory $game and $version"
         }
     }

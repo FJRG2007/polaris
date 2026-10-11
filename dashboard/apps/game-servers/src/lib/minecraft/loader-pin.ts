@@ -65,7 +65,7 @@ type EnvReader = (key: string) => string;
 /** A version string as it may go into a variable: what the loaders publish, and
  *  nothing a shell or a control character could make more of. The manifest is a
  *  file inside the container, so it is not trusted to be what it claims. */
-const VERSION_SHAPE = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/;
+export const VERSION_SHAPE = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/;
 
 function versionIn(value: unknown): string | null {
     return typeof value === "string" && VERSION_SHAPE.test(value) ? value : null;

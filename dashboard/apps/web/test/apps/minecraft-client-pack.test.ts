@@ -391,9 +391,20 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         writeFileSync(join(shared, "beta-2.0.jar"), JARS["beta-2.0.jar"] ?? "", "utf8");
         writeFileSync(join(shared, "their-own-minimap.jar"), "not ours", "utf8");
         writeFileSync(launcher, JSON.stringify(before), "utf8");
+        const store = join(root, "launcher_profiles_microsoft_store.json");
+        if (kind === "ps1") writeFileSync(store, JSON.stringify(before), "utf8");
         missing = [];
-        list = ["alpha-1.0.jar"];
         try {
+            // A run that never got the list leaves the earlier pack where it was,
+            // still recorded as that pack's.
+            list = [];
+            const failed = await run(kind, "", profile);
+            expect(failed.code, failed.output).not.toBe(0);
+            expect(readdirSync(shared).sort()).toEqual(
+                [PACK_RECORD, "beta-2.0.jar", "their-own-minimap.jar"].sort()
+            );
+
+            list = ["alpha-1.0.jar"];
             // No Fabric for that release yet: the mods are in place and the
             // player is told what to install, and the launcher is not touched.
             const first = await run(kind, "", profile);
@@ -426,6 +437,11 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
             expect(entry?.type).toBe("custom");
             expect(entry?.lastVersionId).toBe(version);
             expect(resolve(entry?.gameDir ?? "")).toBe(resolve(game));
+            if (kind === "ps1") {
+                const fromStore = JSON.parse(readFileSync(store, "utf8")) as typeof written;
+                expect(fromStore.profiles.theirs).toEqual(before.profiles.theirs);
+                expect(fromStore.profiles[key]?.lastVersionId).toBe(version);
+            }
 
             // Once more: the same profile, not a second one, and nothing left to
             // move out of the shared folder.

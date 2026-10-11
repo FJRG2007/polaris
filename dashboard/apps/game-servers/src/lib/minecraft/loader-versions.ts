@@ -19,7 +19,7 @@
 
 import { z } from "zod";
 import { fresh } from "../fresh";
-import type { PinnableType } from "./loader-pin";
+import { VERSION_SHAPE, type PinnableType } from "./loader-pin";
 
 /** Where each repository answers. */
 const SOURCES: Record<PinnableType, (minecraft: string) => string> = {
@@ -31,9 +31,6 @@ const SOURCES: Record<PinnableType, (minecraft: string) => string> = {
         "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge",
     FORGE: () => "https://files.minecraftforge.net/net/minecraftforge/forge/maven-metadata.json"
 };
-
-/** The same shape the pin accepts: a version that can go into a variable as-is. */
-const VERSION_SHAPE = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/;
 
 /** More than any loader has published for one release; a bound on a stranger's
  *  answer rather than a limit anybody meets. */
