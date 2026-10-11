@@ -33,7 +33,8 @@ export function MinecraftSeasonal({
 }) {
     const t = useGameText("minecraft");
     const language = figureLanguage(hostUi.i18nProvider.useLocale());
-    const times = (count: number) => t("seasonal.times", { count: formatPlain(count, language, 2) });
+    const times = (count: number) =>
+        t("seasonal.times", { count: formatPlain(count, language, 2) });
     const [view, setView] = useState<SeasonalView | null>(null);
     const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
