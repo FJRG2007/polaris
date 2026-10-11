@@ -64,7 +64,8 @@ export const EVENT_KINDS = [
     "elytra-race",
     "downhill-race",
     "impostor",
-    "glass-bridge"
+    "glass-bridge",
+    "tug-of-war"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -936,6 +937,17 @@ export const optionsSchemas = {
             .default(30),
         /** Whether everybody is told if whoever was voted out was an impostor. */
         confirmEjects: z.boolean().default(true)
+    }),
+    "tug-of-war": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Blocks from the center to each team's line: how far the marker has
+         *  to be pulled to win. */
+        ropeLength: z
+            .number()
+            .int()
+            .min(6, problem("atLeast", { count: 6 }))
+            .max(16, problem("atMost", { count: 16 }))
+            .default(10)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -1086,6 +1098,10 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("glass-bridge"),
             options: optionsSchemas["glass-bridge"]
+        }),
+        presetBase.extend({
+            kind: z.literal("tug-of-war"),
+            options: optionsSchemas["tug-of-war"]
         })
     ])
     .superRefine((value, context) => {
@@ -1169,7 +1185,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 12;
+export const DEFAULTS_VERSION = 13;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1213,7 +1229,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "elytra-race": 6,
     "downhill-race": 7,
     impostor: 11,
-    "glass-bridge": 12
+    "glass-bridge": 12,
+    "tug-of-war": 13
 };
 
 export const settingsSchema = z.object({
@@ -1314,7 +1331,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "elytra-race": { en: "Elytra race", es: "Carrera aérea" },
     "downhill-race": { en: "Downhill boat race", es: "Descenso en barca" },
     impostor: { en: "Impostor", es: "Impostor" },
-    "glass-bridge": { en: "Glass bridge", es: "Puente frágil" }
+    "glass-bridge": { en: "Glass bridge", es: "Puente frágil" },
+    "tug-of-war": { en: "Tug of war", es: "Tira y afloja" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1470,6 +1488,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "glass-bridge": {
         unit: "jumps",
         competitive: true
+    },
+    "tug-of-war": {
+        unit: "points",
+        competitive: true
     }
 };
 
@@ -1601,7 +1623,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "elytra-race": STANDARD,
     "downhill-race": QUICK,
     impostor: STANDARD,
-    "glass-bridge": QUICK
+    "glass-bridge": QUICK,
+    "tug-of-war": QUICK
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1655,7 +1678,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "elytra-race": 8,
     "downhill-race": 5,
     impostor: 15,
-    "glass-bridge": 10
+    "glass-bridge": 10,
+    "tug-of-war": 4
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -2106,7 +2130,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "elytra-race": 1,
     "downhill-race": 1,
     impostor: 10,
-    "glass-bridge": 1
+    "glass-bridge": 1,
+    "tug-of-war": 10
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -2252,6 +2277,7 @@ export function readyToPlay(run: {
         case "sky-wars":
         case "impostor":
         case "glass-bridge":
+        case "tug-of-war":
             // The arena writes its own start when everybody is in it.
             return run.readyAt !== null;
         default:
@@ -2393,6 +2419,7 @@ export function playsInArena(preset: EventPreset): boolean {
         preset.kind === "sky-wars" ||
         preset.kind === "impostor" ||
         preset.kind === "glass-bridge" ||
+        preset.kind === "tug-of-war" ||
         hillFistsOnly(preset)
     );
 }
@@ -2619,7 +2646,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     "elytra-race": { time: "day", weather: "clear" },
     "downhill-race": { time: "day", weather: "clear" },
     impostor: { time: "day", weather: "clear" },
-    "glass-bridge": { time: "day", weather: "clear" }
+    "glass-bridge": { time: "day", weather: "clear" },
+    "tug-of-war": { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {

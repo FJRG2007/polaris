@@ -241,7 +241,9 @@ const KIND_TICK_MS: Partial<Record<catalog.EventKind, number>> = {
     // A step onto the next row seen within the half second.
     "glass-bridge": 500,
     // A kill, a switch and a vote answered within the second.
-    impostor: 1_000
+    impostor: 1_000,
+    // A pull is a click: the marker moves within the half second.
+    "tug-of-war": 500
 };
 
 function tickMsOf(kind: catalog.EventKind): number {
@@ -2163,6 +2165,7 @@ async function play(
         case "sky-wars":
         case "impostor":
         case "glass-bridge":
+        case "tug-of-war":
             decided = await arenaService.arenaTick(
                 kindContext(installedAppId, loop, server, now),
                 lines

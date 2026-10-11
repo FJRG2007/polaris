@@ -1839,6 +1839,11 @@
                 "label": "Glass bridge",
                 "summary": "A long bridge of glass is built in the sky, two panels side by side in every row. In each row one panel holds and the other breaks under whoever stands on it, and both look the same. Cross everybody at once or one at a time in a drawn order; fall and you land in the pool below, out, and watch from the gallery. The first across wins; short of that, whoever got furthest.",
                 "unit": "jumps"
+            },
+            "tug-of-war": {
+                "label": "Tug of war",
+                "summary": "Players who join are split into two even teams, each in a pen at one end of a platform in the sky, with a rope between them and a marker in its middle. Every right-click with the rod handed out is a pull, counted by the server and capped at what a quick hand can do, and each team's pulls are averaged over its players so a smaller team is not behind. The marker moves toward the team pulling harder; pull it over your line to win, or be ahead when time is up. The losers' floor opens and they drop into water below. Nobody is hurt and nothing of anybody's is lost.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -2524,6 +2529,8 @@
         "seekersHint": "1 to 3. Everybody found seeks with them.",
         "fuseSeconds": "Fuse (seconds)",
         "fuseSecondsHint": "10 to 40 before the potato goes off.",
+        "ropeLength": "Rope length",
+        "ropeLengthHint": "6 to 16 blocks from the middle to each team's line.",
         "chestLoot": "What the chests hold",
         "house": "Arena size",
         "seekTime": "Seeking time after hiding",

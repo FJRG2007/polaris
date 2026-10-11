@@ -1839,6 +1839,11 @@
                 "label": "Puente frágil",
                 "summary": "Se construye en el cielo un largo puente de cristal con dos paneles en cada fila. En cada fila un panel aguanta y el otro se rompe bajo quien lo pisa, y los dos parecen iguales. Cruzad todos a la vez o de uno en uno en un orden sorteado; quien cae acaba en la piscina de abajo, queda fuera y mira desde la grada. Gana el primero en cruzar; si nadie lo logra, quien más lejos llegó.",
                 "unit": "jumps"
+            },
+            "tug-of-war": {
+                "label": "Tira y afloja",
+                "summary": "Los jugadores que se apuntan se reparten en dos equipos iguales, cada uno en un corral a un extremo de una plataforma en el cielo, con una cuerda entre ambos y una marca en el centro. Cada clic derecho con la caña que se entrega es un tirón, contado por el servidor y limitado a lo que hace una mano rápida, y los tirones de cada equipo se promedian entre sus jugadores para que un equipo más pequeño no salga perdiendo. La marca se mueve hacia el equipo que tira más fuerte; arrástrala hasta tu línea para ganar, o ve por delante cuando acabe el tiempo. El suelo de los perdedores se abre y caen al agua. Nadie sufre daño y nadie pierde nada suyo.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -2524,6 +2529,8 @@
         "seekersHint": "De 1 a 3. Todos los encontrados buscan con ellos.",
         "fuseSeconds": "Mecha (segundos)",
         "fuseSecondsHint": "De 10 a 40 hasta que explota la patata.",
+        "ropeLength": "Largo cuerda",
+        "ropeLengthHint": "De 6 a 16 bloques desde el centro hasta la línea de cada equipo.",
         "chestLoot": "Qué hay en los cofres",
         "house": "Tamaño arena",
         "seekTime": "Tiempo de búsqueda",
