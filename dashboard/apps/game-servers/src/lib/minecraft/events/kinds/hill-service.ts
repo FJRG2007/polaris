@@ -69,7 +69,7 @@ export async function raiseHill(ctx: KindContext): Promise<boolean> {
             ? await ctx.findPlace(
                   place,
                   hill.DISTANCE,
-                  radius + hill.MARGIN,
+                  hill.footprint(radius, await lookFor(ctx)),
                   "air",
                   true,
                   hill.LIFT
@@ -90,8 +90,11 @@ export async function raiseHill(ctx: KindContext): Promise<boolean> {
  */
 async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number): Promise<boolean> {
     const run = ctx.run;
+    // With fists only, the ring's own look where the server has its blocks:
+    // the court (`hill.ROYAL`) - a ring built before it keeps its own look.
+    const look = await lookFor(ctx);
     const floor = hill.platformBox(at, radius);
-    const proof = hill.proofBox(at, radius);
+    const proof = hill.proofBox(at, radius, look);
     if (proof.y2 > arena.worldTop(await ctx.atLeast([1, 18]))) {
         await giveUp(ctx, at, "tooHigh");
         return false;
@@ -123,13 +126,11 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     // Ours, written down before a block goes in.
     const batch = inServer.batchKey();
     // With fists only, the floor and the layers over it a bolt of the storm
-    // can set alight (`hill.strikeLine`) - and, where the server has the
-    // blocks, the ring's own look (`hill.DEATH`).
+    // can set alight (`hill.strikeLine`) - and everything the look builds.
     const stormy = optionsOf(run).fistsOnly;
-    const look = stormy && (await ctx.atLeast(hill.DEATH_SINCE)) ? hill.DEATH : hill.PLAIN;
     const built: stored.Arena = stormy
         ? {
-              box: { ...floor, y2: floor.y2 + hill.OVER_FLOOR },
+              box: look === hill.ROYAL ? proof : { ...floor, y2: floor.y2 + hill.OVER_FLOOR },
               blocks: [...hill.lookBlocks(look), hill.FIRE],
               batch,
               proved: proof
@@ -190,6 +191,13 @@ async function darkenSky(ctx: KindContext, place: stored.Point, radius: number):
     ctx.run = { ...ctx.run, arena: { ...built, biome: { box, was, now: hill.DEATH_BIOME } } };
     await ctx.persist();
     await ctx.server.sayAll(arena.biomeLines(box, hill.DEATH_BIOME, was));
+}
+
+/** The look a new platform is built in: the court with fists only, on a server
+ *  that has its blocks; plain otherwise. */
+async function lookFor(ctx: KindContext): Promise<hill.Look> {
+    if (!optionsOf(ctx.run).fistsOnly) return hill.PLAIN;
+    return (await ctx.atLeast(hill.ROYAL_SINCE)) ? hill.ROYAL : hill.PLAIN;
 }
 
 async function giveUp(
@@ -455,12 +463,13 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
             ...hill.redrawLines(floor, radius, { ...center, y: floor.y }, ring.radius, look)
         );
     }
-    if (look === hill.DEATH)
+    if (look !== hill.PLAIN)
         lines.push(
             ...hill.ambientLines(
                 { ...platform, y: platform.y - 1 },
                 radius,
-                ring.sprint && !ring.pause
+                ring.sprint && !ring.pause,
+                look
             )
         );
     const everybody = `@a[tag=${arena.IN_ARENA}]`;
