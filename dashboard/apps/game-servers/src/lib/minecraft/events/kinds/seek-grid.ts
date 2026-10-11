@@ -37,15 +37,7 @@ export const NEWEST: Era = { scaffold: true, snow: true, display: true };
 
 /** How a player meets a block. */
 export type Cell =
-    | "air"
-    | "solid"
-    | "tall"
-    | "climb"
-    | "door"
-    | "hatch"
-    | "water"
-    | "lava"
-    | "snow";
+    "air" | "solid" | "tall" | "climb" | "door" | "hatch" | "water" | "lava" | "snow";
 
 const CELL_OF: Readonly<Record<string, Cell>> = {
     "minecraft:ladder": "climb",
