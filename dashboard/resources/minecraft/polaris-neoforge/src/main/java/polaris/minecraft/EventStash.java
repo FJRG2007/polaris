@@ -45,9 +45,10 @@ import net.neoforged.neoforge.attachment.AttachmentType;
  * left open), and the trash slot a mod adds to the inventory screen
  * ({@link #TRASH}) - each kept as a loose stack ({@link #LOOSE}) that comes back
  * into any free slot, or at their feet as theirs. Once all that is taken an
- * open screen is closed: what one gives back on closing (an anvil's, a
- * grindstone's) lands in their emptied slots, where the dashboard's next look
- * stashes it under the next key. With their experience, health, hunger and
+ * open screen is closed, in the same tick: what one gives back on closing (an
+ * anvil's, a grindstone's, a trade's) and what one throws down (a beacon's
+ * payment) is kept in the same stash - the file written again, whole, before
+ * it is taken ({@link #closeKeeping}). With their experience, health, hunger and
  * effects it is all written to a file of their own, and only then are the
  * slots and the experience emptied - all in one tick, so nothing
  * can be picked up or dropped halfway. {@code polaris stash restore} gives it
@@ -91,6 +92,9 @@ final class EventStash {
 
     /** Restored stashes to delete once each player's file is written. */
     private static final Map<UUID, List<Path>> settled = new ConcurrentHashMap<>();
+
+    /** What a screen a stash is closing throws, kept per player while it closes. */
+    private static final Map<UUID, List<ItemStack>> closing = new ConcurrentHashMap<>();
 
     private EventStash() {}
 
@@ -180,7 +184,7 @@ final class EventStash {
         // Written: only now is anything taken.
         for (Runnable empty : emptied) empty.run();
         for (int slot : taken) set(inventory, slot, ItemStack.EMPTY);
-        if (player.containerMenu != player.inventoryMenu) player.closeContainer();
+        if (player.containerMenu != player.inventoryMenu) closeKeeping(player, file, kept, registries);
         player.setExperienceLevels(0);
         player.setExperiencePoints(0);
         CompoundTag next = mark.copy();
@@ -192,6 +196,67 @@ final class EventStash {
         reply.addProperty("already", false);
         describe(reply, kept);
         return reply;
+    }
+
+    /**
+     * Close the screen a stash found open, keeping what it gives back. An
+     * anvil, a grindstone, a trade hands its inputs back into the bag just
+     * emptied; a beacon throws its payment at the player's feet, where it would
+     * lie behind them while they are away. Either is kept in the same stash, in
+     * the same tick: written to the file again, whole, and only then taken.
+     * Should that write fail, the bag keeps what came back (the dashboard's next
+     * look stashes it) and what was thrown is put in it too.
+     */
+    private static void closeKeeping(ServerPlayer player, Path file, CompoundTag kept, HolderLookup.Provider registries) {
+        List<ItemStack> thrown = new ArrayList<>();
+        closing.put(player.getUUID(), thrown);
+        try {
+            player.closeContainer();
+        } finally {
+            closing.remove(player.getUUID());
+        }
+        Inventory inventory = player.getInventory();
+        ListTag items = kept.getList("items", Tag.TAG_COMPOUND);
+        ListTag more = items.copy();
+        List<Integer> back = new ArrayList<>();
+        for (int slot : SLOTS) {
+            ItemStack stack = get(inventory, slot);
+            if (stack.isEmpty() || isKit(stack)) continue;
+            more.add(looseEntry(stack, registries));
+            back.add(slot);
+        }
+        // Kit is the event's: back in the bag, for the event's own clear.
+        List<ItemStack> theirs = new ArrayList<>();
+        List<ItemStack> kit = new ArrayList<>();
+        for (ItemStack stack : thrown) {
+            if (stack.isEmpty()) continue;
+            (isKit(stack) ? kit : theirs).add(stack);
+        }
+        giveOrDrop(player, kit);
+        for (ItemStack stack : theirs) more.add(looseEntry(stack, registries));
+        if (more.size() == items.size()) return;
+        CompoundTag whole = kept.copy();
+        whole.put("items", more);
+        try {
+            write(file, whole);
+        } catch (IOException failed) {
+            PolarisMod.LOG.warn("Polaris could not keep what a closed screen gave back: {}", failed.toString());
+            giveOrDrop(player, theirs);
+            return;
+        }
+        kept.put("items", more);
+        for (int slot : back) set(inventory, slot, ItemStack.EMPTY);
+    }
+
+    /**
+     * The stacks a stash's own close threw for a player, kept instead of thrown
+     * ({@link EventCommands#onToss}): true when the throw is to be cancelled.
+     */
+    static boolean caught(UUID player, ItemStack stack) {
+        List<ItemStack> into = closing.get(player);
+        if (into == null) return false;
+        into.add(stack.copy());
+        return true;
     }
 
     // ------------------------------------------------------------------ restore
@@ -245,25 +310,15 @@ final class EventStash {
                 continue;
             }
             ItemStack now = get(inventory, slot);
-            if (!now.isEmpty()) displaced.add(now);
+            // The event's kit still in the way is the event's to take, never a
+            // stack to move or throw down as theirs: one thrown down outlives
+            // the event, and the next one's clear takes it from whoever has it.
+            if (!now.isEmpty() && !isKit(now)) displaced.add(now);
             set(inventory, slot, stack.get());
             slotted++;
         }
-        int moved = 0;
-        int dropped = 0;
-        for (ItemStack stack : displaced) {
-            inventory.add(stack);
-            if (stack.isEmpty()) {
-                moved++;
-                continue;
-            }
-            ItemEntity drop = new ItemEntity(player.serverLevel(), player.getX(), player.getY(), player.getZ(), stack);
-            drop.setTarget(player.getUUID());
-            drop.setNoPickUpDelay();
-            drop.setUnlimitedLifetime();
-            player.serverLevel().addFreshEntity(drop);
-            dropped++;
-        }
+        int dropped = giveOrDrop(player, displaced);
+        int moved = displaced.size() - dropped;
         player.giveExperienceLevels(kept.getInt("levels"));
         player.giveExperiencePoints(kept.getInt("points"));
         player.setHealth(Math.min(Math.max(kept.getFloat("health"), 1.0F), player.getMaxHealth()));
@@ -317,14 +372,39 @@ final class EventStash {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * Each stack into any free slot, and what fits nowhere dropped at the
+     * player's feet as theirs: nobody else can pick it up, and it never
+     * despawns. Answers how many were dropped.
+     */
+    private static int giveOrDrop(ServerPlayer player, List<ItemStack> stacks) {
+        Inventory inventory = player.getInventory();
+        int dropped = 0;
+        for (ItemStack stack : stacks) {
+            inventory.add(stack);
+            if (stack.isEmpty()) continue;
+            ItemEntity drop = new ItemEntity(player.serverLevel(), player.getX(), player.getY(), player.getZ(), stack);
+            drop.setTarget(player.getUUID());
+            drop.setNoPickUpDelay();
+            drop.setUnlimitedLifetime();
+            player.serverLevel().addFreshEntity(drop);
+            dropped++;
+        }
+        return dropped;
+    }
+
     /** A stack kept loose, and how to empty where it came from once written. */
     private static void loose(ItemStack stack, HolderLookup.Provider registries, ListTag items, List<Runnable> emptied, Runnable empty) {
         if (stack.isEmpty() || isKit(stack)) return;
+        items.add(looseEntry(stack, registries));
+        emptied.add(empty);
+    }
+
+    private static CompoundTag looseEntry(ItemStack stack, HolderLookup.Provider registries) {
         CompoundTag entry = new CompoundTag();
         entry.putInt("slot", LOOSE);
         entry.put("item", stack.save(registries));
-        items.add(entry);
-        emptied.add(empty);
+        return entry;
     }
 
     /** Every stack lying in a menu's crafting grid, kept loose. */

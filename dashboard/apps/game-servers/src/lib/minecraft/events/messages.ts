@@ -431,6 +431,15 @@ export function droppedAtFeet(count: number, item: string, language: Language): 
         : `${WARN}Inventory full: ${mark(`${count} ${item}`, WARN)} fell at your feet. Pick them up before they despawn.`;
 }
 
+/** Stacks of their own things given back with no room left, dropped where they
+ *  stand as theirs: only they can pick them up, and they never despawn. */
+export function keptAtFeet(count: number, language: Language): string {
+    const stacks = count === 1 ? "1 stack" : `${count} stacks`;
+    return language === "es"
+        ? `${WARN}Inventario lleno: ${mark(stacks, WARN)} de tus cosas están a tus pies. Solo tú puedes recogerlos y no desaparecen.`
+        : `${WARN}Inventory full: ${mark(stacks, WARN)} of your things are at your feet. Only you can pick them up, and they stay until you do.`;
+}
+
 export function mendedWith(
     count: number,
     points: number,
