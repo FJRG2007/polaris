@@ -94,9 +94,13 @@ vi.mock("@polaris/app-host", () => ({
 const { GET, POST } = await import(
     "@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route"
 );
-const { MODDED_APPROXIMATE_MAX, approximateOnMods, engineCheckLabel, engineScore } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/suspicion"
-);
+const {
+    MODDED_APPROXIMATE_MAX,
+    approximateOnMods,
+    disqualifiesFromEvent,
+    engineCheckLabel,
+    engineScore
+} = await import("@polaris-app/game-servers/src/lib/minecraft/suspicion");
 
 function report(body: unknown, token = "the-token", id = SERVER) {
     return POST(
@@ -342,6 +346,29 @@ describe("scoring the engine's alerts", () => {
             "BadPacketsA"
         ])
             expect(approximateOnMods(check), check).toBe(false);
+    });
+
+    it("keeps off an event's podium only for checks its own moves cannot trip", () => {
+        for (const check of [
+            "Simulation",
+            "GroundSpoof",
+            "NoSlow",
+            "Timer",
+            "TimerLimit",
+            "ElytraC",
+            "FastBreak",
+            "ChatA"
+        ])
+            expect(disqualifiesFromEvent(check), check).toBe(false);
+        for (const check of [
+            "Reach",
+            "XRayProbe",
+            "MultiBreak",
+            "AimModulo360",
+            "BadPacketsA",
+            "Baritone"
+        ])
+            expect(disqualifiesFromEvent(check), check).toBe(true);
     });
 
     it("has words for every check the engine has", () => {

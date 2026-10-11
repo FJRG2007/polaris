@@ -1219,7 +1219,8 @@ A new kind follows all of them. A change to an old kind must not undo one.
   for the same reason, so the screen and the server agree.
 - **Nobody wins by standing still, in creative, or with a farm.** Players
   seen in creative or spectator, AFK players where `afkCounts`, and players
-  caught by Anti X-Ray or the anti-cheat are left off the podium. Ore placed
+  caught by Anti X-Ray or the anti-cheat are left off the podium - by a check
+  the event cannot trip itself (see "Who wins"). Ore placed
   during a mining rush is taken off the count. A gathering of iron counts
   only smelted raw iron that was picked up, never ingots crafted from blocks
   (`f7b2a8a6b`, `a92042a1f`).
@@ -1479,6 +1480,37 @@ A new kind follows all of them. A change to an old kind must not undo one.
   Done disabled until a saved event is changed also held it disabled for
   one just added, where nothing has to change first - its defaults are a
   choice too (`EventEditor`'s `isNew`) (`1715ffef0`).
+
+### Who wins
+
+A wrong winner is the complaint players notice first and forgive last. Each
+rule below is one that reached a real server.
+
+- **Only a check the event cannot trip keeps somebody off the podium.** Every
+  anti-cheat flag during the run used to disqualify. An event moves its own
+  players - teleports, levitation, knockback, a launch, a dropper fall with
+  resistance on - and its arena build drops the tick rate, and the movement,
+  prediction and timer checks read all of it as the player's doing: on one
+  evening Simulation fired for every player in a dropper (all three off, no
+  podium), two of three in a nether maze, and one in hot potato. Movement,
+  timer, block-modelling and chat checks never disqualify from an event
+  (`suspicion.disqualifiesFromEvent`); aim, reach, packets, the X-Ray probe
+  and the rest still do. The anti-cheat screen still shows every flag.
+- **Score the way players judge the game.** A hide-and-seek scored a point a
+  second hidden plus thirty a find put a hider found early, who then found
+  others, above the last hider standing - three "wrong winners" in a row. The
+  winner is who the players would name at the end: the last one standing, the
+  first over the line, the longest hidden. Anything else is a tiebreak.
+- **What chat announces and what the podium pays are the same decision.**
+  A kind's `resultLines` naming "the last one left" from its own state while
+  the podium is ranked from scores minus the disqualified says two different
+  names the moment anybody is disqualified. Announce from the placed podium,
+  or from the same function that ranks it.
+- **Read the run before touching the code.** A report of a wrong winner is
+  checked against what the run kept: `eventState.history` on the server's
+  config holds each run's podium, `disqualified` list and note, and
+  `MinecraftAnticheatFlag` holds every flag with its check and time. The
+  dropper above looked like a podium bug and was an anti-cheat one.
 
 ### Pitfalls
 

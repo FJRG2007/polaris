@@ -16,6 +16,10 @@ the code. If a rule changes, change it in the doc.
 2. If the change is a fix, find the earlier commits on the same kind or
    mechanism with `git log --oneline -- dashboard/apps/game-servers/src/lib/minecraft/events`.
    Read their bodies, so the fix does not undo an earlier one.
+3. If it is reported from a server - a wrong winner, an empty podium, a
+   prize to the wrong player - read what the run kept on that server first
+   ("Read the run before touching the code" in the doc), and fix the cause
+   that shows, for every kind it applies to rather than the one reported.
 
 ## While writing it
 
@@ -44,7 +48,7 @@ the code. If a rule changes, change it in the doc.
 1. Walk the run in your head as a real server would play it: the countdown,
    arrival, "Go!", the play, the end, a call-off, and a Polaris restart at each
    of those. For each step, check every section of "Lessons from real
-   servers".
+   servers", and "Who wins" for anything that ranks players.
 2. From `dashboard/apps/web`, run
    `npx vitest run test/apps/minecraft-events`, then `npx tsc --noEmit` and
    `npx vitest run test/i18n`. Add a test for the behavior you changed: pure

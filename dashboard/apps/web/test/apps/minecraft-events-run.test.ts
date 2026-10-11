@@ -1826,7 +1826,12 @@ vi.mock("@polaris/db", () => ({
             }
         },
         minecraftAnticheatFlag: {
-            groupBy: async () => world.flagged.map((player) => ({ player }))
+            // "name" is caught by reach; "name:Check" by that check.
+            groupBy: async () =>
+                world.flagged.map((one) => {
+                    const [player, check = "Reach"] = one.split(":");
+                    return { player, check };
+                })
         },
         gamePlayerLink: {
             findMany: async () =>
@@ -2274,6 +2279,28 @@ describe("a mining rush, from start to podium", () => {
         expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 14 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
         expect(world.sent.some((line) => line.startsWith("give Ana"))).toBe(false);
+    });
+
+    it("keeps on the podium somebody flagged only by checks an event's own moves trip", async () => {
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 50, Ben: 14 };
+        world.flagged = ["ana:Simulation", "ana:GroundSpoof", "ben:TimerLimit", "ben:ChatA"];
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([
+            { place: 1, name: "Ana", score: 50 },
+            { place: 2, name: "Ben", score: 14 }
+        ]);
+        expect(entry?.disqualified).toEqual([]);
     });
 });
 
@@ -12494,6 +12521,31 @@ describe("SkyWars", () => {
         await play(2_100);
         expect(saidToAll("Ben is out (Ana).")).toBe(true);
         expect(state().history[0]).toMatchObject({ note: "Only one player was left" });
+    });
+
+    it("never cheers as winner the last one left when the anti-cheat keeps them off the podium", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        const { layout, at } = await placedOf(run);
+        const play0 = sw.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        world.at.Ben = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        world.flagged = ["ana"];
+        await play(2_100);
+        const done = state();
+        expect(done.history[0]).toMatchObject({
+            note: "Only one player was left",
+            disqualified: ["Ana"],
+            podium: [
+                { place: 1, name: "Ben", score: 2 },
+                { place: 2, name: "Cy", score: 1 }
+            ]
+        });
+        expect(saidToAll("Ana is the last one left and wins.")).toBe(false);
     });
 
     it("picked up after a restart, keeps who is out and does not put them out again", async () => {

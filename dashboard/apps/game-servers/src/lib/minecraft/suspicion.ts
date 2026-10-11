@@ -266,6 +266,20 @@ export function approximateOnMods(check: string): boolean {
 /** The most those checks reach on their own on a modded server: "Possible". */
 export const MODDED_APPROXIMATE_MAX = 55;
 
+/**
+ * Whether a flag is proof enough to keep somebody off an event's podium. Not the
+ * approximate checks above, on any server: an event moves its players itself -
+ * teleports, levitation, knockback, a launch, a fall through a dropper with
+ * resistance on - and builds its arena while they wait, which drops the tick
+ * rate, and these read both as the player's own doing. On a real server they
+ * fired for everybody in a dropper and a maze and emptied the podium. Nor the
+ * chat checks, which a trivia round answered quickly trips. Every other check -
+ * aim, reach, packets, the X-Ray probe - still does.
+ */
+export function disqualifiesFromEvent(check: string): boolean {
+    return !approximateOnMods(check) && engineCheckPart(check) !== "Chat";
+}
+
 function alertsValue(
     checks: readonly { readonly check: string; readonly alerts: number }[]
 ): number {

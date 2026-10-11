@@ -278,16 +278,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
 
     let decided: string | null = null;
     const left = alive();
-    if (left.length <= 1) {
-        if (left[0])
-            lines.push(
-                commands.say(
-                    messages.tag(language) + potatoMessages.winner(left[0].name, language)
-                ),
-                commands.sound(commands.SOUNDS.win)
-            );
-        decided = said.LAST_ONE;
-    } else if (state.holders.length === 0 && (state.pauseUntil ?? 0) <= now) {
+    // The winner is named with the results (`resultLines`), once the anti-cheat
+    // has been asked: named here, a player kept off the podium was cheered.
+    if (left.length <= 1) decided = said.LAST_ONE;
+    else if (state.holders.length === 0 && (state.pauseUntil ?? 0) <= now) {
         // The next round, after the breath: new holders, a new fuse.
         state.round += state.pauseUntil === null ? 0 : 1;
         state.holders = drawHolders(
@@ -386,12 +380,12 @@ export const hotPotato: ArenaGame = {
             potato.stateOf(run.game),
             run.entrants.map((one) => one.name)
         ),
-    resultLines: (run, language) => {
+    resultLines: (run, language, disqualified) => {
         const state = potato.stateOf(run.game);
         const left = run.entrants.filter(
             (one) => !state?.out.some((out) => lower(out.name) === lower(one.name))
         );
-        return left.length === 1
+        return left.length === 1 && !disqualified.has(lower(left[0]!.name))
             ? [commands.say(potatoMessages.winner(left[0]!.name, language))]
             : [];
     },

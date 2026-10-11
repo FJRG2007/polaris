@@ -17,6 +17,7 @@
 import * as plan from "./plan";
 import * as stored from "./state";
 import { readXray } from "../xray";
+import { disqualifiesFromEvent } from "../suspicion";
 import * as speech from "../speech";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
@@ -4684,7 +4685,7 @@ async function finish(
             }
             lines.push(commands.say(messages.resultsHeader(preset.name, language)));
             if (catalog.playsInArena(preset))
-                lines.push(...arenaService.resultLines(run, language));
+                lines.push(...arenaService.resultLines(run, language, disqualified));
             if (preset.kind === "world-boss" && !run.decidedBy) {
                 lines.push(
                     commands.say(messages.bossEscaped(bossService.nameOf(run, language), language))
@@ -5243,7 +5244,8 @@ async function survivorsOf(server: ServerContainer, run: stored.EventRun): Promi
 
 /**
  * Who the anti-cheat caught while the event ran: a honeypot dug to, or an alert
- * from Polaris's own engine. Kept off the podium and out of the prizes.
+ * from Polaris's own engine that proves something there (`disqualifiesFromEvent`).
+ * Kept off the podium and out of the prizes.
  */
 async function disqualifiedSince(installedAppId: string, since: number): Promise<Set<string>> {
     const found = new Set<string>();
@@ -5255,9 +5257,13 @@ async function disqualifiedSince(installedAppId: string, since: number): Promise
         }
     }
     const flagged = await prisma.minecraftAnticheatFlag
-        .groupBy({ by: ["player"], where: { installedAppId, at: { gte: new Date(since) } } })
+        .groupBy({
+            by: ["player", "check"],
+            where: { installedAppId, at: { gte: new Date(since) } }
+        })
         .catch(() => []);
-    for (const one of flagged) found.add(one.player.toLowerCase());
+    for (const one of flagged)
+        if (disqualifiesFromEvent(one.check)) found.add(one.player.toLowerCase());
     return found;
 }
 
