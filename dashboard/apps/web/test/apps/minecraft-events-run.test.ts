@@ -13619,21 +13619,40 @@ describe("impostor", () => {
         await play(2_100);
         const first = await stateNow();
         const [impostor] = first.impostors as [string];
+        const run = state().run!;
+        const layout = im.layoutFor(run.id, run.arena!.box);
+        /** Somebody at a station: on its plate, or beside its switch or button. */
+        const work = async (name: string, id: number) => {
+            const station = layout.stations.find((one) => one.id === id)!;
+            const y = layout.box.y1 + 1;
+            if (station.kind === "scan") {
+                world.at[name] = [station.x + 0.5, y, station.z + 0.5];
+                await play((im.SCAN_SECONDS + 1) * 1000);
+                return;
+            }
+            world.at[name] = [station.x + 1.5, y, station.z + 0.5];
+            press(name, im.TASK_BASE + id);
+            await play(2_100);
+        };
+        const switchOf = (ids: readonly number[]) =>
+            ids.find((id) => layout.stations.find((one) => one.id === id)!.kind !== "scan");
         // The impostor pretends: nothing counts.
-        press(impostor, im.TASK_BASE + first.tasks[impostor]![0]!);
-        await play(2_100);
+        const pretended = switchOf(first.tasks[impostor]!) ?? first.tasks[impostor]![0]!;
+        await work(impostor, pretended);
         expect((await stateNow()).done[impostor] ?? []).toEqual([]);
         // Somebody else's station counts nothing either.
         const crew = names.filter((name) => name !== impostor) as [string, string, string];
         const theirs = first.tasks[crew[1]]!.find((id) => !first.tasks[crew[0]]!.includes(id))!;
-        press(crew[0], im.TASK_BASE + theirs);
+        await work(crew[0], theirs);
+        expect((await stateNow()).done[crew[0]] ?? []).toEqual([]);
+        // A press from across the station counts nothing: nobody was there.
+        const mine = first.tasks[crew[0]]![0]!;
+        world.at[crew[0]] = [run.arena!.box.x1 - 40, layout.box.y1 + 1, run.arena!.box.z1 - 40];
+        press(crew[0], im.TASK_BASE + mine);
         await play(2_100);
         expect((await stateNow()).done[crew[0]] ?? []).toEqual([]);
         for (const name of crew)
-            for (const station of first.tasks[name]!) {
-                press(name, im.TASK_BASE + station);
-                await play(2_100);
-            }
+            for (const station of first.tasks[name]!) await work(name, station);
         const done = state();
         expect(done.run).toBeNull();
         expect(done.history[0]).toMatchObject({

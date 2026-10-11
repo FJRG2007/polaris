@@ -235,6 +235,11 @@ describe("who wins", () => {
         expect(imp.get("Ana")!).toBeGreaterThan(imp.get("Bo")!);
         expect(imp.get("Bo")).toBe(8 * im.TASK_POINTS);
     });
+
+    it("counts nothing while the game is open, so no kill shows who made it", () => {
+        const open = stateWith({ impostors: ["Ana"], kills: { Ana: 2 }, done: { Bo: [0] } });
+        expect([...im.scoresOf(open, players).values()]).toEqual(players.map(() => 0));
+    });
 });
 
 describe("kills", () => {
@@ -322,6 +327,50 @@ describe("votes", () => {
         expect(im.pressOf(im.VOTE_BASE + 14)).toEqual({ kind: "vote", entrant: 14 });
         expect(im.pressOf(im.TASK_BASE + 23)).toEqual({ kind: "task", station: 23 });
         expect(im.pressOf(im.REPORT_BASE + 3)).toEqual({ kind: "report", body: 3 });
+    });
+
+    it("takes a press only from beside what it names", () => {
+        const layout = im.layoutFor("reach", im.stationBox(SITE, Y, 8));
+        const y = layout.box.y1 + 1;
+        const far = { x: layout.meeting.x + 5, y, z: layout.meeting.z + 5 };
+        const lever = layout.stations.find((one) => one.kind !== "scan")!;
+        const plate = layout.stations.find((one) => one.kind === "scan")!;
+        const task = { kind: "task", station: lever.id } as const;
+        const besideLever = { x: lever.x + 1.5, y, z: lever.z + 0.5 };
+        expect(im.pressReaches(layout, [], task, besideLever)).toBe(true);
+        expect(im.pressReaches(layout, [], task, { x: lever.x + 40, y, z: lever.z })).toBe(false);
+        expect(im.pressReaches(layout, [], task, undefined)).toBe(false);
+        expect(
+            im.pressReaches(
+                layout,
+                [],
+                { kind: "task", station: plate.id },
+                {
+                    x: plate.x + 0.5,
+                    y,
+                    z: plate.z + 0.5
+                }
+            )
+        ).toBe(false);
+        expect(im.pressReaches(layout, [], { kind: "task", station: 9999 }, far)).toBe(false);
+        const body = { name: "Bo", x: lever.x + 0.5, y, z: lever.z + 0.5, gone: false };
+        expect(im.pressReaches(layout, [body], { kind: "report", body: 0 }, besideLever)).toBe(
+            true
+        );
+        expect(
+            im.pressReaches(
+                layout,
+                [body],
+                { kind: "report", body: 0 },
+                { ...body, x: body.x + 40 }
+            )
+        ).toBe(false);
+        expect(im.pressReaches(layout, [], { kind: "report", body: 0 }, besideLever)).toBe(false);
+        expect(im.pressReaches(layout, [], { kind: "emergency" }, far)).toBe(true);
+        expect(im.pressReaches(layout, [], { kind: "emergency" }, { ...far, x: far.x + 40 })).toBe(
+            false
+        );
+        expect(im.pressReaches(layout, [], { kind: "skip" }, undefined)).toBe(true);
     });
 });
 

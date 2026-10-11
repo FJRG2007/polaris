@@ -852,14 +852,15 @@ export const KILL_POINTS = 25;
 export const WIN_POINTS = Math.max(8 * TASK_POINTS, (MOST - 1) * KILL_POINTS) + TASK_POINTS;
 
 /** The scores: a crew member's tasks, an impostor's kills, and the side that
- *  won given the win on top - everybody on it, alive or not. */
+ *  won given the win on top - everybody on it, alive or not. Nothing until the
+ *  game is decided, since a kill counted would name who made it. */
 export function scoresOf(
     state: ImpostorState | null,
     names: readonly string[]
 ): Map<string, number> {
     const scores = new Map<string, number>();
     for (const name of names) {
-        if (!state) {
+        if (!state?.winner) {
             scores.set(name, 0);
             continue;
         }
@@ -915,6 +916,40 @@ export function pressOf(value: number): Press | null {
     if (value >= TASK_BASE) return { kind: "task", station: value - TASK_BASE };
     if (value >= VOTE_BASE) return { kind: "vote", entrant: value - VOTE_BASE };
     return null;
+}
+
+/** How far from what it names a press is still taken: the reach of a click,
+ *  and the run on from it to the look that reads it. */
+export const PRESS_REACH = 8;
+
+/** Whether somebody here could have made this press: a task at a switch or
+ *  button of theirs, a body or the emergency button within `PRESS_REACH`. A
+ *  plate is only worked by standing on it, never by a press. */
+export function pressReaches(
+    layout: Layout,
+    bodies: readonly Body[],
+    press: Press,
+    at: { x: number; y: number; z: number } | undefined
+): boolean {
+    if (press.kind === "skip" || press.kind === "vote") return true;
+    if (!at) return false;
+    const near = (spot: { x: number; y: number; z: number }) =>
+        Math.hypot(spot.x - at.x, spot.z - at.z) <= PRESS_REACH && Math.abs(spot.y - at.y) < 3;
+    const y = layout.box.y1 + 1;
+    if (press.kind === "task") {
+        const station = layout.stations.find((one) => one.id === press.station);
+        return (
+            !!station &&
+            station.kind !== "scan" &&
+            near({ x: station.x + 0.5, y, z: station.z + 0.5 })
+        );
+    }
+    if (press.kind === "report") {
+        const body = bodies[press.body];
+        return !!body && near(body);
+    }
+    const button = emergencyAt(layout);
+    return near({ x: button.x + 0.5, y, z: button.z + 0.5 });
 }
 
 export function resetPress(name: string): string {

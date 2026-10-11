@@ -457,6 +457,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             const name = entrant(who);
             const press = im.pressOf(value);
             if (!name || !press || !isAlive(name)) continue;
+            if (!im.pressReaches(layout, state.bodies, press, here.get(lower(name)))) continue;
             if (press.kind === "task") completeTask(ctx, state, lines, name, press.station);
             else if (press.kind === "report") reportBody(name, press.body);
             else if (press.kind === "emergency" && !called) {
