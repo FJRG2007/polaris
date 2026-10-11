@@ -31,7 +31,7 @@ const NO_JAR_RETRY_MS = 30 * 60_000;
  *  usually the very next thing the operator does - and a longer wait is a server
  *  that has just restarted onto a jar that can decorate, showing nothing for half
  *  an hour. One console line per pass is the whole cost. */
-const OLD_JAR_RETRY_MS = 2 * 60_000;
+const OLD_JAR_RETRY_MS = 90_000;
 
 /** Servers told at once on a sweep: each is a console trip or two. */
 const SWEEP_CONCURRENCY = 8;
@@ -43,7 +43,6 @@ const told = new Map<
     { readonly line: string } | { readonly oldJarAt: number } | { readonly noJarAt: number }
 >();
 
-/** When a server was found unable to decorate, if it was. */
 /** When this server may be asked again, if it is being left alone for now. */
 function askAgainAt(last: ReturnType<typeof told.get>): number | null {
     if (last && "oldJarAt" in last) return last.oldJarAt + OLD_JAR_RETRY_MS;

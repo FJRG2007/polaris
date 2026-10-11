@@ -165,7 +165,7 @@ describe("the seasons sweep", () => {
         caps = new Set(["stash", "season"]);
         await sweepSeasons(new Date(HALLOWEEN.getTime() + 60_000));
         expect(sent).toEqual([]);
-        await sweepSeasons(new Date(HALLOWEEN.getTime() + 2 * 60_000));
+        await sweepSeasons(new Date(HALLOWEEN.getTime() + 2 * 60_000 - 5_000));
         expect(sent).toEqual(["polaris season set halloween 3600"]);
         expect(await seasonalView(INSTALL)).toMatchObject({ needsRestart: false });
     });
