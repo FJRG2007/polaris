@@ -11,19 +11,28 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { SavedCommand } from "@polaris-app/game-servers/src/lib/console-commands";
 
-Element.prototype.scrollIntoView ??= () => undefined;
+// What jsdom does not implement and Radix's menus call on the way open.
+Object.assign(Element.prototype, {
+    hasPointerCapture: () => false,
+    setPointerCapture: () => undefined,
+    releasePointerCapture: () => undefined,
+    scrollIntoView: () => undefined
+});
 
 vi.mock("@polaris/app-host/client", () => ({
     hostUi: { i18nProvider: { useLocale: () => "en-US" } }
 }));
 
-const { KeepCommandDialog } =
-    await import("@polaris-app/game-servers/src/screens/installed/console-keep-dialog");
-const { RunCommandDialog } =
-    await import("@polaris-app/game-servers/src/screens/installed/console-run-dialog");
+const { KeepCommandDialog } = await import(
+    "@polaris-app/game-servers/src/screens/installed/console-keep-dialog"
+);
+const { RunCommandDialog } = await import(
+    "@polaris-app/game-servers/src/screens/installed/console-run-dialog"
+);
 
 afterEach(cleanup);
 
@@ -108,7 +117,8 @@ describe("keeping a command", () => {
 });
 
 describe("running one", () => {
-    it("asks for each value, checks it as typed, and waits for every field", () => {
+    it("asks for each value, checks it as typed, and waits for every field", async () => {
+        const user = userEvent.setup();
         const onRun = vi.fn();
         render(
             <RunCommandDialog
@@ -139,9 +149,18 @@ describe("running one", () => {
         expect(screen.queryByRole("alert")).toBeNull();
 
         fireEvent.click(screen.getByRole("radio", { name: "One player" }));
-        fireEvent.change(screen.getByRole("combobox", { name: /Player/ }), {
-            target: { value: "Alex" }
-        });
+        // Nobody is picked for them.
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+        expect(onRun).not.toHaveBeenCalled();
+        await user.click(screen.getByRole("button", { name: "Player" }));
+        const search = await screen.findByPlaceholderText("Search players");
+        await user.type(search, "al");
+        // Who is on comes first; what was typed stays offered for somebody who is not.
+        expect(screen.getAllByRole("menuitem").map((option) => option.textContent)).toEqual([
+            "Alex",
+            'Use "al"'
+        ]);
+        await user.click(screen.getByRole("menuitem", { name: "Alex" }));
         fireEvent.click(screen.getByRole("button", { name: "Run" }));
         expect(onRun).toHaveBeenCalledWith({
             values: { item: "minecraft:bread", amount: "8" },
@@ -166,7 +185,115 @@ describe("running one", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
         expect(onSchedule).toHaveBeenCalledWith(
-            expect.objectContaining({ values: {}, target: null, repeat: { kind: "once" } })
+            expect.objectContaining({
+                values: {},
+                target: null,
+                startIn: { amount: 5, unit: "minutes" },
+                repeat: { kind: "once" }
+            })
         );
+    });
+
+    it("picks a player variable from who is on", async () => {
+        const user = userEvent.setup();
+        const onRun = vi.fn();
+        render(
+            <RunCommandDialog
+                entry={{
+                    id: "c3",
+                    label: "Swap",
+                    command: "tp {who} 0 64 0",
+                    variables: [{ name: "who", label: "Who", type: "player", initial: "" }]
+                }}
+                mode="run"
+                edition="java"
+                players={["Steve", "Alex"]}
+                pending={false}
+                error=""
+                onClose={() => undefined}
+                onRun={onRun}
+                onSchedule={() => undefined}
+            />
+        );
+        expect(screen.queryByRole("textbox", { name: /Who/ })).toBeNull();
+        await user.click(screen.getByRole("button", { name: "Who" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Steve" }));
+        fireEvent.click(screen.getByRole("button", { name: "Run" }));
+        expect(onRun).toHaveBeenCalledWith({ values: { who: "Steve" }, target: null });
+    });
+
+    it("schedules it in so many hours, repeating every so many days", async () => {
+        const user = userEvent.setup();
+        const onSchedule = vi.fn();
+        render(
+            <RunCommandDialog
+                entry={{ id: "c2", label: "Save", command: "save-all" }}
+                mode="schedule"
+                edition="java"
+                players={[]}
+                pending={false}
+                error=""
+                onClose={() => undefined}
+                onRun={() => undefined}
+                onSchedule={onSchedule}
+            />
+        );
+        await user.click(screen.getByRole("combobox", { name: "First run" }));
+        await user.click(await screen.findByRole("option", { name: "In..." }));
+        const amount = screen.getByRole("spinbutton", { name: /^In/ });
+        await user.click(screen.getByRole("combobox", { name: "Unit" }));
+        await user.click(await screen.findByRole("option", { name: "hours" }));
+
+        await user.click(screen.getByRole("combobox", { name: "Repeat" }));
+        await user.click(await screen.findByRole("option", { name: "Every" }));
+        const gap = screen.getByRole("spinbutton", { name: "Every" });
+        fireEvent.change(gap, { target: { value: "2" } });
+        await user.click(screen.getByRole("combobox", { name: "Repeat unit" }));
+        await user.click(await screen.findByRole("option", { name: "days" }));
+
+        // Empty is not yet; zero is wrong, and said so.
+        fireEvent.change(amount, { target: { value: "" } });
+        fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+        expect(onSchedule).not.toHaveBeenCalled();
+        expect(screen.queryByRole("alert")).toBeNull();
+        fireEvent.change(amount, { target: { value: "0" } });
+        expect(screen.getByRole("alert").textContent).toBe(
+            "Whole minutes, hours or days, up to a year"
+        );
+
+        fireEvent.change(amount, { target: { value: "3" } });
+        fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+        await waitFor(() => expect(onSchedule).toHaveBeenCalled());
+        const choice = onSchedule.mock.calls[0]?.[0];
+        expect(choice).toMatchObject({
+            startIn: { amount: 3, unit: "hours" },
+            repeat: { kind: "every", minutes: 2 * 24 * 60 }
+        });
+        const ahead = Date.parse(choice.firstAt) - Date.now();
+        expect(ahead).toBeGreaterThan(3 * 60 * 60_000 - 60_000);
+        expect(ahead).toBeLessThanOrEqual(3 * 60 * 60_000);
+    });
+
+    it("keeps a date and time as the first run when one is picked", async () => {
+        const user = userEvent.setup();
+        const onSchedule = vi.fn();
+        render(
+            <RunCommandDialog
+                entry={{ id: "c2", label: "Save", command: "save-all" }}
+                mode="schedule"
+                edition="java"
+                players={[]}
+                pending={false}
+                error=""
+                onClose={() => undefined}
+                onRun={() => undefined}
+                onSchedule={onSchedule}
+            />
+        );
+        await user.click(screen.getByRole("combobox", { name: "First run" }));
+        await user.click(await screen.findByRole("option", { name: "At a set time" }));
+        fireEvent.click(screen.getByRole("button", { name: "Schedule" }));
+        expect(onSchedule).toHaveBeenCalledTimes(1);
+        expect(onSchedule.mock.calls[0]?.[0]).not.toHaveProperty("startIn");
     });
 });

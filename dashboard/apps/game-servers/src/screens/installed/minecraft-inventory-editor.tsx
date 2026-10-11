@@ -26,9 +26,10 @@
 import * as actions from "./minecraft-actions";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { ItemPicker } from "./minecraft-item-picker";
+import { PlayerPicker } from "./player-picker";
 import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
 import { bySlot } from "../../lib/minecraft/inventory";
-import { Badge, Button, Input, Select, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, Input, Skeleton, cn } from "@polaris/ui";
 import { maxStackFor, stacksFor } from "../../lib/minecraft/items";
 import { InventoryGrid, type PendingStack } from "./minecraft-inventory";
 import { isMovable, writableSlots } from "../../lib/minecraft/item-argument";
@@ -631,12 +632,12 @@ export function InventoryEditor({
                             </p>
                         ) : (
                             <>
-                                <Select
+                                <PlayerPicker
                                     aria-label={t("inventoryEditor.playerToSendTo")}
                                     placeholder={t("inventoryEditor.chooseAPlayer")}
                                     value={sendTo ?? ""}
                                     onValueChange={(value) => setRecipient(value || null)}
-                                    options={others.map((name) => ({ value: name, label: name }))}
+                                    players={others}
                                 />
                                 <div
                                     onDragOver={(event) => event.preventDefault()}

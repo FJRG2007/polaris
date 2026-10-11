@@ -41,6 +41,20 @@ export interface SearchableSelectProps {
     searchPlaceholder: string;
     /** What the menu says when nothing is left after typing. */
     emptyText: string;
+    /**
+     * The most options drawn at once. A list of thousands - everybody on a busy
+     * server - is typed down rather than scrolled, and drawing every row of it
+     * on each keystroke is what makes the field lag. The rest are still found
+     * by typing; `moreText` says how many are not drawn.
+     */
+    limit?: number;
+    /** The line under a cut list, given how many options it left out. */
+    moreText?: (hidden: number) => string;
+    /**
+     * Lets what was typed be chosen even when no option is it - a player who is
+     * not online, say - given the words of the row that offers it.
+     */
+    typedText?: (typed: string) => string;
     placeholder?: string;
     disabled?: boolean;
     /** Class for the trigger. */
@@ -71,6 +85,9 @@ export function SearchableSelect({
     options,
     searchPlaceholder,
     emptyText,
+    limit,
+    moreText,
+    typedText,
     placeholder,
     disabled,
     className,
@@ -80,7 +97,14 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
     const [query, setQuery] = useState("");
     const selected = options.find((option) => option.value === value);
-    const shown = useMemo(() => filterSearchableOptions(options, query), [options, query]);
+    const found = useMemo(() => filterSearchableOptions(options, query), [options, query]);
+    const shown = limit !== undefined ? found.slice(0, limit) : found;
+    const hidden = found.length - shown.length;
+    const typed = query.trim();
+    const offerTyped =
+        typedText !== undefined &&
+        typed.length > 0 &&
+        !options.some((option) => option.value.toLowerCase() === typed.toLowerCase());
 
     return (
         // An old search is not what somebody reopening the menu is looking for.
@@ -132,7 +156,7 @@ export function SearchableSelect({
                     placeholder={searchPlaceholder}
                     className="sticky -top-1 z-10 -mx-1 -mt-1 bg-elevated px-3 pt-2"
                 />
-                {shown.length === 0 ? (
+                {shown.length === 0 && !offerTyped ? (
                     <p className="px-2 py-3 text-[0.75rem] text-muted-foreground">{emptyText}</p>
                 ) : (
                     shown.map((option) => (
@@ -158,6 +182,18 @@ export function SearchableSelect({
                             )}
                         </DropdownMenuItem>
                     ))
+                )}
+                {offerTyped && (
+                    <DropdownMenuItem onSelect={() => onValueChange(typed)}>
+                        <span className="min-w-0 flex-1 truncate" title={typedText(typed)}>
+                            {typedText(typed)}
+                        </span>
+                    </DropdownMenuItem>
+                )}
+                {hidden > 0 && moreText && (
+                    <p className="px-2 py-2 text-[0.75rem] text-muted-foreground">
+                        {moreText(hidden)}
+                    </p>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>

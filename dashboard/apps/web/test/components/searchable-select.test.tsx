@@ -105,3 +105,60 @@ describe("the select", () => {
         expect(onChange).toHaveBeenCalledWith("1.20.1");
     });
 });
+
+describe("a list too long to draw", () => {
+    it("draws only so many rows, says how many more there are, and finds the rest by typing", async () => {
+        const user = userEvent.setup();
+        const many = Array.from({ length: 250 }, (_, index) => ({
+            value: `player${index}`,
+            label: `player${index}`
+        }));
+        render(
+            <SearchableSelect
+                aria-label="Player"
+                value=""
+                onValueChange={() => undefined}
+                options={many}
+                searchPlaceholder="Search players"
+                emptyText="Nobody matches."
+                limit={100}
+                moreText={(hidden) => `${hidden} more`}
+            />
+        );
+        await user.click(screen.getByRole("button", { name: "Player" }));
+        const search = await screen.findByPlaceholderText("Search players");
+        expect(screen.getAllByRole("menuitem")).toHaveLength(100);
+        expect(screen.getByText("150 more")).toBeTruthy();
+
+        await user.type(search, "player249");
+        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+            "player249"
+        ]);
+        expect(screen.queryByText(/more$/)).toBeNull();
+    });
+
+    it("offers what was typed when no option is it, and only then", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(
+            <SearchableSelect
+                aria-label="Player"
+                value=""
+                onValueChange={onChange}
+                options={[{ value: "Steve", label: "Steve" }]}
+                searchPlaceholder="Search players"
+                emptyText="Nobody matches."
+                typedText={(typed) => `Use "${typed}"`}
+            />
+        );
+        await user.click(screen.getByRole("button", { name: "Player" }));
+        const search = await screen.findByPlaceholderText("Search players");
+        await user.type(search, "steve");
+        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Steve"]);
+
+        await user.clear(search);
+        await user.type(search, " Alex {Enter}");
+        expect(onChange).toHaveBeenCalledWith("Alex");
+        expect(screen.queryByText("Nobody matches.")).toBeNull();
+    });
+});

@@ -8,7 +8,7 @@
  * where a command that was refused looks exactly like one that was never sent.
  *
  * Two things sit around the input, and they are deliberately not the same thing.
- * The kept commands are the server's: the handful of lines this particular server
+ * The kept commands are the server's: the lines this particular server
  * is run with, stored on the install, so they survive a reload, a different
  * browser and a second operator. The history is one person's typing at one
  * keyboard, so it stays in that browser - but it is on screen now rather than
@@ -26,11 +26,9 @@ import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/co
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import {
     AlertTriangle,
-    CalendarClock,
     CornerDownLeft,
     History,
     ListOrdered,
-    MoreHorizontal,
     Plus,
     RefreshCw,
     Square,
@@ -49,6 +47,7 @@ import type { ConsoleSchedule } from "../../lib/console-schedule";
 import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
 import { RunCommandDialog, type RunChoice, type ScheduleChoice } from "./console-run-dialog";
 import { ConsoleSchedules } from "./console-schedules";
+import { KeptCommandsMenu } from "./console-kept-menu";
 import {
     useCallback,
     useEffect,
@@ -654,9 +653,17 @@ export function GameConsole({
                 {replies.length > 0 && (
                     <div className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-md border border-border bg-surface p-2 font-mono text-xs">
                         {replies.map((reply, index) => (
-                            <div key={`${reply.command}-${index}`} className="flex flex-col">
-                                <span className="text-muted-foreground">&gt; {reply.command}</span>
-                                <span className={reply.failed ? "text-danger" : ""}>
+                            <div
+                                key={`${reply.command}-${index}`}
+                                className="flex min-w-0 flex-col"
+                            >
+                                <span
+                                    className="truncate text-muted-foreground"
+                                    title={reply.command}
+                                >
+                                    &gt; {reply.command}
+                                </span>
+                                <span className={cn("break-words", reply.failed && "text-danger")}>
                                     {reply.output}
                                 </span>
                             </div>
@@ -664,74 +671,33 @@ export function GameConsole({
                     </div>
                 )}
 
-                {/* The commands this server is run with, above the box they would
-                    otherwise be typed into. */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                    {saved.map((entry) => (
-                        <span
-                            key={entry.id}
-                            className="flex items-stretch overflow-hidden rounded-md border border-border bg-surface"
-                        >
-                            <button
-                                type="button"
-                                disabled={!running || pending || !heard}
-                                onClick={() => pressSaved(entry)}
-                                title={entry.command}
-                                className="max-w-56 truncate px-2 py-1 text-xs transition-colors hover:bg-muted disabled:opacity-50"
-                            >
-                                {entry.label}
-                            </button>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button
-                                        type="button"
-                                        aria-label={t("console.moreFor", { name: entry.label })}
-                                        disabled={!heard}
-                                        className="border-l border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                                    >
-                                        <MoreHorizontal className="size-3.5" />
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start">
-                                    <DropdownMenuLabel className="font-mono text-xs">
-                                        {entry.command}
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        onSelect={() => {
-                                            setKeepError("");
-                                            setKeeping({
-                                                id: entry.id,
-                                                label: entry.label,
-                                                command: entry.command,
-                                                variables: entry.variables ?? []
-                                            });
-                                        }}
-                                    >
-                                        {t("console.edit")}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        onSelect={() => {
-                                            setAskError("");
-                                            setAsking({ entry, mode: "schedule" });
-                                        }}
-                                    >
-                                        <CalendarClock className="size-4" />{" "}
-                                        {t("consoleSchedule.scheduleIt")}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => load(entry.command)}>
-                                        {t("console.putItInTheBox")}
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        className="text-danger"
-                                        onSelect={() => forget(entry.id)}
-                                    >
-                                        <Trash2 className="size-4" /> {t("console.forgetIt")}
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </span>
-                    ))}
+                {/* The commands this server is run with, behind one button so a
+                    long list neither pushes the console down nor wraps into a
+                    wall of buttons. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {saved.length > 0 && (
+                        <KeptCommandsMenu
+                            saved={saved}
+                            canRun={running && !pending && heard}
+                            canManage={heard}
+                            onRun={pressSaved}
+                            onEdit={(entry) => {
+                                setKeepError("");
+                                setKeeping({
+                                    id: entry.id,
+                                    label: entry.label,
+                                    command: entry.command,
+                                    variables: entry.variables ?? []
+                                });
+                            }}
+                            onSchedule={(entry) => {
+                                setAskError("");
+                                setAsking({ entry, mode: "schedule" });
+                            }}
+                            onLoad={(entry) => load(entry.command)}
+                            onForget={(entry) => forget(entry.id)}
+                        />
+                    )}
                     <Button
                         size="xs"
                         variant="ghost"
