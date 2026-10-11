@@ -33,7 +33,10 @@ the same change.
    it, because no compiler error tells you: `needsOverworld`,
    `needsHostileMobs`, `summonsMobs`, `needsPvp`, `afkCounts`, `takesJoiners`,
    `playsOnStage`, `playsInArena`, `keepsDay`, `defaultMinPlayers`,
-   `joinersNeeded`, `awardsPrizes`. A kind that is neither `playsOnStage` nor
+   `joinersNeeded`, `awardsPrizes`. A kind that cannot be played by fewer
+   than some number of players gets that number in `playersFloor`: the
+   editor's minimum, the default, what the preset schema refuses below, and
+   how many must join or the event is called off. A kind that is neither `playsOnStage` nor
    `playsInArena` and is held at a place on the ground also needs its own case
    in `heldWhere`'s switch (see "Where an event is held"), or the Events
    screen groups it as `anywhere` by default. Also add it to `KIND_SINCE` with
@@ -136,6 +139,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
+| Impostor                                                       | day   | clear   |
 | TNT run, Dropper, Nether maze                                  | day   | clear   |
 | Elytra race, Downhill boat race                                | day   | clear   |
 | Acid rain                                                      | day   | -       |
@@ -750,6 +754,54 @@ left out.
   hidden while on the server, counted only once the seekers are out
   (`hs.scoresOf`: the time to hide is everybody's); finds only break a tie
   (`hs.tiebreakOf`). The chat's results and the podium are the same ranking.
+- **Impostor** (`impostor`) is a station of rooms built in the sky: three
+  columns of rooms, 11 by 11 inside, three rows up to eight players and four
+  past, joined by corridors three wide, round a meeting room in the middle of
+  the second row with a table and a stone button on it (`impostor.layoutFor`,
+  `planOf`; the room names, which room is which and which console is where are
+  drawn from the run's id). At least four play (`IMPOSTOR_FLOOR`,
+  `catalog.playersFloor`): the editor refuses fewer, the preset schema too,
+  and fewer joined by the end of the countdown calls it off. The impostors
+  (`impostors`, 1 by default, never more than three and never more than one
+  for every three players: `impostorCount`) are drawn from the run's id over
+  the joined names sorted, and each is told privately by a title; impostors are
+  told who the others are. Names are hidden by one team for everybody
+  (`nametagVisibility never`), and the side panel is off
+  (`commands.hasScoreboard`), so points never give a role away. Each crew member is given `tasks` consoles
+  in different rooms first: a lever to pull, a button to press or a plate to
+  stand on for `SCAN_SECONDS`. A lever or button is read on the quick look
+  with `if block ... [powered=true]` and passed through the one trigger
+  objective `pe_imp` (votes, reports and the emergency button too), then
+  turned back off; only the player it was given to, alive and within four
+  blocks, counts it. Impostors can press anything and nothing counts. A boss
+  bar shows the crew's tasks done of all of them; a dead crew member's
+  undone tasks stop counting. Impostors kill with a hit (the events data pack,
+  "Hits" below: the attacker the game names from 1.19.4, else the nearest
+  impostor within `KILL_REACH` who struck), never in a meeting and only once
+  `killCooldown` is out (30 seconds by default, also after "Go!" and after
+  each meeting); everybody else is under Weakness and everybody under
+  Resistance IV, so a hit hurts nobody and only a ready impostor's counts. The
+  dead go to spectator, tagged `pe_im_ghost`, and leave a body: a small armor
+  stand wearing their head, with an interaction entity on it from 1.19.4 that
+  a living player right-clicks to report; on any version a [Report] button in chat for whoever is within
+  `REPORT_REACH`, or typing "report". Vents are iron trapdoors in pairs between
+  rooms; an impostor standing on one is sent to its pair (`VENT_PAUSE_MS`
+  before the next). A meeting - a body reported, or the button pressed, each
+  player `emergencies` times and not in the first `EMERGENCY_CALM_MS` after
+  "Go!" or a meeting - takes every body away and seats the living round the
+  table, held there: `discussionSeconds`, then `votingSeconds` of a ballot in
+  chat, three names a line and a Skip, clicked (`/trigger`, no operator needed)
+  or typed ("vote name", "skip"). A player's first vote is kept. Most votes is
+  ejected and becomes a ghost; a tie or a skip ejects nobody; with
+  `confirmEjects` everybody is told whether they were an impostor. The crew
+  win when every task is done or every impostor is out; the impostors when
+  they are at least as many as the crew alive, or when time runs out. Who left
+  the server for `MISSING_MS` is out. Points: 10 a task, 25 a kill, and the
+  winning side, dead or alive, gets `WIN_POINTS` - more than anybody on the
+  losing side can score - so the podium's top is always on the side that won
+  ("Who wins" below). Where the Polaris mod or plugin is on the server, a
+  ghost's chat reaches only other ghosts ("Impostor ghosts" under "In-server
+  work"); elsewhere they are asked not to tell.
 - **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
   so it must never sit beside what a player brought, and only from 1.17 is
   that put away first; an older server is refused before anything starts.
@@ -1062,6 +1114,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                                                                                                                                                                                                                                                             |
 | Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                                                                                                    |
 | Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams; from design 5 a hall of stone brick posts up to spruce nests, a slime block pad under a spruce ledge, levers on the walls |
+| Impostor         | each room floored in its own drawn stone, wood or concrete, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents                 |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                                                                                                                                                          |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                  |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                                                                                                                                                         |
@@ -1139,6 +1192,16 @@ it does nothing. There is no NeoForge event that can withhold an entity, so it i
 a mixin, and a defensive one: optional, a no-op where another mod replaced the
 tracker (then `polaris caps` leaves `seek` out), and it switches itself off
 rather than ever failing a tick.
+
+**Impostor ghosts** (`EventGhosts.java`, in the mod and in the Paper
+plugin). A player tagged `pe_im_ghost` - dead in an impostor game - talks only
+to other ghosts: their chat is cancelled and sent to the tagged players alone
+(NeoForge), or its recipients narrowed to them (Paper; a plugin that fixed the
+list gets the line cancelled instead), and `/msg`, `/tell`, `/w`, `/me`,
+`/teammsg`, `/tm` and `/say` are refused while the tag lasts. Chat moderation
+runs first. It needs no capability: the tag is the switch, and the event takes
+it off at the end. A jar older than this lets a ghost's chat through; the game
+plays the same.
 
 ## Lessons from real servers
 

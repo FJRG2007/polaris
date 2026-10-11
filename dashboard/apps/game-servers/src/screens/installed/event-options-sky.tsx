@@ -3,11 +3,11 @@
 /**
  * The options of the newer events played on a map built in the sky: a TNT
  * run's floors, an ice track's laps, a dropper's shaft, a nether maze, a flag game, hide and
- * seek, a hot potato and SkyWars.
+ * seek, a hot potato, SkyWars and an impostor game.
  */
 
 import { useGameText } from "../game-text";
-import { Input, Select } from "@polaris/ui";
+import { Input, Select, Switch } from "@polaris/ui";
 import type { GameKey } from "../../../messages";
 import * as catalog from "../../lib/minecraft/events/catalog";
 import { DIFFICULTY_LABELS, Field, PlaceField, numberOf, options, problemAt } from "./event-editor";
@@ -642,6 +642,99 @@ export function HotPotatoFields({
                 issues={issues}
                 field="fuseSeconds"
             />
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.arena")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+        </>
+    );
+}
+
+export function ImpostorFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"impostor">;
+    onChange: (options: catalog.EventOptions<"impostor">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <div className="grid grid-cols-2 gap-3">
+                <NumberField
+                    label={t("editor.impostorCount")}
+                    hint={t("editor.impostorCountHint")}
+                    min={1}
+                    max={3}
+                    value={value.impostors}
+                    onChange={(impostors) => onChange({ ...value, impostors })}
+                    issues={issues}
+                    field="impostors"
+                />
+                <NumberField
+                    label={t("editor.killCooldown")}
+                    hint={t("editor.killCooldownHint")}
+                    min={10}
+                    max={60}
+                    value={value.killCooldown}
+                    onChange={(killCooldown) => onChange({ ...value, killCooldown })}
+                    issues={issues}
+                    field="killCooldown"
+                />
+                <NumberField
+                    label={t("editor.impostorTasks")}
+                    hint={t("editor.impostorTasksHint")}
+                    min={1}
+                    max={8}
+                    value={value.tasks}
+                    onChange={(tasks) => onChange({ ...value, tasks })}
+                    issues={issues}
+                    field="tasks"
+                />
+                <NumberField
+                    label={t("editor.emergencies")}
+                    hint={t("editor.emergenciesHint")}
+                    min={0}
+                    max={3}
+                    value={value.emergencies}
+                    onChange={(emergencies) => onChange({ ...value, emergencies })}
+                    issues={issues}
+                    field="emergencies"
+                />
+                <NumberField
+                    label={t("editor.discussionSeconds")}
+                    hint={t("editor.discussionSecondsHint")}
+                    min={0}
+                    max={120}
+                    value={value.discussionSeconds}
+                    onChange={(discussionSeconds) => onChange({ ...value, discussionSeconds })}
+                    issues={issues}
+                    field="discussionSeconds"
+                />
+                <NumberField
+                    label={t("editor.votingSeconds")}
+                    hint={t("editor.votingSecondsHint")}
+                    min={15}
+                    max={120}
+                    value={value.votingSeconds}
+                    onChange={(votingSeconds) => onChange({ ...value, votingSeconds })}
+                    issues={issues}
+                    field="votingSeconds"
+                />
+            </div>
+            <label className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 font-medium">{t("editor.confirmEjects")}</span>
+                <Switch
+                    checked={value.confirmEjects}
+                    onChange={(confirmEjects) => onChange({ ...value, confirmEjects })}
+                    aria-label={t("editor.confirmEjects")}
+                />
+            </label>
             <PlaceField
                 value={value.place}
                 onChange={(place) => onChange({ ...value, place })}

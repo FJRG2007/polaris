@@ -231,7 +231,11 @@ const TICK_MS = 2_000;
  * potato moving read as a game that missed it. A tick still never overlaps the
  * one before (`kick`), so a slow server only slows it to its own pace.
  */
-const KIND_TICK_MS: Partial<Record<catalog.EventKind, number>> = { "hot-potato": 500 };
+const KIND_TICK_MS: Partial<Record<catalog.EventKind, number>> = {
+    "hot-potato": 500,
+    // A kill, a switch and a vote answered within the second.
+    impostor: 1_000
+};
 
 function tickMsOf(kind: catalog.EventKind): number {
     return KIND_TICK_MS[kind] ?? TICK_MS;
@@ -2056,6 +2060,7 @@ async function play(
         case "hide-and-seek":
         case "hot-potato":
         case "sky-wars":
+        case "impostor":
             decided = await arenaService.arenaTick(
                 kindContext(installedAppId, loop, server, now),
                 lines

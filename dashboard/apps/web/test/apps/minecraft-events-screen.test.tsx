@@ -939,6 +939,32 @@ describe("the editor of an event players join", () => {
         ).toBe(false);
         expect(catalog.newPreset("team-duel", "duel").options).not.toHaveProperty("downHearts");
     });
+
+    it("saves an impostor game's settings, and never fewer than four players", async () => {
+        const saved: catalog.EventPreset[] = [];
+        await edit(catalog.newPreset("impostor", "imp"), saved);
+        const field = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
+        expect(field(/^Impostors/).value).toBe("1");
+        expect(field(/^Between kills/).value).toBe("30");
+        expect(field(/^Minimum player count/).value).toBe("4");
+        expect(field(/^Minimum player count/).min).toBe("4");
+        fireEvent.change(field(/^Minimum player count/), { target: { value: "3" } });
+        await waitFor(() => expect(screen.getAllByText("At least 4").length).toBeGreaterThan(0));
+        expect(done().disabled).toBe(true);
+        fireEvent.change(field(/^Minimum player count/), { target: { value: "6" } });
+        fireEvent.change(field(/^Impostors/), { target: { value: "4" } });
+        await waitFor(() => expect(screen.getAllByText("At most 3").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Impostors/), { target: { value: "2" } });
+        fireEvent.click(screen.getByLabelText(/^Say whether who was voted out/));
+        await waitFor(() => expect(done().disabled).toBe(false));
+        fireEvent.click(done());
+        expect(saved.at(-1)).toMatchObject({ minPlayers: 6 });
+        expect(saved.at(-1)!.options).toEqual({
+            ...catalog.newPreset("impostor", "imp").options,
+            impostors: 2,
+            confirmEjects: false
+        });
+    });
 });
 
 describe("the editor in Spanish", () => {

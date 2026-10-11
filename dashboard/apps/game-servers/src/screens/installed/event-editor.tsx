@@ -43,6 +43,7 @@ import {
     ElytraRaceFields,
     HideAndSeekFields,
     HotPotatoFields,
+    ImpostorFields,
     NetherMazeFields,
     SkyWarsFields,
     TntRunFields
@@ -1187,6 +1188,14 @@ function OptionsFields({
                     issues={issues}
                 />
             );
+        case "impostor":
+            return (
+                <ImpostorFields
+                    value={preset.options as catalog.EventOptions<"impostor">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
         case "sky-wars":
             return (
                 <SkyWarsFields
@@ -1336,7 +1345,7 @@ export function EventEditor({
                     >
                         <Input
                             type="number"
-                            min={1}
+                            min={catalog.playersFloor(draft.kind)}
                             max={50}
                             className="w-32"
                             value={

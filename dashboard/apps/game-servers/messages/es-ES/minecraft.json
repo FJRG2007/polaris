@@ -1793,6 +1793,11 @@
                 "label": "Descenso en barca",
                 "summary": "Un camino de hielo con muros baja desde una salida en lo alto hasta una meta muy por debajo, bloque a bloque. Cada corredor recibe una barca arriba; pasa por cada puerta en orden al bajar y gana el primero en cruzar la meta. Si caes o pierdes la barca, vuelves a tu última puerta con una nueva.",
                 "unit": "puertas"
+            },
+            "impostor": {
+                "label": "Impostor",
+                "summary": "Se construye en el cielo una estación de salas, mayor cuantos más juegan, unidas por pasillos alrededor de una sala de reuniones con una mesa y un botón de emergencia. A cada uno se le dice en privado si es tripulante o impostor, y los nombres van ocultos. La tripulación hace tareas en las consolas de las salas; los impostores las fingen, matan de un golpe y se cuelan de una sala a otra por conductos ocultos. Encontrar un cuerpo o pulsar el botón llama a todos a la mesa para hablar y votar a quién echar. La tripulación gana al terminar todas las tareas o echar a todos los impostores; los impostores ganan cuando son tantos como la tripulación. Al menos 4 jugadores.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -2498,7 +2503,20 @@
         "elytraObstacles": "Pilares",
         "elytraObstaclesHint": "Pilares junto a la línea entre aros, nunca en ella.",
         "downhillSteepness": "Desnivel",
-        "downhillSteepnessHint": "Cada cuánto baja el hielo un bloque al descender."
+        "downhillSteepnessHint": "Cada cuánto baja el hielo un bloque al descender.",
+        "impostorCount": "Impostores",
+        "impostorCountHint": "De 1 a 3, nunca más de uno por cada tres jugadores.",
+        "killCooldown": "Entre muertes (segundos)",
+        "killCooldownHint": "De 10 a 60 que espera un impostor tras matar, al empezar y tras una reunión.",
+        "impostorTasks": "Tareas de cada tripulante",
+        "impostorTasksHint": "De 1 a 8.",
+        "emergencies": "Reuniones de emergencia",
+        "emergenciesHint": "De 0 a 3 veces que cada jugador puede pulsar el botón.",
+        "discussionSeconds": "Para hablar (segundos)",
+        "discussionSecondsHint": "De 0 a 120 antes de abrir la votación.",
+        "votingSeconds": "Para votar (segundos)",
+        "votingSecondsHint": "De 15 a 120 para votar o saltar.",
+        "confirmEjects": "Decir si el expulsado era impostor"
     },
     "moderation": {
         "announcements": {

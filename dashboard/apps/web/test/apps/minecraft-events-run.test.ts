@@ -1639,6 +1639,12 @@ function answer(sent: string): string {
     // Any other block test: whatever the protected-area switch says.
     if (line.startsWith("execute in minecraft:overworld if block "))
         return world.refuseBlocks ? "Test failed" : "Test passed";
+    // A count the board keeps, set back for one player.
+    const boardSet = /^scoreboard players set (\w+) (pe_\w+) (-?\d+)$/.exec(line);
+    if (boardSet && world.board[boardSet[2]!]) {
+        world.board[boardSet[2]!]![boardSet[1]!] = Number(boardSet[3]);
+        return `Set [${boardSet[2]}] for ${boardSet[1]} to ${boardSet[3]}`;
+    }
     // Any other count the board keeps, for whoever is on.
     const board = /^execute as @a run scoreboard players get @s (pe_\w+)$/.exec(line);
     if (board && world.board[board[1]!]) {
@@ -6040,11 +6046,12 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
         ).toBe(true);
     // Everything built is taken out again: by its own box, or by a larger one
     // of the same block that holds it (an arena comes down a block at a time
-    // over its whole box).
+    // over its whole box). A block put down in one state - a lever off - is
+    // taken out by its id, whatever state it is in by then.
     const { built, removed } = builtAndRemoved();
     const parse = (one: string) => {
         const [coords, block] = one.split(" -> ");
-        return { at: coords!.split(" ").map(Number), block };
+        return { at: coords!.split(" ").map(Number), block: block!.replace(/\[.*$/, "") };
     };
     const holds = (outer: number[], inner: number[]) =>
         [0, 1, 2].every(
@@ -13437,5 +13444,228 @@ describe("an event's block checks, by server software", () => {
         world.flagged = ["ana:FastBreak"];
         await play(3 * 60_000);
         expect(state().history[0]?.disqualified).toEqual(out);
+    });
+});
+describe("impostor", () => {
+    const impostorOf = (minutes = 10) => {
+        const preset = newPreset("impostor", "imp");
+        return {
+            ...preset,
+            minutes,
+            options: {
+                ...preset.options,
+                killCooldown: 60,
+                tasks: 2,
+                discussionSeconds: 0,
+                votingSeconds: 15
+            }
+        };
+    };
+    const kind = () => import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/impostor");
+    const names = ["Ana", "Ben", "Cy", "Eve"];
+    const stateNow = async () => (await kind()).stateOf(state().run!.game)!;
+    /** A button clicked or a lever pulled, as the trigger count reads it. */
+    const press = (name: string, value: number) => {
+        (world.board.pe_imp ??= {})[name] = value;
+    };
+    /** A hit as the events data pack sees it, and the game remembering who hurt whom. */
+    const hit = (by: string, victim: string) => {
+        (world.tags.pe_hit_struck ??= new Set()).add(by);
+        (world.tags.pe_hit_hurt ??= new Set()).add(victim);
+        world.attackers[victim] = by;
+    };
+    /** Somebody stood a block from somebody else. */
+    const beside = (name: string, other: string) => {
+        const [x, y, z] = world.at[other]!;
+        world.at[name] = [x + 1, y, z];
+    };
+
+    it("is called off when fewer than four join, and builds nothing", async () => {
+        world.online = [...names];
+        setUp([impostorOf()]);
+        await startArena("imp");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"], ["Cy", "join"]);
+        await play(60_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 3 joined; it needs 4"
+        });
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+    });
+
+    it("deals roles privately, kills on a hit after the cooldown, and a reported body ends in a vote", async () => {
+        const im = await kind();
+        world.online = [...names];
+        world.board.pe_imp = {};
+        setUp([impostorOf()]);
+        await joinAndStart("imp", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        // No side panel to give a role away, names hidden, the trigger set up.
+        expect(
+            world.sent.some((line) => line.startsWith("scoreboard objectives add pe_score"))
+        ).toBe(false);
+        expect(world.sent).toContain("team modify pe_im nametagVisibility never");
+        expect(world.sent).toContain("scoreboard objectives add pe_imp trigger");
+        await play(2_100);
+        const first = await stateNow();
+        expect(first.impostors).toEqual(im.impostorsFor(run.id, run.joined, 1));
+        const [impostor] = first.impostors as [string];
+        const crew = names.filter((name) => name !== impostor) as [string, string, string];
+        // Told privately: the role is never said to everybody.
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith(`title ${impostor} title`) && visible(line).includes("Impostor")
+            )
+        ).toBe(true);
+        for (const name of crew)
+            expect(
+                world.sent.some(
+                    (line) =>
+                        line.startsWith(`title ${name} title`) && visible(line).includes("Impostor")
+                )
+            ).toBe(false);
+        expect(world.sent).toContain(`effect give ${crew[0]} minecraft:weakness 3 100 true`);
+
+        // A hit before the cooldown is out kills nobody.
+        beside(crew[0], impostor);
+        hit(impostor, crew[0]);
+        await play(2_100);
+        expect((await stateNow()).dead).toEqual([]);
+
+        // Once it is out, a hit kills: a ghost, and a body left behind.
+        await play((await stateNow()).ready[impostor]! - Date.now() + 2_100);
+        expect(world.sent).toContain(`effect clear ${impostor} minecraft:weakness`);
+        beside(crew[0], impostor);
+        hit(impostor, crew[0]);
+        await play(2_100);
+        const killed = await stateNow();
+        expect(killed.dead.map((one) => [one.name, one.how, one.by])).toEqual([
+            [crew[0], "killed", impostor]
+        ]);
+        expect(killed.kills[impostor]).toBe(1);
+        expect(killed.bodies.map((one) => one.name)).toEqual([crew[0]]);
+        expect(world.sent).toContain(`gamemode spectator ${crew[0]}`);
+        expect(world.sent).toContain(`tag ${crew[0]} add pe_im_ghost`);
+        expect(
+            world.sent.some(
+                (line) => line.includes("summon minecraft:armor_stand") && line.includes("pe_im_b0")
+            )
+        ).toBe(true);
+        // The next kill waits again.
+        beside(crew[1], impostor);
+        hit(impostor, crew[1]);
+        await play(2_100);
+        expect((await stateNow()).dead).toHaveLength(1);
+
+        // A ghost cannot report; the living can.
+        press(crew[0], im.REPORT_BASE);
+        await play(2_100);
+        expect((await stateNow()).meeting).toBeNull();
+        press(crew[1], im.REPORT_BASE);
+        await play(2_100);
+        const meeting = (await stateNow()).meeting!;
+        expect(meeting).toMatchObject({ reason: "report", by: crew[1], body: crew[0] });
+        // Everybody alive at the table; the body taken away.
+        const layout = im.layoutFor(run.id, run.arena!.box);
+        for (const name of [impostor, crew[1], crew[2]]) {
+            const [x, y, z] = world.at[name]!;
+            expect(im.inside(layout, { x, y, z })).toBe(true);
+        }
+        expect(world.sent).toContain("kill @e[type=minecraft:armor_stand,tag=pe_im_body]");
+
+        // The vote: two for the impostor, one skip - out, and the crew win.
+        press(crew[1], im.VOTE_BASE + run.entrants.findIndex((one) => one.name === impostor));
+        chat([crew[2], `vote ${impostor}`], [impostor, "skip"]);
+        await play(2_100);
+        await play(2_100);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Every impostor was voted out"
+        });
+        const podium = done.history[0]!.podium;
+        // The crew on top, the dead one with them; the impostor's kill below.
+        expect(
+            podium
+                .slice(0, 3)
+                .map((one) => one.name)
+                .sort()
+        ).toEqual([...crew].sort());
+        expect(podium.slice(0, 3).every((one) => one.score >= im.WIN_POINTS)).toBe(true);
+        // Everything taken down: blocks, entities, teams, counts, tags.
+        expect(world.sent).toContain("team remove pe_im");
+        expect(world.sent).toContain("scoreboard objectives remove pe_imp");
+        expect(world.sent).toContain("tag @a[tag=pe_im_ghost] remove pe_im_ghost");
+        expect(world.sent).toContain("kill @e[type=minecraft:armor_stand,tag=pe_im_label]");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+        const { built, removed } = builtAndRemoved();
+        expect(built.length).toBeGreaterThan(0);
+        expect(removed.length).toBeGreaterThan(0);
+        keptTheRules();
+    });
+
+    it("wins for the crew when every task is done, and counts nothing an impostor presses", async () => {
+        const im = await kind();
+        world.online = [...names];
+        world.board.pe_imp = {};
+        setUp([impostorOf()]);
+        await joinAndStart("imp", names);
+        await play(2_100);
+        const first = await stateNow();
+        const [impostor] = first.impostors as [string];
+        // The impostor pretends: nothing counts.
+        press(impostor, im.TASK_BASE + first.tasks[impostor]![0]!);
+        await play(2_100);
+        expect((await stateNow()).done[impostor] ?? []).toEqual([]);
+        // Somebody else's station counts nothing either.
+        const crew = names.filter((name) => name !== impostor) as [string, string, string];
+        const theirs = first.tasks[crew[1]]!.find((id) => !first.tasks[crew[0]]!.includes(id))!;
+        press(crew[0], im.TASK_BASE + theirs);
+        await play(2_100);
+        expect((await stateNow()).done[crew[0]] ?? []).toEqual([]);
+        for (const name of crew)
+            for (const station of first.tasks[name]!) {
+                press(name, im.TASK_BASE + station);
+                await play(2_100);
+            }
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "The crew finished every task"
+        });
+        expect(done.history[0]!.podium[0]!.score).toBe(im.WIN_POINTS + 2 * im.TASK_POINTS);
+    });
+
+    it("picks up where it was after a restart, the roles and the dead kept", async () => {
+        world.online = [...names];
+        world.board.pe_imp = {};
+        setUp([impostorOf()]);
+        await joinAndStart("imp", names);
+        await play(2_100);
+        const before = await stateNow();
+        const [impostor] = before.impostors as [string];
+        await play(before.ready[impostor]! - Date.now() + 2_100);
+        const victim = names.find((name) => name !== impostor)!;
+        beside(victim, impostor);
+        hit(impostor, victim);
+        await play(2_100);
+        expect((await stateNow()).dead.map((one) => one.name)).toEqual([victim]);
+        await restartedWith(state().run!, tagsNow());
+        await play(2_100);
+        const after = await stateNow();
+        expect(after.impostors).toEqual(before.impostors);
+        expect(after.dead.map((one) => one.name)).toEqual([victim]);
+        expect(after.tasks).toEqual(before.tasks);
+        // Built once: nothing put up again over the station.
+        expect(world.sent.some((line) => line.includes(" fill ") && line.endsWith(" keep"))).toBe(
+            false
+        );
     });
 });

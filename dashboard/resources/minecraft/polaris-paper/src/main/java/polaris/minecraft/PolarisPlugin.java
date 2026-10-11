@@ -29,6 +29,8 @@ public final class PolarisPlugin extends JavaPlugin {
         sounds = SoundPack.start(this, version);
         EventRespawn respawns = new EventRespawn();
         getServer().getPluginManager().registerEvents(respawns, this);
+        // An impostor game's dead talk only to each other; idle outside one.
+        getServer().getPluginManager().registerEvents(new EventGhosts(), this);
         PluginCommand polaris = getCommand("polaris");
         if (polaris != null) {
             CommandExecutor soundsCommand = sounds != null

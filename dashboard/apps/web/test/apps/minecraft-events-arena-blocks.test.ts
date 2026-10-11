@@ -24,6 +24,7 @@ import * as dropper from "@polaris-app/game-servers/src/lib/minecraft/events/kin
 import * as hs from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek";
 import * as manor from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/seek-manor";
 import * as potato from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hot-potato";
+import * as impostor from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/impostor";
 import * as build from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle";
 import * as boatRace from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/boat-race";
 import * as acidRain from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/acid-rain";
@@ -214,6 +215,18 @@ describe("every arena takes down everything it placed", () => {
                 []
             );
         }
+    });
+
+    it("impostor", () => {
+        for (const players of [4, 9, 15])
+            for (let seed = 0; seed < SEEDS; seed += 1) {
+                const box = impostor.stationBox(SITE, Y, players);
+                const fills = impostor
+                    .stationFills(impostor.layoutFor(`run-${seed}`, box))
+                    .map((one) => one.block);
+                // Nobody carries anything: what a player pulls or presses stays the same block.
+                expect(arenaLeaves(fills, { items: [] }, impostor.stationBlocks())).toEqual([]);
+            }
     });
 
     it("the hide and seek halls older runs still rebuild", () => {

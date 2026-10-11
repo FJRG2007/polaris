@@ -207,6 +207,8 @@ export function hasScoreboard(preset: EventPreset): boolean {
     if (preset.kind === "rare-catch" || preset.kind === "xp-boost") return false;
     // Who is left standing is on the boss bar; there is nothing to add up.
     if (preset.kind === "spleef" || lastStanding(preset)) return false;
+    // Points would tell everybody who has killed: an impostor's are kept to the end.
+    if (preset.kind === "impostor") return false;
     if (preset.kind === "explorer")
         return (preset.options as EventOptions<"explorer">).mode === "distance";
     return true;
