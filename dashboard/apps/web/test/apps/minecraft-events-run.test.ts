@@ -48,6 +48,8 @@ interface World {
     dealt: Record<string, number>;
     /** Players standing perfectly still, looking the same way. */
     still: string[];
+    /** Players whose rotation the server does not answer for. */
+    unfacing: string[];
     /** Players in creative or spectator. */
     creative: string[];
     difficulty: string;
@@ -243,6 +245,7 @@ const world: World = {
     hurt: {},
     dealt: {},
     still: [],
+    unfacing: [],
     creative: [],
     difficulty: "Normal",
     daylightCycle: "true",
@@ -1379,6 +1382,7 @@ function answer(sent: string): string {
     }
     if (line === "execute as @a run data get entity @s Rotation") {
         return world.online
+            .filter((name) => !world.unfacing.includes(name))
             .map((name) =>
                 world.still.includes(name)
                     ? `${name} has the following entity data: [10.0f, 0.0f]`
@@ -2041,6 +2045,7 @@ beforeEach(() => {
     world.hurt = {};
     world.dealt = {};
     world.still = [];
+    world.unfacing = [];
     world.creative = [];
     world.difficulty = "Normal";
     world.daylightCycle = "true";
@@ -5634,6 +5639,20 @@ describe("a meteor shower", () => {
         expect(world.blocks.get(key(broken))).toBe(broken.block);
         for (const cell of first.crust.slice(1)) expect(world.blocks.has(key(cell))).toBe(false);
         expect(world.sent).toContain("scoreboard objectives remove pe_mh");
+    });
+
+    it("guides by heading alone when it cannot tell which way a player looks", async () => {
+        world.ground = 70;
+        world.unfacing = ["Ana"];
+        setUp([shower()]);
+        await start();
+        world.at.Ana = [400.5, 70, 0.5];
+        await play(8_100);
+        const guides = world.sent.filter(
+            (line) => line.startsWith("title Ana actionbar") && line.includes("Meteor:")
+        );
+        expect(guides.length).toBeGreaterThan(0);
+        for (const line of guides) expect(/\\u219[0-9]/.test(line)).toBe(false);
     });
 
     it("has no heart of debris and no rim on a server older than both", async () => {

@@ -4096,6 +4096,7 @@ async function meteorShower(
         }
         const center = { x: nearest.x + 0.5, z: nearest.z + 0.5 };
         const meters = Math.round(away(nearest));
+        const looking = facing.get(one.name);
         lines.push(
             commands.actionbarFor(
                 one.name,
@@ -4104,7 +4105,7 @@ async function meteorShower(
                     commands.headingTo(one, center),
                     nearest.blocks.length,
                     language,
-                    commands.arrowTo(one, facing.get(one.name)?.yaw ?? 0, center)
+                    looking ? commands.arrowTo(one, looking.yaw, center) : ""
                 )
             )
         );

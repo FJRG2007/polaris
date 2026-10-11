@@ -112,8 +112,8 @@ const RULES: Readonly<Record<EventKind, Text>> = {
         es: "Defiende el punto marcado de cada oleada. Si mueres no pierdes nada."
     },
     "meteor-shower": {
-        en: "Meteors of ore are falling. Follow the arrow and the beam, and mine them first: every block counts, the heart five.",
-        es: "Caen meteoritos de mena. Sigue la flecha y el haz y pícalos antes que nadie: cada bloque cuenta, el centro cinco."
+        en: "Meteors of ore are falling. Follow the arrow and the beam, and mine them first: every block counts, and the heart, where there is one, five.",
+        es: "Caen meteoritos de mena. Sigue la flecha y el haz y pícalos antes que nadie: cada bloque cuenta, y el centro, si lo hay, cinco."
     },
     parkour: {
         en: "Fastest to the finish wins; a fall only sends you back to your checkpoint.",
