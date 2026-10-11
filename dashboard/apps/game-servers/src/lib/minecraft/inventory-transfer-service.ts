@@ -205,12 +205,13 @@ export async function applyPlanNow(
     server: ServerContainer,
     installedAppId: string,
     player: string,
-    plan: readonly transfer.PlannedSlot[]
+    plan: readonly transfer.PlannedSlot[],
+    /** The slots the game said it put a stack in: in, wherever it went next.
+     *  Filled as each is answered, so a caller still has them if a later slot throws. */
+    confirmed: number[] = []
 ): Promise<{ written: number; skipped: number[]; confirmed: number[] }> {
     let written = 0;
     const skipped: number[] = [];
-    /** The slots the game said it put a stack in: in, wherever it went next. */
-    const confirmed: number[] = [];
     for (const one of transfer.writesOf(plan)) {
         const argument = one.after ? itemArgument(one.after) : null;
         if (argument && !argument.ok) {

@@ -65,6 +65,8 @@ let bag = new Map<number, Stack>();
 let ground: { tags: string[]; stack: Stack; pickable: boolean }[] = [];
 /** What happens to a stack the moment it is written into a slot. */
 let landing: ((slot: number) => void) | null = null;
+/** What happens as one slot is read on its own, before it is written. */
+let reading: ((slot: number) => void) | null = null;
 let said: string[] = [];
 
 const SLOT_NAMES: Record<string, number> = {
@@ -97,6 +99,7 @@ async function say(argv: readonly string[]): Promise<string> {
             .join(", ")}]`;
     const one = /^data get entity Ana Inventory\[\{Slot:(-?\d+)b\}\]$/.exec(line);
     if (one) {
+        reading?.(Number(one[1]));
         const stack = bag.get(Number(one[1]));
         return stack
             ? `Ana has the following entity data: ${entry(Number(one[1]), stack)}`
@@ -194,6 +197,7 @@ beforeEach(() => {
     bag = new Map();
     ground = [];
     landing = null;
+    reading = null;
     said = [];
     for (const stack of [BOW, SWORD]) known.set(stack.id, stack);
 });
@@ -261,5 +265,43 @@ describe("giving back what somebody carried", () => {
         expect(bag.get(0)?.id).toBe("minecraft:stick");
         expect(owned(BOW.id)).toBe(1);
         expect(ground.filter((one) => one.stack.id === BOW.id)).toHaveLength(1);
+    });
+
+    it("drops a stack whose slot was filled before its write, even with a plain one of its id elsewhere", async () => {
+        bag.set(0, BOW);
+        const kept = await stashed();
+        // Picked up as the give-back runs: something into the bow's slot, and a
+        // plain bow of their own into another one.
+        known.set("minecraft:stick", { id: "minecraft:stick", count: 3, data: null });
+        reading = (slot) => {
+            if (slot !== 0) return;
+            reading = null;
+            bag.set(0, known.get("minecraft:stick")!);
+            bag.set(20, { id: BOW.id, count: 1, data: null });
+        };
+        expect(await giveBack(server, "Ana", kept, async () => undefined)).toBe("done");
+        expect(bag.get(20)?.data).toBeNull();
+        expect(ground.filter((one) => one.stack.id === BOW.id)).toHaveLength(1);
+    });
+
+    it("keeps a write the game confirmed as given when a later slot cannot be read", async () => {
+        bag.set(0, BOW);
+        bag.set(1, SWORD);
+        const kept = await stashed();
+        landing = (slot) => {
+            if (slot !== 0) return;
+            landing = null;
+            bag.delete(0);
+        };
+        reading = (slot) => {
+            if (slot !== 1) return;
+            reading = null;
+            throw new Error("closed");
+        };
+        await giveBack(server, "Ana", kept, async () => undefined);
+        expect(owned(BOW.id)).toBe(0);
+        expect(
+            said.some((line) => line.includes(`summon minecraft:item ~ ~ ~ {Item:{id:"${BOW.id}"`))
+        ).toBe(false);
     });
 });

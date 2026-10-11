@@ -51,12 +51,12 @@ function printedDigest(item: InventoryItem): string | null {
     return createHash("sha256").update(item.data.snbt).digest("hex").slice(0, 16);
 }
 
-/** The same stack exactly: id, count and every member of its data. */
 /** The same item, as many: what a slot write is read back as. */
 function sameKind(left: InventoryItem | undefined, right: InventoryItem): boolean {
     return left !== undefined && left.id === right.id && left.count === right.count;
 }
 
+/** The same stack exactly: id, count and every member of its data. */
 function whole(left: InventoryItem | undefined, right: InventoryItem): boolean {
     if (left === undefined || left.id !== right.id || left.count !== right.count) return false;
     if (left.data === null || right.data === null) return left.data === right.data;
@@ -634,10 +634,9 @@ export async function giveBack(
                 where: { id: kept.record },
                 data: { writing: JSON.stringify(toWrite.map((each) => each.one.slot)) }
             });
-        const applied = await applyPlanNow(server, server.installedAppId, name, plan).catch(
-            () => null
-        );
-        const confirmed = new Set(applied?.confirmed ?? []);
+        const answered: number[] = [];
+        await applyPlanNow(server, server.installedAppId, name, plan, answered).catch(() => null);
+        const confirmed = new Set(answered);
         // Too long for one command: built in storage and handed over, each
         // into its slot only while that is still empty.
         for (const each of toWrite) {
@@ -658,8 +657,7 @@ export async function giveBack(
             const slot = after.items.find(
                 (one) =>
                     !claimed.has(one.slot) &&
-                    one.id === item.id &&
-                    one.count === item.count &&
+                    whole(one, item) &&
                     !toWrite.some((each) => each.one.slot === one.slot) &&
                     !sameKind(at(current.items, one.slot), one)
             )?.slot;
