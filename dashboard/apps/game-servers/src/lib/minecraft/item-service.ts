@@ -23,6 +23,17 @@ import { withServerContainer, type ServerContainer } from "./service";
 import { recentlyGivenItems as recentlyGiven } from "../recent-items";
 import { AIR, itemArgument, replaceSlot, type ItemArgumentRefusal } from "./item-argument";
 import { host } from "@polaris/app-host";
+import { serverVersion } from "./server-version";
+import { versionAtLeast } from "./version-compare";
+import type { Enchantment } from "./item-details";
+import { PROBE_COMPONENTS, commandKnown, probeParsed } from "./events/commands";
+import {
+    availableEnchantments,
+    enchantFormatFor,
+    enchantedStack,
+    withEnchantments,
+    type EnchantFormat
+} from "./enchantments";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
@@ -44,7 +55,9 @@ export type WriteRefusal =
     | "occupied"
     | "indivisible"
     | "recipient"
-    | "same";
+    | "same"
+    | "rejected"
+    | "enchantUnsupported";
 
 export class ItemWriteError extends Error {
     constructor(
@@ -64,7 +77,9 @@ const REFUSALS: Record<WriteRefusal, string> = {
     occupied: gameMessage("games", "lib.move.occupied"),
     indivisible: gameMessage("games", "lib.move.indivisible"),
     recipient: gameMessage("games", "lib.move.recipient"),
-    same: gameMessage("games", "lib.move.same")
+    same: gameMessage("games", "lib.move.same"),
+    rejected: gameMessage("games", "lib.move.rejected"),
+    enchantUnsupported: gameMessage("games", "lib.move.enchantUnsupported")
 };
 
 function refuse(why: WriteRefusal): never {
@@ -183,10 +198,106 @@ export async function giveToSlot(
     player: string,
     slot: number,
     itemId: string,
-    count: number
+    count: number,
+    /** Put on it as it goes in. None, or absent, is the plain item. */
+    enchantments: readonly Enchantment[] = []
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (server) => {
-        await writeSlot(server, installedAppId, player, slot, itemId, count);
+        const argument = await argumentFor(server, itemId, enchantments);
+        const reply = await writeSlot(server, installedAppId, player, slot, argument, count);
+        if (enchantments.length > 0 && !slotReplaced(reply)) refuse("rejected");
+    });
+}
+
+/** How this server writes enchantments, and which it has. */
+export interface EnchantContext {
+    readonly format: EnchantFormat;
+    /** The version it started as, where its log says. */
+    readonly version: string | null;
+    /** The vanilla enchantments it has. */
+    readonly available: string[];
+}
+
+/** A probe only a server that writes enchantments as a plain map parses (1.21.5). */
+const PROBE_ENCHANT_MAP =
+    'clear @a[tag=pe_probe] minecraft:stone[minecraft:enchantments={"minecraft:sharpness":1}] 0';
+
+/** A probe any server with `/data` (1.13) knows. */
+const PROBE_DATA = "data get entity @e[tag=pe_probe,limit=1]";
+
+/**
+ * How this server writes enchantments. Out of the version in its log; when that
+ * cannot be read, out of which spelling the game parses. Refused on Bedrock and
+ * before 1.13, where enchantments are numbers this does not write.
+ */
+export async function enchantContextOf(server: ServerContainer): Promise<EnchantContext> {
+    if (server.edition !== "java") refuse("enchantUnsupported");
+    const version = await serverVersion(server);
+    let format: EnchantFormat | null;
+    if (version !== null) {
+        format = enchantFormatFor(version, versionAtLeast);
+    } else {
+        const ask = (line: string) => server.say([line]).catch(() => "");
+        if (probeParsed(await ask(PROBE_ENCHANT_MAP))) format = "map";
+        else if (probeParsed(await ask(PROBE_COMPONENTS))) format = "levels";
+        else format = commandKnown(await ask(PROBE_DATA)) ? "tag" : null;
+    }
+    if (format === null) refuse("enchantUnsupported");
+    return { format, version, available: availableEnchantments(version, format, versionAtLeast) };
+}
+
+/** What an item is given as: its id, or the id with these enchantments on it. */
+async function argumentFor(
+    server: ServerContainer,
+    itemId: string,
+    enchantments: readonly Enchantment[]
+): Promise<string> {
+    if (enchantments.length === 0) return itemId;
+    const { format } = await enchantContextOf(server);
+    const stack = enchantedStack(itemId, enchantments, format);
+    if (stack === null) refuse("unreadable");
+    const argument = itemArgument(stack);
+    if (!argument.ok) refuse(argument.why);
+    return argument.value;
+}
+
+/**
+ * Give a stack in a slot exactly these enchantments, and nothing else about it
+ * changes.
+ *
+ * Checked like a move: the slot is read again and compared with what the screen
+ * showed, on everything, so a stack that moved, wore down or was swapped while
+ * the dialog was open is left alone rather than overwritten. Then only the one
+ * enchantment field of its own compound is rewritten (`withEnchantments`), and
+ * it goes back in the same slot at the same count.
+ */
+export async function rewriteEnchantments(
+    ownerId: string,
+    installedAppId: string,
+    player: string,
+    slot: number,
+    expected: InventoryItem,
+    enchantments: readonly Enchantment[]
+): Promise<InventoryItem> {
+    return withServerContainer(ownerId, installedAppId, async (server) => {
+        const { format } = await enchantContextOf(server);
+        const source = await readSlot(server, player, slot);
+        if (source === null) refuse("gone");
+        if (!sameStack(source, expected)) refuse("moved");
+        const changed = withEnchantments(source, enchantments, format);
+        if (changed === null) refuse("unreadable");
+        const argument = itemArgument(changed);
+        if (!argument.ok) refuse(argument.why);
+        const reply = await writeSlot(
+            server,
+            installedAppId,
+            player,
+            slot,
+            argument.value,
+            source.count
+        );
+        if (!slotReplaced(reply)) refuse("rejected");
+        return changed;
     });
 }
 
@@ -285,16 +396,26 @@ export async function giveItem(
     installedAppId: string,
     player: string,
     itemId: string,
-    total: number
+    total: number,
+    /** Put on every stack given. None, or absent, is the plain item. */
+    enchantments: readonly Enchantment[] = []
 ): Promise<{ given: number; output: string }> {
     const stacks = stacksFor(itemId, total);
     return withServerContainer(ownerId, installedAppId, async (server) => {
+        const argument = await argumentFor(server, itemId, enchantments);
         const said: string[] = [];
         let given = 0;
         for (const stack of stacks) {
-            said.push(
-                stripFormatting(await server.say(["give", player, itemId, String(stack)])).trim()
-            );
+            const reply = stripFormatting(
+                await server.say(["give", player, argument, String(stack)])
+            ).trim();
+            said.push(reply);
+            // A stack the server refused - an enchantment this version does not
+            // have - is not counted as given, and the rest are not tried.
+            if (enchantments.length > 0 && !GAVE.test(reply)) {
+                if (given === 0) refuse("rejected");
+                break;
+            }
             given += stack;
         }
         return { given, output: said.filter(Boolean).join("\n") };

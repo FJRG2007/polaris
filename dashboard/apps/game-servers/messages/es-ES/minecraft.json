@@ -856,6 +856,42 @@
             "food": "Comida"
         }
     },
+    "enchant": {
+        "title": "Encantamientos de {name}",
+        "description": "{where}. Se guarda directamente en su inventario, y solo si el objeto sigue siendo el que se ve aquí.",
+        "none": "Sin encantamientos.",
+        "listLabel": "Encantamientos",
+        "levelOf": "Nivel de {name}",
+        "remove": "Quitar {name}",
+        "removeAll": "Quitar todos",
+        "add": "Añadir un encantamiento",
+        "search": "Buscar encantamientos",
+        "noMatch": "Ningún encantamiento coincide.",
+        "nothingFits": "No encaja ninguno más",
+        "overMax": "Por encima del máximo normal",
+        "overMaxHint": "Permite niveles hasta 255, como solo permiten los comandos.",
+        "every": "Ver todos",
+        "everyHint": "Incluye los que no encajan con este objeto o chocan con los que ya tiene.",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "edit": "Editar encantamientos",
+        "saved": "Encantamientos guardados en {name}.",
+        "cannotWrite": "Este objeto no se puede reescribir sin perder parte de sus datos, así que sus encantamientos no se pueden cambiar aquí.",
+        "offlineBlocked": "{name} tiene que estar en el servidor para cambiar los encantamientos de lo que lleva.",
+        "offline": "{name} ya no está en el servidor, así que no se ha tocado el objeto.",
+        "failed": "No se han podido cambiar esos encantamientos. Vuelve a intentarlo.",
+        "giveSection": "Encantar lo que das",
+        "giveWith": "{count, plural, one {Se da con # encantamiento} other {Se da con # encantamientos}}",
+        "pickFirst": "Elige primero un objeto.",
+        "bedrock": "Los servidores Bedrock no aceptan encantamientos desde un comando, así que los objetos se dan sin ellos.",
+        "errors": {
+            "id": "Eso no es un id de encantamiento, como minecraft:sharpness.",
+            "level": "Los niveles van de 1 a {max}.",
+            "tooMany": "Como máximo {max} encantamientos.",
+            "duplicate": "Ese encantamiento ya está en la lista.",
+            "overMax": "Eso supera el máximo normal de {max}. Activa \"Por encima del máximo normal\" para permitirlo."
+        }
+    },
     "inventoryEditor": {
         "everythingTheyCarryGoesArmour": "Se va todo lo que lleva, armadura y mano secundaria incluidas. No se puede deshacer.",
         "everythingTheyCarryGoesWhen": "Todo lo que lleva se va cuando vuelva a entrar, armadura y mano secundaria incluidas. No se puede deshacer.",

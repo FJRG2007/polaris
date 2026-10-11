@@ -981,7 +981,9 @@
             "occupied": "Suelta parte de un montón en una casilla vacía o sobre el mismo objeto. Partirlo sobre otra cosa no es algo que haga el juego.",
             "indivisible": "Ese montón lleva sus propios datos, así que sus objetos no son intercambiables y no se puede partir.",
             "recipient": "El otro jugador tiene que estar en el servidor para recibirlo. No se movió nada.",
-            "same": "Elige otro jugador al que enviarlo."
+            "same": "Elige otro jugador al que enviarlo.",
+            "rejected": "El servidor ha rechazado ese objeto. Puede que uno de los encantamientos no exista en esta versión.",
+            "enchantUnsupported": "Este servidor no acepta encantamientos desde Polaris: hace falta Java Edition 1.13 o posterior."
         },
         "blueprints": {
             "survival": {

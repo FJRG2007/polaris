@@ -23,13 +23,13 @@
  * drawn in the slot it is waiting for, faded, and can be called back off it.
  */
 
-import { X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { useState } from "react";
 import { type GameText, useGameText } from "../game-text";
 import { cn } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
 import { itemLabel } from "../../lib/minecraft/items";
-import { isMovable } from "../../lib/minecraft/item-argument";
+import { isMovable, replaceSlot } from "../../lib/minecraft/item-argument";
 import { enchantmentText, itemDetails, type ItemDetails } from "../../lib/minecraft/item-details";
 import {
     ARMOUR_SLOTS,
@@ -85,6 +85,14 @@ export interface PendingStack {
     readonly count: number;
 }
 
+/**
+ * Changing the enchantments on the stack pointed at: offered with what opens the
+ * editor, or held back with the reason it cannot be done here and now.
+ */
+export type StackEnchanting =
+    | { readonly onOpen: (item: InventoryItem) => void }
+    | { readonly blocked: string };
+
 /** What a grid needs to be draggable. Absent on every screen that only reports. */
 export interface SlotHandlers {
     /** A stack was picked up. Null when the drag ended without a drop. */
@@ -101,12 +109,15 @@ export function InventoryGrid({
     items,
     pending,
     handlers,
-    onCancelPending
+    onCancelPending,
+    enchanting
 }: {
     items: readonly InventoryItem[];
     /** Stacks waiting for the player to join, drawn in the slot they will land in. */
     pending?: readonly PendingStack[];
     handlers?: SlotHandlers;
+    /** Absent where the grid only reports a bag. */
+    enchanting?: StackEnchanting;
     /** Called with a waiting stack's queued id to call it back off the slot. */
     onCancelPending?: (id: string) => void;
 }) {
@@ -183,7 +194,11 @@ export function InventoryGrid({
                 {waiting.size > 0 && ` ${t("inventory.waiting", { count: waiting.size })}`}
             </p>
             {items.length > 0 && (
-                <StackDetails item={shown} where={shown ? slotLabelIn(t, shown.slot) : ""} />
+                <StackDetails
+                    item={shown}
+                    where={shown ? slotLabelIn(t, shown.slot) : ""}
+                    {...(enchanting ? { enchanting } : {})}
+                />
             )}
         </div>
     );
@@ -432,7 +447,15 @@ function describe(t: GameText<"minecraft">, details: ItemDetails): string[] {
  * enchantments: a panel that grew with what it held moved the whole dialog
  * every time the pointer crossed a slot. What does not fit scrolls inside it.
  */
-function StackDetails({ item, where }: { item: InventoryItem | null; where: string }) {
+function StackDetails({
+    item,
+    where,
+    enchanting
+}: {
+    item: InventoryItem | null;
+    where: string;
+    enchanting?: StackEnchanting;
+}) {
     const t = useGameText("minecraft");
     const shell =
         "flex h-24 min-w-0 items-start gap-2 overflow-hidden rounded-md border border-border bg-surface/40 px-3 py-2";
@@ -484,6 +507,38 @@ function StackDetails({ item, where }: { item: InventoryItem | null; where: stri
                     </ul>
                 )}
             </div>
+            {enchanting && <EnchantButton item={item} enchanting={enchanting} />}
         </div>
+    );
+}
+
+/** The way into a stack's enchantments, or why there is none for it. */
+function EnchantButton({ item, enchanting }: { item: InventoryItem; enchanting: StackEnchanting }) {
+    const t = useGameText("minecraft");
+    // A slot only a mod knows, or a stack whose data cannot be written back
+    // exactly, cannot be rewritten without losing something.
+    const why =
+        "blocked" in enchanting
+            ? enchanting.blocked
+            : replaceSlot(item.slot) === null || !isMovable(item)
+              ? t("enchant.cannotWrite")
+              : null;
+    const label = why ?? t("enchant.edit");
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            title={label}
+            aria-disabled={why !== null}
+            onClick={() => why === null && "onOpen" in enchanting && enchanting.onOpen(item)}
+            className={cn(
+                "shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors",
+                why === null
+                    ? "hover:bg-surface hover:text-violet-500"
+                    : "cursor-not-allowed opacity-50"
+            )}
+        >
+            <Sparkles className="size-4" />
+        </button>
     );
 }

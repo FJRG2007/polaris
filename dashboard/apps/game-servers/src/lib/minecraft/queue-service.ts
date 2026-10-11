@@ -268,7 +268,8 @@ async function apply(
             action.username,
             action.payload.slot,
             action.payload.item,
-            action.payload.count
+            action.payload.count,
+            action.payload.enchantments
         );
         return;
     }
@@ -281,7 +282,8 @@ async function apply(
             installedAppId,
             action.username,
             action.payload.item,
-            action.payload.count
+            action.payload.count,
+            action.payload.enchantments
         );
         return;
     }

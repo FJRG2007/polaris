@@ -15,9 +15,13 @@ import {
     clearInventory,
     clearItem,
     giveItem,
+    rewriteEnchantments,
     transferInventory,
     type BagTransfer
 } from "./item-service";
+import type { InventoryItem } from "./inventory";
+import type { Enchantment } from "./item-details";
+import { editableEnchantments } from "./enchantments";
 
 const { recordAudit } = host.auditService;
 
@@ -63,8 +67,11 @@ function audit(target: ItemTarget, action: string, metadata: Record<string, unkn
 export async function givePlayerItems(
     target: ItemTarget,
     item: string,
-    count: number
+    count: number,
+    /** Put on what is given. None is the plain item. */
+    enchantments: readonly Enchantment[] = []
 ): Promise<ItemOutcome> {
+    const enchanted = enchantments.length > 0 ? { enchantments: [...enchantments] } : {};
     const { ownerId, installedAppId, player } = target;
     // `/give` needs somebody standing there. Deciding at four in the afternoon
     // to hand something to a player who is asleep is the ordinary case, so it
@@ -73,14 +80,51 @@ export async function givePlayerItems(
         await queueAction({
             installedAppId,
             username: player,
-            payload: { kind: "give", item, count },
+            payload: { kind: "give", item, count, ...enchanted },
             requestedById: target.actorId
         });
         return { queued: true };
     }
-    const { given, output } = await giveItem(ownerId, installedAppId, player, item, count);
-    await audit(target, "minecraft.give", { player, item, count: given });
+    const { given, output } = await giveItem(
+        ownerId,
+        installedAppId,
+        player,
+        item,
+        count,
+        enchantments
+    );
+    await audit(target, "minecraft.give", { player, item, count: given, ...enchanted });
     return { queued: false, output: output.trim() };
+}
+
+/**
+ * Give the stack in one slot exactly these enchantments. Only while the player
+ * is on: the write has to see the stack it changes, and a slot written down for
+ * later may hold something else by the time they join.
+ */
+export async function enchantPlayerStack(
+    target: ItemTarget,
+    slot: number,
+    expected: InventoryItem,
+    enchantments: readonly Enchantment[]
+): Promise<InventoryItem> {
+    const { ownerId, installedAppId, player } = target;
+    const changed = await rewriteEnchantments(
+        ownerId,
+        installedAppId,
+        player,
+        slot,
+        expected,
+        enchantments
+    );
+    await audit(target, "minecraft.inventory-enchant", {
+        player,
+        slot,
+        item: expected.id,
+        before: editableEnchantments(expected),
+        after: [...enchantments]
+    });
+    return changed;
 }
 
 /** Take a number of one item away, wherever it is in the bag. */

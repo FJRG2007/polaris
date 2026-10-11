@@ -28,21 +28,35 @@ import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { ItemPicker } from "./minecraft-item-picker";
 import { PlayerPicker } from "./player-picker";
 import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
-import { bySlot } from "../../lib/minecraft/inventory";
 import { Badge, Button, Input, Skeleton, cn } from "@polaris/ui";
-import { maxStackFor, stacksFor } from "../../lib/minecraft/items";
+import { itemLabel, maxStackFor, stacksFor } from "../../lib/minecraft/items";
 import { InventoryGrid, type PendingStack } from "./minecraft-inventory";
 import { isMovable, writableSlots } from "../../lib/minecraft/item-argument";
 import type { QueuedAction } from "../../lib/minecraft/queue";
 import { describeQueuedText } from "./queue-text";
+import { bySlot, slotLabelIn, type InventoryItem } from "../../lib/minecraft/inventory";
+import {
+    withEnchantments,
+    type EnchantFormat,
+    type EnchantmentSet
+} from "../../lib/minecraft/enchantments";
+import {
+    EnchantStackDialog,
+    EnchantmentFields,
+    NO_ENCHANTMENTS,
+    checkDraft,
+    type EnchantDraft
+} from "./minecraft-enchantments";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
+    ChevronDown,
     Eraser,
     Loader2,
     PackageMinus,
     PackagePlus,
     RefreshCw,
     Send,
+    Sparkles,
     Trash2,
     X
 } from "lucide-react";
@@ -102,6 +116,17 @@ export function InventoryEditor({
     const [confirm, confirmElement] = useConfirm();
     /** Who a stack dropped on the send area goes to. */
     const [recipient, setRecipient] = useState<string | null>(null);
+    /** How this server writes enchantments and which it has, read the first time
+     *  either enchanting control is used. */
+    const [enchantContext, setEnchantContext] = useState<{
+        available: string[] | null;
+        format: EnchantFormat | null;
+    } | null>(null);
+    /** The stack whose enchantments are open in the dialog. */
+    const [enchanting, setEnchanting] = useState<InventoryItem | null>(null);
+    /** What the next give puts on the item; cleared when the item changes. */
+    const [giveEnchant, setGiveEnchant] = useState<EnchantDraft>(NO_ENCHANTMENTS);
+    const [enchantOpen, setEnchantOpen] = useState(false);
     // Read through a ref so the poll can see it without restarting on every drag.
     const dragging = useRef(false);
     dragging.current = held !== null;
@@ -152,6 +177,64 @@ export function InventoryEditor({
             alive = false;
         };
     }, [installedAppId]);
+
+    const wantsContext = editable && (enchanting !== null || enchantOpen);
+    useEffect(() => {
+        if (!wantsContext || enchantContext !== null) return;
+        let alive = true;
+        void actions.enchantContextAction(installedAppId).then((result) => {
+            // A server that cannot be asked right now still gets the full list:
+            // the write is checked against the server itself when it happens.
+            if (alive)
+                setEnchantContext({
+                    available: result.available ?? null,
+                    format: result.format ?? null
+                });
+        });
+        return () => {
+            alive = false;
+        };
+    }, [wantsContext, enchantContext, installedAppId]);
+
+    // Another item is another set: what fitted a sword does not fit a bow.
+    useEffect(() => setGiveEnchant(NO_ENCHANTMENTS), [picked]);
+    const giveChecked = checkDraft(giveEnchant);
+    const giveEnchantments: { enchant?: EnchantmentSet } =
+        giveChecked.ok && giveChecked.value.enchantments.length > 0
+            ? { enchant: giveChecked.value }
+            : {};
+
+    /**
+     * Write a stack's new enchantments, showing them at once and putting the old
+     * ones back if the server refuses. The poll waits while it is in flight, so
+     * it cannot redraw the old set over the new one before the write lands.
+     */
+    function saveEnchantments(item: InventoryItem, set: EnchantmentSet): void {
+        setEnchanting(null);
+        const format: EnchantFormat =
+            enchantContext?.format ?? (item.data?.era === "tag" ? "tag" : "map");
+        const shown = withEnchantments(item, set.enchantments, format);
+        const before = reading;
+        if (shown && before)
+            setReading({
+                ...before,
+                items: before.items.map((each) => (each.slot === item.slot ? shown : each))
+            });
+        run(async () => {
+            const result = await actions.enchantInventoryStackAction({
+                installedAppId,
+                player,
+                slot: item.slot,
+                expected: item,
+                enchant: set
+            });
+            if (result.error) {
+                if (before) setReading(before);
+                return { error: result.error };
+            }
+            return { note: t("enchant.saved", { name: itemLabel(item.id) }) };
+        });
+    }
 
     const slowRead = reading?.chunked === true;
     useEffect(() => {
@@ -216,7 +299,8 @@ export function InventoryEditor({
             player,
             slot,
             item: id,
-            count: first
+            count: first,
+            ...giveEnchantments
         });
         if (placed.error || rest.length === 0) return placed;
         const spare = rest.reduce((sum, stack) => sum + stack, 0);
@@ -224,7 +308,8 @@ export function InventoryEditor({
             installedAppId,
             player,
             item: id,
-            count: spare
+            count: spare,
+            ...giveEnchantments
         });
         if (given.error) return given;
         return placed;
@@ -236,6 +321,11 @@ export function InventoryEditor({
         if (!carrying) return;
 
         if (carrying.kind === "palette") {
+            // A set that would be refused is not quietly dropped for a plain item.
+            if (!giveChecked.ok) {
+                setError(schemaText(giveChecked.message) ?? t("enchant.failed"));
+                return;
+            }
             run(() => putInSlot(carrying.id, slot));
             return;
         }
@@ -324,6 +414,15 @@ export function InventoryEditor({
     return (
         <div className="flex flex-col gap-4 lg:flex-row">
             {confirmElement}
+            {enchanting && (
+                <EnchantStackDialog
+                    item={enchanting}
+                    where={slotLabelIn(t, enchanting.slot)}
+                    available={enchantContext?.available ?? null}
+                    onClose={() => setEnchanting(null)}
+                    onSave={(set) => saveEnchantments(enchanting, set)}
+                />
+            )}
             <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={live ? "success" : undefined}>
@@ -405,6 +504,13 @@ export function InventoryEditor({
                         onCancelPending={(id) =>
                             run(() => actions.cancelQueuedActionAction(installedAppId, id))
                         }
+                        {...(editable
+                            ? {
+                                  enchanting: live
+                                      ? { onOpen: setEnchanting }
+                                      : { blocked: t("enchant.offlineBlocked", { name: player }) }
+                              }
+                            : {})}
                         {...(editable
                             ? {
                                   handlers: {
@@ -542,11 +648,53 @@ export function InventoryEditor({
                     </p>
                 )}
 
+                <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2">
+                    <button
+                        type="button"
+                        aria-expanded={enchantOpen}
+                        className="flex items-center justify-between gap-2 text-left text-xs"
+                        onClick={() => setEnchantOpen((open) => !open)}
+                    >
+                        <span className="flex min-w-0 items-center gap-1.5">
+                            <Sparkles className="size-3.5 shrink-0 text-violet-500" />
+                            <span className="truncate">
+                                {giveEnchant.enchantments.length > 0
+                                    ? t("enchant.giveWith", {
+                                          count: giveEnchant.enchantments.length
+                                      })
+                                    : t("enchant.giveSection")}
+                            </span>
+                        </span>
+                        <ChevronDown
+                            className={cn(
+                                "size-3.5 shrink-0 transition-transform",
+                                enchantOpen && "rotate-180"
+                            )}
+                        />
+                    </button>
+                    {enchantOpen &&
+                        (!editable ? (
+                            <p className="text-xs text-muted-foreground">{t("enchant.bedrock")}</p>
+                        ) : !picked ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("enchant.pickFirst")}
+                            </p>
+                        ) : (
+                            <EnchantmentFields
+                                itemId={picked}
+                                draft={giveEnchant}
+                                onChange={setGiveEnchant}
+                                available={enchantContext?.available ?? null}
+                                disabled={pending}
+                            />
+                        ))}
+                </div>
+
                 <div className="flex flex-col gap-1.5">
                     <Button
                         size="sm"
                         variant="secondary"
-                        disabled={!picked || pending}
+                        disabled={!picked || pending || !giveChecked.ok}
                         onClick={() =>
                             picked &&
                             run(() =>
@@ -554,7 +702,8 @@ export function InventoryEditor({
                                     installedAppId,
                                     player,
                                     item: picked,
-                                    count: amount
+                                    count: amount,
+                                    ...giveEnchantments
                                 })
                             )
                         }

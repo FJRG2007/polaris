@@ -856,6 +856,42 @@
             "food": "Food"
         }
     },
+    "enchant": {
+        "title": "Enchantments on {name}",
+        "description": "{where}. Saved straight into their inventory, and only if the stack is still the one shown here.",
+        "none": "No enchantments.",
+        "listLabel": "Enchantments",
+        "levelOf": "Level of {name}",
+        "remove": "Remove {name}",
+        "removeAll": "Remove every enchantment",
+        "add": "Add an enchantment",
+        "search": "Search enchantments",
+        "noMatch": "No enchantment matches.",
+        "nothingFits": "Nothing else fits this item",
+        "overMax": "Past the normal maximum",
+        "overMaxHint": "Allow levels up to 255, as only commands can.",
+        "every": "Every enchantment",
+        "everyHint": "Include ones that do not fit this item or clash with what it has.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "edit": "Edit enchantments",
+        "saved": "Enchantments saved on the {name}.",
+        "cannotWrite": "This stack cannot be rewritten without losing some of its data, so its enchantments cannot be changed here.",
+        "offlineBlocked": "{name} has to be on the server to change enchantments on what they carry.",
+        "offline": "{name} is not on the server any more, so the stack was left alone.",
+        "failed": "Could not change those enchantments. Try again.",
+        "giveSection": "Enchant what you give",
+        "giveWith": "{count, plural, one {Given with # enchantment} other {Given with # enchantments}}",
+        "pickFirst": "Pick an item first.",
+        "bedrock": "Bedrock servers do not take enchantments from a command, so items are given plain.",
+        "errors": {
+            "id": "That is not an enchantment id, like minecraft:sharpness.",
+            "level": "Levels go from 1 to {max}.",
+            "tooMany": "{max} enchantments at most.",
+            "duplicate": "That enchantment is already on the list.",
+            "overMax": "That is past the normal maximum of {max}. Turn on \"Past the normal maximum\" to allow it."
+        }
+    },
     "inventoryEditor": {
         "everythingTheyCarryGoesArmour": "Everything they carry goes, armor and offhand included. This cannot be undone.",
         "everythingTheyCarryGoesWhen": "Everything they carry goes when they next join, armor and offhand included. This cannot be undone.",

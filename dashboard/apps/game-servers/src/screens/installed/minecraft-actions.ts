@@ -93,13 +93,16 @@ import {
 } from "../../lib/minecraft/rules-service";
 import {
     clearSlot,
+    enchantContextOf,
     giveToSlot,
     moveStack,
     recentlyGivenItems,
     transferStack
 } from "../../lib/minecraft/item-service";
+import { enchantmentSetSchema, type EnchantFormat } from "../../lib/minecraft/enchantments";
 import {
     emptyPlayerInventory,
+    enchantPlayerStack,
     givePlayerItems,
     isPlayerOnline,
     sendPlayerInventory,
@@ -295,7 +298,9 @@ const giveSchema = z.object({
     /** A total, not a stack. What arrives is stacks - 128 diamonds is two of
      *  them - and the ceiling is a bag's worth: 36 slots of 64 is everything a
      *  player can hold, and past that the rest is on the floor. */
-    count: z.number().int().min(1).max(2304)
+    count: z.number().int().min(1).max(2304),
+    /** Put on what is given, as the dialog's set. Absent for the plain item. */
+    enchant: enchantmentSetSchema.optional()
 });
 
 const teleportSchema = z.object({
@@ -311,7 +316,7 @@ const timeoutSchema = z.object({
     reason: z.string().trim().max(200).optional()
 });
 
-export type GiveItemInput = z.infer<typeof giveSchema>;
+export type GiveItemInput = z.input<typeof giveSchema>;
 export type TeleportInput = z.infer<typeof teleportSchema>;
 export type TimeoutInput = z.infer<typeof timeoutSchema>;
 
@@ -326,13 +331,14 @@ export async function givePlayerItemAction(
                 (await issueText(parsed.error.issues[0]?.message)) ??
                 (await gameWords("minecraft"))("errors.checkTheDetailsAndTry")
         };
-    const { installedAppId, player, item, count } = parsed.data;
+    const { installedAppId, player, item, count, enchant } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
         const done = await givePlayerItems(
             { ownerId: access.ownerId, installedAppId, actorId: user.id, player },
             item,
-            count
+            count,
+            enchant?.enchantments ?? []
         );
         return done.queued ? { queued: true } : { output: done.output };
     } catch (caught) {
@@ -3097,15 +3103,89 @@ export async function moveInventorySlotAction(input: MoveSlotInput): Promise<{ e
     }
 }
 
+const enchantSchema = z.object({
+    installedAppId: z.string().uuid(),
+    player: playerNameSchema,
+    slot: z.number().int().min(-128).max(127),
+    /** What the screen was showing in the slot. The server compares before it
+     *  writes, so a stack that moved or changed is left alone. */
+    expected: stackSchema,
+    enchant: enchantmentSetSchema
+});
+
+export type EnchantStackInput = z.input<typeof enchantSchema>;
+
+/**
+ * Give the stack in one slot exactly this set of enchantments: added, levelled,
+ * removed, or none at all. Only while the player is on.
+ */
+export async function enchantInventoryStackAction(
+    input: EnchantStackInput
+): Promise<{ item?: InventoryItem; error?: string }> {
+    const parsed = enchantSchema.safeParse(input);
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("minecraft"))("errors.checkTheDetailsAndTry")
+        };
+    const { installedAppId, player, slot, expected, enchant } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        if (!(await isPlayerOnline(access.ownerId, installedAppId, player)))
+            return { error: (await gameWords("minecraft"))("enchant.offline", { name: player }) };
+        const item = await enchantPlayerStack(
+            { ownerId: access.ownerId, installedAppId, actorId: user.id, player },
+            slot,
+            expected,
+            enchant.enchantments
+        );
+        return { item };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("minecraft"))("enchant.failed")
+        };
+    }
+}
+
+/** How this server writes enchantments and which it has, for the dialog to
+ *  offer only those. An error, rather than a guess, for one that has none. */
+export async function enchantContextAction(
+    installedAppId: string
+): Promise<{ available?: string[]; format?: EnchantFormat; error?: string }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success)
+        return { error: (await gameWords("minecraft"))("errors.checkTheDetailsAndTry") };
+    try {
+        const { access } = await requireGameServer("games.moderate", parsed.data);
+        const context = await withServerContainer(access.ownerId, parsed.data, (server) =>
+            enchantContextOf(server)
+        );
+        return { available: context.available, format: context.format };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("minecraft"))("enchant.failed")
+        };
+    }
+}
+
 const slotItemSchema = z.object({
     installedAppId: z.string().uuid(),
     player: playerNameSchema,
     slot: z.number().int().min(-128).max(127),
     item: itemIdSchema,
-    count: z.number().int().min(1).max(64)
+    count: z.number().int().min(1).max(64),
+    /** Put on it as it goes in. Absent for the plain item. */
+    enchant: enchantmentSetSchema.optional()
 });
 
-export type SlotItemInput = z.infer<typeof slotItemSchema>;
+export type SlotItemInput = z.input<typeof slotItemSchema>;
 
 /**
  * Put an item in a slot.
@@ -3124,25 +3204,27 @@ export async function setInventorySlotAction(
                 (await issueText(parsed.error.issues[0]?.message)) ??
                 (await gameWords("minecraft"))("errors.checkTheDetailsAndTry")
         };
-    const { installedAppId, player, slot, item, count } = parsed.data;
+    const { installedAppId, player, slot, item, count, enchant } = parsed.data;
+    const enchantments = enchant?.enchantments ?? [];
+    const enchanted = enchantments.length > 0 ? { enchantments } : {};
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
         if (!(await isPlayerOnline(access.ownerId, installedAppId, player))) {
             await queueAction({
                 installedAppId,
                 username: player,
-                payload: { kind: "set-slot", slot, item, count },
+                payload: { kind: "set-slot", slot, item, count, ...enchanted },
                 requestedById: user.id
             });
             return { queued: true };
         }
-        await giveToSlot(access.ownerId, installedAppId, player, slot, item, count);
+        await giveToSlot(access.ownerId, installedAppId, player, slot, item, count, enchantments);
         await recordAudit({
             actorId: user.id,
             action: "minecraft.inventory-set",
             targetType: "installedApp",
             targetId: installedAppId,
-            metadata: { player, slot, item, count }
+            metadata: { player, slot, item, count, ...enchanted }
         });
         return {};
     } catch (caught) {
