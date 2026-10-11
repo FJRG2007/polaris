@@ -536,6 +536,29 @@ export const FAKE_TAG = "pe_gb_fake";
 export const WALKER_TAG = "pe_gb_walk";
 
 /**
+ * The walkers' own team, so nobody is shoved off the glass by somebody
+ * walking into them (`collisionRule never`) - what the parkour and hide and
+ * seek do for theirs. Gone with the run; taking the team away takes everybody
+ * off it.
+ */
+export const NO_PUSH_TEAM = "pe_glass";
+
+/** The team made, and each of `names` on it - only if they are on none of the
+ *  server's own, whose colour and prefix are theirs to keep. */
+export function noPushLines(names: readonly string[]): string[] {
+    return [
+        `team remove ${NO_PUSH_TEAM}`,
+        `team add ${NO_PUSH_TEAM}`,
+        `team modify ${NO_PUSH_TEAM} collisionRule never`,
+        `team modify ${NO_PUSH_TEAM} friendlyFire false`,
+        ...names.map(
+            (name) =>
+                `execute if entity @a[name=${name},team=] run team join ${NO_PUSH_TEAM} ${name}`
+        )
+    ];
+}
+
+/**
  * The pack's functions under `polaris:glass/`: each tick, while the switch is
  * on, every marker whose panel a walker stands on - the panel's whole
  * footprint, a block high over it - shatters its panel and goes.
@@ -577,7 +600,8 @@ export function stopLines(box: Box): string[] {
     return [
         `scoreboard players set #on ${OBJECTIVE} 0`,
         markersOut(box),
-        `tag @a remove ${WALKER_TAG}`
+        `tag @a remove ${WALKER_TAG}`,
+        `team remove ${NO_PUSH_TEAM}`
     ];
 }
 

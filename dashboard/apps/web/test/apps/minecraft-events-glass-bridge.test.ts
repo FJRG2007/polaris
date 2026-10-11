@@ -249,6 +249,17 @@ describe("the data pack", () => {
         expect(glass.FUNCTIONS.shatter!.at(-1)).toBe("kill @s");
     });
 
+    it("puts the walkers on a team nobody is pushed off by, and takes it away at the end", () => {
+        const lines = glass.noPushLines(["Ana", "Bo"]);
+        expect(lines).toContain(`team modify ${glass.NO_PUSH_TEAM} collisionRule never`);
+        expect(lines).toContain(
+            `execute if entity @a[name=Ana,team=] run team join ${glass.NO_PUSH_TEAM} Ana`
+        );
+        expect(glass.stopLines(glass.bridgeBox(SITE, Y, 6))).toContain(
+            `team remove ${glass.NO_PUSH_TEAM}`
+        );
+    });
+
     it("is armed with a marker on every panel that breaks, and switched off at the end", () => {
         const box = glass.bridgeBox(SITE, Y, 20);
         const layout = glass.layoutOf(box, 20);

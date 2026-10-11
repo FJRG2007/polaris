@@ -87,7 +87,10 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const state = firstState(run, ctx.now);
     const names = run.entrants.map((one) => one.name);
     const walking = new Set(glass.walkers(state, options.mode, names).map(lower));
-    const out: string[] = [...glass.armLines(run.arena!.box, layout, run.id)];
+    const out: string[] = [
+        ...glass.armLines(run.arena!.box, layout, run.id),
+        ...glass.noPushLines(names)
+    ];
     for (const one of run.entrants)
         out.push(
             arena.moveTo(one.name, spotOf(run, one)),
