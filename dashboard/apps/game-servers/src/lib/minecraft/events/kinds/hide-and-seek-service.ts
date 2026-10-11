@@ -402,8 +402,47 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         }
     }
     // The manor's lava: everybody crosses it unhurt, so a seeker can look
-    // wherever a hider can hide.
-    if (house) await hitsService.ensure(ctx);
+    // wherever a hider can hide. The same pack freezes a seeker a potion
+    // reaches.
+    const packOn = house ? await hitsService.ensure(ctx) : false;
+    // The freeze potions, once a game, to hiders on the server: only where
+    // the pack can freeze, and only for a run that took them in its kit, so
+    // the end takes them back.
+    if (
+        state.released &&
+        packOn &&
+        options.freezePotions > 0 &&
+        state.freezeGiven.length === 0 &&
+        run.marker &&
+        run.kit.includes(hs.FREEZE_ITEM)
+    ) {
+        state.freezeAt ??= hs.freezeAt(run.id, releaseAt, ctx.run.endsAt);
+        const holders =
+            state.freezeAt !== null && now >= state.freezeAt
+                ? hs.freezeHolders(
+                      run.id,
+                      hiders.map((one) => one.name).filter((name) => here.has(lower(name))),
+                      options.freezePotions
+                  )
+                : [];
+        if (holders.length > 0) {
+            state.freezeGiven = holders;
+            lines.push(
+                ...hs.freezeArmLines(options.freezeSeconds),
+                ...holders.map((name) => arena.giveMarked(name, hs.FREEZE_ITEM, 1, run.marker!)),
+                ...holders.map((name) =>
+                    arena.tellTo(
+                        name,
+                        messages.tag(language) +
+                            seekMessages.freezeTold(options.freezeSeconds, language)
+                    )
+                ),
+                commands.say(
+                    messages.tag(language) + seekMessages.freezeAnnounced(holders.length, language)
+                )
+            );
+        }
+    }
     for (const one of run.entrants) {
         const at = here.get(lower(one.name));
         if (!at) continue;
@@ -579,7 +618,9 @@ export const hideAndSeek: ArenaGame = {
     fills: (run, box) => manor.manorFills(box, manorOf(run)),
     blocks: (run) => manor.manorBlocks(manorOf(run)),
     decorate: (run, box) => manor.decorLines(box, manorOf(run)),
-    kit: () => [],
+    // The freeze potion, when the game hands any out: marked, so the end
+    // takes it back from whoever still has it.
+    kit: (run) => ((optionsOf(run).freezePotions ?? 0) > 0 ? [hs.FREEZE_ITEM] : []),
     hits: true,
     side: (_run, index) => index,
     spot: (run, entrant) => spotOf(run, entrant),

@@ -12459,6 +12459,62 @@ describe("hide and seek", () => {
         ).toBe(true);
     });
 
+    it("hands one hider a freeze potion once, at a drawn moment of the seeking, and takes it back at the end", async () => {
+        const hs = await kind();
+        const arena = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
+        world.online = [...names];
+        setUp([hideOf(15)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        expect(run.kit).toEqual([hs.FREEZE_ITEM]);
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const given = () =>
+            world.sent.filter((line) => line.startsWith("give ") && line.includes(hs.FREEZE_ITEM));
+        // Nothing while they hide.
+        await play(Math.max(100, run.readyAt! + 15_000 - Date.now() + 2_100));
+        const game = () => hs.stateOf(state().run!.game)!;
+        expect(game().released).toBe(true);
+        expect(given()).toEqual([]);
+        const due = game().freezeAt!;
+        expect(due).toBeGreaterThan(Date.now());
+        await play(due - Date.now() + 2_100);
+        // One hider, never the seeker, armed for five seconds a hit and told.
+        expect(given()).toHaveLength(1);
+        const [holder] = game().freezeGiven;
+        expect(holder).not.toBe(seeker);
+        expect(given()[0]).toBe(arena.giveMarked(holder!, hs.FREEZE_ITEM, 1, run.marker!));
+        expect(world.sent).toContain("scoreboard players set #len polaris_frz 100");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith(`tellraw ${holder} `) &&
+                    visible(line).includes("You have a freeze potion")
+            )
+        ).toBe(true);
+        // Never a second one.
+        await play(60_000);
+        expect(given()).toHaveLength(1);
+        // Called off: taken back from everybody, thrown or not.
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        for (const name of names)
+            expect(world.sent).toContain(arena.clearMarked(name, hs.FREEZE_ITEM, run.marker!));
+        expect(world.sent).toContain("effect clear @a[tag=pe_seeker] minecraft:weakness");
+        expect(world.sent).toContain("scoreboard objectives remove polaris_frz");
+    });
+
+    it("hands no freeze potion when the event is set to none", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        const preset = hideOf(15);
+        setUp([{ ...preset, options: { ...preset.options, freezePotions: 0 } }]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        expect(run.kit).toEqual([]);
+        await play(run.readyAt! + 15_000 - Date.now() + 200_000);
+        expect(world.sent.some((line) => line.includes(hs.FREEZE_ITEM))).toBe(false);
+    });
+
     it("by the game's statistics where the pack is not on, finds on the first hit and never by a fall", async () => {
         const hs = await kind();
         world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
