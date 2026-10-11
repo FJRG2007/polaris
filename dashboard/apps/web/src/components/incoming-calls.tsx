@@ -44,7 +44,13 @@ import { noticeAllowed } from "@/lib/notifications/browser-notices";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
-import { leavesMissedCall, ringDecision, roomAfter, type RingRoom } from "@/lib/chat/ring-decision";
+import {
+    answersMissedCall,
+    leavesMissedCall,
+    ringDecision,
+    roomAfter,
+    type RingRoom
+} from "@/lib/chat/ring-decision";
 import {
     mayNotify,
     noticeStanding,
@@ -165,14 +171,19 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         const channel = openPeerChannel<CallTabMessage>(CALLS_CHANNEL, scope, (message) => {
             const parsed = callTabMessageSchema.safeParse(message);
             if (!parsed.success) return;
+            // Dealt with next door: called back, joined, or dismissed.
+            if (parsed.data.kind === "missed-cleared") {
+                const channelId = parsed.data.channelId;
+                setMissed((current) => current.filter((one) => one.channelId !== channelId));
+                return;
+            }
             // Hushed next door is hushed here: one telephone, however many
             // windows it is drawn in. The card stays in all of them, because
             // silence is not an answer.
             if (parsed.data.kind === "silenced") {
+                const meetingId = parsed.data.meetingId;
                 setSilenced((current) =>
-                    current.includes(parsed.data.meetingId)
-                        ? current
-                        : [...current, parsed.data.meetingId]
+                    current.includes(meetingId) ? current : [...current, meetingId]
                 );
                 return;
             }
@@ -184,6 +195,18 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
             channel.close();
         };
     }, [drop, scope]);
+
+    /** Take the missed call from a conversation away here and in every other
+     *  tab of this browser. */
+    const clearMissed = useCallback((channelId: string, tell: boolean) => {
+        setMissed((current) =>
+            current.some((one) => one.channelId === channelId)
+                ? current.filter((one) => one.channelId !== channelId)
+                : current
+        );
+        if (tell) peers.current?.post({ kind: "missed-cleared", channelId });
+    }, []);
+    const forget = useCallback((channelId: string) => clearMissed(channelId, true), [clearMissed]);
 
     /** What is ringing right now, readable from a timer and from a frame handler
      *  without either of them having to be rebuilt every time the list changes. */
@@ -206,12 +229,10 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
     useEffect(() => {
         inChannelNow.current = inChannel;
         if (!inChannel) return;
-        setMissed((current) =>
-            current.some((one) => one.channelId === inChannel)
-                ? current.filter((one) => one.channelId !== inChannel)
-                : current
-        );
-    }, [inChannel]);
+        // The other tabs hear the frame that seated this one, so they are not
+        // told separately.
+        clearMissed(inChannel, false);
+    }, [inChannel, clearMissed]);
 
     /**
      * A call that went away without being answered.
@@ -247,20 +268,19 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                 inChannelId: inChannelNow.current
             });
             if (!owed) return;
+            // One card per conversation: the newest attempt is the one to
+            // call back, and three cards for one person ringing three times is
+            // a pile, not a notice.
             setMissed((current) =>
                 [
                     { ...entry, at: Date.now() },
-                    ...current.filter((one) => one.meetingId !== meetingId)
+                    ...current.filter(
+                        (one) => one.meetingId !== meetingId && one.channelId !== entry.channelId
+                    )
                 ].slice(0, MOST_MISSED)
             );
         },
         [drop]
-    );
-
-    const forget = useCallback(
-        (meetingId: string) =>
-            setMissed((current) => current.filter((one) => one.meetingId !== meetingId)),
-        []
     );
 
     /** Put a call down here, and everywhere else this browser is drawing it. */
@@ -340,6 +360,10 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
         useCallback(
             (frame) => {
                 if (frame.kind !== "call") return;
+                // Called back, joined, or rung again, on any device: the missed
+                // call from that conversation is answered. Every tab and every
+                // device hears the frame, so none of them needs telling.
+                if (answersMissedCall(frame, viewerId)) clearMissed(frame.channelId, false);
                 // Who is in the room, before anything is decided about it: the
                 // decision below cannot see this, and it is what tells a call
                 // nobody answered from one somebody else did.
@@ -385,7 +409,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                         return;
                 }
             },
-            [missedOut, settle, viewerId]
+            [clearMissed, missedOut, settle, viewerId]
         )
     );
 
@@ -628,7 +652,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                             size="sm"
                             variant="secondary"
                             className="flex-1"
-                            onClick={() => forget(entry.meetingId)}
+                            onClick={() => forget(entry.channelId)}
                         >
                             {/* The same address answering uses. What it names is
                                 over, and that is fine: the conversation's screen
@@ -645,7 +669,7 @@ export function IncomingCalls({ viewerId }: { viewerId: string }) {
                             variant="ghost"
                             aria-label={t("calls.dismiss")}
                             title={t("calls.dismiss")}
-                            onClick={() => forget(entry.meetingId)}
+                            onClick={() => forget(entry.channelId)}
                         >
                             <X className="size-4" />
                         </Button>

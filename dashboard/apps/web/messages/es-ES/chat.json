@@ -461,7 +461,18 @@
             "surprise": "Sorpresa",
             "heart": "Me encanta"
         },
-        "sentLevel": "Lo que oyen otros"
+        "sentLevel": "Lo que oyen otros",
+        "hints": {
+            "muted": "Silencio",
+            "deafened": "Ensordecido",
+            "talkingMuted": "Estás silenciado: nadie te oye"
+        },
+        "arrivals": {
+            "joined": "{name} se ha unido",
+            "left": "{name} se ha ido",
+            "joinedMany": "{name} y {others, plural, one {# más} other {# más}} se han unido",
+            "leftMany": "{name} y {others, plural, one {# más} other {# más}} se han ido"
+        }
     },
     "meetingRoom": {
         "meeting": "Reunión",

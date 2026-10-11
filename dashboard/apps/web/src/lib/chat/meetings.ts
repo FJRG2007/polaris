@@ -212,6 +212,7 @@ export async function startOrJoin(
         admission: "admitted",
         pastLimit: access.mayModerate
     });
+    await answerMissedCalls(actor.id, channelId);
     await announceCall(meetingId, wasEmpty ? "ringing" : "moved", actor.id, actor.name);
     // Written by whoever created the call and nobody else: two people pressing
     // call at the same moment make one call, and must make one line.
@@ -410,8 +411,37 @@ export async function join(
         admission: "admitted",
         pastLimit: access.mayModerate
     });
+    await answerMissedCalls(actor.id, meeting.channelId);
     await announceCall(meetingId, "moved", actor.id, actor.name);
     return seat;
+}
+
+/** Where a missed-call alert about a conversation leads. */
+export function missedCallHref(channelId: string): string {
+    return `/chat/c/${channelId}`;
+}
+
+/**
+ * Take a person's missed-call alerts about a conversation off the bell once they
+ * are in a call there - calling back, joining, or picking up a later call.
+ *
+ * Read on every device from the bell's own feed, so the phone that missed the
+ * call agrees with the desk that returned it. Never fails the join it rides on.
+ */
+export async function answerMissedCalls(userId: string, channelId: string): Promise<void> {
+    try {
+        await prisma.notification.updateMany({
+            where: {
+                userId,
+                type: "chat.callMissed",
+                href: missedCallHref(channelId),
+                readAt: null
+            },
+            data: { readAt: new Date() }
+        });
+    } catch (error) {
+        console.error("polaris: could not clear a missed call:", error);
+    }
 }
 
 /**
@@ -1512,7 +1542,7 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                         name: caller?.name || words("notices.somebody")
                     }),
                     body: missedCallBody(meeting.channel, words),
-                    href: `/chat/c/${channelId}`,
+                    href: missedCallHref(channelId),
                     shelf
                 }).catch(() => undefined);
             })
