@@ -655,10 +655,14 @@ describe("hide and seek's rules", () => {
 
     it("freezes only seekers a thrown potion comes near, and counts it down", () => {
         const tick = panels.FUNCTIONS.tick!;
-        const reach = tick.filter((line) => line.includes('nbt={Item:{id:"minecraft:splash_potion"}}'));
+        const reach = tick.filter((line) =>
+            line.includes('nbt={Item:{id:"minecraft:splash_potion"}}')
+        );
         expect(reach).toHaveLength(1);
         // Only somebody tagged a seeker, near the thrown potion - never a hider.
-        expect(reach[0]).toMatch(/^execute as @a\[tag=pe_arena,tag=pe_seeker\] at @s if entity @e\[/);
+        expect(reach[0]).toMatch(
+            /^execute as @a\[tag=pe_arena,tag=pe_seeker\] at @s if entity @e\[/
+        );
         expect(reach[0]).toContain(`distance=..${panels.FREEZE_REACH},`);
         expect(reach[0]).not.toContain("pe_hider");
         // Never by the thrown potion's type: its name changed in 1.21.5.

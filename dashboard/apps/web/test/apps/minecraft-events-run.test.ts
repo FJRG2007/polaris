@@ -12461,7 +12461,8 @@ describe("hide and seek", () => {
 
     it("hands one hider a freeze potion once, at a drawn moment of the seeking, and takes it back at the end", async () => {
         const hs = await kind();
-        const arena = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
+        const arena =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
         world.online = [...names];
         setUp([hideOf(15)]);
         await joinAndStart("hide", names);

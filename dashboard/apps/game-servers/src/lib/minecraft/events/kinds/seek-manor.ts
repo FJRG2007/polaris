@@ -485,8 +485,7 @@ export function drawManor(
     // The nooks in each room's walls, then the room itself.
     plans.forEach((plan, room) => {
         const template = templates[room]!;
-        if (!plain)
-            nooksOf(draft, plan, template.style, doorsOf(room), room, era, random, design);
+        if (!plain) nooksOf(draft, plan, template.style, doorsOf(room), room, era, random, design);
     });
     plans.forEach((plan, room) => {
         const template = templates[room]!;

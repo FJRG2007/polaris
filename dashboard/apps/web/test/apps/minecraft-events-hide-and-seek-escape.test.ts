@@ -56,10 +56,7 @@ function panelCells(house: manor.Manor): Map<number, number[]> {
 /** Whether a player standing at `place` works `key`: within arm's reach of a
  *  button or a lever, on the rug or tile, or where the thing is stared at
  *  from. */
-function works(
-    key: manor.Key,
-    place: { x: number; feet: number; z: number }
-): boolean {
+function works(key: manor.Key, place: { x: number; feet: number; z: number }): boolean {
     if (key.kind === "btn" || key.kind === "lever") {
         const eye = { x: place.x + 0.5, y: place.feet + 1.62, z: place.z + 0.5 };
         return (
@@ -150,7 +147,10 @@ describe("getting out of a hide and seek manor's hiding places", () => {
             for (const panel of house.panels.filter((one) => one.shape === "floor")) {
                 // Down the ladder under it, as far as it goes.
                 let feet = -1;
-                while (model.bare(house.grid.get(panel.x, feet - 1, panel.z) ?? "") === "minecraft:ladder")
+                while (
+                    model.bare(house.grid.get(panel.x, feet - 1, panel.z) ?? "") ===
+                    "minecraft:ladder"
+                )
                     feet -= 1;
                 expect(escapes(house, { x: panel.x, feet, z: panel.z })).toBe(true);
             }
@@ -185,10 +185,7 @@ describe("getting out of a hide and seek manor's hiding places", () => {
                         if (grid.cell(x, level, z) !== "climb") continue;
                         if (grid.cell(x, level + 1, z) === "climb") continue;
                         // Up through what opens over it: a hatch or a floor panel.
-                        if (
-                            grid.cell(x, level + 1, z) === "hatch" ||
-                            grid.panelAt(x, level + 1, z)
-                        )
+                        if (grid.cell(x, level + 1, z) === "hatch" || grid.panelAt(x, level + 1, z))
                             continue;
                         // Off it: a step to a floor beside it, at the top rung's
                         // height or a block over it, with room to stand.
@@ -239,7 +236,10 @@ describe("the escape test itself", () => {
         const house = manor.manorFor("escape-self", 3, model.NEWEST);
         const panel = house.panels.find((one) => one.shape === "wall")!;
         expect(panel).toBeDefined();
-        const inside = { ...house, keys: house.keys.filter((key) => key.id !== panel.id || !key.inside) };
+        const inside = {
+            ...house,
+            keys: house.keys.filter((key) => key.id !== panel.id || !key.inside)
+        };
         const spot = house.spots.find(
             (one) => Math.hypot(one.x - panel.x, one.z - panel.z) <= 3 && one.feet === 1
         )!;

@@ -599,8 +599,7 @@ const BEDROOM: Template = {
             [7, 2],
             [2, 10]
         ] as const;
-        const solid =
-            c.design >= CLOSETS_SINCE ? -1 : Math.floor(c.random() * wardrobes.length);
+        const solid = c.design >= CLOSETS_SINCE ? -1 : Math.floor(c.random() * wardrobes.length);
         wardrobes.forEach(([u, v], index) => {
             c.set(
                 "minecraft:oak_door[facing=south,half=lower,hinge=left,open=false]",
