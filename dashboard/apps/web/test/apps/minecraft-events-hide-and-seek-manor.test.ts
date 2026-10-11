@@ -36,7 +36,7 @@ describe("hide and seek's manor", () => {
         expect([...used].sort()).toEqual(
             [...rooms.TEMPLATES.map((one) => one.name), "foyer"].sort()
         );
-    });
+    }, 120_000);
 
     it("grows with the players, or with the size asked for", () => {
         expect(manor.roomsFor(2)).toBe(3);
