@@ -219,7 +219,7 @@ async function goLines(ctx: KindContext): Promise<string[]> {
             ...hs.joinSide(one.name, seeking),
             ...(seeking
                 ? [
-                      ...hs.waitingLines(one.name),
+                      ...hs.waitingLines(one.name, seconds),
                       ...arena.titleTo(
                           one.name,
                           seekMessages.seekTitle(language),
@@ -257,9 +257,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const taken = await hitsService.take(ctx);
     const on = new Set(here.keys());
     // Back on the server: the radar code again, for a minimap that forgot it.
-    for (const one of run.entrants)
-        if (on.has(lower(one.name)) && !memory.seen.has(lower(one.name)))
-            lines.push(radarOff(one.name));
+    const back = run.entrants.filter(
+        (one) => on.has(lower(one.name)) && !memory.seen.has(lower(one.name))
+    );
+    for (const one of back) lines.push(radarOff(one.name));
     memory.seen = on;
     const struck =
         taken?.struck ??
@@ -282,6 +283,13 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     if (!state.released && state.allReadyAt === null && now < planned)
         readyTick(ctx, state, here, planned, lines, await ctx.chat());
     const releaseAt = state.allReadyAt ?? planned;
+
+    // A seeker who was away when the cage came down: their sight and legs back.
+    if (state.released) {
+        const seeking = new Set(state.seekers.map(lower));
+        for (const one of back)
+            if (seeking.has(lower(one.name))) lines.push(...hs.releasedLines(one.name));
+    }
 
     // The seekers let out: the cage down, their sight and legs back.
     if (!state.released && now >= releaseAt) {
@@ -373,19 +381,39 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             state.powerAt += every * Math.max(1, Math.ceil((now - state.powerAt + 1) / every));
         }
     }
-    // The manor's lava: hiders cross it; a seeker who steps in is sent back by
-    // the pack - and where the pack is not on, nobody is, so seekers cross it
-    // too rather than burn.
-    const packOn = house ? await hitsService.ensure(ctx) : true;
+    // A call from every hider still hidden, now and then, heard from a few
+    // blocks off them: roughly where to look, never the spot.
+    const due = state.released
+        ? hs.nextReveal(options.revealSeconds, releaseAt, state.revealedAt, ctx.run.endsAt)
+        : null;
+    if (due !== null && now >= due) {
+        state.reveals += 1;
+        state.revealedAt = now;
+        for (const one of hiders) {
+            const at = here.get(lower(one.name));
+            if (!at) continue;
+            lines.push(
+                ...hs.revealLines(
+                    hs.revealPoint(run.id, one.name, state.reveals, at),
+                    arena.IN_ARENA
+                ),
+                arena.tellTo(one.name, messages.tag(language) + seekMessages.revealTold(language))
+            );
+        }
+    }
+    // The manor's lava: everybody crosses it unhurt, so a seeker can look
+    // wherever a hider can hide.
+    if (house) await hitsService.ensure(ctx);
     for (const one of run.entrants) {
         const at = here.get(lower(one.name));
         if (!at) continue;
         const seeking = hs.seeks(state, one.name);
         lines.push(...hs.unhurtLines(one.name));
         if (!arena.contains(box, at)) lines.push(arena.moveTo(one.name, spotOf(run, one)));
-        if (house && (!seeking || !packOn)) lines.push(...hs.fireproofLines(one.name));
+        if (house) lines.push(...hs.fireproofLines(one.name));
         if (!seeking) lines.push(hs.hiderLine(one.name));
-        else if (!state.released) lines.push(...hs.waitingLines(one.name));
+        else if (!state.released)
+            lines.push(...hs.waitingLines(one.name, (releaseAt - now) / 1000));
         const power = !seeking ? state.powers[one.name] : undefined;
         const boost =
             power && power.until > now

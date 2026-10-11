@@ -591,6 +591,42 @@ describe("hide and seek's rules", () => {
         expect(hs.rememberSeekers(many.slice(0, 3), many)).toHaveLength(hs.REMEMBERED);
     });
 
+    it("gives each hider's call a few blocks off them, never on the spot", () => {
+        const at = { x: 100.7, y: 64, z: -20.3 };
+        const seen = new Set<string>();
+        for (let run = 0; run < 400; run += 1)
+            for (const name of ["Ana", "Ben"])
+                for (let round = 1; round <= 5; round += 1) {
+                    const point = hs.revealPoint(`call-${run}`, name, round, at);
+                    const away = Math.hypot(point.x - Math.floor(at.x), point.z - Math.floor(at.z));
+                    expect(away).toBeGreaterThanOrEqual(hs.REVEAL_NEAR);
+                    expect(away).toBeLessThanOrEqual(hs.REVEAL_FAR);
+                    expect(point.y).toBe(64);
+                    seen.add(`${point.x - 100},${point.z + 21}`);
+                }
+        // Spread all round them, not one fixed offset.
+        expect(seen.size).toBeGreaterThan(20);
+        // The same call for the same run, hider and round; another for the next.
+        expect(hs.revealPoint("r", "Ana", 1, at)).toEqual(hs.revealPoint("r", "ana", 1, at));
+        const lines = hs.revealLines({ x: 3, y: 64, z: -7 }, "pe_in");
+        expect(lines[0]).toContain(`playsound ${hs.REVEAL_SOUND} master @a[tag=pe_in] 3.5 65 -6.5`);
+        expect(lines[1]).toContain("particle minecraft:note 3.5 65 -6.5");
+    });
+
+    it("calls first a whole interval after the release, then every interval, and never near the end", () => {
+        const release = 1_000_000;
+        const end = release + 300_000;
+        expect(hs.nextReveal(60, release, null, end)).toBe(release + 60_000);
+        expect(hs.nextReveal(60, release, release + 61_000, end)).toBe(release + 121_000);
+        // Not in the last seconds of the game.
+        expect(hs.nextReveal(60, release, end - 70_000, end)).toBeNull();
+        expect(hs.nextReveal(60, release, end - 60_000 - hs.REVEAL_QUIET * 1000, end)).toBe(
+            end - hs.REVEAL_QUIET * 1000
+        );
+        // Switched off.
+        expect(hs.nextReveal(0, release, null, end)).toBeNull();
+    });
+
     it("finds a hider only beside a seeker who struck", () => {
         const at = { x: 0, y: 100, z: 0 };
         expect(hs.foundBy(at, [{ name: "Ben", x: 2, y: 100, z: 0 }])).toBe("Ben");
@@ -635,7 +671,17 @@ describe("hide and seek's rules", () => {
         expect(lines).toContain("team modify pe_hs_seek collisionRule never");
         expect(lines).toContain("team modify pe_hs_hide collisionRule never");
         expect(lines).toContain("team modify pe_hs_hide friendlyFire false");
-        expect(hs.waitingLines("Ben")).toContain("effect give Ben minecraft:blindness 3 0 true");
+        // Blind for all of the wait and a margin, never a few seconds at a time.
+        expect(hs.waitingLines("Ben", 60)).toContain(
+            `effect give Ben minecraft:blindness ${60 + hs.WAIT_MARGIN} 0 true`
+        );
+        expect(hs.waitingLines("Ben", 0.2)).toContain(
+            `effect give Ben minecraft:blindness ${1 + hs.WAIT_MARGIN} 0 true`
+        );
+        expect(
+            hs.TEARDOWN.indexOf("effect clear @a[team=pe_hs_seek] minecraft:blindness")
+        ).toBeLessThan(hs.TEARDOWN.indexOf("team remove pe_hs_seek"));
+        expect(hs.TEARDOWN).toContain("effect clear @a[tag=pe_seeker] minecraft:blindness");
         expect(hs.hiderLine("Ana")).toBe("effect give Ana minecraft:weakness 3 100 true");
         expect(hs.joinSide("Ana", true)).toContain(
             "execute if entity @a[name=Ana,team=pe_hs_hide] run team join pe_hs_seek Ana"
@@ -681,6 +727,7 @@ describe("what hide and seek says", () => {
                 said.readyMarked(language).lead + said.readyMarked(language).undo.label,
                 said.readyUndone(language),
                 said.allReady(language),
+                said.revealTold(language),
                 said.hiddenBar(3599, 11, language),
                 said.seekBar(11, language),
                 said.waitBar(3599, language),

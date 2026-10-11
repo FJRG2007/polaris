@@ -1746,7 +1746,7 @@
             },
             "hide-and-seek": {
                 "label": "Hide and seek",
-                "summary": "A map is built in the sky, bigger the more who play, its rooms drawn anew each time: a library, a forge, a garden with a waterfall, a pond, mazes and more. Its walls hide rooms behind paintings and panels that open from across the room, with a button, a rug or a stare; there are cellars under the floor, a hollow tree and lava only hiders can cross. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. The hider who stays hidden longest wins; names are hidden from the other side.",
+                "summary": "A map is built in the sky, bigger the more who play, its rooms drawn anew each time: a library, a forge, a garden with a waterfall, a pond, mazes and more. Its walls hide rooms behind paintings and panels that open from across the room, with a button, a rug or a stare; there are cellars under the floor, a hollow tree and lava both sides can cross. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. The hider who stays hidden longest wins; names are hidden from the other side.",
                 "unit": "points"
             },
             "hot-potato": {
@@ -2479,6 +2479,8 @@
         "seekTime": "Seeking time after hiding",
         "seekTimeHint": "How long the seekers have once the hiding time ends.",
         "seekMinutes": "Minutes to seek",
+        "revealSeconds": "Hider sounds (seconds)",
+        "revealSecondsHint": "0 to {max}. Each hider still hidden makes a sound a few blocks from where they are; 0 for none.",
         "powerUpMinutes": "Power-ups (minutes)",
         "powerUpMinutesHint": "0 to 10. Each hider gets a short boost this often; 0 for none.",
         "bingoGoal": "What wins",

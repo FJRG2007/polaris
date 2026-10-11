@@ -43,8 +43,9 @@
  *
  * The pack only looks at keys and panels near a player an arena took in, once
  * a tick each however many are near (`LAST`), like the bookcase doors
- * (`secret-doors.ts`). It also sends a seeker who steps into lava back to the
- * middle of the house (`burnt`): hiders cross it with fire resistance.
+ * (`secret-doors.ts`). Its lava is crossed by everybody, hiders and seekers,
+ * with fire resistance (`hide-and-seek.fireproofLines`): a seeker who was sent
+ * back from it could never look in a spot under it.
  *
  * Every command here reads the same from 1.13.
  *
@@ -204,7 +205,6 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         `execute as @a[tag=${IN_ARENA}] at @s as ${MARKER},tag=${PANEL},distance=..${PANEL_NEAR}] at @s run function polaris:panel/each`,
         // A crouch now and the tick before, for the rugs; only near one.
         `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=pe_key_crouch,distance=..${KEY_NEAR}] run function polaris:panel/crouched`,
-        `execute as @a[tag=${IN_ARENA},team=${SEEKERS}] at @s if block ~ ~ ~ minecraft:lava run function polaris:panel/burnt`,
         // Launch pads: whoever stands on one, unless just thrown.
         `scoreboard players remove @a[tag=${IN_ARENA},scores={${PAD_WAIT}=1..}] ${PAD_WAIT} 1`,
         `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=${PAD},distance=..${ON_PAD}] unless score @s ${PAD_WAIT} matches 1.. run function polaris:panel/launch`
@@ -287,11 +287,6 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         ),
         `tag @s remove ${OPEN_TAG}`,
         "playsound minecraft:block.piston.contract block @a[distance=..24] ~ ~ ~ 1 0.7"
-    ],
-    // A seeker in the lava: back to the middle, the fire put out.
-    burnt: [
-        "effect give @s minecraft:fire_resistance 6 0 true",
-        `tp @s ${MARKER},tag=${HOME},limit=1,sort=nearest]`
     ],
     ...materialFunctions()
 };

@@ -187,19 +187,16 @@ describe("hide and seek's manor", () => {
         expect(shown.some((house) => house.shown.length > 0)).toBe(true);
     });
 
-    it("keeps lava away from anything that burns, and only hiders cross it", () => {
+    it("keeps lava away from anything that burns, and never sends a seeker out of it", () => {
         const house = Array.from({ length: 30 }, (_, seed) =>
             manor.manorFor(`lava-${seed}`, 3, model.NEWEST)
         ).find((one) => one.rooms.some((room) => room.template === "forge"))!;
         expect(house).toBeDefined();
         expect(manor.manorProblems(house)).toEqual([]);
-        // The pack sends a seeker in lava home and puts their fire out.
-        expect(panels.FUNCTIONS.tick!.join("\n")).toContain(
-            "team=pe_hs_seek] at @s if block ~ ~ ~ minecraft:lava"
-        );
-        expect(panels.FUNCTIONS.burnt).toContain(
-            "effect give @s minecraft:fire_resistance 6 0 true"
-        );
+        // Seekers cross it as hiders do, to look in a spot under it: the pack
+        // never sends one back out of it.
+        expect(panels.FUNCTIONS.tick!.join("\n")).not.toContain("minecraft:lava");
+        expect(panels.FUNCTIONS.burnt).toBeUndefined();
     });
 });
 

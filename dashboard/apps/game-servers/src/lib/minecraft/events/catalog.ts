@@ -334,6 +334,10 @@ export function houseRooms(players: number, size: (typeof HOUSE_SIZES)[number] =
 export const SEEK_MINUTES_BY_ROOMS: Readonly<Record<number, number>> = { 3: 5, 4: 7, 5: 9 };
 /** The seeking time an operator may set by hand. */
 export const SEEK_MINUTES = { min: 1, max: 60 } as const;
+/** Hide and seek's time between two of the hiders' calls, and the most it may
+ *  be set to. */
+export const REVEAL_SECONDS = 60;
+export const MOST_REVEAL_SECONDS = 600;
 
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
@@ -717,6 +721,14 @@ export const optionsSchemas = {
                     .max(SEEK_MINUTES.max, problem("atMost", { count: SEEK_MINUTES.max }))
             ])
             .default("auto"),
+        /** Seconds between the calls every hider still hidden gives, a few
+         *  blocks from where they are, once the seekers are out; 0 for none. */
+        revealSeconds: z
+            .number()
+            .int()
+            .min(0, problem("atLeast", { count: 0 }))
+            .max(MOST_REVEAL_SECONDS, problem("atMost", { count: MOST_REVEAL_SECONDS }))
+            .default(REVEAL_SECONDS),
         /** Minutes between the hiders' power-ups; 0 for none. */
         powerUpMinutes: z
             .number()

@@ -220,8 +220,8 @@ left out.
   its own color, a net under the lowest; a player is out only through the
   lowest. Each run is played one way, drawn among those switched on in the
   editor (`variants`, all three by default): shovels (break the snow), a
-  vanishing floor (the snow underfoot turns red, then goes on the next look -
-  Fall Guys' Hex-A-Gone), or snowballs (each one breaks the snow it hits).
+  vanishing floor (the snow underfoot turns red, then goes on the next look),
+  or snowballs (each one breaks the snow it hits).
 - **TNT run** is spleef's arena with TNT for snow and no tool: `layers` floors
   (2-4) `LAYER_GAP` apart, one wall round all of them - a colored concrete rim
   at each floor's height, lit at the corners, clear glass between - so the only
@@ -733,6 +733,22 @@ left out.
   written as minutes and seconds in words ("1m 05s") so it is never read as
   a countdown. A seeker's says when they can start seeking, then how many are
   still hidden.
+- **The seekers' wait** is one blindness and slowness for all of it and
+  `WAIT_MARGIN` (10 s) more (`hs.waitingLines`), given again each look only to
+  lengthen it, and taken off when they are let out - by the clock or by the
+  ready vote. A call-off takes it off too (`hs.TEARDOWN`, by team and by tag,
+  before the teams go).
+- **The manor's lava** is crossed by everybody, hiders and seekers, under
+  fire resistance a few seconds at a time (`hs.fireproofLines`), so a seeker
+  can look in any spot under it; nothing sends a seeker back out of it. The
+  rules still check reach with a seeker who stays out of lava, so a hider can
+  never reach a place a seeker could not reach without it.
+- **Hiders' calls** (`revealSeconds`, 60 by default, 0 for none, at most
+  600): every interval once the seekers are out - the first a whole interval
+  after the release, none in the last `REVEAL_QUIET` (15 s) - each hider still
+  hidden and on the server gives a flute note and a few note particles at a
+  point 2 to 5 blocks off them, level, drawn from the run's id, the hider and
+  the round (`hs.revealPoint`), never where they stand; the hider is told.
 - **Hide and seek's sides**: two teams hide each side's names from the other
   (`nametagVisibility`: a seeker's hidden from hiders, a hider's never shown),
   with `collisionRule never`, so nobody can block a doorway with their body or
@@ -1026,6 +1042,13 @@ new map:
   spare, cannot reach the middle. Over 4,100 seeds from two to eight
   players: no rule broken; the ring 19 to 26 blocks across up to six
   players, 24 to 31 for eight.
+- **Nothing in a map sets a spawn point, keeps things, or goes home with a
+  player**: no bed, no respawn anchor (clicking one sets the spawn even in
+  adventure mode, and a player who later died was sent back to a map that is
+  gone); a container in a map is empty and stays furniture. Hide and seek's
+  bedroom builds a look-alike from design 6 (`seek-rooms.BEDLESS_SINCE`), and
+  every builder's source and every house drawn is checked for these blocks
+  (`minecraft-events-no-spawn-blocks.test.ts`).
 - **What hangs comes down first**: a flower, a ladder or a banner whose
   support is taken away drops as an item nobody owns. `arena.teardown`
   takes a kind at a time over the whole box, in the order the arena lists
@@ -1697,6 +1720,11 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   with the rest (`EventStash.LOOSE`); where the mod is not on, a player with
   something in that slot is kept out and told to empty it
   (`stash.readTrash`, refusal `trash`).
+- **Seekers saw the house in flashes while they waited.** Their blindness was
+  three seconds given again every look, and a look that came late let it run
+  under a second, where the game fades the fog out. It is now given for the
+  whole wait and a margin, and taken off only when they are let out
+  (`hs.waitingLines`).
 - **Hide and seek is won by a minimap radar.** Each entrant is sent Xaero's
   Minimap fair-play code at Go, again when they come back on the server, and
   the reset code at the end (`hs.RADAR_OFF`, `hs.RADAR_RESET`). Its limit:
