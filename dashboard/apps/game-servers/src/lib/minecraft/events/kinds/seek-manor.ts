@@ -53,9 +53,10 @@ import type { Fill } from "./arena-game";
 import * as panels from "./secret-panels";
 import { seeded, shuffled } from "../trivia-bank";
 import * as model from "./seek-grid";
+import type { Decoration } from "../../seasonal";
 
 /** The layout's version, written into the run when it is built. */
-export const DESIGN = 7;
+export const DESIGN = 8;
 /** The first design built as a manor: every design from here on is one. */
 export const FIRST = 4;
 /** The most who can play, in the largest house. */
@@ -213,6 +214,8 @@ export interface Manor {
     readonly bare: boolean;
     /** Launch pads (design 5): the slime block's place, in the floor. */
     readonly pads: readonly { readonly x: number; readonly z: number }[];
+    /** Fish summoned into a sealed tank once it is built (design 8). */
+    readonly fish: readonly { readonly x: number; readonly level: number; readonly z: number }[];
 }
 
 const origin = (index: number) => model.WALL + index * (model.ROOM + model.WALL);
@@ -321,6 +324,7 @@ interface Draft {
     spots: Manor["spots"][number][];
     nooks: Manor["nooks"][number][];
     pads: { x: number; z: number }[];
+    fish: { x: number; level: number; z: number }[];
     nextPanel: number;
 }
 
@@ -384,14 +388,23 @@ function linkSide(count: number, a: number, b: number): Side {
     return SIDE_OF(Math.sign(bi - ai), Math.sign(bj - aj));
 }
 
-/** One draw of a house, unchecked: what `manorFor` tries in turn. */
+/**
+ * One draw of a house, unchecked: what `manorFor` tries in turn.
+ *
+ * `season` is the one the run was built in (`hide-and-seek-service.prepare`),
+ * decided once and kept with it: in it, that season's rooms join the deck and
+ * one of them is drawn early, so the house has at least one; out of it - and
+ * for every run built before there were any - the deck and every draw from
+ * the seed are exactly what they were.
+ */
 export function drawManor(
     seed: string,
     count: number,
     era: model.Era,
     draw: number,
     plain = false,
-    design = DESIGN
+    design = DESIGN,
+    season: Decoration | null = null
 ): Manor {
     const random = seeded(`${seed}-manor-${draw}`);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
@@ -410,12 +423,22 @@ export function drawManor(
         spots: [],
         nooks: [],
         pads: [],
+        fish: [],
         nextPanel: 1
     };
     const deck: rooms.Template[] = [];
-    const usable = rooms.TEMPLATES.filter(
-        (one) => (!one.fits || one.fits(era)) && (one.since ?? 0) <= design
-    );
+    const usable = [
+        ...rooms.TEMPLATES,
+        ...rooms.SEASONAL.filter((one) => season !== null && one.season === season)
+    ].filter((one) => (!one.fits || one.fits(era)) && (one.since ?? 0) <= design);
+    // Only drawn in season, so the stream of draws out of it is untouched.
+    let featured =
+        season === null
+            ? undefined
+            : shuffled(
+                  usable.filter((one) => one.season === season),
+                  random
+              )[0];
     // From design 5 the hall to climb is the first room drawn, so every house
     // has one; it comes round again with the rest of the deck in a big house.
     let climb = usable.find((one) => one.name === "atrium");
@@ -430,6 +453,11 @@ export function drawManor(
         else {
             if (deck.length === 0) {
                 deck.push(...shuffled(usable, random));
+                if (featured) {
+                    deck.splice(deck.indexOf(featured), 1);
+                    deck.push(featured);
+                    featured = undefined;
+                }
                 if (climb) {
                     deck.splice(deck.indexOf(climb), 1);
                     deck.push(climb);
@@ -494,9 +522,19 @@ export function drawManor(
             const local = rooms.SIDES.find((one) => place.side(one) === door.side)!;
             return { side: local, at: door.at };
         });
-        template.draw(
-            canvasOf(draft, place, template.style, localDoors, era, random, room, design)
+        const canvas = canvasOf(
+            draft,
+            place,
+            template.style,
+            localDoors,
+            era,
+            random,
+            room,
+            design
         );
+        template.draw(canvas);
+        // In season, the house's own rooms get a touch of it too.
+        if (season !== null && !plain && !template.season) rooms.dress(canvas, season, template);
     });
 
     // Lamps in every room's floor and ceiling - what stands on the floor's
@@ -575,7 +613,8 @@ export function drawManor(
         nooks: draft.nooks,
         middle: mid,
         bare: plain,
-        pads: draft.pads
+        pads: draft.pads,
+        fish: draft.fish
     };
 }
 
@@ -708,6 +747,10 @@ function canvasOf(
             grid.set(PAD_BLOCK, at.x, 0, at.z);
             grid.pad(at.x, 0, at.z, panels.PAD_RISE);
             draft.pads.push({ x: at.x, z: at.z });
+        },
+        fish(u, level, v) {
+            const at = place.at(u, v);
+            draft.fish.push({ x: at.x, level, z: at.z });
         }
     };
     return canvas;
@@ -1119,9 +1162,15 @@ function withHolds(manor: Omit<Manor, "keys">, keys: readonly Key[]): Key[] {
 
 /** A run's house: drawn from the run's id until one keeps every rule, by the
  *  design it was built by (design 4 is still drawn as it was). */
-export function manorFor(seed: string, count: number, era: model.Era, design = DESIGN): Manor {
+export function manorFor(
+    seed: string,
+    count: number,
+    era: model.Era,
+    design = DESIGN,
+    season: Decoration | null = null
+): Manor {
     for (let draw = 0; draw < DRAWS; draw += 1) {
-        const drawn = drawManor(seed, count, era, draw, false, design);
+        const drawn = drawManor(seed, count, era, draw, false, design, season);
         const manor = { ...drawn, keys: withHolds(drawn, drawn.keys) };
         if (manorProblems(manor).length === 0) return manor;
     }
@@ -1151,7 +1200,13 @@ function inCage(manor: Pick<Manor, "middle">, x: number, z: number): boolean {
     return Math.abs(x - manor.middle.x) <= 2 && Math.abs(z - manor.middle.z) <= 2;
 }
 
-/** Blocks that burn: none within reach of lava. */
+/** Blocks that hold water of their own: it runs out of them where there is
+ *  room, so they come down with the water, before the glass round them. */
+const WATERY = /(kelp|kelp_plant|seagrass|sea_pickle)$/;
+
+/** What sets them alight besides lava: a campfire in a hearth. */
+const FIRE = /(campfire|^minecraft:fire)$/;
+/** Blocks that burn: none within reach of lava or a lit fire. */
 const BURNS =
     /(planks|_log|leaves|wool|carpet|bookshelf|oak_fence|spruce_fence|hay_block|scaffolding|_stairs|_slab|_banner|tnt|vine)$/;
 
@@ -1238,18 +1293,25 @@ export function manorProblems(manor: Manor): string[] {
                 problems.push(`the key to panel ${panel.id} cannot be reached`);
         }
     }
-    // Nothing that burns where lava can set it alight: two across and three up.
+    // Nothing that burns where lava or a hearth's fire can set it alight:
+    // three across and four up.
     for (let x = 0; x < grid.size; x += 1)
         for (let z = 0; z < grid.size; z += 1)
             for (let level = model.DEEP; level < model.ROOF; level += 1) {
-                if (grid.cell(x, level, z) !== "lava") continue;
+                const source =
+                    grid.cell(x, level, z) === "lava"
+                        ? "lava"
+                        : FIRE.test(model.bare(grid.get(x, level, z) ?? ""))
+                          ? "fire"
+                          : null;
+                if (!source) continue;
                 for (let dx = -3; dx <= 3; dx += 1)
                     for (let dz = -3; dz <= 3; dz += 1)
                         for (let up = 0; up <= 4; up += 1) {
                             const block = grid.get(x + dx, level + up, z + dz);
                             if (block && BURNS.test(model.bare(block)))
                                 problems.push(
-                                    `${model.bare(block)} at ${x + dx},${level + up},${z + dz} can catch fire from the lava`
+                                    `${model.bare(block)} at ${x + dx},${level + up},${z + dz} can catch fire from the ${source}`
                                 );
                         }
             }
@@ -1270,7 +1332,8 @@ function worldOf(box: Box, x: number, level: number, z: number) {
 }
 
 /** Every kind of block it is built of, as bare ids, in the order it comes
- *  down: the lava and water first, so nothing runs as the rest goes; then what
+ *  down: the plants that hold water and then the lava and water first, so
+ *  nothing runs as the rest goes; then what
  *  hangs on something or stands on it - a painting's banners, buttons,
  *  levers, ladders, doors, trapdoors, rugs, flowers, heads, beds, scaffolding - before
  *  what holds it up. */
@@ -1282,16 +1345,23 @@ export function manorBlocks(manor: Manor): string[] {
     if (ids.has("minecraft:water") && ids.has("minecraft:lava"))
         for (const id of ["minecraft:obsidian", "minecraft:cobblestone", "minecraft:stone"])
             ids.add(id);
+    // A coral block out of water dies: its dead self comes down too.
+    for (const id of [...ids]) {
+        const coral = /^minecraft:(\w+_coral_block)$/.exec(id);
+        if (coral && !id.startsWith("minecraft:dead_")) ids.add(`minecraft:dead_${coral[1]}`);
+    }
     const first = (id: string) =>
-        /lava|water/.test(id)
-            ? 0
-            : /powder_snow/.test(id)
-              ? 1
-              : /(_button|lever|ladder|_banner|_door|_trapdoor|_carpet|poppy|dandelion|cornflower|azure_bluet|_skull|_bed|scaffolding|torch)$/.test(
-                      id
-                  )
-                ? 2
-                : 3;
+        WATERY.test(id)
+            ? -1
+            : /lava|water/.test(id)
+              ? 0
+              : /powder_snow/.test(id)
+                ? 1
+                : /(_button|lever|ladder|_banner|_door|_trapdoor|_carpet|poppy|dandelion|cornflower|azure_bluet|_skull|_bed|scaffolding|torch)$/.test(
+                        id
+                    )
+                  ? 2
+                  : 3;
     return [...ids].sort((a, b) => first(a) - first(b));
 }
 
@@ -1316,7 +1386,10 @@ export function manorFills(box: Box, manor: Manor): Fill[] {
     ];
     const order = (block: string) => {
         const id = model.bare(block);
-        if (/lava|water/.test(id)) return 3;
+        if (/lava|water/.test(id)) return 4;
+        // Plants that hold their own water, after the glass round them and
+        // before the water: it would run from them into a gap left for it.
+        if (WATERY.test(id)) return 3;
         if (/scaffolding$/.test(id)) return 2;
         if (/(_button|lever|ladder|_banner|_door|_trapdoor)$/.test(id)) return 0;
         return 1;
@@ -1346,7 +1419,7 @@ const FACING_BYTE: Readonly<Record<Side, number>> = { south: 0, west: 1, north: 
  * - written with both spellings of their facing and canvas, since 1.19 and
  * 1.21 renamed them and every release ignores the one it does not read, and
  * unbreakable, since a seeker swinging at a hider must not knock one off -
- * and, from 1.19.4, its display blocks.
+ * fish in a sealed tank (design 8), and, from 1.19.4, its display blocks.
  */
 export function decorLines(box: Box, manor: Manor): string[] {
     const lines: string[] = [];
@@ -1355,6 +1428,13 @@ export function decorLines(box: Box, manor: Manor): string[] {
         const facing = FACING_BYTE[one.facing];
         lines.push(
             `execute in minecraft:overworld run summon minecraft:painting ${at.x + 0.5} ${at.y + 0.5} ${at.z + 0.5} {Facing:${facing}b,facing:${facing}b,Motive:"${one.variant}",variant:"${one.variant}",Invulnerable:1b,Tags:["${panels.DECOR}"]}`
+        );
+    }
+    // Fish in the tanks: kept, never harmed, and nothing left when they go.
+    for (const one of manor.fish) {
+        const at = worldOf(box, one.x, one.level, one.z);
+        lines.push(
+            `execute in minecraft:overworld run summon minecraft:tropical_fish ${at.x + 0.5} ${at.y + 0.3} ${at.z + 0.5} {PersistenceRequired:1b,Invulnerable:1b,DeathLootTable:"minecraft:empty",Tags:["${panels.DECOR}"]}`
         );
     }
     if (manor.era.display)

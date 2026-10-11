@@ -65,6 +65,7 @@ import * as doors from "./secret-doors";
 import * as panels from "./secret-panels";
 import type { Fill } from "./arena-game";
 import { seeded, shuffled } from "../trivia-bank";
+import { DECORATIONS } from "../../seasonal";
 
 /** The layout's version, written into the run when it is built. Design 2 was
  *  the first house; 3 added the climbs and the secret rooms, drawn before
@@ -1757,6 +1758,9 @@ export const stateSchema = z.object({
         .object({ scaffold: z.boolean(), snow: z.boolean(), display: z.boolean() })
         .nullable()
         .default(null),
+    /** The season the house was built in, decided once then: its rooms are
+     *  drawn only in it. Null out of season and for a house built before. */
+    season: z.enum(DECORATIONS).nullable().catch(null).default(null),
     /** When the hiders last gave a call (`revealPoint`), and how many. */
     revealedAt: z.number().nullable().default(null),
     reveals: z.number().int().default(0),

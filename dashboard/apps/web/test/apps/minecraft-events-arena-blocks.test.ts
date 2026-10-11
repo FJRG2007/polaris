@@ -92,6 +92,9 @@ function becomes(placed: ReadonlySet<string>, kit: Kit): Set<string> {
         // Water open to a cold sky freezes; ice by a light melts.
         if (id === "minecraft:water") out.add("minecraft:ice");
         if (id === "minecraft:ice") out.add("minecraft:water");
+        // A coral block out of water dies.
+        const coral = /^minecraft:(\w+_coral_block)$/.exec(id);
+        if (coral && !id.startsWith("minecraft:dead_")) out.add(`minecraft:dead_${coral[1]}`);
         // Powder by water sets.
         const powder = /^minecraft:(\w+)_concrete_powder$/.exec(id);
         if (powder && (has("minecraft:water") || carries(/water_bucket$/)))
@@ -254,7 +257,17 @@ describe("every arena takes down everything it placed", () => {
             for (const era of eras)
                 for (let seed = 0; seed < SEEDS; seed += 1)
                     for (let draw = 0; draw < 3; draw += 1) {
-                        const house = manor.drawManor(`blocks-${seed}`, count, era, draw);
+                        // In and out of season: its rooms, and the touch of it on the rest.
+                        const season = ([null, "halloween", "winter"] as const)[(seed + draw) % 3]!;
+                        const house = manor.drawManor(
+                            `blocks-${seed}`,
+                            count,
+                            era,
+                            draw,
+                            false,
+                            manor.DESIGN,
+                            season
+                        );
                         const box = manor.hallBox({ x: SITE.x, y: Y, z: SITE.z }, Y, count);
                         const placed = [
                             ...manor.manorFills(box, house).map((one) => one.block),
