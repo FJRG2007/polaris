@@ -82,6 +82,7 @@ import {
     githubTokenForOwner
 } from "./github-access";
 import * as deployReleases from "./deploy/releases";
+import { ROLLBACK_WINDOW, sweepReleaseImagesFor } from "./deploy/release-retention";
 import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { notifyVolumeHealth } from "./notifications/volume-events";
 import {
@@ -3648,19 +3649,10 @@ export async function setDeploymentCanary(
 
 /**
  * How many releases of one service keep their image besides the one that is live
- * and any somebody pinned.
- *
- * None. It was five, and five is how a host fills up without anybody doing
- * anything: one service deployed a handful of times held five copies of a 1.8 GB
- * image, which on the machine this was found on was nine gigabytes of builds
- * nobody had asked to keep and no screen ever mentioned.
- *
- * A release somebody pins is still kept - pinning is a person saying "this one
- * stays" - and so is whatever is live. Everything else goes as soon as its
- * successor is promoted, and rolling back past that point is a build rather than
- * a restart. That is the trade, and the disk is the reason.
+ * and any somebody pinned: one, so the release before is an instant rollback.
+ * Defined beside the sweep that holds the engine to it (`release-retention`).
  */
-export const ROLLBACK_WINDOW = 0;
+export { ROLLBACK_WINDOW };
 
 /**
  * Remove the kept images that have fallen out of the window.
@@ -4941,6 +4933,11 @@ async function promoteRelease(
     }
     await pruneReleaseImages(dep.deployableId).catch((error) => {
         console.error("polaris: could not tidy the kept release images:", error);
+    });
+    // Then what the engine holds beyond what the rows say: the pins of failed and
+    // cancelled deploys, of deleted services, of a removal that failed once.
+    void sweepReleaseImagesFor(dep.deployableId).catch((error: unknown) => {
+        console.error("polaris: could not sweep the release images:", error);
     });
     // Cloudflare would keep serving the previous release's assets from its cache.
     void import("./cdn").then(({ purgeAfterPromotion }) => purgeAfterPromotion(dep.deployableId));

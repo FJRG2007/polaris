@@ -36,6 +36,7 @@ import { LocaleWatcher } from "@/components/i18n/locale-watcher";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
+import { DiskAlertBanner } from "@/components/disk-alert-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
@@ -486,6 +487,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                     }
                                                                                 >
                                                                                     <DeniedNotice />
+                                                                                    {user.isAdmin &&
+                                                                                    !user.viewingAs ? (
+                                                                                        <DiskAlertBanner />
+                                                                                    ) : null}
                                                                                     <RouteSkeletonCapture>
                                                                                         {children}
                                                                                     </RouteSkeletonCapture>
