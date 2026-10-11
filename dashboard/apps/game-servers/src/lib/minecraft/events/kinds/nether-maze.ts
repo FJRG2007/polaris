@@ -46,8 +46,12 @@ import { rectangles } from "./boat-race";
 import type { EventOptions } from "../catalog";
 import type { Box, Spot, Volume } from "./stage";
 
-/** How mazes are laid out now, written onto the stage when one is built. */
-export const DESIGN = 1;
+/** How mazes are laid out now, written onto the stage when one is built:
+ *  2 dresses the goal as a finish (`FINISH_SINCE`). */
+export const DESIGN = 2;
+/** The first design whose goal is a finish booth: a chequered threshold, a
+ *  chequered gold floor, chequered walls round it and light over the way in. */
+export const FINISH_SINCE = 2;
 
 export type MazeSize = EventOptions<"nether-maze">["size"];
 export type Hazards = EventOptions<"nether-maze">["hazards"];
@@ -78,6 +82,9 @@ const GOAL: Box["block"] = "minecraft:gold_block";
 const GOAL_LIGHT: Box["block"] = "minecraft:sea_lantern";
 const START: Box["block"] = "minecraft:nether_bricks";
 const DOOR: Box["block"] = "minecraft:glass";
+/** A finish's chequer, the way every race's flag is. */
+const DARK: Box["block"] = "minecraft:black_concrete";
+const LIGHT_SQUARE: Box["block"] = "minecraft:white_concrete";
 
 /** What stands on one column of the maze. */
 export type Tile = "wall" | "floor" | "magma" | "fire" | "lava" | "goal" | "start" | "door";
@@ -513,6 +520,31 @@ export interface Maze {
     readonly reach: number;
 }
 
+/**
+ * The blocks right round the goal, side by side with it: the open ones are
+ * its threshold - the way in, crossed to finish - and the wall ones the face
+ * of the wall inside it. Never a hazard: the goal and the doorways into it
+ * are spared (`plan`).
+ */
+export function boothOf(
+    tiles: ReadonlyMap<string, Tile>,
+    goal: ReadonlySet<string>
+): { threshold: Set<string>; faces: Set<string> } {
+    const threshold = new Set<string>();
+    const faces = new Set<string>();
+    for (const at of goal) {
+        const [x, z] = at.split(",").map(Number) as [number, number];
+        for (const [dx, dz] of SIDES) {
+            const near = key(x + dx, z + dz);
+            if (goal.has(near)) continue;
+            const tile = tiles.get(near);
+            if (tile === "wall") faces.add(near);
+            else if (tile === "floor") threshold.add(near);
+        }
+    }
+    return { threshold, faces };
+}
+
 function yawOf(dx: number, dz: number): number {
     return Math.round((Math.atan2(-dx, dz) * 180) / Math.PI);
 }
@@ -539,8 +571,8 @@ export function maze(
         z1: box.z1 + dz,
         z2: box.z2 + dz
     });
-    const where = (wanted: (tile: Tile) => boolean) =>
-        new Set([...made.tiles].filter(([, tile]) => wanted(tile)).map(([at]) => at));
+    const where = (wanted: (tile: Tile, at: string) => boolean) =>
+        new Set([...made.tiles].filter(([at, tile]) => wanted(tile, at)).map(([at]) => at));
     const layer = (
         cells: ReadonlySet<string>,
         y1: number,
@@ -561,15 +593,42 @@ export function maze(
     const startZs = [...startRoom].map((at) => Number(at.split(",")[1]));
     lights.add(key(Math.min(...startXs) + 1, Math.min(...startZs) + 1));
     const goalTiles = where((tile) => tile === "goal");
-    const roof = new Set([...all].filter((at) => !lights.has(at) && !goalTiles.has(at)));
+    // The finish booth (`FINISH_SINCE`): the blocks right round the goal, the
+    // way in (its threshold) and the wall's face inside.
+    const booth = design >= FINISH_SINCE ? boothOf(made.tiles, goalTiles) : null;
+    const threshold = booth?.threshold ?? new Set<string>();
+    const faces = booth?.faces ?? new Set<string>();
+    const roof = new Set(
+        [...all].filter((at) => !lights.has(at) && !goalTiles.has(at) && !threshold.has(at))
+    );
     for (const at of goalTiles) lights.delete(at);
     const doorTiles = where((tile) => tile === "door");
     const door = layer(doorTiles, y + 1, y + HEADROOM, DOOR)[0]!;
+    /** One block of a chequer: dark or light by where it is. */
+    const square = (at: string, h: number, light: Box["block"]): Box => {
+        const [x, z] = at.split(",").map(Number) as [number, number];
+        const block = (((x + z + h) % 2) + 2) % 2 === 0 ? DARK : light;
+        return world({ x1: x, z1: z, x2: x, z2: z, y1: h, y2: h, block });
+    };
+    const finish: Box[] = booth
+        ? [
+              ...[...goalTiles].map((at) => square(at, y, GOAL)),
+              ...[...threshold].map((at) => square(at, y, LIGHT_SQUARE)),
+              ...[...faces].flatMap((at) =>
+                  Array.from({ length: HEADROOM }, (_, step) =>
+                      square(at, y + 1 + step, LIGHT_SQUARE)
+                  )
+              ),
+              ...layer(threshold, ceiling, ceiling, GOAL_LIGHT)
+          ]
+        : [];
     const boxes: Box[] = [
         ...layer(all, y - 1, y - 1, NETHERRACK),
         ...layer(
             where(
-                (tile) => tile === "wall" || tile === "floor" || tile === "fire" || tile === "door"
+                (tile, at) =>
+                    (tile === "wall" || tile === "floor" || tile === "fire" || tile === "door") &&
+                    !threshold.has(at)
             ),
             y,
             y,
@@ -581,7 +640,7 @@ export function maze(
             y,
             START
         ),
-        ...layer(goalTiles, y, y, GOAL),
+        ...(booth ? [] : layer(goalTiles, y, y, GOAL)),
         ...layer(
             where((tile) => tile === "magma"),
             y,
@@ -595,7 +654,7 @@ export function maze(
             LAVA
         ),
         ...layer(
-            where((tile) => tile === "wall"),
+            where((tile, at) => tile === "wall" && !faces.has(at)),
             y + 1,
             y + HEADROOM,
             NETHERRACK
@@ -609,7 +668,8 @@ export function maze(
         door,
         ...layer(roof, ceiling, ceiling, NETHERRACK),
         ...layer(lights, ceiling, ceiling, LIGHT),
-        ...layer(goalTiles, ceiling, ceiling, GOAL_LIGHT)
+        ...layer(goalTiles, ceiling, ceiling, GOAL_LIGHT),
+        ...finish
     ];
     const xs = [...all].map((at) => Number(at.split(",")[0]));
     const zs = [...all].map((at) => Number(at.split(",")[1]));

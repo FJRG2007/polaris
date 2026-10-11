@@ -12821,6 +12821,9 @@ describe("a deadly nether maze", () => {
                     visible(line).includes("Ana reached the finish")
             )
         ).toBe(true);
+        // The finish marked where she stands: light, sparks and a crackle.
+        for (const line of stageKit.finishBurst("Ana")) expect(world.sent).toContain(line);
+        expect(world.sent.some((line) => line.includes("execute at Ben run particle"))).toBe(false);
         const beforeLeaving = world.sent.length;
         chat(["Ben", "leave"]);
         await play(4_100);
@@ -13177,6 +13180,7 @@ describe("a downhill boat race", () => {
                     visible(line).includes("Ana reached the finish")
             )
         ).toBe(true);
+        for (const line of stageKit.finishBurst("Ana")) expect(world.sent).toContain(line);
         expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(2);
         expect(
             world.sent.some(

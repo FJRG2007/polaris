@@ -308,7 +308,14 @@ left out.
   over the built blocks). Xaero's fair-play code (`radar.ts`) turns minimap cave
   view and radar off for each racer as they come in and again when they come
   back on; the reset goes with them home. An X-ray resource pack still shows
-  the corridors: Polaris's anti-xray hides ores, never air.
+  the corridors: Polaris's anti-xray hides ores, never air. From design 2 the
+  goal is a finish booth (`nether-maze.boothOf`): its floor chequered gold and
+  black, the wall's face round it chequered black and white from floor to
+  roof, and the way in - the doorway blocks side by side with it - chequered
+  underfoot with sea lanterns over it, so the finish is seen from the corridor
+  before it is reached. A run built on design 1 keeps its plain gold room.
+  Crossing it, the racer is marked with a burst of light and a firework's
+  crackle (`stage.finishBurst`).
 - **Acid rain** (`acid-rain`) is a walled square of mossy stone, 17, 23 or 29
   blocks a side, open to the sky but for an invisible barrier roof, with a few
   ruined cobblestone huts placed from the run's id. The rain is the event's
@@ -358,6 +365,11 @@ left out.
   their last gate. Past the rows the grid has room for (30 racers), the next
   ones are put on the same spots again from the front rather than off the end
   of the road. A glass net four blocks under the finish catches whoever falls.
+  From design 2 the finish is dressed (`downhill-race.FINISH_SINCE`): its
+  gantry two chequer rows high with a light on each post, and the walls
+  `FINISH_BAND` blocks either side of the line chequered black and white from
+  the ice to the rail - the road, its ice and its lines unchanged. A racer
+  over it gets the same burst as a maze's finish.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -944,10 +956,10 @@ Everything below is part of the arena's own boxes: built into air with
 | TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                                                                                                                    |
 | Dropper          | light walls (one of five stones a run) banded by each floor's color in an order of its own, a ring of light round every hole, blocks of color hanging between floors                                                            |
 | Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
-| Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room, and a gold floor under a sea-lantern ceiling at the goal                                                                              |
+| Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room, and a finish booth at the goal: gold and black chequer underfoot, chequered walls, sea lanterns over it and over the way in           |
 | Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                           |
 | Elytra race      | orange concrete rings, a white start ring lit at its corners, yellow glass boosters, magenta pillars                                                                                                                            |
-| Downhill race    | the boat race's ice, walls and arches, stepping down a block at a time; a white glass net under the finish                                                                                                                      |
+| Downhill race    | the boat race's ice, walls and arches, stepping down a block at a time; a finish gantry two chequers high with lit posts between chequered walls; a white glass net under the finish                                            |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |

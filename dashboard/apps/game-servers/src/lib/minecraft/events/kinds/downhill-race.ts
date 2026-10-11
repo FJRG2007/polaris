@@ -35,8 +35,15 @@ import type { Box } from "./stage";
 import * as boatRace from "./boat-race";
 import type { EventOptions } from "../catalog";
 
-/** How courses are laid out now, written onto the stage when one is built. */
-export const DESIGN = 1;
+/** How courses are laid out now, written onto the stage when one is built:
+ *  2 dresses the finish (`FINISH_SINCE`). */
+export const DESIGN = 2;
+/** The first design whose finish is dressed as one: a gantry two chequers
+ *  high with lights on its posts, and chequered walls either side of the line. */
+export const FINISH_SINCE = 2;
+/** How far either side of the finish line, along the road, its walls are
+ *  chequered. */
+const FINISH_BAND = 2;
 
 /** The boat race's design whose outline, middle line and width this is. */
 const TRACK_DESIGN = 2;
@@ -179,8 +186,10 @@ export function course(
     options: Pick<EventOptions<"downhill-race">, "steepness">,
     seed: string,
     site: { x: number; z: number },
-    y: number
+    y: number,
+    design = DESIGN
 ): boatRace.Track {
+    const dressed = design >= FINISH_SINCE;
     const layout = boatRace.laidOut(seed, TRACK_DESIGN);
     const road = roadOf(layout, options.steepness);
     const fall = -Math.min(...[...road.cells.values()].map((one) => one.drop));
@@ -240,6 +249,29 @@ export function course(
     const ice = new Map(
         [...road.cells.keys()].filter((at) => !lineCells.has(at)).map((at) => [at, heightOf(at)])
     );
+    // The walls either side of the finish line, chequered from the ice to the
+    // rail instead of plain.
+    const finishLine = areas[areas.length - 1]!.line;
+    const band = new Set<string>();
+    if (dressed)
+        for (const at of walls.keys()) {
+            const [x, z] = cellOf(at);
+            const near =
+                x >= finishLine.x1 - FINISH_BAND &&
+                x <= finishLine.x2 + FINISH_BAND &&
+                z >= finishLine.z1 - FINISH_BAND &&
+                z <= finishLine.z2 + FINISH_BAND;
+            if (near) band.add(at);
+        }
+    const chequered: Box[] = [...band].flatMap((at) => {
+        const [x, z] = cellOf(at);
+        const one = walls.get(at)!;
+        return Array.from({ length: one.high - one.low + 2 }, (_, step) => {
+            const h = one.low + step;
+            const block = CHEQUER[(((x + z + h) % 2) + 2) % 2]!;
+            return world({ x1: x, z1: z, x2: x, z2: z, y1: h, y2: h, block });
+        });
+    });
     // A wall stands as columns: grouped by where they start and end.
     const columns = (
         pick: (one: { low: number; high: number }, at: string) => [number, number] | null,
@@ -274,19 +306,32 @@ export function course(
                   { x1: line.x2 + 1, z1: line.z1, x2: line.x2 + 1, z2: line.z1 }
               ];
         const ends = index === 0 || index === areas.length - 1;
-        const beam = Array.from({ length: boatRace.WIDTH }, (_, step) => {
+        // The finish's gantry, dressed: its chequer two rows high.
+        const rows = dressed && index === areas.length - 1 ? 2 : 1;
+        const beam = Array.from({ length: boatRace.WIDTH * rows }, (_, cell) => {
+            const step = cell % boatRace.WIDTH;
+            const row = Math.floor(cell / boatRace.WIDTH);
             const at = across
                 ? { x1: line.x1, z1: line.z1 + step, x2: line.x1, z2: line.z1 + step }
                 : { x1: line.x1 + step, z1: line.z1, x2: line.x1 + step, z2: line.z1 };
-            const block = ends ? CHEQUER[step % CHEQUER.length]! : step === HALF ? LIGHT : BEAM;
-            return world({ ...at, y1: floor + ARCH, y2: floor + ARCH, block });
+            const block = ends
+                ? CHEQUER[(step + row) % CHEQUER.length]!
+                : step === HALF
+                  ? LIGHT
+                  : BEAM;
+            return world({ ...at, y1: floor + ARCH + row, y2: floor + ARCH + row, block });
         });
-        // Each post from over its wall up to the beam.
+        // Each post from over its wall up to the beam, and on the dressed
+        // finish a light on top of it.
         return [
-            ...posts.map((post) => {
+            ...posts.flatMap((post) => {
                 const wall = walls.get(key(post.x1, post.z1));
                 const from = (wall?.high ?? floor) + WALL_HEIGHT + 1;
-                return world({ ...post, y1: from, y2: Math.max(from, floor + ARCH), block: POST });
+                const to = Math.max(from, floor + ARCH + rows - 1);
+                return [
+                    world({ ...post, y1: from, y2: to, block: POST }),
+                    ...(rows > 1 ? [world({ ...post, y1: to + 1, y2: to + 1, block: LIGHT })] : [])
+                ];
             }),
             ...beam
         ];
@@ -311,10 +356,17 @@ export function course(
         ...layers(lineCells, LINE),
         // The wall: plain from the lowest ice beside it to a block over the
         // highest (a light now and then in that top block), the rail over that.
-        ...columns((one) => [one.low, one.high], WALL),
-        ...columns((one, at) => (lit(at) ? null : [one.high + 1, one.high + 1]), WALL),
-        ...columns((one, at) => (lit(at) ? [one.high + 1, one.high + 1] : null), LIGHT),
+        ...columns((one, at) => (band.has(at) ? null : [one.low, one.high]), WALL),
+        ...columns(
+            (one, at) => (lit(at) || band.has(at) ? null : [one.high + 1, one.high + 1]),
+            WALL
+        ),
+        ...columns(
+            (one, at) => (lit(at) && !band.has(at) ? [one.high + 1, one.high + 1] : null),
+            LIGHT
+        ),
         ...columns((one) => [one.high + 2, one.high + 2], RAIL),
+        ...chequered,
         ...arches
     ];
     const respawns = road.lines.map(({ gate }, index) => {
@@ -326,7 +378,9 @@ export function course(
             yaw: Math.round((Math.atan2(-gate.du, gate.dv) * 180) / Math.PI)
         };
     });
-    const highest = Math.max(top, ...[...walls.values()].map((one) => one.high)) + ARCH + 2;
+    // A dressed finish's gantry is a row higher, with a light over each post.
+    const highest =
+        Math.max(top, ...[...walls.values()].map((one) => one.high)) + ARCH + (dressed ? 3 : 2);
     return {
         layout,
         laps: 1,

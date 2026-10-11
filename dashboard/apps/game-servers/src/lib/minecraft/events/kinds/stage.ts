@@ -296,6 +296,19 @@ export function probeBoxes(volume: Volume): Box[] {
     return slices({ ...volume, block: PROBE_BLOCK });
 }
 
+/**
+ * A racer over the finish, marked where they stand: a burst of light and
+ * sparks round them and a firework's crackle for everybody near - particles
+ * and sound only, nothing that burns, breaks or lifts anybody.
+ */
+export function finishBurst(name: string): string[] {
+    return [
+        `execute at ${name} run particle minecraft:totem_of_undying ~ ~1 ~ 0.6 1 0.6 0.4 80 force`,
+        `execute at ${name} run particle minecraft:firework ~ ~2 ~ 1 1 1 0.1 40 force`,
+        `execute at ${name} run playsound minecraft:entity.firework_rocket.twinkle master @a ~ ~ ~ 1 1`
+    ];
+}
+
 /** Built into air only: `keep` never replaces anything that is there. */
 export function buildLine(box: Box): string {
     return `${WORLD} fill ${corners(box)} ${box.block} keep`;
