@@ -426,6 +426,16 @@ export function gameJobTable(): readonly AppJob[] {
                 (await import("./minecraft/polaris-anticheat-service")).adoptPolarisComponent()
         },
         {
+            key: "game-seasons",
+            // Every two minutes while a season is on: a server that restarted
+            // has its decorations back within a pass. Out of season each server
+            // is told to clear once, and a pass after that asks nothing.
+            everyMs: Number(process.env.POLARIS_GAME_SEASONS_MS) || 2 * MINUTE,
+            // Unleased: telling a server the same season twice changes nothing.
+            leaseMs: null,
+            run: async () => (await import("./minecraft/seasonal-service")).sweepSeasons()
+        },
+        {
             key: "game-mod-announcements",
             // The mods that greet every joining player with thanks, tips or
             // another server's address, quietened on every running modded

@@ -49,6 +49,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import { withLiveSince, type PlayerSeen } from "../../lib/games-activity";
 import { MinecraftAppearance } from "./minecraft-appearance";
+import { MinecraftSeasonal } from "./minecraft-seasonal";
 import type { QueuedAction } from "../../lib/minecraft/queue";
 import type { ServerPresence } from "../../lib/games-service";
 import type { PlayerTimeout } from "../../lib/player-timeout";
@@ -859,6 +860,14 @@ export function MinecraftPanel({
                                 canRoute={game?.canRoute ?? false}
                             />
                         </CardBoundary>
+                        {edition === "java" && (
+                            <CardBoundary name="Seasonal">
+                                <MinecraftSeasonal
+                                    installedAppId={installedAppId}
+                                    canManage={held.includes("games.manage")}
+                                />
+                            </CardBoundary>
+                        )}
                         <CardBoundary name="Settings">
                             <MinecraftSettings
                                 installedAppId={installedAppId}

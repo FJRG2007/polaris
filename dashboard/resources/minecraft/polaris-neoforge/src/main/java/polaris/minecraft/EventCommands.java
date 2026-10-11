@@ -34,12 +34,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - {@code polaris guard set <key> <x1> <y1> <z1> <x2> <y2> <z2>},
  *   {@code clear <key>}, {@code list} ({@link EventGuard}).
  * - {@code polaris sounds status|refresh} ({@link SoundPack}).
+ * - {@code polaris season set <halloween|winter> <seconds>}, {@code clear},
+ *   {@code status} ({@link SeasonalDecor}).
  *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
     /** What `polaris caps` lists; the dashboard checks each by name. */
-    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard"};
+    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season"};
 
     private final String version;
 
@@ -56,6 +58,14 @@ final class EventCommands {
                 .then(Commands.literal("sounds")
                         .then(Commands.literal("status").executes(context -> answer(context, server -> sounds(server, false))))
                         .then(Commands.literal("refresh").executes(context -> answer(context, server -> sounds(server, true)))))
+                .then(Commands.literal("season")
+                        .then(Commands.literal("set").then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 86_400))
+                                        .executes(context -> answer(context, server -> SeasonalDecor.set(server,
+                                                StringArgumentType.getString(context, "name"),
+                                                IntegerArgumentType.getInteger(context, "seconds")))))))
+                        .then(Commands.literal("clear").executes(context -> answer(context, SeasonalDecor::clear)))
+                        .then(Commands.literal("status").executes(context -> answer(context, server -> SeasonalDecor.status()))))
                 .then(Commands.literal("stash")
                         .then(Commands.literal("save").then(playerAndKey(EventStash::save)))
                         .then(Commands.literal("restore").then(playerAndKey(EventStash::restore))))

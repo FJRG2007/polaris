@@ -2880,5 +2880,19 @@
         "needsAddress": "El servidor lo descarga de la dirección pública de este Polaris, y aún no tiene. Dale un dominio a Polaris en Ajustes.",
         "onlyManagers": "Solo quien gestiona este servidor puede instalarlo o quitarlo.",
         "readFailed": "No se pudo leer Symbiote"
+    },
+    "seasonal": {
+        "title": "Decoración de temporada",
+        "hint": "Calabazas y telarañas en Halloween, nieve en invierno. Solo se ven en la pantalla de los jugadores; el mundo nunca se modifica.",
+        "turnOn": "Mostrar decoración de temporada",
+        "showingHalloween": "Ahora se ve la decoración de Halloween.",
+        "showingWinter": "Ahora se ve la decoración de invierno.",
+        "waiting": "Ahora no se ve nada. Se activa sola cuando empieza la próxima temporada.",
+        "offHere": "Desactivada en este servidor.",
+        "paused": "En pausa mientras hay un evento. Vuelve cuando termina.",
+        "blocked": "La decoración de temporada está desactivada para todo Polaris en los ajustes de administración.",
+        "needsRestart": "Este servidor necesita un reinicio para cargar la decoración.",
+        "unavailable": "Este servidor no tiene el plugin o mod de Polaris para mostrarla.",
+        "notSaved": "No se pudo guardar. Inténtalo de nuevo."
     }
 }

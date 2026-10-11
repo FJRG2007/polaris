@@ -1,0 +1,193 @@
+/**
+ * Telling each running Minecraft server which season to dress for (`seasonal.ts`
+ * decides, the server's Polaris jar draws it).
+ *
+ * A sweep every two minutes. While a season is on, every running server that
+ * has the jar is told again on every pass - the jar keeps what it was told for
+ * an hour, so a server that restarted picks it up within a pass, and one that
+ * lost Polaris takes the decorations down by itself. Out of season a server is
+ * told to clear once and then left alone: a jar that just started has nothing
+ * up. A server's own switch tells it at once.
+ */
+
+import { prisma } from "@polaris/db";
+import * as seasonal from "./seasonal";
+import { host } from "@polaris/app-host";
+import { readSchedule } from "./schedule";
+import { readEventState } from "./events/state";
+import { withServerContainer } from "./service";
+import { capsReading, forgetCapabilities } from "./events/in-server";
+import { readEventsConfig } from "./events/catalog";
+
+const { readInstallConfig, patchInstallConfig } = host.appsInstallConfig;
+const { seasonsAllowed } = host.seasonalService;
+
+/** How long a server that cannot decorate is left before it is asked again: an
+ *  older jar, or no Polaris at all, answers the same until the server restarts. */
+const NO_JAR_RETRY_MS = 30 * 60_000;
+
+/** Servers told at once on a sweep: each is a console trip or two. */
+const SWEEP_CONCURRENCY = 8;
+
+/** Per server, the last line it took, or when its Polaris jar was found too old
+ *  to decorate, or when it answered with no Polaris jar at all. */
+const told = new Map<
+    string,
+    { readonly line: string } | { readonly oldJarAt: number } | { readonly noJarAt: number }
+>();
+
+/** When a server was found unable to decorate, if it was. */
+function cannotSince(last: ReturnType<typeof told.get>): number | null {
+    if (last && "oldJarAt" in last) return last.oldJarAt;
+    if (last && "noJarAt" in last) return last.noJarAt;
+    return null;
+}
+
+interface ServerRow {
+    readonly id: string;
+    readonly ownerId: string;
+    readonly config: string | null;
+}
+
+/** The time zone a server's days are read in: its events', as its challenges use. */
+function zoneOf(config: Record<string, unknown>): string {
+    return readEventsConfig(config, readSchedule(config).timezone).settings.timezone;
+}
+
+/** What one server should be showing now. */
+export function decorationOf(
+    config: Record<string, unknown>,
+    allowed: boolean,
+    now: Date
+): seasonal.Decoration | null {
+    return seasonal.decorationNow({
+        now,
+        timeZone: zoneOf(config),
+        allowed,
+        serverOn: seasonal.seasonalOn(config),
+        eventRunning: readEventState(config).run !== null
+    });
+}
+
+/** Tell one server. A line it already took out of season is not sent again. */
+async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolean> {
+    const line = seasonal.seasonCommand(decorationOf(readInstallConfig(row.config), allowed, now));
+    const last = told.get(row.id);
+    const cannot = cannotSince(last);
+    if (cannot !== null && now.getTime() - cannot < NO_JAR_RETRY_MS) return false;
+    if (last && "line" in last && last.line === line && line === seasonal.seasonCommand(null))
+        return false;
+    return withServerContainer(row.ownerId, row.id, async (server) => {
+        // A server that is down has nothing up, and starts with nothing.
+        if (!server.running || server.edition !== "java") {
+            told.set(row.id, { line: seasonal.seasonCommand(null) });
+            return false;
+        }
+        const reading = await capsReading(server);
+        // Nobody answered, as a console that is still starting does: asked
+        // again on the next pass, not taken for a server without the jar.
+        if (reading.answer === "none") {
+            forgetCapabilities(row.id);
+            return false;
+        }
+        if (!reading.caps.has("season")) {
+            told.set(
+                row.id,
+                reading.answer === "polaris"
+                    ? { oldJarAt: now.getTime() }
+                    : { noJarAt: now.getTime() }
+            );
+            return false;
+        }
+        await server.say([line]);
+        told.set(row.id, { line });
+        return true;
+    }).catch((caught: unknown) => {
+        console.error(`[minecraft-seasonal] could not tell ${row.id} the season:`, caught);
+        return false;
+    });
+}
+
+/** Every Minecraft server, told what to show. */
+export async function sweepSeasons(now: Date = new Date()): Promise<{ told: number }> {
+    const [rows, allowed] = await Promise.all([
+        prisma.installedApp.findMany({
+            where: {
+                status: { not: "removed" },
+                catalogId: "minecraft",
+                applicationId: { not: null }
+            },
+            select: { id: true, ownerId: true, config: true }
+        }),
+        seasonsAllowed().catch(() => true)
+    ]);
+    let count = 0;
+    let next = 0;
+    const worker = async () => {
+        while (next < rows.length) {
+            const row = rows[next++]!;
+            if (await tell(row, allowed, now)) count += 1;
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(SWEEP_CONCURRENCY, rows.length) }, worker));
+    return { told: count };
+}
+
+/** One server's switch, and what it is showing because of it. */
+export interface SeasonalView {
+    readonly on: boolean;
+    /** What it shows now with this switch; null when out of season, or off. */
+    readonly showing: seasonal.Decoration | null;
+    /** What the season is regardless of this server's switch. */
+    readonly season: seasonal.Decoration | null;
+    /** The deployment's switch is off: nothing shows anywhere. */
+    readonly blocked: boolean;
+    /** An event is running here; the decorations wait for it to end. */
+    readonly paused: boolean;
+    /** The server's jar was found too old to decorate: it needs a restart to
+     *  load the one Polaris keeps on it. */
+    readonly needsRestart: boolean;
+    /** The server answered with no Polaris plugin or mod to draw them. */
+    readonly unavailable: boolean;
+}
+
+export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
+    const [row, allowed] = await Promise.all([
+        prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } }),
+        seasonsAllowed().catch(() => true)
+    ]);
+    const config = readInstallConfig(row?.config);
+    const now = new Date();
+    const last = told.get(installedAppId);
+    return {
+        on: seasonal.seasonalOn(config),
+        showing: decorationOf(config, allowed, now),
+        season: seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config))),
+        blocked: !allowed,
+        paused: readEventState(config).run !== null,
+        needsRestart: last !== undefined && "oldJarAt" in last,
+        unavailable: last !== undefined && "noJarAt" in last
+    };
+}
+
+/** Turn this server's decorations on or off, and tell it now. */
+export async function setSeasonal(
+    ownerId: string,
+    installedAppId: string,
+    on: boolean
+): Promise<SeasonalView> {
+    // Absent is on, so on is written as removing the key.
+    await patchInstallConfig(installedAppId, { [seasonal.SEASONAL_KEY]: on ? null : false });
+    // Asked again now rather than when the last answer runs out, so a server
+    // restarted onto a newer jar is reached on the switch.
+    told.delete(installedAppId);
+    const [row, allowed] = await Promise.all([
+        prisma.installedApp.findUnique({
+            where: { id: installedAppId },
+            select: { id: true, ownerId: true, config: true }
+        }),
+        seasonsAllowed().catch(() => true)
+    ]);
+    if (row) await tell({ ...row, ownerId }, allowed, new Date());
+    return seasonalView(installedAppId);
+}

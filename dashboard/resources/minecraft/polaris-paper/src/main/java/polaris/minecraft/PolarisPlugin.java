@@ -17,12 +17,14 @@ import org.bukkit.plugin.java.JavaPlugin;
  * turned off harmless: the login with {@code POLARIS_LOGIN=on}, and the server's
  * own sounds ({@link SoundPack}) wherever Polaris wrote its address, id and token
  * (unless {@code POLARIS_SOUNDS=off}). Where an event's players respawn
- * ({@link EventRespawn}) and the guard on an event's space ({@link EventGuard})
+ * ({@link EventRespawn}), the guard on an event's space ({@link EventGuard})
+ * and the seasonal decorations ({@link SeasonalDecor})
  * are idle until the dashboard runs one of their commands.
  */
 public final class PolarisPlugin extends JavaPlugin {
     private LoginGate gate;
     private SoundPack sounds;
+    private SeasonalDecor seasonal;
 
     @Override
     public void onEnable() {
@@ -35,6 +37,10 @@ public final class PolarisPlugin extends JavaPlugin {
         // Nobody outside an event changes its space; idle until one is guarded.
         EventGuard guard = new EventGuard(this);
         getServer().getPluginManager().registerEvents(guard, this);
+        // The season Polaris says it is, on players' screens only; idle until told.
+        seasonal = new SeasonalDecor(this);
+        getServer().getPluginManager().registerEvents(seasonal, this);
+        SeasonalDecor season = seasonal;
         PluginCommand polaris = getCommand("polaris");
         if (polaris != null) {
             CommandExecutor soundsCommand = sounds != null
@@ -54,6 +60,8 @@ public final class PolarisPlugin extends JavaPlugin {
                     reply = respawns.answer(Arrays.copyOfRange(args, 1, args.length));
                 else if (args[0].equalsIgnoreCase("guard"))
                     reply = guard.answer(Arrays.copyOfRange(args, 1, args.length));
+                else if (args[0].equalsIgnoreCase("season"))
+                    reply = season.answer(Arrays.copyOfRange(args, 1, args.length));
                 else reply = SoundPack.refused("usage");
                 sender.sendMessage(reply.toString());
                 return true;
@@ -75,7 +83,7 @@ public final class PolarisPlugin extends JavaPlugin {
     }
 
     /** `polaris caps`: what the dashboard may ask of this plugin, as the NeoForge
-     *  mod answers it. Only `respawn` and `guard` here: the rest are the mod's alone. */
+     *  mod answers it. Only `respawn`, `guard` and `season` here: the rest are the mod's alone. */
     private static JsonObject caps(String version) {
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
@@ -83,6 +91,7 @@ public final class PolarisPlugin extends JavaPlugin {
         JsonArray caps = new JsonArray();
         caps.add("respawn");
         caps.add("guard");
+        caps.add("season");
         reply.add("caps", caps);
         return reply;
     }
@@ -93,6 +102,8 @@ public final class PolarisPlugin extends JavaPlugin {
         gate = null;
         if (sounds != null) sounds.stop();
         sounds = null;
+        if (seasonal != null) seasonal.stop();
+        seasonal = null;
         CommandLogFilter.uninstall();
     }
 }

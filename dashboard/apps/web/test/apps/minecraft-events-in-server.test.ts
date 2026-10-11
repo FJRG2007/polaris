@@ -55,6 +55,16 @@ describe("capabilities", () => {
         expect(inServer.parseCaps('{"ok":false}')).toEqual(new Set());
     });
 
+    it("tells a Polaris jar from another answer and from none", () => {
+        expect(inServer.readCaps(CAPS).answer).toBe("polaris");
+        expect(inServer.readCaps("Unknown or incomplete command, see below for error").answer).toBe(
+            "other"
+        );
+        expect(inServer.readCaps('{"ok":false}').answer).toBe("other");
+        expect(inServer.readCaps("").answer).toBe("none");
+        expect(inServer.readCaps(" \n ").answer).toBe("none");
+    });
+
     it("asks once a minute per server, and never a Bedrock one", async () => {
         const { server, said } = fakeServer(() => CAPS);
         expect(await inServer.capabilities(server, 1_000)).toEqual(

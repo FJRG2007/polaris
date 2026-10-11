@@ -252,11 +252,17 @@ describe("the services the dashboard offers apps", () => {
             "m"
         );
         const asyncArrow = new RegExp(`^export\\s+const\\s+${name}\\s*=\\s*async\\b`, "m");
+        // React's per-request `cache` around an async function is still one.
+        const cachedAsync = new RegExp(
+            `^export\\s+const\\s+${name}\\s*=\\s*cache\\(\\s*async\\b`,
+            "m"
+        );
         const declaration =
             new RegExp(`^export\\s+function\\s+${name}\\b[^{]*`, "m").exec(source)?.[0] ?? "";
         const ok =
             asyncFunction.test(source) ||
             asyncArrow.test(source) ||
+            cachedAsync.test(source) ||
             (returnsPromise.test(source) && /\)\s*:\s*Promise</.test(declaration));
         // A synchronous service either moves to a package (as LOCAL_TARGET and the
         // zoom arithmetic did) or its callers await it and it is listed here.
