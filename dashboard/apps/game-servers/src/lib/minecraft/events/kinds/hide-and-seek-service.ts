@@ -219,7 +219,7 @@ async function goLines(ctx: KindContext): Promise<string[]> {
             ...hs.joinSide(one.name, seeking),
             ...(seeking
                 ? [
-                      ...hs.waitingLines(one.name),
+                      ...hs.waitingLines(one.name, seconds),
                       ...arena.titleTo(
                           one.name,
                           seekMessages.seekTitle(language),
@@ -373,19 +373,39 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             state.powerAt += every * Math.max(1, Math.ceil((now - state.powerAt + 1) / every));
         }
     }
-    // The manor's lava: hiders cross it; a seeker who steps in is sent back by
-    // the pack - and where the pack is not on, nobody is, so seekers cross it
-    // too rather than burn.
-    const packOn = house ? await hitsService.ensure(ctx) : true;
+    // A call from every hider still hidden, now and then, heard from a few
+    // blocks off them: roughly where to look, never the spot.
+    const due = state.released
+        ? hs.nextReveal(options.revealSeconds, releaseAt, state.revealedAt, ctx.run.endsAt)
+        : null;
+    if (due !== null && now >= due) {
+        state.reveals += 1;
+        state.revealedAt = now;
+        for (const one of hiders) {
+            const at = here.get(lower(one.name));
+            if (!at) continue;
+            lines.push(
+                ...hs.revealLines(
+                    hs.revealPoint(run.id, one.name, state.reveals, at),
+                    arena.IN_ARENA
+                ),
+                arena.tellTo(one.name, messages.tag(language) + seekMessages.revealTold(language))
+            );
+        }
+    }
+    // The manor's lava: everybody crosses it unhurt, so a seeker can look
+    // wherever a hider can hide.
+    if (house) await hitsService.ensure(ctx);
     for (const one of run.entrants) {
         const at = here.get(lower(one.name));
         if (!at) continue;
         const seeking = hs.seeks(state, one.name);
         lines.push(...hs.unhurtLines(one.name));
         if (!arena.contains(box, at)) lines.push(arena.moveTo(one.name, spotOf(run, one)));
-        if (house && (!seeking || !packOn)) lines.push(...hs.fireproofLines(one.name));
+        if (house) lines.push(...hs.fireproofLines(one.name));
         if (!seeking) lines.push(hs.hiderLine(one.name));
-        else if (!state.released) lines.push(...hs.waitingLines(one.name));
+        else if (!state.released)
+            lines.push(...hs.waitingLines(one.name, (releaseAt - now) / 1000));
         const power = !seeking ? state.powers[one.name] : undefined;
         const boost =
             power && power.until > now

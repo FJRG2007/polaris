@@ -599,6 +599,16 @@ export function HideAndSeekFields({
                     />
                 )}
                 <NumberField
+                    label={t("editor.revealSeconds")}
+                    hint={t("editor.revealSecondsHint", { max: catalog.MOST_REVEAL_SECONDS })}
+                    min={0}
+                    max={catalog.MOST_REVEAL_SECONDS}
+                    value={value.revealSeconds}
+                    onChange={(revealSeconds) => onChange({ ...value, revealSeconds })}
+                    issues={issues}
+                    field="revealSeconds"
+                />
+                <NumberField
                     label={t("editor.powerUpMinutes")}
                     hint={t("editor.powerUpMinutesHint")}
                     min={0}

@@ -12094,14 +12094,17 @@ describe("hide and seek", () => {
         expect(world.sent).toContain(
             `execute if entity @a[name=${seeker},team=] run team join pe_hs_seek ${seeker}`
         );
-        expect(world.sent).toContain(`effect give ${seeker} minecraft:blindness 3 0 true`);
+        expect(world.sent).toContain(
+            `effect give ${seeker} minecraft:blindness ${60 + hs.WAIT_MARGIN} 0 true`
+        );
         expect(world.sent).toContain(`effect give ${hiders[0]} minecraft:weakness 3 100 true`);
         expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
         const cageDown = (await manorKind()).cageDown(run.arena!.box, await houseOf(run));
         expect(world.sent).not.toContain(cageDown);
-        // Hiders can cross the manor's lava; the seeker cannot.
-        for (const line of hs.fireproofLines(hiders[0])) expect(world.sent).toContain(line);
-        expect(world.sent).not.toContain(hs.fireproofLines(seeker)[1]);
+        // Everybody crosses the manor's lava, the seeker too: a spot under it
+        // can be looked in.
+        for (const name of [hiders[0], seeker])
+            for (const line of hs.fireproofLines(name)) expect(world.sent).toContain(line);
         expect(hs.stateOf(state().run!.game)?.seekers).toEqual([seeker]);
         // Everybody can read the countdown: the hiders the time left to hide,
         // the seeker when they can start, the boss bar the same for all.
@@ -12113,6 +12116,18 @@ describe("hide and seek", () => {
         expect(shown(`title ${seeker} actionbar`, "You can start seeking in")).toBe(true);
         expect(shown("bossbar set", "Time left to hide")).toBe(true);
         expect(shown(`title ${hiders[0]} actionbar`, "Time hidden")).toBe(false);
+        // The seeker's blindness is always longer than what is left of the wait:
+        // it never runs down to a flash of the house.
+        const left = (run.readyAt! + 60_000 - Date.now()) / 1000;
+        const blind = world.sent
+            .slice(from)
+            .map((line) =>
+                new RegExp(`^effect give ${seeker} minecraft:blindness ([0-9]+) `).exec(line)
+            )
+            .filter((match) => match !== null)
+            .map((match) => Number(match![1]));
+        expect(blind.length).toBeGreaterThan(0);
+        for (const seconds of blind) expect(seconds).toBeGreaterThan(left);
 
         // Let out once the hiding time is up, the cage down by its barrier alone.
         await play(run.readyAt! + 60_000 - Date.now() + 2_100);
@@ -12237,6 +12252,39 @@ describe("hide and seek", () => {
         await play(2_100);
         expect(game().released).toBe(true);
         expect(game().allReadyAt).toBe(at);
+    });
+
+    it("has every hider still hidden give a call a few blocks off them, once the seekers are out", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(15)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const hiders = names.filter((name) => name !== seeker);
+        const calls = () =>
+            world.sent.filter((line) => line.includes(`playsound ${hs.REVEAL_SOUND}`));
+        // Nothing while they hide, nor the moment the seekers are out.
+        await play(Math.max(100, run.readyAt! + 15_000 - Date.now() + 2_100));
+        expect(hs.stateOf(state().run!.game)?.released).toBe(true);
+        expect(calls()).toEqual([]);
+        // A minute on: one call for each hider, none for the seeker, each off
+        // where the hider stands.
+        await play(60_000);
+        expect(calls()).toHaveLength(hiders.length);
+        for (const name of hiders) {
+            const at = world.at[name]!;
+            const exact = `${Math.floor(at[0]) + 0.5} ${Math.floor(at[1]) + 1} ${Math.floor(at[2]) + 0.5}`;
+            expect(calls().some((line) => line.endsWith(`${exact} 2 1.2`))).toBe(false);
+        }
+        expect(hs.stateOf(state().run!.game)?.reveals).toBe(1);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith(`tellraw ${hiders[0]} `) &&
+                    visible(line).includes("You made a sound")
+            )
+        ).toBe(true);
     });
 
     it("by the game's statistics where the pack is not on, finds on the first hit and never by a fall", async () => {

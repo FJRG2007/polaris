@@ -55,7 +55,7 @@ import { seeded, shuffled } from "../trivia-bank";
 import * as model from "./seek-grid";
 
 /** The layout's version, written into the run when it is built. */
-export const DESIGN = 5;
+export const DESIGN = 6;
 /** The first design built as a manor: every design from here on is one. */
 export const FIRST = 4;
 /** The most who can play, in the largest house. */

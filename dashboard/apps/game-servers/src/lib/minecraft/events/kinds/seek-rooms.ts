@@ -1,11 +1,9 @@
 /**
  * The rooms hide and seek's manor (`seek-manor.ts`) is put together from: a
  * library of hand-made templates, each with its own look and its own hiding
- * places, set into the house turned any of four ways and mirrored, the way
- * Spelunky fills its grid of rooms from templates that fit the openings a
- * path needs (Derek Yu, "Spelunky", Boss Fight Books 2016; Darius Kazemi,
- * "Spelunky Generator Lessons", 2013) and Minecraft's jigsaw structures join
- * pieces at matching connectors.
+ * places, set into the house turned any of four ways and mirrored: a grid of
+ * rooms filled from templates that fit the openings a path through it needs,
+ * the pieces joined at matching connectors.
  *
  * A template draws in its room's own terms: `u` across, `v` deep, 0 to 13, the
  * north side at `v` 0; levels from the floor, 1 to 10 inside, the cellars down
@@ -625,6 +623,14 @@ const BEDROOM: Template = {
             [10, 8],
             [12, 8]
         ] as const) {
+            if (c.design >= BEDLESS_SINCE) {
+                // A bed's look without a bed: a frame, a red cover and a
+                // white pillow. Nothing here sets a spawn point.
+                c.set("minecraft:white_carpet", u, 2, v + 1);
+                c.set("minecraft:red_carpet", u, 2, v);
+                c.set("minecraft:oak_slab[type=top]", u, 1, v, u, 1, v + 1);
+                continue;
+            }
             c.set("minecraft:red_bed[facing=south,part=head,occupied=false]", u, 1, v + 1);
             c.set("minecraft:red_bed[facing=south,part=foot,occupied=false]", u, 1, v);
         }
@@ -686,6 +692,13 @@ const SNOW: Template = {
  * landing, and the nests and the ledge are over the doorways' height.
  */
 export const ATRIUM_SINCE = 5;
+
+/**
+ * From design 6 no room has a bed: a bed sets the spawn point of whoever
+ * sleeps in or clicks it, so after the event a player could be sent back to a
+ * house that is gone. The bedroom builds a look-alike instead.
+ */
+export const BEDLESS_SINCE = 6;
 
 const ATRIUM: Template = {
     name: "atrium",

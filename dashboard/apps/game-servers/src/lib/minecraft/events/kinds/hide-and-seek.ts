@@ -1757,6 +1757,9 @@ export const stateSchema = z.object({
         .object({ scaffold: z.boolean(), snow: z.boolean(), display: z.boolean() })
         .nullable()
         .default(null),
+    /** When the hiders last gave a call (`revealPoint`), and how many. */
+    revealedAt: z.number().nullable().default(null),
+    reveals: z.number().int().default(0),
     /** When the hiders' next power-up is due, and the last each was given. */
     powerAt: z.number().nullable().default(null),
     powers: z
@@ -1845,6 +1848,12 @@ export function setupLines(names: readonly [string, string]): string[] {
 export { RADAR_OFF, RADAR_RESET } from "./radar";
 
 export const TEARDOWN = [
+    // A seeker still waiting when it is called off is not left blind for the
+    // rest of the wait (`waitingLines`); by team or by tag, before either goes.
+    ...[`@a[team=${TEAMS[0]}]`, `@a[tag=${SIDE_TAGS[0]}]`].flatMap((who) => [
+        `effect clear ${who} minecraft:blindness`,
+        `effect clear ${who} minecraft:slowness`
+    ]),
     ...TEAMS.map((team) => `team remove ${team}`),
     ...SIDE_TAGS.map((tag) => `tag @a[tag=${tag}] remove ${tag}`),
     ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`),
@@ -1875,10 +1884,20 @@ export function sideTagsOff(name: string): string[] {
 }
 
 /** A seeker before the cage comes down: blind, and unable to walk. */
-export function waitingLines(name: string): string[] {
+/**
+ * A seeker waiting in the cage: blind and unable to walk until they are let
+ * out, `seconds` from now. Given for all of the wait and `WAIT_MARGIN` more,
+ * never a few seconds at a time: blindness under a second from its end fades
+ * the fog out, and a refresh that came late showed the seekers the house in
+ * flashes. Given again each look only lengthens it (the game keeps the longer
+ * of two); it comes off when they are let out (`releasedLines`).
+ */
+export const WAIT_MARGIN = 10;
+export function waitingLines(name: string, seconds: number): string[] {
+    const lasts = Math.max(1, Math.ceil(seconds)) + WAIT_MARGIN;
     return [
-        `effect give ${name} minecraft:blindness 3 0 true`,
-        `effect give ${name} minecraft:slowness 3 10 true`
+        `effect give ${name} minecraft:blindness ${lasts} 0 true`,
+        `effect give ${name} minecraft:slowness ${lasts} 10 true`
     ];
 }
 
@@ -1913,11 +1932,12 @@ export function hiderLine(name: string): string {
 /** The tag on everybody the game gave an effect of its own (`EFFECTS`), so
  *  only those are ever taken off again, and only from them. */
 export const FX_TAG = "pe_hs_fx";
-/** What the game gives a hider besides the hits' effects: fire resistance, to
- *  cross the manor's lava, and the power-ups. */
+/** What the game gives besides the hits' effects: fire resistance, for anybody
+ *  to cross the manor's lava, and a hider's power-ups. */
 export const EFFECTS = ["fire_resistance", "invisibility", "speed"] as const;
 
-/** A hider in a manor: through its lava unhurt, a few seconds at a time. */
+/** Anybody in a manor, hider or seeker: through its lava unhurt, a few
+ *  seconds at a time, so a seeker can look under it too. */
 export function fireproofLines(name: string): string[] {
     return [`tag ${name} add ${FX_TAG}`, `effect give ${name} minecraft:fire_resistance 6 0 true`];
 }
@@ -1942,6 +1962,64 @@ export function powerFor(seed: string, name: string, round: number): Power {
     return POWERS[
         Math.floor(seeded(`${seed}-power-${round}-${name.toLowerCase()}`)() * POWERS.length)
     ]!;
+}
+
+// ------------------------------------------------------------------ the call
+
+/**
+ * Every `revealSeconds` once the seekers are out, each hider still hidden
+ * gives a call: a flute note and a few note particles at a point near them,
+ * never where they are - `REVEAL_NEAR` to `REVEAL_FAR` blocks off, level, drawn
+ * from the run's id, the hider and the round. A seeker hears roughly where to
+ * look, never the spot. None in the last `REVEAL_QUIET` seconds of the game.
+ */
+export const REVEAL_NEAR = 2;
+export const REVEAL_FAR = 5;
+export const REVEAL_QUIET = 15;
+export const REVEAL_SOUND = "minecraft:block.note_block.flute";
+
+/** Where a hider's call is heard from: a point `REVEAL_NEAR` to `REVEAL_FAR`
+ *  blocks from `at`, in whole blocks, at their height. */
+export function revealPoint(
+    seed: string,
+    name: string,
+    round: number,
+    at: { x: number; y: number; z: number }
+): { x: number; y: number; z: number } {
+    const random = seeded(`${seed}-call-${round}-${name.toLowerCase()}`);
+    const angle = random() * Math.PI * 2;
+    const reach = REVEAL_NEAR + random() * (REVEAL_FAR - REVEAL_NEAR);
+    // Rounded outwards, so a whole block never lands nearer than `REVEAL_NEAR`.
+    const away = (value: number) => (value < 0 ? Math.floor(value) : Math.ceil(value));
+    let dx = away(Math.cos(angle) * reach);
+    let dz = away(Math.sin(angle) * reach);
+    while (Math.hypot(dx, dz) > REVEAL_FAR) {
+        dx -= Math.sign(dx);
+        if (Math.hypot(dx, dz) > REVEAL_FAR) dz -= Math.sign(dz);
+    }
+    return { x: Math.floor(at.x) + dx, y: Math.floor(at.y), z: Math.floor(at.z) + dz };
+}
+
+/** The call itself, heard by everybody in the arena, at `point`. */
+export function revealLines(point: { x: number; y: number; z: number }, inArena: string): string[] {
+    const where = `${point.x + 0.5} ${point.y + 1} ${point.z + 0.5}`;
+    return [
+        `execute in minecraft:overworld run playsound ${REVEAL_SOUND} master @a[tag=${inArena}] ${where} 2 1.2`,
+        `execute in minecraft:overworld run particle minecraft:note ${where} 0.4 0.4 0.4 1 6`
+    ];
+}
+
+/** When the next call is due after `last` (or after the release), or null for
+ *  none: switched off, or too near the end. */
+export function nextReveal(
+    every: number,
+    releaseAt: number,
+    last: number | null,
+    endsAt: number
+): number | null {
+    if (every <= 0) return null;
+    const next = (last ?? releaseAt) + every * 1000;
+    return next <= endsAt - REVEAL_QUIET * 1000 ? next : null;
 }
 
 /** Everything the game gave one player taken off, and only that: for a hider

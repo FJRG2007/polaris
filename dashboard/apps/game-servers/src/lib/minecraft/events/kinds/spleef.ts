@@ -1,10 +1,9 @@
 /**
  * A spleef arena, floating high over a site: several floors of snow stacked one
- * under the other (as Fall Guys' Hex-A-Gone stacks its layers), each walled in
- * glass three blocks high so nobody walks off an edge, and a glass net under the
- * lowest that catches whoever falls through it - who is then out, and sent back
- * to where they were. No lava anywhere: falling through the last floor is the
- * lava.
+ * under the other, each walled in glass three blocks high so nobody walks off
+ * an edge, and a glass net under the lowest that catches whoever falls through
+ * it - who is then out, and sent back to where they were. No lava anywhere:
+ * falling through the last floor is the lava.
  *
  * Each run plays one of three ways, drawn for it among those the event allows
  * (`variantFor`):

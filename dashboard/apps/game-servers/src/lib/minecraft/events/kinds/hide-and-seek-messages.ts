@@ -125,6 +125,13 @@ export function readyUndone(language: Language): string {
     return language === "es" ? `${INFO}Sigues escondiéndote.` : `${INFO}Back to hiding.`;
 }
 
+/** Told to a hider as they give a call (`hs.revealPoint`). */
+export function revealTold(language: Language): string {
+    return language === "es"
+        ? `${WARN}Has hecho ruido: los buscadores oyen más o menos dónde estás.`
+        : `${WARN}You made a sound: the seekers heard roughly where you are.`;
+}
+
 /** Every hider ready: the rest of the time to hide is skipped. */
 export function allReady(language: Language): string {
     return language === "es"
