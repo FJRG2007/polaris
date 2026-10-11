@@ -36,7 +36,24 @@ describe("codes and sign-ins", () => {
             "Your one-time passcode",
             "Code de vérification",
             "Bestätigungscode",
-            "Codice di verifica"
+            "Codice di verifica",
+            "Tu enlace seguro a Claude.ai está aquí",
+            "Your sign-in link for Polaris",
+            "Secure link to log in",
+            "Votre lien de connexion",
+            "Ihr Anmeldelink",
+            "Il tuo link di accesso",
+            "Seu link de acesso",
+            "Password change request in PromoBox",
+            "Forgot your password?",
+            "Account recovery for your profile",
+            "Solicitud de cambio de contraseña",
+            "¿Olvidaste tu contraseña?",
+            "Recupera tu cuenta: recuperar contraseña",
+            "Mot de passe oublié",
+            "Passwort vergessen?",
+            "Password dimenticata",
+            "Esqueceu sua senha?"
         ]) {
             expect(categoriseMail(message({ subject })), subject).toBe("security");
         }
