@@ -20,6 +20,7 @@ const Y = 90;
 const ICE = new Set(["minecraft:packed_ice", "minecraft:blue_ice"]);
 const WALLS = new Set([
     "minecraft:white_concrete",
+    "minecraft:black_concrete",
     "minecraft:sea_lantern",
     "minecraft:light_blue_stained_glass"
 ]);
@@ -125,6 +126,49 @@ describe("a downhill race's road", () => {
         expect(runs).toBe(1200);
         expect(problems.slice(0, 5)).toEqual([]);
     }, 300_000);
+
+    it("dresses its finish - chequered walls by the line, a gantry two chequers high - and nothing else", () => {
+        for (let seed = 0; seed < 40; seed += 1) {
+            const dressed = downhill.course({ steepness: "steep" }, `finish-${seed}`, SITE, Y);
+            const plain = downhill.course({ steepness: "steep" }, `finish-${seed}`, SITE, Y, 1);
+            const problems: string[] = [];
+            const now = blocksOf(dressed.boxes, problems);
+            const before = blocksOf(plain.boxes, problems);
+            expect(problems).toEqual([]);
+            // The same road, the same ice, the same lines.
+            const ice = (blocks: Map<string, string>) =>
+                [...blocks].filter(([, block]) => ICE.has(block)).sort();
+            expect(ice(now)).toEqual(ice(before));
+            expect(dressed.gates).toEqual(plain.gates);
+            // The chequer only at the start's beam and round the finish.
+            const finish = dressed.gates.at(-1)!;
+            const start = dressed.gates[0]!;
+            const by = (gate: typeof finish, at: string, reach: number) => {
+                const [x, , z] = at.split(",").map(Number) as [number, number, number];
+                return (
+                    x >= Math.min(gate.x1, gate.x2) - reach &&
+                    x <= Math.max(gate.x1, gate.x2) + reach &&
+                    z >= Math.min(gate.z1, gate.z2) - reach &&
+                    z <= Math.max(gate.z1, gate.z2) + reach
+                );
+            };
+            const dark = [...now].filter(([, block]) => block === "minecraft:black_concrete");
+            const darkBefore = [...before.values()].filter(
+                (block) => block === "minecraft:black_concrete"
+            );
+            expect(dark.length).toBeGreaterThan(darkBefore.length);
+            for (const [at] of dark) expect(by(finish, at, 4) || by(start, at, 2), at).toBe(true);
+            // Two rows of chequer over the finish line.
+            const floor = dressed.downhill!.gateFloors.at(-1)!;
+            const rows = [...now].filter(
+                ([at, block]) =>
+                    by(finish, at, 0) &&
+                    /black_concrete|white_concrete/.test(block) &&
+                    Number(at.split(",")[1]) > floor + 2
+            );
+            expect(new Set(rows.map(([at]) => at.split(",")[1])).size).toBe(2);
+        }
+    });
 
     it("lays out the same road for the same run, steeper when asked", () => {
         const one = downhill.course({ steepness: "gentle" }, "same", SITE, Y);

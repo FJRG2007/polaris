@@ -122,6 +122,32 @@ describe("a kind added in an update", () => {
     });
 });
 
+describe("a meteor shower's prizes", () => {
+    const read = (defaults: number, rewards: catalog.Rewards) =>
+        catalog
+            .readEventsConfig({
+                [catalog.EVENTS_KEY]: {
+                    presets: [{ ...catalog.newPreset("meteor-shower", "meteors"), rewards }],
+                    settings: { defaults }
+                }
+            })
+            .presets.find((one) => one.id === "meteors")!.rewards;
+    const steady = catalog.DEFAULT_PRIZES["mining-rush"];
+
+    it("pays more than steady work, and brings the old prizes up once", () => {
+        const meteor = catalog.DEFAULT_PRIZES["meteor-shower"];
+        const diamonds = (rewards: catalog.Rewards) =>
+            rewards.first.items.find((item) => item.id === "minecraft:diamond")?.count ?? 0;
+        expect(diamonds(meteor)).toBeGreaterThan(diamonds(steady));
+        expect(catalog.newPreset("meteor-shower", "m").rewards).toEqual(meteor);
+        expect(read(8, steady)).toEqual(meteor);
+        // Changed by the operator, or saved since: theirs.
+        const theirs = { ...steady, everyone: catalog.NO_REWARD };
+        expect(read(8, theirs)).toEqual(theirs);
+        expect(read(catalog.DEFAULTS_VERSION, steady)).toEqual(steady);
+    });
+});
+
 describe("hide and seek's time to hide", () => {
     const seek = (hideSeconds: number, minutes = 7) => {
         const preset = catalog.newPreset("hide-and-seek", "seek") as catalog.EventPreset & {

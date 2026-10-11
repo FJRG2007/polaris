@@ -174,18 +174,48 @@ describe("a deadly nether maze", () => {
                     const [x, y, z] = at.split(",").map(Number) as [number, number, number];
                     expect(blocks.get(`${x},${y - 1},${z}`)).toBe("minecraft:netherrack");
                 }
-                // The goal reads as the goal: gold underfoot and lit overhead from
-                // wall to wall, and nowhere else is.
+                // The goal reads as a finish: gold and black chequered underfoot
+                // and lit overhead from wall to wall, the way in chequered black
+                // and white under light too, and the wall round it chequered -
+                // and nowhere else is gold, chequered or lit like that.
                 const g = built.goal;
+                const goalBlocks = (g.x2 - g.x1 + 1) * (g.z2 - g.z1 + 1);
                 for (let x = g.x1; x <= g.x2; x += 1)
                     for (let z = g.z1; z <= g.z2; z += 1) {
-                        expect(blocks.get(`${x},${Y},${z}`)).toBe("minecraft:gold_block");
+                        expect(blocks.get(`${x},${Y},${z}`)).toMatch(/gold_block|black_concrete/);
                         expect(blocks.get(`${x},${v.y2},${z}`)).toBe("minecraft:sea_lantern");
                     }
-                const marked = [...blocks.values()].filter(
-                    (block) => block === "minecraft:gold_block" || block === "minecraft:sea_lantern"
+                const goldAndBlack = [g.x1, g.x1 + 1].map((x) => blocks.get(`${x},${Y},${g.z1}`));
+                expect(new Set(goldAndBlack).size).toBe(2);
+                const lanterns = [...blocks.entries()].filter(
+                    ([, block]) => block === "minecraft:sea_lantern"
                 );
-                expect(marked).toHaveLength((g.x2 - g.x1 + 1) * (g.z2 - g.z1 + 1) * 2);
+                const near = (at: string) => {
+                    const [x, , z] = at.split(",").map(Number) as [number, number, number];
+                    return x >= g.x1 - 1 && x <= g.x2 + 1 && z >= g.z1 - 1 && z <= g.z2 + 1;
+                };
+                expect(lanterns.length).toBeGreaterThan(goalBlocks);
+                for (const [at] of lanterns) expect(near(at), at).toBe(true);
+                for (const [at, block] of blocks)
+                    if (/gold_block|black_concrete|white_concrete/.test(block))
+                        expect(near(at), at).toBe(true);
+                // Round the goal, side by side with it: chequered wall from the
+                // floor to the roof, or a chequered way in.
+                for (let x = g.x1 - 1; x <= g.x2 + 1; x += 1)
+                    for (let z = g.z1 - 1; z <= g.z2 + 1; z += 1) {
+                        const inside = x >= g.x1 && x <= g.x2 && z >= g.z1 && z <= g.z2;
+                        const corner = (x < g.x1 || x > g.x2) && (z < g.z1 || z > g.z2);
+                        if (inside || corner) continue;
+                        if (blocks.has(`${x},${Y + 1},${z}`)) {
+                            for (let up = 1; up <= maze.HEADROOM; up += 1)
+                                expect(blocks.get(`${x},${Y + up},${z}`)).toMatch(
+                                    /black_concrete|white_concrete/
+                                );
+                        } else
+                            expect(blocks.get(`${x},${Y},${z}`)).toMatch(
+                                /black_concrete|white_concrete/
+                            );
+                    }
                 // The middle is centred on the site.
                 expect(Math.abs((built.goal.x1 + built.goal.x2) / 2 - SITE.x)).toBeLessThanOrEqual(
                     2
@@ -195,6 +225,18 @@ describe("a deadly nether maze", () => {
                 );
             }
     }, 180_000);
+
+    it("keeps a maze built before its finish booth exactly as it was built", () => {
+        const before = maze.maze({ size: SIZES[0]!, hazards: "some" }, "old", SITE, Y, 1);
+        const blocks = before.boxes.map((box) => box.block);
+        expect(blocks).not.toContain("minecraft:black_concrete");
+        expect(blocks).not.toContain("minecraft:white_concrete");
+        const g = before.goal;
+        const gold = before.boxes
+            .filter((box) => box.block === "minecraft:gold_block")
+            .reduce((sum, box) => sum + (box.x2 - box.x1 + 1) * (box.z2 - box.z1 + 1), 0);
+        expect(gold).toBe((g.x2 - g.x1 + 1) * (g.z2 - g.z1 + 1));
+    });
 
     it("can be walked from the starting room to the middle on the blocks it is built of", () => {
         for (const size of SIZES)

@@ -211,7 +211,8 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             run.preset.options as catalog.EventOptions<"downhill-race">,
             run.id,
             site,
-            y
+            y,
+            run.stage?.origin ? run.stage.design : downhillRace.DESIGN
         );
         return {
             kind: "boat-race",
@@ -1826,6 +1827,8 @@ function boatRaceOf(loop: StageLoop, server: ServerContainer, track: boatRace.Tr
         },
         whole: boatRace.passesOf(track),
         finishTitle: messages.checkpointTitle(gates, gates, language),
+        // Over the finish of a downhill road: the moment marked where they stand.
+        ...(track.downhill ? { finished: stage.finishBurst } : {}),
         bar: (racer) => {
             const progress = boatRace.progressOf(track, racer.best);
             return track.downhill
@@ -1885,6 +1888,7 @@ function mazeRace(loop: StageLoop, built: netherMaze.Maze): PackRace {
         },
         whole: rooms,
         finishTitle: messages.checkpointTitle(rooms, rooms, language),
+        finished: stage.finishBurst,
         bar: (racer, at) =>
             mazeMessages.bar(
                 Math.max(racer.best, netherMaze.progressAt(built, at) ?? 0),

@@ -1813,6 +1813,96 @@ describe("a meteor shower", () => {
         ).toBe(12);
     });
 
+    it("puts a heart in the middle of the heap, of something rarer than its ore", () => {
+        const cells = meteors.meteorCells(point, 6, "precious", always, "ancient_debris");
+        expect(cells[0]).toEqual({ x: 120, y: 64, z: -40, block: "minecraft:ancient_debris" });
+        expect(cells.slice(1).every((cell) => cell.block === "minecraft:gold_ore")).toBe(true);
+        for (const ores of catalog.METEOR_ORES)
+            expect(meteors.ORE_MIX[ores].map(([id]) => id)).not.toContain(meteors.HEART[ores]);
+        // Ancient debris only where the server has it; diamond ore anywhere.
+        expect(meteors.heartOf("precious", false)).toBeNull();
+        expect(meteors.heartOf("precious", true)).toBe("ancient_debris");
+        expect(meteors.heartOf("common", false)).toBe("diamond_ore");
+    });
+
+    it("rims the heap on the ground beside it, never on it, and stacks rim only on rim", () => {
+        const heap = meteors.meteorCells(point, 12, "common", Math.random);
+        for (let run = 0; run < 200; run += 1) {
+            const crust = meteors.crustCells(point, heap, Math.random);
+            const at = (cell: { x: number; y: number; z: number }) =>
+                `${cell.x} ${cell.y} ${cell.z}`;
+            const ore = new Set(heap.map(at));
+            const low = crust.filter((cell) => cell.y === point.y);
+            for (const cell of crust) {
+                expect(ore.has(at(cell))).toBe(false);
+                expect(meteors.CRUST_MIX.map(([id]) => `minecraft:${id}`)).toContain(cell.block);
+                expect(cell.y === point.y || cell.y === point.y + 1).toBe(true);
+                if (cell.y > point.y)
+                    expect(low.some((under) => under.x === cell.x && under.z === cell.z)).toBe(
+                        true
+                    );
+                else
+                    expect(
+                        heap.some(
+                            (one) =>
+                                one.y === point.y &&
+                                Math.max(Math.abs(one.x - cell.x), Math.abs(one.z - cell.z)) === 1
+                        )
+                    ).toBe(true);
+            }
+            expect(new Set(crust.map(at)).size).toBe(crust.length);
+        }
+        expect(meteors.groundTest(point)).toBe(
+            "execute in minecraft:overworld if block 120 63 -40 minecraft:air"
+        );
+    });
+
+    it("draws a line of light towards a meteor that only its player sees", () => {
+        const lines = meteors.trail("Ana", { x: 100.5, y: 64, z: -39.5 }, point);
+        expect(lines).toEqual([
+            "execute in minecraft:overworld run particle minecraft:end_rod 102.50 65.20 -39.50 0 0 0 0 1 force Ana",
+            "execute in minecraft:overworld run particle minecraft:end_rod 104.50 65.20 -39.50 0 0 0 0 1 force Ana",
+            "execute in minecraft:overworld run particle minecraft:end_rod 106.50 65.20 -39.50 0 0 0 0 1 force Ana",
+            "execute in minecraft:overworld run particle minecraft:end_rod 108.50 65.20 -39.50 0 0 0 0 1 force Ana"
+        ]);
+        // Never past the meteor, and nothing once standing on it.
+        expect(meteors.trail("Ana", { x: 117.5, y: 64, z: -39.5 }, point)).toHaveLength(1);
+        expect(meteors.trail("Ana", { x: 120.5, y: 64, z: -39.5 }, point)).toEqual([]);
+    });
+
+    it("counts a heart mined near a meteor as five blocks, and one placed as five off", () => {
+        const plain = meteors.meteorTick([point], "precious");
+        expect(plain.some((line) => line.includes("pe_mh"))).toBe(false);
+        const lines = meteors.meteorTick([point], "precious", "ancient_debris");
+        expect(
+            lines.filter(
+                (line) =>
+                    line === "execute as @a run scoreboard players operation @s pe_mraw += @s pe_mh"
+            )
+        ).toHaveLength(meteors.HEART_POINTS);
+        expect(
+            lines.filter(
+                (line) =>
+                    line ===
+                    "execute as @a run scoreboard players operation @s pe_mused += @s pe_mhu"
+            )
+        ).toHaveLength(meteors.HEART_POINTS);
+        // Added before the meteors take it, emptied after.
+        const added = lines.lastIndexOf(
+            "execute as @a run scoreboard players operation @s pe_mraw += @s pe_mh"
+        );
+        expect(added).toBeLessThan(
+            lines.findIndex((line) => line.includes("pe_mtot += @s pe_mraw"))
+        );
+        expect(lines).toContain("scoreboard players set @a pe_mh 0");
+        expect(meteors.meteorSetup("precious")).toContain(
+            "scoreboard objectives add pe_mh minecraft.mined:minecraft.ancient_debris"
+        );
+        expect(meteors.meteorSetup("precious", null).some((line) => line.includes("pe_mh"))).toBe(
+            false
+        );
+    });
+
     it("only ever fills air, and only takes back its own ore", () => {
         const block = { x: 121, y: 64, z: -40, block: "minecraft:diamond_ore" };
         expect(meteors.airTest(block)).toBe(
@@ -1897,13 +1987,15 @@ describe("a meteor shower", () => {
                     blocks: [
                         { x: 120, y: 64, z: -40, block: "minecraft:iron_ore" },
                         { x: 121, y: 64, z: -40, block: "minecraft:iron_ore run kill @a" }
-                    ]
+                    ],
+                    crust: [{ x: 122, y: 64, z: -40, block: "minecraft:blackstone" }]
                 }
             ],
             "common"
         );
         expect(cleanup.filter((line) => line.includes("setblock"))).toEqual([
-            "execute in minecraft:overworld if block 120 64 -40 minecraft:iron_ore run setblock 120 64 -40 minecraft:air"
+            "execute in minecraft:overworld if block 120 64 -40 minecraft:iron_ore run setblock 120 64 -40 minecraft:air",
+            "execute in minecraft:overworld if block 122 64 -40 minecraft:blackstone run setblock 122 64 -40 minecraft:air"
         ]);
         for (const objective of made)
             expect(cleanup).toContain(`scoreboard objectives remove ${objective}`);

@@ -349,6 +349,9 @@ interface Loop {
      *  once asked; and which meteor's turn it is to creep first. */
     infects?: boolean;
     infectTurn?: number;
+    /** Whether this server has a meteor's heart of ancient debris and its rim
+     *  of blackstone and basalt (1.16 on), once asked. */
+    rich?: boolean;
 }
 
 const loops = new Map<string, Loop>();
@@ -1605,7 +1608,23 @@ async function showClock(installedAppId: string, loop: Loop): Promise<void> {
         const left = (loop.run.endsAt - now) / 1000;
         if (left <= 0) return;
         const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
-        lines.push(...commands.barUpdate(messages.barName(preset.name, left), left, total));
+        // A meteor shower says how many are there to mine, and how many are
+        // still to fall.
+        const name =
+            preset.kind === "meteor-shower"
+                ? messages.meteorBar(
+                      preset.name,
+                      loop.run.meteors.filter((meteor) => meteor.blocks.length > 0).length,
+                      Math.max(
+                          0,
+                          (preset.options as catalog.EventOptions<"meteor-shower">).meteors -
+                              loop.run.landings
+                      ),
+                      left,
+                      loop.language
+                  )
+                : messages.barName(preset.name, left);
+        lines.push(...commands.barUpdate(name, left, total));
     }
     if (lines.length > 0) await server.sayAll(lines).catch(() => undefined);
 }
@@ -1823,9 +1842,10 @@ async function begin(
         );
     }
     if (preset.kind === "meteor-shower") {
-        lines.push(
-            ...meteors.meteorSetup((preset.options as catalog.EventOptions<"meteor-shower">).ores)
-        );
+        const ores = (preset.options as catalog.EventOptions<"meteor-shower">).ores;
+        // Its heart counted only where the server has it (`meteors.heartOf`).
+        loop.rich ??= await serverAtLeast(server, meteors.RICH_SINCE).catch(() => false);
+        lines.push(...meteors.meteorSetup(ores, meteors.heartOf(ores, loop.rich)));
     }
     if (catalog.playsInArena(preset)) lines.push(...arenaService.beginLines(preset, loop.home));
     const needs = catalog.worldNeeds(preset);
@@ -3969,6 +3989,7 @@ async function meteorShower(
     // lands, so the landing says so only where it will happen.
     if (options.infection)
         loop.infects ??= await serverAtLeast(server, infection.SINCE).catch(() => false);
+    loop.rich ??= await serverAtLeast(server, meteors.RICH_SINCE).catch(() => false);
     const due = meteors.dueMeteors(
         now - loop.run.startsAt,
         loop.run.endsAt - loop.run.startsAt,
@@ -4013,7 +4034,7 @@ async function meteorShower(
     const checked: stored.EventRun["meteors"] = [];
     for (const meteor of loop.run.meteors) {
         const near =
-            meteor.blocks.length > 0 &&
+            meteor.blocks.length + meteor.crust.length > 0 &&
             players.some(
                 (one) =>
                     Math.hypot(
@@ -4022,21 +4043,23 @@ async function meteorShower(
                         one.z - (meteor.z + 0.5)
                     ) <= meteors.NEAR
             );
-        const whole = meteors.allOurs(meteor);
-        if (!near || (whole && commands.readTest(await server.say([whole])) === "passed")) {
+        if (!near) {
             checked.push(meteor);
             continue;
         }
-        const kept: typeof meteor.blocks = [];
-        for (const block of meteor.blocks) {
-            if (commands.readTest(await server.say([meteors.isOurs(block)])) !== "failed")
-                kept.push(block);
-        }
-        if (kept.length === 0) emptied += 1;
-        checked.push({ ...meteor, blocks: kept });
+        const blocks = await stillOurs(server, meteor.blocks);
+        // Its rim the same way: a block broken is forgotten, whatever is put
+        // there after.
+        const crust = await stillOurs(server, meteor.crust);
+        if (blocks.length === 0 && meteor.blocks.length > 0) emptied += 1;
+        checked.push({ ...meteor, blocks, crust });
     }
     if (
-        checked.some((meteor, at) => meteor.blocks.length !== loop.run.meteors[at]?.blocks.length)
+        checked.some(
+            (meteor, at) =>
+                meteor.blocks.length !== loop.run.meteors[at]?.blocks.length ||
+                meteor.crust.length !== loop.run.meteors[at]?.crust.length
+        )
     ) {
         loop.run = { ...loop.run, meteors: checked };
         await persist(installedAppId, loop);
@@ -4047,8 +4070,22 @@ async function meteorShower(
     if (options.infection) await infect(installedAppId, loop, server, lines);
 
     const live = loop.run.meteors.filter((meteor) => meteor.blocks.length > 0);
-    lines.push(...meteors.meteorTick(loop.run.meteors, options.ores), ...live.map(commands.beam));
-    // Each player pointed at the nearest meteor still to mine.
+    lines.push(
+        ...meteors.meteorTick(
+            loop.run.meteors,
+            options.ores,
+            meteors.heartOf(options.ores, loop.rich)
+        ),
+        ...live.map(commands.beam),
+        ...live.flatMap(meteors.smoulder)
+    );
+    // Each player pointed at the nearest meteor still to mine: an arrow from
+    // the way they look, and a line of light on the ground's way there while
+    // it is still out of sight.
+    const facing =
+        live.length > 0 && players.length > 0
+            ? commands.readFacing(await server.say([commands.FACING]))
+            : new Map<string, { yaw: number; pitch: number }>();
     for (const one of players) {
         const away = (meteor: (typeof live)[number]) =>
             Math.hypot(one.x - (meteor.x + 0.5), one.z - (meteor.z + 0.5));
@@ -4058,17 +4095,21 @@ async function meteorShower(
             continue;
         }
         const center = { x: nearest.x + 0.5, z: nearest.z + 0.5 };
+        const meters = Math.round(away(nearest));
+        const looking = facing.get(one.name);
         lines.push(
             commands.actionbarFor(
                 one.name,
                 messages.meteorGuide(
-                    Math.round(away(nearest)),
+                    meters,
                     commands.headingTo(one, center),
                     nearest.blocks.length,
-                    language
+                    language,
+                    looking ? commands.arrowTo(one, looking.yaw, center) : ""
                 )
             )
         );
+        if (meters > meteors.NEAR) lines.push(...meteors.trail(one.name, one, nearest));
     }
 
     if (loop.run.landings < options.meteors || live.length > 0) return null;
@@ -4142,6 +4183,22 @@ async function infect(
  * down first, then filled with ore - `keep`, so only air is ever filled - and
  * then only the cells that really hold that ore kept as the meteor's.
  */
+/**
+ * The blocks of a meteor that are still exactly what the event put there: all
+ * of them when one question says so, else each asked about alone. Any other
+ * answer than a plain "failed" - a chunk not loaded - keeps the block.
+ */
+async function stillOurs(
+    server: ServerContainer,
+    blocks: readonly meteors.MeteorBlock[]
+): Promise<meteors.MeteorBlock[]> {
+    if (blocks.length === 0) return [];
+    const whole = meteors.allOurs({ x: 0, y: 0, z: 0, blocks });
+    if (whole && commands.readTest(await server.say([whole])) === "passed") return [...blocks];
+    const answers = await commands.answersOf(server, blocks.map(meteors.isOurs));
+    return blocks.filter((_, at) => commands.readTest(answers[at] ?? "") !== "failed");
+}
+
 async function landMeteor(
     installedAppId: string,
     loop: Loop,
@@ -4150,12 +4207,34 @@ async function landMeteor(
     options: catalog.EventOptions<"meteor-shower">
 ): Promise<void> {
     const language = loop.language;
-    const cells = meteors.meteorCells(found, options.size, options.ores, Math.random);
-    const free: meteors.MeteorBlock[] = [];
-    for (const cell of cells) {
-        if (commands.readTest(await server.say([meteors.airTest(cell)])) === "passed")
-            free.push(cell);
-    }
+    const heart = meteors.heartOf(options.ores, loop.rich ?? false);
+    const cells = meteors.meteorCells(found, options.size, options.ores, Math.random, heart);
+    const open = await commands.answersOf(server, cells.map(meteors.airTest));
+    const free = cells.filter((_, at) => commands.readTest(open[at] ?? "") === "passed");
+    // Its rim, where the server has the blocks: each into air, the ring round
+    // the heap's foot only over something solid, and the ring above only on
+    // rim that is going down too.
+    const rim = loop.rich && free.length > 0 ? meteors.crustCells(found, free, Math.random) : [];
+    const low = rim.filter((cell) => cell.y === found.y);
+    const rimAnswers = await commands.answersOf(server, [
+        ...rim.map(meteors.airTest),
+        ...low.map(meteors.groundTest)
+    ]);
+    const lowFree = new Set(
+        low
+            .filter(
+                (_, at) =>
+                    commands.readTest(rimAnswers[rim.indexOf(low[at]!)] ?? "") === "passed" &&
+                    commands.readTest(rimAnswers[rim.length + at] ?? "") === "failed"
+            )
+            .map((cell) => `${cell.x} ${cell.z}`)
+    );
+    const crust = rim.filter((cell, at) =>
+        cell.y === found.y
+            ? lowFree.has(`${cell.x} ${cell.z}`)
+            : commands.readTest(rimAnswers[at] ?? "") === "passed" &&
+              lowFree.has(`${cell.x} ${cell.z}`)
+    );
     // The chunks it lies across held until the end, so it can still be taken
     // away: the place's own and the column's, which finding it loaded, and the
     // ones round it nobody held already.
@@ -4176,7 +4255,15 @@ async function landMeteor(
         ...loop.run,
         meteors: [
             ...loop.run.meteors,
-            { x: found.x, y: found.y, z: found.z, blocks: free, infected: [], missed: [] }
+            {
+                x: found.x,
+                y: found.y,
+                z: found.z,
+                blocks: free,
+                crust,
+                infected: [],
+                missed: []
+            }
         ],
         chunks: [...loop.run.chunks, ...added],
         // The place and the column tried are the meteor's now, let go with
@@ -4192,13 +4279,17 @@ async function landMeteor(
     await server.sayAll([
         ...added.map(chunks.holdChunk),
         ...free.map(meteors.placeBlock),
+        ...crust.map(meteors.placeBlock),
         commands.CLEAR_MARK
     ]);
-    const ours: meteors.MeteorBlock[] = [];
-    for (const block of free) {
-        if (commands.readTest(await server.say([meteors.isOurs(block)])) === "passed")
-            ours.push(block);
-    }
+    const placed = await commands.answersOf(server, [
+        ...free.map(meteors.isOurs),
+        ...crust.map(meteors.isOurs)
+    ]);
+    const ours = free.filter((_, at) => commands.readTest(placed[at] ?? "") === "passed");
+    const rimOurs = crust.filter(
+        (_, at) => commands.readTest(placed[free.length + at] ?? "") === "passed"
+    );
     // A meteor none of whose blocks took is no meteor: forgotten, its chunks
     // still let go at the end.
     loop.run = {
@@ -4206,10 +4297,14 @@ async function landMeteor(
         meteors:
             ours.length > 0
                 ? loop.run.meteors.map((meteor, at) =>
-                      at === index ? { ...meteor, blocks: ours } : meteor
+                      at === index ? { ...meteor, blocks: ours, crust: rimOurs } : meteor
                   )
                 : loop.run.meteors.filter((_, at) => at !== index)
     };
+    // None of its heap took, but some of its rim did: that rim taken away now,
+    // while it is still exactly what was put there.
+    if (ours.length === 0 && rimOurs.length > 0)
+        await server.sayAll(rimOurs.map(meteors.removeIfOurs));
     await persist(installedAppId, loop);
     if (ours.length === 0) return;
     await server.sayAll([
@@ -4222,6 +4317,14 @@ async function landMeteor(
             messages.tag(language) +
                 messages.meteorAt(found.x, found.y, found.z, ours.length, language)
         ),
+        ...(heart && ours.some((block) => block.block === `minecraft:${heart}`)
+            ? [
+                  commands.say(
+                      messages.tag(language) +
+                          messages.meteorHeart(heart, meteors.HEART_POINTS, language)
+                  )
+              ]
+            : []),
         ...(options.infection && loop.infects
             ? [commands.say(messages.tag(language) + messages.meteorInfected(language))]
             : [])

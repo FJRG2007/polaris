@@ -1019,7 +1019,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 8;
+export const DEFAULTS_VERSION = 9;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1028,6 +1028,10 @@ const KIND_DEFAULTS_SINCE = 2;
 /** Hide and seek saved before this was given `OLD_HIDE_SECONDS` to hide, and is
  *  brought up to `HIDE_SECONDS` once (`toHideSeconds`). */
 const HIDE_SECONDS_SINCE = 8;
+
+/** A meteor shower saved before this was paid the steady-work prizes
+ *  (`STANDARD`), and is brought up to its own once (`toMeteorPrizes`). */
+const METEOR_PRIZES_SINCE = 9;
 
 /**
  * The defaults version each kind joined the catalog at. A server whose events
@@ -1354,6 +1358,15 @@ const STANDARD: Rewards = {
     everyone: prize(0, ["experience_bottle", 4])
 };
 
+/** A meteor shower: a race across the map for ore, paid like a fight - the
+ *  steady-work prizes it had were too little for the run it is. */
+const METEOR: Rewards = {
+    first: prize(8, ["diamond", 4], ["golden_apple", 2]),
+    second: prize(5, ["diamond", 2], ["golden_apple", 1]),
+    third: prize(3, ["diamond", 1], ["experience_bottle", 8]),
+    everyone: prize(0, ["experience_bottle", 6])
+};
+
 /** A fight: a night out among monsters, a duel. */
 const HARD: Rewards = {
     first: prize(8, ["diamond", 3], ["golden_apple", 2]),
@@ -1400,7 +1413,7 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "rare-catch": FOUND_IT,
     "xp-boost": NO_REWARDS,
     waves: EPIC,
-    "meteor-shower": STANDARD,
+    "meteor-shower": METEOR,
     parkour: QUICK,
     spleef: QUICK,
     "team-duel": HARD,
@@ -1604,6 +1617,13 @@ function toHideSeconds(preset: EventPreset): EventPreset {
     return { ...preset, options: { ...options, hideSeconds: HIDE_SECONDS } } as EventPreset;
 }
 
+/** A meteor shower still on exactly the steady-work prizes it used to have,
+ *  given its own - one whose prizes the operator changed keeps them. */
+export function toMeteorPrizes(preset: EventPreset): EventPreset {
+    if (preset.kind !== "meteor-shower" || !same(preset.rewards, STANDARD)) return preset;
+    return { ...preset, rewards: METEOR };
+}
+
 /** The name the first events gave a horde defense. */
 const BRITISH_HORDE_NAME = "Horde defence";
 
@@ -1735,7 +1755,8 @@ export function readEventsConfig(
         .map(({ preset }) =>
             replaceRetired(saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset)
         )
-        .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset));
+        .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset))
+        .map((preset) => (saved < METEOR_PRIZES_SINCE ? toMeteorPrizes(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
     const had = new Set(kept.map((preset) => preset.kind));
