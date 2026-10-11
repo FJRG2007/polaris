@@ -17,6 +17,7 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
+import { holdReload } from "@/lib/reload-safety";
 import type { RecordedSound } from "./voice-recorder";
 import { Paperclip, RotateCcw, X } from "lucide-react";
 import type { KeptPick } from "@/components/file-picker/as-files";
@@ -63,7 +64,14 @@ export interface Outgoing {
 let pending: readonly Outgoing[] = [];
 const listeners = new Set<() => void>();
 
+let release: (() => void) | null = null;
+
 function announce(): void {
+    if (pending.length > 0) release ??= holdReload();
+    else {
+        release?.();
+        release = null;
+    }
     for (const listener of listeners) listener();
 }
 

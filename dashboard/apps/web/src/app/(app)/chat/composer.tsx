@@ -35,6 +35,7 @@ import { ImageViewer } from "@/components/image-viewer";
 import { ScheduleDialog } from "./schedule-dialog";
 import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
+import { holdReload } from "@/lib/reload-safety";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
@@ -552,6 +553,9 @@ export function Composer({
     // than of the stored source. Spaces and line breaks alone are not a message,
     // and they do not always serialize to an empty string.
     const blank = useMemo(() => isBlankMarkdown(body), [body]);
+
+    const staged = files.length > 0 || kept.length > 0 || scheduleBusy || pollBusy;
+    useEffect(() => (staged ? holdReload() : undefined), [staged]);
 
     /**
      * A recording goes as soon as it is stopped.

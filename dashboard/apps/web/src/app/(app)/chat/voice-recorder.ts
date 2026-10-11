@@ -21,6 +21,7 @@ import { micGain } from "./mic-gain";
 import { isVoiceFileName, voiceFileName } from "@/lib/chat/voice-name";
 import { filterMic, type FilteredMic } from "./mic-filter";
 import { micCleanup, micConstraints } from "./mic-cleanup";
+import { holdReload } from "@/lib/reload-safety";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -181,6 +182,8 @@ export function useVoiceRecording(
     const [levels, setLevels] = useState<readonly number[]>([]);
     const [silent, setSilent] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // A reload mid-message throws the message away; an update can wait.
+    useEffect(() => (recording ? holdReload() : undefined), [recording]);
 
     const recorder = useRef<MediaRecorder | null>(null);
     const chunks = useRef<Blob[]>([]);
