@@ -91,7 +91,7 @@ describe("management", () => {
 
 describe("game servers", () => {
     /**
-     * The two that do not ask in their own body, each for a reason that is not
+     * The ones that do not ask in their own body, each for a reason that is not
      * an oversight.
      */
     const ASKS_ELSEWHERE = new Set([
@@ -99,7 +99,11 @@ describe("game servers", () => {
         "suggestFivemResourceNameAction",
         // Hands straight to `invitePlayer`, whose first line asks for
         // games.manage on the server named.
-        "invitePlayerAccountAction"
+        "invitePlayerAccountAction",
+        // Both hand straight to `keptRun`, whose first read asks for
+        // games.console on the server named.
+        "runKeptCommandAction",
+        "scheduleKeptCommandAction"
     ]);
 
     it("asks about the server named in every action on one", () => {

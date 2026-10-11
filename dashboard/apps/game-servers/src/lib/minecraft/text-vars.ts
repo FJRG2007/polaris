@@ -185,16 +185,14 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 32
     },
-    ...STATS_RANKINGS.map(
-        (name): VariableSpec => ({
-            name,
-            label: gameMessage("minecraft", `sidebar.blocks.${name}` as GameKey<"minecraft">),
-            kind: "server",
-            sample: RANKINGS[name].sample.join(", "),
-            bedrock: false,
-            width: 32
-        })
-    ),
+    ...STATS_RANKINGS.map((name): VariableSpec => ({
+        name,
+        label: gameMessage("minecraft", `sidebar.blocks.${name}` as GameKey<"minecraft">),
+        kind: "server",
+        sample: RANKINGS[name].sample.join(", "),
+        bedrock: false,
+        width: 32
+    })),
     {
         // Polaris's own record, so it costs the server nothing to read.
         name: EVENTS_RANKING,
@@ -281,6 +279,23 @@ export function variablesIn(text: string): VariableUse[] {
         found.push({ raw: match[0], name, fallback: match[2] ?? null, spec: variable(name) });
     }
     return found;
+}
+
+/**
+ * Every `{...}` in a text passed through `replace`; one it answers null for is
+ * left exactly as written. The console's kept commands are filled through this,
+ * so a command and a line of text are read by the same parser, and a brace that
+ * is not a variable - `{SkeletonTrap:1b}` - is never one.
+ */
+export function replaceVariables(
+    text: string,
+    replace: (use: VariableUse) => string | null
+): string {
+    return text.replace(
+        TOKEN,
+        (raw, name: string, fallback: string | undefined) =>
+            replace({ raw, name, fallback: fallback ?? null, spec: variable(name) }) ?? raw
+    );
 }
 
 /**

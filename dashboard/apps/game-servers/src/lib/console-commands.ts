@@ -11,15 +11,22 @@
  * precisely because it is one person's typing.
  *
  * A command may carry a placeholder - `Broadcast <message>` - and that is what
- * decides whether pressing it runs it or loads it into the box. Nothing else about
- * a saved command is interpreted: it is sent exactly as the console would send it,
- * through the same action, the same permission and the same audit line.
+ * decides whether pressing it runs it or loads it into the box. It may also carry
+ * variables (`console-vars`), which the server fills in when it is run. Nothing
+ * else about a saved command is interpreted: it is sent exactly as the console
+ * would send it, through the same permission and the same audit line.
  *
  * Pure, so the dialog that validates a command as it is typed and the action that
  * stores it cannot disagree about what is allowed.
  */
 
 import { gameMessage } from "./game-message";
+import {
+    customVariablesProblem,
+    normalizeCustomVariable,
+    readCustomVariables,
+    type CustomVariable
+} from "./console-vars";
 
 /** One line somebody kept. */
 export interface SavedCommand {
@@ -27,6 +34,9 @@ export interface SavedCommand {
     /** What the button says. Never empty - it falls back to the command itself. */
     readonly label: string;
     readonly command: string;
+    /** The values it asks for when it is run (`console-vars`). Absent when it
+     *  declares none, which is every command kept before they existed. */
+    readonly variables?: readonly CustomVariable[];
 }
 
 /** Where the list lives on the install's own settings blob. */
@@ -56,14 +66,25 @@ export function normalizeSavedCommand(input: {
     id: string;
     label?: string | null;
     command: string;
+    variables?: readonly CustomVariable[] | null;
 }): SavedCommand | null {
     const command = input.command.trim();
     if (command.length === 0 || command.length > MAX_SAVED_COMMAND) return null;
     if (/[\0\r\n]/.test(command)) return null;
     const id = input.id.trim();
     if (id.length === 0 || id.length > 64) return null;
-    const label = (input.label ?? "").replace(/[\0\r\n]/g, " ").trim().slice(0, MAX_SAVED_LABEL);
-    return { id, label: label.length > 0 ? label : command.slice(0, MAX_SAVED_LABEL), command };
+    const label = (input.label ?? "")
+        .replace(/[\0\r\n]/g, " ")
+        .trim()
+        .slice(0, MAX_SAVED_LABEL);
+    const variables = (input.variables ?? []).map(normalizeCustomVariable);
+    if (customVariablesProblem(command, variables)) return null;
+    return {
+        id,
+        label: label.length > 0 ? label : command.slice(0, MAX_SAVED_LABEL),
+        command,
+        ...(variables.length > 0 ? { variables } : {})
+    };
 }
 
 /**
@@ -81,11 +102,23 @@ export function readSavedCommands(config: Record<string, unknown>): SavedCommand
         if (typeof entry !== "object" || entry === null) continue;
         const row = entry as Record<string, unknown>;
         if (typeof row.id !== "string" || typeof row.command !== "string") continue;
-        const normalized = normalizeSavedCommand({
-            id: row.id,
-            label: typeof row.label === "string" ? row.label : null,
-            command: row.command
-        });
+        const variables = readCustomVariables(row.variables);
+        const normalized =
+            normalizeSavedCommand({
+                id: row.id,
+                label: typeof row.label === "string" ? row.label : null,
+                command: row.command,
+                variables
+            }) ??
+            // Variables a later version wrote differently are dropped, not the
+            // command: the line itself is still one somebody kept.
+            (variables.length > 0
+                ? normalizeSavedCommand({
+                      id: row.id,
+                      label: typeof row.label === "string" ? row.label : null,
+                      command: row.command
+                  })
+                : null);
         if (normalized && !list.some((kept) => kept.id === normalized.id)) list.push(normalized);
     }
     return list.slice(0, MAX_SAVED_COMMANDS);
@@ -93,11 +126,15 @@ export function readSavedCommands(config: Record<string, unknown>): SavedCommand
 
 /** The list with one entry added, or the entry of that id rewritten in place -
  *  editing must not move a button somebody has learned the position of. */
-export function withSavedCommand(list: readonly SavedCommand[], entry: SavedCommand): SavedCommand[] {
+export function withSavedCommand(
+    list: readonly SavedCommand[],
+    entry: SavedCommand
+): SavedCommand[] {
     if (list.some((kept) => kept.id === entry.id)) {
         return list.map((kept) => (kept.id === entry.id ? entry : kept));
     }
-    if (list.length >= MAX_SAVED_COMMANDS) throw new Error(gameMessage("games", "lib.maxCommands", { count: MAX_SAVED_COMMANDS }));
+    if (list.length >= MAX_SAVED_COMMANDS)
+        throw new Error(gameMessage("games", "lib.maxCommands", { count: MAX_SAVED_COMMANDS }));
     return [...list, entry];
 }
 
@@ -110,5 +147,7 @@ export function withoutSavedCommand(list: readonly SavedCommand[], id: string): 
  *  selected, and sends the second kind straight away. */
 export function placeholderRange(command: string): { start: number; end: number } | null {
     const found = PLACEHOLDER.exec(command);
-    return found?.index === undefined ? null : { start: found.index, end: found.index + found[0].length };
+    return found?.index === undefined
+        ? null
+        : { start: found.index, end: found.index + found[0].length };
 }

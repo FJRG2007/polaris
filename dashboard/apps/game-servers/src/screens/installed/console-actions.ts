@@ -18,10 +18,31 @@ import { z } from "zod";
 import { gameWords, issueText, messageText } from "../game-words";
 import { randomUUID } from "node:crypto";
 import {
+    addConsoleSchedule,
     deleteConsoleCommand,
     readConsoleCommands,
+    readConsoleSchedulesOf,
+    removeConsoleSchedule,
     saveConsoleCommand
 } from "../../lib/console-command-service";
+import {
+    CUSTOM_VARIABLE_TYPES,
+    MAX_CUSTOM_VARIABLES,
+    MAX_VARIABLE_LABEL,
+    MAX_VARIABLE_VALUE,
+    customVariablesProblem,
+    normalizeCustomVariable,
+    runTargetSchema,
+    valuesSchema,
+    type CustomVariableType
+} from "../../lib/console-vars";
+import {
+    repeatProblem,
+    startProblem,
+    type ConsoleSchedule,
+    type ScheduleRepeat
+} from "../../lib/console-schedule";
+import { keptRunProblem, runKeptCommand } from "../../lib/console-run-service";
 import {
     MAX_SAVED_COMMAND,
     MAX_SAVED_LABEL,
@@ -38,7 +59,26 @@ const saveSchema = z.object({
     /** Absent for a new one; present when an existing one is being rewritten. */
     id: z.string().uuid().optional(),
     label: z.string().trim().max(MAX_SAVED_LABEL).optional(),
-    command: z.string().trim().min(1).max(MAX_SAVED_COMMAND)
+    command: z.string().trim().min(1).max(MAX_SAVED_COMMAND),
+    variables: z
+        .array(
+            z.object({
+                name: z.string().max(40),
+                label: z
+                    .string()
+                    .max(MAX_VARIABLE_LABEL * 2)
+                    .optional(),
+                type: z.enum(
+                    CUSTOM_VARIABLE_TYPES as [CustomVariableType, ...CustomVariableType[]]
+                ),
+                initial: z
+                    .string()
+                    .max(MAX_VARIABLE_VALUE * 4)
+                    .optional()
+            })
+        )
+        .max(MAX_CUSTOM_VARIABLES)
+        .optional()
 });
 
 export type SaveConsoleCommandInput = z.infer<typeof saveSchema>;
@@ -62,11 +102,20 @@ export async function saveConsoleCommandAction(
     input: SaveConsoleCommandInput
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: (await issueText(parsed.error.issues[0]?.message)) ?? (await gameWords("games"))("errors.checkTheCommandAndTry") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheCommandAndTry")
+        };
+    const variables = (parsed.data.variables ?? []).map(normalizeCustomVariable);
+    const problem = customVariablesProblem(parsed.data.command, variables);
+    if (problem) return { error: await messageText(problem) };
     const entry = normalizeSavedCommand({
         id: parsed.data.id ?? randomUUID(),
         label: parsed.data.label ?? null,
-        command: parsed.data.command
+        command: parsed.data.command,
+        variables
     });
     if (!entry) return { error: (await gameWords("games"))("errors.thatCommandCannotBeKept") };
     try {
@@ -77,11 +126,20 @@ export async function saveConsoleCommandAction(
             action: "games.console.save",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId,
-            metadata: { label: entry.label, command: entry.command }
+            metadata: {
+                label: entry.label,
+                command: entry.command,
+                variables: (entry.variables ?? []).map((declared) => declared.name)
+            }
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatCommandCouldNotBe") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatCommandCouldNotBe")
+        };
     }
 }
 
@@ -89,11 +147,14 @@ export async function deleteConsoleCommandAction(
     installedAppId: string,
     id: string
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
-    const parsed = z.object({ installedAppId: z.string().uuid(), id: z.string().min(1).max(64) }).safeParse({
-        installedAppId,
-        id
-    });
-    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), id: z.string().min(1).max(64) })
+        .safeParse({
+            installedAppId,
+            id
+        });
+    if (!parsed.success)
+        return { error: (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         const commands = await deleteConsoleCommand(parsed.data.installedAppId, parsed.data.id);
@@ -106,6 +167,204 @@ export async function deleteConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatCommandCouldNotBe2")
+        };
+    }
+}
+
+const runSchema = z.object({
+    installedAppId: z.string().uuid(),
+    id: z.string().min(1).max(64),
+    /** Checked against the command's own declared variables once it is read. */
+    values: z.record(z.string(), z.unknown()).default({}),
+    target: runTargetSchema.nullable().default(null)
+});
+
+export type RunKeptCommandInput = z.input<typeof runSchema>;
+
+/** One reply per line the run sent. */
+export interface KeptReply {
+    readonly line: string;
+    readonly output: string;
+    readonly failed: boolean;
+}
+
+/** The kept command, its values checked against what it declares, and the
+ *  standing to run it - shared by running now and scheduling. */
+async function keptRun(input: RunKeptCommandInput) {
+    const words = await gameWords("games");
+    const parsed = runSchema.safeParse(input);
+    if (!parsed.success) {
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                words("errors.checkTheCommandAndTry")
+        } as const;
+    }
+    const { user, access } = await requireGameServer("games.console", parsed.data.installedAppId);
+    const entry = (await readConsoleCommands(parsed.data.installedAppId)).find(
+        (kept) => kept.id === parsed.data.id
+    );
+    if (!entry) return { error: words("errors.thatCommandCouldNotBe2") } as const;
+    const variables = entry.variables ?? [];
+    const values = valuesSchema(variables).safeParse(parsed.data.values);
+    if (!values.success) {
+        const issue = values.error.issues[0];
+        const name = typeof issue?.path[0] === "string" ? issue.path[0] : "";
+        const label = variables.find((declared) => declared.name === name)?.label ?? name;
+        const why = (await issueText(issue?.message)) ?? words("errors.checkTheCommandAndTry");
+        return { error: label ? `${label}: ${why}` : why } as const;
+    }
+    const run = {
+        command: entry.command,
+        variables,
+        values: values.data,
+        target: parsed.data.target
+    };
+    const problem = keptRunProblem(access, run);
+    if (problem) return { error: await messageText(problem) } as const;
+    return { user, access, entry, run } as const;
+}
+
+/** Run a kept command that carries variables, with the values the person gave. */
+export async function runKeptCommandAction(
+    input: RunKeptCommandInput
+): Promise<{ replies?: KeptReply[]; error?: string }> {
+    try {
+        const resolved = await keptRun(input);
+        if ("error" in resolved) return { error: resolved.error };
+        const replies = await runKeptCommand(resolved.user.id, resolved.access, resolved.run);
+        return {
+            replies: await Promise.all(
+                replies.map(async (reply) => ({
+                    ...reply,
+                    output: await messageText(reply.output)
+                }))
+            )
+        };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatCommandCouldNotBe")
+        };
+    }
+}
+
+const repeatSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("once") }).strict(),
+    z.object({ kind: z.literal("every"), minutes: z.number().int() }).strict(),
+    z
+        .object({ kind: z.literal("times"), minutes: z.number().int(), times: z.number().int() })
+        .strict()
+]);
+
+const scheduleSchema = z.object({
+    /** When it first runs, ISO; absent for now. */
+    firstAt: z.string().datetime({ offset: true }).optional(),
+    repeat: repeatSchema
+});
+
+export type ScheduleKeptCommandInput = RunKeptCommandInput & z.input<typeof scheduleSchema>;
+
+/** Schedule a kept command, its values fixed now, to be run by the minute sweep. */
+export async function scheduleKeptCommandAction(
+    input: ScheduleKeptCommandInput
+): Promise<{ schedules?: ConsoleSchedule[]; error?: string }> {
+    const words = await gameWords("games");
+    const when = scheduleSchema.safeParse({ firstAt: input.firstAt, repeat: input.repeat });
+    if (!when.success) {
+        return {
+            error:
+                (await issueText(when.error.issues[0]?.message)) ??
+                words("errors.checkTheCommandAndTry")
+        };
+    }
+    const repeat: ScheduleRepeat = when.data.repeat;
+    const now = new Date();
+    const firstAt = when.data.firstAt ? new Date(when.data.firstAt) : now;
+    const problem = repeatProblem(repeat) ?? startProblem(firstAt, now);
+    if (problem) return { error: await messageText(problem) };
+    try {
+        const resolved = await keptRun(input);
+        if ("error" in resolved) return { error: resolved.error };
+        const schedule: ConsoleSchedule = {
+            id: randomUUID(),
+            commandId: resolved.entry.id,
+            label: resolved.entry.label,
+            ...resolved.run,
+            repeat,
+            nextAt: new Date(Math.max(firstAt.getTime(), now.getTime())).toISOString(),
+            done: 0,
+            skipped: 0,
+            last: null,
+            createdBy: resolved.user.id
+        };
+        const schedules = await addConsoleSchedule(resolved.access.install.id, schedule);
+        await recordAudit({
+            actorId: resolved.user.id,
+            action: "games.console.schedule",
+            targetType: "installedApp",
+            targetId: resolved.access.install.id,
+            metadata: { command: schedule.command, repeat, firstAt: schedule.nextAt }
+        });
+        return { schedules };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.thatCommandCouldNotBe")
+        };
+    }
+}
+
+/** This server's scheduled commands. Empty for somebody who may not see them. */
+export async function listConsoleSchedulesAction(
+    installedAppId: string
+): Promise<{ schedules: ConsoleSchedule[] }> {
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { schedules: [] };
+    try {
+        await requireGameServer("games.console", parsed.data);
+        return { schedules: await readConsoleSchedulesOf(parsed.data) };
+    } catch {
+        return { schedules: [] };
+    }
+}
+
+/** Stop a schedule, or clear one that has finished. */
+export async function removeConsoleScheduleAction(
+    installedAppId: string,
+    id: string
+): Promise<{ schedules?: ConsoleSchedule[]; error?: string }> {
+    const words = await gameWords("games");
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), id: z.string().uuid() })
+        .safeParse({ installedAppId, id });
+    if (!parsed.success) return { error: words("errors.thatCommandCouldNotBe2") };
+    try {
+        const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
+        const schedules = await removeConsoleSchedule(parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.console.unschedule",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { id: parsed.data.id }
+        });
+        return { schedules };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.thatCommandCouldNotBe2")
+        };
     }
 }

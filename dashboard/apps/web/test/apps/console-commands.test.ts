@@ -25,9 +25,10 @@ describe("normalizeSavedCommand", () => {
     });
 
     it("keeps the name somebody gave it", () => {
-        expect(normalizeSavedCommand({ id: "a", label: " Save the world ", command: "SaveWorld" })?.label).toBe(
-            "Save the world"
-        );
+        expect(
+            normalizeSavedCommand({ id: "a", label: " Save the world ", command: "SaveWorld" })
+                ?.label
+        ).toBe("Save the world");
     });
 
     it("refuses a line that would become two commands", () => {
@@ -42,7 +43,11 @@ describe("normalizeSavedCommand", () => {
     });
 
     it("repairs a name rather than refusing it", () => {
-        const kept = normalizeSavedCommand({ id: "a", label: "x".repeat(80), command: "SaveWorld" });
+        const kept = normalizeSavedCommand({
+            id: "a",
+            label: "x".repeat(80),
+            command: "SaveWorld"
+        });
         expect(kept?.label.length).toBe(40);
     });
 });
@@ -59,7 +64,12 @@ describe("readSavedCommands", () => {
     });
 
     it("drops an entry it cannot read rather than showing half of one", () => {
-        const rows = [{ id: "a", command: "SaveWorld" }, { id: "b" }, null, { command: "Broadcast hi" }];
+        const rows = [
+            { id: "a", command: "SaveWorld" },
+            { id: "b" },
+            null,
+            { command: "Broadcast hi" }
+        ];
         expect(readSavedCommands({ consoleCommands: rows }).map((row) => row.id)).toEqual(["a"]);
     });
 
@@ -74,7 +84,10 @@ describe("readSavedCommands", () => {
 
 describe("withSavedCommand", () => {
     it("adds one to the end", () => {
-        expect(withSavedCommand([entry("a")], entry("b", "DoExit")).map((row) => row.id)).toEqual(["a", "b"]);
+        expect(withSavedCommand([entry("a")], entry("b", "DoExit")).map((row) => row.id)).toEqual([
+            "a",
+            "b"
+        ]);
     });
 
     it("rewrites in place, so editing does not move the button", () => {
@@ -94,7 +107,9 @@ describe("withSavedCommand", () => {
 
 describe("withoutSavedCommand", () => {
     it("takes one off and leaves the rest", () => {
-        expect(withoutSavedCommand([entry("a"), entry("b", "DoExit")], "a").map((row) => row.id)).toEqual(["b"]);
+        expect(
+            withoutSavedCommand([entry("a"), entry("b", "DoExit")], "a").map((row) => row.id)
+        ).toEqual(["b"]);
     });
 });
 
@@ -109,5 +124,47 @@ describe("placeholderRange", () => {
 
     it("takes the first of several", () => {
         expect(placeholderRange("give <player> <item>")).toEqual({ start: 5, end: 13 });
+    });
+});
+
+describe("a kept command's variables", () => {
+    const amount = { name: "amount", label: "How many", type: "number", initial: "8" } as const;
+
+    it("are kept with it and read back", () => {
+        const kept = normalizeSavedCommand({
+            id: "a",
+            command: "give {player} bread {amount}",
+            variables: [amount]
+        });
+        expect(kept?.variables).toEqual([amount]);
+        expect(readSavedCommands({ consoleCommands: [kept] })).toEqual([kept]);
+    });
+
+    it("refuse a command that declares one it does not use", () => {
+        expect(
+            normalizeSavedCommand({ id: "a", command: "give @a bread 8", variables: [amount] })
+        ).toBeNull();
+    });
+
+    it("leave a command kept before they existed exactly as it was", () => {
+        expect(
+            readSavedCommands({
+                consoleCommands: [{ id: "a", label: "Day", command: "time set day" }]
+            })
+        ).toEqual([{ id: "a", label: "Day", command: "time set day" }]);
+    });
+
+    it("drop variables a later version wrote differently, and keep the command", () => {
+        const read = readSavedCommands({
+            consoleCommands: [
+                {
+                    id: "a",
+                    label: "Give",
+                    command: "give {player} {x}",
+                    variables: [{ name: "y", type: "text" }]
+                }
+            ]
+        });
+        expect(read).toEqual([{ id: "a", label: "Give", command: "give {player} {x}" }]);
     });
 });
