@@ -95,7 +95,6 @@ const bingoSay = speech.spoken(bingoMessages);
 const fishSay = speech.spoken(fishingMessages);
 
 const { readInstallConfig } = host.appsInstallConfig;
-const { listEnvVars } = host.envVarService;
 
 /** How long what kind of server one is stays known: it changes only with a restart. */
 const KIND_KNOWN_MS = 10 * 60_000;
@@ -5253,6 +5252,7 @@ async function moddedInstall(installedAppId: string): Promise<boolean> {
             select: { applicationId: true, ownerId: true }
         });
         if (!install?.applicationId) return true;
+        const { listEnvVars } = await Promise.resolve(host.envVarService);
         const vars = await listEnvVars("application", install.applicationId, install.ownerId);
         return moddedServer(new Map(vars.map((one) => [one.key, one.value ?? ""])));
     } catch {
