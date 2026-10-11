@@ -20,6 +20,7 @@
  */
 
 import type { SettingsOverview } from "./overview";
+import { checkForNewBuild } from "@/lib/new-build";
 import { clearUpdateInProgress, markUpdateInProgress } from "@/lib/update-in-progress";
 import { LogViewer } from "@/components/log-viewer";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -103,6 +104,13 @@ let lastAutoCheck = 0;
  *  does not re-ask on every one. */
 const AUTO_CHECK_FLOOR_MS = 30_000;
 
+/** How long one overview request may take before it is asked again, and how the
+ *  retries space out while the dashboard is not answering. The server's slowest
+ *  path (GitHub, the registry, the IP echo) is bounded well inside the timeout. */
+const OVERVIEW_TIMEOUT_MS = 30_000;
+const OVERVIEW_RETRY_FIRST_MS = 2_000;
+const OVERVIEW_RETRY_MAX_MS = 30_000;
+
 /** How often the open page re-asks on its own. The answer is cached server-side for
  *  ten minutes and shared by every tab, so this costs a request rather than a GitHub
  *  call, and a build published while the page is open shows up without being asked
@@ -146,7 +154,9 @@ function isFailure(result: UpdateResult | null): boolean {
 
 function outcomeLabel(result: UpdateResult, t: Translate): string {
     if (result.code === null) return t("settings.log.noResult");
-    return result.code === 0 ? t("settings.log.success") : t("settings.log.failed", { code: result.code });
+    return result.code === 0
+        ? t("settings.log.success")
+        : t("settings.log.failed", { code: result.code });
 }
 
 function outcomeTone(result: UpdateResult): string {
@@ -188,6 +198,7 @@ export function SettingsView({
     // than a sentence about a check that has not happened - "Up to date" before
     // anybody has looked is the one thing this line must never say.
     const [status, setStatus] = useState<UpdateStatus | null>(null);
+    const [checkFailed, setCheckFailed] = useState(false);
     const [policy, setPolicy] = useState(initialPolicy);
     const [source, setSource] = useState(initialSource);
     // What the time field shows. A time input empties itself between segments, so
@@ -226,26 +237,63 @@ export function SettingsView({
      * One request for the three of them: they all land in the same render, and
      * three round trips would fill the update line, then the addresses, then the
      * IPs, each a frame apart. A failure leaves the skeletons standing rather
-     * than replacing them with a wrong answer - the Check button is right there,
-     * and it is the same question asked again.
+     * than replacing them with a wrong answer, and asks again by itself: the page
+     * is most often opened right after an update, while the new dashboard is
+     * still coming up, and an answer that never comes back must not leave the
+     * card blank until somebody thinks to reload.
      */
     useEffect(() => {
         const controller = new AbortController();
-        void fetch("/api/admin/settings/overview", { signal: controller.signal })
-            .then((answer) => (answer.ok ? (answer.json() as Promise<SettingsOverview>) : null))
-            .then((overview) => {
-                if (!overview) return;
-                setStatus(overview.status);
-                setAddresses(overview.addresses);
-                setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
-            })
-            .catch(() => undefined);
-        return () => controller.abort();
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let delay = OVERVIEW_RETRY_FIRST_MS;
+        const load = async (): Promise<void> => {
+            // One attempt's own abort: the page leaving, or the attempt running long.
+            const attempt = new AbortController();
+            const leave = () => attempt.abort();
+            controller.signal.addEventListener("abort", leave);
+            const slow = setTimeout(leave, OVERVIEW_TIMEOUT_MS);
+            try {
+                const answer = await fetch("/api/admin/settings/overview", {
+                    cache: "no-store",
+                    signal: attempt.signal
+                });
+                if (answer.ok) {
+                    const overview = (await answer.json()) as SettingsOverview;
+                    // A check that answered first is newer than this one.
+                    setStatus((current) => current ?? overview.status);
+                    setAddresses(overview.addresses);
+                    setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
+                    return;
+                }
+                if (answer.status < 500) return;
+            } catch {
+                if (controller.signal.aborted) return;
+            } finally {
+                clearTimeout(slow);
+                controller.signal.removeEventListener("abort", leave);
+            }
+            timer = setTimeout(() => void load(), delay);
+            delay = Math.min(delay * 2, OVERVIEW_RETRY_MAX_MS);
+        };
+        void load();
+        return () => {
+            controller.abort();
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
     function onCheck(force = true) {
         startTransition(async () => {
-            setStatus(await checkUpdatesAction(force));
+            // A check that cannot reach the server (a restart under way, a tab
+            // left on the previous build) keeps what is on screen, and asks
+            // whether Polaris was updated under this tab so the update notice
+            // and its reload can take over.
+            setCheckFailed(false);
+            const answer = await checkUpdatesAction(force).catch(async () => {
+                if (!(await checkForNewBuild()) && force) setCheckFailed(true);
+                return null;
+            });
+            if (answer) setStatus(answer);
         });
     }
 
@@ -283,6 +331,7 @@ export function SettingsView({
             setPolicyError(error);
             return;
         }
+        setStatus(null);
         onCheck(true);
     }
 
@@ -673,7 +722,11 @@ export function SettingsView({
                         {updating ? (
                             <>
                                 <RefreshCw className="size-4 animate-spin text-primary" />
-                                <span>{step ? t("settings.updates.updatingStep", { step }) : t("settings.updates.updating")}</span>
+                                <span>
+                                    {step
+                                        ? t("settings.updates.updatingStep", { step })
+                                        : t("settings.updates.updating")}
+                                </span>
                             </>
                         ) : !status ? (
                             <Skeleton className="h-4 w-56" />
@@ -742,9 +795,15 @@ export function SettingsView({
                             </>
                         )}
                     </div>
+                    {checkFailed ? (
+                        <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p>
+                    ) : null}
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label={t("settings.updates.runningBuild")} value={status?.current ?? null} />
+                        <Row
+                            label={t("settings.updates.runningBuild")}
+                            value={status?.current ?? null}
+                        />
                         <Row
                             label={
                                 status?.source === "build"
@@ -842,7 +901,9 @@ export function SettingsView({
                                         ) : (
                                             <DownloadCloud className="size-4" />
                                         )}
-                                        {updating ? t("settings.updates.updating") : t("settings.updates.updateNow")}
+                                        {updating
+                                            ? t("settings.updates.updating")
+                                            : t("settings.updates.updateNow")}
                                     </Button>
                                 </div>
                             ) : null}
@@ -887,9 +948,7 @@ export function SettingsView({
                                     }
                                 />
                             ) : null}
-                            {isFailure(logResult) ? (
-                                <p>{t("settings.log.reportNote")}</p>
-                            ) : null}
+                            {isFailure(logResult) ? <p>{t("settings.log.reportNote")}</p> : null}
                         </div>
                     ) : null}
                 </CardBody>
@@ -901,7 +960,9 @@ export function SettingsView({
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm text-muted-foreground">{t("settings.deployment.reachableAt")}</span>
+                        <span className="text-sm text-muted-foreground">
+                            {t("settings.deployment.reachableAt")}
+                        </span>
                         {addresses ? (
                             <AddressList
                                 addresses={addresses}
@@ -918,14 +979,25 @@ export function SettingsView({
                         )}
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label={t("settings.deployment.localHostname")} value={`${deployment.hostname}.local`} />
+                        <Row
+                            label={t("settings.deployment.localHostname")}
+                            value={`${deployment.hostname}.local`}
+                        />
                         <Row
                             label={t("settings.deployment.serverIp")}
-                            value={network ? (network.serverIp ?? t("settings.deployment.unknown")) : null}
+                            value={
+                                network
+                                    ? (network.serverIp ?? t("settings.deployment.unknown"))
+                                    : null
+                            }
                         />
                         <Row
                             label={t("settings.deployment.publicIp")}
-                            value={network ? (network.publicIp ?? t("settings.deployment.notDetected")) : null}
+                            value={
+                                network
+                                    ? (network.publicIp ?? t("settings.deployment.notDetected"))
+                                    : null
+                            }
                         />
                         <Row
                             label={t("settings.deployment.repository")}
@@ -988,9 +1060,21 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                 <p className="text-sm text-muted-foreground">{t("settings.publicPages.intro")}</p>
 
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <Row label={t("settings.publicPages.home")} value={pages.home} href={pages.home} />
-                    <Row label={t("settings.publicPages.privacy")} value={pages.privacy} href={pages.privacy} />
-                    <Row label={t("settings.publicPages.terms")} value={pages.terms} href={pages.terms} />
+                    <Row
+                        label={t("settings.publicPages.home")}
+                        value={pages.home}
+                        href={pages.home}
+                    />
+                    <Row
+                        label={t("settings.publicPages.privacy")}
+                        value={pages.privacy}
+                        href={pages.privacy}
+                    />
+                    <Row
+                        label={t("settings.publicPages.terms")}
+                        value={pages.terms}
+                        href={pages.terms}
+                    />
                 </dl>
 
                 <label className="flex flex-col gap-1 text-sm">
