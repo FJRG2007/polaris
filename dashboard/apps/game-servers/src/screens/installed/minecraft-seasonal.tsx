@@ -13,6 +13,7 @@ import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
 import * as seasonal from "../../lib/minecraft/seasonal";
+import { figureLanguage, formatPlain } from "../../lib/figures";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { SeasonalPatch, SeasonalView } from "../../lib/minecraft/seasonal-service";
 import { readSeasonalAction, saveSeasonalAction } from "./seasonal-actions";
@@ -31,6 +32,8 @@ export function MinecraftSeasonal({
     canManage: boolean;
 }) {
     const t = useGameText("minecraft");
+    const language = figureLanguage(hostUi.i18nProvider.useLocale());
+    const times = (count: number) => t("seasonal.times", { count: formatPlain(count, language, 2) });
     const [view, setView] = useState<SeasonalView | null>(null);
     const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -120,7 +123,7 @@ export function MinecraftSeasonal({
                             value={view.nightSpawns}
                             choices={seasonal.NIGHT_SPAWN_CHOICES}
                             none={t("seasonal.asUsual")}
-                            times={(count) => t("seasonal.times", { count })}
+                            times={times}
                             disabled={!canManage || !heard || pending}
                             onChange={(nightSpawns) => save({ nightSpawns })}
                         />
@@ -131,7 +134,7 @@ export function MinecraftSeasonal({
                             value={view.snowGolems}
                             choices={seasonal.SNOW_GOLEM_CHOICES}
                             none={t("seasonal.none")}
-                            times={(count) => t("seasonal.times", { count })}
+                            times={times}
                             disabled={!canManage || !heard || pending}
                             onChange={(snowGolems) => save({ snowGolems })}
                         />
@@ -164,7 +167,7 @@ function MobChoice({
     value: number;
     choices: readonly number[];
     none: string;
-    times: (count: string) => string;
+    times: (count: number) => string;
     disabled: boolean;
     onChange: (value: number) => void;
 }) {
@@ -182,7 +185,7 @@ function MobChoice({
                 }}
                 options={choices.map((choice, index) => ({
                     value: String(choice),
-                    label: index === 0 ? none : times(String(choice))
+                    label: index === 0 ? none : times(choice)
                 }))}
                 disabled={disabled}
             />

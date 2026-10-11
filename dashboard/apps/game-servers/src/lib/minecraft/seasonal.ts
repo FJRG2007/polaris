@@ -87,8 +87,8 @@ export const NIGHT_SPAWN_CHOICES = [1, 1.25, 1.5, 2, 3] as const;
 /** Winter snow golems, as a multiple of the usual few: 0 brings none. */
 export const SNOW_GOLEM_CHOICES = [0, 0.5, 1, 2, 3] as const;
 
-export const DEFAULT_NIGHT_SPAWNS = 1.5;
-export const DEFAULT_SNOW_GOLEMS = 1;
+export const DEFAULT_NIGHT_SPAWNS = 1;
+export const DEFAULT_SNOW_GOLEMS = 0;
 
 /** The jar capability that takes the mob settings on the season line. */
 export const MOBS_CAP = "season-mobs";

@@ -256,10 +256,10 @@ describe("the seasonal mobs", () => {
         config = { seasonalNightSpawns: 2 };
         const { sweepSeasons, seasonalView } = await service();
         await sweepSeasons(HALLOWEEN);
-        expect(sent).toEqual(["polaris season set halloween 3600 200 100"]);
+        expect(sent).toEqual(["polaris season set halloween 3600 200 0"]);
         expect(await seasonalView(INSTALL)).toMatchObject({
             nightSpawns: 2,
-            snowGolems: 1,
+            snowGolems: 0,
             mobsNeedRestart: false
         });
     });
@@ -280,10 +280,10 @@ describe("the seasonal mobs", () => {
         vi.setSystemTime(HALLOWEEN);
         try {
             const { setSeasonal } = await service();
-            const view = await setSeasonal(OWNER, INSTALL, { snowGolems: 0, nightSpawns: 1 });
-            expect(config).toEqual({ seasonalSnowGolems: 0, seasonalNightSpawns: 1 });
-            expect(sent).toEqual(["polaris season set halloween 3600 100 0"]);
-            expect(view).toMatchObject({ on: true, nightSpawns: 1, snowGolems: 0 });
+            const view = await setSeasonal(OWNER, INSTALL, { snowGolems: 2, nightSpawns: 3 });
+            expect(config).toEqual({ seasonalSnowGolems: 2, seasonalNightSpawns: 3 });
+            expect(sent).toEqual(["polaris season set halloween 3600 300 200"]);
+            expect(view).toMatchObject({ on: true, nightSpawns: 3, snowGolems: 2 });
         } finally {
             vi.useRealTimers();
         }
@@ -294,6 +294,6 @@ describe("the seasonal mobs", () => {
         const { sweepSeasons } = await service();
         await sweepSeasons(HALLOWEEN);
         await sweepSeasons(NOVEMBER);
-        expect(sent).toEqual(["polaris season set halloween 3600 150 100", "polaris season clear"]);
+        expect(sent).toEqual(["polaris season set halloween 3600 100 0", "polaris season clear"]);
     });
 });

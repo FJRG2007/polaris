@@ -60,9 +60,9 @@ export function durationParts(ms: number): { value: number; unit: DurationUnit }
 }
 
 /** A number as the language writes it: `1.5`, `1,5`. */
-export function formatPlain(value: number, language: FigureLanguage = "en"): string {
+export function formatPlain(value: number, language: FigureLanguage = "en", digits = 1): string {
     return new Intl.NumberFormat(TAGS[language], {
-        maximumFractionDigits: 1,
+        maximumFractionDigits: digits,
         useGrouping: false
     }).format(value);
 }

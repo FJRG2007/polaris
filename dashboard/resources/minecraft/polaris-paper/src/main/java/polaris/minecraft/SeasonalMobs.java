@@ -142,6 +142,16 @@ final class SeasonalMobs implements Listener {
         World world = mob.getWorld();
         if (world.getEnvironment() != World.Environment.NORMAL || !night(world)) return;
         if (wearsHeads(mob) && bareHead(mob) && random.nextInt(100) < HEAD_CHANCE) putHeadOn(mob);
+    }
+
+    /** Extras only for a spawn every other plugin let through. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSpawned(CreatureSpawnEvent event) {
+        if (decor.season() != SeasonalDecor.Season.HALLOWEEN) return;
+        if (event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.NATURAL) return;
+        LivingEntity mob = event.getEntity();
+        World world = mob.getWorld();
+        if (world.getEnvironment() != World.Environment.NORMAL || !night(world)) return;
         if (spawns <= USUAL || !bringsExtras(mob)) return;
         int more = (spawns - USUAL) / 100;
         if (random.nextInt(100) < (spawns - USUAL) % 100) more++;
