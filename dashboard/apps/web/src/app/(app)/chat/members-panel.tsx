@@ -123,6 +123,9 @@ export function useMembersPanel(): {
     return { open, setOpen, toggle: useCallback(() => setOpen(!open), [open, setOpen]) };
 }
 
+/** How long a burst of list changes settles before the roster is read again. */
+const ROSTER_SETTLE_MS = 1000;
+
 /**
  * The people in one conversation, kept in step with who joins and leaves.
  *
@@ -146,12 +149,24 @@ function useRoster(channelId: string, ownerId: string | null, showing: boolean):
 
     // Somebody joining or leaving is exactly the frame this list exists to
     // follow, and it is the one the rail already listens for.
+    const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(
+        () => () => {
+            if (reloadTimer.current) clearTimeout(reloadTimer.current);
+            reloadTimer.current = null;
+        },
+        [load]
+    );
     useChatStream(
         useCallback(
             (frame) => {
-                if (frame.kind === "channels") void load();
+                if (frame.kind !== "channels" || !showing || reloadTimer.current) return;
+                reloadTimer.current = setTimeout(() => {
+                    reloadTimer.current = null;
+                    void load();
+                }, ROSTER_SETTLE_MS);
             },
-            [load]
+            [load, showing]
         )
     );
 
@@ -460,7 +475,7 @@ export function ChannelMembers({
                         </DialogTitle>
                     </DialogHeader>
                     <MemberRows
-                        className="h-[60vh] overflow-y-auto"
+                        className="max-h-[60vh] overflow-y-auto"
                         members={members}
                         loading={loading}
                         viewerId={viewerId}

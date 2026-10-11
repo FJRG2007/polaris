@@ -20,12 +20,12 @@ export async function listChannelRoster(
     channelId: string
 ): Promise<ChatRosterMember[]> {
     const members = await listChannelMembers(viewer, channelId);
-    const around = new Set<string>();
+    const batches: string[][] = [];
     for (let start = 0; start < members.length; start += BATCH) {
-        const found = await presenceFor(
-            viewer,
-            members.slice(start, start + BATCH).map((member) => member.userId)
-        );
+        batches.push(members.slice(start, start + BATCH).map((member) => member.userId));
+    }
+    const around = new Set<string>();
+    for (const found of await Promise.all(batches.map((ids) => presenceFor(viewer, ids)))) {
         for (const [id, where] of found) if (isAround(where.status)) around.add(id);
     }
     return members.map((member) => ({ ...member, online: around.has(member.userId) }));
