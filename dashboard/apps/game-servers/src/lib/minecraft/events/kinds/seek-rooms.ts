@@ -99,6 +99,18 @@ export interface Canvas {
         inside: { u: number; level: number; v: number; facing: Side },
         bottom?: number
     ): void;
+    /** A wall panel two high from `level` (from design 7, anywhere in the
+     *  room: a loft, a tower), of the room's face, that the data pack opens
+     *  into air: `facing` the way through it from where somebody stands to
+     *  use it, and a button on the far side to get back out. False where
+     *  there is no room for it. */
+    wallPanel(
+        u: number,
+        level: number,
+        v: number,
+        facing: Side,
+        inside: { u: number; level: number; v: number; facing: Side }
+    ): boolean;
     /** A block shown by a display entity over air (from 1.19.4). */
     display(block: string, u: number, level: number, v: number): void;
     hook(hook: Hook): void;
@@ -745,6 +757,265 @@ const ATRIUM: Template = {
     }
 };
 
+// ------------------------------------------------------------------ design 7
+
+/**
+ * The themed rooms (design 7). Each keeps the house's rules: a way out of
+ * every hiding place, nothing that traps or hurts, no bed, light everywhere
+ * anybody stands, and only what the server can show. Several hide a place
+ * inside another: a cellar under a hut, a room behind a frame with a hatch in
+ * its floor, a chamber reached through a secret door high in a tower.
+ */
+
+/** A ruined nether hut with a cellar under its floor panel, outcrops of
+ *  netherrack and glowstone, and fence posts topped with skulls. */
+const NETHER: Template = {
+    name: "nether",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:nether_bricks",
+        floor: "minecraft:red_nether_bricks",
+        entrances: ["panel", "painting"]
+    },
+    draw(c) {
+        // The hut: three by three inside, its way in on the south side.
+        c.clear(3, 1, 3, 5, 3, 5);
+        c.clear(4, 1, 6, 4, 2, 6);
+        c.set("minecraft:glowstone", 4, 4, 4);
+        c.spot(5, 1, 3);
+        // Under it, through a panel of its floor: the cellar, and the button
+        // to get back out.
+        cellar(c, 3, 3, 5, 5);
+        c.floorPanel(3, 3, "south", { u: 4, level: -2, v: 3, facing: "south" });
+        c.spot(5, -3, 5);
+        c.set("minecraft:nether_bricks", 2, 1, 2, 6, 4, 6);
+        // Outcrops to crouch behind, lit through glowstone.
+        c.set("minecraft:netherrack", 9, 1, 3, 11, 2, 4);
+        c.set("minecraft:glowstone", 10, 3, 3);
+        c.set("minecraft:netherrack", 3, 1, 10, 4, 2, 11);
+        c.set("minecraft:nether_wart_block", 9, 1, 9, 10, 3, 10);
+        c.set("minecraft:nether_brick_fence", 11, 1, 11);
+        gaze(c, "minecraft:wither_skeleton_skull[rotation=8]", 11, 2, 11, { u: 11, v: 7 });
+        button(c, "minecraft:stone_button", 8, 1, 9, "west");
+        rug(c, "red", 7, 4);
+        tile(c, 7, 11);
+    }
+};
+
+/**
+ * A deep dark ruin (from 1.19.4): sculk underfoot, a frame of reinforced
+ * deepslate on a side with no doorway whose middle is only a picture of
+ * deepslate - walked through, a room behind with a hatch to a hollow under
+ * it - and spore blossoms and dripstone under the ceiling.
+ */
+const DEEP: Template = {
+    name: "deep",
+    since: CLOSETS_SINCE,
+    fits: (era) => era.display,
+    style: {
+        face: "minecraft:cobblestone",
+        floor: "minecraft:polished_andesite",
+        entrances: ["veil", "panel", "painting"]
+    },
+    draw(c) {
+        const side = (["south", "north"] as const).find((one) => !hasDoor(c, one));
+        if (side) {
+            // In the south's terms; turned round for the north.
+            const v = (at: number) => (side === "south" ? at : LAST - at);
+            c.clear(5, 1, v(11), 8, 3, v(12));
+            c.clear(6, 1, v(10), 7, 2, v(10));
+            for (const [u, level] of [
+                [6, 1],
+                [7, 1],
+                [6, 2],
+                [7, 2]
+            ] as const)
+                c.display("minecraft:deepslate_tiles", u, level, v(10));
+            c.set("minecraft:sea_lantern", 8, 0, v(12));
+            c.spot(8, 1, v(11));
+            // A hatch in the hidden room's floor, to a hollow under it.
+            cellar(c, 5, Math.min(v(11), v(12)), 6, Math.max(v(11), v(12)));
+            hatch(c, "dark_oak", 5, v(11), side);
+            c.spot(6, -3, v(12));
+            c.set("minecraft:reinforced_deepslate", 4, 1, v(10), 9, 4, v(10));
+            c.set("minecraft:deepslate_tiles", 4, 1, v(11), 9, 4, v(13));
+        }
+        // Sculk underfoot, set before the floor.
+        for (const [u, at] of [
+            [2, 2],
+            [3, 2],
+            [2, 3],
+            [10, 4],
+            [11, 4],
+            [11, 5],
+            [6, 6],
+            [7, 7]
+        ] as const)
+            c.set("minecraft:sculk", u, 0, at);
+        // Pillars of deepslate with a skull to stare at.
+        c.set("minecraft:deepslate_tiles", 2, 1, 7, 2, 3, 7);
+        gaze(c, "minecraft:skeleton_skull[rotation=4]", 2, 4, 7, { u: 6, v: 7 });
+        c.set("minecraft:deepslate_tiles", 11, 1, 8, 11, 2, 8);
+        button(c, "minecraft:stone_button", 10, 1, 8, "west");
+        // Set dressing under the ceiling: dust that floats down, and drips.
+        c.set("minecraft:spore_blossom", 7, 10, 3);
+        c.set("minecraft:spore_blossom", 4, 10, 9);
+        c.set("minecraft:pointed_dripstone[vertical_direction=down,thickness=tip]", 11, 10, 11);
+        c.set("minecraft:pointed_dripstone[vertical_direction=down,thickness=tip]", 2, 10, 5);
+        rug(c, "gray", 9, 6);
+        tile(c, 5, 3);
+    }
+};
+
+/**
+ * An end island: a tower of purpur with a ladder inside up to a hatch onto
+ * its roof, behind iron bars; a cellar under a panel of its floor; pillars of
+ * purpur and a dragon's head to stare at.
+ */
+const END: Template = {
+    name: "end",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:end_stone_bricks",
+        floor: "minecraft:end_stone",
+        entrances: ["panel", "painting", "veil"]
+    },
+    draw(c) {
+        // The tower, eight to eleven across and two to five deep, its way in
+        // on the south side.
+        c.clear(9, 1, 3, 10, 6, 4);
+        c.clear(9, 1, 5, 9, 2, 5);
+        c.set("minecraft:ladder[facing=south]", 10, 1, 3, 10, 6, 3);
+        c.set("minecraft:birch_trapdoor[facing=south,half=top,open=false]", 10, 7, 3);
+        c.set("minecraft:sea_lantern", 10, 0, 4);
+        // Under the tower, through a panel of its floor.
+        cellar(c, 9, 4, 11, 6);
+        c.floorPanel(9, 4, "south", { u: 10, level: -2, v: 4, facing: "south" });
+        c.spot(11, -3, 6);
+        c.set("minecraft:purpur_block", 8, 1, 2, 11, 7, 5);
+        // On its roof, behind bars: somewhere to lie low under the lamps.
+        for (let u = 8; u <= 11; u += 1)
+            for (let at = 2; at <= 5; at += 1)
+                if (u === 8 || u === 11 || at === 2 || at === 5)
+                    c.set("minecraft:iron_bars", u, 8, at);
+        c.spot(9, 8, 4);
+        // Pillars, and a dragon's head on one.
+        for (const [u, at] of [
+            [3, 3],
+            [3, 10],
+            [10, 10]
+        ] as const)
+            c.set("minecraft:purpur_pillar", u, 1, at, u, 2, at);
+        gaze(c, "minecraft:dragon_head[rotation=0]", 3, 3, 10, { u: 3, v: 6 });
+        button(c, "minecraft:stone_button", 2, 1, 3, "west");
+        c.set("minecraft:obsidian", 6, 1, 8, 7, 1, 9);
+        rug(c, "purple", 6, 11);
+        tile(c, 5, 6);
+    }
+};
+
+/**
+ * A bell tower (from 1.14, the bell's release): a stone tower in the middle
+ * with a hatch to a cellar at its foot and a ladder up to the bell. High in
+ * its east wall is a secret door to a chamber only it reaches, opened by a key
+ * across the room and by a button inside to get back out.
+ */
+const BELFRY: Template = {
+    name: "belfry",
+    since: CLOSETS_SINCE,
+    fits: (era) => era.scaffold,
+    style: {
+        face: "minecraft:stone_bricks",
+        floor: "minecraft:polished_andesite",
+        entrances: ["painting", "panel", "door"]
+    },
+    draw(c) {
+        // The tower: four to nine either way, its way in on the north.
+        c.set("minecraft:bell[attachment=floor,facing=north]", 6, 7, 6);
+        c.clear(5, 1, 5, 8, 5, 8);
+        c.clear(5, 7, 5, 8, 9, 8);
+        c.clear(6, 1, 4, 7, 2, 4);
+        c.set("minecraft:ladder[facing=north]", 6, 1, 8, 6, 6, 8);
+        c.set("minecraft:sea_lantern", 8, 6, 5);
+        c.set("minecraft:sea_lantern", 8, 0, 7);
+        c.set("minecraft:spruce_planks", 5, 6, 5, 8, 6, 8);
+        c.spot(5, 7, 8);
+        // Openings at the top, on its north and west faces.
+        c.clear(6, 8, 4, 7, 8, 4);
+        c.clear(4, 8, 6, 4, 8, 7);
+        // The chamber, out of sight east of the tower, and its secret door.
+        c.clear(10, 7, 6, 12, 8, 7);
+        c.set("minecraft:sea_lantern", 12, 6, 7);
+        if (c.wallPanel(9, 7, 6, "east", { u: 10, level: 8, v: 7, facing: "east" }))
+            c.spot(11, 7, 6);
+        c.set("minecraft:stone_bricks", 10, 6, 5, 13, 9, 8);
+        // A hatch at the tower's foot, to a cellar under it.
+        cellar(c, 5, 5, 7, 7);
+        hatch(c, "spruce", 5, 5, "south");
+        c.spot(7, -3, 7);
+        c.set("minecraft:stone_bricks", 4, 1, 4, 9, 9, 9);
+        // Round it: a bench, a post with a head, a rug and a tile.
+        c.set("minecraft:spruce_planks", 1, 1, 11, 3, 1, 11);
+        button(c, "minecraft:oak_button", 1, 1, 12, "south");
+        c.set("minecraft:oak_fence", 2, 1, 2);
+        gaze(c, "minecraft:skeleton_skull[rotation=0]", 2, 2, 2, { u: 2, v: 5 });
+        rug(c, "blue", 11, 11);
+        tile(c, 12, 12);
+    }
+};
+
+/**
+ * A village under one roof: two little houses - one hung with a curtain, one
+ * with a door, each a place to hide and the first with a hatch to a cellar -
+ * a well whose shaft goes on down into a dry cave, hay bales and a lamp post.
+ */
+const VILLAGE: Template = {
+    name: "village",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:oak_planks",
+        floor: "minecraft:grass_block",
+        entrances: ["door", "painting", "panel"]
+    },
+    draw(c) {
+        // The first house, its way in hung with a banner curtain.
+        c.set("minecraft:red_wall_banner[facing=east]", 4, 1, 6, 4, 2, 6);
+        c.clear(3, 1, 3, 5, 3, 5);
+        c.set("minecraft:glowstone", 4, 4, 4);
+        c.spot(5, 1, 3);
+        cellar(c, 3, 3, 5, 5);
+        hatch(c, "spruce", 3, 3, "south");
+        c.spot(5, -3, 5);
+        c.set("minecraft:spruce_planks", 2, 1, 2, 6, 4, 6);
+        // The second, with a door.
+        c.clear(8, 1, 9, 10, 3, 11);
+        c.set("minecraft:oak_door[facing=north,half=lower,hinge=left,open=false]", 9, 1, 8);
+        c.set("minecraft:oak_door[facing=north,half=upper,hinge=left,open=false]", 9, 2, 8);
+        c.set("minecraft:glowstone", 9, 4, 10);
+        c.spot(10, 1, 11);
+        c.set("minecraft:birch_planks", 7, 1, 8, 11, 4, 12);
+        // The well: its water up to the top of its rim, so whoever comes up
+        // steps out onto the rim; down its shaft, along a tunnel two high
+        // under the floor - room to swim - and up into a cave.
+        c.set("minecraft:water", 3, -5, 10, 3, 1, 10);
+        c.set("minecraft:water", 4, -5, 10, 5, -4, 10);
+        c.set("minecraft:water", 6, -5, 10, 6, -3, 10);
+        c.set("minecraft:sea_lantern", 3, -6, 10);
+        c.clear(5, -2, 9, 7, -1, 11);
+        c.set("minecraft:sea_lantern", 7, -3, 11);
+        c.spot(5, -2, 9);
+        c.set("minecraft:cobblestone", 2, 1, 9, 4, 1, 11);
+        // Hay, a lamp post, a pumpkin to stare at.
+        c.set("minecraft:hay_block", 11, 1, 2, 12, 2, 3);
+        c.set("minecraft:oak_fence", 7, 1, 2, 7, 2, 2);
+        c.set("minecraft:sea_lantern", 7, 3, 2);
+        c.set("minecraft:hay_block", 12, 1, 6);
+        gaze(c, "minecraft:jack_o_lantern[facing=west]", 12, 2, 6, { u: 8, v: 6 });
+        button(c, "minecraft:oak_button", 10, 1, 3, "west");
+        rug(c, "green", 1, 7);
+        tile(c, 6, 12);
+    }
+};
 /** Every template but the foyer, which is only ever the middle room. */
 export const TEMPLATES: readonly Template[] = [
     LIBRARY,
@@ -757,7 +1028,12 @@ export const TEMPLATES: readonly Template[] = [
     WORKSHOP,
     BEDROOM,
     SNOW,
-    ATRIUM
+    ATRIUM,
+    NETHER,
+    DEEP,
+    END,
+    BELFRY,
+    VILLAGE
 ];
 
 /** A plain room, for a house that falls back to its bare walls. */

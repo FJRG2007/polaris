@@ -553,7 +553,9 @@ export function drawManor(
     // A panel left with no key is plain wall or floor: nothing opens it.
     for (const panel of draft.panels)
         if (!keys.some((key) => key.id === panel.id && !key.inside))
-            for (const level of panel.shape === "wall" ? [1, 2] : [0])
+            for (const level of panel.shape === "wall"
+                ? [panel.level, panel.level + 1]
+                : [panel.level])
                 grid.panels.delete(grid.index(panel.x, level, panel.z));
     return {
         design,
@@ -655,6 +657,36 @@ function canvasOf(
                 inside.v
             );
             draft.insideKeys.push({ panel: id, x: button.x, level: inside.level, z: button.z });
+        },
+        wallPanel(u, level, v, facing, inside) {
+            const at = place.at(u, v);
+            const material = panels.MATERIALS.find((one) => one === model.bare(style.face));
+            if (!material || !grid.free(at.x, level, at.z) || !grid.free(at.x, level + 1, at.z))
+                return false;
+            grid.set(material, at.x, level, at.z, at.x, level + 1, at.z);
+            grid.panel(at.x, level, at.z, "wall");
+            grid.panel(at.x, level + 1, at.z, "wall");
+            const [dx, dz] = STEP[place.side(facing)];
+            const id = draft.nextPanel++;
+            draft.panels.push({
+                id,
+                x: at.x,
+                level,
+                z: at.z,
+                shape: "wall",
+                material,
+                front: { x: at.x - dx, feet: level, z: at.z - dz },
+                room
+            });
+            const button = place.at(inside.u, inside.v);
+            canvas.set(
+                `minecraft:stone_button[face=wall,facing=${inside.facing},powered=false]`,
+                inside.u,
+                inside.level,
+                inside.v
+            );
+            draft.insideKeys.push({ panel: id, x: button.x, level: inside.level, z: button.z });
+            return true;
         },
         display(block, u, level, v) {
             if (!era.display) return;

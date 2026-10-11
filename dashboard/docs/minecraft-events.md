@@ -781,6 +781,20 @@ left out.
   hidden and on the server gives a flute note and a few note particles at a
   point 2 to 5 blocks off them, level, drawn from the run's id, the hider and
   the round (`hs.revealPoint`), never where they stand; the hider is told.
+- **Freeze potions** (`freezePotions`, 1 by default, 0 for none, at most 3;
+  `freezeSeconds`, 5 by default, 2 to 15): once a game, at a moment drawn
+  from the run's id between 15% and 60% of the seeking and never in its last
+  `FREEZE_QUIET` (30 s) (`hs.freezeAt`), that many hiders still hidden, drawn
+  from the run's id (`hs.freezeHolders`), are each handed one splash potion,
+  once (`state.freezeGiven`). The potion does nothing of its own; the events
+  data pack freezes every seeker (`pe_seeker`) within `FREEZE_REACH` (3) of a
+  thrown one for `freezeSeconds` - Slowness and Weakness a second at a time,
+  so they can neither walk nor strike - and touches no hider. The thrown
+  potion is matched by the item it carries, not by its entity type, which
+  was renamed in 1.21.5. It is the run's kit, so a potion never thrown is
+  taken back at the end, and a call-off takes the seekers' Weakness off. It
+  needs the data pack; without it no potion is handed out. Hiders being
+  invisible is intended and is not weakened by any of this.
 - **Hide and seek's sides**: two teams hide each side's names from the other
   (`nametagVisibility`: a seeker's hidden from hiders, a hider's never shown),
   with `collisionRule never`, so nobody can block a doorway with their body or
@@ -1107,6 +1121,54 @@ new map:
     A run built by design 4 still draws exactly its own house
     (`manorFor(seed, count, era, 4)`: no hall, no pads, no levers, no jumps).
 
+    Design 6 builds the bedroom without a bed (see below). Design 7
+    (`seek-rooms.CLOSETS_SINCE`) adds:
+
+    - **every door leads somewhere**: a door hung on solid wall gets a closet
+      one deep and lit behind it - a hiding place of its own - and every
+      bedroom wardrobe is hollow. A door never opens onto wall, on either
+      side;
+    - **themed rooms**, each with a place hidden inside another:
+
+        - a ruined **nether** hut of nether bricks, a cellar under a panel of
+          its floor, outcrops of netherrack and nether wart lit through
+          glowstone, a skull on a fence post;
+        - a **deep dark** ruin (from 1.19.4): sculk underfoot, a frame of
+          reinforced deepslate on a wall with no doorway whose middle is only
+          a picture of deepslate (a display entity) - walked through, a room
+          behind with a hatch to a hollow under it - and spore blossoms and
+          pointed dripstone under the ceiling;
+        - an **end** island: a purpur tower with a ladder up to a hatch onto
+          its roof behind iron bars, a cellar under a panel of its floor,
+          purpur pillars and a dragon's head;
+        - a **bell tower** (from 1.14, the bell's release): a stone tower
+          with a ladder up to the bell, a hatch to a cellar at its foot, and
+          a secret door high up its wall into a chamber only it
+          reaches, opened by a key across the room and by a button inside;
+        - a **village** under one roof: a house hung with a banner curtain
+          and a cellar under a hatch, a house with a door, and a well whose
+          water comes up to the top of its rim - so whoever swims up steps
+          out onto the rim - and goes down a shaft and along a tunnel two
+          high into a dry cave.
+
+        The panels for them may be of nether bricks, red nether bricks, end
+        stone, end stone bricks or purpur (`secret-panels.MATERIALS`, every one
+        known from 1.13), and a wall panel can be at any height
+        (`Canvas.wallPanel`). A run built by design 6 or earlier draws none of
+        them and is the same house it was.
+
+    Every hiding place is proven to have a way out
+    (`minecraft-events-hide-and-seek-escape.test.ts`, every design-7 house
+    over many seeds, both sizes and every server age): from every hiding
+    place, with every secret panel shut, a player walks back to the middle
+    opening only the panels whose key they can reach from where they are -
+    the button inside, then the lever across the room - never one somebody
+    outside has to open. The test also proves every floor panel has its
+    button below, every door opens onto floor on both sides, every ladder's
+    top lets a player off, and the spots under the forge's lava get out.
+    There are no stair blocks in any hide and seek house; a report of being
+    stuck on stairs has not been matched to a place yet.
+
 - **No island is a jump from another**: SkyWars' islands are drawn from the
   run's id (`sky-wars.layoutFor`) - each a blob with a waving edge, grass over
   dirt over stone narrowing to a point and flecked with andesite and ore, an
@@ -1168,7 +1230,9 @@ teardown, before the blocks they hang on.
 
 Hiding spots that follow from those: behind a banner curtain, through a
 painting door, under a hay-and-campfire mist, in a bubble column's corner with
-a way out. Every one still keeps the hiding rules in "Building a map": a way out, nothing
+a way out. Hide and seek's themed rooms (design 7) use the
+curtain (the village), display props (the deep dark's false wall), floating
+dust and dripping ceilings (the deep dark). Every one still keeps the hiding rules in "Building a map": a way out, nothing
 that traps or hurts.
 
 ## How the floating maps look

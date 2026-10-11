@@ -168,7 +168,14 @@ export const MATERIALS = [
     "minecraft:birch_planks",
     "minecraft:quartz_block",
     "minecraft:hay_block",
-    "minecraft:white_wool"
+    "minecraft:white_wool",
+    // The themed rooms (design 7). Only blocks every release from 1.13 knows:
+    // a function naming one it does not is refused whole.
+    "minecraft:nether_bricks",
+    "minecraft:red_nether_bricks",
+    "minecraft:end_stone_bricks",
+    "minecraft:end_stone",
+    "minecraft:purpur_block"
 ] as const;
 export type Material = (typeof MATERIALS)[number];
 const FACINGS = ["north", "south", "east", "west"] as const;
