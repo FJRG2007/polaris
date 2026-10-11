@@ -6,7 +6,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { runSchema } from "@polaris-app/game-servers/src/lib/minecraft/events/state";
+import {
+    runSchema,
+    withOwedLines,
+    OWED_LINES_MAX
+} from "@polaris-app/game-servers/src/lib/minecraft/events/state";
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
 import * as outsiders from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/outsiders";
 
@@ -267,6 +271,46 @@ describe("the end of the event", () => {
                 ["Ana", 0]
             ])
         );
+    });
+});
+
+describe("a busy server", () => {
+    it("keeps everybody still held once the list is full, dropping those let go first", () => {
+        const letGo = Array.from({ length: outsiders.HELD_MAX }, (_, at) => ({
+            name: `Gone${at}`,
+            mode: "survival" as const,
+            holding: false
+        }));
+        const held = [{ name: "Mallory", mode: "creative" as const, holding: true }, ...letGo];
+        const result = outsiders.step({
+            volume,
+            outsiders: [
+                { name: "Mallory", x: 95.5, y: 160, z: 110.5 },
+                { name: "Newcomer", x: 96.5, y: 160, z: 110.5 }
+            ],
+            modes: new Map([["Newcomer", "survival"]]),
+            held,
+            notes
+        });
+        expect(result.held).toHaveLength(outsiders.HELD_MAX);
+        expect(result.held[0]).toEqual({ name: "Mallory", mode: "creative", holding: true });
+        expect(result.held.at(-1)).toEqual({ name: "Newcomer", mode: "survival", holding: true });
+        expect(result.held.some((one) => one.name === "Gone0")).toBe(false);
+    });
+
+    it("never lets a held outsider's release push out what another event owes", () => {
+        const owed = [
+            { player: "Ana", reason: "things", lines: ["give Ana minecraft:stone"], until: 10 }
+        ];
+        const held = Array.from({ length: OWED_LINES_MAX }, (_, at) => ({
+            name: `Passer${at}`,
+            mode: "survival" as const,
+            holding: false
+        }));
+        const kept = withOwedLines(owed, outsiders.owedRelease(held, 10), 0);
+        expect(kept).toHaveLength(OWED_LINES_MAX);
+        expect(kept[0]).toEqual(owed[0]);
+        expect(kept.at(-1)?.player).toBe(`Passer${OWED_LINES_MAX - 1}`);
     });
 });
 

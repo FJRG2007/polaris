@@ -518,7 +518,12 @@ export const PENDING_MAX = 200;
 /** How many players may be owed lines at once, the oldest let go first. */
 export const OWED_LINES_MAX = 200;
 
-/** Owed lines still in time, `added` replacing any owed the same player for the same reason. */
+/** The reason a held outsider's own game mode is owed (`kinds/outsiders`):
+ *  mostly owed to somebody already let go, so the first to make room. */
+export const HELD_OUT_REASON = "held-out";
+
+/** Owed lines still in time, `added` replacing any owed the same player for the same reason.
+ *  Over the cap, the oldest `HELD_OUT_REASON` ones go first, then the oldest of the rest. */
 export function withOwedLines(
     owed: readonly OwedLines[],
     added: readonly OwedLines[],
@@ -526,9 +531,13 @@ export function withOwedLines(
 ): OwedLines[] {
     const key = (one: OwedLines) => `${one.player.toLowerCase()} ${one.reason}`;
     const replaced = new Set(added.map(key));
-    return [...owed.filter((one) => !replaced.has(key(one))), ...added]
-        .filter((one) => one.until > now)
-        .slice(-OWED_LINES_MAX);
+    const live = [...owed.filter((one) => !replaced.has(key(one))), ...added].filter(
+        (one) => one.until > now
+    );
+    const over = live.length - OWED_LINES_MAX;
+    if (over <= 0) return live;
+    const dropped = new Set(live.filter((one) => one.reason === HELD_OUT_REASON).slice(0, over));
+    return live.filter((one) => !dropped.has(one)).slice(-OWED_LINES_MAX);
 }
 
 export const EMPTY_EVENT_STATE: EventState = {

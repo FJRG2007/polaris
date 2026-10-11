@@ -28,7 +28,7 @@
 import * as stage from "./stage";
 import * as arena from "./arena";
 import { text } from "../commands";
-import { GAMEMODES, type HeldOut } from "../state";
+import { GAMEMODES, HELD_OUT_REASON, type HeldOut } from "../state";
 import { PLAYER_NAME } from "../catalog";
 
 type Gamemode = (typeof GAMEMODES)[number];
@@ -244,7 +244,16 @@ export function step(input: {
             );
         }
     }
-    return { lines, held: held.slice(-HELD_MAX), changed };
+    return { lines, held: capped(held), changed };
+}
+
+/** The list kept to `HELD_MAX`, the oldest let go first: nobody still held is
+ *  dropped while somebody let go is kept. */
+function capped(held: HeldOut[]): HeldOut[] {
+    const over = held.length - HELD_MAX;
+    if (over <= 0) return held;
+    const dropped = new Set(held.filter((one) => !one.holding).slice(0, over));
+    return held.filter((one) => !dropped.has(one)).slice(-HELD_MAX);
 }
 
 /** The mode somebody held is to be written down with if the event takes them
@@ -288,5 +297,10 @@ export function owedRelease(
 ): { player: string; reason: string; lines: string[]; until: number }[] {
     return held
         .filter((one) => PLAYER_NAME.test(one.name))
-        .map((one) => ({ player: one.name, reason: "held-out", lines: releaseLines(one), until }));
+        .map((one) => ({
+            player: one.name,
+            reason: HELD_OUT_REASON,
+            lines: releaseLines(one),
+            until
+        }));
 }
