@@ -655,18 +655,21 @@ describe("hide and seek's rules", () => {
 
     it("freezes only seekers a thrown potion comes near, and counts it down", () => {
         const tick = panels.FUNCTIONS.tick!;
-        const reach = tick.filter((line) =>
-            line.includes('nbt={Item:{id:"minecraft:splash_potion"}}')
-        );
-        expect(reach).toHaveLength(1);
-        // Only somebody tagged a seeker, near the thrown potion - never a hider.
-        expect(reach[0]).toMatch(
-            /^execute as @a\[tag=pe_arena,tag=pe_seeker\] at @s if entity @e\[/
-        );
-        expect(reach[0]).toContain(`distance=..${panels.FREEZE_REACH},`);
-        expect(reach[0]).not.toContain("pe_hider");
-        // Never by the thrown potion's type: its name changed in 1.21.5.
-        expect(reach[0]).not.toMatch(/type=minecraft:(potion|splash_potion)/);
+        const reach = tick.filter((line) => line.includes('{id:"minecraft:splash_potion"}}'));
+        // `Item` from 1.14, `Potion` in 1.13.
+        expect(reach).toHaveLength(2);
+        expect(reach[0]).toContain('nbt={Item:{id:"minecraft:splash_potion"}}');
+        expect(reach[1]).toContain('nbt={Potion:{id:"minecraft:splash_potion"}}');
+        for (const line of reach) {
+            // Only somebody tagged a seeker, near the thrown potion - never a hider.
+            expect(line).toMatch(
+                /^execute as @a\[tag=pe_arena,tag=pe_seeker\] at @s if entity @e\[/
+            );
+            expect(line).toContain(`distance=..${panels.FREEZE_REACH},`);
+            expect(line).not.toContain("pe_hider");
+            // Never by the thrown potion's type: its name changed in 1.21.5.
+            expect(line).not.toMatch(/type=minecraft:(potion|splash_potion)/);
+        }
         expect(panels.FUNCTIONS.frozen).toEqual([
             "scoreboard players remove @s polaris_frz 1",
             "effect give @s minecraft:slowness 1 10 true",

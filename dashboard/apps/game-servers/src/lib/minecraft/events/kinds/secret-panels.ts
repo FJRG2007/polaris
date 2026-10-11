@@ -186,13 +186,15 @@ const SEEKER_TAG = "pe_seeker";
 /** How near a thrown splash potion has to come to a seeker to freeze them. */
 export const FREEZE_REACH = 3;
 /**
- * A thrown splash potion: whatever carries a splash potion's `Item` and is not
- * a dropped item, a frame or a marker. Not by its type: the thrown potion's
+ * A thrown splash potion: whatever carries a splash potion and is not a
+ * dropped item, a frame or a marker. Not by its type: the thrown potion's
  * entity was renamed in 1.21.5, and a name the server does not know is a
- * function it refuses to load. The game's kit is the only splash potion in an
+ * function it refuses to load. Its stack is `Item` from 1.14 and `Potion` in
+ * 1.13, so both are looked for. The game's kit is the only splash potion in an
  * arena: everybody's own things were taken at the door.
  */
-const THROWN = `@e[type=!minecraft:player,type=!minecraft:item,type=!minecraft:item_frame,type=!minecraft:armor_stand,type=!minecraft:painting,distance=..${FREEZE_REACH},nbt={Item:{id:"minecraft:splash_potion"}}]`;
+const THROWN = (field: "Item" | "Potion"): string =>
+    `@e[type=!minecraft:player,type=!minecraft:item,type=!minecraft:item_frame,type=!minecraft:armor_stand,type=!minecraft:painting,distance=..${FREEZE_REACH},nbt={${field}:{id:"minecraft:splash_potion"}}]`;
 
 /** Anything but a dropped item, a marker, a painting or what the house shows. */
 const SOMEBODY = `@e[type=!minecraft:item,type=!minecraft:armor_stand,type=!minecraft:painting,type=!minecraft:item_frame,tag=!${DECOR}`;
@@ -234,7 +236,10 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=${PAD},distance=..${ON_PAD}] unless score @s ${PAD_WAIT} matches 1.. run function polaris:panel/launch`,
         // Hide and seek's freeze potion: a seeker it comes near stands still
         // for as long as `#len` says, counted down here; nobody else.
-        `execute as @a[tag=${IN_ARENA},tag=${SEEKER_TAG}] at @s if entity ${THROWN} run scoreboard players operation @s ${FROZEN} = #len ${FROZEN}`,
+        ...(["Item", "Potion"] as const).map(
+            (field) =>
+                `execute as @a[tag=${IN_ARENA},tag=${SEEKER_TAG}] at @s if entity ${THROWN(field)} run scoreboard players operation @s ${FROZEN} = #len ${FROZEN}`
+        ),
         `execute as @a[tag=${IN_ARENA},scores={${FROZEN}=1..}] at @s run function polaris:panel/frozen`
     ],
     // Unable to walk (Slowness 10, as in the cage) or to strike (Weakness 100,
