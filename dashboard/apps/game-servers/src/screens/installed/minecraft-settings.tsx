@@ -17,6 +17,7 @@ import { RestartPlanner } from "./restart-planner";
 import { useGameText, useSchemaText } from "../game-text";
 import { MinecraftMemory } from "./minecraft-memory";
 import { MinecraftLoader } from "./minecraft-loader";
+import { ReleaseField, SoftwareField } from "./minecraft-setting-fields";
 import { Loader2, RotateCw, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { updateServerSettingsAction } from "./minecraft-actions";
@@ -37,6 +38,7 @@ export function MinecraftSettings({
     playersOnline,
     running = true,
     withMemory = false,
+    javaRelease = false,
     onSaved
 }: {
     installedAppId: string;
@@ -48,6 +50,9 @@ export function MinecraftSettings({
     /** Whether the Memory card belongs above these fields. Only the Minecraft
      *  Settings tab carries the heap. */
     withMemory?: boolean;
+    /** Whether this is a Java server, whose software and release are picked from
+     *  Minecraft's own lists rather than typed. */
+    javaRelease?: boolean;
     onSaved: () => void;
 }) {
     const schemaText = useSchemaText();
@@ -187,7 +192,28 @@ export function MinecraftSettings({
                         {fields.map((field) => (
                             <label key={field.key} className="flex flex-col gap-1 text-sm">
                                 <span>{field.label}</span>
-                                {field.options ? (
+                                {javaRelease && field.key === "TYPE" && field.options ? (
+                                    <SoftwareField
+                                        value={values[field.key] ?? ""}
+                                        options={field.options}
+                                        onChange={(value) =>
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.key]: value
+                                            }))
+                                        }
+                                    />
+                                ) : javaRelease && field.key === "VERSION" && !field.options ? (
+                                    <ReleaseField
+                                        value={values[field.key] ?? ""}
+                                        onChange={(value) =>
+                                            setValues((current) => ({
+                                                ...current,
+                                                [field.key]: value
+                                            }))
+                                        }
+                                    />
+                                ) : field.options ? (
                                     <Select
                                         value={values[field.key] ?? ""}
                                         onValueChange={(value) =>
@@ -227,6 +253,7 @@ export function MinecraftSettings({
             <RestartPlanner
                 installedAppId={installedAppId}
                 running={running}
+                playersOnline={playersOnline}
                 changed={waiting}
                 reason={t("settings.restartReason")}
                 onRestarted={() => {

@@ -8,6 +8,8 @@
  * dispatch on, hours after the create, in a log nobody opens.
  */
 
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
     findSoftware,
@@ -168,5 +170,19 @@ describe("the one value some software asks for", () => {
         // Spigot stopped answering automated downloads, so the image's only route
         // is to build it. Without this the server never gets a jar at all.
         expect(findSoftware("SPIGOT")?.env).toEqual({ BUILD_FROM_SOURCE: "true" });
+    });
+});
+
+describe("the logo each software is shown with", () => {
+    it("is a file the dashboard actually serves, for every entry that names one", () => {
+        const named = MINECRAFT_SOFTWARE.filter((software) => software.logo);
+        expect(named.length).toBeGreaterThan(10);
+        for (const software of named) {
+            expect(software.logo, software.type).toMatch(/^\/logos\/[a-z0-9/.-]+\.(svg|webp)$/);
+            expect(
+                existsSync(join(process.cwd(), "public", software.logo ?? "")),
+                software.type
+            ).toBe(true);
+        }
     });
 });

@@ -66,12 +66,15 @@ function size(bytes: number | null): string {
 export function ArkMods({
     installedAppId,
     canManage,
+    playersOnline = 0,
     running
 }: {
     installedAppId: string;
     canManage: boolean;
     /** Whether the server is up. What is on disk can only be read from a running
      *  container, and the restart is only offered against one. */
+    /** Who a restart now would disconnect. */
+    playersOnline?: number;
     running: boolean;
 }) {
     const t = useGameText("ark");
@@ -183,6 +186,7 @@ export function ArkMods({
                 <RestartPlanner
                     installedAppId={installedAppId}
                     running={running}
+                    playersOnline={playersOnline}
                     changed={changed}
                     reason={t("mods.restartReason")}
                     onRestarted={() => {

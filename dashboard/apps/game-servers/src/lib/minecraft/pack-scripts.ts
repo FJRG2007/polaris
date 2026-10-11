@@ -17,6 +17,8 @@
  * Pure: it only builds the text.
  */
 
+import { neoforgePrefix } from "./loader-versions";
+
 /** The file the installers keep beside the jars, naming what they put there. */
 export const PACK_RECORD = ".polaris-pack.txt";
 
@@ -76,27 +78,126 @@ export function scriptUrl(url: string): string {
 }
 
 /**
+ * The game folder and launcher profile a server's mods are installed into.
+ *
+ * Each server gets a folder of its own under the Minecraft folder, with its own
+ * `mods`, and a profile in the official launcher that plays from it. One shared
+ * `mods` folder for every server is how a player on two of them ends up with
+ * both sets at once - and a server that does not have a mod another one needs
+ * on the client turns that player away ("Incompatible client!").
+ *
+ * The profile needs the mod loader's own entry in the launcher, which the
+ * loader's installer adds; `versionGlob` is how the installers find it among
+ * what is installed, newest first. Null for software with no client loader of
+ * its own, where only the folder is made.
+ */
+export interface PackProfile {
+    /** The folder's name and the profile's key: the server's id. */
+    readonly key: string;
+    readonly versionGlob: string | null;
+    /** What to tell somebody who has not installed the loader yet. */
+    readonly loader: string | null;
+    /** The release, or empty for a server following the newest. */
+    readonly minecraft: string;
+}
+
+/** Which loader a player runs to join a server running this software. A hybrid
+ *  runs mods of the loader it is built on. */
+const CLIENT_LOADERS: Readonly<Record<string, { family: string; name: string }>> = {
+    FABRIC: { family: "fabric", name: "Fabric" },
+    BANNER: { family: "fabric", name: "Fabric" },
+    QUILT: { family: "quilt", name: "Quilt" },
+    FORGE: { family: "forge", name: "Forge" },
+    MOHIST: { family: "forge", name: "Forge" },
+    KETTING: { family: "forge", name: "Forge" },
+    NEOFORGE: { family: "neoforge", name: "NeoForge" },
+    ARCLIGHT: { family: "neoforge", name: "NeoForge" },
+    YOUER: { family: "neoforge", name: "NeoForge" }
+};
+
+/** A release named exactly, which is all a version folder can be matched on. */
+const RELEASE = /^\d+(?:\.\d+){1,2}$/;
+
+/** The folder name under `versions` each loader's installer creates, as a glob. */
+function versionGlobOf(family: string, minecraft: string): string {
+    const release = RELEASE.test(minecraft) ? minecraft : "";
+    switch (family) {
+        case "fabric":
+            return release ? `fabric-loader-*-${release}` : "fabric-loader-*";
+        case "quilt":
+            return release ? `quilt-loader-*-${release}` : "quilt-loader-*";
+        case "forge":
+            return release ? `${release}-forge-*` : "*-forge-*";
+        default: {
+            const prefix = release ? neoforgePrefix(release) : null;
+            return prefix ? `neoforge-${prefix}*` : "neoforge-*";
+        }
+    }
+}
+
+/** The id a folder and a profile key may be: what an install id is made of. */
+const PROFILE_KEY = /^[A-Za-z0-9-]{1,64}$/;
+
+/** The profile for a server, from its id, `TYPE` and `VERSION`. */
+export function packProfile(installedAppId: string, type: string, version: string): PackProfile {
+    const key = PROFILE_KEY.test(installedAppId) ? installedAppId : "server";
+    const minecraft = RELEASE.test(version.trim()) ? version.trim() : "";
+    const client = CLIENT_LOADERS[type.trim().toUpperCase()];
+    return {
+        key,
+        versionGlob: client ? versionGlobOf(client.family, minecraft) : null,
+        loader: client?.name ?? null,
+        minecraft
+    };
+}
+
+/** What a script is told of a loader somebody still has to install. */
+function loaderAdvice(profile: PackProfile): string {
+    if (!profile.loader) return "";
+    return profile.minecraft
+        ? `${profile.loader} for Minecraft ${profile.minecraft}`
+        : profile.loader;
+}
+
+/**
  * Where each system keeps Minecraft, and the escape hatch.
  *
- * `POLARIS_MC_DIR` wins everywhere, because a launcher that keeps its instances
- * elsewhere - Prism, MultiMC, CurseForge - is normal, and the alternative is a
- * script that installs into a folder the player does not use.
+ * The mods go into the server's own game folder (see `PackProfile`), under
+ * `POLARIS_MC_ROOT` when the Minecraft folder is somewhere else. `POLARIS_MC_DIR`
+ * wins over both, because a launcher that keeps its instances elsewhere - Prism,
+ * MultiMC, CurseForge - is normal, and the alternative is a script that installs
+ * into a folder the player does not use; no profile is made for that one.
+ *
+ * A run that finds a pack an earlier version of this script put into the shared
+ * `mods` folder moves those jars aside, once: they are the other server's half
+ * of the mix this exists to end.
  */
-export function shellInstaller(manifestUrl: string, server: string): string {
+export function shellInstaller(
+    manifestUrl: string,
+    server: string,
+    profile: PackProfile = packProfile("server", "", "")
+): string {
     return `#!/bin/sh
-# Installs the mods for "${scriptName(server)}" into this machine's Minecraft folder.
+# Installs the mods for "${scriptName(server)}" into a Minecraft profile of its own.
 # Run it again to update. Of your own jars it only moves aside one that is another
 # copy of a mod on the list, or one a mod on the list cannot run beside.
 set -eu
 
 manifest="${scriptUrl(manifestUrl)}"
 foreign="\${manifest%pack.tsv}foreign.tsv"
-dir="\${POLARIS_MC_DIR:-}"
-if [ -z "$dir" ]; then
+root="\${POLARIS_MC_ROOT:-}"
+if [ -z "$root" ]; then
     case "$(uname -s)" in
-        Darwin) dir="$HOME/Library/Application Support/minecraft/mods" ;;
-        *) dir="$HOME/.minecraft/mods" ;;
+        Darwin) root="$HOME/Library/Application Support/minecraft" ;;
+        *) root="$HOME/.minecraft" ;;
     esac
+fi
+game="$root/polaris/${profile.key}"
+dir="\${POLARIS_MC_DIR:-}"
+own=0
+if [ -z "$dir" ]; then
+    dir="$game/mods"
+    own=1
 fi
 
 say() { printf '%s\\n' "$*"; }
@@ -218,22 +319,127 @@ else
     cp "$tmp/wanted" "$record"
 fi
 
+# A pack an earlier run installed into the shared mods folder, where every
+# server's mods ended up together. Moved aside, not deleted, only the jars that
+# run recorded as its own, and only once this server's own folder is in place.
+# A jar that could not be moved stays on that record for the next run.
+shared="$root/mods"
+if [ "$own" = "1" ] && [ -f "$shared/${PACK_RECORD}" ]; then
+    away="$root/${SET_ASIDE}"
+    moved=0
+    : > "$tmp/left"
+    while IFS= read -r old; do
+        case "$old" in ""|*/*) continue ;; esac
+        if [ -f "$shared/$old" ]; then
+            if mkdir -p "$away" && mv "$shared/$old" "$away/$old"; then
+                moved=$((moved + 1))
+            else
+                printf '%s\\n' "$old" >> "$tmp/left"
+            fi
+        fi
+    done < "$shared/${PACK_RECORD}"
+    if [ -s "$tmp/left" ]; then
+        cp "$tmp/left" "$shared/${PACK_RECORD}"
+        say "polaris: moved $moved mods an earlier run put in $shared to $away; the rest are still there"
+    else
+        rm -f "$shared/${PACK_RECORD}"
+        say "polaris: moved $moved mods an earlier run put in $shared to $away"
+    fi
+fi
+
+# The launcher profile that plays from this server's folder. Written with a
+# JSON tool the system already has - JavaScript for Automation on a Mac,
+# Python elsewhere - and left to the player to add by hand without one.
+if [ "$own" = "1" ]; then
+    profiles="$root/launcher_profiles.json"
+    pattern="${profile.versionGlob ?? ""}"
+    version=""
+    if [ -n "$pattern" ] && [ -d "$root/versions" ]; then
+        version=$(cd "$root/versions" && ls -1td -- $pattern 2>/dev/null | head -n 1) || version=""
+    fi
+    name="${scriptName(server)} (Polaris)"
+    wrote=""
+    if [ -z "$pattern" ]; then
+        say "polaris: point a launcher profile's game directory at $game to play with these mods"
+    elif [ -z "$version" ]; then
+        say "polaris: install ${loaderAdvice(profile)} first, then run this line again to add the profile $name"
+    elif [ ! -f "$profiles" ]; then
+        say "polaris: open the Minecraft Launcher once, then run this line again to add the profile $name"
+    elif [ "$(uname -s)" = "Darwin" ]; then
+        cat > "$tmp/profile.js" <<'POLARIS_JS'
+ObjC.import("Foundation");
+function run(argv) {
+    var text = $.NSString.stringWithContentsOfFileEncodingError(argv[0], $.NSUTF8StringEncoding, null);
+    if (text.isNil()) return "unreadable";
+    var data = JSON.parse(ObjC.unwrap(text));
+    if (typeof data.profiles !== "object" || data.profiles === null) data.profiles = {};
+    var now = new Date().toISOString();
+    var entry = data.profiles[argv[1]] || { created: now };
+    entry.name = argv[2];
+    entry.type = "custom";
+    entry.gameDir = argv[3];
+    entry.lastVersionId = argv[4];
+    entry.lastUsed = now;
+    data.profiles[argv[1]] = entry;
+    var ok = $(JSON.stringify(data, null, 2)).writeToFileAtomicallyEncodingError(argv[0], true, $.NSUTF8StringEncoding, null);
+    return ok ? "ok" : "unwritable";
+}
+POLARIS_JS
+        wrote=$(osascript -l JavaScript "$tmp/profile.js" "$profiles" "${profile.key}" "$name" "$game" "$version" 2>/dev/null) || wrote=""
+    elif command -v python3 >/dev/null 2>&1; then
+        cat > "$tmp/profile.py" <<'POLARIS_PY'
+import datetime, json, os, sys
+path, key, name, game, version = sys.argv[1:6]
+with open(path, encoding="utf-8") as source:
+    data = json.load(source)
+if not isinstance(data.get("profiles"), dict):
+    data["profiles"] = {}
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+entry = data["profiles"].get(key) or {"created": now}
+entry.update({"name": name, "type": "custom", "gameDir": game, "lastVersionId": version, "lastUsed": now})
+data["profiles"][key] = entry
+with open(path + ".polaris", "w", encoding="utf-8") as target:
+    json.dump(data, target, indent=2)
+os.replace(path + ".polaris", path)
+print("ok")
+POLARIS_PY
+        wrote=$(python3 "$tmp/profile.py" "$profiles" "${profile.key}" "$name" "$game" "$version" 2>/dev/null) || wrote=""
+    fi
+    if [ "$wrote" = "ok" ]; then
+        say "polaris: the profile $name plays $version with only this server's mods - restart the Minecraft Launcher to see it"
+    elif [ -n "$version" ] && [ -f "$profiles" ]; then
+        say "polaris: could not add the profile; make one with the game directory $game and $version"
+    fi
+fi
+
 say ""
 say "polaris: $added installed, $kept already current, $removed removed, $aside moved aside"
 say "polaris: mods folder $dir"
 `;
 }
 
-export function powershellInstaller(manifestUrl: string, server: string): string {
-    return `# Installs the mods for "${scriptName(server)}" into this machine's Minecraft folder.
+export function powershellInstaller(
+    manifestUrl: string,
+    server: string,
+    profile: PackProfile = packProfile("server", "", "")
+): string {
+    return `# Installs the mods for "${scriptName(server)}" into a Minecraft profile of its own.
 # Run it again to update. Of your own jars it only moves aside one that is another
 # copy of a mod on the list, or one a mod on the list cannot run beside.
 $ErrorActionPreference = "Stop"
 
 $manifest = "${scriptUrl(manifestUrl)}"
 $foreign = $manifest -replace 'pack\\.tsv$', 'foreign.tsv'
+$root = $env:POLARIS_MC_ROOT
+if (-not $root) {
+    if ($env:APPDATA) { $root = Join-Path $env:APPDATA ".minecraft" }
+    elseif ($IsMacOS) { $root = Join-Path $HOME "Library/Application Support/minecraft" }
+    else { $root = Join-Path $HOME ".minecraft" }
+}
+$game = Join-Path (Join-Path $root "polaris") "${profile.key}"
 $dir = $env:POLARIS_MC_DIR
-if (-not $dir) { $dir = Join-Path $env:APPDATA ".minecraft\\mods" }
+$own = $false
+if (-not $dir) { $dir = Join-Path $game "mods"; $own = $true }
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $record = Join-Path $dir "${PACK_RECORD}"
 
@@ -343,6 +549,96 @@ if ($partial -and (Test-Path -LiteralPath $record)) {
     }
 }
 Set-Content -LiteralPath $record -Value $keep -Encoding utf8
+
+# A pack an earlier run installed into the shared mods folder, where every
+# server's mods ended up together. Moved aside, not deleted, only the jars that
+# run recorded as its own, and only once this server's own folder is in place.
+# A jar that could not be moved stays on that record for the next run.
+$shared = Join-Path $root "mods"
+$sharedRecord = Join-Path $shared "${PACK_RECORD}"
+if ($own -and (Test-Path -LiteralPath $sharedRecord)) {
+    $away = Join-Path $root "${SET_ASIDE}"
+    $moved = 0
+    $left = New-Object System.Collections.Generic.List[string]
+    foreach ($old in (Get-Content -LiteralPath $sharedRecord)) {
+        if (-not $old -or $old.Contains("/") -or $old.Contains("\\")) { continue }
+        $source = Join-Path $shared $old
+        if (Test-Path -LiteralPath $source -PathType Leaf) {
+            try {
+                New-Item -ItemType Directory -Force -Path $away | Out-Null
+                Move-Item -LiteralPath $source -Destination (Join-Path $away $old) -Force
+                $moved++
+            } catch {
+                $left.Add($old) | Out-Null
+            }
+        }
+    }
+    if ($left.Count -gt 0) {
+        Set-Content -LiteralPath $sharedRecord -Value $left -Encoding utf8
+        Write-Host "polaris: moved $moved mods an earlier run put in $shared to $away; the rest are still there"
+    } else {
+        Remove-Item -LiteralPath $sharedRecord -Force
+        Write-Host "polaris: moved $moved mods an earlier run put in $shared to $away"
+    }
+}
+
+# The launcher profile that plays from this server's folder.
+if ($own) {
+    $profiles = @(
+        (Join-Path $root "launcher_profiles.json"),
+        (Join-Path $root "launcher_profiles_microsoft_store.json")
+    ) | Where-Object { Test-Path -LiteralPath $_ }
+    $pattern = "${profile.versionGlob ?? ""}"
+    $name = "${scriptName(server)} (Polaris)"
+    $version = $null
+    $versions = Join-Path $root "versions"
+    if ($pattern -and (Test-Path -LiteralPath $versions)) {
+        $found = Get-ChildItem -LiteralPath $versions -Directory -Filter $pattern | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($found) { $version = $found.Name }
+    }
+    if (-not $pattern) {
+        Write-Host "polaris: point a launcher profile's game directory at $game to play with these mods"
+    } elseif (-not $version) {
+        Write-Host "polaris: install ${loaderAdvice(profile)} first, then run this line again to add the profile $name"
+    } elseif (-not $profiles) {
+        Write-Host "polaris: open the Minecraft Launcher once, then run this line again to add the profile $name"
+    } else {
+        $wrote = 0
+        foreach ($file in $profiles) {
+            try {
+                $data = [System.IO.File]::ReadAllText($file) | ConvertFrom-Json
+                if (-not ($data.PSObject.Properties.Name -contains "profiles") -or $null -eq $data.profiles) {
+                    $data | Add-Member -NotePropertyName "profiles" -NotePropertyValue ([pscustomobject]@{}) -Force
+                }
+                $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+                $created = $now
+                $existing = $data.profiles.PSObject.Properties["${profile.key}"]
+                if ($existing -and $existing.Value.created) { $created = $existing.Value.created }
+                $entry = [pscustomobject]@{
+                    name = $name
+                    type = "custom"
+                    created = $created
+                    lastUsed = $now
+                    lastVersionId = $version
+                    gameDir = $game
+                }
+                $data.profiles | Add-Member -NotePropertyName "${profile.key}" -NotePropertyValue $entry -Force
+                $json = $data | ConvertTo-Json -Depth 32
+                $temp = "$file.polaris"
+                [System.IO.File]::WriteAllText($temp, $json, (New-Object System.Text.UTF8Encoding $false))
+                Move-Item -LiteralPath $temp -Destination $file -Force
+                $wrote++
+            } catch {
+                Write-Host "polaris: could not add the profile to $file"
+            }
+        }
+        if ($wrote -gt 0) {
+            Write-Host "polaris: the profile $name plays $version with only this server's mods - restart the Minecraft Launcher to see it"
+        } else {
+            Write-Host "polaris: could not add the profile; make one with the game directory $game and $version"
+        }
+    }
+}
 
 Write-Host ""
 Write-Host "polaris: $added installed, $kept already current, $removed removed, $aside moved aside"

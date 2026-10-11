@@ -14,6 +14,7 @@ import { gameMessage } from "../game-message";
 import { isIP } from "node:net";
 import { prisma } from "@polaris/db";
 import { accessRefusal } from "./access";
+import { runSince } from "./run-since";
 import * as polarisLogin from "./polaris-login";
 import { bundledModVersion } from "./polaris-mod-files";
 import { anticheatHoldsMod } from "./polaris-anticheat";
@@ -321,8 +322,8 @@ export async function loginState(
     ]);
     const env = new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
     const now = new Date();
-    const upSince = latest(
-        onlineSince(install?.config ?? null),
+    const upSince = runSince(
+        install?.config ?? null,
         deployment ? (deployment.finishedAt ?? now) : null
     );
     const on = polarisLogin.loginOn(env);
@@ -353,23 +354,6 @@ export async function loginState(
             lastLoginAt: row.lastLoginAt?.toISOString() ?? null
         }))
     };
-}
-
-/** The later of two moments, or null when the server is not up at all. */
-function latest(onlineAt: Date | null, deployedAt: Date | null): Date | null {
-    if (!onlineAt) return null;
-    return deployedAt && deployedAt > onlineAt ? deployedAt : onlineAt;
-}
-
-/** When the server's current run began, as the activity sweep recorded it. */
-function onlineSince(config: string | null): Date | null {
-    try {
-        const raw = (JSON.parse(config ?? "{}") as { onlineSince?: unknown }).onlineSince;
-        const at = typeof raw === "string" ? new Date(raw) : null;
-        return at && !Number.isNaN(at.getTime()) ? at : null;
-    } catch {
-        return null;
-    }
 }
 
 /**

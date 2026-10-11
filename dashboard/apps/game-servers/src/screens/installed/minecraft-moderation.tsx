@@ -45,10 +45,13 @@ const STATUS_TONE: Readonly<Record<AnnouncerStatus, "success" | "warning" | "neu
 export function MinecraftModeration({
     installedAppId,
     canManage,
+    playersOnline = 0,
     running
 }: {
     installedAppId: string;
     canManage: boolean;
+    /** Who a restart now would disconnect. */
+    playersOnline?: number;
     running: boolean;
 }) {
     return (
@@ -57,6 +60,7 @@ export function MinecraftModeration({
                 installedAppId={installedAppId}
                 canManage={canManage}
                 running={running}
+                playersOnline={playersOnline}
             />
             <ModAnnouncementsCard
                 installedAppId={installedAppId}
@@ -173,7 +177,9 @@ function ModAnnouncementsCard({
                                 >
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="truncate text-sm" title={mod.name}>{mod.name}</span>
+                                            <span className="truncate text-sm" title={mod.name}>
+                                                {mod.name}
+                                            </span>
                                             <Badge variant={STATUS_TONE[mod.status]}>
                                                 {t(STATUS_WORD[mod.status])}
                                             </Badge>
@@ -229,6 +235,7 @@ function ModAnnouncementsCard({
                 <RestartPlanner
                     installedAppId={installedAppId}
                     running={running}
+                    playersOnline={playersOnline}
                     changed
                     reason={t("moderation.announcements.restartReason")}
                     title={t("moderation.announcements.restartTitle")}

@@ -13,6 +13,7 @@ import { host } from "@polaris/app-host";
 import { revalidatePath } from "next/cache";
 import { gameWords, messageText } from "../game-words";
 import * as service from "../../lib/minecraft/symbiote-service";
+import { markModsChanged } from "../../lib/minecraft/mods-restart-service";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
@@ -59,12 +60,14 @@ export async function setSymbioteAction(input: {
         const applicationId = access.install.applicationId;
         if (!applicationId)
             throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
-        await service.setSymbiote(
+        const changed = await service.setSymbiote(
             applicationId,
             access.ownerId,
             parsed.data.installedAppId,
             parsed.data.on
         );
+        // Nothing restarts here: the panel's restart card offers it.
+        if (changed) await markModsChanged(parsed.data.installedAppId).catch(() => undefined);
         await recordAudit({
             actorId: user.id,
             action: parsed.data.on ? "minecraft.symbiote.install" : "minecraft.symbiote.remove",

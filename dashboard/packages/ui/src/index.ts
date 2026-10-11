@@ -79,6 +79,12 @@ export {
     type SelectOption,
     type SelectProps
 } from "./components/select";
+export {
+    SearchableSelect,
+    filterSearchableOptions,
+    type SearchableSelectOption,
+    type SearchableSelectProps
+} from "./components/searchable-select";
 export { SegmentedControl, type SegmentedOption } from "./components/segmented-control";
 export { RadialGauge, TimeSeriesChart, type GaugeTone, type TimePoint } from "./components/charts";
 export { summarizeSeries, type SeriesStats, type SeriesSummary } from "./lib/series-summary";

@@ -20,10 +20,12 @@
  */
 
 import { GAME_RULES } from "../../lib/minecraft/rules";
+import { incompatibleClients } from "../../lib/minecraft/join-refusals";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/console-complete";
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import {
+    AlertTriangle,
     CornerDownLeft,
     History,
     ListOrdered,
@@ -157,6 +159,8 @@ export function GameConsole({
     const schemaText = useSchemaText();
     const t = useGameText("games");
     const { log, refresh } = useRuntimeLog(applicationId, true, 400);
+    // Only a Java server runs a mod loader that turns clients away for their mods.
+    const refused = useMemo(() => (game === "java" ? incompatibleClients(log) : null), [game, log]);
     const [line, setLine] = useState("");
     const [replies, setReplies] = useState<Reply[]>([]);
     const [pending, startTransition] = useTransition();
@@ -503,6 +507,27 @@ export function GameConsole({
                         <RefreshCw className="size-4" />
                     </Button>
                 </div>
+
+                {refused && (
+                    <div
+                        role="status"
+                        className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm"
+                    >
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                        <div className="min-w-0">
+                            <p className="font-medium">
+                                {refused.players.length > 0
+                                    ? t("console.incompatibleNamed", {
+                                          names: refused.players.join(", ")
+                                      })
+                                    : t("console.incompatibleTitle")}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("console.incompatibleDetail")}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 <LogViewer
                     log={log}

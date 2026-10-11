@@ -38,10 +38,14 @@ function PolarisIcon() {
 export function SymbioteRow({
     installedAppId,
     canManage,
-    onInstalled
+    onInstalled,
+    onChanged
 }: {
     installedAppId: string;
     canManage: boolean;
+    /** Told after the list changed, so the page can offer the restart that
+     *  installs it. */
+    onChanged?: () => void;
     /** Told whether the server's list carries it, whenever that changes. */
     onInstalled?: (installed: boolean) => void;
 }) {
@@ -104,6 +108,7 @@ export function SymbioteRow({
                 return;
             }
             setNote(on ? t("symbiote.installedNote") : t("symbiote.removedNote"));
+            onChanged?.();
         });
     }
 

@@ -13,9 +13,14 @@
 import { useGameText, type GameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Badge, Button, Card, CardBody, Skeleton } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, SearchableSelect, Skeleton } from "@polaris/ui";
 import type { LoaderPinView } from "../../lib/minecraft/loader-pin-service";
-import { readLoaderPinAction, updateLoaderAction } from "./minecraft-actions";
+import {
+    chooseLoaderVersionAction,
+    loaderVersionsAction,
+    readLoaderPinAction,
+    updateLoaderAction
+} from "./minecraft-actions";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 const { useConfirm } = hostUi.confirmDialog;
@@ -48,6 +53,9 @@ export function MinecraftLoader({
     const [note, setNote] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
+    /** The versions the loader's repository lists for this release: null while
+     *  they are being read, empty when they could not be. */
+    const [versions, setVersions] = useState<readonly string[] | null>(null);
 
     const read = useCallback(async () => {
         const answer = await readLoaderPinAction(installedAppId).catch(() => ({
@@ -67,6 +75,23 @@ export function MinecraftLoader({
     useEffect(() => {
         void read();
     }, [read, refresh]);
+
+    // Only asked once the card knows there is a choice to make, and again when
+    // the server's release or loader may have moved under it.
+    const choosable =
+        (view?.pin.state === "held" || view?.pin.state === "following") && !view.updating;
+    useEffect(() => {
+        if (!choosable) return;
+        let live = true;
+        void loaderVersionsAction(installedAppId)
+            .catch(() => ({ versions: null }))
+            .then((answer) => {
+                if (live) setVersions(answer.versions?.versions ?? []);
+            });
+        return () => {
+            live = false;
+        };
+    }, [choosable, installedAppId, refresh]);
 
     // Nothing to say about a server with no mod loader, and nothing drawn for one.
     if (view?.pin.state === "none") return null;
@@ -121,6 +146,40 @@ export function MinecraftLoader({
         });
     }
 
+    const current = pin.state === "held" ? pin.version : "";
+
+    async function choose(version: string): Promise<void> {
+        if (pin.state !== "held" && pin.state !== "following") return;
+        if (version === current) return;
+        const body = t("loader.chooseBody", { loader: pin.loader, version });
+        const restartWords =
+            playersOnline > 0
+                ? t("joinPassword.playersWillDrop", { count: playersOnline })
+                : t("loader.confirmRestartEmpty");
+        const ok = await confirm({
+            title: t("loader.chooseTitle", { loader: pin.loader, version }),
+            description: running ? `${body} ${restartWords}` : body,
+            confirmLabel: running ? t("loader.switchAndRestart") : t("loader.switchOnly")
+        });
+        if (!ok) return;
+        setNote(null);
+        startTransition(async () => {
+            const answer = await chooseLoaderVersionAction({ installedAppId, version }).catch(
+                () => ({ restarted: undefined, error: t("errors.couldNotUpdateTheLoader") })
+            );
+            if (answer.error) {
+                setNote(answer.error);
+                return;
+            }
+            setNote(
+                answer.restarted
+                    ? t("loader.chosenStarted", { loader: pin.loader, version })
+                    : t("loader.chosenQueued", { loader: pin.loader, version })
+            );
+            await read();
+        });
+    }
+
     return (
         <Card>
             <CardBody className="flex flex-col gap-2">
@@ -160,6 +219,32 @@ export function MinecraftLoader({
                             {t("loader.update")}
                         </Button>
                     </div>
+                )}
+                {choosable && (
+                    <label className="flex flex-col gap-1 text-sm sm:max-w-xs">
+                        <span className="text-xs font-medium">{t("loader.chooseVersion")}</span>
+                        {versions === null ? (
+                            <Skeleton className="h-8 w-full" />
+                        ) : versions.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">
+                                {t("loader.versionsUnavailable", { loader: pin.loader })}
+                            </span>
+                        ) : (
+                            <SearchableSelect
+                                aria-label={t("loader.chooseVersion")}
+                                value={current}
+                                placeholder={t("loader.newest")}
+                                onValueChange={(version) => void choose(version)}
+                                disabled={pending}
+                                searchPlaceholder={t("loader.searchVersions")}
+                                emptyText={t("loader.noVersionMatches")}
+                                options={(current && !versions.includes(current)
+                                    ? [current, ...versions]
+                                    : versions
+                                ).map((version) => ({ value: version, label: version }))}
+                            />
+                        )}
+                    </label>
                 )}
                 {note && <p className="text-xs text-muted-foreground">{note}</p>}
             </CardBody>

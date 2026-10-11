@@ -44,6 +44,7 @@ const KEPT_RULES_MS = 24 * 3_600_000;
 export function ArkRules({
     installedAppId,
     canManage,
+    playersOnline = 0,
     running
 }: {
     installedAppId: string;
@@ -51,6 +52,8 @@ export function ArkRules({
     canManage: boolean;
     /** Whether the server is up. Everything here is a file inside its container,
      *  so a stopped server can be neither read nor changed. */
+    /** Who a restart now would disconnect. */
+    playersOnline?: number;
     running: boolean;
 }) {
     const t = useGameText("ark");
@@ -178,6 +181,7 @@ export function ArkRules({
                 <RestartPlanner
                     installedAppId={installedAppId}
                     running={running}
+                    playersOnline={playersOnline}
                     changed={changed}
                     reason={t("rules.restartReason")}
                     onRestarted={() => {

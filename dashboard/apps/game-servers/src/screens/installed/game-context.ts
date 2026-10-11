@@ -22,6 +22,7 @@ import { readArkAccess, readArkPorts } from "../../lib/ark/service";
 import { forViewer, listPlayerAccess } from "../../lib/minecraft/player-access";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import { clientMods, packCommands } from "../../lib/minecraft/client-pack";
+import { modsRestartPending } from "../../lib/minecraft/mods-restart-service";
 import { editionOf, type MinecraftEdition } from "../../lib/minecraft/service";
 import { loginState, type LoginState } from "../../lib/minecraft/polaris-login-service";
 import { rememberedLevels, type RememberedLevel } from "../../lib/minecraft/level-memory";
@@ -121,6 +122,9 @@ export interface GameContext {
     /** The one line a player runs to install or update all of it, per system.
      *  Null for a game that has no such pack. */
     readonly packCommands: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
+    /** Whether the server runs on a mod list older than its last change, which
+     *  nothing has restarted it for yet. */
+    readonly modsAwaitRestart: boolean;
 }
 
 /**
@@ -156,7 +160,8 @@ export async function gameContextFor(app: {
         rosterMemory,
         lastLevels,
         login,
-        packBase
+        packBase,
+        modsAwaitRestart
     ] = await Promise.all([
         installRead,
         // Each game's servers live under a label of their own, so the address
@@ -177,7 +182,8 @@ export async function gameContextFor(app: {
         minecraft && ownerId && editionOf(app.catalogId) === "java"
             ? loginState(app.id, app.applicationId, ownerId).catch(() => null)
             : null,
-        minecraft ? appBaseUrl().catch(() => null) : null
+        minecraft ? appBaseUrl().catch(() => null) : null,
+        minecraft ? modsRestartPending(app.id, app.applicationId).catch(() => false) : false
     ]);
     const config = readInstallConfig(install?.config);
     return {
@@ -209,6 +215,7 @@ export async function gameContextFor(app: {
         // What the players install, and the line that installs it. Resolved here
         // so the screen has both before it paints.
         clientMods: clientMods(config),
-        packCommands: packBase ? packCommands(packBase, app.id) : null
+        packCommands: packBase ? packCommands(packBase, app.id) : null,
+        modsAwaitRestart
     };
 }

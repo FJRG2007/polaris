@@ -63,7 +63,14 @@ export interface MinecraftSoftware {
     /** Said on the card, when choosing this commits to something somebody would
      *  otherwise find out from a log. */
     readonly caveat?: string;
+    /** The project's own mark, served from the dashboard's public folder. Absent
+     *  where the project publishes none of its own - a neutral icon stands in,
+     *  since a drawn look-alike is somebody's trademark and still wrong. */
+    readonly logo?: string;
 }
+
+/** Where the marks under `logo` live. */
+const LOGOS = "/logos/minecraft-software";
 
 export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
     {
@@ -72,7 +79,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "Runs Bukkit and Spigot plugins, and is considerably faster than vanilla.",
         group: "recommended",
         loader: "paper",
-        weight: "plugins"
+        weight: "plugins",
+        logo: `${LOGOS}/paper.svg`
     },
     {
         id: "VANILLA",
@@ -80,7 +88,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "The server Mojang ships, exactly as they ship it. Nothing loads into it.",
         group: "recommended",
         loader: null,
-        weight: "vanilla"
+        weight: "vanilla",
+        logo: "/logos/minecraft.webp"
     },
     {
         id: "FABRIC",
@@ -88,7 +97,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "A light mod loader. Mods have to be built for it and for the release.",
         group: "recommended",
         loader: "fabric",
-        weight: "mods"
+        weight: "mods",
+        logo: `${LOGOS}/fabric.webp`
     },
     {
         id: "NEOFORGE",
@@ -96,7 +106,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "The mod loader most modern modpacks are built on.",
         group: "recommended",
         loader: "neoforge",
-        weight: "mods"
+        weight: "mods",
+        logo: `${LOGOS}/neoforge.webp`
     },
     {
         id: "FORGE",
@@ -104,7 +115,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "The original mod loader, and what older mods target.",
         group: "recommended",
         loader: "forge",
-        weight: "mods"
+        weight: "mods",
+        logo: `${LOGOS}/forge.webp`
     },
     {
         id: "PURPUR",
@@ -112,7 +124,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "Paper with several hundred more settings and some gameplay of its own.",
         group: "recommended",
         loader: "paper",
-        weight: "plugins"
+        weight: "plugins",
+        logo: `${LOGOS}/purpur.webp`
     },
     {
         id: "PUFFERFISH",
@@ -120,7 +133,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "A Paper fork tuned for servers with a lot of people on them.",
         group: "established",
         loader: "paper",
-        weight: "plugins"
+        weight: "plugins",
+        logo: `${LOGOS}/pufferfish.webp`
     },
     {
         id: "LEAF",
@@ -128,7 +142,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "A Paper fork that trades a little vanilla behavior for speed.",
         group: "established",
         loader: "paper",
-        weight: "plugins"
+        weight: "plugins",
+        logo: `${LOGOS}/leaf.webp`
     },
     {
         id: "FOLIA",
@@ -137,7 +152,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         group: "established",
         loader: "folia",
         weight: "plugins",
-        caveat: "Only plugins built for Folia load. An ordinary Paper plugin will not."
+        caveat: "Only plugins built for Folia load. An ordinary Paper plugin will not.",
+        logo: `${LOGOS}/folia.webp`
     },
     {
         id: "SPIGOT",
@@ -151,7 +167,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         // first start with nothing on screen but a log, which is worth saying
         // before somebody picks it rather than after.
         env: { BUILD_FROM_SOURCE: "true" },
-        caveat: "Built from source the first time it starts, which takes several minutes."
+        caveat: "Built from source the first time it starts, which takes several minutes.",
+        logo: `${LOGOS}/spigot.webp`
     },
     {
         id: "SPONGEVANILLA",
@@ -160,7 +177,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         group: "established",
         loader: null,
         weight: "plugins",
-        caveat: "Sponge plugins are not on Modrinth, so they go into the server files by hand."
+        caveat: "Sponge plugins are not on Modrinth, so they go into the server files by hand.",
+        logo: `${LOGOS}/sponge.webp`
     },
     {
         id: "QUILT",
@@ -168,7 +186,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "A fork of Fabric. It loads most Fabric mods as well as its own.",
         group: "experimental",
         loader: "quilt",
-        weight: "mods"
+        weight: "mods",
+        logo: `${LOGOS}/quilt.webp`
     },
     {
         id: "ARCLIGHT",
@@ -176,7 +195,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "NeoForge with the Bukkit API on top, so mods and plugins run side by side.",
         group: "hybrid",
         loader: "bukkit",
-        weight: "mods"
+        weight: "mods",
+        logo: `${LOGOS}/arclight.webp`
     },
     {
         id: "MOHIST",
@@ -184,7 +204,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         summary: "Forge with the Bukkit API on top.",
         group: "hybrid",
         loader: "bukkit",
-        weight: "mods"
+        weight: "mods",
+        logo: `${LOGOS}/mohist.webp`
     },
     {
         id: "YOUER",
@@ -209,7 +230,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         group: "hybrid",
         loader: "bukkit",
         weight: "mods",
-        caveat: "Nothing before Minecraft 1.20.1 has a build."
+        caveat: "Nothing before Minecraft 1.20.1 has a build.",
+        logo: `${LOGOS}/ketting.webp`
     },
     {
         id: "LIMBO",
@@ -235,7 +257,8 @@ export const MINECRAFT_SOFTWARE: readonly MinecraftSoftware[] = [
         group: "modpack",
         loader: null,
         weight: "mods",
-        asks: "modpack"
+        asks: "modpack",
+        logo: `${LOGOS}/modrinth.webp`
     },
     {
         id: "CUSTOM",
@@ -302,7 +325,11 @@ export function isBrowsableLoader(loader: string): boolean {
 }
 
 /** The software in the order the picker shows it, by group. */
-export function softwareByGroup(): { group: SoftwareGroup; label: string; entries: MinecraftSoftware[] }[] {
+export function softwareByGroup(): {
+    group: SoftwareGroup;
+    label: string;
+    entries: MinecraftSoftware[];
+}[] {
     return SOFTWARE_GROUPS.map((group) => ({
         group: group.id,
         label: group.label,

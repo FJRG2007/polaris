@@ -13,7 +13,10 @@ import userEvent from "@testing-library/user-event";
 import { provideAppHostUi } from "@polaris/app-host/client";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LoaderPinView } from "@polaris-app/game-servers/src/lib/minecraft/loader-pin-service";
+import type {
+    LoaderPinView,
+    LoaderVersions
+} from "@polaris-app/game-servers/src/lib/minecraft/loader-pin-service";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -24,11 +27,19 @@ const confirmCalls: Array<{ title: string; description: string; confirmLabel: st
 
 vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
     readLoaderPinAction: async () => readAnswer,
-    updateLoaderAction: async () => updateAnswer
+    updateLoaderAction: async () => updateAnswer,
+    loaderVersionsAction: async () => versionsAnswer,
+    chooseLoaderVersionAction: async (input: { installedAppId: string; version: string }) => {
+        chosen.push(input.version);
+        return chooseAnswer;
+    }
 }));
 
 let readAnswer: { view?: LoaderPinView; error?: string } = { error: "unset" };
 let updateAnswer: { restarted?: boolean; error?: string } = { error: "unset" };
+let versionsAnswer: { versions?: LoaderVersions | null; error?: string } = { versions: null };
+let chooseAnswer: { restarted?: boolean; error?: string } = { error: "unset" };
+const chosen: string[] = [];
 
 provideAppHostUi({
     confirmDialog: {
@@ -54,6 +65,9 @@ beforeEach(() => {
     confirmCalls.length = 0;
     readAnswer = { error: "unset" };
     updateAnswer = { error: "unset" };
+    versionsAnswer = { versions: null };
+    chooseAnswer = { error: "unset" };
+    chosen.length = 0;
 });
 
 afterEach(() => cleanup());
@@ -191,6 +205,108 @@ describe("a loader still following the newest release", () => {
             )
         ).toBeTruthy();
         expect(screen.queryByRole("button", { name: /Update loader/ })).toBeNull();
+    });
+});
+
+describe("choosing the loader version from the repository's list", () => {
+    const held: LoaderPinView = {
+        pin: { state: "held", loader: "NeoForge", key: "NEOFORGE_VERSION", version: "21.4.158" },
+        updating: false
+    };
+
+    it("switches to the version picked, after a confirm that warns about players", async () => {
+        readAnswer = { view: held };
+        versionsAnswer = {
+            versions: {
+                loader: "NeoForge",
+                minecraft: "1.21.4",
+                versions: ["21.4.158", "21.4.150", "21.4.9-beta"]
+            }
+        };
+        chooseAnswer = { restarted: true };
+        const user = userEvent.setup();
+        await act(async () => {
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={2}
+                    running={true}
+                />
+            );
+        });
+
+        const trigger = await screen.findByRole("button", { name: "Version" });
+        expect(trigger.textContent).toContain("21.4.158");
+        await act(async () => {
+            await user.click(trigger);
+        });
+        await act(async () => {
+            await user.type(await screen.findByPlaceholderText("Search versions"), "150");
+        });
+        await act(async () => {
+            await user.click(screen.getByRole("menuitem", { name: "21.4.150" }));
+        });
+
+        expect(confirmCalls).toHaveLength(1);
+        expect(confirmCalls[0]?.title).toBe("Switch to NeoForge 21.4.150?");
+        expect(confirmCalls[0]?.description).toContain(
+            "2 players are connected and will be disconnected"
+        );
+        expect(confirmCalls[0]?.confirmLabel).toBe("Switch and restart");
+        expect(chosen).toEqual(["21.4.150"]);
+        expect(
+            await screen.findByText("The server is restarting with NeoForge 21.4.150.")
+        ).toBeTruthy();
+    });
+
+    it("changes nothing when the operator backs out", async () => {
+        readAnswer = { view: held };
+        versionsAnswer = {
+            versions: {
+                loader: "NeoForge",
+                minecraft: "1.21.4",
+                versions: ["21.4.158", "21.4.150"]
+            }
+        };
+        confirmAnswer = false;
+        const user = userEvent.setup();
+        await act(async () => {
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={false}
+                />
+            );
+        });
+        await act(async () => {
+            await user.click(await screen.findByRole("button", { name: "Version" }));
+        });
+        await act(async () => {
+            await user.click(await screen.findByRole("menuitem", { name: "21.4.150" }));
+        });
+        expect(confirmCalls[0]?.confirmLabel).toBe("Switch version");
+        expect(chosen).toEqual([]);
+    });
+
+    it("says the repository could not be reached instead of an empty list", async () => {
+        readAnswer = { view: held };
+        versionsAnswer = { versions: { loader: "NeoForge", minecraft: "1.21.4", versions: [] } };
+        await act(async () => {
+            render(
+                <MinecraftLoader
+                    installedAppId={INSTALLED_APP_ID}
+                    playersOnline={0}
+                    running={true}
+                />
+            );
+        });
+        expect(
+            await screen.findByText(
+                "Could not reach the NeoForge repository, so there is no list of versions right now."
+            )
+        ).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Version" })).toBeNull();
     });
 });
 

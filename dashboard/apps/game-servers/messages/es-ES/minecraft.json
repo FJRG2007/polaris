@@ -276,7 +276,9 @@
         "couldNotPinTheLoader": "No se pudo fijar la versión instalada",
         "loaderNotHeld": "El cargador de este servidor no está fijado",
         "couldNotUpdateTheLoader": "No se pudo actualizar el cargador",
-        "couldNotReadTheLoader": "No se pudo leer el cargador"
+        "couldNotReadTheLoader": "No se pudo leer el cargador",
+        "loaderVersionUnknown": "Esa versión no está en la lista del cargador para esta versión de Minecraft",
+        "noLoaderToChoose": "Este servidor no tiene una versión de cargador que elegir"
     },
     "world": {
         "world": "Mundo",
@@ -1043,6 +1045,9 @@
         "readFailed": "No se pudo leer el servidor",
         "loginUpdateReason": "Polaris login nuevo",
         "loginUpdateDetail": "Este servidor usa una versión anterior. Instala la nueva al reiniciar; las contraseñas se conservan.",
+        "modsWaitForARestart": "Mods cambiados, falta reiniciar",
+        "modsChangedReason": "Mods cambiados",
+        "modsChangedDetail": "Los mods añadidos o quitados desde que arrancó el servidor se instalan o se retiran al reiniciar.",
         "settingsMoved": "Los ajustes antiguos se movieron junto al mundo y el servidor está arrancando.",
         "nothingToMove": "No quedaba nada que mover. El servidor está arrancando.",
         "worldSaved": "Mundo guardado",
@@ -1172,6 +1177,7 @@
         "removeNamed": "Quitar {name}",
         "oneLine": "Una línea instala los mods de este servidor en su juego, y volver a ejecutarla es como se actualizan: sustituye lo que cambió y quita lo que salió de las listas. Un mod suyo que sea otra copia de uno de aquí, o que no pueda funcionar junto a uno de aquí, se mueve a una carpeta mods-polaris-removed; lo demás suyo no se toca. El enlace no necesita cuenta aquí.",
         "oneLineCount": "Una línea instala los {count} mods de este servidor en su juego, y volver a ejecutarla es como se actualizan: sustituye lo que cambió y quita lo que salió de las listas. Un mod suyo que sea otra copia de uno de aquí, o que no pueda funcionar junto a uno de aquí, se mueve a una carpeta mods-polaris-removed; lo demás suyo no se toca. El enlace no necesita cuenta aquí.",
+        "ownProfile": "Los mods van a un perfil del launcher propio de este servidor, así quien juega en varios servidores nunca mezcla sus mods; una mezcla es lo que hace que un jugador sea rechazado como cliente incompatible. Los jugadores instalan antes el cargador de mods del servidor; la línea lo avisa si falta.",
         "commandFor": "el comando de {system}"
     },
     "appearance": {
@@ -2602,7 +2608,18 @@
         "updateAndRestart": "Actualizar y reiniciar",
         "updateOnly": "Actualizar",
         "updateQueued": "El último {loader} se instala la próxima vez que arranque el servidor.",
-        "updateStarted": "El servidor se está reiniciando con el último {loader}."
+        "updateStarted": "El servidor se está reiniciando con el último {loader}.",
+        "chooseVersion": "Versión",
+        "searchVersions": "Buscar versiones",
+        "noVersionMatches": "Ninguna versión coincide.",
+        "newest": "Más nueva",
+        "versionsUnavailable": "No se pudo contactar con el repositorio de {loader}, así que ahora mismo no hay lista de versiones.",
+        "chooseTitle": "¿Cambiar a {loader} {version}?",
+        "chooseBody": "El servidor descarga {loader} {version} de su repositorio en el próximo arranque. Los mods hechos para otra versión pueden no cargar con ella.",
+        "switchAndRestart": "Cambiar y reiniciar",
+        "switchOnly": "Cambiar versión",
+        "chosenStarted": "El servidor se está reiniciando con {loader} {version}.",
+        "chosenQueued": "{loader} {version} se instala la próxima vez que arranque el servidor."
     },
     "disconnect": {
         "refused": "Rechazado",

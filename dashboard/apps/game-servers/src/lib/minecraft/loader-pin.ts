@@ -65,7 +65,7 @@ type EnvReader = (key: string) => string;
 /** A version string as it may go into a variable: what the loaders publish, and
  *  nothing a shell or a control character could make more of. The manifest is a
  *  file inside the container, so it is not trusted to be what it claims. */
-const VERSION_SHAPE = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/;
+export const VERSION_SHAPE = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/;
 
 function versionIn(value: unknown): string | null {
     return typeof value === "string" && VERSION_SHAPE.test(value) ? value : null;
@@ -306,6 +306,38 @@ export function loaderReleasedBy(current: EnvReader, next: EnvReader): string[] 
     const held = loaderValue(spec, next);
     if (held !== loaderValue(spec, current) || isMoving(held, spec.moving)) return [];
     return unpinVars(next);
+}
+
+/**
+ * Where a server is choosing its loader version from: the loader and the exact
+ * release it runs. Null when there is nothing to choose - not a loader this
+ * holds, one of somebody's own, or a release that is itself "newest", for which
+ * no list of loader versions means anything.
+ */
+export function loaderChoiceOf(
+    env: EnvReader
+): { readonly type: PinnableType; readonly loader: string; readonly minecraft: string } | null {
+    const state = loaderPinState(env);
+    if (state.state !== "held" && state.state !== "following") return null;
+    if (!isExactRelease(env("VERSION"))) return null;
+    const spec = loaderSpecOf(env("TYPE"));
+    return spec ? { type: spec.type, loader: spec.name, minecraft: env("VERSION").trim() } : null;
+}
+
+/**
+ * The variables that hold the server at a version somebody chose.
+ *
+ * Written into the main spelling, and the older spellings emptied, so the image
+ * cannot read a stale one first. Null for a value that is not a version - the
+ * caller has already checked it against the repository's own list.
+ */
+export function chosenLoaderVars(env: EnvReader, version: string): Record<string, string> | null {
+    const spec = loaderSpecOf(env("TYPE"));
+    const value = version.trim();
+    if (!spec || !VERSION_SHAPE.test(value) || isMoving(value, spec.moving)) return null;
+    const vars: Record<string, string> = { [spec.key]: value };
+    for (const key of spec.legacyKeys) if (env(key).trim().length > 0) vars[key] = "";
+    return vars;
 }
 
 /** An env reader over a plain record. */

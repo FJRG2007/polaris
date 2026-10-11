@@ -194,6 +194,14 @@ export async function blueprintVersionsAction(
     return { versions: offered, latest: offered[0] ?? null, pinned: versions.length > 0 };
 }
 
+/** Minecraft's releases, newest first, for the version field of a server that
+ *  already exists. Empty when they could not be read, which the field answers
+ *  by letting the release be typed instead. */
+export async function minecraftReleasesAction(): Promise<string[]> {
+    await requirePermission("games.read");
+    return releaseVersions().catch(() => []);
+}
+
 /** Create a server. Returns its installed-app id so the page can open it. */
 export async function createGameServerAction(
     input: CreateGameServerInput & { templateId?: string }
