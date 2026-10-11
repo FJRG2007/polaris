@@ -662,16 +662,9 @@ const SNOW: Template = {
         entrances: ["panel", "painting"]
     },
     draw(c) {
-        // Drifts of powder snow, which looks like the floor round it: step on
-        // one and you sink - into nothing, or, on one of them, down into a
-        // hollow under the floor. Its way out is a panel of the floor.
-        for (const [u, v] of [
-            [4, 4],
-            [9, 4],
-            [4, 9]
-        ] as const)
-            c.set("minecraft:powder_snow", u, 0, v);
-        c.set("minecraft:powder_snow", 9, 0, 9);
+        // A hollow under the snow, in and out through a panel of the floor.
+        // Never powder snow: a player who sinks into it is held there, slowed
+        // and freezing, and in a match that reads as stuck in the floor.
         c.clear(8, -2, 8, 10, -1, 10);
         c.set("minecraft:sea_lantern", 10, -3, 10);
         c.floorPanel(10, 8, "west", { u: 9, level: -2, v: 8, facing: "south" }, -2);

@@ -187,6 +187,19 @@ describe("hide and seek's manor", () => {
         expect(shown.some((house) => house.shown.length > 0)).toBe(true);
     });
 
+    it("never lays powder snow, which holds whoever sinks into it", () => {
+        let snowRooms = 0;
+        for (let seed = 0; seed < 40; seed += 1) {
+            const house = manor.manorFor(`snow-${seed}`, 4, model.NEWEST);
+            const snow = house.rooms.filter((room) => room.template === "snow");
+            snowRooms += snow.length;
+            expect(manor.manorBlocks(house)).not.toContain("minecraft:powder_snow");
+            // Its hollow under the floor is still somewhere to hide, through its panel.
+            if (snow.length > 0) expect(manor.manorProblems(house)).toEqual([]);
+        }
+        expect(snowRooms).toBeGreaterThan(0);
+    });
+
     it("keeps lava away from anything that burns, and never sends a seeker out of it", () => {
         const house = Array.from({ length: 30 }, (_, seed) =>
             manor.manorFor(`lava-${seed}`, 3, model.NEWEST)
