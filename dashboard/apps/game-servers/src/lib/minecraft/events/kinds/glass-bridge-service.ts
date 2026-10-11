@@ -174,11 +174,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             continue;
         }
         if (glass.onFinish(layout, at)) {
-            const from =
-                options.mode === "turns"
-                    ? (state.turnAt ?? run.readyAt ?? now)
-                    : (run.readyAt ?? now);
-            const seconds = Math.max(0, (now - from) / 1000);
+            const seconds = Math.max(0, (now - (run.readyAt ?? now)) / 1000);
             const key =
                 Object.keys(state.reached).find((one) => lower(one) === lower(name)) ?? name;
             state.reached[key] = { rows: layout.steps, at: now };

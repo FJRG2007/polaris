@@ -12,7 +12,7 @@ const { bad: BAD, good: GOOD, warn: WARN, info: INFO, reason: REASON } = PALETTE
 export const ALL_DONE = "Everybody has crossed or fallen";
 
 export function goTitle(language: Language): string {
-    return language === "es" ? "&bPuente de cristal" : "&bGlass bridge";
+    return language === "es" ? "&bPuente frágil" : "&bGlass bridge";
 }
 
 export function goSubtitle(language: Language): string {
@@ -120,14 +120,14 @@ export function finishedBar(language: Language): string {
 
 export function bar(left: number, crossedCount: number, language: Language): string {
     return language === "es"
-        ? `Puente de cristal - quedan ${left}, han cruzado ${crossedCount}`
+        ? `Puente frágil - quedan ${left}, han cruzado ${crossedCount}`
         : `Glass bridge - ${left} left, ${crossedCount} across`;
 }
 
 export function winner(name: string, crossedIt: boolean, language: Language): string {
     if (crossedIt)
         return language === "es"
-            ? `${GOOD}${mark(name, GOOD)} es el primero en cruzar el puente de cristal.`
+            ? `${GOOD}${mark(name, GOOD)} es el primero en cruzar el puente frágil.`
             : `${GOOD}${mark(name, GOOD)} was the first across the glass bridge.`;
     return language === "es"
         ? `${GOOD}Nadie lo ha cruzado; ${mark(name, GOOD)} es quien más lejos ha llegado.`

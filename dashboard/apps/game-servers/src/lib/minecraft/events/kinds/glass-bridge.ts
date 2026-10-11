@@ -27,7 +27,7 @@
 
 import { z } from "zod";
 import type { Box } from "../state";
-import type { Spot } from "./arena";
+import { within, type Spot } from "./arena";
 import type { Fill } from "./arena-game";
 import { seeded, shuffled } from "../trivia-bank";
 
@@ -212,25 +212,36 @@ export function breakingPanels(layout: Layout, seed: string): Panel[] {
     );
 }
 
-/** The ground (or glass) under somebody's feet: in that box's footprint and
- *  standing on it, or a hop over it. */
-function standingOn(box: Box, at: { x: number; y: number; z: number }): boolean {
+/** Half a player's width: how far their feet reach past where they are. */
+const HALF_WIDTH = 0.3;
+/** How high over a platform a jump in place goes. */
+const JUMP = 3;
+
+/** The ground (or glass) under somebody's feet: in that box's footprint, `edge`
+ *  blocks past it on every side, and standing on it or up to `height` over it. */
+function standingOn(
+    box: Box,
+    at: { x: number; y: number; z: number },
+    edge = 0,
+    height = 2
+): boolean {
     return (
-        at.x >= box.x1 &&
-        at.x < box.x2 + 1 &&
-        at.z >= box.z1 &&
-        at.z < box.z2 + 1 &&
+        at.x >= box.x1 - edge &&
+        at.x < box.x2 + 1 + edge &&
+        at.z >= box.z1 - edge &&
+        at.z < box.z2 + 1 + edge &&
         at.y >= box.y1 + 0.9 &&
-        at.y < box.y1 + 2
+        at.y < box.y1 + height
     );
 }
 
-/** Whether somebody stands on the start platform, or on the finish one. */
+/** Whether somebody stands on the start platform, or on the finish one, or
+ *  jumps in place over it. */
 export function onStart(layout: Layout, at: { x: number; y: number; z: number }): boolean {
-    return standingOn(layout.start, at);
+    return standingOn(layout.start, at, 0, JUMP);
 }
 export function onFinish(layout: Layout, at: { x: number; y: number; z: number }): boolean {
-    return standingOn(layout.finish, at);
+    return standingOn(layout.finish, at, 0, JUMP);
 }
 
 /** Fallen: under the glass, whether through it or off a side. */
@@ -267,13 +278,16 @@ export function rowsReached(
     return null;
 }
 
-/** The panel that breaks under somebody standing here, or null. */
+/** The panel that breaks under somebody standing here, or null: any of their
+ *  feet over it, as the pack sees it. */
 export function breakingUnder(
     layout: Layout,
     seed: string,
     at: { x: number; y: number; z: number }
 ): Panel | null {
-    return breakingPanels(layout, seed).find((panel) => standingOn(panel.box, at)) ?? null;
+    return (
+        breakingPanels(layout, seed).find((panel) => standingOn(panel.box, at, HALF_WIDTH)) ?? null
+    );
 }
 
 /**
@@ -412,7 +426,7 @@ export const stateSchema = z.object({
     /** When the walker on the bridge last reached a new row (or their turn
      *  began): standing still past `turnSeconds` puts them out. */
     movedAt: z.number().nullable().default(null),
-    /** When the current walker's turn began, for how long they took. */
+    /** When the current walker's turn began. */
     turnAt: z.number().nullable().default(null),
     /** The furthest each player has got, in rows, and when they got there. */
     reached: z.record(z.string(), z.object({ rows: z.number().int(), at: z.number() })).default({}),
@@ -527,7 +541,7 @@ export const WALKER_TAG = "pe_gb_walk";
 export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     tick: [`execute if score #on ${OBJECTIVE} matches 1 run function polaris:glass/run`],
     run: [
-        `execute as @e[type=minecraft:armor_stand,tag=${FAKE_TAG}] at @s if entity @a[tag=${WALKER_TAG},dx=${PANEL - 1},dy=0,dz=${PANEL - 1}] run function polaris:glass/shatter`
+        `execute as @e[type=minecraft:armor_stand,tag=${FAKE_TAG}] at @s positioned ~-0.5 ~ ~-0.5 if entity @a[tag=${WALKER_TAG},dx=${PANEL - 1},dy=0,dz=${PANEL - 1}] run function polaris:glass/shatter`
     ],
     shatter: [
         `fill ~ ~-1 ~ ~${PANEL - 1} ~-1 ~${PANEL - 1} minecraft:air replace ${GLASS}`,
@@ -536,11 +550,6 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         "kill @s"
     ]
 };
-
-/** Inside the box, as a selector's volume. */
-function within(box: Box): string {
-    return `x=${box.x1},y=${box.y1},z=${box.z1},dx=${box.x2 - box.x1},dy=${box.y2 - box.y1},dz=${box.z2 - box.z1}`;
-}
 
 /** The markers in the box, gone. */
 function markersOut(box: Box): string {

@@ -136,6 +136,12 @@ describe("the bridge", () => {
                 true
             );
         }
+        // A jump in place on a platform is still on it.
+        for (const platform of [layout.start, layout.finish]) {
+            const jumping = { ...standing(platform), y: platform.y1 + 2.25 };
+            expect(glass.onStart(layout, jumping)).toBe(platform === layout.start);
+            expect(glass.onFinish(layout, jumping)).toBe(platform === layout.finish);
+        }
     });
 
     it("breaks only the panel that breaks, under somebody standing on it", () => {
@@ -145,6 +151,19 @@ describe("the bridge", () => {
             const weak = glass.panelOf(layout, row, glass.safeLane("run-1", row) === 0 ? 1 : 0);
             expect(glass.breakingUnder(layout, "run-1", standing(safe.box))).toBeNull();
             expect(glass.breakingUnder(layout, "run-1", standing(weak.box))).toEqual(weak);
+            // Feet on its west or north lip, the middle over the gap: it breaks.
+            expect(
+                glass.breakingUnder(layout, "run-1", {
+                    ...standing(weak.box),
+                    x: weak.box.x1 - 0.2
+                })
+            ).toEqual(weak);
+            expect(
+                glass.breakingUnder(layout, "run-1", {
+                    ...standing(weak.box),
+                    z: weak.box.z1 - 0.2
+                })
+            ).toEqual(weak);
             // Falling through it, not standing on it.
             expect(
                 glass.breakingUnder(layout, "run-1", { ...standing(weak.box), y: layout.y - 3 })
@@ -222,6 +241,8 @@ describe("the data pack", () => {
         ]);
         // Only a walker breaks glass, over the whole panel and nowhere else.
         expect(glass.FUNCTIONS.run![0]).toContain(`@a[tag=${glass.WALKER_TAG},dx=2,dy=0,dz=2]`);
+        // The stand stands in its corner block's middle: checked from the corner.
+        expect(glass.FUNCTIONS.run![0]).toContain("at @s positioned ~-0.5 ~ ~-0.5 if entity");
         expect(glass.FUNCTIONS.shatter![0]).toBe(
             "fill ~ ~-1 ~ ~2 ~-1 ~2 minecraft:air replace minecraft:glass"
         );
@@ -287,6 +308,12 @@ function runOf(mode: "free" | "turns", players: readonly string[], steps = 6) {
         arena: { box, blocks: [...glass.BRIDGE_BLOCKS] }
     });
 }
+
+const order = (run: stored.EventRun) =>
+    glass.orderFor(
+        run.id,
+        run.entrants.map((one) => one.name)
+    );
 
 /** A context whose server answers only where everybody is. */
 function contextFor(run: stored.EventRun) {
@@ -407,6 +434,49 @@ describe("a glass bridge played", () => {
         expect(state.turn).toBe(1);
         expect(lines.join("\n")).toContain(`title ${second} title`);
         expect(glass.walkers(state, "turns", ["Ana", "Ben", "Cy"])).toEqual([second]);
+    });
+
+    it("in turns, ranks whoever crossed first above a quicker later walker", async () => {
+        const run = runOf("turns", ["Ana", "Ben"]);
+        const layout = glass.layoutOf(run.arena!.box, 6);
+        const world = contextFor(run);
+        const [first, second] = glass.orderFor(run.id, ["Ana", "Ben"]) as [string, string];
+        const lines: string[] = [];
+        world.place({ [first]: standing(layout.finish), [second]: standing(layout.start) });
+        world.at(40_000);
+        await game.tick(world.ctx, lines);
+        world.place({ [first]: standing(layout.finish), [second]: standing(layout.finish) });
+        world.at(45_000);
+        await game.tick(world.ctx, lines);
+        const state = glass.stateOf(world.run.game)!;
+        expect(state.finished.map((one) => [one.name, one.seconds])).toEqual([
+            [first, 40],
+            [second, 45]
+        ]);
+        expect(game.resultLines(world.run, "en", new Set()).join("")).toContain(first);
+        // Waiting on the start, a jump in place is not pulled back.
+        const waiting = runOf("turns", ["Ana", "Ben"]);
+        const waitWorld = contextFor(waiting);
+        const waiter = glass.orderFor(waiting.id, ["Ana", "Ben"])[1]!;
+        const side = waiting.entrants.find((one) => one.name === waiter)!.side;
+        const spot = glass.startSpot(layout, side);
+        const jumpLines: string[] = [];
+        waitWorld.place({
+            [order(waiting)[0]!]: standing(layout.start),
+            [waiter]: { x: spot.x + 0.5, y: spot.y + 1.2, z: spot.z + 0.5 }
+        });
+        waitWorld.at(1_000);
+        await game.tick(waitWorld.ctx, jumpLines);
+        expect(jumpLines).not.toContain(arena.moveTo(waiter, spot));
+    });
+
+    it("in turns, lasts long enough for every walker's whole turn", () => {
+        const preset = runOf("turns", ["Ana"], 12).preset;
+        expect(catalog.playSeconds(preset, 1)).toBe(preset.minutes * 60);
+        expect(catalog.playSeconds(preset, 24)).toBe(24 * 12 * 10);
+        expect(catalog.playSeconds(runOf("free", ["Ana"], 12).preset, 24)).toBe(
+            preset.minutes * 60
+        );
     });
 
     it("takes its markers and switch away at the end, whatever the box", () => {

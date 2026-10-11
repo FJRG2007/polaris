@@ -2261,8 +2261,9 @@ export function readyToPlay(run: {
 /**
  * How long a run is played once it starts, in seconds, for `players` who
  * joined (0 before anybody has: the smallest house). Hide and seek is the time
- * to hide and then the time to seek; build battle the build and the vote;
- * everything else its minutes.
+ * to hide and then the time to seek; build battle the build and the vote; a
+ * glass bridge in turns at least every walker's whole turn; everything else
+ * its minutes.
  */
 export function playSeconds(preset: EventPreset, players = 0): number {
     if (preset.kind === "hide-and-seek") {
@@ -2276,6 +2277,11 @@ export function playSeconds(preset: EventPreset, players = 0): number {
     if (preset.kind === "build-battle") {
         const options = preset.options as EventOptions<"build-battle">;
         return preset.minutes * 60 + options.voteSeconds;
+    }
+    if (preset.kind === "glass-bridge") {
+        const options = preset.options as EventOptions<"glass-bridge">;
+        if (options.mode === "turns")
+            return Math.max(preset.minutes * 60, players * options.steps * options.turnSeconds);
     }
     return preset.minutes * 60;
 }
