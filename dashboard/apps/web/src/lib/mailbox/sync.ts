@@ -38,6 +38,7 @@ import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
+import { confirmedGone, missingFromWindow } from "./folder-window";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
@@ -53,6 +54,10 @@ import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imap
  *  a working inbox and about eight screens of scrolling; past it the answer is
  *  the search box, which asks the server. */
 const WINDOW = 400;
+
+/** Uids per folder that a pass read and chose not to store - Polaris' own draft
+ *  copies - so the window refill does not fetch them again on every pass. */
+const unstored = new Map<string, Set<number>>();
 
 /** A folder with no role and nobody subscribed to it is not synced: an IMAP
  *  account has dozens, and syncing all of them is why other clients take an hour
@@ -336,6 +341,7 @@ async function syncFolder(
             folder.uidValidity !== null && folder.uidValidity !== BigInt(mailbox.uidValidity);
         if (validityMoved) {
             await prisma.mailMessage.deleteMany({ where: { folderId: folder.id } });
+            unstored.delete(folder.id);
         }
 
         const known = validityMoved ? null : folder.uidNext;
@@ -353,6 +359,7 @@ async function syncFolder(
         if (!validityMoved) {
             await reconcileFlags(client, folder, mailbox.highestModseq ?? null);
             await reconcileDeletions(client, folder);
+            await refillWindow(client, account, folder, mailbox.exists, extraHeaders);
         }
 
         await prisma.mailFolder.update({
@@ -501,12 +508,16 @@ async function storeMessages(
     client: ImapFlow,
     account: AccountRow,
     folder: FolderRow,
-    fetched: readonly Fetched[]
+    fetched: readonly Fetched[],
+    /** False for mail put back into the window (`refillWindow`): it is not
+     *  arriving, so no rule, junk filter or away reply may act on it. */
+    arrivals = true
 ): Promise<void> {
     const snippets = await fetchSnippets(client, fetched);
     /** What the junk filter said to file, gathered rather than acted on one at a
      *  time: filing opens a connection, and this function is already inside one. */
     const judged: string[] = [];
+    let stored = 0;
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -534,7 +545,13 @@ async function storeMessages(
         // The draft itself is already here, in the Drafts screen; filed as a
         // message it would join the conversation it answers and show up there
         // as if it had been sent.
-        if (core.isPolarisDraftMessageId(shape.messageId)) continue;
+        if (core.isPolarisDraftMessageId(shape.messageId)) {
+            const skipped = unstored.get(folder.id) ?? new Set<number>();
+            skipped.add(message.uid);
+            unstored.set(folder.id, skipped);
+            continue;
+        }
+        stored += 1;
 
         const threadId = await threadFor(account.id, shape);
         const snippet = core.snippetFrom(snippets.get(message.uid) ?? "");
@@ -619,7 +636,7 @@ async function storeMessages(
         // a folder resynced from scratch must not re-file a year of mail or
         // re-count everybody in it.
         const isNew = row.createdAt.getTime() === row.updatedAt.getTime();
-        if (isNew) {
+        if (isNew && arrivals) {
             await rememberContacts(account.id, folder.role, { from, to, cc });
             // What this sender says about getting off their list, noted as the
             // mail arrives. Not for the folders holding what this person wrote:
@@ -656,6 +673,8 @@ async function storeMessages(
             }
         }
     }
+
+    if (stored === 0) return;
 
     // One connection for the whole page, after the loop rather than inside it.
     await fileJudgedJunk(account.userId, judged);
@@ -1277,9 +1296,69 @@ async function reconcileDeletions(client: ImapFlow, folder: FolderRow): Promise<
     }
     if (present === false) return;
     const alive = new Set(present);
-    const gone = held.filter((row) => !alive.has(Number(row.uid))).map((row) => row.id);
+    const candidates = held.filter((row) => !alive.has(Number(row.uid)));
+    if (candidates.length === 0) return;
+
+    // A second opinion before anything is dropped: a fetch of exactly those
+    // uids, a different command from the search. A search answered short would
+    // otherwise empty the cache, and a dropped row is behind the cursor - no
+    // later pass fetches it again.
+    const stillThere = new Set<number>();
+    try {
+        const uids = candidates.map((row) => Number(row.uid)).join(",");
+        for await (const message of client.fetch(uids, { uid: true }, { uid: true })) {
+            stillThere.add(message.uid);
+        }
+    } catch {
+        return;
+    }
+    const gone = confirmedGone(candidates, stillThere).map((row) => row.id);
     if (gone.length === 0) return;
     await prisma.mailMessage.deleteMany({ where: { id: { in: gone } } });
+}
+
+/**
+ * Put back what the newest window is missing.
+ *
+ * A row lost by mistake is behind the cursor, so nothing else ever fetches it
+ * again: this is what brings it back, and what repairs a cache that lost rows
+ * before this existed. One uid list of the window per pass, numbers only like
+ * the search `reconcileDeletions` runs, because a count of the folder cannot see
+ * a gap in its newest rows once older ones are held too. What it fetches is old
+ * mail, not arrivals, so it is stored without rules, the junk filter or an away
+ * reply.
+ */
+async function refillWindow(
+    client: ImapFlow,
+    account: AccountRow,
+    folder: FolderRow,
+    exists: number,
+    extraHeaders: readonly string[]
+): Promise<void> {
+    if (exists === 0) return;
+    const from = Math.max(1, exists - WINDOW + 1);
+    const listed: number[] = [];
+    try {
+        for await (const message of client.fetch(`${from}:${exists}`, { uid: true })) {
+            listed.push(message.uid);
+        }
+    } catch {
+        return;
+    }
+    if (listed.length === 0) return;
+    const lowest = listed.reduce((low, uid) => (uid < low ? uid : low), listed[0] ?? 0);
+    const held = await prisma.mailMessage.findMany({
+        where: { folderId: folder.id, uid: { gte: BigInt(lowest) } },
+        select: { uid: true }
+    });
+    const listedSet = new Set(listed);
+    const skipped = [...(unstored.get(folder.id) ?? [])].filter((uid) => listedSet.has(uid));
+    unstored.set(folder.id, new Set(skipped));
+    const known = new Set([...held.map((row) => Number(row.uid)), ...skipped]);
+    const missing = missingFromWindow(listed, known, WINDOW);
+    if (missing.length === 0) return;
+    const fetched = await collect(client, missing.join(","), { uid: true }, extraHeaders);
+    if (fetched.length > 0) await storeMessages(client, account, folder, fetched, false);
 }
 
 /**

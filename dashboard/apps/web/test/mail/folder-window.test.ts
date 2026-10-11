@@ -1,0 +1,74 @@
+/**
+ * A folder's cached window stays whole.
+ *
+ * An inbox of three thousand messages showed two: rows dropped by mistake are
+ * behind the sync cursor and were never fetched again. A pass now needs two
+ * commands to agree before it drops a row, and puts back whatever the newest
+ * window is missing - as old mail, never as arrivals.
+ */
+
+import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+import { confirmedGone, missingFromWindow } from "@/lib/mailbox/folder-window";
+
+const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
+const sync = readFile(`${SRC}lib/mailbox/sync.ts`, "utf8");
+
+describe("dropping a row", () => {
+    const rows = [{ uid: 10n }, { uid: 11n }, { uid: 12n }];
+
+    it("drops only what the second command did not find either", () => {
+        expect(confirmedGone(rows, new Set([10, 12]))).toEqual([{ uid: 11n }]);
+    });
+
+    it("drops nothing when the fetch still finds every one", () => {
+        expect(confirmedGone(rows, new Set([10, 11, 12]))).toEqual([]);
+    });
+
+    it("asks the server a second time before deleting", async () => {
+        const source = await sync;
+        const reconcile = source.slice(source.indexOf("async function reconcileDeletions"));
+        const body = reconcile.slice(0, reconcile.indexOf("\n}\n"));
+        expect(body.indexOf("client.fetch(")).toBeGreaterThan(-1);
+        expect(body.indexOf("client.fetch(")).toBeLessThan(body.indexOf("deleteMany"));
+    });
+});
+
+describe("the newest window", () => {
+    it("lists what is not held, newest first", () => {
+        expect(missingFromWindow([5, 9, 7, 8], new Set([9, 5]), 400)).toEqual([8, 7]);
+    });
+
+    it("looks no further back than the window", () => {
+        expect(missingFromWindow([1, 2, 3, 4], new Set([4]), 2)).toEqual([3]);
+    });
+
+    it("finds nothing missing in a whole window", () => {
+        expect(missingFromWindow([1, 2], new Set([1, 2]), 400)).toEqual([]);
+    });
+
+    it("is refilled on every pass, and as old mail rather than arrivals", async () => {
+        const source = await sync;
+        expect(source).toContain(
+            "await refillWindow(client, account, folder, mailbox.exists, extraHeaders);"
+        );
+        expect(source).toContain("await storeMessages(client, account, folder, fetched, false);");
+        expect(source).toContain("if (isNew && arrivals) {");
+    });
+
+    it("lists the window instead of trusting a count of the whole folder", async () => {
+        const source = await sync;
+        const refill = source.slice(source.indexOf("async function refillWindow"));
+        const body = refill.slice(0, refill.indexOf("\n}\n"));
+        expect(body).not.toContain("mailMessage.count(");
+    });
+
+    it("does not fetch Polaris' own draft copies again on every pass", async () => {
+        const source = await sync;
+        const refill = source.slice(source.indexOf("async function refillWindow"));
+        const body = refill.slice(0, refill.indexOf("\n}\n"));
+        expect(body).toContain("unstored.get(folder.id)");
+        expect(source).toContain("if (stored === 0) return;");
+    });
+});

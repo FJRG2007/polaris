@@ -614,6 +614,9 @@ if ($own) {
                 $created = $now
                 $existing = $data.profiles.PSObject.Properties["${profile.key}"]
                 if ($existing -and $existing.Value.created) { $created = $existing.Value.created }
+                # PowerShell 7 reads an ISO string back as a DateTime, which
+                # ConvertTo-Json would write with its trailing zeros dropped.
+                if ($created -is [DateTime]) { $created = $created.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }
                 $entry = [pscustomobject]@{
                     name = $name
                     type = "custom"
