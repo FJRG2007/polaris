@@ -101,6 +101,15 @@ describe("the menu", () => {
         expect(handlers.onRun).not.toHaveBeenCalled();
     });
 
+    it("leaves Enter doing nothing while the server cannot take it", async () => {
+        const user = userEvent.setup();
+        const handlers = renderMenu(false);
+        await user.click(screen.getByRole("button", { name: /Kept commands/ }));
+        await user.type(await screen.findByPlaceholderText("Search kept commands"), "night{Enter}");
+        expect(handlers.onRun).not.toHaveBeenCalled();
+        expect(screen.queryByRole("menuitem", { name: "Edit" })).toBeNull();
+    });
+
     it("offers the rest under each one by the keyboard, with the command cut to a line", async () => {
         const user = userEvent.setup();
         const handlers = renderMenu();

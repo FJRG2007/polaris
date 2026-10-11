@@ -1133,7 +1133,8 @@
             "twice": "{name} está dos veces",
             "unused": "{name} no está en el comando. Úsala o quítala.",
             "whichPlayer": "Elige para quién se ejecuta",
-            "nobodyOn": "No hay nadie conectado"
+            "nobodyOn": "No hay nadie conectado",
+            "nobodyOnType": "No hay nadie conectado. Escribe un nombre en la búsqueda para elegir a otro."
         },
         "types": {
             "text": "Texto",
@@ -1215,6 +1216,7 @@
         "choose": "Elige un jugador",
         "search": "Buscar jugadores",
         "noMatch": "Ningún jugador conectado coincide.",
-        "more": "{count} más. Escribe para acotar la lista."
+        "more": "{count} más. Escribe para acotar la lista.",
+        "useTyped": "Usar «{name}»"
     }
 }

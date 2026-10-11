@@ -23,6 +23,7 @@ export function PlayerPicker({
     placeholder,
     className,
     id,
+    allowTyped,
     "aria-label": ariaLabel
 }: {
     /** Who can be picked, in the order they are listed. */
@@ -32,6 +33,9 @@ export function PlayerPicker({
     placeholder?: string;
     className?: string;
     id?: string;
+    /** Whether a name typed into the search can be chosen when nobody online
+     *  has it, for what is done to a player who is not on. */
+    allowTyped?: boolean;
     "aria-label"?: string;
 }) {
     const t = useGameText("games");
@@ -57,6 +61,7 @@ export function PlayerPicker({
             emptyText={t("playerPicker.noMatch")}
             limit={PLAYER_PICKER_LIMIT}
             moreText={(hidden) => t("playerPicker.more", { count: hidden })}
+            typedText={allowTyped ? (name) => t("playerPicker.useTyped", { name }) : undefined}
             className={className}
         />
     );

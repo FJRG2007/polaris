@@ -136,4 +136,29 @@ describe("a list too long to draw", () => {
         ]);
         expect(screen.queryByText(/more$/)).toBeNull();
     });
+
+    it("offers what was typed when no option is it, and only then", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(
+            <SearchableSelect
+                aria-label="Player"
+                value=""
+                onValueChange={onChange}
+                options={[{ value: "Steve", label: "Steve" }]}
+                searchPlaceholder="Search players"
+                emptyText="Nobody matches."
+                typedText={(typed) => `Use "${typed}"`}
+            />
+        );
+        await user.click(screen.getByRole("button", { name: "Player" }));
+        const search = await screen.findByPlaceholderText("Search players");
+        await user.type(search, "steve");
+        expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Steve"]);
+
+        await user.clear(search);
+        await user.type(search, " Alex {Enter}");
+        expect(onChange).toHaveBeenCalledWith("Alex");
+        expect(screen.queryByText("Nobody matches.")).toBeNull();
+    });
 });

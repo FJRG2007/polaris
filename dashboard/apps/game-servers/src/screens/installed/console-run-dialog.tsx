@@ -256,10 +256,11 @@ export function RunCommandDialog({
                                         players={players}
                                         value={player}
                                         onValueChange={setPlayer}
+                                        allowTyped
                                     />
                                     {players.length === 0 && player.length === 0 && (
                                         <span className="text-xs text-muted-foreground">
-                                            {t("consoleVars.errors.nobodyOn")}
+                                            {t("consoleVars.errors.nobodyOnType")}
                                         </span>
                                     )}
                                     {playerProblem && (
@@ -290,7 +291,7 @@ export function RunCommandDialog({
                         const set = (value: string) =>
                             setValues((current) => ({ ...current, [declared.name]: value }));
                         // A player is picked from who is on, the same way as the
-                        // player a per-player command is run for.
+                        // player a per-player command is run for, or typed.
                         return declared.type === "player" ? (
                             <div key={declared.name} className="flex min-w-0 flex-col gap-1">
                                 {caption}
@@ -299,6 +300,7 @@ export function RunCommandDialog({
                                     players={players}
                                     value={values[declared.name] ?? ""}
                                     onValueChange={set}
+                                    allowTyped
                                 />
                                 {problem}
                             </div>

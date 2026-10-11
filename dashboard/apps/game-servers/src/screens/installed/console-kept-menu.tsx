@@ -83,6 +83,7 @@ export function KeptCommandsMenu({
                     value={query}
                     onChange={setQuery}
                     placeholder={t("console.searchKept")}
+                    onSubmit={canRun ? undefined : () => undefined}
                     className="sticky -top-1 z-10 -mx-1 -mt-1 bg-elevated px-3 pt-2"
                 />
                 {!canRun && (

@@ -1133,7 +1133,8 @@
             "twice": "{name} is there twice",
             "unused": "{name} is not in the command. Use it or remove it.",
             "whichPlayer": "Choose who to run it for",
-            "nobodyOn": "Nobody is online to run it for"
+            "nobodyOn": "Nobody is online to run it for",
+            "nobodyOnType": "Nobody is online. Type a name in the search to choose someone else."
         },
         "types": {
             "text": "Text",
@@ -1215,6 +1216,7 @@
         "choose": "Choose a player",
         "search": "Search players",
         "noMatch": "No player online matches that.",
-        "more": "{count} more. Type to narrow the list."
+        "more": "{count} more. Type to narrow the list.",
+        "useTyped": "Use \"{name}\""
     }
 }
