@@ -27,6 +27,9 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.food.FoodData;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.CraftingContainer;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.storage.LevelResource;
@@ -36,9 +39,17 @@ import net.neoforged.neoforge.attachment.AttachmentType;
  * A player's things kept safe through an event, inside the server.
  *
  * {@code polaris stash save} takes every stack in the 41 slots (hotbar, bag,
- * armour, offhand - never the ender chest, never the event's own kit), their
- * experience, health, hunger and effects, writes them to a file of their own and
- * only then empties the slots and the experience - all in one tick, so nothing
+ * armour, offhand - never the ender chest, never the event's own kit), and
+ * every one a player could otherwise carry in out of sight of them: the stack
+ * held on the cursor, what lies in a crafting grid (their own, or a table's
+ * left open), and the trash slot a mod adds to the inventory screen
+ * ({@link #TRASH}) - each kept as a loose stack ({@link #LOOSE}) that comes back
+ * into any free slot, or at their feet as theirs. Once all that is taken an
+ * open screen is closed: what one gives back on closing (an anvil's, a
+ * grindstone's) lands in their emptied slots, where the dashboard's next look
+ * stashes it under the next key. With their experience, health, hunger and
+ * effects it is all written to a file of their own, and only then are the
+ * slots and the experience emptied - all in one tick, so nothing
  * can be picked up or dropped halfway. {@code polaris stash restore} gives it
  * all back in one tick: each stack into the slot it came from, whatever the
  * player holds there now moved to a free slot, and what fits nowhere dropped at
@@ -62,6 +73,17 @@ import net.neoforged.neoforge.attachment.AttachmentType;
 final class EventStash {
     /** The slots kept, in the game's own numbering (as the dashboard's `SLOTS`). */
     private static final int[] SLOTS = slots();
+    /** A stack kept from no slot of the 41 - the cursor, a crafting grid, the
+     *  trash slot - given back wherever there is room. */
+    static final int LOOSE = -1000;
+    /**
+     * Where the trash slot mod keeps its one stack on a player: its library's
+     * data under NeoForge's persisted player data, as an item stack's own tag
+     * (empty for none). The mod empties it itself on every login.
+     */
+    private static final String PERSISTED = "PlayerPersisted";
+    private static final String TRASH_OWNER = "BalmData";
+    static final String TRASH = "TrashSlot";
     /** A key is a file name and an NBT path segment: no dots, no slashes. */
     private static final Pattern KEY = Pattern.compile("[A-Za-z0-9_-]{1,64}");
 
@@ -116,6 +138,16 @@ final class EventStash {
         HolderLookup.Provider registries = server.registryAccess();
         Inventory inventory = player.getInventory();
         ListTag items = new ListTag();
+        // Out of sight first: the cursor, every crafting grid and the trash slot.
+        List<Runnable> emptied = new ArrayList<>();
+        loose(player.containerMenu.getCarried(), registries, items, emptied, () -> player.containerMenu.setCarried(ItemStack.EMPTY));
+        grids(player.inventoryMenu, registries, items, emptied);
+        if (player.containerMenu != player.inventoryMenu) grids(player.containerMenu, registries, items, emptied);
+        CompoundTag trash = trashOf(player);
+        if (trash != null) {
+            ItemStack trashed = ItemStack.parseOptional(registries, trash.getCompound(TRASH));
+            loose(trashed, registries, items, emptied, () -> trash.put(TRASH, new CompoundTag()));
+        }
         List<Integer> taken = new ArrayList<>();
         for (int slot : SLOTS) {
             ItemStack stack = get(inventory, slot);
@@ -146,13 +178,16 @@ final class EventStash {
             return refuse(reply, "unsaved");
         }
         // Written: only now is anything taken.
+        for (Runnable empty : emptied) empty.run();
         for (int slot : taken) set(inventory, slot, ItemStack.EMPTY);
+        if (player.containerMenu != player.inventoryMenu) player.closeContainer();
         player.setExperienceLevels(0);
         player.setExperiencePoints(0);
         CompoundTag next = mark.copy();
         next.putBoolean(key, true);
         player.setData(marks, next);
         player.inventoryMenu.broadcastChanges();
+        player.containerMenu.broadcastChanges();
         reply.addProperty("ok", true);
         reply.addProperty("already", false);
         describe(reply, kept);
@@ -205,6 +240,10 @@ final class EventStash {
                 continue;
             }
             int slot = entry.getInt("slot");
+            if (slot == LOOSE) {
+                displaced.add(stack.get());
+                continue;
+            }
             ItemStack now = get(inventory, slot);
             if (!now.isEmpty()) displaced.add(now);
             set(inventory, slot, stack.get());
@@ -277,6 +316,34 @@ final class EventStash {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** A stack kept loose, and how to empty where it came from once written. */
+    private static void loose(ItemStack stack, HolderLookup.Provider registries, ListTag items, List<Runnable> emptied, Runnable empty) {
+        if (stack.isEmpty() || isKit(stack)) return;
+        CompoundTag entry = new CompoundTag();
+        entry.putInt("slot", LOOSE);
+        entry.put("item", stack.save(registries));
+        items.add(entry);
+        emptied.add(empty);
+    }
+
+    /** Every stack lying in a menu's crafting grid, kept loose. */
+    private static void grids(AbstractContainerMenu menu, HolderLookup.Provider registries, ListTag items, List<Runnable> emptied) {
+        for (Slot slot : menu.slots) {
+            if (!(slot.container instanceof CraftingContainer)) continue;
+            loose(slot.getItem(), registries, items, emptied, () -> slot.set(ItemStack.EMPTY));
+        }
+    }
+
+    /** The trash slot mod's data on a player, or null where it keeps none. */
+    static CompoundTag trashOf(ServerPlayer player) {
+        CompoundTag data = player.getPersistentData();
+        if (!data.contains(PERSISTED, Tag.TAG_COMPOUND)) return null;
+        CompoundTag persisted = data.getCompound(PERSISTED);
+        if (!persisted.contains(TRASH_OWNER, Tag.TAG_COMPOUND)) return null;
+        CompoundTag owner = persisted.getCompound(TRASH_OWNER);
+        return owner.contains(TRASH, Tag.TAG_COMPOUND) ? owner : null;
+    }
 
     static boolean isKit(ItemStack stack) {
         CustomData data = stack.get(DataComponents.CUSTOM_DATA);

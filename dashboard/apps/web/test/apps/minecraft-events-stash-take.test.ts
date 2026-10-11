@@ -59,6 +59,8 @@ let said: string[] = [];
 /** Run after each batch of lines: what the player does meanwhile. */
 let meanwhile: (() => void) | null = null;
 let online = true;
+/** What a trash slot mod holds for Ana, as NeoForge keeps it; null for nothing. */
+let trash: string | null = null;
 
 const SLOT_NAMES: Record<string, number> = {
     "armor.feet": 100,
@@ -100,6 +102,10 @@ async function say(argv: readonly string[]): Promise<string> {
         bag.delete(slotOf(replace[1]!));
         return "Replaced a slot";
     }
+    if (line === "data get entity Ana NeoForgeData.PlayerPersisted.BalmData.TrashSlot.id")
+        return trash
+            ? `Ana has the following entity data: "${trash}"`
+            : "Found no elements matching NeoForgeData.PlayerPersisted.BalmData.TrashSlot.id";
     const xp = /^xp set Ana (\d+) levels$/.exec(line);
     if (xp) levels = Number(xp[1]);
     return "";
@@ -131,6 +137,7 @@ beforeEach(() => {
     said = [];
     meanwhile = null;
     online = true;
+    trash = null;
 });
 
 describe("putting away what somebody carries", () => {
@@ -221,5 +228,26 @@ describe("putting away what somebody carries", () => {
         expect(rows.size).toBe(1);
         expect(kept.kept.map((one) => one.slot).sort((a, b) => a - b)).toEqual([9, 102]);
         expect(bag.size).toBe(0);
+    });
+});
+
+describe("a trash slot nobody can see from a command", () => {
+    it("keeps out whoever has something in it, taking nothing, and names it", async () => {
+        bag.set(0, { id: "minecraft:iron_sword", count: 1, data: null });
+        trash = "minecraft:diamond_block";
+        const result = await stashIn(server, owner, "Ana", async () => undefined);
+        expect(result.refused).toEqual({ why: "trash", items: ["minecraft:diamond_block"] });
+        expect(bag.get(0)?.id).toBe("minecraft:iron_sword");
+        expect(said.some((line) => line.startsWith("item replace"))).toBe(false);
+    });
+
+    it("lets them in once it is empty", async () => {
+        bag.set(0, { id: "minecraft:iron_sword", count: 1, data: null });
+        const result = await stashIn(server, owner, "Ana", async () => undefined);
+        expect(result.refused).toBeNull();
+        expect(bag.size).toBe(0);
+        expect(said).toContain(
+            "data get entity Ana NeoForgeData.PlayerPersisted.BalmData.TrashSlot.id"
+        );
     });
 });

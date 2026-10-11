@@ -241,3 +241,21 @@ describe("keeping a player's things", () => {
         ]);
     });
 });
+
+describe("the trash slot a mod adds to the inventory screen", () => {
+    it("is read where each loader keeps it, and named by its item", () => {
+        expect(stash.readTrash("Ana")).toEqual([
+            "data get entity Ana NeoForgeData.PlayerPersisted.BalmData.TrashSlot.id",
+            "data get entity Ana ForgeData.PlayerPersisted.BalmData.TrashSlot.id",
+            "data get entity Ana BalmData.TrashSlot.id"
+        ]);
+        expect(
+            stash.trashedIn('Ana has the following entity data: "minecraft:diamond_block"')
+        ).toBe("minecraft:diamond_block");
+        expect(
+            stash.trashedIn("Found no elements matching NeoForgeData.PlayerPersisted.BalmData")
+        ).toBeNull();
+        expect(stash.trashedIn('Ana has the following entity data: "minecraft:air"')).toBeNull();
+        expect(stash.trashedIn("Unknown command")).toBeNull();
+    });
+});

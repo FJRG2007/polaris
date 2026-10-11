@@ -42,6 +42,7 @@ import type { InventoryItem } from "../../inventory";
 import { itemArgument, replaceSlot } from "../../item-argument";
 import { readInt, splitTopLevel, topLevelColon, unquote } from "../../snbt";
 import { COMMAND_BYTES_MAX, commandBytes } from "../../command-size";
+import { stripFormatting } from "../../parse";
 
 const pointSchema = z.object({ x: z.number().int(), y: z.number().int(), z: z.number().int() });
 
@@ -207,6 +208,34 @@ export function sameStack(
 export function emptySlot(name: string, slot: number): string | null {
     const named = replaceSlot(slot);
     return named ? `item replace entity ${name} ${named} with minecraft:air` : null;
+}
+
+// ------------------------------------------------------------------ trash slot
+
+/**
+ * Where a trash slot mod keeps the one stack in the slot it adds to the
+ * inventory screen: its library's data on the player, under NeoForge's or
+ * Forge's persisted player data, or at the top on Fabric. No command can empty
+ * it, so on the plain path a player with something in it is kept out until
+ * they empty it; the Polaris mod takes it with the rest (`EventStash.java`).
+ */
+export const TRASH_PATHS = [
+    "NeoForgeData.PlayerPersisted.BalmData.TrashSlot.id",
+    "ForgeData.PlayerPersisted.BalmData.TrashSlot.id",
+    "BalmData.TrashSlot.id"
+] as const;
+
+export function readTrash(name: string): string[] {
+    return TRASH_PATHS.map((path) => `data get entity ${name} ${path}`);
+}
+
+/** The item in the trash slot, from one of `readTrash`'s answers; null for
+ *  none (an empty slot has no id, and a server without the mod no such data). */
+export function trashedIn(output: string): string | null {
+    const match = /has the following entity data: "([a-z0-9_.-]+:[a-z0-9_./-]+)"/.exec(
+        stripFormatting(output)
+    );
+    return match && match[1] !== "minecraft:air" ? match[1]! : null;
 }
 
 // ------------------------------------------------------------------ experience
