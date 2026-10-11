@@ -1370,6 +1370,8 @@
         "dismiss": "Ocultar",
         "notAllowed": "Solo quien gestiona el sistema puede hacer esto.",
         "unknownServer": "Ese servidor no es uno en el que Polaris despliegue.",
-        "unreachable": "Polaris no pudo conectar con ese servidor. Comprueba que está encendido y vuelve a intentarlo."
+        "unreachable": "Polaris no pudo conectar con ese servidor. Comprueba que está encendido y vuelve a intentarlo.",
+        "move": "Mover datos",
+        "moveHint": "Mueve los datos de un servicio a un NAS u otra ubicación."
     }
 }

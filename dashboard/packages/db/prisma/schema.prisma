@@ -12850,3 +12850,47 @@ model CrmView {
 
     @@unique([shelf, object, name])
 }
+
+// A service volume being moved from one storage location to another (this
+// server, a NAS). Worked by the storage-moves job: the app is stopped, the files
+// copied and checked, the volume pointed at the copy and the app started again.
+// The original is only emptied once somebody confirms it. No foreign keys: the
+// row outlives a volume or app removed mid-move, and says what happened to it.
+model StorageMove {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    volumeId      String    @db.Uuid
+    applicationId String    @db.Uuid
+    // The owner of the app's project: mounts and deploys are resolved as them.
+    ownerId       String    @db.Uuid
+    // Who pressed the button.
+    actorId       String?   @db.Uuid
+    // queued | stopping | copying | switching | starting | moved | cleaning |
+    // finished | rolling-back | failed - see lib/storage-moves/plan.ts.
+    state         String    @default("queued")
+    // JSON placement the volume had before ({ kind, source, connectionId }).
+    origin        String
+    // JSON placement it is moved to.
+    destination   String
+    // What the screen calls each end, fixed when the move was started.
+    originLabel   String
+    targetLabel   String
+    // Whether the app was meant to be running, so a rollback leaves it as found.
+    wasRunning    Boolean?
+    // Whether the volume row already points at the copy.
+    switched      Boolean   @default(false)
+    totalBytes    BigInt?
+    copiedBytes   BigInt?
+    fileCount     Int?
+    error         String?
+    // Whether the original's files were removed (true) or kept (false) at the end.
+    originRemoved Boolean?
+    leaseUntil    DateTime?
+    // Which worker holds the lease: only it may renew, release or advance it.
+    leaseToken    String?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+    finishedAt    DateTime?
+
+    @@index([state])
+    @@index([volumeId])
+}

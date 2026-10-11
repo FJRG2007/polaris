@@ -1822,6 +1822,26 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_PLATFORM_GROUP
         },
         {
+            label: "Storage locations", // i18n-ignore
+            href: "/admin/storage",
+            adminOnly: true,
+            icon: HardDrive,
+            keywords: [
+                "storage",
+                "nas",
+                "smb",
+                "nfs",
+                "cifs",
+                "share",
+                "disk",
+                "volumes",
+                "move",
+                "space",
+                "full"
+            ],
+            group: ADMIN_PLATFORM_GROUP
+        },
+        {
             label: "Keeping records", // i18n-ignore
             href: "/admin/retention",
             adminOnly: true,
