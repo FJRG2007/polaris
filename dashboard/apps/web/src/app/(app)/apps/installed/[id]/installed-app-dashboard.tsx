@@ -214,7 +214,9 @@ export function InstalledAppDashboard({
                         {duplicate &&
                             (duplicate.allowed ? (
                                 <Button asChild size="sm" variant="secondary">
-                                    <Link href={`/apps/games?duplicate=${encodeURIComponent(app.id)}`}>
+                                    <Link
+                                        href={`/apps/games?duplicate=${encodeURIComponent(app.id)}`}
+                                    >
                                         <CopyPlus className="size-4" /> {t("duplicate")}
                                     </Link>
                                 </Button>

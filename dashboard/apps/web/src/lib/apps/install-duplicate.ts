@@ -86,7 +86,14 @@ export async function readInstallCopySource(
 ): Promise<InstallCopySource> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
-        select: { id: true, name: true, catalogId: true, ownerId: true, config: true, applicationId: true }
+        select: {
+            id: true,
+            name: true,
+            catalogId: true,
+            ownerId: true,
+            config: true,
+            applicationId: true
+        }
     });
     if (!install?.applicationId) throw new InstallCopyRefusal("not-found");
     const app = await prisma.application.findUnique({
@@ -130,7 +137,11 @@ export interface InstallCopyInput {
     readonly ports: {
         readonly hostPort?: number;
         readonly hostProtocol?: "tcp" | "udp";
-        readonly extraPorts?: readonly { host: number; container: number; protocol?: "tcp" | "udp" }[];
+        readonly extraPorts?: readonly {
+            host: number;
+            container: number;
+            protocol?: "tcp" | "udp";
+        }[];
     };
     /** The new install's config, whole. */
     readonly config: Record<string, unknown>;
@@ -210,7 +221,9 @@ export async function createInstallCopy(
                 kind,
                 // A bind or a share gets a folder of its own, generated from the
                 // copy's name; the source's path would be the same files.
-                ...(kind === "nas" && volume.connectionId ? { connectionId: volume.connectionId } : {}),
+                ...(kind === "nas" && volume.connectionId
+                    ? { connectionId: volume.connectionId }
+                    : {}),
                 ...(volume.sizeLimit ? { sizeLimit: volume.sizeLimit } : {})
             });
         }
@@ -273,7 +286,11 @@ export async function discardInstallCopy(ownerId: string, installedAppId: string
     publishAccessChange();
 }
 
-async function discardCopy(ownerId: string, installedAppId: string, applicationId: string | null): Promise<void> {
+async function discardCopy(
+    ownerId: string,
+    installedAppId: string,
+    applicationId: string | null
+): Promise<void> {
     await prisma.installedApp.deleteMany({ where: { id: installedAppId } }).catch(() => undefined);
     await prisma.resourceGrant
         .deleteMany({ where: { resourceKind: "install", resourceId: installedAppId } })
@@ -330,7 +347,12 @@ async function copyGrants(fromId: string, toId: string, actorId: string): Promis
  * copy of them too. Its copies are the source's and stay there - the new one
  * starts with none, and is due on the plan's next turn.
  */
-async function copyProtection(ownerId: string, fromId: string, toId: string, name: string): Promise<void> {
+async function copyProtection(
+    ownerId: string,
+    fromId: string,
+    toId: string,
+    name: string
+): Promise<void> {
     const rows = await prisma.protectedResource.findMany({
         where: { ownerId, selector: { endsWith: `:${fromId}` } },
         take: 20
@@ -385,7 +407,8 @@ export async function measureInstallData(
 ): Promise<InstallDataFigures | null> {
     const key = `${ownerId}:${installedAppId}`;
     const now = Date.now();
-    for (const [entry, kept] of measured) if (now - kept.at > MEASURE_KEEP_MS) measured.delete(entry);
+    for (const [entry, kept] of measured)
+        if (now - kept.at > MEASURE_KEEP_MS) measured.delete(entry);
     const kept = measured.get(key);
     if (kept) return kept.figures;
     const figures = measureNow(ownerId, installedAppId);
@@ -395,13 +418,19 @@ export async function measureInstallData(
     return settled;
 }
 
-async function measureNow(ownerId: string, installedAppId: string): Promise<InstallDataFigures | null> {
+async function measureNow(
+    ownerId: string,
+    installedAppId: string
+): Promise<InstallDataFigures | null> {
     const app = await installApplication(ownerId, installedAppId).catch(() => null);
     if (!app?.currentDeploymentId || app.volumes.length === 0) return null;
     const ports = await getPorts(app.target as TargetRow, ownerId);
     try {
         const container = (await currentReleaseRef(app)).name;
-        if (parseContainerState(await ports.inspect(container).catch(() => null)).status !== "running")
+        if (
+            parseContainerState(await ports.inspect(container).catch(() => null)).status !==
+            "running"
+        )
             return null;
         let used = 0;
         let free = Number.POSITIVE_INFINITY;
@@ -413,7 +442,8 @@ async function measureNow(ownerId: string, installedAppId: string): Promise<Inst
                 `if command -v timeout >/dev/null 2>&1; then limit="timeout ${MEASURE_LIMIT_S}"; else limit=""; fi; u=$($limit du -sk ${path} | awk '{print $1}'); f=$(df -Pk ${path} | awk 'NR==2 {print $4}'); [ -n "$u" ] && [ -n "$f" ] && echo "$u $f"`
             ]);
             const [usedKb, freeKb] = said.output.trim().split(/\s+/).map(Number);
-            if (said.code !== 0 || !Number.isFinite(usedKb) || !Number.isFinite(freeKb)) return null;
+            if (said.code !== 0 || !Number.isFinite(usedKb) || !Number.isFinite(freeKb))
+                return null;
             used += (usedKb ?? 0) * 1024;
             free = Math.min(free, (freeKb ?? 0) * 1024);
         }
@@ -504,7 +534,9 @@ export async function copyInstallData(
     const copy = await installApplication(ownerId, copyInstalledAppId);
     if (!source.currentDeploymentId) throw new InstallCopyRefusal("never-deployed");
     if (source.targetId !== copy.targetId) throw new InstallCopyRefusal("copy-failed");
-    await holdWhileCopying([source.id, copy.id], () => copyVolumes(ownerId, source, copy, onProgress));
+    await holdWhileCopying([source.id, copy.id], () =>
+        copyVolumes(ownerId, source, copy, onProgress)
+    );
 }
 
 /** The copy itself, with both services held so nothing starts either meanwhile. */
@@ -530,7 +562,13 @@ async function copyVolumes(
             return { from: mountedSource(volume, inspect), into };
         });
         if (pairs.length === 0) return;
-        const spec = copySpec(project, `polaris-copy-${shortHash(copy.id, 8)}`, image, pairs, copyScript(pairs.length));
+        const spec = copySpec(
+            project,
+            `polaris-copy-${shortHash(copy.id, 8)}`,
+            image,
+            pairs,
+            copyScript(pairs.length)
+        );
         const task = spec.services[0]!.name;
 
         await ports.composeDown(spec.project).catch(() => undefined);
@@ -569,7 +607,8 @@ async function waitForCopy(
         if (Date.now() > deadline) throw new InstallCopyRefusal("timed-out");
         const landed = await ports.runIn(task, ["du", "-sk", TO_ROOT]).catch(() => null);
         const copiedKb = landed?.code === 0 ? Number(landed.output.trim().split(/\s+/)[0]) : NaN;
-        if (Number.isFinite(copiedKb)) await onProgress({ copiedBytes: copiedKb * 1024, totalBytes: total });
+        if (Number.isFinite(copiedKb))
+            await onProgress({ copiedBytes: copiedKb * 1024, totalBytes: total });
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
     }
 }
@@ -583,18 +622,28 @@ async function lastWords(ports: RuntimePorts, container: string): Promise<string
     return Buffer.concat(parts).toString("utf8").trim();
 }
 
-type VolumeRow = { kind: string; name: string; source: string | null; mountPath: string; connectionId: string | null };
+type VolumeRow = {
+    kind: string;
+    name: string;
+    source: string | null;
+    mountPath: string;
+    connectionId: string | null;
+};
 
 /** The compose project the copy's own deploy runs under, which names its volumes. */
-function copyProject(app: { id: string; slug: string; environment: { project: { slug: string } } }): string {
+function copyProject(app: {
+    id: string;
+    slug: string;
+    environment: { project: { slug: string } };
+}): string {
     return serviceRef(app.environment.project.slug, app.slug, app.id).project;
 }
 
 /** Where a source volume's data actually is, as a mount for another container. */
 function mountedSource(volume: VolumeRow, inspect: unknown): ComposeSpecVolume {
-    if (volume.kind === "nas")
-        return { kind: "nas", source: nasSource(volume), target: "" };
-    if (volume.kind === "bind") return { kind: "bind", source: volume.source ?? volume.name, target: "" };
+    if (volume.kind === "nas") return { kind: "nas", source: nasSource(volume), target: "" };
+    if (volume.kind === "bind")
+        return { kind: "bind", source: volume.source ?? volume.name, target: "" };
     // Read off the container rather than derived: a service that changed over
     // between releases mounts its volume under the project that first made it.
     const name = volumeAt(inspect, volume.mountPath);
@@ -633,7 +682,8 @@ export function copySpec(
     pairs.forEach((pair, index) => {
         volumes.push({ ...pair.from, target: `${FROM_ROOT}/${index}` });
         if (pair.from.kind === "volume") external.push(pair.from.source);
-        const kind = pair.into.kind === "nas" ? "nas" : pair.into.kind === "bind" ? "bind" : "volume";
+        const kind =
+            pair.into.kind === "nas" ? "nas" : pair.into.kind === "bind" ? "bind" : "volume";
         const source = kind === "nas" ? nasSource(pair.into) : (pair.into.source ?? pair.into.name);
         if (kind === "volume") owned.push(source);
         volumes.push({ kind, source, target: `${TO_ROOT}/${index}` });
@@ -665,7 +715,10 @@ export function copySpec(
  * that named them differently would come up on an empty volume of its own and
  * look like a fresh server, which is the one outcome worse than a failure.
  */
-export async function verifyInstallCopy(ownerId: string, copyInstalledAppId: string): Promise<void> {
+export async function verifyInstallCopy(
+    ownerId: string,
+    copyInstalledAppId: string
+): Promise<void> {
     const copy = await installApplication(ownerId, copyInstalledAppId);
     if (!copy.currentDeploymentId) throw new InstallCopyRefusal("copy-failed");
     const ports = await getPorts(copy.target as TargetRow, ownerId);
@@ -675,7 +728,8 @@ export async function verifyInstallCopy(ownerId: string, copyInstalledAppId: str
         for (const volume of copy.volumes) {
             if (volume.kind !== "volume") continue;
             const expected = `${project}_${volume.source ?? volume.name}`;
-            if (volumeAt(inspect, volume.mountPath) !== expected) throw new InstallCopyRefusal("wrong-volume");
+            if (volumeAt(inspect, volume.mountPath) !== expected)
+                throw new InstallCopyRefusal("wrong-volume");
         }
     } finally {
         await ports.dispose();

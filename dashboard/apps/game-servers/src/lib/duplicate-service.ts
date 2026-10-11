@@ -68,7 +68,10 @@ export async function startDuplicate(
     raw: plan.DuplicateServerInput
 ): Promise<{ installedAppId: string }> {
     const parsed = plan.duplicateServerSchema.safeParse(raw);
-    if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? gameMessage("games", "duplicate.nameRequired"));
+    if (!parsed.success)
+        throw new Error(
+            parsed.error.issues[0]?.message ?? gameMessage("games", "duplicate.nameRequired")
+        );
     const { installedAppId: sourceId, name } = parsed.data;
     return claimSource(sourceId, () => recordDuplicate(ownerId, actorId, sourceId, name));
 }
@@ -83,14 +86,20 @@ async function recordDuplicate(
     if (!source || !gameServerCatalogIds().includes(source.catalogId))
         throw new Error(gameMessage("games", "lib.noSuchServer"));
     if (!source.deployed) throw new Error(gameMessage("games", "duplicate.failure.neverDeployed"));
-    if ((await heldByCopies()).has(sourceId)) throw new Error(gameMessage("games", "duplicate.alreadyCopying"));
+    if ((await heldByCopies()).has(sourceId))
+        throw new Error(gameMessage("games", "duplicate.alreadyCopying"));
 
     const siblings = await prisma.installedApp.findMany({
         where: { ownerId, status: { not: "removed" }, catalogId: { in: gameServerCatalogIds() } },
         select: { name: true },
         take: 1000
     });
-    if (plan.nameTaken(name, siblings.map((row) => row.name)))
+    if (
+        plan.nameTaken(
+            name,
+            siblings.map((row) => row.name)
+        )
+    )
         throw new Error(gameMessage("games", "duplicate.nameTaken", { name }));
 
     // Asked of the running server before anything exists, so a copy that cannot
@@ -149,9 +158,11 @@ async function recordDuplicate(
     try {
         await copyGameRows(sourceId, copyId, substitutions);
     } catch (error) {
-        await duplicates.discardInstallCopy(ownerId, copyId).catch((discardError: unknown) =>
-            console.error(`games: duplicate ${copyId} could not be taken back:`, discardError)
-        );
+        await duplicates
+            .discardInstallCopy(ownerId, copyId)
+            .catch((discardError: unknown) =>
+                console.error(`games: duplicate ${copyId} could not be taken back:`, discardError)
+            );
         throw error;
     }
     return { installedAppId: copyId };
@@ -162,7 +173,11 @@ async function recordDuplicate(
  * copy. Never throws - every outcome is written onto the copy for the list to
  * show, and the source is started again whatever happened to the copy.
  */
-export async function runDuplicate(ownerId: string, actorId: string | null, copyId: string): Promise<void> {
+export async function runDuplicate(
+    ownerId: string,
+    actorId: string | null,
+    copyId: string
+): Promise<void> {
     await copyThrough(ownerId, actorId, copyId).catch(async (error: unknown) => {
         console.error(`games: duplicate ${copyId} failed:`, error);
         await markFailed(copyId, "copyFailed").catch(() => undefined);
@@ -181,12 +196,20 @@ async function copyThrough(ownerId: string, actorId: string | null, copyId: stri
         select: { id: true, applicationId: true }
     });
 
-    let state: DuplicateState = { ...begun, stage: "preparing", failure: null, needBytes: null, freeBytes: null };
+    let state: DuplicateState = {
+        ...begun,
+        stage: "preparing",
+        failure: null,
+        needBytes: null,
+        freeBytes: null
+    };
     const write = async (patch: Partial<DuplicateState>): Promise<void> => {
         state = { ...state, ...patch };
         await patchInstallConfig(copyId, { [plan.DUPLICATE_KEY]: state }).catch(() => undefined);
     };
-    await prisma.installedApp.update({ where: { id: copyId }, data: { status: "installing" } }).catch(() => undefined);
+    await prisma.installedApp
+        .update({ where: { id: copyId }, data: { status: "installing" } })
+        .catch(() => undefined);
     await write({});
 
     if (!source?.applicationId) {
@@ -249,7 +272,11 @@ async function copyThrough(ownerId: string, actorId: string | null, copyId: stri
                 })
                 .catch(() => undefined);
     } catch (error) {
-        const refusal = error as { name?: unknown; code?: unknown; detail?: { needBytes?: number; freeBytes?: number } };
+        const refusal = error as {
+            name?: unknown;
+            code?: unknown;
+            detail?: { needBytes?: number; freeBytes?: number };
+        };
         if (refusal.name === "InstallCopyRefusal" && typeof refusal.code === "string") {
             await fail(copyId, write, plan.failureFor(refusal.code), refusal.detail);
             return;
@@ -309,7 +336,11 @@ export async function claimRetry(ownerId: string, copyId: string): Promise<boole
         });
         if (claimed.count !== 1) return false;
         await patchInstallConfig(copyId, {
-            [plan.DUPLICATE_KEY]: { ...state, stage: "preparing", failure: null } satisfies DuplicateState
+            [plan.DUPLICATE_KEY]: {
+                ...state,
+                stage: "preparing",
+                failure: null
+            } satisfies DuplicateState
         });
         return true;
     });
@@ -327,7 +358,11 @@ async function claimSource<T>(sourceId: string, work: () => Promise<T>): Promise
 }
 
 /** Write a copy as failed from outside its run, from what its config says. */
-async function markFailed(copyId: string, failure: DuplicateFailure, known?: DuplicateState): Promise<void> {
+async function markFailed(
+    copyId: string,
+    failure: DuplicateFailure,
+    known?: DuplicateState
+): Promise<void> {
     const row = known
         ? null
         : await prisma.installedApp.findUnique({ where: { id: copyId }, select: { config: true } });
@@ -337,7 +372,9 @@ async function markFailed(copyId: string, failure: DuplicateFailure, known?: Dup
             [plan.DUPLICATE_KEY]: { ...state, stage: "failed", failure } satisfies DuplicateState
         }).catch(() => undefined);
     }
-    await prisma.installedApp.update({ where: { id: copyId }, data: { status: "failed" } }).catch(() => undefined);
+    await prisma.installedApp
+        .update({ where: { id: copyId }, data: { status: "failed" } })
+        .catch(() => undefined);
 }
 
 async function fail(
@@ -352,26 +389,39 @@ async function fail(
         needBytes: detail.needBytes ?? null,
         freeBytes: detail.freeBytes ?? null
     });
-    await prisma.installedApp.update({ where: { id: copyId }, data: { status: "failed" } }).catch(() => undefined);
+    await prisma.installedApp
+        .update({ where: { id: copyId }, data: { status: "failed" } })
+        .catch(() => undefined);
 }
 
 /** Start the source again, logged rather than thrown: the copy's outcome is
  *  reported on the copy, and this must not replace it. */
-async function restartSource(ownerId: string, applicationId: string, actorId: string | null): Promise<void> {
+async function restartSource(
+    ownerId: string,
+    applicationId: string,
+    actorId: string | null
+): Promise<void> {
     await setApplicationRunning(applicationId, ownerId, true, actorId).catch((error: unknown) =>
         console.error(`games: could not start ${applicationId} again after copying it:`, error)
     );
 }
 
 /** The copy is up: its own address, and the record says it is done. */
-async function finish(ownerId: string, copyId: string, catalogId: string, name: string): Promise<void> {
+async function finish(
+    ownerId: string,
+    copyId: string,
+    catalogId: string,
+    name: string
+): Promise<void> {
     const game = gameOfServer(catalogId);
     const definition = game ? findGame(game.id) : undefined;
     await setGameHostname(ownerId, copyId, {
         name,
         srv: catalogId === "minecraft",
         ...(definition ? { gameLabel: definition.domainLabel } : {})
-    }).catch((error: unknown) => console.error(`games: duplicate ${copyId} has no address:`, error));
+    }).catch((error: unknown) =>
+        console.error(`games: duplicate ${copyId} has no address:`, error)
+    );
     await patchInstallConfig(copyId, { [plan.DUPLICATE_KEY]: null });
     await prisma.installedApp.update({ where: { id: copyId }, data: { status: "running" } });
 }
@@ -382,7 +432,10 @@ async function afterCopy(ownerId: string, copyId: string, catalogId: string): Pr
     // FiveM keeps its console password in a config file the image wrote on the
     // source's first start, so the copied file names the source's. The deploy
     // holds the copy's own; the file is brought in line with it.
-    const app = await prisma.installedApp.findUnique({ where: { id: copyId }, select: { applicationId: true } });
+    const app = await prisma.installedApp.findUnique({
+        where: { id: copyId },
+        select: { applicationId: true }
+    });
     const row = app?.applicationId
         ? await prisma.envVar.findFirst({
               where: { scopeType: "application", scopeId: app.applicationId, key: "RCON_PASSWORD" },
@@ -392,7 +445,10 @@ async function afterCopy(ownerId: string, copyId: string, catalogId: string): Pr
     const password = row ? await host.envVarService.revealEnvVar(row.id, ownerId) : null;
     if (!password) return;
     await adoptConsolePassword(ownerId, copyId, password).catch((error: unknown) =>
-        console.error(`games: duplicate ${copyId} kept the source's console password in its config:`, error)
+        console.error(
+            `games: duplicate ${copyId} kept the source's console password in its config:`,
+            error
+        )
     );
 }
 
@@ -407,7 +463,8 @@ function remintFor(catalogId: string): Record<string, () => string> {
     };
     for (const declared of findApp(catalogId)?.template?.env ?? []) {
         if (declared.generated)
-            remint[declared.key] = () => `${declared.generatedPrefix ?? ""}${randomBytes(24).toString("hex")}`;
+            remint[declared.key] = () =>
+                `${declared.generatedPrefix ?? ""}${randomBytes(24).toString("hex")}`;
     }
     if (catalogId === "fivem") remint.RCON_PASSWORD = mintConsolePassword;
     if (catalogId === "ark") remint.ADMIN_PASSWORD = mintJoinPassword;
@@ -421,14 +478,23 @@ function publishedPorts(sourceConfig: Record<string, unknown>): PublishedPort[] 
     if (typeof sourceConfig.hostPort === "number") {
         out.push({
             host: sourceConfig.hostPort,
-            container: typeof sourceConfig.port === "number" ? sourceConfig.port : sourceConfig.hostPort,
+            container:
+                typeof sourceConfig.port === "number" ? sourceConfig.port : sourceConfig.hostPort,
             protocol: protocolOf(sourceConfig.hostProtocol)
         });
     }
     if (Array.isArray(sourceConfig.extraPorts)) {
-        for (const entry of sourceConfig.extraPorts as { host?: unknown; container?: unknown; protocol?: unknown }[]) {
+        for (const entry of sourceConfig.extraPorts as {
+            host?: unknown;
+            container?: unknown;
+            protocol?: unknown;
+        }[]) {
             if (typeof entry.host === "number" && typeof entry.container === "number")
-                out.push({ host: entry.host, container: entry.container, protocol: protocolOf(entry.protocol) });
+                out.push({
+                    host: entry.host,
+                    container: entry.container,
+                    protocol: protocolOf(entry.protocol)
+                });
         }
     }
     return out;
@@ -532,7 +598,11 @@ async function copyGameRows(
         prisma.gamePlayerAccess.findMany({ where, take: 5000 }),
         prisma.gameRuleSetting.findMany({ where, take: 1000 }),
         prisma.gameSanction.findMany({
-            where: { ...where, liftedAt: null, OR: [{ until: null }, { until: { gt: new Date() } }] },
+            where: {
+                ...where,
+                liftedAt: null,
+                OR: [{ until: null }, { until: { gt: new Date() } }]
+            },
             take: 5000
         }),
         prisma.gamePlayerLink.findMany({ where, take: 5000 }),

@@ -29,7 +29,10 @@ export const duplicateServerSchema = z.object({
             z
                 .string()
                 .min(1, gameMessage("games", "duplicate.nameRequired"))
-                .max(SERVER_NAME_MAX, gameMessage("games", "duplicate.nameTooLong", { max: SERVER_NAME_MAX }))
+                .max(
+                    SERVER_NAME_MAX,
+                    gameMessage("games", "duplicate.nameTooLong", { max: SERVER_NAME_MAX })
+                )
         )
 });
 
@@ -43,7 +46,8 @@ export function normalizeServerName(name: string): string {
 /** Whether a name is already one of these servers', the way a person reads it. */
 export function nameTaken(name: string, taken: Iterable<string>): boolean {
     const wanted = normalizeServerName(name).toLowerCase();
-    for (const existing of taken) if (normalizeServerName(existing).toLowerCase() === wanted) return true;
+    for (const existing of taken)
+        if (normalizeServerName(existing).toLowerCase() === wanted) return true;
     return false;
 }
 
@@ -65,7 +69,9 @@ export function defaultCopyName(
     for (let count = 1; count < 100; count += 1) {
         const numbered = count === 1 ? null : count;
         const room = SERVER_NAME_MAX - word("", numbered).length;
-        const candidate = normalizeServerName(word(base.slice(0, Math.max(1, room)).trim(), numbered));
+        const candidate = normalizeServerName(
+            word(base.slice(0, Math.max(1, room)).trim(), numbered)
+        );
         if (!nameTaken(candidate, names)) return candidate;
     }
     return normalizeServerName(word(base.slice(0, 20), Date.now() % 1000));
@@ -135,7 +141,10 @@ export const DROPPED_CONFIG_KEYS: readonly string[] = [
 ];
 
 /** Swap every occurrence of each `from` for its `to`, in order. */
-export function substitute(value: string, substitutions: readonly (readonly [string, string])[]): string {
+export function substitute(
+    value: string,
+    substitutions: readonly (readonly [string, string])[]
+): string {
     let out = value;
     for (const [from, to] of substitutions) if (from.length > 0) out = out.split(from).join(to);
     return out;
@@ -229,7 +238,9 @@ export interface DuplicateState {
 }
 
 /** A state read back off a config, or null when it is not one. */
-export function readDuplicateState(config: Readonly<Record<string, unknown>>): DuplicateState | null {
+export function readDuplicateState(
+    config: Readonly<Record<string, unknown>>
+): DuplicateState | null {
     const raw = config[DUPLICATE_KEY];
     if (typeof raw !== "object" || raw === null) return null;
     const value = raw as Record<string, unknown>;
@@ -255,7 +266,9 @@ export function readDuplicateState(config: Readonly<Record<string, unknown>>): D
 
 /** Whole percent copied, or null while the size is not known yet. Never 100
  *  before the copy has said it finished. */
-export function copyPercent(state: Pick<DuplicateState, "copiedBytes" | "totalBytes">): number | null {
+export function copyPercent(
+    state: Pick<DuplicateState, "copiedBytes" | "totalBytes">
+): number | null {
     if (state.totalBytes === null) return null;
     if (state.totalBytes === 0) return 99;
     return Math.min(99, Math.floor((state.copiedBytes / state.totalBytes) * 100));

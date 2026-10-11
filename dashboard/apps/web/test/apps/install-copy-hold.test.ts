@@ -8,7 +8,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 
-const { heldForCopy, holdWhileCopying, refuseWhileCopying } = await import("@/lib/apps/install-copy-hold");
+const { heldForCopy, holdWhileCopying, refuseWhileCopying } = await import(
+    "@/lib/apps/install-copy-hold"
+);
 
 describe("the copy hold", () => {
     it("refuses a start while the copy runs, and not after", async () => {
@@ -34,7 +36,10 @@ describe("the copy hold", () => {
 
     it("keeps a service held until every copy holding it is done", async () => {
         let release: () => void = () => undefined;
-        const first = holdWhileCopying(["source"], () => new Promise<void>((resolve) => (release = resolve)));
+        const first = holdWhileCopying(
+            ["source"],
+            () => new Promise<void>((resolve) => (release = resolve))
+        );
         await holdWhileCopying(["source"], async () => undefined);
         expect(heldForCopy("source")).toBe(true);
         release();

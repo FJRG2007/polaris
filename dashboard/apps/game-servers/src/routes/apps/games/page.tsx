@@ -91,7 +91,9 @@ export default async function GameServersPage() {
 }
 
 /** The copy state of each install that carries one, in one read. */
-async function copyStates(ids: readonly string[]): Promise<Map<string, duplicatePlan.DuplicateState>> {
+async function copyStates(
+    ids: readonly string[]
+): Promise<Map<string, duplicatePlan.DuplicateState>> {
     if (ids.length === 0) return new Map();
     const rows = await prisma.installedApp.findMany({
         where: { id: { in: [...ids] }, config: { contains: `"${duplicatePlan.DUPLICATE_KEY}":{` } },

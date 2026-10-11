@@ -189,7 +189,10 @@ export async function sweepGameSchedules(
     let restarted = 0;
     // A copy holding a server is the one thing a schedule must not undo: it would
     // start the world while it is being read.
-    const held = pending.length === 0 ? new Set<string>() : await heldByCopies().catch(() => new Set<string>());
+    const held =
+        pending.length === 0
+            ? new Set<string>()
+            : await heldByCopies().catch(() => new Set<string>());
     for (const { install, config, schedule, waiting } of pending) {
         if (held.has(install.id)) continue;
         const desiredState = desired.get(install.applicationId as string);

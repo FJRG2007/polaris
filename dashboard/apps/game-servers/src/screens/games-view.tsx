@@ -326,7 +326,11 @@ export function GamesView({
 
     function duplicateRefusal(server: list.GameServerSeed): string {
         return server.duplicate && !server.duplicate.allowed
-            ? t(server.duplicate.reason === "cannot-create" ? "duplicate.cannotCreate" : "duplicate.notOwner")
+            ? t(
+                  server.duplicate.reason === "cannot-create"
+                      ? "duplicate.cannotCreate"
+                      : "duplicate.notOwner"
+              )
             : t("duplicate.couldNotStart");
     }
 
@@ -1027,7 +1031,9 @@ function ServerRow({
                     <ContextMenuItem disabled>
                         <CopyPlus className="size-4" /> {t("duplicate.duplicate")}
                         <span className="ml-auto min-w-0 max-w-48 truncate pl-3 text-xs">
-                            {server.copy && !failedCopy ? t("duplicate.stillCopying") : duplicateReason}
+                            {server.copy && !failedCopy
+                                ? t("duplicate.stillCopying")
+                                : duplicateReason}
                         </span>
                     </ContextMenuItem>
                 )}

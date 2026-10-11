@@ -45,7 +45,9 @@ export function DuplicateServerDialog({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const word = (base: string, count: number | null) =>
-        count === null ? t("duplicate.defaultName", { name: base }) : t("duplicate.defaultNameNumbered", { name: base, count });
+        count === null
+            ? t("duplicate.defaultName", { name: base })
+            : t("duplicate.defaultNameNumbered", { name: base, count });
     const [name, setName] = useState(() => plan.defaultCopyName(source.name, knownNames, word));
     const [edited, setEdited] = useState(false);
 
@@ -138,7 +140,8 @@ export function DuplicateServerDialog({
                     <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
                         {setup === null && setupError === null ? (
                             <li className="flex items-center gap-2">
-                                <Loader2 className="size-3.5 animate-spin" /> {t("duplicate.checking")}
+                                <Loader2 className="size-3.5 animate-spin" />{" "}
+                                {t("duplicate.checking")}
                             </li>
                         ) : setup ? (
                             <>
@@ -215,7 +218,10 @@ export function CopyStatus({ copy }: { copy: plan.DuplicateState }) {
                     aria-label={t("duplicate.progress")}
                     className="h-1 w-32 overflow-hidden rounded-full bg-muted"
                 >
-                    <div className="h-full bg-primary transition-[width]" style={{ width: `${percent}%` }} />
+                    <div
+                        className="h-full bg-primary transition-[width]"
+                        style={{ width: `${percent}%` }}
+                    />
                 </div>
             )}
         </div>

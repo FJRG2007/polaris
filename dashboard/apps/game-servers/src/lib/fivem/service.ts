@@ -1163,7 +1163,11 @@ export async function adoptConsolePassword(
     const written = await withFivemServer(ownerId, installedAppId, async (server) => {
         const cfg = await readContainerFile(server.container, SERVER_CFG);
         if (cfg === null) return false;
-        await writeContainerFile(server.container, SERVER_CFG, writeSetting(cfg, RCON_PASSWORD_KEY, password));
+        await writeContainerFile(
+            server.container,
+            SERVER_CFG,
+            writeSetting(cfg, RCON_PASSWORD_KEY, password)
+        );
         return true;
     });
     if (written) await restartServer(ownerId, installedAppId);

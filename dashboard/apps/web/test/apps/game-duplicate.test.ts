@@ -13,7 +13,8 @@ import * as plan from "@polaris-app/game-servers/src/lib/duplicate-plan";
 
 const SOURCE = "0190a0b0-0000-7000-8000-000000000001";
 const COPY = "0190a0b0-0000-7000-8000-000000000002";
-const word = (base: string, count: number | null) => (count === null ? `${base} copy` : `${base} copy ${count}`);
+const word = (base: string, count: number | null) =>
+    count === null ? `${base} copy` : `${base} copy ${count}`;
 
 describe("the copy's name", () => {
     it("is offered as '<name> copy'", () => {
@@ -21,8 +22,12 @@ describe("the copy's name", () => {
     });
 
     it("is numbered when that is taken too, ignoring case and spacing", () => {
-        expect(plan.defaultCopyName("Survival", ["Survival", "survival  COPY"], word)).toBe("Survival copy 2");
-        expect(plan.defaultCopyName("Survival", ["Survival copy", "Survival copy 2"], word)).toBe("Survival copy 3");
+        expect(plan.defaultCopyName("Survival", ["Survival", "survival  COPY"], word)).toBe(
+            "Survival copy 2"
+        );
+        expect(plan.defaultCopyName("Survival", ["Survival copy", "Survival copy 2"], word)).toBe(
+            "Survival copy 3"
+        );
     });
 
     it("shortens the source's name so the word that says what it is still fits", () => {
@@ -33,24 +38,35 @@ describe("the copy's name", () => {
     });
 
     it("is trimmed and its inner spaces collapsed before it is checked", () => {
-        const parsed = plan.duplicateServerSchema.safeParse({ installedAppId: SOURCE, name: "  My   copy " });
+        const parsed = plan.duplicateServerSchema.safeParse({
+            installedAppId: SOURCE,
+            name: "  My   copy "
+        });
         expect(parsed.success && parsed.data.name).toBe("My copy");
     });
 
     it("refuses an empty name and one past the limit", () => {
-        expect(plan.duplicateServerSchema.safeParse({ installedAppId: SOURCE, name: "   " }).success).toBe(false);
         expect(
-            plan.duplicateServerSchema.safeParse({ installedAppId: SOURCE, name: "a".repeat(plan.SERVER_NAME_MAX + 1) })
-                .success
+            plan.duplicateServerSchema.safeParse({ installedAppId: SOURCE, name: "   " }).success
         ).toBe(false);
         expect(
-            plan.duplicateServerSchema.safeParse({ installedAppId: SOURCE, name: "a".repeat(plan.SERVER_NAME_MAX) })
-                .success
+            plan.duplicateServerSchema.safeParse({
+                installedAppId: SOURCE,
+                name: "a".repeat(plan.SERVER_NAME_MAX + 1)
+            }).success
+        ).toBe(false);
+        expect(
+            plan.duplicateServerSchema.safeParse({
+                installedAppId: SOURCE,
+                name: "a".repeat(plan.SERVER_NAME_MAX)
+            }).success
         ).toBe(true);
     });
 
     it("refuses a source that is not an id", () => {
-        expect(plan.duplicateServerSchema.safeParse({ installedAppId: "../etc", name: "x" }).success).toBe(false);
+        expect(
+            plan.duplicateServerSchema.safeParse({ installedAppId: "../etc", name: "x" }).success
+        ).toBe(false);
     });
 
     it("counts a name as taken the way a person reads it", () => {
@@ -61,19 +77,27 @@ describe("the copy's name", () => {
 
 describe("who may duplicate", () => {
     it("is the owner or an administrator, who may also create servers", () => {
-        expect(plan.duplicatePermission({ canCreate: true, isOwner: true, isAdmin: false })).toEqual({ allowed: true });
-        expect(plan.duplicatePermission({ canCreate: true, isOwner: false, isAdmin: true })).toEqual({ allowed: true });
+        expect(
+            plan.duplicatePermission({ canCreate: true, isOwner: true, isAdmin: false })
+        ).toEqual({ allowed: true });
+        expect(
+            plan.duplicatePermission({ canCreate: true, isOwner: false, isAdmin: true })
+        ).toEqual({ allowed: true });
     });
 
     it("is not somebody only invited to help run it", () => {
-        expect(plan.duplicatePermission({ canCreate: true, isOwner: false, isAdmin: false })).toEqual({
+        expect(
+            plan.duplicatePermission({ canCreate: true, isOwner: false, isAdmin: false })
+        ).toEqual({
             allowed: false,
             reason: "not-owner"
         });
     });
 
     it("is not an owner who may no longer create servers", () => {
-        expect(plan.duplicatePermission({ canCreate: false, isOwner: true, isAdmin: false })).toEqual({
+        expect(
+            plan.duplicatePermission({ canCreate: false, isOwner: true, isAdmin: false })
+        ).toEqual({
             allowed: false,
             reason: "cannot-create"
         });
@@ -85,7 +109,11 @@ describe("the copy's config", () => {
 
     it("keeps every setting, including ones this file has never heard of", () => {
         const copied = plan.copiedConfig(
-            { blueprintId: "skyblock", consoleCommands: [{ id: "a", command: "say hi" }], someFutureSetting: 7 },
+            {
+                blueprintId: "skyblock",
+                consoleCommands: [{ id: "a", command: "say hi" }],
+                someFutureSetting: 7
+            },
             substitutions
         );
         expect(copied).toEqual({
@@ -114,7 +142,10 @@ describe("the copy's config", () => {
     });
 
     it("re-points anything that named the source, at any depth", () => {
-        const copied = plan.copiedConfig({ events: [{ target: `server:${SOURCE}` }] }, substitutions);
+        const copied = plan.copiedConfig(
+            { events: [{ target: `server:${SOURCE}` }] },
+            substitutions
+        );
         expect(JSON.stringify(copied)).not.toContain(SOURCE);
         expect(JSON.stringify(copied)).toContain(`server:${COPY}`);
     });
@@ -125,7 +156,11 @@ describe("the copy's environment", () => {
         { key: "RCON_PASSWORD", value: "source-secret", isSecret: true },
         { key: "POLARIS_SERVER_ID", value: SOURCE, isSecret: false },
         { key: "POLARIS_SERVER_TOKEN", value: "source-token", isSecret: true },
-        { key: "RESOURCE_PACK", value: `https://p.example.test/api/minecraft/sounds/${SOURCE}/TOKEN-A/pack.zip`, isSecret: false },
+        {
+            key: "RESOURCE_PACK",
+            value: `https://p.example.test/api/minecraft/sounds/${SOURCE}/TOKEN-A/pack.zip`,
+            isSecret: false
+        },
         { key: "MODRINTH_PROJECTS", value: "lithium,ferrite-core", isSecret: false },
         { key: "GAME_CLIENT_PORT", value: "7777", isSecret: false }
     ];
@@ -157,7 +192,9 @@ describe("the copy's environment", () => {
 
     it("re-points the server id and the id-derived pack link at the copy", () => {
         expect(value("POLARIS_SERVER_ID")).toBe(COPY);
-        expect(value("RESOURCE_PACK")).toBe(`https://p.example.test/api/minecraft/sounds/${COPY}/TOKEN-B/pack.zip`);
+        expect(value("RESOURCE_PACK")).toBe(
+            `https://p.example.test/api/minecraft/sounds/${COPY}/TOKEN-B/pack.zip`
+        );
     });
 
     it("keeps the mods and plugins exactly, and writes the caller's ports over the source's", () => {
@@ -204,7 +241,9 @@ describe("how far a copy has got", () => {
         expect(state?.stage).toBe("copying");
         expect(state?.sourceWasRunning).toBe(true);
         expect(plan.readDuplicateState({ duplicating: null })).toBeNull();
-        expect(plan.readDuplicateState({ duplicating: { from: SOURCE, stage: "teleporting" } })).toBeNull();
+        expect(
+            plan.readDuplicateState({ duplicating: { from: SOURCE, stage: "teleporting" } })
+        ).toBeNull();
     });
 
     it("never says 100 percent before the copy says it is done", () => {

@@ -75,7 +75,8 @@ async function serverNamed(hostname: string): Promise<{
         if (!routesByHostname(install.catalogId)) continue;
         const config = readInstallConfig(install.config);
         if (config.routed !== true) continue;
-        const named = typeof config.hostname === "string" ? config.hostname.trim().toLowerCase() : "";
+        const named =
+            typeof config.hostname === "string" ? config.hostname.trim().toLowerCase() : "";
         if (named !== name) continue;
         return {
             id: install.id,
@@ -113,6 +114,8 @@ export async function wakeForJoin(hostname: string, now: Date = new Date()): Pro
         .then(() => true)
         .catch(() => false);
     if (!started) return "failed";
-    await patchInstallConfig(server.id, { [WOKEN_AT_KEY]: now.toISOString() }).catch(() => undefined);
+    await patchInstallConfig(server.id, { [WOKEN_AT_KEY]: now.toISOString() }).catch(
+        () => undefined
+    );
     return "started";
 }

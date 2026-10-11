@@ -16,7 +16,10 @@
 const held = new Map<string, number>();
 
 /** Run `work` with the given services held, releasing them however it ends. */
-export async function holdWhileCopying<T>(applicationIds: readonly string[], work: () => Promise<T>): Promise<T> {
+export async function holdWhileCopying<T>(
+    applicationIds: readonly string[],
+    work: () => Promise<T>
+): Promise<T> {
     const ids = [...new Set(applicationIds)];
     for (const id of ids) held.set(id, (held.get(id) ?? 0) + 1);
     try {

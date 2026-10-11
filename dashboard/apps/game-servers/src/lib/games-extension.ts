@@ -100,7 +100,9 @@ export const gameServersExtension: AppExtension = {
         // finishes, so it is marked so and the server it stopped is started again.
         void import("./duplicate-service")
             .then((service) => service.recoverInterruptedCopies())
-            .catch((error) => console.error("polaris: interrupted server copies could not be recovered:", error));
+            .catch((error) =>
+                console.error("polaris: interrupted server copies could not be recovered:", error)
+            );
         void import("./minecraft/symbiote-service")
             .then((service) => service.moveSymbioteLinks())
             .catch((error) => console.error("polaris: Symbiote links could not be moved:", error));
