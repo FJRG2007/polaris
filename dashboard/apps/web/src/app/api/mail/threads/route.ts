@@ -23,7 +23,10 @@ import { NextResponse } from "next/server";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { apiPermission } from "@/lib/api-session";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
+import { reachForOlder } from "@/lib/mailbox/sync";
+import { reachesForOlder } from "@/lib/mailbox/folder-window";
 import { EMPTY_QUERY, listThreads } from "@/lib/mailbox/views";
+import { everyAccountId, unifiedAccountIds } from "@/lib/mailbox/access";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
@@ -39,17 +42,27 @@ export async function GET(request: Request): Promise<Response> {
     // list says it could not be loaded rather than showing an empty mailbox,
     // which reads as "you have no mail".
     if (!parsed.success) {
-        return NextResponse.json({ error: (await readerWords("api"))("errors.listLoadFailed") }, { status: 400 });
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.listLoadFailed") },
+            { status: 400 }
+        );
     }
 
     const { cursor, query, ...narrow } = parsed.data;
     // The shelf comes from the cookie, never from the query string: the address
     // says which list, and the switch in the header says whose.
-    const page = await listThreads(
-        user.id,
-        { ...EMPTY_QUERY, ...narrow, query, cursor },
-        await mailShelfFor(user.id)
-    );
+    const shelf = await mailShelfFor(user.id);
+    const list = { ...EMPTY_QUERY, ...narrow, query, cursor };
+    let page = await listThreads(user.id, list, shelf);
+    // The end of what is held here: the sync keeps only a folder's newest
+    // messages, so the scroll reaching the bottom is what brings down the next
+    // older page from the server - and then the same page again, with it in.
+    if (page.cursor === "" && reachesForOlder(list)) {
+        const accountIds = narrow.accountId
+            ? (await everyAccountId(user.id)).filter((id) => id === narrow.accountId)
+            : await unifiedAccountIds(user.id, shelf);
+        if (await reachForOlder(accountIds, narrow)) page = await listThreads(user.id, list, shelf);
+    }
     return NextResponse.json(page, {
         headers: { "cache-control": "private, no-store" }
     });

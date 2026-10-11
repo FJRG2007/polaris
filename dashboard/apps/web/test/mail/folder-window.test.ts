@@ -10,7 +10,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { confirmedGone, missingFromWindow } from "@/lib/mailbox/folder-window";
+import { confirmedGone, missingFromWindow, reachesForOlder } from "@/lib/mailbox/folder-window";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const sync = readFile(`${SRC}lib/mailbox/sync.ts`, "utf8");
@@ -69,6 +69,70 @@ describe("the newest window", () => {
         const refill = source.slice(source.indexOf("async function refillWindow"));
         const body = refill.slice(0, refill.indexOf("\n}\n"));
         expect(body).toContain("unstored.get(folder.id)");
-        expect(source).toContain("if (stored === 0) return;");
+        expect(source).toContain("if (stored === 0) return 0;");
+    });
+});
+
+describe("scrolling past the held window", () => {
+    const inbox = {
+        folderId: null,
+        role: "inbox",
+        query: "",
+        sort: "newest",
+        labelId: null,
+        unreadOnly: false,
+        readOnly: false,
+        starredOnly: false,
+        importantOnly: false,
+        snoozedOnly: false,
+        withAttachments: false,
+        category: ""
+    };
+
+    it("reaches for older mail at the end of a plain folder list", () => {
+        expect(reachesForOlder(inbox)).toBe(true);
+        expect(reachesForOlder({ ...inbox, role: null, folderId: "f1" })).toBe(true);
+    });
+
+    it("never for a search, a filter, another order or no folder at all", () => {
+        expect(reachesForOlder({ ...inbox, query: "invoice" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, sort: "oldest" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, unreadOnly: true })).toBe(false);
+        expect(reachesForOlder({ ...inbox, starredOnly: true })).toBe(false);
+        expect(reachesForOlder({ ...inbox, labelId: "l1" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, category: "social" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, role: null })).toBe(false);
+    });
+
+    it("brings the next page down as old mail, below what is held, and lists again", async () => {
+        const source = await sync;
+        const older = source.slice(source.indexOf("async function fetchOlderNow"));
+        const body = older.slice(0, older.indexOf("\n}\n"));
+        expect(body).toContain(
+            "(await storeMessages(client, account, folder, fetched, false)) > 0"
+        );
+        expect(body).toContain("readOnly: true");
+        const route = await readFile(`${SRC}app/api/mail/threads/route.ts`, "utf8");
+        expect(route).toContain('page.cursor === "" && reachesForOlder(list)');
+        expect(route).toContain("everyAccountId(user.id)");
+    });
+
+    it("skips Polaris' own draft copies instead of fetching them on every reach", async () => {
+        const source = await sync;
+        const older = source.slice(source.indexOf("async function fetchOlderNow"));
+        const body = older.slice(0, older.indexOf("\n}\n"));
+        expect(body).toContain("unstored.get(folderId)");
+        expect(body).toContain("held.length + skipped.size >= folder.total");
+        expect(body).toContain("...skipped]");
+    });
+
+    it("never runs beside the mailbox's pass or a second reach for the same folder", async () => {
+        const source = await sync;
+        const entry = source.slice(source.indexOf("export async function fetchOlder("));
+        const body = entry.slice(0, entry.indexOf("\n}\n"));
+        expect(body).toContain("olderRuns().get(folderId)");
+        expect(body).toContain("passes().get(accountId)");
+        const pass = source.slice(source.indexOf("export async function syncAccount"));
+        expect(pass.slice(0, pass.indexOf("\n}\n"))).toContain("settleOlder(accountId)");
     });
 });

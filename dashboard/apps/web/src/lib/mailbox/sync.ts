@@ -123,9 +123,9 @@ export async function syncAccount(
     // scheduled pass still finishes before the screen redraws.
     const running = passes().get(accountId);
     if (running) return running;
-    const pass = onePass(accountId, options.force === true).finally(() =>
-        passes().delete(accountId)
-    );
+    const pass = settleOlder(accountId)
+        .then(() => onePass(accountId, options.force === true))
+        .finally(() => passes().delete(accountId));
     passes().set(accountId, pass);
     return pass;
 }
@@ -322,6 +322,113 @@ export async function catchUpFolder(
     await syncFolder(client, account, folder, await bodyWindowEdge(accountId));
 }
 
+/** How many older messages one reach for the bottom of a list brings down. */
+const OLDER_BATCH = 200;
+
+/**
+ * The next page of a folder older than anything held here, for a list scrolled
+ * to its end. The sync keeps only the newest `WINDOW` of a folder; everything
+ * behind that is fetched when somebody goes looking for it, as old mail - no
+ * rule, junk filter or away reply runs on it. Answers whether anything came.
+ */
+export async function fetchOlder(accountId: string, folderId: string): Promise<boolean> {
+    const running = olderRuns().get(folderId);
+    if (running) return running.run;
+    const run = (passes().get(accountId) ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(() => fetchOlderNow(accountId, folderId))
+        .finally(() => olderRuns().delete(folderId));
+    olderRuns().set(folderId, { accountId, run });
+    return run;
+}
+
+/** Older-mail fetches in flight, by folder, kept apart from the account's pass
+ *  so the two never store the same rows at once. */
+const OLDER = Symbol.for("polaris.mail.older");
+
+function olderRuns(): Map<string, { accountId: string; run: Promise<boolean> }> {
+    const held = globalThis as {
+        [OLDER]?: Map<string, { accountId: string; run: Promise<boolean> }>;
+    };
+    held[OLDER] ??= new Map();
+    return held[OLDER];
+}
+
+/** Waits out every older-mail fetch of a mailbox, however each one ended. */
+async function settleOlder(accountId: string): Promise<void> {
+    const runs = [...olderRuns().values()]
+        .filter((entry) => entry.accountId === accountId)
+        .map((entry) => entry.run);
+    if (runs.length > 0) await Promise.allSettled(runs);
+}
+
+async function fetchOlderNow(accountId: string, folderId: string): Promise<boolean> {
+    const [account, folder] = await Promise.all([
+        prisma.mailAccount.findUnique({ where: { id: accountId }, select: ACCOUNT_COLUMNS }),
+        prisma.mailFolder.findUnique({ where: { id: folderId } })
+    ]);
+    if (!account || !folder || folder.accountId !== accountId) return false;
+    const held = await prisma.mailMessage.findMany({
+        where: { folderId },
+        select: { uid: true }
+    });
+    const skipped = unstored.get(folderId) ?? new Set<number>();
+    if (held.length + skipped.size >= folder.total) return false;
+
+    return withImap(account, async (client) => {
+        const lock = await client.getMailboxLock(folder.path, { readOnly: true });
+        try {
+            const mailbox = client.mailbox;
+            if (!mailbox || typeof mailbox === "boolean" || mailbox.exists === 0) return false;
+            // By sequence number: the held rows are roughly the newest ones, so
+            // the next page sits just below them.
+            const want = held.length + skipped.size + OLDER_BATCH;
+            const from = Math.max(1, mailbox.exists - want + 1);
+            const listed: number[] = [];
+            for await (const message of client.fetch(`${from}:${mailbox.exists}`, { uid: true })) {
+                listed.push(message.uid);
+            }
+            const missing = missingFromWindow(
+                listed,
+                new Set([...held.map((row) => Number(row.uid)), ...skipped]),
+                want
+            ).slice(0, OLDER_BATCH);
+            if (missing.length === 0) return false;
+            const extraHeaders = folder.role === "inbox" ? await filterHeaderNames(account.id) : [];
+            const fetched = await collect(client, missing.join(","), { uid: true }, extraHeaders);
+            if (fetched.length === 0) return false;
+            return (await storeMessages(client, account, folder, fetched, false)) > 0;
+        } finally {
+            lock.release();
+        }
+    });
+}
+
+/**
+ * The next older page of every folder a list reads from, among `accountIds` -
+ * the ones named by `folderId`, or every folder of the kind `role`. Each folder
+ * on its own connection, one failing leaving the others. Answers whether any of
+ * them brought anything down.
+ */
+export async function reachForOlder(
+    accountIds: readonly string[],
+    narrow: { folderId: string | null; role: string | null }
+): Promise<boolean> {
+    if (accountIds.length === 0 || (!narrow.folderId && !narrow.role)) return false;
+    const folders = await prisma.mailFolder.findMany({
+        where: {
+            accountId: { in: [...accountIds] },
+            ...(narrow.folderId ? { id: narrow.folderId } : {}),
+            ...(narrow.role ? { role: narrow.role } : {})
+        },
+        select: { id: true, accountId: true }
+    });
+    const settled = await Promise.allSettled(
+        folders.map((folder) => fetchOlder(folder.accountId, folder.id))
+    );
+    return settled.some((result) => result.status === "fulfilled" && result.value);
+}
+
 async function syncFolder(
     client: ImapFlow,
     account: AccountRow,
@@ -512,7 +619,7 @@ async function storeMessages(
     /** False for mail put back into the window (`refillWindow`): it is not
      *  arriving, so no rule, junk filter or away reply may act on it. */
     arrivals = true
-): Promise<void> {
+): Promise<number> {
     const snippets = await fetchSnippets(client, fetched);
     /** What the junk filter said to file, gathered rather than acted on one at a
      *  time: filing opens a connection, and this function is already inside one. */
@@ -674,7 +781,7 @@ async function storeMessages(
         }
     }
 
-    if (stored === 0) return;
+    if (stored === 0) return 0;
 
     // One connection for the whole page, after the loop rather than inside it.
     await fileJudgedJunk(account.userId, judged);
@@ -692,6 +799,7 @@ async function storeMessages(
         actorId: account.userId,
         folderId: folder.id
     });
+    return stored;
 }
 
 /** How much of a plain part is read for its preview. A plain part starts with
