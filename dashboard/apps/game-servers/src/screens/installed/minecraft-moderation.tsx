@@ -177,7 +177,9 @@ function ModAnnouncementsCard({
                                 >
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="truncate text-sm" title={mod.name}>{mod.name}</span>
+                                            <span className="truncate text-sm" title={mod.name}>
+                                                {mod.name}
+                                            </span>
                                             <Badge variant={STATUS_TONE[mod.status]}>
                                                 {t(STATUS_WORD[mod.status])}
                                             </Badge>

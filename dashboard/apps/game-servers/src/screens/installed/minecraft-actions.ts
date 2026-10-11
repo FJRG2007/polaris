@@ -2198,10 +2198,7 @@ export async function loaderVersionsAction(
 
 const loaderChoiceSchema = z.object({
     installedAppId: z.string().uuid(),
-    version: z
-        .string()
-        .trim()
-        .regex(VERSION_SHAPE)
+    version: z.string().trim().regex(VERSION_SHAPE)
 });
 
 /**

@@ -119,7 +119,9 @@ export function ChatModerationSection({
     const invalid = candidate !== null && !candidate.success;
 
     const change = (patch: Partial<ChatModeration>) => {
-        setDraft((current) => (current ? { ...current, rules: { ...current.rules, ...patch } } : current));
+        setDraft((current) =>
+            current ? { ...current, rules: { ...current.rules, ...patch } } : current
+        );
         setNote(null);
         setError(null);
     };
@@ -146,7 +148,9 @@ export function ChatModerationSection({
     function flipEnabled(enabled: boolean): void {
         if (!saved) return;
         const rules = { ...saved, enabled };
-        setDraft((current) => (current ? { ...current, rules: { ...current.rules, enabled } } : current));
+        setDraft((current) =>
+            current ? { ...current, rules: { ...current.rules, enabled } } : current
+        );
         save(rules);
     }
 
@@ -182,7 +186,9 @@ export function ChatModerationSection({
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="text-sm font-medium">{t("moderation.chat.title")}</p>
-                            <p className="text-xs text-muted-foreground">{t("moderation.chat.intro")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("moderation.chat.intro")}
+                            </p>
                         </div>
                         <Switch
                             checked={enabled}
@@ -255,7 +261,9 @@ export function ChatModerationSection({
                                         value={draft?.domains ?? ""}
                                         onChange={(event) => {
                                             const domains = event.target.value;
-                                            setDraft((current) => (current ? { ...current, domains } : current));
+                                            setDraft((current) =>
+                                                current ? { ...current, domains } : current
+                                            );
                                         }}
                                         placeholder="play.example.net"
                                     />
@@ -313,7 +321,9 @@ export function ChatModerationSection({
                                     value={draft?.words ?? ""}
                                     onChange={(event) => {
                                         const words = event.target.value;
-                                        setDraft((current) => (current ? { ...current, words } : current));
+                                        setDraft((current) =>
+                                            current ? { ...current, words } : current
+                                        );
                                     }}
                                 />
                                 <span className="text-xs text-muted-foreground">
@@ -361,7 +371,9 @@ export function ChatModerationSection({
                         >
                             {t("moderation.chat.save")}
                         </Button>
-                        {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
+                        {note ? (
+                            <span className="text-xs text-muted-foreground">{note}</span>
+                        ) : null}
                     </div>
                     {error ? (
                         <p role="alert" className="text-xs text-danger">
@@ -466,11 +478,21 @@ function ChatLog({ state }: { state: ChatModerationState | null }) {
                         <table className="w-full text-left text-xs">
                             <thead className="text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">{t("moderation.chat.when")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("moderation.chat.player")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("moderation.chat.reason")}</th>
-                                    <th className="py-1 pr-3 font-medium">{t("moderation.chat.line")}</th>
-                                    <th className="py-1 font-medium">{t("moderation.chat.action")}</th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("moderation.chat.when")}
+                                    </th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("moderation.chat.player")}
+                                    </th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("moderation.chat.reason")}
+                                    </th>
+                                    <th className="py-1 pr-3 font-medium">
+                                        {t("moderation.chat.line")}
+                                    </th>
+                                    <th className="py-1 font-medium">
+                                        {t("moderation.chat.action")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border/60">
@@ -479,19 +501,27 @@ function ChatLog({ state }: { state: ChatModerationState | null }) {
                                         <td className="whitespace-nowrap py-1.5 pr-3 text-muted-foreground">
                                             <RelativeTime iso={entry.at} />
                                         </td>
-                                        <td className="whitespace-nowrap py-1.5 pr-3">{entry.player}</td>
+                                        <td className="whitespace-nowrap py-1.5 pr-3">
+                                            {entry.player}
+                                        </td>
                                         <td className="whitespace-nowrap py-1.5 pr-3">
                                             {BLOCK_REASONS.includes(entry.reason as BlockReason)
                                                 ? t(REASON_WORD[entry.reason as BlockReason])
                                                 : entry.reason}
                                             {entry.detail ? (
-                                                <span className="block max-w-40 truncate text-muted-foreground" title={entry.detail}>
+                                                <span
+                                                    className="block max-w-40 truncate text-muted-foreground"
+                                                    title={entry.detail}
+                                                >
                                                     {entry.detail}
                                                 </span>
                                             ) : null}
                                         </td>
                                         <td className="max-w-80 py-1.5 pr-3">
-                                            <span className="line-clamp-2 break-words" title={entry.text}>
+                                            <span
+                                                className="line-clamp-2 break-words"
+                                                title={entry.text}
+                                            >
                                                 {entry.command ? (
                                                     <span className="text-muted-foreground">
                                                         {t("moderation.chat.viaCommand")}{" "}
@@ -501,7 +531,13 @@ function ChatLog({ state }: { state: ChatModerationState | null }) {
                                             </span>
                                         </td>
                                         <td className="whitespace-nowrap py-1.5">
-                                            <Badge variant={entry.action === "timeout" ? "danger" : "neutral"}>
+                                            <Badge
+                                                variant={
+                                                    entry.action === "timeout"
+                                                        ? "danger"
+                                                        : "neutral"
+                                                }
+                                            >
                                                 {entry.action === "timeout"
                                                     ? t("moderation.chat.actionTimeout")
                                                     : t("moderation.chat.actionWarn")}

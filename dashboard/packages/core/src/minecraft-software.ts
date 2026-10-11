@@ -325,7 +325,11 @@ export function isBrowsableLoader(loader: string): boolean {
 }
 
 /** The software in the order the picker shows it, by group. */
-export function softwareByGroup(): { group: SoftwareGroup; label: string; entries: MinecraftSoftware[] }[] {
+export function softwareByGroup(): {
+    group: SoftwareGroup;
+    label: string;
+    entries: MinecraftSoftware[];
+}[] {
     return SOFTWARE_GROUPS.map((group) => ({
         group: group.id,
         label: group.label,
