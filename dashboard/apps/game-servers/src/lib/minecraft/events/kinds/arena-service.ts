@@ -340,7 +340,9 @@ async function raise(ctx: KindContext): Promise<void> {
     // The batch it goes up in is written down with it, so whatever takes it
     // down calls that off first - should this process stop waiting for it.
     const batch = inServer.batchKey();
-    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills), batch };
+    // The box just counted as nothing but air is written down as proved: the
+    // only one its teardown may sweep whole (`arena.teardown`).
+    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills), batch, proved: box };
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
@@ -1351,7 +1353,8 @@ function releases(left: stored.ArenaLeftover): string[] {
 export async function closeArena(
     server: ServerContainer,
     left: stored.ArenaLeftover,
-    language: speech.Speech | null = null
+    language: speech.Speech | null = null,
+    live: readonly stage.Area[] = []
 ): Promise<stored.ArenaLeftover | null> {
     memories.delete(left.id);
     arrival.forget(left.id);
@@ -1496,6 +1499,8 @@ export async function closeArena(
             return { ...left, entrants: remaining, gamerules: {} };
         }
         if (left.arena) {
+            if (left.arena.proved && stage.sweepHeld(left.arena.proved, live))
+                return { ...left, entrants: [], gamerules: {} };
             // A batch still building it would put blocks back after the teardown.
             if (left.arena.batch) await inServer.cancelBatch(server, left.arena.batch);
             await server.sayAll([

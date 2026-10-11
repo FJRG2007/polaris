@@ -16,7 +16,14 @@
  * - **Nothing is removed that the event did not place.** Every box it fills is
  *   written into the run state before it is filled, and taken out with
  *   `fill <box> air replace <the block it used>`: inside its own box, and only
- *   where that block still is.
+ *   where that block still is. The volume the probe proved empty is written
+ *   down too (`proved`), and once every box is out it is swept with a plain
+ *   `fill <slice> air` and its dropped items killed (`sweepLines`): it was
+ *   nothing but air before the event, so whatever is in it now - a block a
+ *   player put down, a mod's block nobody here knows - came with the event.
+ *   Only that volume, never a block past it, and never with `destroy`; a run
+ *   with no proof written down (an older one, a probe that failed) keeps the
+ *   per-box removal alone.
  * - **Nobody is moved who did not ask.** A player takes part by typing `join`
  *   (or `unirse`) in the chat; their exact position, facing, world and game mode
  *   are written down before they are moved, and they are sent back there at the
@@ -126,6 +133,8 @@ export type Box = z.infer<typeof boxSchema>;
 /** A box with nothing in it yet: the volume an arena takes up. */
 export type Volume = Omit<Box, "block">;
 
+const volumeSchema = boxSchema.omit({ block: true });
+
 const areaSchema = z.object({
     x1: z.number().int(),
     z1: z.number().int(),
@@ -185,6 +194,10 @@ export const stageSchema = z.object({
     built: z.boolean().default(false),
     /** Ticks spent waiting for the area to load before it can be probed. */
     waits: z.number().int().default(0),
+    /** The volume the probe proved empty air, written down as it passed: the
+     *  only one ever swept whole at the end (`sweepLines`). Null for a run
+     *  from before it was kept, and for one whose probe never passed. */
+    proved: volumeSchema.nullable().default(null),
     /** The players inside, until each one is sent back. */
     saved: z.array(savedSchema).default([]),
     racers: z.array(racerSchema).default([]),
@@ -208,7 +221,9 @@ export const stageLeftoverSchema = z.object({
     boxes: z.array(boxSchema),
     saved: z.array(savedSchema),
     /** The chunks held before the event, which letting its area go must spare. */
-    keepForced: z.array(z.string()).nullable().default(null)
+    keepForced: z.array(z.string()).nullable().default(null),
+    /** The run's proved volume, until it is swept (`StageState.proved`). */
+    proved: volumeSchema.nullable().default(null)
 });
 
 export type Leftover = z.infer<typeof stageLeftoverSchema>;
@@ -220,13 +235,15 @@ export function leftoverOf(
     keepForced: readonly string[] | null = null
 ): Leftover | null {
     if (!arena) return null;
-    if (arena.boxes.length === 0 && arena.saved.length === 0 && !arena.area) return null;
+    if (arena.boxes.length === 0 && arena.saved.length === 0 && !arena.area && !arena.proved)
+        return null;
     return {
         runId,
         area: arena.area,
         boxes: arena.boxes,
         saved: arena.saved,
-        keepForced: keepForced ? [...keepForced] : null
+        keepForced: keepForced ? [...keepForced] : null,
+        proved: arena.proved
     };
 }
 
@@ -318,6 +335,60 @@ export function buildLine(box: Box): string {
 /** Taken out only where the block is still the one that was put there. */
 export function removeLine(box: Box): string {
     return `${WORLD} fill ${corners(box)} minecraft:air replace ${box.block}`;
+}
+
+/**
+ * A volume proved empty air before the event, emptied again whatever is in it
+ * now: a plain `fill <slice> air` a slice at a time, within `FILL_LIMIT`, and
+ * never past the volume's own corners. Only ever for a volume the probe proved
+ * and the run wrote down - nothing else may be swept this way - and never with
+ * `destroy`, which would drop what it breaks.
+ */
+export function sweepFills(volume: Volume): string[] {
+    return slices({ ...areaOf(volume), ...yRange(volume) }).map(
+        (piece) => `${WORLD} fill ${corners(piece)} minecraft:air`
+    );
+}
+
+/** Every dropped item inside a proved volume killed: what the sweep or the
+ *  event left lying in the sky. Items only - never a player, a pet or a mob -
+ *  and never one somebody threw (it has a `Thrower`): those stay theirs. */
+export function dropsGone(volume: Volume): string {
+    const x = Math.min(volume.x1, volume.x2);
+    const y = Math.min(volume.y1, volume.y2);
+    const z = Math.min(volume.z1, volume.z2);
+    const dx = Math.abs(volume.x2 - volume.x1);
+    const dy = Math.abs(volume.y2 - volume.y1);
+    const dz = Math.abs(volume.z2 - volume.z1);
+    return `execute in minecraft:overworld as @e[type=minecraft:item,x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz}] unless data entity @s Thrower run kill @s`;
+}
+
+/** The whole sweep of a proved volume: its blocks, then the items it dropped. */
+export function sweepLines(volume: Volume): string[] {
+    return [...sweepFills(volume), dropsGone(volume)];
+}
+
+/**
+ * Whether a proved volume shares a column with anything a live run holds: its
+ * sweep waits for that run to end, since site search never steers clear of a
+ * volume still to be swept and a plain `fill air` would take the live run's
+ * blocks with it.
+ */
+export function sweepHeld(volume: Volume, live: readonly Area[]): boolean {
+    const own = areaOf(volume);
+    return live.some((other) => {
+        const columns = areaOf({ ...other, y1: 0, y2: 0 });
+        return (
+            own.x1 <= columns.x2 &&
+            columns.x1 <= own.x2 &&
+            own.z1 <= columns.z2 &&
+            columns.z1 <= own.z2
+        );
+    });
+}
+
+function yRange(volume: Volume): { y1: number; y2: number } {
+    return { y1: Math.min(volume.y1, volume.y2), y2: Math.max(volume.y1, volume.y2) };
 }
 
 /**

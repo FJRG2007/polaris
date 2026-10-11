@@ -440,7 +440,11 @@ async function provedEmpty(ctx: KindContext, memory: Memory): Promise<boolean> {
             cleared = false;
     }
     if (cleared) changeStage(ctx, { boxes: kept });
-    if (!unloaded && cleared && filled === stage.volumeOf(volume)) return true;
+    if (!unloaded && cleared && filled === stage.volumeOf(volume)) {
+        // Proved: the only volume the end may sweep whole (`stage.sweepLines`).
+        changeStage(ctx, { proved: volume });
+        return true;
+    }
     if (unloaded && memory.waits < LOAD_WAITS) {
         memory.waits += 1;
         await ctx.persist();
@@ -453,7 +457,7 @@ async function provedEmpty(ctx: KindContext, memory: Memory): Promise<boolean> {
     // The beam stays where it was found: it was chosen by the players, not by
     // the arena's site.
     const area = stageOf(ctx).area;
-    changeStage(ctx, { origin: null, area: null, waits: 0 });
+    changeStage(ctx, { origin: null, area: null, waits: 0, proved: null });
     memory.waits = 0;
     await ctx.persist();
     if (area) await ctx.server.sayAll([stage.releaseArea(area)]);

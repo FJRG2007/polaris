@@ -131,9 +131,10 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
         ? {
               box: { ...floor, y2: floor.y2 + hill.OVER_FLOOR },
               blocks: [...hill.lookBlocks(look), hill.FIRE],
-              batch
+              batch,
+              proved: proof
           }
-        : { box: floor, blocks: [...hill.PLATFORM_BLOCKS], batch };
+        : { box: floor, blocks: [...hill.PLATFORM_BLOCKS], batch, proved: proof };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
     // Paced inside the server where the Polaris mod can (`in-server.build`).
