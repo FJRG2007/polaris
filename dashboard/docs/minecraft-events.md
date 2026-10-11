@@ -185,6 +185,22 @@ left out.
   so it is used again and taken back. Silk touch is spelled with `levels` up
   to 1.21.4 and as a plain map from 1.21.5: the brush is given in the first
   spelling, then in the second and plain only to whoever still has none.
+- **Meteor shower** meteors are worth finding. From 1.16 each one has a heart
+  in the middle of its heap (`meteor-shower.HEART`: ancient debris, or diamond
+  ore where the mix has no diamond) that counts `HEART_POINTS` (5) blocks, and
+  a scorched rim of blackstone, basalt and some gilded blackstone round the
+  heap's foot (`crustCells`): only on the ground beside the heap, never on an
+  ore, a second layer only on rim, each block put into air over something
+  solid and taken back at the end only while it is still exactly that block.
+  A rim block a player breaks is forgotten like an ore. Older servers keep the
+  plain heap, with a diamond-ore heart where the mix allows. Finding one: every
+  look, the beam, smoke and embers over each meteor still to mine; for each
+  player an arrow from the way they face, the distance and the blocks left on
+  the action bar, and while they are further than `NEAR` a short line of light
+  towards it that only they see (`trail`); the bar says how many are down to
+  mine and how many are still to fall. It pays its own prizes (`METEOR`, above
+  steady work); a preset still on the old steady-work prizes is moved to them
+  once (`toMeteorPrizes`, defaults version 9).
 - **Meteor shower** craters are infected by default (`infection`): sculk veins
   grow round each one and creep outwards (`meteor-infection.ts`). A vein goes
   only into air over the game's own ground (`#minecraft:sculk_replaceable`)

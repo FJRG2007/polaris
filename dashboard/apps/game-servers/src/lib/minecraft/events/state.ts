@@ -269,6 +269,10 @@ export const runSchema = z.object({
         .array(
             pointSchema.extend({
                 blocks: z.array(pointSchema.extend({ block: z.string() })).default([]),
+                /** Its scorched rim, each block put into air and still there as
+                 *  far as it knows (`meteor-shower.crustCells`): taken away at
+                 *  the end only while still exactly that block. Never scored. */
+                crust: z.array(pointSchema.extend({ block: z.string() })).default([]),
                 /** Every cell its infection was put into air at, or is about to
                  *  be (`meteor-infection.ts`) - cleared at the end only while
                  *  still a vein. */

@@ -112,8 +112,8 @@ const RULES: Readonly<Record<EventKind, Text>> = {
         es: "Defiende el punto marcado de cada oleada. Si mueres no pierdes nada."
     },
     "meteor-shower": {
-        en: "Meteors of ore are falling. Mine them first: every block counts.",
-        es: "Caen meteoritos de mena. Pícalos antes que nadie: cada bloque cuenta."
+        en: "Meteors of ore are falling. Follow the arrow and the beam, and mine them first: every block counts, the heart five.",
+        es: "Caen meteoritos de mena. Sigue la flecha y el haz y pícalos antes que nadie: cada bloque cuenta, el centro cinco."
     },
     parkour: {
         en: "Fastest to the finish wins; a fall only sends you back to your checkpoint.",
@@ -812,16 +812,49 @@ export function meteorInfected(language: Language): string {
         : `${INFO}Its crater is infected: the sculk creeps out, poisons and slows. Break it to cleanse the ground.`;
 }
 
-/** How far the latest meteor still unmined is from a player, and which way. */
+/** How far the latest meteor still unmined is from a player, and which way:
+ *  an arrow from the way they look first, when there is one. */
 export function meteorGuide(
     meters: number,
     heading: Heading,
     left: number,
+    language: Language,
+    arrow = ""
+): string {
+    const pointer = arrow ? `&e&l${arrow}&r ` : "";
+    return language === "es"
+        ? `${pointer}&6Meteorito: &f${meters} m &eal &f${HEADING_ES[heading]}&e, quedan &f${left}&e bloques`
+        : `${pointer}&6Meteor: &f${meters} m &e${heading}&e, &f${left}&e blocks left`;
+}
+
+/** The bar over a meteor shower: how many are down to mine, how many are
+ *  still to fall, and the time left. */
+export function meteorBar(
+    name: string,
+    down: number,
+    coming: number,
+    secondsLeft: number,
     language: Language
 ): string {
+    const parts =
+        language === "es"
+            ? [`${down} por picar`, ...(coming > 0 ? [`${coming} por caer`] : [])]
+            : [`${down} to mine`, ...(coming > 0 ? [`${coming} still to fall`] : [])];
+    return `${name} - ${parts.join(", ")} - ${clock(secondsLeft)}`;
+}
+
+const HEART_NAMES: Readonly<Record<string, { en: string; es: string }>> = {
+    ancient_debris: { en: "ancient debris", es: "escombros ancestrales" },
+    diamond_ore: { en: "diamond ore", es: "mena de diamante" }
+};
+
+/** Said as a meteor with a heart lands: what it is, and what it counts. */
+export function meteorHeart(heart: string, points: number, language: Language): string {
+    const plain = heart.replace(/_/g, " ");
+    const named = HEART_NAMES[heart] ?? { en: plain, es: plain };
     return language === "es"
-        ? `&6Meteorito: &f${meters} m &eal &f${HEADING_ES[heading]}&e, quedan &f${left}&e bloques`
-        : `&6Meteor: &f${meters} m &e${heading}&e, &f${left}&e blocks left`;
+        ? `${INFO}En su centro hay ${mark(named.es, INFO)}: vale ${mark(points, INFO)} bloques.`
+        : `${INFO}Its heart is ${mark(named.en, INFO)}: worth ${mark(points, INFO)} blocks.`;
 }
 
 export function meteorWaiting(language: Language): string {

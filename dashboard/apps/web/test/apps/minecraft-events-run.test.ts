@@ -103,6 +103,8 @@ interface World {
     opened: string[];
     /** Nothing is air: every chest the event tries to put down is refused. */
     solid: boolean;
+    /** Everything below this height is solid ground: no air there. */
+    ground?: number;
     /** Who reeled a treasure in since the last look. */
     caught: string[];
     /** What each player has gathered, as the scoreboard counts it. */
@@ -1043,6 +1045,7 @@ function answer(sent: string): string {
         const taken =
             world.blocks.has(at) ||
             world.solid ||
+            (world.ground !== undefined && Number(at.split(" ")[1]) < world.ground) ||
             world.chests.includes(at) ||
             plantAt(at) !== undefined;
         return taken ? "Test failed" : "Test passed";
@@ -1115,7 +1118,9 @@ function answer(sent: string): string {
     if (
         ours &&
         (world.blocks.has(ours[1] as string) ||
-            /(_ore|ancient_debris|^minecraft:barrel|^minecraft:barrier)$/.test(ours[2]!))
+            /(_ore|ancient_debris|blackstone|basalt|^minecraft:barrel|^minecraft:barrier)$/.test(
+                ours[2]!
+            ))
     )
         return world.blocks.get(ours[1] as string) === ours[2] ? "Test passed" : "Test failed";
     if (line.includes("if entity @a[distance=..12]"))
@@ -2066,6 +2071,7 @@ beforeEach(() => {
     world.chestTable = "";
     world.opened = [];
     world.solid = false;
+    delete world.ground;
     world.caught = [];
     world.progress = {};
     world.keepInventory = "false";
@@ -5569,6 +5575,79 @@ describe("a meteor shower", () => {
         ).toBe(false);
         expect(world.sent).toContain("scoreboard objectives remove pe_mtot");
         expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 288 0");
+    });
+
+    it("lands a heart and a scorched rim on solid ground, guides the way, and takes back only its rim", async () => {
+        world.ground = 70;
+        setUp([shower()]);
+        await start();
+        world.at.Ana = [400.5, 70, 0.5];
+        await play(8_100);
+        const first = state().run!.meteors[0]!;
+        const key = (cell: { x: number; y: number; z: number }) => `${cell.x} ${cell.y} ${cell.z}`;
+        expect(first.blocks.map((block) => block.block)).toContain("minecraft:ancient_debris");
+        expect(first.crust.length).toBeGreaterThan(0);
+        for (const cell of first.crust) {
+            expect(world.blocks.get(key(cell))).toBe(cell.block);
+            expect(first.blocks.some((block) => key(block) === key(cell))).toBe(false);
+            if (cell.y > first.y)
+                expect(
+                    first.crust.some((under) => key(under) === key({ ...cell, y: cell.y - 1 }))
+                ).toBe(true);
+        }
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes("Its heart is")
+            )
+        ).toBe(true);
+        // Far from it: a line of light only Ana sees, an arrow, and the bar's count.
+        expect(
+            world.sent.some(
+                (line) => line.includes("particle minecraft:end_rod") && line.endsWith(" force Ana")
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title Ana actionbar") && /\\u219[0-9]/.test(line)
+            )
+        ).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("bossbar set polaris:event name") && line.includes("to mine")
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => line.includes("particle minecraft:large_smoke"))).toBe(
+            true
+        );
+
+        // Ana breaks a block of the rim and puts down blackstone of her own there.
+        const broken = first.crust[0]!;
+        world.blocks.delete(key(broken));
+        world.at.Ana = [first.x + 0.5, 70, first.z + 0.5];
+        await play(2_100);
+        expect(state().run!.meteors[0]!.crust).toHaveLength(first.crust.length - 1);
+        world.blocks.set(key(broken), broken.block);
+        delete world.at.Ana;
+        await play(10 * 60_000);
+        expect(state().run).toBeNull();
+        expect(world.blocks.get(key(broken))).toBe(broken.block);
+        for (const cell of first.crust.slice(1)) expect(world.blocks.has(key(cell))).toBe(false);
+        expect(world.sent).toContain("scoreboard objectives remove pe_mh");
+    });
+
+    it("has no heart of debris and no rim on a server older than both", async () => {
+        world.version = "1.15.2";
+        world.ground = 70;
+        setUp([shower()]);
+        await start();
+        await play(30_000);
+        const landed = state().run!.meteors;
+        expect(landed.length).toBeGreaterThan(0);
+        for (const meteor of landed) expect(meteor.crust).toEqual([]);
+        expect(world.sent.some((line) => /blackstone|basalt|ancient_debris/.test(line))).toBe(
+            false
+        );
     });
 
     it("grows an infection round each crater that poisons and slows, and takes back what is still a vein", async () => {
