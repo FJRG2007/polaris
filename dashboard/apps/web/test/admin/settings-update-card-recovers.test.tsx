@@ -60,12 +60,13 @@ const overview = {
 
 /** How many overview requests fail before one answers. */
 let failures = 0;
+let failWith = 502;
 const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/api/admin/settings/overview")) {
         if (failures > 0) {
             failures -= 1;
-            return new Response("starting", { status: 502 });
+            return new Response("starting", { status: failWith });
         }
         return new Response(JSON.stringify(overview), {
             headers: { "content-type": "application/json" }
@@ -79,8 +80,10 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
 beforeEach(() => {
     checkRefused = true;
     failures = 2;
+    failWith = 502;
     fetchMock.mockClear();
     checkForNewBuild.mockClear();
+    checkForNewBuild.mockResolvedValue(false);
     vi.stubGlobal("fetch", fetchMock);
     vi.useFakeTimers();
 });
@@ -138,5 +141,32 @@ describe("the update card after an update", () => {
         });
         expect(checkForNewBuild).toHaveBeenCalled();
         expect(screen.getAllByText("running-abc").length).toBeGreaterThan(0);
+        expect(screen.getByText("Could not check for updates. Try again in a moment.")).toBeTruthy();
+    });
+
+    it("says nothing about a refused check when a new build is what refused it", async () => {
+        failures = 0;
+        view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(1_000);
+        });
+        checkForNewBuild.mockResolvedValue(true);
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+            await vi.advanceTimersByTimeAsync(1_000);
+        });
+        expect(screen.queryByText("Could not check for updates. Try again in a moment.")).toBeNull();
+    });
+
+    it("stops asking for the overview when the answer is a refusal", async () => {
+        failWith = 403;
+        view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(60_000);
+        });
+        const asked = fetchMock.mock.calls.filter(([url]) =>
+            String(url).includes("/overview")
+        ).length;
+        expect(asked).toBe(1);
     });
 });

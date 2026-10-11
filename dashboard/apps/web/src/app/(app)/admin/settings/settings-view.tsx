@@ -196,6 +196,7 @@ export function SettingsView({
     // than a sentence about a check that has not happened - "Up to date" before
     // anybody has looked is the one thing this line must never say.
     const [status, setStatus] = useState<UpdateStatus | null>(null);
+    const [checkFailed, setCheckFailed] = useState(false);
     const [policy, setPolicy] = useState(initialPolicy);
     const [source, setSource] = useState(initialSource);
     // What the time field shows. A time input empties itself between segments, so
@@ -262,6 +263,7 @@ export function SettingsView({
                     setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
                     return;
                 }
+                if (answer.status < 500) return;
             } catch {
                 if (controller.signal.aborted) return;
             } finally {
@@ -284,8 +286,9 @@ export function SettingsView({
             // left on the previous build) keeps what is on screen, and asks
             // whether Polaris was updated under this tab so the update notice
             // and its reload can take over.
-            const answer = await checkUpdatesAction(force).catch(() => {
-                void checkForNewBuild();
+            setCheckFailed(false);
+            const answer = await checkUpdatesAction(force).catch(async () => {
+                if (!(await checkForNewBuild()) && force) setCheckFailed(true);
                 return null;
             });
             if (answer) setStatus(answer);
@@ -326,6 +329,7 @@ export function SettingsView({
             setPolicyError(error);
             return;
         }
+        setStatus(null);
         onCheck(true);
     }
 
@@ -785,6 +789,7 @@ export function SettingsView({
                             </>
                         )}
                     </div>
+                    {checkFailed ? <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p> : null}
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                         <Row label={t("settings.updates.runningBuild")} value={status?.current ?? null} />

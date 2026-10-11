@@ -2972,6 +2972,7 @@
             "title": "Versiones",
             "check": "Buscar actualizaciones",
             "checking": "Comprobando...",
+            "checkFailed": "No se han podido buscar actualizaciones. Vuelve a intentarlo en un momento.",
             "updating": "Actualizando...",
             "updatingStep": "Actualizando - {step}",
             "available": "Hay una actualización disponible.",
