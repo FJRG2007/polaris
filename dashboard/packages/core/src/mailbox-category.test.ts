@@ -36,7 +36,24 @@ describe("codes and sign-ins", () => {
             "Your one-time passcode",
             "Code de vérification",
             "Bestätigungscode",
-            "Codice di verifica"
+            "Codice di verifica",
+            "Tu enlace seguro a Claude.ai está aquí",
+            "Your sign-in link for Polaris",
+            "Secure link to log in",
+            "Votre lien de connexion",
+            "Ihr Anmeldelink",
+            "Il tuo link di accesso",
+            "Seu link de acesso",
+            "Password change request in PromoBox",
+            "Forgot your password?",
+            "Account recovery for your profile",
+            "Solicitud de cambio de contraseña",
+            "¿Olvidaste tu contraseña?",
+            "Recupera tu cuenta: recuperar contraseña",
+            "Mot de passe oublié",
+            "Passwort vergessen?",
+            "Password dimenticata",
+            "Esqueceu sua senha?"
         ]) {
             expect(categoriseMail(message({ subject })), subject).toBe("security");
         }
@@ -353,6 +370,42 @@ describe("mail about the safety of an account", () => {
         // evidence, and it has to still be there in a month.
         expect(isDisposableSecurityMail(message("Rockstar Games Password Changed"))).toBe(false);
         expect(isDisposableSecurityMail(message("Your password has been updated"))).toBe(false);
+    });
+
+    it("never sweeps a password change or an account recovery in any language", () => {
+        for (const subject of [
+            "Bestätigung Ihrer Passwortänderung",
+            "Passwort ändern",
+            "Confirmation de changement de mot de passe",
+            "Confirmação de alteração de senha",
+            "Conferma cambio password",
+            "Account recovery request for your account",
+            "Someone started account recovery",
+            "Recover your account",
+            "Recuperación de cuenta",
+            "Recuperar tu cuenta"
+        ]) {
+            expect(categoriseMail(message(subject)), subject).toBe("security");
+            expect(isDisposableSecurityMail(message(subject)), subject).toBe(false);
+        }
+    });
+
+    it("never sweeps a secure link that does not say it signs in", () => {
+        for (const subject of [
+            "Secure link to your statement",
+            "Your secure link to view the document",
+            "Tu enlace seguro a Claude.ai está aquí",
+            "Votre lien sécurisé",
+            "Ihr sicherer Link",
+            "Il tuo link sicuro",
+            "Seu link seguro"
+        ]) {
+            expect(categoriseMail(message(subject)), subject).toBe("security");
+            expect(isDisposableSecurityMail(message(subject)), subject).toBe(false);
+        }
+        expect(isDisposableSecurityMail(message("Secure link to log in"))).toBe(true);
+        expect(isDisposableSecurityMail(message("Your sign-in link for Polaris"))).toBe(true);
+        expect(isDisposableSecurityMail(message("Forgot your password?"))).toBe(true);
     });
 
     it("is never swept, however old it gets", () => {

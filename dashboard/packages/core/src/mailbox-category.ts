@@ -55,7 +55,7 @@
  * nothing fetched and nobody asked to resync. Leaving it alone is what makes a
  * new rule apply to tomorrow's mail and no further.
  */
-export const MAIL_CATEGORY_VERSION = 6;
+export const MAIL_CATEGORY_VERSION = 7;
 
 export const MAIL_CATEGORIES = [
     "primary",
@@ -154,12 +154,30 @@ const SECURITY_WORDS: readonly string[] = [
     "2fa code",
     "authentication code",
     "magic link",
+    "sign-in link",
+    "sign in link",
+    "login link",
+    "log in link",
+    "secure sign-in",
+    "secure link to log in",
+    "secure link to sign in",
     "sign in to",
     "new sign-in",
     "new device",
     "reset your password",
     "password reset",
     "change your password",
+    "password change request",
+    "change password request",
+    "password reset request",
+    "reset password",
+    "forgot your password",
+    "forgot password",
+    "forgotten password",
+    "password recovery",
+    "recover your password",
+    "set a new password",
+    "create a new password",
     "your otp",
     "otp code",
     // Spanish
@@ -175,6 +193,10 @@ const SECURITY_WORDS: readonly string[] = [
     "verificacion en dos pasos",
     "doble factor",
     "enlace magico",
+    "enlace de acceso",
+    "enlace seguro para iniciar sesion",
+    "enlace de inicio de sesion",
+    "enlace para iniciar sesion",
     "inicio de sesion",
     "inicia sesion",
     "nuevo inicio de sesion",
@@ -182,27 +204,67 @@ const SECURITY_WORDS: readonly string[] = [
     "restablecer contrasena",
     "cambiar tu contrasena",
     "nueva contrasena",
+    "solicitud de cambio de contrasena",
+    "restablece tu contrasena",
+    "restablecimiento de contrasena",
+    "recuperar tu contrasena",
+    "recuperar contrasena",
+    "recuperacion de contrasena",
+    "olvidaste tu contrasena",
     // Portuguese
     "codigo de verificacao",
     "codigo de seguranca",
     "redefinir sua senha",
     "alterar sua senha",
+    "redefinicao de senha",
+    "recuperar senha",
+    "esqueceu sua senha",
+    "link de acesso",
+    "link magico",
     // French
     "code de verification",
     "code de securite",
     "code a usage unique",
     "reinitialiser votre mot de passe",
+    "reinitialiser le mot de passe",
+    "reinitialisation du mot de passe",
+    "mot de passe oublie",
     "nouvelle connexion",
+    "lien de connexion",
+    "lien magique",
     // German
     "bestatigungscode",
     "sicherheitscode",
     "einmalcode",
     "passwort zurucksetzen",
+    "passwort vergessen",
     "neue anmeldung",
+    "anmeldelink",
     // Italian
     "codice di verifica",
     "codice di sicurezza",
-    "reimposta la password"
+    "reimposta la password",
+    "reimpostazione della password",
+    "password dimenticata",
+    "recupero password",
+    "link di accesso"
+];
+
+/**
+ * "Secure link" with nothing to say what it opens.
+ *
+ * A sign-in link is often written this way ("Tu enlace seguro a Claude.ai"), and
+ * so is a bank statement or a document to sign. Both go under Security, but only
+ * a link that says it signs somebody in is ever swept: a statement mistaken for a
+ * sign-in would be deleted by the clear-up.
+ */
+const SECURE_LINK_WORDS: readonly string[] = [
+    "secure link",
+    "enlace seguro",
+    "link seguro",
+    "lien securise",
+    "sicherer link",
+    "link sicuro"
 ];
 
 /**
@@ -282,6 +344,8 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "new sign-in",
     "new sign in",
     "new login",
+    "account recovery",
+    "recover your account",
     // Spanish
     "alerta de seguridad",
     "actividad sospechosa",
@@ -302,6 +366,8 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "hemos cambiado tu contrasena",
     "correo de recuperacion",
     "nuevo inicio de sesion",
+    "recuperar tu cuenta",
+    "recuperacion de cuenta",
     // Portuguese
     "alerta de seguranca",
     "atividade suspeita",
@@ -309,6 +375,7 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "senha alterada",
     "senha atualizada",
     "sua senha foi",
+    "alteracao de senha",
     // French
     "alerte de securite",
     "activite suspecte",
@@ -316,6 +383,7 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "mot de passe modifie",
     "mot de passe a ete",
     "mot de passe mis a jour",
+    "changement de mot de passe",
     // German
     "sicherheitswarnung",
     "sicherheitshinweis",
@@ -323,11 +391,14 @@ const SECURITY_ALERT_WORDS: readonly string[] = [
     "unbefugter zugriff",
     "passwort geandert",
     "passwort wurde",
+    "passwort andern",
+    "passwortanderung",
     // Italian
     "avviso di sicurezza",
     "attivita sospetta",
     "password modificata",
     "password aggiornata",
+    "cambio password",
     "la tua password e stata"
 ];
 
@@ -884,6 +955,7 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
     if (SECURITY_WORDS.some((word) => subject.includes(word))) return "security";
     if (bareCode(message.subject) && SECURITY_WORDS.some((word) => words.includes(word)))
         return "security";
+    if (SECURE_LINK_WORDS.some((word) => subject.includes(word))) return "security";
     // And anything about the safety of an account rather than a code to type
     // into one: a leaked credential, a suspicious sign-in, a repository with a
     // secret in it. Read from the snippet as well as the subject, because these
