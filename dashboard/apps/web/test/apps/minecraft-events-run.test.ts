@@ -13693,9 +13693,9 @@ describe("an elytra race", () => {
         for (const name of ["Ana", "Ben"]) {
             const wings = world.sent.indexOf(elytraKind.elytraLine(name, "components"));
             expect(wings).toBeGreaterThan(one);
-            expect(world.sent).toContain(
-                elytraKind.rocketLine(name, "components", elytraKind.START_ROCKETS)
-            );
+            // Into the hand they hold, not the first free slot.
+            for (const line of elytraKind.rocketLines(name, "components", elytraKind.START_ROCKETS))
+                expect(world.sent).toContain(line);
         }
         const gone = world.sent.indexOf(elytraKind.padGone(built));
         expect(gone).toBeGreaterThan(one);
@@ -13706,7 +13706,9 @@ describe("an elytra race", () => {
         await play(500);
         expect(world.sent.some((line) => line.includes("nbt={OnGround:1b}"))).toBe(true);
         expect(
-            world.sent.some((line) => line.startsWith("give @a[tag=pe_in,scores={pe_erkt=1..}]"))
+            world.sent.some((line) =>
+                line.startsWith("execute as @a[tag=pe_in,scores={pe_erkt=1..}] unless items")
+            )
         ).toBe(true);
 
         // Ben is three rings on; Ana crosses the line after two laps.
@@ -13742,7 +13744,9 @@ describe("an elytra race", () => {
         expect(after.run).toBeNull();
         expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
         expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 3 });
-        for (const line of elytraKind.stopLines(built.boxes)) expect(world.sent).toContain(line);
+        // And at the teardown, from anybody out of it who still holds any.
+        for (const line of elytraKind.stopLines(built.boxes, "components"))
+            expect(world.sent).toContain(line);
         for (const line of elytraKind.SCORES_REMOVED) expect(world.sent).toContain(line);
         // The wings and rockets were the event's: taken back from both.
         for (const name of ["Ana", "Ben"])

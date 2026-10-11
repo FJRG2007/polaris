@@ -20,7 +20,10 @@
  *
  * The elytra and the rockets carry the events' marker, and are taken back with
  * everything else the event gave (`stage.clearMarked`) - at the end, on leaving
- * and when a player who left comes back on.
+ * and when a player who left comes back on. Whoever holds them while not in
+ * the race loses them at the next quick look and at the teardown
+ * (`kitGoneLines`), whatever way they got out with them. The rockets go into
+ * the hand the racer holds (`rocketLines`).
  *
  * Pure: the course, the boxes and the lines are functions of what they are given.
  */
@@ -680,17 +683,56 @@ export function elytraLine(name: string, items: Flavour["items"]): string {
         : `item replace entity ${name} armor.chest with minecraft:elytra{polaris_event:1b,Unbreakable:1b} 1`;
 }
 
-/** Marked rockets, a short burst each, for `who`. */
-export function rocketLine(who: string, items: Flavour["items"], count: number): string {
+/** A marked rocket, a short burst each. */
+function rocket(items: Flavour["items"]): string {
     return items === "components"
-        ? `give ${who} minecraft:firework_rocket[${MARK},minecraft:fireworks={flight_duration:1}] ${count}`
-        : `give ${who} minecraft:firework_rocket{polaris_event:1b,Fireworks:{Flight:1b}} ${count}`;
+        ? `minecraft:firework_rocket[${MARK},minecraft:fireworks={flight_duration:1}]`
+        : "minecraft:firework_rocket{polaris_event:1b,Fireworks:{Flight:1b}}";
+}
+
+/**
+ * Marked rockets for everybody `who` names, in the hand they hold: put in the
+ * selected slot while it is empty, and given otherwise - which tops up the
+ * rockets already in that hand first. Handed out with a plain `give`, they
+ * went to the first free slot, so a racer gliding with an empty hand selected
+ * right-clicked and nothing happened. No command can change which slot a
+ * player has selected, so the rockets go to it instead.
+ */
+export function rocketLines(who: string, items: Flavour["items"], count: number): string[] {
+    const held =
+        items === "components"
+            ? "items entity @s weapon.mainhand *"
+            : "data entity @s SelectedItem";
+    return [
+        `execute as ${who} if ${held} run give @s ${rocket(items)} ${count}`,
+        `execute as ${who} unless ${held} run item replace entity @s weapon.mainhand with ${rocket(items)} ${count}`
+    ];
 }
 
 /** Everything a racer needs to fly, once they are in the air or about to be. */
 export function flyLines(name: string, items: Flavour["items"]): string[] {
-    return [elytraLine(name, items), rocketLine(name, items, START_ROCKETS)];
+    return [elytraLine(name, items), ...rocketLines(name, items, START_ROCKETS)];
 }
+
+/**
+ * The race's kit - the marked elytra, worn or not, and the marked rockets -
+ * taken from everybody `who` names. Only this race hands out either, so it
+ * never touches anything of a player's own, or another event's kit.
+ */
+export function kitGoneLines(who: string, items: Flavour["items"]): string[] {
+    return items === "components"
+        ? [
+              `clear ${who} minecraft:elytra[${MARK}]`,
+              `clear ${who} minecraft:firework_rocket[${MARK}]`
+          ]
+        : [
+              `clear ${who} minecraft:elytra{polaris_event:1b}`,
+              `clear ${who} minecraft:firework_rocket{polaris_event:1b}`
+          ];
+}
+
+/** Everybody not in a stage: nobody of them should hold the race's kit. */
+export const OUTSIDE = "@a[tag=!pe_in]";
 
 // ------------------------------------------------------------------ in the game
 
@@ -845,10 +887,13 @@ export function armLines(built: Course): string[] {
 
 /**
  * Switched off - only while the switch is still this course's - and any rocket
- * still flying over it put out. Safe when it was never on.
+ * still flying over it put out. Safe when it was never on. Given how this
+ * server spells items, the kit is also taken from everybody no longer in it
+ * (`kitGoneLines`): the teardown's last word on what the race handed out.
  */
 export function stopLines(
-    boxes: readonly Pick<Box, "x1" | "y1" | "z1" | "x2" | "y2" | "z2" | "block">[]
+    boxes: readonly Pick<Box, "x1" | "y1" | "z1" | "x2" | "y2" | "z2" | "block">[],
+    items: Flavour["items"] | null = null
 ): string[] {
     const corner = cornerOf(boxes);
     if (!corner) return [];
@@ -864,7 +909,8 @@ export function stopLines(
     };
     return [
         `execute if score ${score("tx")} matches ${corner.x} if score ${score("tz")} matches ${corner.z} run scoreboard players set ${score("on")} 0`,
-        `execute in minecraft:overworld run kill @e[type=minecraft:firework_rocket,x=${low.x - 16},y=${low.y - 32},z=${low.z - 16},dx=${high.x - low.x + 32},dy=${high.y - low.y + 48},dz=${high.z - low.z + 32}]`
+        `execute in minecraft:overworld run kill @e[type=minecraft:firework_rocket,x=${low.x - 16},y=${low.y - 32},z=${low.z - 16},dx=${high.x - low.x + 32},dy=${high.y - low.y + 48},dz=${high.z - low.z + 32}]`,
+        ...(items ? kitGoneLines(OUTSIDE, items) : [])
     ];
 }
 
@@ -971,8 +1017,11 @@ export function quickLines(
     ];
     if (items)
         lines.push(
-            rocketLine(`@a[tag=pe_in,scores={${OWED_SCORE}=1..}]`, items, 1),
-            `scoreboard players remove @a[tag=pe_in,scores={${OWED_SCORE}=1..}] ${OWED_SCORE} 1`
+            ...rocketLines(`@a[tag=pe_in,scores={${OWED_SCORE}=1..}]`, items, 1),
+            `scoreboard players remove @a[tag=pe_in,scores={${OWED_SCORE}=1..}] ${OWED_SCORE} 1`,
+            // Whoever is out of the race by any way at all - left, sent home,
+            // back on after it - and still holds its kit loses it here.
+            ...kitGoneLines(OUTSIDE, items)
         );
     return lines;
 }

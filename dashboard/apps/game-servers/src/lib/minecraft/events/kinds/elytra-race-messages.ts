@@ -35,11 +35,24 @@ export function bar(
         : `&eLap &f${lap}/${laps} &7| &eRings &f${ring}/${rings} &7| &eNext &f${meters} m &7(${up})`;
 }
 
+/**
+ * Put back in the air, a racer is held up a moment (`PUT_BACK_LIFT`), and the
+ * game closes the wings of anybody held up like that: until they press jump
+ * again, a rocket does nothing. Said with every put-back.
+ */
+function openAgain(language: Language): string {
+    return language === "es"
+        ? " Pulsa saltar para abrir los élitros otra vez."
+        : " Press jump to open your elytra again.";
+}
+
 /** Fell below the course, or landed on something. */
 export function fell(language: Language): string {
-    return language === "es"
-        ? "&cHas caído o aterrizado: &fde vuelta a tu último aro."
-        : "&cYou fell or landed: &fback to your last ring.";
+    return (
+        (language === "es"
+            ? "&cHas caído o aterrizado: &fde vuelta a tu último aro."
+            : "&cYou fell or landed: &fback to your last ring.") + openAgain(language)
+    );
 }
 
 /**
@@ -55,9 +68,11 @@ export function howToFly(language: Language): string {
 
 /** Flew through a ring out of turn. */
 export function cut(language: Language): string {
-    return language === "es"
-        ? "&cEse no era tu siguiente aro: &fde vuelta al último."
-        : "&cThat was not your next ring: &fback to your last one.";
+    return (
+        (language === "es"
+            ? "&cEse no era tu siguiente aro: &fde vuelta al último."
+            : "&cThat was not your next ring: &fback to your last one.") + openAgain(language)
+    );
 }
 
 /** Said when the server cannot play it at all: the data pack that counts the

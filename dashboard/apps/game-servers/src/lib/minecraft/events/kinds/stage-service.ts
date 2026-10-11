@@ -1904,7 +1904,7 @@ function elytraRaceOf(
             );
         },
         readFinished: elytraRace.READ_FINISHED,
-        stop: elytraRace.stopLines(course.boxes)
+        stop: elytraRace.stopLines(course.boxes, loop.items ?? null)
     };
 }
 
@@ -2508,7 +2508,7 @@ export async function settle(
             ...boatRace.stopLines(boxes),
             ...netherMaze.stopLines(boxes),
             ...acidRain.stopLines(boxes),
-            ...elytraRace.stopLines(boxes)
+            ...elytraRace.stopLines(boxes, flavour.items)
         ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);

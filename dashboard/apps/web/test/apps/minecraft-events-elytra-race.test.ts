@@ -19,6 +19,17 @@ import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/event
 
 const SITE = { x: -400, z: 250 };
 const Y = 140;
+/** A racer on their way home. */
+const SAVED: stage.Saved = {
+    name: "Ana",
+    dimension: "minecraft:overworld",
+    x: 0,
+    y: 64,
+    z: 0,
+    yaw: 0,
+    pitch: 0,
+    mode: "survival"
+};
 
 /** Every block the boxes put down, by `x,y,z`; a block put twice is a problem. */
 function blocksOf(boxes: readonly stage.Box[], problems: string[]): Map<string, string> {
@@ -154,6 +165,7 @@ describe("the elytra race's data pack", () => {
         expect(elytra.stopLines(one.boxes)[0]).not.toEqual(elytra.stopLines(other.boxes)[0]);
         expect(elytra.stopLines(one.boxes)[1]).toContain("kill @e[type=minecraft:firework_rocket,");
         expect(elytra.stopLines([])).toEqual([]);
+        expect(elytra.stopLines([], "components")).toEqual([]);
         expect(elytra.isCourse(one.boxes)).toBe(true);
         expect(elytra.isCourse([{ block: "minecraft:packed_ice" }])).toBe(false);
     });
@@ -187,9 +199,15 @@ describe("the elytra race's data pack", () => {
         expect(lines.filter((line) => line.includes(" run tp @a[tag=pe_ereset,"))).toHaveLength(
             built.rings.length + 1
         );
-        expect(lines.at(-2)).toContain(
-            "give @a[tag=pe_in,scores={pe_erkt=1..}] minecraft:firework_rocket["
-        );
+        // The rockets they are owed go into the hand they hold, one each look;
+        // then whoever is out of the race and still holds its kit loses it.
+        const owed = "@a[tag=pe_in,scores={pe_erkt=1..}]";
+        const handed = lines.indexOf(elytra.rocketLines(owed, "components", 1)[0]!);
+        expect(lines.slice(handed, handed + 3)).toEqual([
+            ...elytra.rocketLines(owed, "components", 1),
+            `scoreboard players remove ${owed} pe_erkt 1`
+        ]);
+        expect(lines.slice(-2)).toEqual(elytra.kitGoneLines("@a[tag=!pe_in]", "components"));
         expect(
             elytra
                 .quickLines(built, null, { fell: "1", cut: "2", howTo: "3" })
@@ -335,13 +353,79 @@ describe("what an elytra race hands out and says", () => {
             "item replace entity Ana armor.chest with minecraft:elytra[minecraft:custom_data={polaris_event:1b},minecraft:unbreakable={}] 1"
         );
         expect(elytra.elytraLine("Ana", "nbt")).toContain("{polaris_event:1b,Unbreakable:1b}");
-        expect(elytra.rocketLine("Ana", "nbt", 3)).toContain("firework_rocket{polaris_event:1b,");
+        expect(elytra.rocketLines("Ana", "nbt", 3)[0]).toContain(
+            "firework_rocket{polaris_event:1b,Fireworks:{Flight:1b}} 3"
+        );
+        expect(elytra.rocketLines("Ana", "components", 3)[0]).toContain(
+            "minecraft:firework_rocket[minecraft:custom_data={polaris_event:1b},minecraft:fireworks={flight_duration:1}] 3"
+        );
         expect(stage.clearMarked("Ana", "nbt")).toEqual(
             expect.arrayContaining([
                 "clear Ana minecraft:elytra{polaris_event:1b}",
                 "clear Ana minecraft:firework_rocket{polaris_event:1b}"
             ])
         );
+    });
+
+    it("puts the rockets in the hand the racer holds, never in some other slot", () => {
+        // In the selected slot while it is empty; with a plain give they went
+        // to the first free slot, and a racer gliding with an empty hand
+        // right-clicked to no effect. Otherwise given, which tops up the
+        // rockets already held. Exactly one of the two lines ever runs: the
+        // give first, so a hand just filled is not given to again.
+        const rocket =
+            "minecraft:firework_rocket[minecraft:custom_data={polaris_event:1b},minecraft:fireworks={flight_duration:1}]";
+        expect(elytra.flyLines("Ana", "components")).toEqual([
+            "item replace entity Ana armor.chest with minecraft:elytra[minecraft:custom_data={polaris_event:1b},minecraft:unbreakable={}] 1",
+            `execute as Ana if items entity @s weapon.mainhand * run give @s ${rocket} ${elytra.START_ROCKETS}`,
+            `execute as Ana unless items entity @s weapon.mainhand * run item replace entity @s weapon.mainhand with ${rocket} ${elytra.START_ROCKETS}`
+        ]);
+        // Before 1.20.5 there is no `if items`: a held stack is `SelectedItem`.
+        expect(elytra.rocketLines("Ana", "nbt", 2)).toEqual([
+            "execute as Ana if data entity @s SelectedItem run give @s minecraft:firework_rocket{polaris_event:1b,Fireworks:{Flight:1b}} 2",
+            "execute as Ana unless data entity @s SelectedItem run item replace entity @s weapon.mainhand with minecraft:firework_rocket{polaris_event:1b,Fireworks:{Flight:1b}} 2"
+        ]);
+        // Rockets are never handed out with a bare give again.
+        for (const line of [
+            ...elytra.flyLines("Ana", "components"),
+            ...elytra.flyLines("Ana", "nbt")
+        ])
+            expect(line.startsWith("give ")).toBe(false);
+    });
+
+    it("takes the kit back - the worn elytra too - from whoever is out of the race", () => {
+        // On the way home: the marked wildcard reaches the chest slot as well
+        // as the bag, before the tag that marks them as in is taken off.
+        expect(stage.clearMarked("Ana", "components")).toEqual([
+            "clear Ana *[minecraft:custom_data={polaris_event:1b}]"
+        ]);
+        const home = stage.afterReturnLines(SAVED, "components", '"back"');
+        expect(home.indexOf("clear Ana *[minecraft:custom_data={polaris_event:1b}]")).toBe(0);
+        expect(home.indexOf("tag Ana remove pe_in")).toBeGreaterThan(0);
+        // And from anybody outside the race who still holds it, whatever way
+        // they got out with it: every quick look, and at the teardown.
+        expect(elytra.kitGoneLines(elytra.OUTSIDE, "components")).toEqual([
+            "clear @a[tag=!pe_in] minecraft:elytra[minecraft:custom_data={polaris_event:1b}]",
+            "clear @a[tag=!pe_in] minecraft:firework_rocket[minecraft:custom_data={polaris_event:1b}]"
+        ]);
+        expect(elytra.kitGoneLines(elytra.OUTSIDE, "nbt")).toEqual([
+            "clear @a[tag=!pe_in] minecraft:elytra{polaris_event:1b}",
+            "clear @a[tag=!pe_in] minecraft:firework_rocket{polaris_event:1b}"
+        ]);
+        const built = elytra.course({ laps: 2, obstacles: "few" }, "kit", SITE, Y);
+        expect(elytra.stopLines(built.boxes, "components").slice(-2)).toEqual(
+            elytra.kitGoneLines(elytra.OUTSIDE, "components")
+        );
+        expect(elytra.stopLines(built.boxes)).toHaveLength(2);
+    });
+
+    it("tells a racer put back to open their wings again", () => {
+        // The lift that holds them up after a put-back closes the wings, and a
+        // rocket does nothing until they are open again.
+        expect(said.fell("en")).toContain("Press jump to open your elytra again.");
+        expect(said.cut("en")).toContain("Press jump to open your elytra again.");
+        expect(said.fell("es")).toContain("Pulsa saltar para abrir los élitros otra vez.");
+        expect(said.cut("es")).toContain("Pulsa saltar para abrir los élitros otra vez.");
     });
 
     it("needs 1.17, to put the elytra on", () => {
@@ -366,7 +450,7 @@ describe("what an elytra race hands out and says", () => {
         for (const line of [
             ...built.boxes.map(stage.buildLine),
             ...elytra.armLines(built),
-            ...elytra.stopLines(built.boxes),
+            ...elytra.stopLines(built.boxes, "components"),
             ...elytra.quickLines(built, "components", { fell: '"x"', cut: '"y"', howTo: '"z"' }),
             elytra.padGone(built)
         ])

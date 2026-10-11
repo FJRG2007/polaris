@@ -406,15 +406,21 @@ left out.
   quarter of its length, and passes no other frame or pillar. A track no rings
   fit is drawn again, then the plain one. Racers wait on a glass pad behind the
   start ring; at "Go!" its floor goes, and each wears a marked, unbreakable
-  elytra and holds three marked rockets. A ring passed gives one more rocket, a
+  elytra and holds three marked rockets - in the hand they have selected, or
+  added to what that hand holds (`elytra-race.rocketLines`), never in another
+  slot. A ring passed gives one more rocket, a
   yellow glass booster on each leg two; the quick look hands them out one at a
   time and puts back behind their last ring whoever fell under the course,
   landed, or flew a ring out of turn - with a moment of Levitation and a few
-  looks before a fall counts again (`elytra-race.GRACE_LOOKS`). After three in
+  looks before a fall counts again (`elytra-race.GRACE_LOOKS`). The Levitation
+  closes the wings, so every put-back tells them to press jump to open them
+  again before a rocket does anything. After three in
   a row with no ring passed a racer is told how to open the wings, and a
   landing no longer puts them back. Laps and checkpoints are counted by the
   events data pack, as in the boat race. The wings and rockets are taken back
-  at the end, on leaving and on coming back. Needs 1.17, to put the elytra on.
+  at the end, on leaving and on coming back, and from anybody out of the race
+  who still holds either - every quick look and at the teardown
+  (`elytra-race.kitGoneLines`). Needs 1.17, to put the elytra on.
 - **Downhill boat race** (`downhill-race`) is an ice boat race's track
   (`boat-race.laidOut`, design 2) cut open into one road, raced once: from a
   level grid at the top (`downhill-race.GRID` blocks of it behind the start
