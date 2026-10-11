@@ -34,9 +34,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     }
 }));
 
-const { stashIn, giveBack } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-);
+const { stashIn, giveBack } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
 const inServer = await import("@polaris-app/game-servers/src/lib/minecraft/events/in-server");
 import type { ServerContainer } from "@polaris-app/game-servers/src/lib/minecraft/service";
 import type { Stash } from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash";
