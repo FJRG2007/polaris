@@ -174,6 +174,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | SkyWars                                                        | day   | clear   |
 | Impostor                                                       | day   | clear   |
 | Glass bridge                                                   | day   | clear   |
+| Tug of war                                                     | day   | clear   |
 | TNT run, Dropper, Nether maze                                  | day   | clear   |
 | Elytra race, Downhill boat race                                | day   | clear   |
 | Acid rain                                                      | day   | -       |
@@ -908,6 +909,23 @@ left out.
   Weakness). It ends once everybody has crossed or is out, or when its
   minutes run out. Its markers and the switch are taken away at the end
   (`stopLines`).
+- **Tug of war** (`tug-of-war`) is two teams split as they join (`index % 2`),
+  each in a stained glass pen at one end of a platform in the sky, with an oak
+  fence rope down the middle and a yellow wool marker at the center. Everybody
+  gets a marked rod; a right-click with it is a pull, read from the game's own
+  `minecraft.used` count (`pe_tug`), so nothing client-side can add one. Each
+  look (every half second) takes how much each count rose (`hits.rose`), caps
+  it at `CAP_PER_SECOND` for the time since (`capPulls`: a macro counts as a
+  fast hand, no more) and averages each team over its players on, so the
+  smaller side of an odd split is not behind (`teamPull`). The marker moves by
+  the difference times `STEP` toward the team pulling harder; over a team's
+  line (`ropeLength` blocks from the middle) it wins, and with `FALL_MS` left
+  the team it is nearer wins. The losers' pen floor opens and they drop into
+  the pool under it, unhurt, before the run ends; dead center at the end is a
+  draw. Points are each player's pulls; the losers score nothing, so the
+  podium is the winning team by effort. Anybody out of their pen is put back
+  and counts nothing that look. No PvP: the pens are more than ten blocks
+  apart.
 - **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
   so it must never sit beside what a player brought, and only from 1.17 is
   that put away first; an older server is refused before anything starts.
@@ -1306,6 +1324,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams; from design 5 a hall of stone brick posts up to spruce nests, a slime block pad under a spruce ledge, levers on the walls |
 | Glass bridge     | plain glass panels, a light gray start with a cyan rim, a finish in black and white squares, quartz arches over both ends with hanging lanterns, quartz posts with lanterns at the outer corners, a spruce gallery behind white glass under a barrier roof, a prismarine pool lit by sea lanterns                                                          |
 | Impostor         | each room floored in its own drawn stone, wood or concrete, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents                 |
+| Tug of war       | a smooth stone field with a white middle line and a red and a blue line, an oak fence rope with a yellow wool marker, red and blue stained glass pens floored in spruce over pools of water, chiseled pillars topped with sea lanterns                                                                                                                     |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                                                                                                                                                          |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                  |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                                                                                                                                                         |

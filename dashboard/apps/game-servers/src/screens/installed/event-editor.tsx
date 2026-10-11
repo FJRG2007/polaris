@@ -47,7 +47,8 @@ import {
     ImpostorFields,
     NetherMazeFields,
     SkyWarsFields,
-    TntRunFields
+    TntRunFields,
+    TugOfWarFields
 } from "./event-options-sky";
 import { BingoFields, BossFishingFields, VillageDefenseFields } from "./event-options-anywhere";
 
@@ -1193,6 +1194,14 @@ function OptionsFields({
             return (
                 <GlassBridgeFields
                     value={preset.options as catalog.EventOptions<"glass-bridge">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "tug-of-war":
+            return (
+                <TugOfWarFields
+                    value={preset.options as catalog.EventOptions<"tug-of-war">}
                     onChange={onChange}
                     issues={issues}
                 />

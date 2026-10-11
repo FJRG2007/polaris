@@ -3,7 +3,7 @@
 /**
  * The options of the newer events played on a map built in the sky: a TNT
  * run's floors, an ice track's laps, a dropper's shaft, a nether maze, a flag game, hide and
- * seek, a hot potato, SkyWars, an impostor game and a glass bridge.
+ * seek, a hot potato, SkyWars, an impostor game, a glass bridge and a tug of war.
  */
 
 import { useGameText } from "../game-text";
@@ -683,6 +683,39 @@ export function HotPotatoFields({
                 onChange={(fuseSeconds) => onChange({ ...value, fuseSeconds })}
                 issues={issues}
                 field="fuseSeconds"
+            />
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.arena")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+        </>
+    );
+}
+
+export function TugOfWarFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"tug-of-war">;
+    onChange: (options: catalog.EventOptions<"tug-of-war">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <NumberField
+                label={t("editor.ropeLength")}
+                hint={t("editor.ropeLengthHint")}
+                min={6}
+                max={16}
+                value={value.ropeLength}
+                onChange={(ropeLength) => onChange({ ...value, ropeLength })}
+                issues={issues}
+                field="ropeLength"
             />
             <PlaceField
                 value={value.place}

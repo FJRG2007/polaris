@@ -54,7 +54,8 @@ describe("a kind added in an update", () => {
             "elytra-race",
             "downhill-race",
             "impostor",
-            "glass-bridge"
+            "glass-bridge",
+            "tug-of-war"
         ]);
         expect(added.find((one) => one.kind === "hot-potato")?.name).toBe("Patata bomba");
         expect(added.find((one) => one.kind === "nether-maze")?.name).toBe("Laberintos mortales");
@@ -64,6 +65,7 @@ describe("a kind added in an update", () => {
         expect(added.find((one) => one.kind === "impostor")?.name).toBe("Impostor");
         expect(added.find((one) => one.kind === "impostor")?.minPlayers).toBe(4);
         expect(added.find((one) => one.kind === "glass-bridge")?.name).toBe("Puente frágil");
+        expect(added.find((one) => one.kind === "tug-of-war")?.name).toBe("Tira y afloja");
         expect(read.settings.defaults).toBe(catalog.DEFAULTS_VERSION);
         // Saved since: one deleted after that stays deleted.
         expect(
@@ -85,21 +87,30 @@ describe("a kind added in an update", () => {
             "elytra-race",
             "downhill-race",
             "impostor",
-            "glass-bridge"
+            "glass-bridge",
+            "tug-of-war"
         ]);
         expect(added(4)).toEqual([
             "acid-rain",
             "elytra-race",
             "downhill-race",
             "impostor",
-            "glass-bridge"
+            "glass-bridge",
+            "tug-of-war"
         ]);
-        expect(added(5)).toEqual(["elytra-race", "downhill-race", "impostor", "glass-bridge"]);
-        expect(added(6)).toEqual(["downhill-race", "impostor", "glass-bridge"]);
-        expect(added(9)).toEqual(["impostor", "glass-bridge"]);
-        expect(added(10)).toEqual(["impostor", "glass-bridge"]);
-        expect(added(11)).toEqual(["glass-bridge"]);
-        expect(added(12)).toEqual([]);
+        expect(added(5)).toEqual([
+            "elytra-race",
+            "downhill-race",
+            "impostor",
+            "glass-bridge",
+            "tug-of-war"
+        ]);
+        expect(added(6)).toEqual(["downhill-race", "impostor", "glass-bridge", "tug-of-war"]);
+        expect(added(9)).toEqual(["impostor", "glass-bridge", "tug-of-war"]);
+        expect(added(10)).toEqual(["impostor", "glass-bridge", "tug-of-war"]);
+        expect(added(11)).toEqual(["glass-bridge", "tug-of-war"]);
+        expect(added(12)).toEqual(["tug-of-war"]);
+        expect(added(13)).toEqual([]);
     });
 
     it("joins the draw only where the draw took every event the server had", () => {
@@ -109,7 +120,7 @@ describe("a kind added in an update", () => {
                 { presetId: "quiz", weight: 2 }
             ])
         );
-        expect(all.settings.random.pool).toHaveLength(17);
+        expect(all.settings.random.pool).toHaveLength(18);
         expect(all.settings.random.pool.every((entry) => entry.weight === 2)).toBe(true);
         const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
         expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);

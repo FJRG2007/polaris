@@ -12,6 +12,7 @@ import { hideAndSeek } from "./hide-and-seek-service";
 import { impostor } from "./impostor-service";
 import { glassBridge } from "./glass-bridge-service";
 import { skyWars } from "./sky-wars-service";
+import { tugOfWar } from "./tug-of-war-service";
 
 const GAMES: Partial<Record<EventKind, ArenaGame>> = {
     "capture-the-flag": captureTheFlag,
@@ -19,7 +20,8 @@ const GAMES: Partial<Record<EventKind, ArenaGame>> = {
     "glass-bridge": glassBridge,
     "hot-potato": hotPotato,
     impostor,
-    "sky-wars": skyWars
+    "sky-wars": skyWars,
+    "tug-of-war": tugOfWar
 };
 
 /** The kind's own game, or null for one `arena-service` plays itself. */

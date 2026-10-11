@@ -970,6 +970,22 @@ describe("the editor of an event players join", () => {
             confirmEjects: false
         });
     });
+    it("saves a tug of war's rope length, and holds it between six and sixteen", async () => {
+        const saved: catalog.EventPreset[] = [];
+        await edit(catalog.newPreset("tug-of-war", "tug"), saved);
+        const field = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
+        expect(field(/^Rope length/).value).toBe("10");
+        fireEvent.change(field(/^Rope length/), { target: { value: "20" } });
+        await waitFor(() => expect(screen.getAllByText("At most 16").length).toBeGreaterThan(0));
+        expect(done().disabled).toBe(true);
+        fireEvent.change(field(/^Rope length/), { target: { value: "12" } });
+        await waitFor(() => expect(done().disabled).toBe(false));
+        fireEvent.click(done());
+        expect(saved.at(-1)!.options).toEqual({
+            ...catalog.newPreset("tug-of-war", "tug").options,
+            ropeLength: 12
+        });
+    });
 });
 
 describe("the editor in Spanish", () => {

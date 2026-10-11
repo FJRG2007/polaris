@@ -194,6 +194,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "glass-bridge": {
         en: "Cross the bridge row by row. In every row one glass panel holds and the other breaks under you; fall and you are out. The first across wins.",
         es: "Cruza el puente fila a fila. En cada fila un panel de cristal aguanta y el otro se rompe bajo tus pies; si caes, quedas fuera. Gana el primero en cruzar."
+    },
+    "tug-of-war": {
+        en: "Two teams on a rope. Right-click with your rod to pull; drag the marker over your line and the other team drops into the water.",
+        es: "Dos equipos y una cuerda. Haz clic derecho con la caña para tirar; arrastra la marca hasta tu línea y el otro equipo cae al agua."
     }
 };
 
