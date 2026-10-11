@@ -47,6 +47,7 @@ import {
     type GeneratorOptions
 } from "@/lib/generator";
 import { readForm, type FieldFacts, type PageFields } from "@/lib/fields";
+import { enterSendsLogin } from "@/lib/enter-submit";
 import {
     askBackground,
     speakRepliesIn,
@@ -517,6 +518,17 @@ async function start(): Promise<void> {
             // button is not somebody signing in.
             if (!box || !sharesForm(pressed, box)) return;
             submitted();
+        },
+        true
+    );
+    // Enter in a login box that no form submits, which neither of the two
+    // above ever sees.
+    document.addEventListener(
+        "keydown",
+        (event) => {
+            const { fields } = seen;
+            const boxes = [fields.newPassword, fields.password, fields.username].map(at);
+            if (enterSendsLogin(event, boxes)) submitted();
         },
         true
     );
