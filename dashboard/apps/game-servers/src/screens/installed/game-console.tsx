@@ -26,6 +26,7 @@ import { applyCompletion, completeConsole, type ConsoleGame } from "../../lib/co
 import { recentItemsAction, sendConsoleCommandAction } from "./minecraft-actions";
 import {
     AlertTriangle,
+    CalendarClock,
     CornerDownLeft,
     History,
     ListOrdered,
@@ -41,17 +42,13 @@ import {
     parseQueue,
     type QueueStep
 } from "../../lib/console-queue";
-import {
-    deleteConsoleCommandAction,
-    listConsoleCommandsAction,
-    saveConsoleCommandAction
-} from "./console-actions";
-import {
-    MAX_SAVED_COMMAND,
-    MAX_SAVED_LABEL,
-    placeholderRange,
-    type SavedCommand
-} from "../../lib/console-commands";
+import * as consoleActions from "./console-actions";
+import { placeholderRange, type SavedCommand } from "../../lib/console-commands";
+import { hasVariables, needsAsking } from "../../lib/console-vars";
+import type { ConsoleSchedule } from "../../lib/console-schedule";
+import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
+import { RunCommandDialog, type RunChoice, type ScheduleChoice } from "./console-run-dialog";
+import { ConsoleSchedules } from "./console-schedules";
 import {
     useCallback,
     useEffect,
@@ -92,6 +89,10 @@ const { mergeUnchanged } = hostUi.structuralMerge;
 
 /** How old the kept commands may be and still paint first on a revisit. */
 const KEPT_COMMANDS_MS = 24 * 3_600_000;
+
+/** How often the scheduled commands are read again while the console is open:
+ *  the sweep that runs them moves once a minute. */
+const SCHEDULES_EVERY_MS = 60_000;
 
 /** One command and what the server said back. */
 interface Reply {
@@ -159,6 +160,9 @@ export function GameConsole({
     const schemaText = useSchemaText();
     const t = useGameText("games");
     const { log, refresh } = useRuntimeLog(applicationId, true, 400);
+    // Polaris's own variables are Minecraft's; on another game only the
+    // person's own apply.
+    const edition = game === "java" || game === "bedrock" ? game : null;
     // Only a Java server runs a mod loader that turns clients away for their mods.
     const refused = useMemo(() => (game === "java" ? incompatibleClients(log) : null), [game, log]);
     const [line, setLine] = useState("");
@@ -194,10 +198,14 @@ export function GameConsole({
         if (heard) writeSnapshot(savedKey, saved);
     }, [heard, savedKey, saved]);
     /** The kept command being written, or null while the dialog is shut. */
-    const [keeping, setKeeping] = useState<{ id?: string; label: string; command: string } | null>(
+    const [keeping, setKeeping] = useState<KeepDraft | null>(null);
+    const [keepError, setKeepError] = useState("");
+    /** The kept command being run with values, or scheduled; null while shut. */
+    const [asking, setAsking] = useState<{ entry: SavedCommand; mode: "run" | "schedule" } | null>(
         null
     );
-    const [keepError, setKeepError] = useState("");
+    const [askError, setAskError] = useState("");
+    const [schedules, setSchedules] = useState<readonly ConsoleSchedule[]>([]);
     /** The block being written in "Run several", or null while it is shut. */
     const [batch, setBatch] = useState<string | null>(null);
     /** Where a running sequence is, or null when none is. */
@@ -216,7 +224,21 @@ export function GameConsole({
     }, [installedAppId]);
 
     useEffect(() => {
-        void listConsoleCommandsAction(installedAppId).then((answer) => {
+        let live = true;
+        const read = () =>
+            void consoleActions.listConsoleSchedulesAction(installedAppId).then((answer) => {
+                if (live) setSchedules(answer.schedules);
+            });
+        read();
+        const timer = window.setInterval(read, SCHEDULES_EVERY_MS);
+        return () => {
+            live = false;
+            window.clearInterval(timer);
+        };
+    }, [installedAppId]);
+
+    useEffect(() => {
+        void consoleActions.listConsoleCommandsAction(installedAppId).then((answer) => {
             setSaved((current) =>
                 mergeUnchanged<readonly SavedCommand[]>(current, answer.commands)
             );
@@ -389,26 +411,116 @@ export function GameConsole({
         [installedAppId, refresh, remember]
     );
 
-    /** Pressing a kept command. One that is complete runs; one with a blank in it
-     *  lands in the box with the blank selected, because sending
-     *  `Broadcast <message>` verbatim is never what anybody meant. */
-    const pressSaved = useCallback(
-        (entry: SavedCommand) => {
-            if (placeholderRange(entry.command)) load(entry.command);
-            else submit(entry.command);
+    /** A kept command with variables, filled in and sent by the server. */
+    const runKept = useCallback(
+        (entry: SavedCommand, choice: RunChoice, inDialog: boolean) => {
+            setAskError("");
+            startTransition(async () => {
+                const result = await consoleActions
+                    .runKeptCommandAction({ installedAppId, id: entry.id, ...choice })
+                    .catch(() => ({
+                        error: t("console.theServerDidNotAnswer"),
+                        replies: undefined
+                    }));
+                if (result.error || !result.replies) {
+                    // Shown in the dialog it was run from, and with the replies
+                    // otherwise, so a refusal is never silent.
+                    if (inDialog) {
+                        setAskError(result.error ?? t("console.theServerDidNotAnswer"));
+                        return;
+                    }
+                    setReplies((current) =>
+                        [
+                            ...current,
+                            {
+                                command: entry.command,
+                                output: result.error ?? t("console.theServerDidNotAnswer"),
+                                failed: true
+                            }
+                        ].slice(-KEPT_REPLIES)
+                    );
+                    return;
+                }
+                const sent = result.replies;
+                setAsking(null);
+                setReplies((current) =>
+                    [
+                        ...current,
+                        ...sent.map((reply) => ({
+                            command: reply.line,
+                            output: reply.output || "Done",
+                            failed: reply.failed
+                        }))
+                    ].slice(-KEPT_REPLIES)
+                );
+                void refresh();
+            });
         },
-        [load, submit]
+        [installedAppId, refresh, t]
     );
 
-    function keep(): void {
-        if (!keeping) return;
+    /** Pressing a kept command. One that asks for something opens the dialog that
+     *  asks; one whose variables the server fills alone runs through it; one with
+     *  a blank in it lands in the box with the blank selected, because sending
+     *  `Broadcast <message>` verbatim is never what anybody meant; the rest run. */
+    const pressSaved = useCallback(
+        (entry: SavedCommand) => {
+            const declared = entry.variables ?? [];
+            if (needsAsking(entry.command, edition, declared)) {
+                setAskError("");
+                setAsking({ entry, mode: "run" });
+            } else if (hasVariables(entry.command, edition, declared)) {
+                runKept(entry, { values: {}, target: null }, false);
+            } else if (placeholderRange(entry.command)) load(entry.command);
+            else submit(entry.command);
+        },
+        [edition, load, runKept, submit]
+    );
+
+    function schedule(entry: SavedCommand, choice: ScheduleChoice): void {
+        setAskError("");
+        startTransition(async () => {
+            const result = await consoleActions.scheduleKeptCommandAction({
+                installedAppId,
+                id: entry.id,
+                ...choice
+            });
+            if (result.error || !result.schedules) {
+                setAskError(result.error ?? t("console.keepFailed"));
+                return;
+            }
+            setSchedules(result.schedules);
+            setAsking(null);
+        });
+    }
+
+    function unschedule(id: string): void {
+        startTransition(async () => {
+            const result = await consoleActions.removeConsoleScheduleAction(installedAppId, id);
+            if (result.schedules) setSchedules(result.schedules);
+            else
+                setReplies((current) =>
+                    [
+                        ...current,
+                        {
+                            command: t("consoleSchedule.scheduled"),
+                            output: result.error ?? t("consoleSchedule.stopFailed"),
+                            failed: true
+                        }
+                    ].slice(-KEPT_REPLIES)
+                );
+        });
+    }
+
+    function keep(draft: KeepDraft): void {
         setKeepError("");
         startTransition(async () => {
-            const result = await saveConsoleCommandAction({
+            const result = await consoleActions.saveConsoleCommandAction({
                 installedAppId,
-                id: keeping.id,
-                label: keeping.label,
-                command: keeping.command
+                id: draft.id,
+                label: draft.label,
+                command: draft.command,
+                variables: [...draft.variables]
             });
             if (result.error || !result.commands) {
                 setKeepError(result.error ?? t("console.keepFailed"));
@@ -422,10 +534,12 @@ export function GameConsole({
 
     function forget(id: string): void {
         startTransition(async () => {
-            const result = await deleteConsoleCommandAction(installedAppId, id);
+            const result = await consoleActions.deleteConsoleCommandAction(installedAppId, id);
             if (result.commands) {
                 setSaved(result.commands);
                 setHeard(true);
+                // Its schedules went with it.
+                setSchedules((current) => current.filter((one) => one.commandId !== id));
             }
         });
     }
@@ -589,11 +703,21 @@ export function GameConsole({
                                             setKeeping({
                                                 id: entry.id,
                                                 label: entry.label,
-                                                command: entry.command
+                                                command: entry.command,
+                                                variables: entry.variables ?? []
                                             });
                                         }}
                                     >
                                         {t("console.edit")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() => {
+                                            setAskError("");
+                                            setAsking({ entry, mode: "schedule" });
+                                        }}
+                                    >
+                                        <CalendarClock className="size-4" />{" "}
+                                        {t("consoleSchedule.scheduleIt")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => load(entry.command)}>
                                         {t("console.putItInTheBox")}
@@ -614,12 +738,14 @@ export function GameConsole({
                         disabled={pending}
                         onClick={() => {
                             setKeepError("");
-                            setKeeping({ label: "", command: line.trim() });
+                            setKeeping({ label: "", command: line.trim(), variables: [] });
                         }}
                     >
                         <Plus className="size-3.5" /> {t("console.keepACommand")}
                     </Button>
                 </div>
+
+                <ConsoleSchedules schedules={schedules} pending={pending} onRemove={unschedule} />
 
                 <div className="relative flex items-center gap-2">
                     {suggestions.length > 0 && (
@@ -836,71 +962,29 @@ export function GameConsole({
                 )}
 
                 {keeping && (
-                    <Dialog open onOpenChange={(open: boolean) => !open && setKeeping(null)}>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>
-                                    {keeping.id
-                                        ? t("console.editTheCommand")
-                                        : t("console.keepACommand")}
-                                </DialogTitle>
-                                <DialogDescription>
-                                    {t.rich<ReactNode>("console.keepHelp", {
-                                        example: () => (
-                                            <code key="example">
-                                                {/* i18n-ignore: the command by its own name */}
-                                                {`Broadcast <${t("console.messagePlaceholder")}>`}
-                                            </code>
-                                        )
-                                    })}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex flex-col gap-3">
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-sm font-medium">
-                                        {t("console.command")}
-                                    </span>
-                                    <Input
-                                        autoFocus
-                                        value={keeping.command}
-                                        maxLength={MAX_SAVED_COMMAND}
-                                        className="font-mono"
-                                        placeholder={hint ?? t("console.defaultHint")}
-                                        onChange={(event) =>
-                                            setKeeping({ ...keeping, command: event.target.value })
-                                        }
-                                    />
-                                </label>
-                                <label className="flex flex-col gap-1">
-                                    <span className="text-sm font-medium">{t("console.name")}</span>
-                                    <Input
-                                        value={keeping.label}
-                                        maxLength={MAX_SAVED_LABEL}
-                                        placeholder={t("console.theCommandItselfIfYou")}
-                                        onChange={(event) =>
-                                            setKeeping({ ...keeping, label: event.target.value })
-                                        }
-                                    />
-                                </label>
-                                {keepError && (
-                                    <p role="alert" className="text-sm text-danger">
-                                        {keepError}
-                                    </p>
-                                )}
-                            </div>
-                            <DialogFooter>
-                                <Button variant="ghost" onClick={() => setKeeping(null)}>
-                                    {t("console.cancel")}
-                                </Button>
-                                <Button
-                                    onClick={keep}
-                                    disabled={pending || keeping.command.trim().length === 0}
-                                >
-                                    {t("console.keepIt")}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                    <KeepCommandDialog
+                        initial={keeping}
+                        edition={edition}
+                        hint={hint}
+                        pending={pending}
+                        error={keepError}
+                        onClose={() => setKeeping(null)}
+                        onKeep={keep}
+                    />
+                )}
+
+                {asking && (
+                    <RunCommandDialog
+                        entry={asking.entry}
+                        mode={asking.mode}
+                        edition={edition}
+                        players={players}
+                        pending={pending}
+                        error={askError}
+                        onClose={() => setAsking(null)}
+                        onRun={(choice) => runKept(asking.entry, choice, true)}
+                        onSchedule={(choice) => schedule(asking.entry, choice)}
+                    />
                 )}
             </CardBody>
         </Card>

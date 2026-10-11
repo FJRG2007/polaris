@@ -18,6 +18,7 @@ type AppJob = AppHostTypes["AppJob"];
 const games = () => import("./games-service");
 const worlds = () => import("./minecraft/world-service");
 const schedules = () => import("./minecraft/schedule-service");
+const consoleSchedules = () => import("./console-run-service");
 
 const MINUTE = 60 * 1000;
 
@@ -99,6 +100,16 @@ async function runGameActivity(): Promise<{
         // not race the sweep that was about to stop it for being empty.
         for (const installedAppId of activity?.known.keys() ?? []) {
             await runGameRoutines(ownerId, installedAppId, now).catch(() => 0);
+        }
+        // The console's scheduled commands, with whether each server answered: one
+        // that did not has its moment skipped and shown, never saved for later.
+        if (activity) {
+            const { runConsoleSchedules } = await consoleSchedules();
+            for (const [installedAppId, online] of activity.known) {
+                await runConsoleSchedules(ownerId, installedAppId, online !== null, now).catch(
+                    () => 0
+                );
+            }
         }
         if (activity) {
             arrived += activity.arrived;

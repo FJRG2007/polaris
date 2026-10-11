@@ -284,6 +284,23 @@ export function variablesIn(text: string): VariableUse[] {
 }
 
 /**
+ * Every `{...}` in a text passed through `replace`; one it answers null for is
+ * left exactly as written. The console's kept commands are filled through this,
+ * so a command and a line of text are read by the same parser, and a brace that
+ * is not a variable - `{SkeletonTrap:1b}` - is never one.
+ */
+export function replaceVariables(
+    text: string,
+    replace: (use: VariableUse) => string | null
+): string {
+    return text.replace(
+        TOKEN,
+        (raw, name: string, fallback: string | undefined) =>
+            replace({ raw, name, fallback: fallback ?? null, spec: variable(name) }) ?? raw
+    );
+}
+
+/**
  * What is wrong with the variables in one field, in words for under it, or null.
  *
  * A brace that does not make a variable is refused rather than sent as written:
