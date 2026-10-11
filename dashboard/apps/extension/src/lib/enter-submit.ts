@@ -1,7 +1,17 @@
 /** Input types whose presence in a form stops Enter submitting it when there is no button. */
 const BLOCKING_TYPES = new Set([
-    "text", "search", "url", "tel", "email", "password", "date", "month", "week", "time",
-    "datetime-local", "number"
+    "text",
+    "search",
+    "url",
+    "tel",
+    "email",
+    "password",
+    "date",
+    "month",
+    "week",
+    "time",
+    "datetime-local",
+    "number"
 ]);
 
 /**
@@ -39,6 +49,7 @@ export function enterSendsLogin(
 ): boolean {
     if (event.key !== "Enter" || event.isComposing || event.repeat) return false;
     const box = event.target;
-    if (!(box instanceof HTMLInputElement) || (box.form && enterSubmitsForm(box.form))) return false;
+    if (!(box instanceof HTMLInputElement) || (box.form && enterSubmitsForm(box.form)))
+        return false;
     return loginBoxes.includes(box);
 }

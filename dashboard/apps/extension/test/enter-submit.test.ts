@@ -43,21 +43,21 @@ describe("an Enter press", () => {
     });
 
     it("is left to the submit event in a lone password box with no button", () => {
-        const password = form("<input type=\"password\">");
+        const password = form('<input type="password">');
         expect(enterSendsLogin(enter(password), [password])).toBe(false);
     });
 
     it("sends the login from a form Enter cannot submit", () => {
         const password = form(
-            "<input type=\"email\">",
-            "<input type=\"password\">",
-            "<button type=\"button\">Sign in</button>"
+            '<input type="email">',
+            '<input type="password">',
+            '<button type="button">Sign in</button>'
         );
         expect(enterSendsLogin(enter(password), [null, password, null])).toBe(true);
     });
 
     it("sends the login when the form's submit button is disabled", () => {
-        const password = form("<input type=\"password\">", "<button disabled></button>");
+        const password = form('<input type="password">', "<button disabled></button>");
         expect(enterSendsLogin(enter(password), [password])).toBe(true);
     });
 
