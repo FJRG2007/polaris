@@ -929,6 +929,7 @@
         },
         "collapse": "Collapse repeats",
         "collapseHint": "Show a line that repeats in a row once, with how many times it did",
+        "levelCount": "{count, number}",
         "repeat": "x{count, number}",
         "repeatedTitle": "{lines, plural, one {This line} other {These # lines}} repeated {count, number} times in a row",
         "matchCount": "{total, plural, =0 {No matches} one {# match} other {# matches}}",

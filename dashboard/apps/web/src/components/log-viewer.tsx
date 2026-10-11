@@ -165,13 +165,20 @@ export function LogViewer({
     // that nearly say it, which in a log is a wrong answer that reads like a
     // right one - and it would rank a stream whose only meaningful order is
     // time.
-    const matched = useMemo(
-        () =>
-            query && view.onlyMatches
-                ? folded.filter((row) => row.entry.text.toLowerCase().includes(query))
-                : folded,
-        [folded, query, view.onlyMatches]
-    );
+    // Each kept row notes whether it is the first of its repeat block still
+    // shown, so the count stays visible when the block's first line is filtered out.
+    const matched = useMemo(() => {
+        const filter = Boolean(query && view.onlyMatches);
+        const result: Array<{ row: logLines.LogRow; lead: boolean }> = [];
+        let lastBlock = -1;
+        folded.forEach((row, index) => {
+            if (filter && !row.entry.text.toLowerCase().includes(query)) return;
+            const block = index - row.offset;
+            result.push({ row, lead: block !== lastBlock });
+            lastBlock = block;
+        });
+        return result;
+    }, [folded, query, view.onlyMatches]);
     // Logs are read tail-first, so cap the rendered rows to the most recent slice -
     // this keeps the DOM light on a huge stream without losing what matters.
     const shown = useMemo(
@@ -179,18 +186,20 @@ export function LogViewer({
         [matched]
     );
     const hiddenCount = matched.length - shown.length;
-    // The rows of `shown` the search hits, in order - what next and previous step through.
+    // The rows the search hits, in order - what next and previous step through.
+    // Numbered from the start of `matched`, so a row keeps its number as the
+    // tail streams in and the oldest rows drop off the top.
     const hits = useMemo(() => {
         if (!query) return [];
         const result: number[] = [];
-        shown.forEach((row, index) => {
-            if (row.entry.text.toLowerCase().includes(query)) result.push(index);
+        shown.forEach(({ row }, index) => {
+            if (row.entry.text.toLowerCase().includes(query)) result.push(hiddenCount + index);
         });
         return result;
-    }, [shown, query]);
+    }, [shown, query, hiddenCount]);
     // One gutter for the whole view, not per line: a stream where only some lines
     // are stamped still reads as one column.
-    const hasTimes = useMemo(() => shown.some((row) => row.entry.time !== null), [shown]);
+    const hasTimes = useMemo(() => shown.some(({ row }) => row.entry.time !== null), [shown]);
 
     // Follows the tail as new output streams in, matching a live console - and
     // leaves the view alone while it is being read further up. Keyed on the rows
@@ -209,20 +218,21 @@ export function LogViewer({
         const before = previous.current;
         if (onReachStart && before && before.last === last && before.first !== first) {
             element.scrollTop += element.scrollHeight - before.height;
+            setCurrent(null);
         }
         previous.current = { height: element.scrollHeight, first, last };
     }, [log, onReachStart, follow]);
 
-    useEffect(() => setCurrent(null), [query]);
+    useEffect(() => setCurrent(null), [query, levelKey, view.collapse, view.onlyMatches]);
 
-    const active = current !== null && current < hits.length ? current : null;
-    const activeRow = active !== null ? hits[active] : undefined;
+    const position = current !== null ? hits.indexOf(current) : -1;
+    const active = position >= 0 ? position : null;
 
     function step(direction: 1 | -1): void {
         if (hits.length === 0) return;
         let next = direction === 1 ? 0 : hits.length - 1;
         if (active !== null) next = (active + direction + hits.length) % hits.length;
-        setCurrent(next);
+        setCurrent(hits[next] ?? null);
         // Moving the view away from the tail is what stops it following, which is
         // what the reader wants while stepping through matches.
         const row = follow.ref.current?.querySelector(`[data-row="${hits[next]}"]`);
@@ -345,7 +355,7 @@ export function LogViewer({
                                 <span className={cn("size-2 rounded-full", CHIP_DOT[level], !on && "opacity-40")} />
                                 {t(`logViewer.level.${level}`)}
                                 <span className="tabular-nums text-muted-foreground">
-                                    {counts[level].toLocaleString()}
+                                    {t("logViewer.levelCount", { count: counts[level] })}
                                 </span>
                             </button>
                         );
@@ -387,13 +397,18 @@ export function LogViewer({
                                 {t("logViewer.hidden", { hidden: hiddenCount, shown: MAX_LOG_ROWS })}
                             </p>
                         )}
-                        {shown.map((row, index) => (
+                        {shown.map(({ row, lead }, index) => (
                             <LogRow
-                                key={index}
-                                index={index}
-                                row={row}
+                                key={hiddenCount + index}
+                                index={hiddenCount + index}
+                                text={row.entry.text}
+                                level={row.entry.level}
+                                time={row.entry.time}
+                                repeat={row.repeat}
+                                span={row.span}
+                                badge={lead && row.repeat > 1}
                                 query={query}
-                                active={index === activeRow}
+                                active={hiddenCount + index === current}
                                 gutter={hasTimes}
                                 withDates={withDates}
                             />
@@ -424,17 +439,29 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     return <>{parts}</>;
 }
 
-// Memoized so a new line arriving re-renders that line, not the thousands above it.
+// Memoized on plain values, so a new line arriving re-renders that line, not the
+// thousands above it - the rows are rebuilt on every change, their contents are not.
 const LogRow = memo(function LogRow({
     index,
-    row,
+    text,
+    level,
+    time: stamp,
+    repeat,
+    span,
+    badge,
     query,
     active,
     gutter,
     withDates
 }: {
     index: number;
-    row: logLines.LogRow;
+    text: string;
+    level: logLines.LogLevel;
+    time: string | null;
+    repeat: number;
+    span: number;
+    /** This row carries the count of the repeat block it belongs to. */
+    badge: boolean;
     query: string;
     active: boolean;
     gutter: boolean;
@@ -443,13 +470,12 @@ const LogRow = memo(function LogRow({
     const t = useTranslations("components");
     const [copied, setCopied] = useState(false);
     const format = useDisplayFormat();
-    const { entry, repeat, span, offset } = row;
-    const time = entry.time ? logLines.formatLogTime(entry.time, format, withDates) : null;
+    const time = stamp ? logLines.formatLogTime(stamp, format, withDates) : null;
     const repeated = repeat > 1;
 
     async function copy(): Promise<void> {
         try {
-            await navigator.clipboard.writeText(time ? `${time} ${entry.text}` : entry.text);
+            await navigator.clipboard.writeText(time ? `${time} ${text}` : text);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
         } catch {
@@ -476,9 +502,9 @@ const LogRow = memo(function LogRow({
                     {time ?? ""}
                 </span>
             )}
-            <span className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words", LEVEL_CLASS[entry.level])}>
-                {entry.text ? <Highlighted text={entry.text} query={query} /> : " "}
-                {repeated && offset === 0 && (
+            <span className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words", LEVEL_CLASS[level])}>
+                {text ? <Highlighted text={text} query={query} /> : " "}
+                {badge && (
                     <span
                         className="ml-2 inline-block rounded bg-zinc-700/80 px-1 align-baseline text-[0.6875rem] tabular-nums text-zinc-200"
                         title={t("logViewer.repeatedTitle", { count: repeat, lines: span })}

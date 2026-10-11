@@ -45,7 +45,9 @@ function chip(name: RegExp): HTMLElement {
 
 describe("log filters", () => {
     it("counts each level and folds the repeated line", () => {
-        const { container } = render(<LogViewer log={LOG} name="mc" searchable />, { wrapper: MessagesWrapper });
+        const { container } = render(<LogViewer log={LOG} name="mc" searchable />, {
+            wrapper: MessagesWrapper
+        });
         expect(chip(/^Errors/).textContent).toContain("1");
         expect(chip(/^Warnings/).textContent).toContain("1");
         expect(chip(/^Info/).textContent).toContain("4");
@@ -54,13 +56,17 @@ describe("log filters", () => {
     });
 
     it("shows every repeat once folding is switched off", () => {
-        const { container } = render(<LogViewer log={LOG} name="mc" />, { wrapper: MessagesWrapper });
+        const { container } = render(<LogViewer log={LOG} name="mc" />, {
+            wrapper: MessagesWrapper
+        });
         fireEvent.click(chip(/Collapse repeats/));
         expect(rows(container)).toHaveLength(6);
     });
 
     it("filters by several levels at once and remembers the choice", () => {
-        const { container, unmount } = render(<LogViewer log={LOG} name="mc" />, { wrapper: MessagesWrapper });
+        const { container, unmount } = render(<LogViewer log={LOG} name="mc" />, {
+            wrapper: MessagesWrapper
+        });
         fireEvent.click(chip(/^Info/));
         expect(rows(container)).toHaveLength(2);
         expect(chip(/^Info/).getAttribute("aria-pressed")).toBe("false");
@@ -72,12 +78,16 @@ describe("log filters", () => {
 
     it("keeps a separate choice per viewer and survives a corrupt entry", () => {
         window.localStorage.setItem("polaris.logViewer.other", "{not json");
-        const { container } = render(<LogViewer log={LOG} name="other" />, { wrapper: MessagesWrapper });
+        const { container } = render(<LogViewer log={LOG} name="other" />, {
+            wrapper: MessagesWrapper
+        });
         expect(rows(container)).toHaveLength(4);
     });
 
     it("never filters down to nothing when the last level is switched off", () => {
-        const { container } = render(<LogViewer log={LOG} name="mc" />, { wrapper: MessagesWrapper });
+        const { container } = render(<LogViewer log={LOG} name="mc" />, {
+            wrapper: MessagesWrapper
+        });
         fireEvent.click(chip(/^Info/));
         fireEvent.click(chip(/^Warnings/));
         fireEvent.click(chip(/^Errors/));
@@ -85,7 +95,9 @@ describe("log filters", () => {
     });
 
     it("highlights matches and steps through them", () => {
-        const { container } = render(<LogViewer log={LOG} name="mc" searchable />, { wrapper: MessagesWrapper });
+        const { container } = render(<LogViewer log={LOG} name="mc" searchable />, {
+            wrapper: MessagesWrapper
+        });
         const input = screen.getByRole("textbox");
         fireEvent.change(input, { target: { value: "server" } });
         expect(container.querySelectorAll("mark").length).toBeGreaterThan(0);
@@ -102,10 +114,50 @@ describe("log filters", () => {
     });
 
     it("keeps the live tail coming in while filtered", () => {
-        const { container, rerender } = render(<LogViewer log={LOG} name="mc" />, { wrapper: MessagesWrapper });
+        const { container, rerender } = render(<LogViewer log={LOG} name="mc" />, {
+            wrapper: MessagesWrapper
+        });
         fireEvent.click(chip(/^Info/));
-        rerender(<LogViewer log={`${LOG}\n[12:00:07] [Server thread/ERROR]: second failure`} name="mc" />);
+        rerender(
+            <LogViewer log={`${LOG}\n[12:00:07] [Server thread/ERROR]: second failure`} name="mc" />
+        );
         expect(rows(container).at(-1)).toContain("second failure");
         expect(chip(/^Errors/).textContent).toContain("2");
+    });
+
+    it("keeps the repeat count when only a later line of the block matches", () => {
+        const block = ["client started", "client shutting down"];
+        const log = ["boot", ...block, ...block, ...block].join("\n");
+        const { container } = render(<LogViewer log={log} name="mc" searchable />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "shutting" } });
+        expect(rows(container)).toHaveLength(1);
+        expect(screen.getByText("x3")).toBeTruthy();
+    });
+
+    it("keeps the active match on its line as the tail passes the row cap", () => {
+        const lines = (count: number) =>
+            Array.from(
+                { length: count },
+                (_, index) => `line ${index}${index % 500 === 0 ? " needle" : ""}`
+            ).join("\n");
+        const { container, rerender } = render(
+            <LogViewer log={lines(3000)} name="cap" searchable />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
+        fireEvent.change(screen.getByRole("textbox"), { target: { value: "needle" } });
+        fireEvent.click(screen.getByRole("button", { name: "Only show matching lines" }));
+        fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+        fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+        const marked = () =>
+            container.querySelector('[data-row][class*="bg-yellow-400/10"]')?.textContent ?? "";
+        expect(marked()).toContain("line 500 needle");
+
+        rerender(<LogViewer log={lines(3100)} name="cap" searchable />);
+        expect(marked()).toContain("line 500 needle");
+        expect(screen.getByText(/^1 of 6$/)).toBeTruthy();
     });
 });

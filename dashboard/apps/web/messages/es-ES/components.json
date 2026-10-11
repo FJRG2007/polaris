@@ -929,6 +929,7 @@
         },
         "collapse": "Agrupar repetidas",
         "collapseHint": "Muestra una sola vez la línea que se repite seguida, con cuántas veces lo hizo",
+        "levelCount": "{count, number}",
         "repeat": "x{count, number}",
         "repeatedTitle": "{lines, plural, one {Esta línea se repitió} other {Estas # líneas se repitieron}} {count, number} veces seguidas",
         "matchCount": "{total, plural, =0 {Sin coincidencias} one {# coincidencia} other {# coincidencias}}",
