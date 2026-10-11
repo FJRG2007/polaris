@@ -440,15 +440,26 @@ left out.
   floating. Walked to (fists only off), it stays on the ground and none of what
   follows applies. Its circle is `RING_RADIUS` (10) by default; one saved on
   the old 6 is moved to 10 once (`toRingRadius`, fists only).
-- **The king of the ring's look** (`hill.DEATH`, from 1.19; `hill.PLAIN`
-  before, and for one walked to): a floor of deepslate tiles edged in sculk,
-  reinforced deepslate at the corners with a soul campfire on each, a wither
-  skeleton's skull in the middle of each side looking in, and the ring a line
-  of ochre froglight, under the soul sand valley's sky, with souls and ash
-  drifting over it (`hill.ambientLines`) and a heartbeat through a round that
-  counts double. The look a platform was built in is read back from its
-  arena's block list (`hill.lookOf`), so a restart keeps it, and every block of
-  it is in that list for the teardown.
+- **The king of the ring's court** (`hill.ROYAL`, from 1.19; `hill.PLAIN`
+  before, and for one walked to): the same fighting floor, in polished
+  blackstone inside a crimson brick border lit by shroomlight, the ring a line
+  of ochre froglight, raised on a tapered blackstone underside with a gilded
+  core. Round it, starting a block past where a fall is brought back
+  (`hill.strayed`), so nothing in it catches anybody knocked off: stands of
+  blackstone seats down the east and west sides, an entrance arch with a red
+  carpet to the north, a gold throne on a crimson dais to the south, four tall
+  pillars, red banners and soul lanterns, and a gold crown floating ten blocks
+  over the middle of the ring. Over the floor only banners, a lantern on each
+  corner and unseen `light` blocks stand, so the floor stays lit however the
+  ring shrinks. Crown and throne glitter (`hill.ambientLines`) under the soul
+  sand valley's sky, with souls and ash and a heartbeat through a round that
+  counts double. The place is looked for, proved empty and taken down over the
+  whole court (`hill.proofBox`, `hill.footprint`); every block is in the
+  arena's list, what hangs on something first, so nothing drops as an item.
+  A ring built before keeps its look: `hill.DEATH` (deepslate tiles edged in
+  sculk, soul campfires on the corners, a wither skeleton's skull looking in
+  from each side) or `hill.PLAIN`, read back from its arena's block list
+  (`hill.lookOf`), so a restart keeps it.
 - **Each blow throws further** (`hill.knockbackLines`), from 1.21, where a
   player's punch reads the `attack_knockback` attribute: every fighter punches
   at `ATTACK_KNOCKBACK` and starts at `FRESH_RESISTANCE` knockback resistance,

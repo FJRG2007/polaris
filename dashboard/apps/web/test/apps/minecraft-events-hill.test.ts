@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import * as hill from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill";
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
@@ -424,5 +425,250 @@ describe("the king of the ring's own look", () => {
                     )
                 )
         ).toBe(true);
+    });
+});
+describe("the king of the ring's court", () => {
+    const radius = 10;
+    const half = radius + hill.MARGIN;
+    const id = (block: string) => block.replace(/\[.*$/, "");
+    const cells = (look: hill.Look, r = radius) =>
+        hill.platformDecor(place, r, look).flatMap((one, order) => {
+            const out: { x: number; y: number; z: number; block: string; order: number }[] = [];
+            for (let x = one.box.x1; x <= one.box.x2; x += 1)
+                for (let y = one.box.y1; y <= one.box.y2; y += 1)
+                    for (let z = one.box.z1; z <= one.box.z2; z += 1)
+                        out.push({
+                            x: x - place.x,
+                            y: y - place.y,
+                            z: z - place.z,
+                            block: one.block,
+                            order
+                        });
+            return out;
+        });
+    /** Blocks nobody can stand on or be stopped by. */
+    const PASSABLE = new Set([
+        "minecraft:red_banner",
+        "minecraft:red_wall_banner",
+        "minecraft:light"
+    ]);
+    const HANGING = new Set([
+        "minecraft:red_banner",
+        "minecraft:red_wall_banner",
+        "minecraft:soul_lantern",
+        "minecraft:end_rod",
+        "minecraft:red_carpet"
+    ]);
+
+    it("keeps the platforms built before it exactly as they were drawn", () => {
+        // Fingerprints taken before the court existed: a ring still standing
+        // in an old look is redrawn, lit and taken down as it was built.
+        const hash = (value: unknown) =>
+            createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+        const before: Record<string, string[]> = {
+            "PLAIN 4": [
+                "60fc3cc5257d8770",
+                "a60e771a028afafc",
+                "9e841a66eeac507f",
+                "1aa02f6c1f2a50e0",
+                "80f02a83c1e96aab"
+            ],
+            "PLAIN 10": [
+                "9e9be4fd6e622b6b",
+                "a60e771a028afafc",
+                "6f7c6b5dd35a9b4e",
+                "691fa4de23eae763",
+                "849a85b70ea88a7d"
+            ],
+            "PLAIN 16": [
+                "eb0e297c73edddc0",
+                "a60e771a028afafc",
+                "234ac5f9b0a1dcb3",
+                "e1a02c1695afe416",
+                "d58bddab796f9e7f"
+            ],
+            "DEATH 4": [
+                "92e482f0e2f47e31",
+                "acac932a1b6a2f11",
+                "9e841a66eeac507f",
+                "1aa02f6c1f2a50e0",
+                "4abd558da1891751"
+            ],
+            "DEATH 10": [
+                "69a5c353bfabf3ed",
+                "acac932a1b6a2f11",
+                "6f7c6b5dd35a9b4e",
+                "691fa4de23eae763",
+                "4d8cf81e285629ca"
+            ],
+            "DEATH 16": [
+                "609d261fdaa83eb9",
+                "acac932a1b6a2f11",
+                "234ac5f9b0a1dcb3",
+                "e1a02c1695afe416",
+                "528e560b6a3b3bc6"
+            ]
+        };
+        for (const [key, prints] of Object.entries(before)) {
+            const [name, size] = key.split(" ") as ["PLAIN" | "DEATH", string];
+            const r = Number(size);
+            const look = hill[name];
+            expect([
+                hash(hill.platformDecor(place, r, look)),
+                hash(hill.lookBlocks(look)),
+                hash(hill.proofBox(place, r)),
+                hash(hill.platformBox(place, r)),
+                hash(hill.redrawLines(place, r, place, 6, look))
+            ]).toEqual(prints);
+        }
+        expect(hash(hill.ambientLines(place, 10, false))).toBe("956905e1924e9e11");
+        expect(hash(hill.ambientLines(place, 10, true))).toBe("b90ed44bd7cee80f");
+        expect(hill.lookOf([...hill.lookBlocks(hill.DEATH), hill.FIRE])).toBe(hill.DEATH);
+        expect(hill.lookOf([...hill.lookBlocks(hill.ROYAL), hill.FIRE])).toBe(hill.ROYAL);
+    });
+
+    it("builds every block it lists, and only those - and nothing anybody sleeps or respawns on", () => {
+        for (const r of [3, 10, 20]) {
+            // The fighting floor is filled round the rest (`buildPlatform`).
+            const built = new Set([
+                ...cells(hill.ROYAL, r).map((one) => id(one.block)),
+                hill.ROYAL.floor
+            ]);
+            const listed = hill.lookBlocks(hill.ROYAL);
+            expect([...built].sort()).toEqual([...listed].sort());
+            expect(listed.some((block) => /_bed$|respawn_anchor/.test(block))).toBe(false);
+        }
+    });
+
+    it("stands nothing in the air a knocked-off player falls through, and nothing on the floor to hide behind", () => {
+        for (const r of [3, 10, 20]) {
+            const h = r + hill.MARGIN;
+            for (const one of cells(hill.ROYAL, r)) {
+                const out = Math.max(Math.abs(one.x), Math.abs(one.z));
+                // Past the edge and short of where a fall is brought back: only
+                // what nobody can stand on or be stopped by.
+                if (out > h && out <= h + 6)
+                    expect(PASSABLE.has(id(one.block)), JSON.stringify(one)).toBe(true);
+                // Over the fighting floor inside the edge: only the crown, far
+                // over everybody's head.
+                if (out < h && one.y > 0 && !PASSABLE.has(id(one.block)))
+                    expect(one.y, JSON.stringify(one)).toBeGreaterThanOrEqual(8);
+                // On the edge: the border, and only low markers over it.
+                if (out === h && one.y > 0) {
+                    expect(one.y).toBe(1);
+                    expect(["minecraft:soul_lantern", "minecraft:red_banner"]).toContain(
+                        id(one.block)
+                    );
+                }
+            }
+        }
+    });
+
+    it("keeps the ring's redraw off its border, its court and its crown", () => {
+        for (const one of cells(hill.ROYAL)) {
+            const out = Math.max(Math.abs(one.x), Math.abs(one.z));
+            if (one.y === 0 && out === half) {
+                expect(one.block).not.toBe(hill.ROYAL.floor);
+                expect(one.block).not.toBe(hill.ROYAL.ring);
+            }
+            if (one.y === 0 && out < half) expect(one.block).toBe(hill.ROYAL.ring);
+        }
+        for (const line of hill.redrawLines(place, radius, place, 6, hill.ROYAL))
+            expect(line).toMatch(
+                / minecraft:(polished_blackstone replace minecraft:ochre_froglight|ochre_froglight replace minecraft:polished_blackstone)$/
+            );
+    });
+
+    it("is proved empty and taken down whole: every block inside its proof, and what hangs on something taken first", () => {
+        const step: Record<string, readonly [number, number, number]> = {
+            north: [0, 0, 1],
+            south: [0, 0, -1],
+            east: [-1, 0, 0],
+            west: [1, 0, 0]
+        };
+        const order = hill.lookBlocks(hill.ROYAL);
+        for (const r of [3, 10, 20]) {
+            const proof = hill.proofBox(place, r, hill.ROYAL);
+            const all = cells(hill.ROYAL, r);
+            for (const one of all) {
+                const x = one.x + place.x;
+                const y = one.y + place.y;
+                const z = one.z + place.z;
+                expect(x >= proof.x1 && x <= proof.x2 && y >= proof.y1 && y <= proof.y2).toBe(true);
+                expect(z >= proof.z1 && z <= proof.z2).toBe(true);
+            }
+            expect(hill.footprint(r, hill.ROYAL)).toBe(proof.x2 - place.x);
+            // Each block that needs something to hold it is built after it, and
+            // its kind comes down before every kind that holds it.
+            const at = new Map(all.map((one) => [`${one.x},${one.y},${one.z}`, one]));
+            for (const one of all) {
+                if (!HANGING.has(id(one.block))) continue;
+                const facing = /facing=(\w+)/.exec(one.block)?.[1] ?? "";
+                const [dx, dy, dz] = one.block.includes("hanging=true")
+                    ? [0, 1, 0]
+                    : id(one.block) === "minecraft:red_wall_banner"
+                      ? step[facing]!
+                      : [0, -1, 0];
+                const holder = at.get(`${one.x + dx},${one.y + dy},${one.z + dz}`);
+                expect(holder, JSON.stringify(one)).toBeDefined();
+                expect(holder!.order).toBeLessThan(one.order);
+                expect(order.indexOf(id(one.block))).toBeLessThan(order.indexOf(id(holder!.block)));
+            }
+        }
+    });
+
+    it("leaves no dark top a monster could spawn on", () => {
+        for (const r of [3, 10, 20]) {
+            const all = cells(hill.ROYAL, r);
+            const LIGHTS = new Set([
+                "minecraft:shroomlight",
+                "minecraft:ochre_froglight",
+                "minecraft:soul_lantern",
+                "minecraft:end_rod",
+                "minecraft:soul_campfire",
+                "minecraft:light"
+            ]);
+            // Nothing spawns on these, however dark.
+            const NO_SPAWN = /_stairs|_wall$|_banner|lantern|end_rod|carpet|campfire|chain|:light$/;
+            const h = r + hill.MARGIN;
+            const onFloor = (one: { x: number; y: number; z: number }) =>
+                one.y === 0 && Math.max(Math.abs(one.x), Math.abs(one.z)) < h;
+            const taken = new Set(all.map((one) => `${one.x},${one.y},${one.z}`));
+            // The floor, filled round the rest, covers what lies under it.
+            for (let x = -h; x <= h; x += 1)
+                for (let z = -h; z <= h; z += 1) taken.add(`${x},0,${z}`);
+            // Not the ring: it moves, and the floor goes back where it was.
+            const lights = all.filter((one) => LIGHTS.has(id(one.block)) && !onFloor(one));
+            for (const one of all) {
+                if (NO_SPAWN.test(id(one.block)) || onFloor(one)) continue;
+                if (taken.has(`${one.x},${one.y + 1},${one.z}`)) continue;
+                // Block light falls off a level a block: well short of nought.
+                const lit = lights.some(
+                    (light) =>
+                        Math.abs(light.x - one.x) +
+                            Math.abs(light.y - one.y - 1) +
+                            Math.abs(light.z - one.z) <=
+                        9
+                );
+                expect(lit, JSON.stringify(one)).toBe(true);
+            }
+            // And the fighting floor, filled round it all: every block of it.
+            for (let x = -h; x <= h; x += 1)
+                for (let z = -h; z <= h; z += 1) {
+                    const lit = lights.some(
+                        (light) =>
+                            Math.abs(light.x - x) + Math.abs(light.y - 1) + Math.abs(light.z - z) <=
+                            13
+                    );
+                    expect(lit, `${x},${z}`).toBe(true);
+                }
+        }
+    });
+
+    it("lets its crown and throne glitter over the souls and ash", () => {
+        const lines = hill.ambientLines(place, radius, false, hill.ROYAL);
+        expect(lines.some((line) => line.includes("particle minecraft:sculk_soul"))).toBe(true);
+        expect(lines.some((line) => line.includes("particle minecraft:end_rod"))).toBe(true);
+        expect(lines.some((line) => line.includes("particle minecraft:wax_on"))).toBe(true);
     });
 });

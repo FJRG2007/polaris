@@ -75,17 +75,303 @@ export const DEATH: Look = {
     middle: "minecraft:wither_skeleton_skull"
 };
 
+/**
+ * The king of the ring's court (fists only, from 1.19), the look every new
+ * ring is built in: the same fighting floor - one block inside a clear border,
+ * the ring drawn on it in froglight - raised on a tapered underside of
+ * blackstone with a gilded core, and round it, out of reach of anybody knocked
+ * off (`royalPieces`), a court in blackstone, crimson and gold: stands down
+ * two sides, an entrance arch with a red carpet, a throne under a jewelled
+ * crown, four tall pillars, red banners, soul lanterns, and a golden crown
+ * floating high over the middle of the ring. Lit all round, so nothing
+ * hostile spawns on any of it.
+ *
+ * Only blocks with no collision (banners, unseen light) and low markers (a
+ * lantern on each corner) stand on or over the floor; everything else keeps out of the
+ * air a knocked-off player falls through before they are brought back
+ * (`strayed`), so who falls and who stays is exactly as on a plain platform.
+ */
+export const ROYAL_SINCE = DEATH_SINCE;
+export const ROYAL: Look = {
+    floor: "minecraft:polished_blackstone",
+    edge: "minecraft:red_nether_bricks",
+    corner: "minecraft:chiseled_polished_blackstone",
+    ring: "minecraft:ochre_froglight",
+    top: "minecraft:soul_lantern",
+    middle: "minecraft:red_banner"
+};
+
+/**
+ * Every block of the court, in the order it is taken down: whatever hangs on,
+ * stands on or lies on something first, so nothing it holds up is ever
+ * dropped as an item when what held it goes.
+ */
+const ROYAL_BLOCKS = [
+    "minecraft:red_wall_banner",
+    "minecraft:red_banner",
+    "minecraft:soul_lantern",
+    "minecraft:end_rod",
+    "minecraft:red_carpet",
+    "minecraft:light",
+    "minecraft:soul_campfire",
+    "minecraft:chain",
+    "minecraft:polished_blackstone_brick_stairs",
+    "minecraft:polished_blackstone_stairs",
+    "minecraft:polished_blackstone_brick_wall",
+    "minecraft:gold_block",
+    "minecraft:shroomlight",
+    ROYAL.ring,
+    ROYAL.edge,
+    ROYAL.corner,
+    ROYAL.floor,
+    "minecraft:polished_blackstone_bricks",
+    "minecraft:gilded_blackstone",
+    "minecraft:blackstone"
+] as const;
+
 /** The look a platform was built in, from the blocks its arena lists - the
  *  same after a restart, and plain for one built before there were looks. */
 export function lookOf(blocks: readonly string[]): Look {
+    if (blocks.includes(ROYAL.floor)) return ROYAL;
     return blocks.includes(DEATH.floor) ? DEATH : PLAIN;
 }
 
 /** Every block of a look, for its arena's list and so for taking it down. */
 export function lookBlocks(look: Look): string[] {
+    if (look === ROYAL) return [...ROYAL_BLOCKS];
     return [look.floor, look.edge, look.corner, look.ring, look.top, look.middle].filter(
         (one): one is string => one !== null
     );
+}
+
+/** How far apart, and how high over the floor, its unseen lights hang. */
+const LIGHT_EVERY = 8;
+const LIGHT_OVER = 6;
+
+/** How far the court reaches past the floor's edge, all round. */
+const COURT = 10;
+/** How far under the floor its underside hangs, and how far over it the
+ *  crown floats - the top of the court. */
+const UNDERSIDE = 4;
+const COURT_TOP = 12;
+
+/**
+ * Where the court starts, past the floor's edge: the first block a knocked-off
+ * player could only reach already brought back (`strayed`, from the middle of
+ * the block they would stand on).
+ */
+function courtStart(): number {
+    return STRAY + 1;
+}
+
+/**
+ * The court round a platform, in the order it is built - what holds a block
+ * up always before it. `place` is the platform's floor; the floor itself is
+ * filled round all this afterwards (`platformDecor`).
+ */
+function royalPieces(place: Point, radius: number): { box: Box; block: string }[] {
+    const half = radius + MARGIN;
+    const { x, y, z } = place;
+    const out: { box: Box; block: string }[] = [];
+    const fill = (
+        x1: number,
+        y1: number,
+        z1: number,
+        x2: number,
+        y2: number,
+        z2: number,
+        block: string
+    ) =>
+        out.push({
+            box: {
+                x1: Math.min(x1, x2),
+                y1: Math.min(y1, y2),
+                z1: Math.min(z1, z2),
+                x2: Math.max(x1, x2),
+                y2: Math.max(y1, y2),
+                z2: Math.max(z1, z2)
+            },
+            block
+        });
+    const one = (bx: number, by: number, bz: number, block: string) =>
+        fill(bx, by, bz, bx, by, bz, block);
+    const square = (by: number, size: number, block: string) => {
+        if (size >= 0) fill(x - size, by, z - size, x + size, by, z + size, block);
+    };
+
+    // Raised: a tapered underside, blackstone round a gilded core.
+    square(y - 1, half, "minecraft:polished_blackstone_bricks");
+    square(y - 2, half - 1, "minecraft:blackstone");
+    square(y - 3, half - 3, "minecraft:blackstone");
+    square(y - 4, half - 6, "minecraft:gilded_blackstone");
+
+    // The border: crimson brick, a shroomlight every fourth block to light the
+    // floor all round, chiseled blackstone on the corners. Never the floor's
+    // block or the ring's, so the ring's redraw never touches it.
+    for (let t = -half + 1; t <= half - 1; t += 1) {
+        if (t % 4 !== 0) continue;
+        one(x + t, y, z - half, "minecraft:shroomlight");
+        one(x + t, y, z + half, "minecraft:shroomlight");
+        one(x - half, y, z + t, "minecraft:shroomlight");
+        one(x + half, y, z + t, "minecraft:shroomlight");
+    }
+    const corners = [
+        [-1, -1],
+        [1, -1],
+        [-1, 1],
+        [1, 1]
+    ] as const;
+    for (const [sx, sz] of corners) one(x + sx * half, y, z + sz * half, ROYAL.corner);
+    fill(x - half + 1, y, z - half, x + half - 1, y, z - half, ROYAL.edge);
+    fill(x - half + 1, y, z + half, x + half - 1, y, z + half, ROYAL.edge);
+    fill(x - half, y, z - half + 1, x - half, y, z + half - 1, ROYAL.edge);
+    fill(x + half, y, z - half + 1, x + half, y, z + half - 1, ROYAL.edge);
+
+    // The ring, on the floor's own layer.
+    for (let dx = -radius; dx <= radius; dx += 1)
+        for (let dz = -radius; dz <= radius; dz += 1)
+            if (Math.abs(Math.hypot(dx, dz) - radius) <= 0.5) one(x + dx, y, z + dz, ROYAL.ring);
+
+    const start = half + courtStart();
+
+    // Stands down the east and west sides: three tiers of seats looking in,
+    // a wall behind them.
+    for (const side of [1, -1] as const) {
+        const facing = side === 1 ? "east" : "west";
+        for (let tier = 0; tier < 3; tier += 1) {
+            const sx = x + side * (start + tier);
+            if (tier > 0)
+                fill(
+                    sx,
+                    y - 1,
+                    z - half,
+                    sx,
+                    y - 1 + tier - 1,
+                    z + half,
+                    "minecraft:polished_blackstone_bricks"
+                );
+            fill(
+                sx,
+                y - 1 + tier,
+                z - half,
+                sx,
+                y - 1 + tier,
+                z + half,
+                `minecraft:polished_blackstone_brick_stairs[facing=${facing}]`
+            );
+        }
+        const back = x + side * (start + 3);
+        fill(back, y - 1, z - half, back, y + 3, z + half, "minecraft:polished_blackstone_bricks");
+        fill(
+            back,
+            y + 4,
+            z - half,
+            back,
+            y + 4,
+            z + half,
+            "minecraft:polished_blackstone_brick_wall"
+        );
+    }
+
+    // Four tall pillars where the stands' corners meet the court's.
+    const far = start + 1;
+    for (const [sx, sz] of corners) {
+        const px = x + sx * far;
+        const pz = z + sz * far;
+        fill(px, y - 2, pz, px, y + 6, pz, "minecraft:polished_blackstone_bricks");
+        one(px, y + 7, pz, "minecraft:gilded_blackstone");
+    }
+
+    // The entrance, north: a landing with a red carpet under an arch.
+    const gate = z - start - 1;
+    fill(x - 3, y - 1, gate - 1, x + 3, y - 1, gate + 1, "minecraft:polished_blackstone_bricks");
+    for (const sx of [-3, 3])
+        fill(x + sx, y, gate, x + sx, y + 4, gate, "minecraft:polished_blackstone_bricks");
+    fill(x - 3, y + 5, gate, x + 3, y + 5, gate, "minecraft:polished_blackstone_bricks");
+    one(x - 2, y + 4, gate, "minecraft:polished_blackstone_brick_stairs[facing=west,half=top]");
+    one(x + 2, y + 4, gate, "minecraft:polished_blackstone_brick_stairs[facing=east,half=top]");
+    fill(x - 3, y + 6, gate, x - 1, y + 6, gate, "minecraft:polished_blackstone_brick_wall");
+    fill(x + 1, y + 6, gate, x + 3, y + 6, gate, "minecraft:polished_blackstone_brick_wall");
+    one(x, y + 6, gate, "minecraft:gold_block");
+    one(x, y + 7, gate, ROYAL.ring);
+
+    // The throne, south: on a crimson dais, looking in, a jewel on its back.
+    const dais = z + start + 1;
+    fill(x - 3, y - 1, dais - 1, x + 3, y - 1, dais + 2, "minecraft:polished_blackstone_bricks");
+    fill(x - 2, y, dais, x + 2, y, dais + 2, ROYAL.edge);
+    one(x, y + 1, dais + 1, "minecraft:polished_blackstone_stairs[facing=south]");
+    one(x - 1, y + 1, dais + 1, ROYAL.corner);
+    one(x + 1, y + 1, dais + 1, ROYAL.corner);
+    fill(x, y + 1, dais + 2, x, y + 3, dais + 2, "minecraft:gold_block");
+    fill(x - 1, y + 1, dais + 2, x - 1, y + 2, dais + 2, ROYAL.edge);
+    fill(x + 1, y + 1, dais + 2, x + 1, y + 2, dais + 2, ROYAL.edge);
+    one(x - 1, y + 3, dais + 2, "minecraft:gold_block");
+    one(x + 1, y + 3, dais + 2, "minecraft:gold_block");
+    one(x, y + 4, dais + 2, ROYAL.ring);
+    one(x - 3, y, dais, "minecraft:soul_campfire");
+    one(x + 3, y, dais, "minecraft:soul_campfire");
+
+    // The crown, floating over the middle of the ring well out of reach: a
+    // band of gold set with froglight, eight points, a lantern on a chain.
+    const band = y + 10;
+    for (let dx = -2; dx <= 2; dx += 1)
+        for (let dz = -2; dz <= 2; dz += 1) {
+            if (Math.max(Math.abs(dx), Math.abs(dz)) !== 2) continue;
+            const jewel = Math.abs(dx) === 2 && Math.abs(dz) === 2;
+            one(x + dx, band, z + dz, jewel ? ROYAL.ring : "minecraft:gold_block");
+            if (dx === 0 || dz === 0 || jewel)
+                one(x + dx, band + 1, z + dz, "minecraft:gold_block");
+        }
+    one(x, band, z, "minecraft:gold_block");
+    one(x, band - 1, z, "minecraft:chain");
+
+    // What hangs on, stands on or lies on all that: last.
+    for (const [sx, sz] of corners) one(x + sx * half, y + 1, z + sz * half, ROYAL.top!);
+    one(x, y + 1, z - half, `${ROYAL.middle}[rotation=0]`);
+    one(x, y + 1, z + half, `${ROYAL.middle}[rotation=8]`);
+    one(x - half, y + 1, z, `${ROYAL.middle}[rotation=12]`);
+    one(x + half, y + 1, z, `${ROYAL.middle}[rotation=4]`);
+    for (const side of [1, -1] as const) {
+        const back = x + side * (start + 3);
+        const facing = side === 1 ? "west" : "east";
+        for (let t = -half + 2; t <= half - 2; t += 4) {
+            one(back, y + 5, z + t, ROYAL.top!);
+            one(back - side, y + 3, z + t, `minecraft:red_wall_banner[facing=${facing}]`);
+        }
+    }
+    for (const [sx, sz] of corners) {
+        const px = x + sx * far;
+        const pz = z + sz * far;
+        one(px, y + 8, pz, ROYAL.top!);
+        one(px + sx, y + 4, pz, `minecraft:red_wall_banner[facing=${sx === 1 ? "east" : "west"}]`);
+        one(
+            px,
+            y + 4,
+            pz + sz,
+            `minecraft:red_wall_banner[facing=${sz === 1 ? "south" : "north"}]`
+        );
+    }
+    fill(x - 2, y, gate - 1, x + 2, y, gate + 1, "minecraft:red_carpet");
+    one(x - 1, y + 4, gate, `${ROYAL.top}[hanging=true]`);
+    one(x + 1, y + 4, gate, `${ROYAL.top}[hanging=true]`);
+    for (const sx of [-3, 3]) {
+        one(x + sx, y + 3, gate - 1, "minecraft:red_wall_banner[facing=north]");
+        one(x + sx, y + 3, gate + 1, "minecraft:red_wall_banner[facing=south]");
+    }
+    one(x - 2, y + 1, dais + 2, `${ROYAL.middle}[rotation=8]`);
+    one(x + 2, y + 1, dais + 2, `${ROYAL.middle}[rotation=8]`);
+    for (const [sx, sz] of corners)
+        one(x + sx * 2, band + 2, z + sz * 2, "minecraft:end_rod[facing=up]");
+    one(x, band - 2, z, `${ROYAL.top}[hanging=true]`);
+    // Light nobody sees or bumps into, over the floor: however the ring
+    // shrinks and its froglight goes back to floor, no block of it is dark.
+    for (let dx = 0; dx <= half - 1; dx += LIGHT_EVERY)
+        for (let dz = 0; dz <= half - 1; dz += LIGHT_EVERY)
+            for (const [sx, sz] of corners) {
+                if ((dx === 0 && sx === -1) || (dz === 0 && sz === -1)) continue;
+                one(x + sx * dx, y + LIGHT_OVER, z + sz * dz, "minecraft:light[level=15]");
+            }
+    return out;
 }
 /** What a bolt of the storm (`strikeLine`) can leave on the platform. */
 export const FIRE = "minecraft:fire";
@@ -103,6 +389,7 @@ export function platformDecor(
     radius: number,
     look: Look = PLAIN
 ): { box: Box; block: string }[] {
+    if (look === ROYAL) return royalPieces(place, radius);
     const half = radius + MARGIN;
     const { x, y, z } = place;
     const one = (bx: number, bz: number, block: string, by = y) => ({
@@ -158,7 +445,12 @@ export function platformDecor(
  * the end of a round that counts double, a heartbeat everybody on it hears.
  * `place` is the platform's floor.
  */
-export function ambientLines(place: Point, radius: number, sprint: boolean): string[] {
+export function ambientLines(
+    place: Point,
+    radius: number,
+    sprint: boolean,
+    look: Look = DEATH
+): string[] {
     const half = radius + MARGIN;
     const at = `${place.x + 0.5} ${place.y + 1.5} ${place.z + 0.5}`;
     const run = "execute in minecraft:overworld run";
@@ -166,6 +458,14 @@ export function ambientLines(place: Point, radius: number, sprint: boolean): str
         `${run} particle minecraft:sculk_soul ${at} ${half / 2} 0.4 ${half / 2} 0.03 10 normal`,
         `${run} particle minecraft:ash ${place.x + 0.5} ${place.y + 5} ${place.z + 0.5} ${half} 2 ${half} 0 60 normal`
     ];
+    // The court's crown and throne glitter.
+    if (look === ROYAL) {
+        const throne = place.z + half + courtStart() + 3;
+        lines.push(
+            `${run} particle minecraft:end_rod ${place.x + 0.5} ${place.y + 11} ${place.z + 0.5} 1.6 0.6 1.6 0.01 8 normal`,
+            `${run} particle minecraft:wax_on ${place.x + 0.5} ${place.y + 3} ${throne + 0.5} 0.8 1 0.4 0 6 normal`
+        );
+    }
     if (sprint)
         lines.push(
             `${run} playsound minecraft:entity.warden.heartbeat ambient @a[tag=${IN_ARENA}] ${at} 2 1`
@@ -208,8 +508,23 @@ export function platformBox(place: Point, radius: number): Box {
 }
 
 /** The platform's layer and the air over it, proven empty before it is built. */
-export function proofBox(place: Point, radius: number): Box {
-    return { ...platformBox(place, radius), y2: place.y + HEADROOM };
+export function proofBox(place: Point, radius: number, look: Look = PLAIN): Box {
+    if (look !== ROYAL) return { ...platformBox(place, radius), y2: place.y + HEADROOM };
+    const reach = footprint(radius, look);
+    return {
+        x1: place.x - reach,
+        y1: place.y - UNDERSIDE,
+        z1: place.z - reach,
+        x2: place.x + reach,
+        y2: place.y + COURT_TOP,
+        z2: place.z + reach
+    };
+}
+
+/** How far from the middle a look's blocks reach, every way: the room the
+ *  place for it is looked for in. */
+export function footprint(radius: number, look: Look = PLAIN): number {
+    return radius + MARGIN + (look === ROYAL ? COURT : 0);
 }
 
 /**

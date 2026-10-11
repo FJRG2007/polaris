@@ -1166,12 +1166,12 @@ function answer(sent: string): string {
         return "Changed the block";
     }
     const ours = /^execute in minecraft:overworld if block (-?\d+ -?\d+ -?\d+) (\S+)$/.exec(line);
-    // A block the world knows of, or a meteor's ore; any other test is answered
-    // further down.
+    // A block the world knows of, or a meteor's ore (never the ring's polished
+    // floor); any other test is answered further down.
     if (
         ours &&
         (world.blocks.has(ours[1] as string) ||
-            /(_ore|ancient_debris|blackstone|basalt|^minecraft:barrel|^minecraft:barrier)$/.test(
+            /(_ore|ancient_debris|(?<!polished_)blackstone|basalt|^minecraft:barrel|^minecraft:barrier)$/.test(
                 ours[2]!
             ))
     )
@@ -6120,7 +6120,7 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
     const fills = world.sent.filter((line) => line.includes(" fill "));
     // The ring is drawn again as it shrinks and moves: its floor's own block
     // painted over its own ring block and back, never anything else.
-    const repaints = [hill.PLAIN, hill.DEATH].map(
+    const repaints = [hill.PLAIN, hill.DEATH, hill.ROYAL].map(
         (look) => new RegExp(` (${look.floor}|${look.ring}) replace (${look.ring}|${look.floor})$`)
     );
     for (const line of fills)
@@ -6129,7 +6129,7 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
                 / minecraft:air replace minecraft:\S+$/.test(line) ||
                 sweptInProved(line) ||
                 (repaints.some((repaint) => repaint.test(line)) &&
-                    ![hill.PLAIN, hill.DEATH].some((look) =>
+                    ![hill.PLAIN, hill.DEATH, hill.ROYAL].some((look) =>
                         line.includes(`${look.ring} replace ${look.ring}`)
                     )),
             line
@@ -9103,7 +9103,7 @@ describe("a king of the hill", () => {
         expect(world.sent.some((line) => line.includes("Double points!"))).toBe(true);
         expect(
             world.sent.some((line) =>
-                / minecraft:ochre_froglight replace minecraft:deepslate_tiles$/.test(line)
+                / minecraft:ochre_froglight replace minecraft:polished_blackstone$/.test(line)
             )
         ).toBe(true);
         expect(
@@ -9133,16 +9133,16 @@ describe("a king of the hill", () => {
         await play(30_000);
         const run = state().run!;
         // And the fire its storm can light over it, swept with it.
-        // In the ring's own look, on a server that has its blocks.
-        expect(run.arena?.blocks).toEqual([...hill.lookBlocks(hill.DEATH), hill.FIRE]);
+        // In the ring's own court, on a server that has its blocks.
+        expect(run.arena?.blocks).toEqual([...hill.lookBlocks(hill.ROYAL), hill.FIRE]);
         expect(run.readyAt).not.toBeNull();
         // Only into air proven empty.
-        const build = world.sent.find((line) => line.includes(` ${hill.DEATH.floor} keep`));
+        const build = world.sent.find((line) => line.includes(` ${hill.ROYAL.floor} keep`));
         expect(build).toBeDefined();
         await play(4 * 60_000);
         expect(state().run).toBeNull();
         expect(
-            world.sent.some((line) => line.endsWith(` minecraft:air replace ${hill.DEATH.floor}`))
+            world.sent.some((line) => line.endsWith(` minecraft:air replace ${hill.ROYAL.floor}`))
         ).toBe(true);
         keptTheRules();
     });
