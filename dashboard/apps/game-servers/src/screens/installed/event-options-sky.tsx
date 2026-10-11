@@ -3,7 +3,7 @@
 /**
  * The options of the newer events played on a map built in the sky: a TNT
  * run's floors, an ice track's laps, a dropper's shaft, a nether maze, a flag game, hide and
- * seek, a hot potato, SkyWars and an impostor game.
+ * seek, a hot potato, SkyWars, an impostor game and a glass bridge.
  */
 
 import { useGameText } from "../game-text";
@@ -30,6 +30,13 @@ const HOUSE_LABELS: Readonly<Record<(typeof catalog.HOUSE_SIZES)[number], GameKe
 const SEEK_TIME_LABELS: Readonly<Record<"auto" | "manual", GameKey<"minecraft">>> = {
     auto: "editor.labels.seekTime.auto",
     manual: "editor.labels.seekTime.manual"
+};
+
+const GLASS_MODE_LABELS: Readonly<
+    Record<(typeof catalog.GLASS_BRIDGE_MODES)[number], GameKey<"minecraft">>
+> = {
+    free: "editor.labels.glassMode.free",
+    turns: "editor.labels.glassMode.turns"
 };
 
 const MAZE_SIZE_LABELS: Readonly<
@@ -814,6 +821,63 @@ export function SkyWarsFields({
                 value={value.place}
                 onChange={(place) => onChange({ ...value, place })}
                 what={t("editor.place.islands")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+        </>
+    );
+}
+
+export function GlassBridgeFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"glass-bridge">;
+    onChange: (options: catalog.EventOptions<"glass-bridge">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <div className="grid grid-cols-2 gap-3">
+                <Field label={t("editor.glassMode")}>
+                    <Select
+                        value={value.mode}
+                        onValueChange={(mode) =>
+                            onChange({ ...value, mode: mode as typeof value.mode })
+                        }
+                        options={options(t, GLASS_MODE_LABELS)}
+                        aria-label={t("editor.glassMode")}
+                    />
+                </Field>
+                <NumberField
+                    label={t("editor.glassSteps")}
+                    hint={t("editor.glassStepsHint")}
+                    min={6}
+                    max={20}
+                    value={value.steps}
+                    onChange={(steps) => onChange({ ...value, steps })}
+                    issues={issues}
+                    field="steps"
+                />
+                {value.mode === "turns" && (
+                    <NumberField
+                        label={t("editor.turnSeconds")}
+                        hint={t("editor.turnSecondsHint")}
+                        min={10}
+                        max={60}
+                        value={value.turnSeconds}
+                        onChange={(turnSeconds) => onChange({ ...value, turnSeconds })}
+                        issues={issues}
+                        field="turnSeconds"
+                    />
+                )}
+            </div>
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.arena")}
                 issues={issues}
                 path={["options", "place"]}
             />

@@ -2306,6 +2306,7 @@ describe("a spleef floor", () => {
                     "polaris:maze/tick",
                     "polaris:acid/tick",
                     "polaris:elytra/tick",
+                    "polaris:glass/tick",
                     "polaris:door/tick",
                     "polaris:panel/tick"
                 ]

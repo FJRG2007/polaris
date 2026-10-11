@@ -43,6 +43,7 @@ import * as boatRace from "./boat-race";
 import * as netherMaze from "./nether-maze";
 import * as acidRain from "./acid-rain";
 import * as elytraRace from "./elytra-race";
+import * as glassBridge from "./glass-bridge";
 import { FLOOR, WARN, type Arena } from "./spleef";
 
 /** The pack's folder under the world's `datapacks`, and its id in `/datapack`. */
@@ -196,8 +197,8 @@ const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
  * Every game the pack plays, by its folder under `polaris:`: the snowballs that
  * break a spleef floor, the floor a TNT run takes from under its players
  * (`tnt-run.ts`), a dropper's landings (`dropper.ts`) and a boat race's gates
- * (`boat-race.ts`), and hide and seek's secret doors and panels (`secret-doors.ts`,
- * `secret-panels.ts`). Each has a `tick`
+ * (`boat-race.ts`), hide and seek's secret doors and panels (`secret-doors.ts`,
+ * `secret-panels.ts`) and the glass bridge's panels that break (`glass-bridge.ts`). Each has a `tick`
  * function, which the game runs every tick and which does nothing while that
  * game's own switch is off. And the arenas' hits (`hits.ts`), which have no
  * tick: their functions are the rewards of the advancements under `hit/`.
@@ -210,6 +211,7 @@ const GAMES: readonly (readonly [string, Readonly<Record<string, readonly string
     ["maze", netherMaze.FUNCTIONS],
     ["acid", acidRain.FUNCTIONS],
     ["elytra", elytraRace.FUNCTIONS],
+    ["glass", glassBridge.FUNCTIONS],
     ["hit", hits.FUNCTIONS],
     ["door", doors.FUNCTIONS],
     ["panel", secretPanels.FUNCTIONS]

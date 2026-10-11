@@ -1038,3 +1038,50 @@ describe("the editor in Spanish", () => {
         });
     });
 });
+
+describe("the glass bridge editor", () => {
+    type Preset = ReturnType<typeof catalog.newPreset>;
+    const edit = (preset: Preset, saved: Preset[]) =>
+        render(
+            <EventEditor
+                preset={preset}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+    const field = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
+
+    it("saves its rows between six and twenty, everybody at once by default", async () => {
+        const saved: Preset[] = [];
+        edit(catalog.newPreset("glass-bridge", "glass"), saved);
+        expect(screen.getByLabelText("How it is crossed").textContent).toContain(
+            "Everybody at once"
+        );
+        expect(screen.queryByLabelText(/^Time for each row/)).toBeNull();
+        expect(field(/^Rows of glass/).value).toBe("12");
+        fireEvent.change(field(/^Rows of glass/), { target: { value: "21" } });
+        await waitFor(() => expect(screen.getAllByText("At most 20").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Rows of glass/), { target: { value: "8" } });
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved.at(-1)!.options).toMatchObject({ mode: "free", steps: 8, turnSeconds: 20 });
+    });
+
+    it("asks for the time each row takes only when played in turns", async () => {
+        const saved: Preset[] = [];
+        const preset = catalog.newPreset("glass-bridge", "glass");
+        edit({ ...preset, options: { ...preset.options, mode: "turns" } } as Preset, saved);
+        expect(field(/^Time for each row/).value).toBe("20");
+        fireEvent.change(field(/^Time for each row/), { target: { value: "5" } });
+        await waitFor(() => expect(screen.getAllByText("At least 10").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Time for each row/), { target: { value: "30" } });
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved.at(-1)!.options).toMatchObject({ mode: "turns", turnSeconds: 30 });
+    });
+});
