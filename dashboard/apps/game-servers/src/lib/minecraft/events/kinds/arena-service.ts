@@ -31,6 +31,7 @@
 
 import * as arena from "./arena";
 import * as stage from "./stage";
+import * as outsiders from "./outsiders";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
 import * as build from "./build-battle";
@@ -454,7 +455,10 @@ async function bringIn(ctx: KindContext): Promise<void> {
         for (const name of waiting) {
             const at = where.get(lower(name));
             const dimension = at ? worlds.get(at.name) : undefined;
-            const gamemode = at ? modes.get(at.name) : undefined;
+            // Held near the arena before they joined: the mode they had then.
+            const gamemode = at
+                ? (outsiders.trueMode(run.heldOut ?? [], at.name) ?? modes.get(at.name))
+                : undefined;
             // Gone, or unreadable: not moved at all.
             if (!at || !dimension || !gamemode) continue;
             const turned = facing.get(at.name) ?? { yaw: 0, pitch: 0 };

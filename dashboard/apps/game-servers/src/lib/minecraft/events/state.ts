@@ -88,6 +88,17 @@ export const keptOutSchema = z.object({
 
 export type KeptOut = z.infer<typeof keptOutSchema>;
 
+/** Somebody not in the event held in adventure mode near its space
+ *  (`kinds/outsiders`): the game mode to give back, and whether they are held
+ *  now - kept once let go, so the end can owe it to whoever was off. */
+export const heldOutSchema = z.object({
+    name: z.string(),
+    mode: z.enum(GAMEMODES),
+    holding: z.boolean().default(true)
+});
+
+export type HeldOut = z.infer<typeof heldOutSchema>;
+
 /** Somebody brought into an event from the Events screen rather than by typing
  *  `join`: who, by whom - their user id, and their name as it read then - and when. */
 export const forcedSchema = z.object({
@@ -305,6 +316,8 @@ export const runSchema = z.object({
     /** Taken from and then kept out (`keptOut`), and not yet put back or given
      *  back their things: never played, only sent home at the end. */
     sentOut: z.array(entrantSchema).default([]),
+    /** Who not in it is held near its space, and was (`kinds/outsiders`). */
+    heldOut: z.array(heldOutSchema).default([]),
     /** How the kit it handed out is marked, and which items it was. */
     marker: z.enum(MARKERS).nullable().default(null),
     kit: z.array(z.string()).default([]),
@@ -505,7 +518,12 @@ export const PENDING_MAX = 200;
 /** How many players may be owed lines at once, the oldest let go first. */
 export const OWED_LINES_MAX = 200;
 
-/** Owed lines still in time, `added` replacing any owed the same player for the same reason. */
+/** The reason a held outsider's own game mode is owed (`kinds/outsiders`):
+ *  mostly owed to somebody already let go, so the first to make room. */
+export const HELD_OUT_REASON = "held-out";
+
+/** Owed lines still in time, `added` replacing any owed the same player for the same reason.
+ *  Over the cap, the oldest `HELD_OUT_REASON` ones go first, then the oldest of the rest. */
 export function withOwedLines(
     owed: readonly OwedLines[],
     added: readonly OwedLines[],
@@ -513,9 +531,13 @@ export function withOwedLines(
 ): OwedLines[] {
     const key = (one: OwedLines) => `${one.player.toLowerCase()} ${one.reason}`;
     const replaced = new Set(added.map(key));
-    return [...owed.filter((one) => !replaced.has(key(one))), ...added]
-        .filter((one) => one.until > now)
-        .slice(-OWED_LINES_MAX);
+    const live = [...owed.filter((one) => !replaced.has(key(one))), ...added].filter(
+        (one) => one.until > now
+    );
+    const over = live.length - OWED_LINES_MAX;
+    if (over <= 0) return live;
+    const dropped = new Set(live.filter((one) => one.reason === HELD_OUT_REASON).slice(0, over));
+    return live.filter((one) => !dropped.has(one)).slice(-OWED_LINES_MAX);
 }
 
 export const EMPTY_EVENT_STATE: EventState = {

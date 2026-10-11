@@ -828,6 +828,37 @@ function answer(sent: string): string {
     let line = sent;
     const respawnAnswer = respawnModAnswer(line);
     if (respawnAnswer !== null) return respawnAnswer;
+    // Who is near an event's space and in no event (`kinds/outsiders.nearRead`).
+    const near =
+        /^execute in minecraft:overworld as @a\[x=(-?\d+),y=(-?\d+),z=(-?\d+),dx=(\d+),dy=(\d+),dz=(\d+),tag=!pe_arena,tag=!pe_in,gamemode=!spectator\] run data get entity @s Pos$/.exec(
+            line
+        );
+    if (near) {
+        const [x, y, z, dx, dy, dz] = near.slice(1).map(Number) as [
+            number,
+            number,
+            number,
+            number,
+            number,
+            number
+        ];
+        const within = (value: number, low: number, size: number) =>
+            value >= low && value < low + size + 1;
+        return world.online
+            .filter((name) => !tagged("pe_arena").has(name) && !world.inside.has(name))
+            .filter((name) => (world.modes[name] ?? 0) !== 3)
+            .filter((name) => {
+                const at = world.at[name];
+                return !!at && within(at[0], x, dx) && within(at[1], y, dy) && within(at[2], z, dz);
+            })
+            .map((name) => {
+                const [ax, ay, az] = world.at[name]!.map((value) =>
+                    Number.isInteger(value) ? value.toFixed(1) : value
+                );
+                return `${name} has the following entity data: [${ax}d, ${ay}d, ${az}d]`;
+            })
+            .join("\n");
+    }
     // A data pack is found once the folder is looked at again, and on once enabled.
     if (line === "datapack list available") {
         for (const path of world.files.keys()) {
@@ -9187,6 +9218,60 @@ describe("a team duel", () => {
         // No plugin or mod here: nothing asked of one beyond what it can do.
         expect(world.sent.some((line) => line.startsWith("polaris respawn"))).toBe(false);
         noSpawnpoint();
+    });
+
+    it("keeps somebody not in it out of its arena, held in adventure mode near it, their own mode back further off", async () => {
+        const duel = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
+        );
+        world.online = ["Ana", "Ben", "Mallory"];
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const box = run.arena!.box;
+        const red = duel.sideSpot(box, 0, 0);
+        const blue = duel.sideSpot(box, 1, 0);
+        // Mallory, who never joined, flies into the arena.
+        world.at = {
+            Ana: [red.x + 0.5, red.y, red.z + 0.5],
+            Ben: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Mallory: [box.x1 + 1.5, box.y1 + 2, box.z1 + 1.5]
+        };
+        await play(2_100);
+        expect(world.sent).toContain("tag @a[name=Mallory,gamemode=survival] add pe_held");
+        expect(world.sent).toContain(
+            "gamemode adventure @a[name=Mallory,tag=pe_held,gamemode=survival]"
+        );
+        expect(world.sent.some((line) => /spreadplayers .* false Mallory$/.test(line))).toBe(true);
+        // Nobody taking part is held or moved out.
+        expect(world.sent.some((line) => /spreadplayers .* false (Ana|Ben)$/.test(line))).toBe(
+            false
+        );
+        expect(
+            world.sent.some((line) =>
+                /(@a\[name=(Ana|Ben),|tag (Ana|Ben) remove )\S*pe_held/.test(line)
+            )
+        ).toBe(false);
+        expect(state().run!.heldOut).toEqual([
+            { name: "Mallory", mode: "survival", holding: true }
+        ]);
+
+        // Well away: their own mode back, and only while still held.
+        const release =
+            "gamemode survival @a[name=Mallory,tag=pe_held,tag=!pe_arena,tag=!pe_in,gamemode=adventure]";
+        world.at = { ...world.at, Mallory: [box.x2 + 60.5, 64, box.z2 + 60.5] };
+        await play(2_100);
+        expect(world.sent).toContain(release);
+        expect(state().run!.heldOut).toEqual([
+            { name: "Mallory", mode: "survival", holding: false }
+        ]);
+
+        // At the end, let go again: harmless now, and owed had they been off.
+        const before = world.sent.filter((line) => line === release).length;
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        expect(world.sent.filter((line) => line === release).length).toBeGreaterThan(before);
     });
 
     it("has the Polaris plugin or mod respawn a fallen duellist on their side, the spot set again when forgotten", async () => {

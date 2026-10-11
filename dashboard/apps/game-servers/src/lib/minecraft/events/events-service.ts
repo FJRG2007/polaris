@@ -57,6 +57,8 @@ import * as stageService from "./kinds/stage-service";
 import * as snowballPackService from "./kinds/snowball-pack-service";
 import * as arenaService from "./kinds/arena-service";
 import * as pace from "./kinds/pace";
+import * as arena from "./kinds/arena";
+import * as outsiders from "./kinds/outsiders";
 import * as stashService from "./kinds/stash-service";
 import * as search from "./place-search";
 import * as hillService from "./kinds/hill-service";
@@ -887,6 +889,7 @@ export async function startEvent(input: {
         timeBefore: null,
         offMode: [],
         keptOut: [],
+        heldOut: [],
         forced: [],
         chests: [],
         held: [],
@@ -1352,6 +1355,9 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     }
     await hearPlayers(installedAppId, loop, server);
     if (run.cancelled) return finish(installedAppId, loop, server, "cancelled", "Called off");
+    await keepOutsidersOut(installedAppId, loop, server).catch((error: unknown) =>
+        console.warn("polaris: keeping outsiders out of an event failed", String(error))
+    );
 
     if (run.phase === "countdown") {
         await countdown(installedAppId, loop, server, now);
@@ -1359,6 +1365,63 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         if (loop.run.phase !== "running" || loop.finishing || loop.run.cancelled) return;
     }
     return running(installedAppId, loop, server, Date.now());
+}
+
+/** Everybody an event takes part with, by name in lower case: whoever joined
+ *  and was not kept out, or was taken in and not yet sent back. Never held,
+ *  never moved out. */
+function insidersOf(run: stored.EventRun): Set<string> {
+    const keptOut = new Set((run.keptOut ?? []).map((one) => one.name.toLowerCase()));
+    return new Set([
+        ...[...run.joined, ...(run.stage?.joined ?? [])]
+            .map((name) => name.toLowerCase())
+            .filter((name) => !keptOut.has(name)),
+        ...run.entrants.filter((one) => one.away).map((one) => one.name.toLowerCase()),
+        ...(run.stage?.saved ?? []).map((one) => one.name.toLowerCase())
+    ]);
+}
+
+/**
+ * Whoever is not in the event kept from changing it (`kinds/outsiders`): held
+ * in adventure mode near its space, moved out of it, let go further off. Each
+ * tick, before the kind's own: somebody who has just joined has their own mode
+ * back before the event reads it to take them in. What changes is written
+ * down before it is sent, so a restart never loses the mode to give back.
+ */
+async function keepOutsidersOut(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer
+): Promise<void> {
+    const run = loop.run;
+    const volume = outsiders.guardedVolume(
+        catalog.playsInArena(run.preset) ? (run.arena?.box ?? null) : null,
+        run.stage
+    );
+    const held = run.heldOut ?? [];
+    if (!volume && !held.some((one) => one.holding)) return;
+    const near = volume ? commands.readWhere(await server.say([outsiders.nearRead(volume)])) : [];
+    const out = outsiders.outsidersOf(near, insidersOf(run));
+    const unread = outsiders.toRead(out, held);
+    const modes =
+        unread.length > 0
+            ? arena.readGamemodes(await server.say([arena.READ_GAMEMODES]))
+            : new Map<string, (typeof stored.GAMEMODES)[number]>();
+    const result = outsiders.step({
+        volume,
+        outsiders: out,
+        modes,
+        held,
+        notes: {
+            held: messages.tag(loop.language) + messages.outsiderHeld(loop.language),
+            movedOut: messages.tag(loop.language) + messages.outsiderMovedOut(loop.language)
+        }
+    });
+    if (result.changed) {
+        loop.run = { ...loop.run, heldOut: result.held };
+        await persist(installedAppId, loop);
+    }
+    if (result.lines.length > 0) await server.sayAll(result.lines);
 }
 
 /** One tick of a run that has begun. */
@@ -4881,7 +4944,16 @@ async function finish(
                 : state.lastSeekers,
         nextRandomAt: afterAnEnd(draw, state.nextRandomAt, entry.endedAt),
         pending: stored.livePending([...state.pending, ...pending], Date.now()),
-        owedLines: stored.withOwedLines(state.owedLines, owedLines, Date.now()),
+        // Whoever it held and could not let go - off when it ended - let go
+        // when next seen: harmless to anybody already let go.
+        owedLines: stored.withOwedLines(
+            state.owedLines,
+            [
+                ...owedLines,
+                ...outsiders.owedRelease(run.heldOut ?? [], Date.now() + stored.PENDING_KEPT_MS)
+            ],
+            Date.now()
+        ),
         stageLeftovers: stage.withLeftover(state.stageLeftovers, stageLeftover),
         arenaLeftovers: arenaLeftover
             ? [...state.arenaLeftovers, arenaLeftover]
@@ -4987,6 +5059,8 @@ export function cleanupOf(run: stored.EventRun): string[] {
     }
     // An arena kind's own teams and counts (`ArenaGame.endLines`).
     after.push(...arenaService.endLines(run));
+    // Whoever it held near its space, their own game mode back (`kinds/outsiders`).
+    after.push(...outsiders.releaseAll(run.heldOut ?? []));
     // Operators' chat is given back last, so the tidying up does not fill it either.
     const feedback: string[] = commands.FEEDBACK_RULES.filter((rule) => rule in run.gamerules);
     const rules = Object.fromEntries(
@@ -5080,6 +5154,11 @@ async function abandon(
                   ...stored.withHistory({ ...state, run: null }, entry),
                   lastKind: run.preset.kind,
                   nextRandomAt: afterAnEnd(draw, state.nextRandomAt, now),
+                  owedLines: stored.withOwedLines(
+                      state.owedLines,
+                      outsiders.owedRelease(run.heldOut ?? [], now + stored.PENDING_KEPT_MS),
+                      now
+                  ),
                   // Its stage or arena, if it had one, is undone by the sweep from here.
                   stageLeftovers: stage.withLeftover(
                       state.stageLeftovers,

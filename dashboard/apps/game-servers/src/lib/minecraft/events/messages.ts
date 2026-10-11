@@ -1140,6 +1140,20 @@ export function notSurvival(language: Language): string {
         : `${WARN}Switch to survival or adventure to take part.`;
 }
 
+/** Somebody not in the event, near its space, put in adventure mode (`kinds/outsiders`). */
+export function outsiderHeld(language: Language): string {
+    return language === "es"
+        ? `${INFO}Hay un evento aquí: puedes mirarlo, pero no tocarlo.`
+        : `${INFO}An event is on here: you can watch it, but not touch it.`;
+}
+
+/** Somebody not in the event, moved out of its space (`kinds/outsiders`). */
+export function outsiderMovedOut(language: Language): string {
+    return language === "es"
+        ? `${WARN}Solo los jugadores del evento pueden entrar.`
+        : `${WARN}Only the players in the event can go in.`;
+}
+
 export function tooLate(language: Language): string {
     return language === "es"
         ? `${INFO}Ya ha empezado. Apúntate en la próxima.`
