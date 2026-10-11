@@ -14,9 +14,11 @@ import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { gapFor, gapWords, useLoudness } from "./call-loudness";
 import {
     Check,
+    Crown,
     Headphones,
     Music2,
     PictureInPicture2,
+    UserMinus,
     Users,
     Volume2,
     VolumeX
@@ -40,6 +42,15 @@ import {
     ContextMenuTrigger
 } from "@polaris/ui";
 
+/** What the host of a meeting may do to one person in it, from their face. */
+export interface SeatHosting {
+    /** A guest is a name typed into a link: they can be shown out, never handed
+     *  the room. */
+    readonly guest: boolean;
+    readonly onMakeHost: () => void;
+    readonly onRemove: () => void;
+}
+
 /**
  * What right-clicking somebody offers, wherever they are drawn.
  *
@@ -61,6 +72,7 @@ export function PersonMenu({
     combineAsked = false,
     combineLocked = false,
     moderation,
+    hosting,
     children
 }: {
     name: string;
@@ -77,6 +89,9 @@ export function PersonMenu({
     /** Present for somebody who moderates the conversation the call is in:
      *  mute, deafen and disconnect this person for everybody. */
     moderation?: SeatModeration;
+    /** Present for the host of a meeting, on everybody but themselves: hand
+     *  the room over, or show this person out. */
+    hosting?: SeatHosting;
     children: React.ReactNode;
 }) {
     const t = useTranslations("chat");
@@ -204,6 +219,29 @@ export function PersonMenu({
                     </p>
                 )}
                 {moderation && <ModerationItems seat={moderation} name={name} />}
+                {hosting && (
+                    <>
+                        <ContextMenuSeparator />
+                        <ContextMenuLabel className="text-xs text-muted-foreground">
+                            {t("meetingRoom.hosting")}
+                        </ContextMenuLabel>
+                        <ContextMenuItem disabled={hosting.guest} onSelect={hosting.onMakeHost}>
+                            <Crown className="size-3.5" />
+                            {t("meetingRoom.makeHost", { name })}
+                        </ContextMenuItem>
+                        {/* Said, not left to a tooltip: a disabled item takes no
+                            pointer, so a title on it is never shown. */}
+                        {hosting.guest && (
+                            <p className="px-2 pb-1 text-xs text-muted-foreground">
+                                {t("meetingRoom.onlySomebodyWithAPolaris")}
+                            </p>
+                        )}
+                        <ContextMenuItem variant="danger" onSelect={hosting.onRemove}>
+                            <UserMinus className="size-3.5" />
+                            {t("meetingRoom.removeNamed", { name })}
+                        </ContextMenuItem>
+                    </>
+                )}
             </ContextMenuContent>
         </ContextMenu>
     );
