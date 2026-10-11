@@ -1,6 +1,7 @@
 /**
  * A Minecraft server dressed for the time of year: pumpkins and cobwebs around
- * Halloween, snow through winter.
+ * Halloween, with monsters wearing pumpkins and a few more of them at night;
+ * snow through winter, with snow golems about the cold places.
  *
  * The dates are Polaris's own (`seasonOn` in @polaris/core), read on the
  * server's wall clock in its events' time zone, so a server decorates on the
@@ -74,9 +75,51 @@ export function decorationNow(inputs: SeasonInputs): Decoration | null {
     return decorationFor(seasonInZone(inputs.now, inputs.timeZone));
 }
 
-/** The console line that tells the jar. */
-export function seasonCommand(decoration: Decoration | null): string {
-    return decoration
-        ? `polaris season set ${decoration} ${SEASON_HOLD_SECONDS}`
-        : "polaris season clear";
+/** Where a server keeps how many more monsters come out on a Halloween night. */
+export const NIGHT_SPAWNS_KEY = "seasonalNightSpawns";
+
+/** Where a server keeps how many snow golems wander its cold places in winter. */
+export const SNOW_GOLEMS_KEY = "seasonalSnowGolems";
+
+/** Halloween night spawns, as a multiple of the usual: 1 adds none. */
+export const NIGHT_SPAWN_CHOICES = [1, 1.25, 1.5, 2, 3] as const;
+
+/** Winter snow golems, as a multiple of the usual few: 0 brings none. */
+export const SNOW_GOLEM_CHOICES = [0, 0.5, 1, 2, 3] as const;
+
+export const DEFAULT_NIGHT_SPAWNS = 1.5;
+export const DEFAULT_SNOW_GOLEMS = 1;
+
+/** The jar capability that takes the mob settings on the season line. */
+export const MOBS_CAP = "season-mobs";
+
+/** The seasonal mobs a server asks for. */
+export interface SeasonalMobs {
+    readonly nightSpawns: number;
+    readonly snowGolems: number;
+}
+
+function choice(value: unknown, choices: readonly number[], fallback: number): number {
+    return typeof value === "number" && choices.includes(value) ? value : fallback;
+}
+
+/** This server's mob settings; anything absent or not one of the choices is the default. */
+export function seasonalMobs(config: Readonly<Record<string, unknown>>): SeasonalMobs {
+    return {
+        nightSpawns: choice(config[NIGHT_SPAWNS_KEY], NIGHT_SPAWN_CHOICES, DEFAULT_NIGHT_SPAWNS),
+        snowGolems: choice(config[SNOW_GOLEMS_KEY], SNOW_GOLEM_CHOICES, DEFAULT_SNOW_GOLEMS)
+    };
+}
+
+/**
+ * The console line that tells the jar. With `mobs` (a jar that lists
+ * {@link MOBS_CAP}) the line carries both settings as whole percentages; a jar
+ * without it is told the season alone, the line it has always taken.
+ */
+export function seasonCommand(decoration: Decoration | null, mobs?: SeasonalMobs | null): string {
+    if (!decoration) return "polaris season clear";
+    const line = `polaris season set ${decoration} ${SEASON_HOLD_SECONDS}`;
+    if (!mobs) return line;
+    const percent = (multiple: number) => Math.round(multiple * 100);
+    return `${line} ${percent(mobs.nightSpawns)} ${percent(mobs.snowGolems)}`;
 }

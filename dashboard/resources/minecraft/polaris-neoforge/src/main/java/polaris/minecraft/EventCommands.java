@@ -35,14 +35,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - {@code polaris guard set <key> <x1> <y1> <z1> <x2> <y2> <z2>},
  *   {@code clear <key>}, {@code list} ({@link EventGuard}).
  * - {@code polaris sounds status|refresh} ({@link SoundPack}).
- * - {@code polaris season set <halloween|winter> <seconds>}, {@code clear},
- *   {@code status} ({@link SeasonalDecor}).
+ * - {@code polaris season set <halloween|winter> <seconds> [<spawns%> <golems%>]},
+ *   {@code clear}, {@code status} ({@link SeasonalDecor}, {@link SeasonalMobs}).
  *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
     /** What `polaris caps` lists; the dashboard checks each by name. */
-    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season"};
+    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season", "season-mobs"};
 
     private final String version;
 
@@ -64,7 +64,17 @@ final class EventCommands {
                                 .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 86_400))
                                         .executes(context -> answer(context, server -> SeasonalDecor.set(server,
                                                 StringArgumentType.getString(context, "name"),
-                                                IntegerArgumentType.getInteger(context, "seconds")))))))
+                                                IntegerArgumentType.getInteger(context, "seconds"),
+                                                SeasonalMobs.USUAL, 0)))
+                                        .then(Commands.argument("spawns", IntegerArgumentType.integer(
+                                                        SeasonalMobs.USUAL, SeasonalMobs.MAX_PERCENT))
+                                                .then(Commands.argument("golems", IntegerArgumentType.integer(
+                                                                0, SeasonalMobs.MAX_PERCENT))
+                                                        .executes(context -> answer(context, server -> SeasonalDecor.set(server,
+                                                                StringArgumentType.getString(context, "name"),
+                                                                IntegerArgumentType.getInteger(context, "seconds"),
+                                                                IntegerArgumentType.getInteger(context, "spawns"),
+                                                                IntegerArgumentType.getInteger(context, "golems")))))))))
                         .then(Commands.literal("clear").executes(context -> answer(context, SeasonalDecor::clear)))
                         .then(Commands.literal("status").executes(context -> answer(context, server -> SeasonalDecor.status()))))
                 .then(Commands.literal("stash")

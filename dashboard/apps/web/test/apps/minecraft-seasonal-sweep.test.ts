@@ -226,7 +226,7 @@ describe("a server's own switch", () => {
         vi.setSystemTime(HALLOWEEN);
         try {
             const { setSeasonal } = await service();
-            const view = await setSeasonal(OWNER, INSTALL, false);
+            const view = await setSeasonal(OWNER, INSTALL, { on: false });
             expect(config.seasonalDecorations).toBe(false);
             expect(sent).toEqual(["polaris season clear"]);
             expect(view).toMatchObject({ on: false, showing: null, season: "halloween" });
@@ -241,11 +241,59 @@ describe("a server's own switch", () => {
         try {
             const { setSeasonal } = await service();
             config = { seasonalDecorations: false };
-            const view = await setSeasonal(OWNER, INSTALL, true);
+            const view = await setSeasonal(OWNER, INSTALL, { on: true });
             expect(sent).toEqual(["polaris season set halloween 3600"]);
             expect(view).toMatchObject({ on: true, showing: "halloween" });
         } finally {
             vi.useRealTimers();
         }
+    });
+});
+
+describe("the seasonal mobs", () => {
+    it("go on the line to a jar that takes them", async () => {
+        caps = new Set(["season", "season-mobs"]);
+        config = { seasonalNightSpawns: 2 };
+        const { sweepSeasons, seasonalView } = await service();
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toEqual(["polaris season set halloween 3600 200 100"]);
+        expect(await seasonalView(INSTALL)).toMatchObject({
+            nightSpawns: 2,
+            snowGolems: 1,
+            mobsNeedRestart: false
+        });
+    });
+
+    it("are left off for an older jar, which still decorates and says a restart brings them", async () => {
+        const { sweepSeasons, seasonalView } = await service();
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toEqual(["polaris season set halloween 3600"]);
+        expect(await seasonalView(INSTALL)).toMatchObject({
+            needsRestart: false,
+            mobsNeedRestart: true
+        });
+    });
+
+    it("change at once on a save, keeping the switch as it was", async () => {
+        caps = new Set(["season", "season-mobs"]);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(HALLOWEEN);
+        try {
+            const { setSeasonal } = await service();
+            const view = await setSeasonal(OWNER, INSTALL, { snowGolems: 0, nightSpawns: 1 });
+            expect(config).toEqual({ seasonalSnowGolems: 0, seasonalNightSpawns: 1 });
+            expect(sent).toEqual(["polaris season set halloween 3600 100 0"]);
+            expect(view).toMatchObject({ on: true, nightSpawns: 1, snowGolems: 0 });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("are cleared with everything else out of season", async () => {
+        caps = new Set(["season", "season-mobs"]);
+        const { sweepSeasons } = await service();
+        await sweepSeasons(HALLOWEEN);
+        await sweepSeasons(NOVEMBER);
+        expect(sent).toEqual(["polaris season set halloween 3600 150 100", "polaris season clear"]);
     });
 });

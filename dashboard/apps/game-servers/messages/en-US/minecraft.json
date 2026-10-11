@@ -2886,7 +2886,7 @@
     },
     "seasonal": {
         "title": "Seasonal decorations",
-        "hint": "Pumpkins and cobwebs around Halloween, snow in winter. Only players' screens show them; the world is never changed.",
+        "hint": "Pumpkins and cobwebs around Halloween, snow in winter. The decorations are drawn on players' screens only, and nothing anybody built is touched.",
         "turnOn": "Show seasonal decorations",
         "showingHalloween": "Halloween decorations are showing now.",
         "showingWinter": "Winter decorations are showing now.",
@@ -2896,6 +2896,14 @@
         "blocked": "Seasonal decorations are turned off for the whole of Polaris in Admin settings.",
         "needsRestart": "This server needs a restart to load the decorations.",
         "unavailable": "This server has no Polaris plugin or mod to show them.",
-        "notSaved": "That could not be saved. Try again."
+        "notSaved": "That could not be saved. Try again.",
+        "nightSpawns": "Halloween night monsters",
+        "nightSpawnsHint": "More monsters come out at night, and they wear pumpkins until sunrise.",
+        "snowGolems": "Winter snow golems",
+        "snowGolemsHint": "Snow golems turn up near players in snowy places, some still wearing their pumpkin.",
+        "asUsual": "As usual",
+        "none": "None",
+        "times": "{count}x",
+        "mobsNeedRestart": "Restart this server to bring the seasonal mobs. The decorations already show."
     }
 }

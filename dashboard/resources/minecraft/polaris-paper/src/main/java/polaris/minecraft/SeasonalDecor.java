@@ -90,6 +90,9 @@ final class SeasonalDecor implements Listener {
      *  how much further each block they moved in the last tick takes that. */
     private static final double WEB_REACH = 6;
     private static final double WEB_REACH_PER_SPEED = 12;
+    /** Halloween chunks with a pumpkin, and of those, the ones with two, in percent. */
+    private static final int PUMPKIN_CHUNKS = 45;
+    private static final int TWO_PUMPKIN_CHUNKS = 30;
 
     /** One block a player's game was told is something else, and what it really was. */
     private record Fake(Location at, BlockData real, BlockData shown) {}
@@ -108,37 +111,62 @@ final class SeasonalDecor implements Listener {
     private BukkitTask timer;
     private int ticks;
     private final Random particles = new Random();
+    private final SeasonalMobs mobs = new SeasonalMobs(this);
 
     SeasonalDecor(Plugin plugin) {
         this.plugin = plugin;
+    }
+
+    /** The season's mobs, which listen for spawns alongside this. */
+    SeasonalMobs mobs() {
+        return mobs;
+    }
+
+    /** The season showing now, or null. */
+    Season season() {
+        return season;
     }
 
     void stop() {
         if (timer != null) timer.cancel();
         timer = null;
         revertAll();
+        mobs.revert();
         season = null;
     }
 
     // ------------------------------------------------------------------ commands
 
-    /** {@code polaris season set <name> <seconds>|clear|status}. */
+    /** {@code polaris season set <name> <seconds> [<spawns%> <golems%>]|clear|status}:
+     *  the mob settings are {@link SeasonalMobs}'. */
     JsonObject answer(String[] args) {
         if (args.length == 1 && args[0].equalsIgnoreCase("clear")) return clear();
         if (args.length == 1 && args[0].equalsIgnoreCase("status")) return status();
-        if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
+        if ((args.length == 3 || args.length == 5) && args[0].equalsIgnoreCase("set")) {
             Season next = Season.named(args[1]);
             if (next == null) return SoundPack.refused("unknownSeason");
             long seconds;
+            int spawns = SeasonalMobs.USUAL;
+            int golems = 0;
             try {
                 seconds = Long.parseLong(args[2]);
+                if (args.length == 5) {
+                    spawns = Integer.parseInt(args[3]);
+                    golems = Integer.parseInt(args[4]);
+                }
             } catch (NumberFormatException bad) {
                 return SoundPack.refused("usage");
             }
             if (seconds < 1 || seconds > MAX_HOLD_SECONDS) return SoundPack.refused("usage");
-            if (next != season) revertAll();
+            if (spawns < SeasonalMobs.USUAL || spawns > SeasonalMobs.MAX_PERCENT) return SoundPack.refused("usage");
+            if (golems < 0 || golems > SeasonalMobs.MAX_PERCENT) return SoundPack.refused("usage");
+            if (next != season) {
+                revertAll();
+                mobs.revert();
+            }
             season = next;
             untilMillis = System.currentTimeMillis() + seconds * 1000L;
+            mobs.configure(spawns, golems);
             if (timer == null) timer = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1, 1);
             return status();
         }
@@ -147,6 +175,7 @@ final class SeasonalDecor implements Listener {
 
     private JsonObject clear() {
         revertAll();
+        mobs.revert();
         season = null;
         if (timer != null) timer.cancel();
         timer = null;
@@ -162,6 +191,7 @@ final class SeasonalDecor implements Listener {
         for (Seen one : seen.values()) for (List<Fake> fakes : one.chunks.values()) blocks += fakes.size();
         reply.addProperty("players", seen.size());
         reply.addProperty("blocks", blocks);
+        mobs.status(reply);
         return reply;
     }
 
@@ -179,6 +209,7 @@ final class SeasonalDecor implements Listener {
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(false);
             if (ticks % PASS_TICKS == 0) pass(ticks % RESEND_TICKS == 0);
+            mobs.tick();
         } catch (RuntimeException failed) {
             // A tick must never fail over a decoration: put everything back and stop.
             plugin.getLogger().severe("Polaris seasonal decorations failed and are off until told again: " + failed);
@@ -187,6 +218,7 @@ final class SeasonalDecor implements Listener {
             } catch (RuntimeException ignored) {
                 season = null;
                 seen.clear();
+                mobs.forget();
             }
         }
     }
@@ -347,19 +379,20 @@ final class SeasonalDecor implements Listener {
         int baseX = cx << 4;
         int baseZ = cz << 4;
         if (season == Season.HALLOWEEN) {
-            if (random.nextInt(100) < 22) {
-                for (int tries = 0; tries < 4; tries++) {
+            // Most chunks get one, some two, and over half of them are lit: a
+            // jack o'lantern is what a player sees from across a field at night.
+            if (random.nextInt(100) < PUMPKIN_CHUNKS) {
+                int pumpkins = random.nextInt(100) < TWO_PUMPKIN_CHUNKS ? 2 : 1;
+                for (int tries = 0; tries < 8 && pumpkins > 0; tries++) {
                     Block ground = groundAt(world, baseX + 2 + random.nextInt(12), baseZ + 2 + random.nextInt(12));
-                    int kind = random.nextInt(3);
+                    int kind = random.nextInt(100);
                     BlockFace facing = FACINGS[random.nextInt(4)];
-                    if (ground == null || !naturalGrass(ground)) continue;
-                    BlockData shown = switch (kind) {
-                        case 0 -> facing(Material.CARVED_PUMPKIN, facing);
-                        case 1 -> facing(Material.JACK_O_LANTERN, facing);
-                        default -> Material.PUMPKIN.createBlockData();
-                    };
+                    if (ground == null || !naturalGrass(ground) || taken(fakes, ground)) continue;
+                    BlockData shown = kind < 55
+                            ? facing(Material.JACK_O_LANTERN, facing)
+                            : kind < 85 ? facing(Material.CARVED_PUMPKIN, facing) : Material.PUMPKIN.createBlockData();
                     fakes.add(new Fake(ground.getLocation(), ground.getBlockData(), shown));
-                    break;
+                    pumpkins--;
                 }
             }
             if (random.nextInt(100) < 35) {
@@ -394,6 +427,17 @@ final class SeasonalDecor implements Listener {
         return fakes;
     }
 
+    /** Whether a pumpkin already stands within a few blocks of this one. */
+    private static boolean taken(List<Fake> fakes, Block ground) {
+        for (Fake fake : fakes) {
+            Location at = fake.at();
+            int apart = Math.abs(at.getBlockX() - ground.getX()) + Math.abs(at.getBlockY() - ground.getY())
+                    + Math.abs(at.getBlockZ() - ground.getZ());
+            if (apart <= 4) return true;
+        }
+        return false;
+    }
+
     private static BlockData facing(Material material, BlockFace face) {
         BlockData data = material.createBlockData();
         if (data instanceof Directional directional) directional.setFacing(face);
@@ -424,7 +468,7 @@ final class SeasonalDecor implements Listener {
         return true;
     }
 
-    private static boolean natural(Block block) {
+    static boolean natural(Block block) {
         Material type = block.getType();
         if (type.isAir()) return true;
         if (Tag.LEAVES.isTagged(type)) return wild(block.getBlockData());

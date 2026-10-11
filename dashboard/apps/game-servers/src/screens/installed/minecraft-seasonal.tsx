@@ -1,19 +1,20 @@
 "use client";
 
 /**
- * The server's seasonal decorations on the Settings tab: one switch, and a line
- * saying what is showing now and why.
+ * The server's seasonal decorations on the Settings tab: one switch, a line
+ * saying what is showing now and why, and how many seasonal mobs come out.
  *
- * The switch flips at once and goes back if the save fails. The last reading
+ * Every change shows at once and goes back if the save fails. The last reading
  * paints first on a revisit; until the server's own answer arrives it cannot be
  * changed, so a flip is only ever made from what the server holds.
  */
 
 import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
-import { Card, CardBody, Skeleton, Switch } from "@polaris/ui";
+import { Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
+import * as seasonal from "../../lib/minecraft/seasonal";
 import { useEffect, useRef, useState, useTransition } from "react";
-import type { SeasonalView } from "../../lib/minecraft/seasonal-service";
+import type { SeasonalPatch, SeasonalView } from "../../lib/minecraft/seasonal-service";
 import { readSeasonalAction, saveSeasonalAction } from "./seasonal-actions";
 
 const { writeSnapshot } = hostUi.snapshotCache;
@@ -56,13 +57,13 @@ export function MinecraftSeasonal({
         });
     }, [installedAppId]);
 
-    function flip(on: boolean) {
+    function save(patch: SeasonalPatch) {
         if (!view) return;
         const before = view;
         setError(null);
-        setView({ ...view, on });
+        setView({ ...view, ...patch });
         startTransition(async () => {
-            const result = await saveSeasonalAction({ installedAppId, on });
+            const result = await saveSeasonalAction({ installedAppId, ...patch });
             answered.current = true;
             if (result.view) setView(result.view);
             else {
@@ -102,7 +103,7 @@ export function MinecraftSeasonal({
                         <Switch
                             checked={view.on}
                             disabled={!canManage || !heard || pending || view.blocked}
-                            onChange={flip}
+                            onChange={(on) => save({ on })}
                             aria-label={t("seasonal.turnOn")}
                         />
                     ) : error ? null : (
@@ -110,8 +111,82 @@ export function MinecraftSeasonal({
                     )}
                 </div>
                 {status && <p className="text-xs text-muted-foreground">{status}</p>}
+                {view && view.on && !view.blocked && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <MobChoice
+                            id={`${installedAppId}-night-spawns`}
+                            label={t("seasonal.nightSpawns")}
+                            hint={t("seasonal.nightSpawnsHint")}
+                            value={view.nightSpawns}
+                            choices={seasonal.NIGHT_SPAWN_CHOICES}
+                            none={t("seasonal.asUsual")}
+                            times={(count) => t("seasonal.times", { count })}
+                            disabled={!canManage || !heard || pending}
+                            onChange={(nightSpawns) => save({ nightSpawns })}
+                        />
+                        <MobChoice
+                            id={`${installedAppId}-snow-golems`}
+                            label={t("seasonal.snowGolems")}
+                            hint={t("seasonal.snowGolemsHint")}
+                            value={view.snowGolems}
+                            choices={seasonal.SNOW_GOLEM_CHOICES}
+                            none={t("seasonal.none")}
+                            times={(count) => t("seasonal.times", { count })}
+                            disabled={!canManage || !heard || pending}
+                            onChange={(snowGolems) => save({ snowGolems })}
+                        />
+                    </div>
+                )}
+                {view?.on && view.mobsNeedRestart && (
+                    <p className="text-xs text-muted-foreground">{t("seasonal.mobsNeedRestart")}</p>
+                )}
                 {error && <p className="text-xs text-destructive">{error}</p>}
             </CardBody>
         </Card>
+    );
+}
+
+/** One seasonal mob setting: a multiple of the usual, the first choice being none. */
+function MobChoice({
+    id,
+    label,
+    hint,
+    value,
+    choices,
+    none,
+    times,
+    disabled,
+    onChange
+}: {
+    id: string;
+    label: string;
+    hint: string;
+    value: number;
+    choices: readonly number[];
+    none: string;
+    times: (count: string) => string;
+    disabled: boolean;
+    onChange: (value: number) => void;
+}) {
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            <label htmlFor={id} className="text-xs font-medium">
+                {label}
+            </label>
+            <Select
+                id={id}
+                value={String(value)}
+                onValueChange={(next) => {
+                    const picked = Number(next);
+                    if (picked !== value && choices.includes(picked)) onChange(picked);
+                }}
+                options={choices.map((choice, index) => ({
+                    value: String(choice),
+                    label: index === 0 ? none : times(String(choice))
+                }))}
+                disabled={disabled}
+            />
+            <p className="text-xs text-muted-foreground">{hint}</p>
+        </div>
     );
 }

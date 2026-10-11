@@ -2886,7 +2886,7 @@
     },
     "seasonal": {
         "title": "Decoración de temporada",
-        "hint": "Calabazas y telarañas en Halloween, nieve en invierno. Solo se ven en la pantalla de los jugadores; el mundo nunca se modifica.",
+        "hint": "Calabazas y telarañas en Halloween, nieve en invierno. La decoración solo se dibuja en la pantalla de los jugadores y nunca toca lo que alguien construyó.",
         "turnOn": "Mostrar decoración de temporada",
         "showingHalloween": "Ahora se ve la decoración de Halloween.",
         "showingWinter": "Ahora se ve la decoración de invierno.",
@@ -2896,6 +2896,14 @@
         "blocked": "La decoración de temporada está desactivada para todo Polaris en los ajustes de administración.",
         "needsRestart": "Este servidor necesita un reinicio para cargar la decoración.",
         "unavailable": "Este servidor no tiene el plugin o mod de Polaris para mostrarla.",
-        "notSaved": "No se pudo guardar. Inténtalo de nuevo."
+        "notSaved": "No se pudo guardar. Inténtalo de nuevo.",
+        "nightSpawns": "Monstruos de Halloween",
+        "nightSpawnsHint": "Salen más monstruos de noche, con calabazas en la cabeza hasta el amanecer.",
+        "snowGolems": "Gólems de nieve",
+        "snowGolemsHint": "Aparecen gólems de nieve cerca de los jugadores en zonas nevadas, algunos aún con su calabaza.",
+        "asUsual": "Lo normal",
+        "none": "Ninguno",
+        "times": "{count}x",
+        "mobsNeedRestart": "Reinicia este servidor para traer los mobs de temporada. Las decoraciones ya se ven."
     }
 }

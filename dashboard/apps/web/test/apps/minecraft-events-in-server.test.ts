@@ -47,6 +47,12 @@ describe("capabilities", () => {
         ).toEqual(new Set(["respawn", "guard"]));
     });
 
+    it("counts the seasonal mobs, which a newer jar lists beside the season", () => {
+        expect(
+            inServer.parseCaps('{"ok":true,"polaris":"0.5.0","caps":["season","season-mobs"]}')
+        ).toEqual(new Set(["season", "season-mobs"]));
+    });
+
     it("is nothing on a server without the mod", () => {
         expect(inServer.parseCaps("Unknown or incomplete command, see below for error")).toEqual(
             new Set()

@@ -98,6 +98,9 @@ final class SeasonalDecor {
      *  how much further each block they moved in the last tick takes that. */
     private static final double WEB_REACH = 6;
     private static final double WEB_REACH_PER_SPEED = 12;
+    /** Halloween chunks with a pumpkin, and of those, the ones with two, in percent. */
+    private static final int PUMPKIN_CHUNKS = 45;
+    private static final int TWO_PUMPKIN_CHUNKS = 30;
 
     /** One block a player's game was told is something else, and what it really was. */
     private record Fake(BlockPos pos, BlockState real, BlockState shown) {}
@@ -118,13 +121,18 @@ final class SeasonalDecor {
 
     // ------------------------------------------------------------------ commands
 
-    /** {@code polaris season set <name> <seconds>}. */
-    static JsonObject set(MinecraftServer server, String name, long seconds) {
+    /** {@code polaris season set <name> <seconds> [<spawns%> <golems%>]}: the mob
+     *  settings are {@link SeasonalMobs}'. */
+    static JsonObject set(MinecraftServer server, String name, long seconds, int spawns, int golems) {
         Season next = Season.named(name);
         if (next == null) return refused("unknownSeason");
-        if (next != season) revertAll(server);
+        if (next != season) {
+            revertAll(server);
+            SeasonalMobs.revert(server);
+        }
         season = next;
         untilMillis = System.currentTimeMillis() + Math.min(Math.max(seconds, 1), MAX_HOLD_SECONDS) * 1000L;
+        SeasonalMobs.configure(server, spawns, golems);
         return status();
     }
 
@@ -132,7 +140,13 @@ final class SeasonalDecor {
     static JsonObject clear(MinecraftServer server) {
         if (season != null) revertAll(server);
         season = null;
+        SeasonalMobs.revert(server);
         return status();
+    }
+
+    /** The season showing now, or null. */
+    static Season season() {
+        return season;
     }
 
     /** {@code polaris season status}. */
@@ -145,6 +159,7 @@ final class SeasonalDecor {
         for (Seen one : seen.values()) for (List<Fake> fakes : one.chunks.values()) blocks += fakes.size();
         reply.addProperty("players", seen.size());
         reply.addProperty("blocks", blocks);
+        SeasonalMobs.status(reply);
         return reply;
     }
 
@@ -183,7 +198,7 @@ final class SeasonalDecor {
         return x0 + 15 >= box[0] && x0 <= box[2] && z0 + 15 >= box[1] && z0 <= box[3];
     }
 
-    private static boolean isAvoided(int chunkX, int chunkZ) {
+    static boolean isAvoided(int chunkX, int chunkZ) {
         for (long[] box : avoided) if (overlaps(box, chunkX, chunkZ)) return true;
         return false;
     }
@@ -212,6 +227,7 @@ final class SeasonalDecor {
             } catch (RuntimeException ignored) {
                 season = null;
                 seen.clear();
+                SeasonalMobs.forget();
             }
         }
     }
@@ -362,19 +378,22 @@ final class SeasonalDecor {
         int baseX = cx << 4;
         int baseZ = cz << 4;
         if (season == Season.HALLOWEEN) {
-            if (random.nextInt(100) < 22) {
-                for (int tries = 0; tries < 4; tries++) {
+            // Most chunks get one, some two, and over half of them are lit: a
+            // jack o'lantern is what a player sees from across a field at night.
+            if (random.nextInt(100) < PUMPKIN_CHUNKS) {
+                int pumpkins = random.nextInt(100) < TWO_PUMPKIN_CHUNKS ? 2 : 1;
+                for (int tries = 0; tries < 8 && pumpkins > 0; tries++) {
                     BlockPos ground = groundAt(level, baseX + 2 + random.nextInt(12), baseZ + 2 + random.nextInt(12));
-                    int kind = random.nextInt(3);
+                    int kind = random.nextInt(100);
                     Direction facing = Direction.from2DDataValue(random.nextInt(4));
-                    if (ground == null || !naturalGrass(level, ground)) continue;
-                    BlockState shown = switch (kind) {
-                        case 0 -> Blocks.CARVED_PUMPKIN.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing);
-                        case 1 -> Blocks.JACK_O_LANTERN.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing);
-                        default -> Blocks.PUMPKIN.defaultBlockState();
-                    };
+                    if (ground == null || !naturalGrass(level, ground) || taken(fakes, ground)) continue;
+                    BlockState shown = kind < 55
+                            ? Blocks.JACK_O_LANTERN.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing)
+                            : kind < 85
+                                    ? Blocks.CARVED_PUMPKIN.defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, facing)
+                                    : Blocks.PUMPKIN.defaultBlockState();
                     fakes.add(new Fake(ground, level.getBlockState(ground), shown));
-                    break;
+                    pumpkins--;
                 }
             }
             if (random.nextInt(100) < 35) {
@@ -405,6 +424,12 @@ final class SeasonalDecor {
         return fakes;
     }
 
+    /** Whether a pumpkin already stands within a few blocks of this one. */
+    private static boolean taken(List<Fake> fakes, BlockPos ground) {
+        for (Fake fake : fakes) if (fake.pos().distManhattan(ground) <= 4) return true;
+        return false;
+    }
+
     /** The top solid block of a column, ignoring leaves, or null outside the world. */
     private static BlockPos groundAt(ServerLevel level, int x, int z) {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
@@ -432,7 +457,7 @@ final class SeasonalDecor {
         return true;
     }
 
-    private static boolean natural(BlockState state) {
+    static boolean natural(BlockState state) {
         if (state.isAir()) return true;
         if (state.is(BlockTags.LEAVES)) return wild(state);
         return state.is(BlockTags.DIRT) || state.is(BlockTags.BASE_STONE_OVERWORLD) || state.is(BlockTags.SAND)

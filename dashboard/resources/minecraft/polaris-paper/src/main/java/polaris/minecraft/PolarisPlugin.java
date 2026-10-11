@@ -40,6 +40,7 @@ public final class PolarisPlugin extends JavaPlugin {
         // The season Polaris says it is, on players' screens only; idle until told.
         seasonal = new SeasonalDecor(this);
         getServer().getPluginManager().registerEvents(seasonal, this);
+        getServer().getPluginManager().registerEvents(seasonal.mobs(), this);
         SeasonalDecor season = seasonal;
         PluginCommand polaris = getCommand("polaris");
         if (polaris != null) {
@@ -83,7 +84,7 @@ public final class PolarisPlugin extends JavaPlugin {
     }
 
     /** `polaris caps`: what the dashboard may ask of this plugin, as the NeoForge
-     *  mod answers it. Only `respawn`, `guard` and `season` here: the rest are the mod's alone. */
+     *  mod answers it. Only `respawn`, `guard`, `season` and `season-mobs` here: the rest are the mod's alone. */
     private static JsonObject caps(String version) {
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
@@ -92,6 +93,7 @@ public final class PolarisPlugin extends JavaPlugin {
         caps.add("respawn");
         caps.add("guard");
         caps.add("season");
+        caps.add("season-mobs");
         reply.add("caps", caps);
         return reply;
     }

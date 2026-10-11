@@ -24,7 +24,14 @@ import { stripFormatting } from "../parse";
 import type { ServerContainer } from "../service";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 
-export type Capability = "stash" | "batch" | "seek" | "respawn" | "guard" | "season";
+export type Capability =
+    | "stash"
+    | "batch"
+    | "seek"
+    | "respawn"
+    | "guard"
+    | "season"
+    | "season-mobs";
 
 const capsSchema = z.object({
     ok: z.literal(true),
@@ -71,7 +78,9 @@ export function readCaps(reply: string): CapsReading {
     return {
         caps: new Set(
             parsed.data.caps.filter((cap): cap is Capability =>
-                ["stash", "batch", "seek", "respawn", "guard", "season"].includes(cap)
+                ["stash", "batch", "seek", "respawn", "guard", "season", "season-mobs"].includes(
+                    cap
+                )
             )
         ),
         answer: "polaris"
