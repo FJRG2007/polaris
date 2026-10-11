@@ -1419,6 +1419,43 @@ runs first. It needs no capability: the tag is the switch, and the event takes
 it off at the end. A jar older than this lets a ghost's chat through; the game
 plays the same.
 
+## Building and tearing down: rules learned on live servers
+
+One line each, with the file that enforces it. A new kind keeps every one.
+
+1. **Every fill uses `keep`, and the read-back block is really there.** The
+   build checks the first corner of the last fill; if an earlier fill already
+   put a different block there, every site reads as "refused"
+   (`arena-service.ts`, test `minecraft-events-arena-probe.test.ts`).
+2. **Blocks that fall go first and never float.** Sand, gravel, concrete
+   powder, anvils, pointed dripstone, scaffolding and the rest of
+   `stage.GRAVITY_BLOCKS` are placed only on something solid, removed before
+   any other block (highest slice first), and falling blocks in and under the
+   box are killed after the teardown (`arena.teardown`, `stage.fallingGone`,
+   test `minecraft-events-gravity.test.ts`).
+3. **No powder snow where players walk**: they sink into it and get stuck
+   (`seek-rooms.ts`, `seek-grid.ts`).
+4. **Adventure mode: re-mark a broken block's drop in the same tick.** A drop
+   picked up before it is marked as kit again cannot be placed; the data pack
+   marks it (`FUNCTIONS.step` in `acid-rain.ts`), not the RCON look.
+5. **Potions on 1.20.5+ carry `potion_contents`**, or they show as
+   "Uncraftable Potion" (`arena.ts`, `KitExtras.potion`).
+6. **Kit items go to the selected hotbar slot**, and the kit is always taken
+   back, armor slots included (`elytra-race.ts`, `stage.clearMarked`).
+7. **No pushing, no friendly hits**: a team with `collisionRule never` and
+   `friendlyFire false`, joined only by players on no server team
+   (`parkour.ts`, `nether-maze.ts`, `team-duel.ts`).
+8. **Paintings need solid support across their whole size** (banners count),
+   or they pop off within about 5 seconds (`seek-manor.ts`).
+9. **Tests that loop over many generated maps set an explicit timeout**; CI
+   runners are slower than a laptop.
+10. **The Java mod compiles with `-Xlint:all -Werror`** only in the publish
+    workflow: no deprecated APIs (`resources/minecraft/polaris-paper/build.gradle`).
+11. **The trash slot (mod) keeps its own stash slot**: its item goes back to
+    the trash slot, never into the backpack (`stash.ts`).
+12. **Big tracks and arenas check loaded chunks in batches** of at most 64
+    columns per check, so teardown stays batched (`pace.ts`, `COLUMNS_ASKED`).
+
 ## Lessons from real servers
 
 Every rule below was learned from a bug, most of them seen on a live server.

@@ -368,6 +368,74 @@ export function sweepLines(volume: Volume): string[] {
     return [...sweepFills(volume), dropsGone(volume)];
 }
 
+const POWDER_COLOURS = [
+    "white",
+    "light_gray",
+    "gray",
+    "black",
+    "brown",
+    "red",
+    "orange",
+    "yellow",
+    "lime",
+    "green",
+    "cyan",
+    "light_blue",
+    "blue",
+    "purple",
+    "magenta",
+    "pink"
+];
+
+/**
+ * Blocks the game lets fall: with nothing under them (a stalactite of pointed
+ * dripstone, with nothing over it) they turn into a falling block, which lands
+ * as a real block wherever it comes down - under the event, outside its box,
+ * on somebody's roof - and nothing that takes the event down knows it is
+ * there. Scaffolding with nothing holding it does the same. So an event never
+ * puts one where nothing holds it, and a teardown takes these before anything
+ * else (`arena.teardown`).
+ */
+export const GRAVITY_BLOCKS: readonly string[] = [
+    "minecraft:sand",
+    "minecraft:red_sand",
+    "minecraft:gravel",
+    "minecraft:suspicious_sand",
+    "minecraft:suspicious_gravel",
+    "minecraft:anvil",
+    "minecraft:chipped_anvil",
+    "minecraft:damaged_anvil",
+    "minecraft:dragon_egg",
+    "minecraft:pointed_dripstone",
+    "minecraft:scaffolding",
+    ...POWDER_COLOURS.map((colour) => `minecraft:${colour}_concrete_powder`)
+];
+
+const FALLS = new Set(GRAVITY_BLOCKS);
+
+/** Whether a block - by id, a state or not - is one that falls. */
+export function falls(block: string): boolean {
+    return FALLS.has(block.replace(/[[{].*$/, ""));
+}
+
+/** How far under a volume a block that fell from it is still looked for. */
+export const FALL_MARGIN = 16;
+
+/**
+ * Every falling block in a volume, and in `FALL_MARGIN` blocks under it,
+ * removed before it lands: one a teardown still let loose. Falling blocks only
+ * - never a player, a mob or an item - and no block is touched.
+ */
+export function fallingGone(volume: Volume): string {
+    const x = Math.min(volume.x1, volume.x2);
+    const z = Math.min(volume.z1, volume.z2);
+    const top = Math.max(volume.y1, volume.y2);
+    const y = Math.min(volume.y1, volume.y2) - FALL_MARGIN;
+    const dx = Math.abs(volume.x2 - volume.x1);
+    const dz = Math.abs(volume.z2 - volume.z1);
+    return `${WORLD} kill @e[type=minecraft:falling_block,x=${x},y=${y},z=${z},dx=${dx},dy=${top - y},dz=${dz}]`;
+}
+
 /**
  * Whether a proved volume shares a column with anything a live run holds: its
  * sweep waits for that run to end, since site search never steers clear of a

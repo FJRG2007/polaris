@@ -59,7 +59,7 @@ describe("a parkour course's layout", () => {
         // must not.
         expect(slimes).toBeGreaterThan(150);
         expect(specials).toBeGreaterThan(3000);
-    });
+    }, 120_000);
 
     it("falls back to a course that keeps every rule, up to the longest a race can be", () => {
         for (const shape of PARKOUR_SHAPES)

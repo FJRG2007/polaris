@@ -31,7 +31,7 @@
  */
 
 import { text } from "../commands";
-import { fallProof, sweepLines } from "./stage";
+import { falls, fallProof, fallingGone, sweepLines } from "./stage";
 import { PLAYER_NAME } from "../catalog";
 import { stripFormatting } from "../../parse";
 import { GAMEMODES, type Arena, type Box, type Entrant, type Marker } from "../state";
@@ -182,17 +182,30 @@ export function withDecayed(blocks: readonly string[]): string[] {
  * up. Taken the other way - every kind in the lowest slice, then the next -
  * the ground of one slice went first, and what stood on it in the slice over
  * it dropped as an item nobody owns.
+ *
+ * Except what falls (`stage.falls`): an anvil, a stalactite, a tower of
+ * scaffolding, sand or gravel goes before anything at all, the highest slice
+ * first, while everything under and over it still stands. Taken after its
+ * floor, it fell as a block, landed under the box and stayed in the world.
+ * Whatever fell anyway is taken once the rest is down - its kinds inside the
+ * box, and every falling block in it and just under it (`stage.fallingGone`) -
+ * only for an arena that placed one, so nobody else's is touched.
  */
 export function teardown(arena: Arena): string[] {
     const pieces = slices(arena.box);
     const kinds = withDecayed(arena.blocks.filter((block) => ITEM_ID.test(block)));
+    const heavy = kinds.filter(falls);
+    const take = (piece: Box, block: string) =>
+        `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`;
     return [
-        ...kinds.flatMap((block) =>
-            pieces.map(
-                (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
-            )
-        ),
-        ...(arena.proved ? sweepLines(arena.proved) : []),
+        ...[...pieces].reverse().flatMap((piece) => heavy.map((block) => take(piece, block))),
+        ...kinds
+            .filter((block) => !falls(block))
+            .flatMap((block) => pieces.map((piece) => take(piece, block))),
+        ...(arena.proved
+            ? sweepLines(arena.proved)
+            : heavy.flatMap((block) => pieces.map((piece) => take(piece, block)))),
+        ...(heavy.length > 0 ? [fallingGone(arena.box)] : []),
         ...(arena.biome ? biomeLines(arena.biome.box, arena.biome.was, arena.biome.now) : [])
     ];
 }
