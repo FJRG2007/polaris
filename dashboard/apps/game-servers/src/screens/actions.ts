@@ -10,6 +10,7 @@
 import { type GameId, GAMES } from "@polaris/core";
 import { gameWords, issueText, messageText } from "./game-words";
 import { z } from "zod";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { clearResourceGrants } from "@polaris/auth";
 import { findMap } from "../lib/minecraft/maps";
@@ -26,8 +27,13 @@ import { clearLogins } from "../lib/minecraft/polaris-login-service";
 import { clearSounds } from "../lib/minecraft/sounds-service";
 import { clearAnticheatFlags } from "../lib/minecraft/polaris-anticheat-service";
 import { clearSanctions } from "../lib/sanctions-service";
+import { prisma } from "@polaris/db";
+import { gameServerCatalogIds } from "../lib/game-catalog";
 import { isTemplateName, type ServerTemplateView } from "../lib/game-templates";
 import { adoptGameServersApp, installGameServersApp } from "../lib/game-install";
+import * as duplicatePlan from "../lib/duplicate-plan";
+import * as duplicateService from "../lib/duplicate-service";
+import { refuseWhileCopying } from "../lib/duplicate-busy";
 import { createGameServerSchema, type CreateGameServerInput } from "../lib/games-schema";
 import { GAME_BLUEPRINTS, formatMemory } from "../lib/minecraft/blueprints";
 import {
@@ -39,11 +45,12 @@ import {
 import { host } from "@polaris/app-host";
 
 const { clientIp } = host.requestContext;
-const { requirePermission } = host.session;
+const { requirePermission, userHasManage } = host.session;
 const { recordAudit } = host.auditService;
 const { uninstallApp } = host.appsInstallService;
 const { deployApplication } = host.deployService;
 const { installRef, requireGameServer, requireGameServerOwner } = host.appsInstallAccess;
+const { measureInstallData } = host.appsInstallDuplicate;
 
 export interface GameSetup {
     /** Machines a server can run on, with what each has left. */
@@ -378,6 +385,7 @@ export async function redeployGameServerAction(
         const { user, access } = await requireGameServer("games.manage", installedAppId);
         if (!access.install.applicationId)
             throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
+        await refuseWhileCopying(installedAppId);
         // A redeploy tears the container down and builds it again, so it costs the
         // same unwritten minutes a stop does - and used to take them silently.
         await flushGameWorld(access.ownerId, installedAppId);
@@ -438,6 +446,144 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
                 caught instanceof Error
                     ? await messageText(caught.message)
                     : (await gameWords("games"))("errors.couldNotDeleteTheServer")
+        };
+    }
+}
+
+/**
+ * Who may duplicate this server, decided by the same rule the screens draw the
+ * action from: a copy is a new server (instance-wide `games.manage`) of somebody's
+ * world (the owner's or an administrator's). Throws the reason otherwise.
+ */
+async function requireDuplicate(installedAppId: string) {
+    const { user, access } = await requireGameServer("games.manage", installedAppId);
+    const allowed = duplicatePlan.duplicatePermission({
+        canCreate: await userHasManage(user, "games.manage"),
+        isOwner: access.isOwner,
+        isAdmin: user.isAdmin
+    });
+    if (!allowed.allowed)
+        throw new Error(
+            allowed.reason === "cannot-create"
+                ? (await gameWords("games"))("duplicate.cannotCreate")
+                : (await gameWords("games"))("duplicate.notOwner")
+        );
+    return { user, access };
+}
+
+export interface DuplicateSetup {
+    /** Every name the owner's servers already use, for the dialog to check as
+     *  somebody types. */
+    readonly takenNames: string[];
+    /** What the files take and what the machine has free, or null when the server
+     *  is off and cannot be asked - the copy checks again either way. */
+    readonly usedBytes: number | null;
+    readonly freeBytes: number | null;
+    readonly fits: boolean | null;
+    /** Whether it is up, which is whether the copy takes it down for a while. */
+    readonly running: boolean;
+}
+
+/** What the duplicate dialog needs to know before anybody presses anything. */
+export async function duplicateSetupAction(
+    installedAppId: string
+): Promise<{ setup?: DuplicateSetup; error?: string }> {
+    try {
+        const { access } = await requireDuplicate(installedAppId);
+        const [figures, siblings, running] = await Promise.all([
+            measureInstallData(access.ownerId, installedAppId),
+            listOwnerServerNames(access.ownerId),
+            access.install.applicationId
+                ? prisma.application
+                      .findUnique({
+                          where: { id: access.install.applicationId },
+                          select: { desiredState: true }
+                      })
+                      .then((row) => row?.desiredState === "running")
+                : Promise.resolve(false)
+        ]);
+        return {
+            setup: {
+                takenNames: siblings,
+                usedBytes: figures?.usedBytes ?? null,
+                freeBytes: figures?.freeBytes ?? null,
+                fits: figures?.fits ?? null,
+                running
+            }
+        };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("duplicate.couldNotStart")
+        };
+    }
+}
+
+/** The names of every server the owner has, for the uniqueness check. */
+async function listOwnerServerNames(ownerId: string): Promise<string[]> {
+    const rows = await prisma.installedApp.findMany({
+        where: { ownerId, status: { not: "removed" }, catalogId: { in: gameServerCatalogIds() } },
+        select: { name: true },
+        take: 1000
+    });
+    return rows.map((row) => row.name);
+}
+
+/**
+ * Duplicate a server. Answers as soon as the copy is recorded; the source is
+ * stopped, copied and started again after the answer, and the copy's row says
+ * how far that has got.
+ */
+export async function duplicateGameServerAction(
+    input: duplicatePlan.DuplicateServerInput
+): Promise<{ installedAppId?: string; error?: string }> {
+    const parsed = duplicatePlan.duplicateServerSchema.safeParse(input);
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheDetailsAndTry")
+        };
+    try {
+        const { user, access } = await requireDuplicate(parsed.data.installedAppId);
+        const created = await duplicateService.startDuplicate(access.ownerId, user.id, parsed.data);
+        after(() => duplicateService.runDuplicate(access.ownerId, user.id, created.installedAppId));
+        await recordAudit({
+            actorId: user.id,
+            action: "games.duplicate.start",
+            targetType: "installedApp",
+            targetId: created.installedAppId,
+            metadata: { from: parsed.data.installedAppId }
+        });
+        revalidatePath("/apps/games");
+        return { installedAppId: created.installedAppId };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("duplicate.couldNotStart")
+        };
+    }
+}
+
+/** Try a copy that failed again, from where its source is now. */
+export async function retryDuplicateAction(copyId: string): Promise<{ error?: string }> {
+    try {
+        const { user, access } = await requireDuplicate(copyId);
+        if (!(await duplicateService.claimRetry(access.ownerId, copyId)))
+            throw new Error((await gameWords("games"))("duplicate.nothingToRetry"));
+        after(() => duplicateService.runDuplicate(access.ownerId, user.id, copyId));
+        revalidatePath("/apps/games");
+        return {};
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("duplicate.couldNotStart")
         };
     }
 }

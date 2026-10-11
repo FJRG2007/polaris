@@ -31,10 +31,11 @@ import { type GameId, GAMES } from "@polaris/core";
 import { useGameText, useSchemaText } from "./game-text";
 import Link from "next/link";
 import * as list from "./list";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { rowClickIntent } from "../lib/row-open";
 import { GameLogo } from "../components/game-picker";
 import { NewServerDialog } from "./new-server-dialog";
+import { CopyStatus, DuplicateServerDialog } from "./duplicate-parts";
 import { useGamePresence } from "../components/use-game-presence";
 import type { GameServerFacts, GameServerLive } from "../lib/games-service";
 import {
@@ -50,6 +51,7 @@ import {
     deleteGameServerAction,
     installGameServersAction,
     redeployGameServerAction,
+    retryDuplicateAction,
     setGameServerPrefAction,
     setGameServerRunningAction
 } from "./actions";
@@ -60,6 +62,7 @@ import {
     ArrowUp,
     ArrowUpDown,
     Copy,
+    CopyPlus,
     ExternalLink,
     FolderOpen,
     Gamepad2,
@@ -67,6 +70,7 @@ import {
     Play,
     Plus,
     RefreshCw,
+    RotateCcw,
     Search,
     Square,
     Star,
@@ -105,6 +109,9 @@ const { mergeUnchanged } = hostUi.structuralMerge;
  *  arrives on the live stream, which pushes it as it changes. This is also the
  *  backstop if that stream cannot be held open at all. */
 const POLL_MS = 20000;
+
+/** How often a list with a copy in progress re-reads it. */
+const COPY_POLL_MS = 4000;
 
 /** How old a kept reading of the table may be and still paint first on a revisit. */
 const KEPT_ROWS_MS = 24 * 3_600_000;
@@ -177,6 +184,10 @@ export function GamesView({
     // down takes a moment, and a row that sits there until the next poll reads as
     // a button that did nothing.
     const [removed, setRemoved] = useState<string[]>([]);
+    // The server the duplicate dialog is copying. Opened from a row, or from the
+    // server's own page, which links here with `?duplicate=<id>`.
+    const [duplicating, setDuplicating] = useState<{ id: string; name: string } | null>(null);
+    const searchParams = useSearchParams();
     // Stars and archivings this tab has just made, laid over what the page was
     // rendered with. Starring is a click on a row's own icon and has to land on
     // the row, not a page later.
@@ -291,6 +302,38 @@ export function GamesView({
             ),
         [shelf, query, gameFilter, statusFilter, sortKey, sortDir]
     );
+    // A server's own page sends people here to duplicate it; the dialog opens on
+    // arrival and the address is put back, so a reload does not open it again.
+    const askedToDuplicate = searchParams?.get("duplicate") ?? null;
+    useEffect(() => {
+        if (!askedToDuplicate) return;
+        const server = servers.find((candidate) => candidate.id === askedToDuplicate);
+        if (server?.duplicate?.allowed) setDuplicating({ id: server.id, name: server.name });
+        else if (server) setError(duplicateRefusal(server));
+        router.replace("/apps/games");
+        // Only when the address asks; the list moving under it is not a request.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [askedToDuplicate]);
+
+    // While a copy is being made its row is the only place that says how far it
+    // has got, so the page re-reads it on a short beat until none is left.
+    const copying = servers.some((server) => server.copy && server.copy.stage !== "failed");
+    useEffect(() => {
+        if (!copying) return;
+        const timer = setInterval(() => router.refresh(), COPY_POLL_MS);
+        return () => clearInterval(timer);
+    }, [copying, router]);
+
+    function duplicateRefusal(server: list.GameServerSeed): string {
+        return server.duplicate && !server.duplicate.allowed
+            ? t(
+                  server.duplicate.reason === "cannot-create"
+                      ? "duplicate.cannotCreate"
+                      : "duplicate.notOwner"
+              )
+            : t("duplicate.couldNotStart");
+    }
+
     const filtering = query.trim().length > 0 || gameFilter !== "" || statusFilter !== "";
 
     function run(action: () => Promise<{ error?: string }>): void {
@@ -482,6 +525,15 @@ export function GamesView({
                                             setDeleteError(null);
                                             setDeleting(server);
                                         }}
+                                        onDuplicate={() =>
+                                            setDuplicating({ id: server.id, name: server.name })
+                                        }
+                                        onRetry={() => run(() => retryDuplicateAction(server.id))}
+                                        duplicateReason={
+                                            server.duplicate && !server.duplicate.allowed
+                                                ? duplicateRefusal(server)
+                                                : null
+                                        }
                                     />
                                 ))}
                                 {visible.length === 0 && (
@@ -520,6 +572,17 @@ export function GamesView({
             )}
 
             {creating && <NewServerDialog onClose={() => setCreating(false)} />}
+            {duplicating && (
+                <DuplicateServerDialog
+                    source={duplicating}
+                    knownNames={servers.map((server) => server.name)}
+                    onClose={() => setDuplicating(null)}
+                    onStarted={() => {
+                        setDuplicating(null);
+                        router.refresh();
+                    }}
+                />
+            )}
             <ConfirmDeleteDialog
                 open={deleting !== null}
                 onOpenChange={(open) => !open && !pending && setDeleting(null)}
@@ -690,7 +753,10 @@ function ServerRow({
     factsFresh,
     onRun,
     onPref,
-    onDelete
+    onDelete,
+    onDuplicate,
+    onRetry,
+    duplicateReason
 }: {
     server: list.ServerView;
     canManage: boolean;
@@ -701,9 +767,16 @@ function ServerRow({
     onRun: (action: () => Promise<{ error?: string }>) => void;
     onPref: (patch: { favorite?: boolean; archived?: boolean }) => void;
     onDelete: () => void;
+    onDuplicate: () => void;
+    onRetry: () => void;
+    /** Why this viewer cannot duplicate it, or null when they can. */
+    duplicateReason: string | null;
 }) {
     const t = useGameText("games");
     const { facts, live } = server;
+    const mayDuplicate = server.duplicate?.allowed === true;
+    const canDuplicate = mayDuplicate && !server.copy;
+    const failedCopy = server.copy?.stage === "failed";
     const definition = GAMES.find((game) => game.id === server.game) ?? null;
     const href = `/apps/installed/${server.id}`;
     const files = filesHref(server.applicationId, server.game);
@@ -839,6 +912,24 @@ function ServerRow({
                                     )}
                                 </IconButton>
                             )}
+                            {failedCopy && mayDuplicate && (
+                                <IconButton
+                                    label={t("duplicate.retryNamed", { name: server.name })}
+                                    disabled={pending}
+                                    onClick={onRetry}
+                                >
+                                    <RotateCcw className="size-4" />
+                                </IconButton>
+                            )}
+                            {canDuplicate && (
+                                <IconButton
+                                    label={t("duplicate.duplicateNamed", { name: server.name })}
+                                    disabled={pending}
+                                    onClick={onDuplicate}
+                                >
+                                    <CopyPlus className="size-4" />
+                                </IconButton>
+                            )}
                             {canRemove && (
                                 <IconButton
                                     label={t("list.deleteNamed", { name: server.name })}
@@ -924,6 +1015,27 @@ function ServerRow({
                             <RefreshCw className="size-4" /> {t("list.redeploy")}
                         </ContextMenuItem>
                     </>
+                )}
+                <ContextMenuSeparator />
+                {failedCopy && mayDuplicate ? (
+                    <ContextMenuItem disabled={pending} onSelect={onRetry}>
+                        <RotateCcw className="size-4" /> {t("duplicate.retry")}
+                    </ContextMenuItem>
+                ) : canDuplicate ? (
+                    <ContextMenuItem disabled={pending} onSelect={onDuplicate}>
+                        <CopyPlus className="size-4" /> {t("duplicate.duplicate")}
+                    </ContextMenuItem>
+                ) : (
+                    // Disabled items take no pointer events, so the reason is
+                    // written on the item rather than kept in a tooltip.
+                    <ContextMenuItem disabled>
+                        <CopyPlus className="size-4" /> {t("duplicate.duplicate")}
+                        <span className="ml-auto min-w-0 max-w-48 truncate pl-3 text-xs">
+                            {server.copy && !failedCopy
+                                ? t("duplicate.stillCopying")
+                                : duplicateReason}
+                        </span>
+                    </ContextMenuItem>
                 )}
                 {canRemove && (
                     <>
@@ -1046,6 +1158,11 @@ function AddressCell({
  * a restart loop from a world that has been fine all week.
  */
 function StatusCell({ server }: { server: list.ServerView }) {
+    if (server.copy) return <CopyStatus copy={server.copy} />;
+    return <ServerStatusCell server={server} />;
+}
+
+function ServerStatusCell({ server }: { server: list.ServerView }) {
     const t = useGameText("games");
     const format = useDisplayFormat();
     const badge = list.STATUS_BADGE[list.statusOf(server)];

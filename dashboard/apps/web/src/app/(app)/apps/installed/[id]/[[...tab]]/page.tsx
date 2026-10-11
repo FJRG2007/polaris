@@ -16,7 +16,7 @@
 
 import { findApp } from "@/lib/apps/catalog";
 import { notFound, redirect } from "next/navigation";
-import { requireUser } from "@/lib/session";
+import { requireUser, userHasManage } from "@/lib/session";
 import { installedPanelSlot } from "@/lib/app-extensions/registry";
 import { canOpenGameTab, isGameTab } from "../tabs";
 import { gameOfServer } from "@/lib/apps/games-catalog";
@@ -79,6 +79,18 @@ export default async function InstalledAppPage({
     // that are merely hidden here - they are screens this server does not have.
     const gameId = gameOfServer(app.catalogId)?.id ?? null;
     if (slug && !isGameTab(slug, gameId)) notFound();
+    // Duplicating a game server takes what creating one does (instance-wide
+    // games.manage) and what removing this one does (owner or administrator) -
+    // the rule the game app's own duplicate action enforces. Offered to whoever
+    // may manage it, disabled with the reason for the ones that rule leaves out.
+    const duplicate =
+        gameId && canManage
+            ? !(await userHasManage(user, "games.manage"))
+                ? ({ allowed: false, reason: "cannot-create" } as const)
+                : !canRemove
+                  ? ({ allowed: false, reason: "not-owner" } as const)
+                  : ({ allowed: true } as const)
+            : null;
     // A screen they do not hold reads the same as one that is not there. Hiding the
     // tab is what the bar does; this is what makes the URL agree with it.
     if (slug && !canOpenGameTab(slug, held, gameId)) notFound();
@@ -105,6 +117,7 @@ export default async function InstalledAppPage({
                 held={held}
                 canManage={canManage}
                 canRemove={canRemove}
+                duplicate={duplicate}
             />
         </Messages>
     );

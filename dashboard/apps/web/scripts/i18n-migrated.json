@@ -1638,6 +1638,7 @@
         "web/src/lib/view-as-service.ts",
         "web/src/lib/agents/model-catalog.ts",
         "web/src/lib/agents/model-key-actions.ts",
+        "web/src/lib/apps/install-copy-hold.ts",
         "web/src/lib/apps/install-sharing.ts",
         "web/src/lib/connection-removal-service.ts",
         "web/src/lib/deploy-project-service.ts",
