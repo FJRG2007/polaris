@@ -321,7 +321,10 @@ describe("Slow Falling in an event", () => {
         ];
         for (const line of given.filter((one) => one.includes("slow_falling")))
             expect(line).toContain("@e[type=!player,");
-        expect(stage.fallProof("Ana")).toEqual(["effect give Ana minecraft:resistance 10 4 true"]);
+        expect(stage.fallProof("Ana")).toEqual([
+            "effect give Ana minecraft:resistance 10 4 true",
+            `effect give Ana minecraft:fire_resistance ${stage.BURN_SECONDS} 0 true`
+        ]);
         expect(arena.floatDown("Ana")).toBe("effect give Ana minecraft:resistance 3 4 true");
     });
 });
