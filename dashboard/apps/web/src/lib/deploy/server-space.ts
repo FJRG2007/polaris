@@ -66,7 +66,7 @@ export async function serversWithDeployments(): Promise<DeployServer[]> {
 /** Run one command on a server, keeping what it printed. Null when the machine
  *  could not be reached at all, which is a different answer from "it said
  *  nothing" and must not be read as a disk with no room on it. */
-async function onServer(hostId: string, command: string): Promise<string | null> {
+export async function onServer(hostId: string, command: string): Promise<string | null> {
     let connection;
     try {
         connection = await getHostConnectionUnscoped(hostId);

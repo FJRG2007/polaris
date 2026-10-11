@@ -7,9 +7,10 @@
  * and no screen ever mentioned - and a service that keeps its history ran three
  * containers where one was being used.
  *
- * So: the live one, and whatever somebody pinned. Pinning is a person saying
- * "this one stays"; everything else goes as its successor is promoted, and
- * reaching further back is a build rather than a restart.
+ * So: the live one, the one before it (an instant rollback), and whatever
+ * somebody pinned. Pinning is a person saying "this one stays"; everything else
+ * goes as its successor is promoted, and reaching further back is a build rather
+ * than a restart.
  */
 
 import { describe, expect, it } from "vitest";
@@ -20,8 +21,8 @@ const tag = (n: number) => `polaris-release/app:${n}`;
 const row = (id: string, n: number, pinned = false) => ({ id, imageTag: tag(n), pinned });
 
 describe("what is kept", () => {
-    it("keeps no image besides the live one", () => {
-        expect(ROLLBACK_WINDOW).toBe(0);
+    it("keeps one image besides the live one: current plus one rollback", () => {
+        expect(ROLLBACK_WINDOW).toBe(1);
     });
 
     it("keeps one release running", () => {
@@ -32,18 +33,13 @@ describe("what is kept", () => {
 describe("what that means for a service deployed a few times", () => {
     const rows = [row("d5", 5), row("d4", 4), row("d3", 3), row("d2", 2), row("d1", 1)];
 
-    it("drops every image but the one serving", () => {
-        expect(imagesOutsideWindow(rows, "d5", ROLLBACK_WINDOW)).toEqual([
-            tag(4),
-            tag(3),
-            tag(2),
-            tag(1)
-        ]);
+    it("drops every image but the one serving and the one before it", () => {
+        expect(imagesOutsideWindow(rows, "d5", ROLLBACK_WINDOW)).toEqual([tag(3), tag(2), tag(1)]);
     });
 
-    it("keeps the one somebody pinned", () => {
-        const pinned = [row("d5", 5), row("d4", 4, true), row("d3", 3)];
-        expect(imagesOutsideWindow(pinned, "d5", ROLLBACK_WINDOW)).toEqual([tag(3)]);
+    it("keeps the one somebody pinned on top of the window", () => {
+        const pinned = [row("d5", 5), row("d4", 4, true), row("d3", 3), row("d2", 2)];
+        expect(imagesOutsideWindow(pinned, "d5", ROLLBACK_WINDOW)).toEqual([tag(2)]);
     });
 
     it("keeps the image a rollback is currently serving, not the newest build", () => {

@@ -1337,5 +1337,22 @@
     },
     "customEmoji": {
         "from": "From {space}"
+    },
+    "diskAlert": {
+        "low": "{name} is running out of disk: {free} free ({percent}% used)",
+        "critical": "{name} is almost out of disk: {free} free ({percent}% used). Deploys and databases on it can fail.",
+        "usage": "Images {images}, build cache {cache}, volumes {volumes}. About {reclaimable} can be removed safely.",
+        "usageUnknown": "Polaris could not read what is using the space on this server.",
+        "thisServer": "This server",
+        "free": "Free up space",
+        "freeing": "Freeing",
+        "freeHint": "Removes old release images, build cache and images no container uses. Volumes are never touched.",
+        "freed": "{size} freed.",
+        "nothingFreed": "Nothing else could be removed safely. What is left is volumes and files, and only you can decide what goes.",
+        "details": "Details",
+        "dismiss": "Hide for now",
+        "notAllowed": "Only someone who manages the system can do this.",
+        "unknownServer": "That server is not one Polaris deploys to.",
+        "unreachable": "Polaris could not reach that server. Check that it is on and try again."
     }
 }

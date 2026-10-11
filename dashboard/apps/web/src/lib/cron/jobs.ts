@@ -55,6 +55,8 @@ import { ensureManagedCertificates } from "@/lib/tls/managed-certificates";
 import { captureRuntimeLogs, pruneRuntimeLogs } from "@/lib/deploy/runtime-logs";
 import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories";
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
+import { sweepReleaseImages } from "@/lib/deploy/release-retention";
+import { watchDisks } from "@/lib/deploy/disk-watch";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 
 const MINUTE = 60 * 1000;
@@ -96,10 +98,18 @@ async function syncMailboxes(): Promise<number> {
  * one found nothing to do: they fill at completely different rates, and the local
  * box is usually the one with room.
  */
-async function sweepEveryDisk(): Promise<{ local: number; servers: number }> {
+async function sweepEveryDisk(): Promise<{ local: number; servers: number; releases: number }> {
+    // Release images first and whatever the disk says: keeping only what a
+    // rollback can use is a rule, not a reaction to a full disk, and the prunes
+    // below never touch a release image.
+    const releases = await sweepReleaseImages().catch(() => []);
     const local = await sweepHostSpace();
     const servers = await sweepServerSpace().catch(() => []);
-    return { local: local.freed, servers: servers.reduce((total, one) => total + one.freed, 0) };
+    return {
+        local: local.freed,
+        servers: servers.reduce((total, one) => total + one.freed, 0),
+        releases: releases.reduce((total, one) => total + one.removed, 0)
+    };
 }
 
 export interface ScheduledJob {
@@ -486,6 +496,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // records, and one of them fails on what the other already took.
         leaseMs: 7 * 60 * MINUTE,
         run: sweepEveryDisk
+    },
+    {
+        key: "disk-watch",
+        // Fifteen minutes. A disk goes from low to full in one or two builds,
+        // and this is what puts it on the screen before that happens. Reading a
+        // disk is one `df` per server.
+        everyMs: Number(process.env.POLARIS_DISK_WATCH_MS) || 15 * MINUTE,
+        // Leased: a low disk is swept here, and two sweeps of one store race.
+        leaseMs: 30 * MINUTE,
+        run: watchDisks
     },
     {
         key: "leftover-volumes",
