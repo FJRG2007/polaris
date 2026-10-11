@@ -1493,9 +1493,12 @@ rule below is one that reached a real server.
   prediction and timer checks read all of it as the player's doing: on one
   evening Simulation fired for every player in a dropper (all three off, no
   podium), two of three in a nether maze, and one in hot potato. Movement,
-  timer, block-modelling and chat checks never disqualify from an event
-  (`suspicion.disqualifiesFromEvent`); aim, reach, packets, the X-Ray probe
-  and the rest still do. The anti-cheat screen still shows every flag.
+  timer and chat checks never disqualify from an event
+  (`suspicion.disqualifiesFromEvent`); the block checks (break, place, and
+  their speed and reach) only on a modded server, where unknown blocks make
+  them approximate - on any other a fast-break in a mining rush still does.
+  Aim, reach, packets, the X-Ray probe and the rest always do. The anti-cheat
+  screen still shows every flag.
 - **Score the way players judge the game.** A hide-and-seek scored a point a
   second hidden plus thirty a find put a hider found early, who then found
   others, above the last hider standing - three "wrong winners" in a row. The
@@ -1505,7 +1508,10 @@ rule below is one that reached a real server.
   A kind's `resultLines` naming "the last one left" from its own state while
   the podium is ranked from scores minus the disqualified says two different
   names the moment anybody is disqualified. Announce from the placed podium,
-  or from the same function that ranks it.
+  or from the same function that ranks it; a line that can only be true of
+  the kind's own winner ("the last one left") is passed the disqualified set
+  and says nothing when that winner is in it, leaving the podium to name who
+  took first.
 - **Read the run before touching the code.** A report of a wrong winner is
   checked against what the run kept: `eventState.history` on the server's
   config holds each run's podium, `disqualified` list and note, and

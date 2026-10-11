@@ -22,6 +22,8 @@ interface World {
     chestOpenedAfter: number;
     chestChecks: number;
     flagged: string[];
+    /** The server's software, its `TYPE`: whether it runs mods. */
+    software: string;
     sent: string[];
     /** The server log, for what players say in the chat. */
     log: string;
@@ -230,6 +232,7 @@ const world: World = {
     chestOpenedAfter: 3,
     chestChecks: 0,
     flagged: [],
+    software: "PAPER",
     sent: [],
     log: "",
     bossAlive: true,
@@ -1805,6 +1808,7 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findUnique: async () => ({
                 ownerId: "owner",
+                applicationId: "app",
                 name: "ExampleSMP",
                 catalogId: "minecraft",
                 status: "running",
@@ -1898,6 +1902,9 @@ vi.mock("@polaris/app-host", () => ({
         i18nLocaleService: {
             getUserLocale: async (userId: string) => world.locales[userId] ?? "en-US",
             storedLocale: async (userId: string) => world.locales[userId] ?? null
+        },
+        envVarService: {
+            listEnvVars: async () => [{ key: "TYPE", value: world.software }]
         }
     }
 }));
@@ -2035,6 +2042,7 @@ beforeEach(() => {
     world.chestOpenedAfter = 3;
     world.chestChecks = 0;
     world.flagged = [];
+    world.software = "PAPER";
     world.sent = [];
     world.log = "";
     world.bossAlive = true;
@@ -13297,5 +13305,28 @@ describe("a downhill boat race", () => {
         expect(world.sent).toContain(
             `execute in minecraft:overworld run tp Ben ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
         );
+    });
+});
+
+describe("an event's block checks, by server software", () => {
+    it.each([
+        ["PAPER", ["Ana"]],
+        ["FABRIC", []]
+    ])("on %s, judges a fast-breaker by whether the server runs mods", async (software, out) => {
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        world.software = software;
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 50, Ben: 14 };
+        world.flagged = ["ana:FastBreak"];
+        await play(3 * 60_000);
+        expect(state().history[0]?.disqualified).toEqual(out);
     });
 });

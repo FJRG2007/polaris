@@ -356,10 +356,15 @@ describe("scoring the engine's alerts", () => {
             "Timer",
             "TimerLimit",
             "ElytraC",
-            "FastBreak",
             "ChatA"
-        ])
+        ]) {
             expect(disqualifiesFromEvent(check), check).toBe(false);
+            expect(disqualifiesFromEvent(check, true), check).toBe(false);
+        }
+        for (const check of ["FastBreak", "FarBreak", "BreakA", "Place", "FarPlace"]) {
+            expect(disqualifiesFromEvent(check), check).toBe(true);
+            expect(disqualifiesFromEvent(check, true), check).toBe(false);
+        }
         for (const check of [
             "Reach",
             "XRayProbe",

@@ -18,6 +18,7 @@ import * as plan from "./plan";
 import * as stored from "./state";
 import { readXray } from "../xray";
 import { disqualifiesFromEvent } from "../suspicion";
+import { moddedServer } from "../polaris-anticheat";
 import * as speech from "../speech";
 import { prisma } from "@polaris/db";
 import * as catalog from "./catalog";
@@ -94,6 +95,7 @@ const bingoSay = speech.spoken(bingoMessages);
 const fishSay = speech.spoken(fishingMessages);
 
 const { readInstallConfig } = host.appsInstallConfig;
+const { listEnvVars } = host.envVarService;
 
 /** How long what kind of server one is stays known: it changes only with a restart. */
 const KIND_KNOWN_MS = 10 * 60_000;
@@ -5242,6 +5244,22 @@ async function survivorsOf(server: ServerContainer, run: stored.EventRun): Promi
     return on.filter((name) => took.has(name.toLowerCase()) && (deaths.get(name) ?? 0) === 0);
 }
 
+/** Whether the server runs mods (`moddedServer`), read from its settings; an
+ *  unreadable one counts as modded, so a flag it cannot judge never disqualifies. */
+async function moddedInstall(installedAppId: string): Promise<boolean> {
+    try {
+        const install = await prisma.installedApp.findUnique({
+            where: { id: installedAppId },
+            select: { applicationId: true, ownerId: true }
+        });
+        if (!install?.applicationId) return true;
+        const vars = await listEnvVars("application", install.applicationId, install.ownerId);
+        return moddedServer(new Map(vars.map((one) => [one.key, one.value ?? ""])));
+    } catch {
+        return true;
+    }
+}
+
 /**
  * Who the anti-cheat caught while the event ran: a honeypot dug to, or an alert
  * from Polaris's own engine that proves something there (`disqualifiesFromEvent`).
@@ -5256,14 +5274,17 @@ async function disqualifiedSince(installedAppId: string, since: number): Promise
                 found.add(evidence.name.toLowerCase());
         }
     }
-    const flagged = await prisma.minecraftAnticheatFlag
-        .groupBy({
-            by: ["player", "check"],
-            where: { installedAppId, at: { gte: new Date(since) } }
-        })
-        .catch(() => []);
+    const [flagged, modded] = await Promise.all([
+        prisma.minecraftAnticheatFlag
+            .groupBy({
+                by: ["player", "check"],
+                where: { installedAppId, at: { gte: new Date(since) } }
+            })
+            .catch(() => []),
+        moddedInstall(installedAppId)
+    ]);
     for (const one of flagged)
-        if (disqualifiesFromEvent(one.check)) found.add(one.player.toLowerCase());
+        if (disqualifiesFromEvent(one.check, modded)) found.add(one.player.toLowerCase());
     return found;
 }
 
