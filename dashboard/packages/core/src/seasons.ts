@@ -5,7 +5,7 @@
  * Modelled on Discord's seasonal events: Polaris carries the packs and runs each
  * one on its dates - a light decoration and a set of sounds - with nothing to
  * set up. The windows are Discord's: Halloween from 7 October to 2 November (its
- * 2026 event), the winter pack from 19 December to 5 January, with New Year's
+ * 2026 event), the winter pack from 1 December to 9 January, with New Year's
  * Eve and Day carved out of winter for confetti, and the Lunar New Year (the
  * first fifteen days of the first lunar month, up to the Lantern Festival).
  *
@@ -31,7 +31,7 @@ export function packOf(season: Season): Season {
 
 /**
  * Which pack is playing on a date, as a key that names that one run of it -
- * `halloween-2026`, `winter-2026` (through to 5 January 2027) - or null when
+ * `halloween-2026`, `winter-2026` (through to 9 January 2027) - or null when
  * none is. A pack turned off is stored by this key, so turning one off says
  * nothing about the next.
  */
@@ -126,7 +126,7 @@ export function seasonOn(date: Date): Season | null {
     const month = date.getMonth() + 1;
     const day = date.getDate();
     if ((month === 12 && day === 31) || (month === 1 && day === 1)) return "newYear";
-    if (within(month, day, [12, 19], [12, 31]) || within(month, day, [1, 1], [1, 5]))
+    if (within(month, day, [12, 1], [12, 31]) || within(month, day, [1, 1], [1, 9]))
         return "winter";
     if (within(month, day, [10, 7], [11, 2])) return "halloween";
     // The lunar new year never falls before 21 January or after 20 February, so
@@ -156,7 +156,7 @@ export function seasonLastDay(date: Date): Date | null {
     const current = seasonOn(date);
     if (!current) return null;
     const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    for (let step = 0; step < 40; step += 1) {
+    for (let step = 0; step < 60; step += 1) {
         const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
         if (seasonOn(next) !== current) return day;
         day.setDate(day.getDate() + 1);
@@ -170,7 +170,7 @@ export function packLastDay(date: Date): Date | null {
     const pack = packOn(date);
     if (!pack) return null;
     const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    for (let step = 0; step < 40; step += 1) {
+    for (let step = 0; step < 60; step += 1) {
         const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
         if (packOn(next) !== pack) return day;
         day.setDate(day.getDate() + 1);

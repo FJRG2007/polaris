@@ -27,15 +27,15 @@ describe("seasonOn", () => {
         expect(seasonOn(on(2026, 11, 3))).toBeNull();
     });
 
-    it("runs winter from 19 December to 5 January, with New Year's Eve and Day apart", () => {
-        expect(seasonOn(on(2026, 12, 18))).toBeNull();
-        expect(seasonOn(on(2026, 12, 19))).toBe("winter");
+    it("runs winter from 1 December to 9 January, with New Year's Eve and Day apart", () => {
+        expect(seasonOn(on(2026, 11, 30))).toBeNull();
+        expect(seasonOn(on(2026, 12, 1))).toBe("winter");
         expect(seasonOn(on(2026, 12, 25))).toBe("winter");
         expect(seasonOn(on(2026, 12, 31))).toBe("newYear");
         expect(seasonOn(on(2027, 1, 1))).toBe("newYear");
         expect(seasonOn(on(2027, 1, 2))).toBe("winter");
-        expect(seasonOn(on(2027, 1, 5))).toBe("winter");
-        expect(seasonOn(on(2027, 1, 6))).toBeNull();
+        expect(seasonOn(on(2027, 1, 9))).toBe("winter");
+        expect(seasonOn(on(2027, 1, 10))).toBeNull();
     });
 
     it("finds the Lunar New Year from the lunar calendar, through the Lantern Festival", () => {
@@ -81,13 +81,13 @@ describe("the sound pack in force", () => {
         expect(packOn(on(2026, 10, 9))).toBe("halloween-2026");
         expect(packOn(on(2026, 12, 20))).toBe("winter-2026");
         expect(packOn(on(2026, 12, 31))).toBe("winter-2026");
-        expect(packOn(on(2027, 1, 5))).toBe("winter-2026");
+        expect(packOn(on(2027, 1, 9))).toBe("winter-2026");
         expect(packOn(on(2026, 6, 15))).toBeNull();
     });
 
-    it("ends winter's on 5 January, through New Year", () => {
+    it("ends winter's on 9 January, through New Year", () => {
         const last = packLastDay(on(2026, 12, 20));
-        expect([last?.getFullYear(), last?.getMonth(), last?.getDate()]).toEqual([2027, 0, 5]);
+        expect([last?.getFullYear(), last?.getMonth(), last?.getDate()]).toEqual([2027, 0, 9]);
         expect(packLastDay(on(2026, 6, 15))).toBeNull();
     });
 
