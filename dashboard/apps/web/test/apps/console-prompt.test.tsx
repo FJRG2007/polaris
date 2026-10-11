@@ -27,10 +27,12 @@ vi.mock("@polaris/app-host/client", () => ({
     hostUi: { i18nProvider: { useLocale: () => "en-US" } }
 }));
 
-const { KeepCommandDialog } =
-    await import("@polaris-app/game-servers/src/screens/installed/console-keep-dialog");
-const { RunCommandDialog } =
-    await import("@polaris-app/game-servers/src/screens/installed/console-run-dialog");
+const { KeepCommandDialog } = await import(
+    "@polaris-app/game-servers/src/screens/installed/console-keep-dialog"
+);
+const { RunCommandDialog } = await import(
+    "@polaris-app/game-servers/src/screens/installed/console-run-dialog"
+);
 
 afterEach(cleanup);
 
