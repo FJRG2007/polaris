@@ -24,6 +24,7 @@ import org.slf4j.Logger;
  * address, id and token, for either of them. The
  * event commands ({@link EventCommands}) and the guard on an event's space
  * ({@link EventGuard}) are always there: idle until the dashboard runs one.
+ * So are the seasonal decorations ({@link SeasonalDecor}).
  */
 @Mod(value = PolarisMod.ID, dist = Dist.DEDICATED_SERVER)
 public final class PolarisMod {
@@ -48,6 +49,8 @@ public final class PolarisMod {
         NeoForge.EVENT_BUS.register(new EventGhosts());
         // Nobody outside an event changes its space; idle until one is guarded.
         NeoForge.EVENT_BUS.register(new EventGuard());
+        // The season Polaris says it is, on players' screens only; idle until told.
+        NeoForge.EVENT_BUS.register(new SeasonalDecor());
         if (AntiXray.wanted(System.getenv())) {
             AntiXrayLink.start(PolarisConfig.linkFromEnvironment(System.getenv()));
             NeoForge.EVENT_BUS.register(new AntiXray());

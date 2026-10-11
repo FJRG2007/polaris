@@ -85,6 +85,10 @@ final class EventBatch {
         ListTag list = store.getList(key, Tag.TAG_STRING);
         Deque<String> pending = new ArrayDeque<>(list.size());
         for (int i = 0; i < list.size(); i++) expand(list.getString(i), blocksPerTick, pending);
+        // Whatever the event builds, the season's decorations keep clear of.
+        long[] area = null;
+        for (String command : pending) area = union(area, area(command));
+        if (area != null) SeasonalDecor.avoid(server, area[0], area[1], area[2], area[3]);
         store.remove(key);
         server.getCommandStorage().set(STORAGE, store);
         Job job = new Job(key, pending, blocksPerTick);
@@ -235,6 +239,63 @@ final class EventBatch {
             }
         }
         return box;
+    }
+
+    /** How far a placed template or structure may reach from where it is placed. */
+    private static final int PLACE_REACH = 48;
+
+    /**
+     * The ground a command builds on, as {minX, minZ, maxX, maxZ}; null where its
+     * text names no whole coordinates. A placed template or structure is taken
+     * as reaching {@link #PLACE_REACH} blocks every way.
+     */
+    static long[] area(String command) {
+        String[] words = innermost(command).split(" +");
+        if (words.length == 0) return null;
+        switch (words[0]) {
+            case "fill", "clone" -> {
+                long[] box = box(words);
+                if (box == null) return null;
+                long[] area = {Math.min(box[0], box[3]), Math.min(box[2], box[5]),
+                    Math.max(box[0], box[3]), Math.max(box[2], box[5])};
+                if (words[0].equals("clone") && words.length >= 10) {
+                    long[] to = point(words, 7, 9, Math.max(box[3] - box[0], box[0] - box[3]),
+                            Math.max(box[5] - box[2], box[2] - box[5]));
+                    area = union(area, to);
+                }
+                return area;
+            }
+            case "setblock" -> {
+                return words.length >= 4 ? point(words, 1, 3, 0, 0) : null;
+            }
+            case "place" -> {
+                return words.length >= 6 ? grow(point(words, 3, 5, 0, 0), PLACE_REACH) : null;
+            }
+            default -> {
+                return null;
+            }
+        }
+    }
+
+    /** The whole x and z at two places in a command, reaching on by the sizes given. */
+    private static long[] point(String[] words, int xAt, int zAt, long width, long depth) {
+        try {
+            long x = Long.parseLong(words[xAt]);
+            long z = Long.parseLong(words[zAt]);
+            return new long[] {x, z, x + width, z + depth};
+        } catch (NumberFormatException relative) {
+            return null;
+        }
+    }
+
+    private static long[] grow(long[] area, long by) {
+        return area == null ? null : new long[] {area[0] - by, area[1] - by, area[2] + by, area[3] + by};
+    }
+
+    private static long[] union(long[] a, long[] b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return new long[] {Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])};
     }
 
     private static long volume(long[] box) {

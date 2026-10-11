@@ -109,6 +109,22 @@ overworld, read from its clock once a second since the game has no event for it.
 online player's state (`loaded`, `pending`, `declined`, `failed`).
 `POLARIS_SOUNDS=off` switches it all off.
 
+## Seasonal decorations
+
+Around Halloween some grass in the ground shows as a pumpkin or a jack
+o'lantern and cobwebs hang under natural trees; in winter snow falls round
+players under the open sky and a thin layer lies on some grass. The dashboard
+decides the season from Polaris's own dates and the server's time zone, and
+says so with `polaris season set <halloween|winter> <seconds>` (repeated while
+it lasts) or `polaris season clear`; `polaris season status` answers what is up.
+A season nobody repeats ends on its own when its seconds run out.
+
+Every block is sent to one player's game only and never set in the world, so
+nothing is saved and a reloaded chunk shows the world as it is. Only natural
+ground and leaves are used, never within reach of a build, and nothing near
+what an event batch built. Each chunk is decided from the world seed, so the
+decorations stay put. A server's own switch is on its Settings tab.
+
 ## Event commands
 
 Always registered, idle until the dashboard runs one. Console and operators only

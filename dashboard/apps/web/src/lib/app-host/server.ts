@@ -143,6 +143,7 @@ const load = {
     rateLimitService: once(() => import("@/lib/rate-limit-service")),
     registry: once(() => import("@/lib/registry")),
     requestContext: once(() => import("@/lib/request-context")),
+    seasonalService: once(() => import("@/lib/seasonal-service")),
     serverMetricsService: once(() => import("@/lib/server-metrics-service")),
     session: once(() => import("@/lib/session")),
     sessionDirectory: once(() => import("@/lib/session-directory")),
@@ -431,6 +432,9 @@ export const serverHost = {
     },
     requestContext: {
         clientIp: later(load.requestContext, "clientIp")
+    },
+    seasonalService: {
+        seasonsAllowed: later(load.seasonalService, "seasonsAllowed")
     },
     serverMetricsService: {
         getServerMetrics: later(load.serverMetricsService, "getServerMetrics"),

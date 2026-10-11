@@ -2880,5 +2880,18 @@
         "needsAddress": "The server downloads it from this Polaris's public address, and there is none yet. Give Polaris a domain in Settings.",
         "onlyManagers": "Only somebody who manages this server can install or remove it.",
         "readFailed": "Could not read Symbiote"
+    },
+    "seasonal": {
+        "title": "Seasonal decorations",
+        "hint": "Pumpkins and cobwebs around Halloween, snow in winter. Only players' screens show them; the world is never changed.",
+        "turnOn": "Show seasonal decorations",
+        "showingHalloween": "Halloween decorations are showing now.",
+        "showingWinter": "Winter decorations are showing now.",
+        "waiting": "Nothing is showing now. They come on by themselves when the next season starts.",
+        "offHere": "Off for this server.",
+        "paused": "Paused while an event runs. They come back when it ends.",
+        "blocked": "Seasonal decorations are turned off for the whole of Polaris in Admin settings.",
+        "needsRestart": "This server needs a restart to load the decorations.",
+        "notSaved": "That could not be saved. Try again."
     }
 }

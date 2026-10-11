@@ -24,7 +24,7 @@ import { stripFormatting } from "../parse";
 import type { ServerContainer } from "../service";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 
-export type Capability = "stash" | "batch" | "seek" | "respawn" | "guard";
+export type Capability = "stash" | "batch" | "seek" | "respawn" | "guard" | "season";
 
 const capsSchema = z.object({
     ok: z.literal(true),
@@ -55,7 +55,7 @@ export function parseCaps(reply: string): ReadonlySet<Capability> {
     if (!parsed.success) return new Set();
     return new Set(
         parsed.data.caps.filter((cap): cap is Capability =>
-            ["stash", "batch", "seek", "respawn", "guard"].includes(cap)
+            ["stash", "batch", "seek", "respawn", "guard", "season"].includes(cap)
         )
     );
 }
