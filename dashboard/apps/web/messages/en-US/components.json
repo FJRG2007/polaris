@@ -913,14 +913,29 @@
         "native": "There is also a native app for Windows, macOS and Linux: it pushes a build from your own computer and follows a service's logs in a window of its own."
     },
     "logViewer": {
-        "search": "Filter and search logs",
+        "search": "Search logs",
         "copied": "Copied",
         "copyAll": "Copy all",
         "export": "Export",
         "noMatch": "No matching lines.",
         "waiting": "Waiting for output...",
         "hidden": "{hidden, number} earlier lines hidden - showing the latest {shown, number}.",
-        "copyEntry": "Copy log entry"
+        "copyEntry": "Copy log entry",
+        "levels": "Log levels",
+        "level": {
+            "error": "Errors",
+            "warn": "Warnings",
+            "info": "Info"
+        },
+        "collapse": "Collapse repeats",
+        "collapseHint": "Show a line that repeats in a row once, with how many times it did",
+        "repeat": "x{count, number}",
+        "repeatedTitle": "{lines, plural, one {This line} other {These # lines}} repeated {count, number} times in a row",
+        "matchCount": "{total, plural, =0 {No matches} one {# match} other {# matches}}",
+        "matchPosition": "{current, number} of {total, number}",
+        "previousMatch": "Previous match",
+        "nextMatch": "Next match",
+        "onlyMatches": "Only show matching lines"
     },
     "downloads": {
         "desktopVersion": "Download the desktop app {version}",

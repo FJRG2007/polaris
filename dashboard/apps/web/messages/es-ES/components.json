@@ -913,14 +913,29 @@
         "native": "También hay una app nativa para Windows, macOS y Linux: envía una compilación desde tu propio ordenador y sigue los registros de un servicio en su propia ventana."
     },
     "logViewer": {
-        "search": "Filtrar y buscar registros",
+        "search": "Buscar texto",
         "copied": "Copiado",
         "copyAll": "Copiar todo",
         "export": "Exportar",
         "noMatch": "Ninguna línea coincide.",
         "waiting": "Esperando salida...",
         "hidden": "{hidden, number} líneas anteriores ocultas - se muestran las últimas {shown, number}.",
-        "copyEntry": "Copiar la entrada"
+        "copyEntry": "Copiar la entrada",
+        "levels": "Niveles",
+        "level": {
+            "error": "Errores",
+            "warn": "Avisos",
+            "info": "Info"
+        },
+        "collapse": "Agrupar repetidas",
+        "collapseHint": "Muestra una sola vez la línea que se repite seguida, con cuántas veces lo hizo",
+        "repeat": "x{count, number}",
+        "repeatedTitle": "{lines, plural, one {Esta línea se repitió} other {Estas # líneas se repitieron}} {count, number} veces seguidas",
+        "matchCount": "{total, plural, =0 {Sin coincidencias} one {# coincidencia} other {# coincidencias}}",
+        "matchPosition": "{current, number} de {total, number}",
+        "previousMatch": "Anterior",
+        "nextMatch": "Siguiente",
+        "onlyMatches": "Solo las líneas que coinciden"
     },
     "downloads": {
         "desktopVersion": "Descargar la app de escritorio {version}",
