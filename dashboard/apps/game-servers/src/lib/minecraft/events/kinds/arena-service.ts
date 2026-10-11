@@ -340,7 +340,9 @@ async function raise(ctx: KindContext): Promise<void> {
     // The batch it goes up in is written down with it, so whatever takes it
     // down calls that off first - should this process stop waiting for it.
     const batch = inServer.batchKey();
-    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills), batch };
+    // The box just counted as nothing but air is written down as proved: the
+    // only one its teardown may sweep whole (`arena.teardown`).
+    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills), batch, proved: box };
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;

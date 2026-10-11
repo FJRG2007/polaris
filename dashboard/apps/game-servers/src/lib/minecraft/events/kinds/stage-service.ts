@@ -646,7 +646,12 @@ async function provedEmpty(
     ).every((said) => stage.fillCount(said) !== null);
     if (cleared) change(loop, { boxes: kept });
     const current = state(loop);
-    if (!unloaded && cleared && filled === stage.volumeOf(volume)) return true;
+    if (!unloaded && cleared && filled === stage.volumeOf(volume)) {
+        // Proved: written down with the boxes that go in next, the only volume
+        // the end may sweep whole (`stage.sweepLines`).
+        change(loop, { proved: volume });
+        return true;
+    }
     if (unloaded && current.waits < LOAD_WAITS) {
         change(loop, { waits: current.waits + 1 });
         await tools.persist();
@@ -659,7 +664,7 @@ async function provedEmpty(
     // somewhere else.
     const ground = loop.run.place;
     const area = current.area;
-    change(loop, { origin: null, area: null, waits: 0 });
+    change(loop, { origin: null, area: null, waits: 0, proved: null });
     await tools.persist();
     if (area) await server.sayAll([stage.releaseArea(area)]);
     if (ground) await tools.giveUpSite(ground, unloaded ? "unloaded" : "occupied");
@@ -2521,13 +2526,29 @@ export async function settle(
             }
         boxes = boxes.slice(0, standing);
     }
-    if (boxes.length === 0 && area) {
+    // Every box out: the volume proved empty before the event is swept whole -
+    // a block a player put down, a mod's block, the items lying in it - and
+    // nothing past it. A run with no proof written down keeps the per-box
+    // removal alone. A slice that did not answer leaves it to sweep again.
+    let proved = leftover.proved;
+    if (boxes.length === 0 && proved) {
+        const said = await pace.answered(
+            server,
+            [...(area ? [stage.holdArea(area)] : []), ...stage.sweepFills(proved)],
+            pace.teardownPacer()
+        );
+        if (said.slice(area ? 1 : 0).every((answer) => stage.fillCount(answer) !== null)) {
+            await server.sayAll([stage.dropsGone(proved)]);
+            proved = null;
+        }
+    }
+    if (boxes.length === 0 && !proved && area) {
         await server.sayAll([stage.releaseArea(area)]);
         area = null;
     }
-    return saved.length === 0 && boxes.length === 0 && !area
+    return saved.length === 0 && boxes.length === 0 && !area && !proved
         ? null
-        : { ...leftover, saved, boxes, area };
+        : { ...leftover, saved, boxes, area, proved };
 }
 
 /** The final scores, and everybody who took part. */

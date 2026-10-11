@@ -25,6 +25,9 @@ interface World {
     /** The server's software, its `TYPE`: whether it runs mods. */
     software: string;
     sent: string[];
+    /** Every volume asked to be proved empty this test, as six corners - kept
+     *  when `sent` is cleared, so a sweep is checked against its proof. */
+    proving: number[][];
     /** The server log, for what players say in the chat. */
     log: string;
     bossAlive: boolean;
@@ -234,6 +237,7 @@ const world: World = {
     flagged: [],
     software: "PAPER",
     sent: [],
+    proving: [],
     log: "",
     bossAlive: true,
     deaths: {},
@@ -351,10 +355,12 @@ let step = 0;
 /** A `fill` as the game answers it: how many blocks changed. */
 function fillAnswer(line: string): string | null {
     const fill =
-        /fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (\S+)(?: replace (\S+)| keep)$/.exec(
+        /fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (\S+)(?: replace (\S+)| (keep))?$/.exec(
             line
         );
     if (!fill) return null;
+    // The sweep of a proved volume, once the event's own blocks are out: air.
+    if (!fill[8] && !fill[9]) return "No blocks were filled";
     const [x1, y1, z1, x2, y2, z2] = fill.slice(1, 7).map(Number) as number[];
     const volume =
         (Math.abs(x2! - x1!) + 1) * (Math.abs(y2! - y1!) + 1) * (Math.abs(z2! - z1!) + 1);
@@ -815,6 +821,10 @@ function pointsAsKept(level: number, points: number): number {
 function answer(sent: string): string {
     world.onLine?.(sent);
     world.sent.push(sent);
+    const proving =
+        cornersIn(sent, new RegExp(` fill ${SIX} minecraft:structure_void keep$`)) ??
+        cornersIn(sent, new RegExp(` if blocks ${SIX} .* masked$`));
+    if (proving) world.proving.push(proving);
     let line = sent;
     const respawnAnswer = respawnModAnswer(line);
     if (respawnAnswer !== null) return respawnAnswer;
@@ -2050,6 +2060,7 @@ beforeEach(() => {
     world.flagged = [];
     world.software = "PAPER";
     world.sent = [];
+    world.proving = [];
     world.log = "";
     world.bossAlive = true;
     world.deaths = {};
@@ -6024,6 +6035,34 @@ function builtAndRemoved(): { built: string[]; removed: string[] } {
     return { built, removed };
 }
 
+/** The six corners a line names after `pattern`, or null. */
+function cornersIn(line: string, pattern: RegExp): number[] | null {
+    return pattern.exec(line)?.slice(1, 7).map(Number) ?? null;
+}
+
+const SIX = "(-?\\d+) (-?\\d+) (-?\\d+) (-?\\d+) (-?\\d+) (-?\\d+)";
+
+/**
+ * A plain `fill ... air` is the sweep of a volume proved empty first - by the
+ * probe's structure void, or an arena's count of what is not air - and never
+ * reaches a block past what was proved: every corner of it lies in one.
+ */
+function sweptInProved(line: string): boolean {
+    const box = cornersIn(line, new RegExp(` fill ${SIX} minecraft:air$`));
+    if (!box) return false;
+    const inProved = (point: number[]) =>
+        world.proving.some((at) =>
+            [0, 1, 2].every(
+                (axis) =>
+                    point[axis]! >= Math.min(at[axis]!, at[axis + 3]!) &&
+                    point[axis]! <= Math.max(at[axis]!, at[axis + 3]!)
+            )
+        );
+    return [0, 3].every((x) =>
+        [1, 4].every((y) => [2, 5].every((z) => inProved([box[x]!, box[y]!, box[z]!])))
+    );
+}
+
 /** The rules every one of these must keep, whatever happened: blocks go up only
  *  into air and come down only where they are still the event's; nothing is
  *  cleared but the event's marked items; nothing that burns or floods - but for
@@ -6039,10 +6078,12 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
         expect(
             line.endsWith(" keep") ||
                 / minecraft:air replace minecraft:\S+$/.test(line) ||
+                sweptInProved(line) ||
                 (repaints.some((repaint) => repaint.test(line)) &&
                     ![hill.PLAIN, hill.DEATH].some((look) =>
                         line.includes(`${look.ring} replace ${look.ring}`)
-                    ))
+                    )),
+            line
         ).toBe(true);
     // Everything built is taken out again: by its own box, or by a larger one
     // of the same block that holds it (an arena comes down a block at a time
@@ -7802,7 +7843,9 @@ const fills = () => world.sent.filter((line) => line.includes(" run fill "));
 function onlyOurBlocks(): void {
     for (const line of fills()) {
         expect(
-            line.endsWith(" keep") || / minecraft:air replace minecraft:[a-z_]+$/.test(line)
+            line.endsWith(" keep") ||
+                / minecraft:air replace minecraft:[a-z_]+$/.test(line) ||
+                sweptInProved(line)
         ).toBe(true);
     }
     for (const line of takesItems(world.sent).filter((one) => one.startsWith("clear "))) {
@@ -9503,8 +9546,15 @@ describe("a team duel", () => {
             false
         );
         const removed = fills().slice(built);
-        expect(removed).toHaveLength(arenaKind.withDecayed(run.arena!.blocks).length);
-        expect(removed.every((line) => line.includes("minecraft:air replace"))).toBe(true);
+        // Its own blocks, then the box it proved empty swept whole.
+        const swept = stageKit.sweepFills(run.arena!.proved!);
+        expect(removed).toHaveLength(
+            arenaKind.withDecayed(run.arena!.blocks).length + swept.length
+        );
+        expect(removed.slice(-swept.length)).toEqual(swept);
+        expect(
+            removed.every((line) => line.includes("minecraft:air replace") || sweptInProved(line))
+        ).toBe(true);
         for (const one of run.entrants) {
             expect(world.sent).toContain(
                 `execute in minecraft:overworld run tp ${one.name} ${one.x.toFixed(3)} ${one.y.toFixed(3)} ${one.z.toFixed(3)} ${one.yaw.toFixed(1)} ${one.pitch.toFixed(1)}`

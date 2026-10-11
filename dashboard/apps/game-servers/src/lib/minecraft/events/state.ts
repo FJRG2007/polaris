@@ -64,6 +64,11 @@ export const arenaSchema = z.object({
     blocks: z.array(z.string()),
     /** The Polaris mod batch it was built by, called off before it comes down. */
     batch: z.string().max(64).optional(),
+    /** The box counted as nothing but air before it went up, written down with
+     *  it: the only one its teardown sweeps whole (`arena.teardown`). Missing on
+     *  an arena from before it was kept, and on one not built into air - the
+     *  hill on the world's own ground - which keep the per-block removal alone. */
+    proved: boxSchema.optional(),
     /** The air round it given a biome of its own (`hill.DEATH_BIOME`): where,
      *  which biome its cells had, and which they were given - written down
      *  before they were, so its teardown gives back exactly those. */

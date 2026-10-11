@@ -15,8 +15,13 @@
  *   air replace <block>` for each kind of block it used - and what one of
  *   them turns into by itself, grass gone to dirt - inside its own box; and
  *   nobody can have put one of those there meanwhile, since everybody in it
- *   plays in adventure mode. Once down, the box is counted again: it was all
- *   air, so anything still in it is named on the event's screen.
+ *   plays in adventure mode. Then the box counted as air before it went up
+ *   (`proved`) is swept whole with a plain `fill ... air` and its dropped
+ *   items killed: whatever is in it came with the event - a block a player
+ *   put down, a mod's block. Never past that box, never with `destroy`, and
+ *   not at all for an arena with no proof written down. Once down, the box is
+ *   counted again: it was all air, so anything still in it is named on the
+ *   event's screen.
  * - None of anybody's own items is taken. What the event hands out carries a
  *   marker, and only items with the marker are cleared. What somebody drops
  *   while they are there is kept theirs - only they can pick it up, it does
@@ -26,7 +31,7 @@
  */
 
 import { text } from "../commands";
-import { fallProof } from "./stage";
+import { fallProof, sweepLines } from "./stage";
 import { PLAYER_NAME } from "../catalog";
 import { stripFormatting } from "../../parse";
 import { GAMEMODES, type Arena, type Box, type Entrant, type Marker } from "../state";
@@ -169,7 +174,8 @@ export function withDecayed(blocks: readonly string[]): string[] {
 
 /**
  * The arena taken down: every kind of block it used replaced with air, and
- * nothing else, inside its own box and nowhere else.
+ * nothing else, inside its own box and nowhere else - then, where the box it
+ * was built in was proved air first, that box swept whole (`stage.sweepLines`).
  *
  * A kind at a time over the whole box, in the order the arena lists them: a
  * flower, a ladder or a banner listed first comes down before what holds it
@@ -186,6 +192,7 @@ export function teardown(arena: Arena): string[] {
                 (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
             )
         ),
+        ...(arena.proved ? sweepLines(arena.proved) : []),
         ...(arena.biome ? biomeLines(arena.biome.box, arena.biome.was, arena.biome.now) : [])
     ];
 }

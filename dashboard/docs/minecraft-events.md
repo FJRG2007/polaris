@@ -10,6 +10,8 @@ own play).
 
 - **Nothing built is broken, and no item is lost.** Arenas, stages and anything
   an event places go only into air, and only what the event placed is removed.
+  The one wider removal is the sweep of a volume proved empty air before
+  anything went in (see "Blocks players left in an event's space" below).
   A player's own things are stashed in the database before they enter an arena
   and given back after, with the health and hunger they came in with;
   `keepInventory` is on for any event a player can die in.
@@ -1767,6 +1769,26 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   starts at the end of the tick rather than inside `polaris batch run` - counting
   its blocks or time there counted nothing.
 
+- **Blocks players left in an event's space stayed in the sky.** A modded
+  reinforced block, carried in through the trash slot (#546), was placed in an
+  event and still floated there after it: the teardown took out only what the
+  event had placed (`fill <box> air replace <its block>`), and nothing else in
+  its space. That space was proved empty air before a block went in - a
+  stage's or the boss arena's by the structure void probe, an arena's and the
+  hill platform's by counting what is not air - so whatever is in it at the
+  end came with the event. The proved volume is now written on the run as it
+  passes (`StageState.proved`, `Arena.proved`) and carried to its leftover;
+  once the event's own boxes are out it is swept with a plain
+  `fill <slice> air`, sliced to `FILL_LIMIT`, and its dropped items killed
+  (`stage.sweepLines`), at every teardown: the end, a call-off, a refused
+  build and the minute sweep of leftovers. The rules that keep it safe: only
+  a volume whose probe passed and is written down is swept; a run or
+  leftover with none (from before this, or a probe that failed) keeps the
+  per-block removal alone; never past the volume's own corners, and never
+  with `destroy`. A slice that does not answer keeps the proof and the area
+  held, and is swept again on a later sweep. A treasure hunt's chests and the
+  hill on the world's own ground stand on ground, not proved air, and keep the
+  per-block removal.
 - **Players arrive and leave an arena one by one, seconds apart.** Each
   entrant's stash and teleport went in its own RCON trip, so a SkyWars of
   three took three seconds to bring in and eleven to send home (seen in a
