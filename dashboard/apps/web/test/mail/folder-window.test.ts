@@ -10,7 +10,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { confirmedGone, missingFromWindow } from "@/lib/mailbox/folder-window";
+import { confirmedGone, missingFromWindow, reachesForOlder } from "@/lib/mailbox/folder-window";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const sync = readFile(`${SRC}lib/mailbox/sync.ts`, "utf8");
@@ -70,5 +70,48 @@ describe("the newest window", () => {
         const body = refill.slice(0, refill.indexOf("\n}\n"));
         expect(body).toContain("unstored.get(folder.id)");
         expect(source).toContain("if (stored === 0) return;");
+    });
+});
+
+describe("scrolling past the held window", () => {
+    const inbox = {
+        folderId: null,
+        role: "inbox",
+        query: "",
+        sort: "newest",
+        labelId: null,
+        unreadOnly: false,
+        readOnly: false,
+        starredOnly: false,
+        importantOnly: false,
+        snoozedOnly: false,
+        withAttachments: false,
+        category: ""
+    };
+
+    it("reaches for older mail at the end of a plain folder list", () => {
+        expect(reachesForOlder(inbox)).toBe(true);
+        expect(reachesForOlder({ ...inbox, role: null, folderId: "f1" })).toBe(true);
+    });
+
+    it("never for a search, a filter, another order or no folder at all", () => {
+        expect(reachesForOlder({ ...inbox, query: "invoice" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, sort: "oldest" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, unreadOnly: true })).toBe(false);
+        expect(reachesForOlder({ ...inbox, starredOnly: true })).toBe(false);
+        expect(reachesForOlder({ ...inbox, labelId: "l1" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, category: "social" })).toBe(false);
+        expect(reachesForOlder({ ...inbox, role: null })).toBe(false);
+    });
+
+    it("brings the next page down as old mail, below what is held, and lists again", async () => {
+        const source = await sync;
+        const older = source.slice(source.indexOf("export async function fetchOlder"));
+        const body = older.slice(0, older.indexOf("\n}\n"));
+        expect(body).toContain("storeMessages(client, account, folder, fetched, false)");
+        expect(body).toContain("readOnly: true");
+        const route = await readFile(`${SRC}app/api/mail/threads/route.ts`, "utf8");
+        expect(route).toContain('page.cursor === "" && reachesForOlder(list)');
+        expect(route).toContain("everyAccountId(user.id)");
     });
 });

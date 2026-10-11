@@ -35,7 +35,7 @@ describe("a pass over a folder", () => {
 
     it("does it on the connection the sync already has open", async () => {
         const source = await sync;
-        const folder = source.slice(source.indexOf("async function syncFolder"));
+        const folder = source.slice(source.indexOf("async function syncFolder("));
         const body = folder.slice(0, folder.indexOf("lock.release()"));
         // Inside the lock: a second session to fetch what this one is already
         // looking at is the cost this exists to remove.

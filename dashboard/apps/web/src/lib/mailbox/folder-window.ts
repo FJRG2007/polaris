@@ -39,3 +39,38 @@ export function missingFromWindow(
         .slice(0, window)
         .filter((uid) => !held.has(uid));
 }
+
+/**
+ * Whether a list that came back with nothing after it should reach the server
+ * for older mail. Only the plain newest-first list of a folder or of a kind of
+ * folder: a search, a filter or another order is a question about what is held,
+ * not a request for more of it.
+ */
+export function reachesForOlder(list: {
+    folderId: string | null;
+    role: string | null;
+    query: string;
+    sort: string;
+    labelId: string | null;
+    unreadOnly: boolean;
+    readOnly: boolean;
+    starredOnly: boolean;
+    importantOnly: boolean;
+    snoozedOnly: boolean;
+    withAttachments: boolean;
+    category: string;
+}): boolean {
+    return (
+        (list.folderId !== null || list.role !== null) &&
+        list.query.trim() === "" &&
+        list.sort === "newest" &&
+        list.labelId === null &&
+        !list.unreadOnly &&
+        !list.readOnly &&
+        !list.starredOnly &&
+        !list.importantOnly &&
+        !list.snoozedOnly &&
+        !list.withAttachments &&
+        list.category === ""
+    );
+}

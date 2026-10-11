@@ -322,6 +322,82 @@ export async function catchUpFolder(
     await syncFolder(client, account, folder, await bodyWindowEdge(accountId));
 }
 
+/** How many older messages one reach for the bottom of a list brings down. */
+const OLDER_BATCH = 200;
+
+/**
+ * The next page of a folder older than anything held here, for a list scrolled
+ * to its end. The sync keeps only the newest `WINDOW` of a folder; everything
+ * behind that is fetched when somebody goes looking for it, as old mail - no
+ * rule, junk filter or away reply runs on it. Answers whether anything came.
+ */
+export async function fetchOlder(accountId: string, folderId: string): Promise<boolean> {
+    const [account, folder] = await Promise.all([
+        prisma.mailAccount.findUnique({ where: { id: accountId }, select: ACCOUNT_COLUMNS }),
+        prisma.mailFolder.findUnique({ where: { id: folderId } })
+    ]);
+    if (!account || !folder || folder.accountId !== accountId) return false;
+    const held = await prisma.mailMessage.findMany({
+        where: { folderId },
+        select: { uid: true }
+    });
+    if (held.length >= folder.total) return false;
+
+    return withImap(account, async (client) => {
+        const lock = await client.getMailboxLock(folder.path, { readOnly: true });
+        try {
+            const mailbox = client.mailbox;
+            if (!mailbox || typeof mailbox === "boolean" || mailbox.exists === 0) return false;
+            // By sequence number: the held rows are roughly the newest ones, so
+            // the next page sits just below them.
+            const want = held.length + OLDER_BATCH;
+            const from = Math.max(1, mailbox.exists - want + 1);
+            const listed: number[] = [];
+            for await (const message of client.fetch(`${from}:${mailbox.exists}`, { uid: true })) {
+                listed.push(message.uid);
+            }
+            const missing = missingFromWindow(
+                listed,
+                new Set(held.map((row) => Number(row.uid))),
+                want
+            ).slice(0, OLDER_BATCH);
+            if (missing.length === 0) return false;
+            const extraHeaders = folder.role === "inbox" ? await filterHeaderNames(account.id) : [];
+            const fetched = await collect(client, missing.join(","), { uid: true }, extraHeaders);
+            if (fetched.length === 0) return false;
+            await storeMessages(client, account, folder, fetched, false);
+            return true;
+        } finally {
+            lock.release();
+        }
+    });
+}
+
+/**
+ * The next older page of every folder a list reads from, among `accountIds` -
+ * the ones named by `folderId`, or every folder of the kind `role`. Each folder
+ * on its own connection, one failing leaving the others. Answers whether any of
+ * them brought anything down.
+ */
+export async function reachForOlder(
+    accountIds: readonly string[],
+    narrow: { folderId: string | null; role: string | null }
+): Promise<boolean> {
+    if (accountIds.length === 0 || (!narrow.folderId && !narrow.role)) return false;
+    const folders = await prisma.mailFolder.findMany({
+        where: {
+            accountId: { in: [...accountIds] },
+            ...(narrow.folderId ? { id: narrow.folderId } : {}),
+            ...(narrow.role ? { role: narrow.role } : {})
+        },
+        select: { id: true, accountId: true }
+    });
+    const settled = await Promise.allSettled(
+        folders.map((folder) => fetchOlder(folder.accountId, folder.id))
+    );
+    return settled.some((result) => result.status === "fulfilled" && result.value);
+}
+
 async function syncFolder(
     client: ImapFlow,
     account: AccountRow,
