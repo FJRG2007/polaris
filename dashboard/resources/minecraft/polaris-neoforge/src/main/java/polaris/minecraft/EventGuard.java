@@ -229,8 +229,15 @@ public final class EventGuard {
             AABB box = guard.box();
             if (box.contains(center)) continue;
             event.getAffectedBlocks().removeIf(pos -> box.contains(Vec3.atCenterOf(pos)));
-            event.getAffectedEntities().removeIf(entity -> entrant(entity) || box.contains(entity.position()));
+            event.getAffectedEntities().removeIf(entity -> box.contains(entity.position()));
         }
+        event.getAffectedEntities().removeIf(entity -> entrant(entity) && !sameBox(entity.position(), center));
+    }
+
+    /** Whether two places are inside the same box. */
+    private static boolean sameBox(Vec3 one, Vec3 two) {
+        for (Guard guard : live()) if (guard.box().contains(one) && guard.box().contains(two)) return true;
+        return false;
     }
 
     /** A piston outside a box never pushes or pulls into it. */

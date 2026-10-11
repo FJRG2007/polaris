@@ -332,7 +332,12 @@ final class EventGuard implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onIgnite(BlockIgniteEvent event) {
-        if (!inside(event.getBlock()) || entrant(event.getIgnitingEntity())) return;
+        if (!inside(event.getBlock())) return;
+        Entity by = event.getIgnitingEntity();
+        if (by != null) {
+            if (outsider(culprit(by))) event.setCancelled(true);
+            return;
+        }
         Block from = event.getIgnitingBlock();
         if (from == null || !inside(from)) event.setCancelled(true);
     }
