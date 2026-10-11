@@ -167,7 +167,9 @@ describe("a route with injection protection", () => {
     it("gets the guard even with nothing else switched on", () => {
         // Both checks are on by default, so this is the state most routes are actually
         // in: no denylist, no packs, no custom rules, and still inspected.
-        const config = renderDynamicConfig([route({ sqlInjectionProtection: true, xssProtection: true })]);
+        const config = renderDynamicConfig([
+            route({ sqlInjectionProtection: true, xssProtection: true })
+        ]);
 
         expect(config).toContain("polaris-waf-guard");
         expect(config).toContain("X-Polaris-Waf");
@@ -177,8 +179,12 @@ describe("a route with injection protection", () => {
     });
 
     it("gets the guard for either check on its own", () => {
-        expect(renderDynamicConfig([route({ sqlInjectionProtection: true })])).toContain("polaris-waf-guard");
-        expect(renderDynamicConfig([route({ xssProtection: true })])).toContain("polaris-waf-guard");
+        expect(renderDynamicConfig([route({ sqlInjectionProtection: true })])).toContain(
+            "polaris-waf-guard"
+        );
+        expect(renderDynamicConfig([route({ xssProtection: true })])).toContain(
+            "polaris-waf-guard"
+        );
     });
 });
 
@@ -194,7 +200,9 @@ describe("names in a deploy zone with nothing on them", () => {
     it("answers one label deep under the zone, and nothing else", () => {
         const config = zoned();
 
-        expect(config).toContain("HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]plr[.]example[.]com$`)");
+        expect(config).toContain(
+            "HostRegexp(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.]plr[.]example[.]com$`)"
+        );
         // The dot is a regex metacharacter and a backslash is a YAML escape, so the
         // literal dot is written as a class instead of being escaped.
         expect(config).not.toContain("\\.");
@@ -212,7 +220,11 @@ describe("names in a deploy zone with nothing on them", () => {
         // The jail watches exactly this surface. Without the guard here it would ban an
         // address and then carry on serving that address every name it asked for.
         const config = zoned();
-        const vacant = config.slice(config.indexOf("    polaris-vacant:")).split("\n").slice(0, 8).join("\n");
+        const vacant = config
+            .slice(config.indexOf("    polaris-vacant:"))
+            .split("\n")
+            .slice(0, 8)
+            .join("\n");
 
         expect(vacant).toContain("polaris-vacant-waf-ctx");
         expect(vacant).toContain("polaris-waf-guard");
@@ -223,7 +235,8 @@ describe("names in a deploy zone with nothing on them", () => {
         // A missing rule header is read as require-login, which would send every visitor
         // to a name with nothing on it round a login handoff.
         const config = zoned();
-        const encoded = /polaris-vacant-waf-ctx:[\s\S]*?X-Polaris-Waf: "([^"]*)"/.exec(config)?.[1] ?? "";
+        const encoded =
+            /polaris-vacant-waf-ctx:[\s\S]*?X-Polaris-Waf: "([^"]*)"/.exec(config)?.[1] ?? "";
         const rule = decodeGuardRule(encoded);
 
         expect(encoded).not.toBe("");
@@ -243,7 +256,11 @@ describe("names in a deploy zone with nothing on them", () => {
 
     it("serves the page over plain HTTP too, rather than redirecting onto a certificate it may not have", () => {
         const config = zoned();
-        const http = config.slice(config.indexOf("    polaris-vacant-http:")).split("\n").slice(0, 6).join("\n");
+        const http = config
+            .slice(config.indexOf("    polaris-vacant-http:"))
+            .split("\n")
+            .slice(0, 6)
+            .join("\n");
 
         expect(http).toContain("entryPoints: [web]");
         expect(http).toContain("service: polaris-vacant");
@@ -278,7 +295,9 @@ describe("an app whose container is not answering", () => {
     });
 
     it("wraps the rest of the chain rather than sitting inside it", () => {
-        const config = renderDynamicConfig([route({ deny: ["203.0.113.0/24"] })], { vacantAvailable: true });
+        const config = renderDynamicConfig([route({ deny: ["203.0.113.0/24"] })], {
+            vacantAvailable: true
+        });
         const middlewares = /middlewares: \[([^\]]+)\]/.exec(config)?.[1] ?? "";
 
         expect(middlewares.split(", ")[0]).toBe("polaris-vacant-errors");
