@@ -61,7 +61,7 @@ export const PULLS = "pe_tug";
 export const READ_PULLS = `execute as @a run scoreboard players get @s ${PULLS}`;
 export const SETUP: readonly string[] = [
     `scoreboard objectives remove ${PULLS}`,
-    `scoreboard objectives add ${PULLS} minecraft.used:${ROD}`
+    `scoreboard objectives add ${PULLS} minecraft.used:${ROD.replace(":", ".")}`
 ];
 export const TEARDOWN: readonly string[] = [`scoreboard objectives remove ${PULLS}`];
 

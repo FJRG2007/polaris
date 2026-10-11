@@ -60,6 +60,10 @@ describe("counting pulls", () => {
         expect(tug.teamPull([])).toBe(0);
         expect(tug.teamPull([8, 0])).toBe(4);
     });
+
+    it("counts uses of the rod with a statistic criterion the server accepts", () => {
+        expect(tug.SETUP).toContain(`scoreboard objectives add ${tug.PULLS} minecraft.used:minecraft.carrot_on_a_stick`);
+    });
 });
 
 describe("moving the marker", () => {
