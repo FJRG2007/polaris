@@ -31,6 +31,7 @@ import * as acidRainSaid from "./acid-rain-messages";
 import * as elytraRace from "./elytra-race";
 import * as elytraRaceSaid from "./elytra-race-messages";
 import * as stash from "./stash";
+import * as fair from "./fair-start";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
 import * as pace from "./pace";
@@ -848,6 +849,8 @@ async function admit(
                     ? elytraRace.resumeSpot(layout.course, resumed)
                     : places[index]!;
         going.push(
+            // Their own effects off where they come back with them (`fair-start`).
+            ...fair.clearLines(one.name, keptFor(loop, one.name)),
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
             `title ${one.name} subtitle ${commands.text(readySubtitle(loop, layout))}`,
@@ -898,7 +901,19 @@ async function admit(
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
     if (!stashing) return brought.length;
-    return (await stashAll(loop, server, tools, brought, true)).filter(Boolean).length;
+    const inside = await stashAll(loop, server, tools, brought, true);
+    // Everybody in whole and fed, the same as the rest (`fair-start`): only
+    // now, once what they came in with is kept for good.
+    const even = brought.flatMap((name, index) =>
+        inside[index] ? fair.evenLines(name, keptFor(loop, name)) : []
+    );
+    if (even.length > 0) await server.sayAll(even);
+    return inside.filter(Boolean).length;
+}
+
+/** What is kept of `name`'s, while they are in. */
+function keptFor(loop: StageLoop, name: string): stash.Stash | null {
+    return state(loop).saved.find((one) => same(one.name, name))?.stash ?? null;
 }
 
 /**

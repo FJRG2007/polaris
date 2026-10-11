@@ -68,6 +68,7 @@ import * as villageMessages from "./kinds/village-defense-messages";
 import * as bingo from "./kinds/bingo";
 import * as bingoMessages from "./kinds/bingo-messages";
 import * as fishing from "./kinds/boss-fishing";
+import * as impostor from "./kinds/impostor";
 import * as seek from "./kinds/hide-and-seek";
 import * as fishingMessages from "./kinds/boss-fishing-messages";
 import { editionOf, type ServerContainer } from "../service";
@@ -3180,11 +3181,22 @@ async function bingoBegin(
 /** Every few minutes each player is shown their own card again. */
 const CARD_AGAIN_TICKS = 90;
 
+/** Who is asked about for `noteOffMode`: in an event played in a space of
+ *  its own, only those inside it - never a watcher, nor the mode a racer had
+ *  before joining - and never an impostor's ghost, put in spectator by the
+ *  game itself. Anywhere else, everybody. */
+function offModeRead(preset: catalog.EventPreset): string {
+    if (catalog.playsOnStage(preset)) return commands.notSurvivalInside(stage.IN_ARENA);
+    if (catalog.playsInArena(preset))
+        return commands.notSurvivalInside(arena.IN_ARENA, impostor.GHOST_TAG);
+    return commands.NOT_SURVIVAL;
+}
+
 /** Whoever is in creative or spectator now, added to those the run has seen
  *  so (`offMode`), for good. Answers whether anybody new was. */
 async function noteOffMode(loop: Loop, server: ServerContainer): Promise<boolean> {
     const offMode = commands
-        .readWhere(await server.say([commands.NOT_SURVIVAL]))
+        .readWhere(await server.say([offModeRead(loop.run.preset)]))
         .map((one) => one.name);
     const noted = new Set(loop.run.offMode.map((name) => name.toLowerCase()));
     const fresh = offMode.filter((name) => !noted.has(name.toLowerCase()));

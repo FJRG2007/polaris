@@ -1533,6 +1533,17 @@ export function isPeaceful(output: string): boolean {
 export const NOT_SURVIVAL =
     "execute as @a[gamemode=!survival,gamemode=!adventure] run data get entity @s Pos";
 
+/**
+ * The same among those inside an event's own space, a stage or an arena,
+ * tagged `tag`: it puts them in adventure as they come in, so the mode
+ * somebody had before they joined, or has watching from outside, is not
+ * playing it. `except`: a tag the event's own spectators wear.
+ */
+export function notSurvivalInside(tag: string, except?: string): string {
+    const not = except ? `tag=!${except},` : "";
+    return `execute as @a[tag=${tag},${not}gamemode=!survival,gamemode=!adventure] run data get entity @s Pos`;
+}
+
 export const WAVE_EVERY_MS = 40_000;
 
 const WAVE_SIZE: Readonly<Record<EventOptions<"blood-moon">["intensity"], number>> = {

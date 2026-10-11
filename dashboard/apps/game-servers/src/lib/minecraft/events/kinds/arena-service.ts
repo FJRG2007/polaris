@@ -42,6 +42,7 @@ import * as hillService from "./hill-service";
 import * as hitsService from "./hits-service";
 import * as stashService from "./stash-service";
 import * as pace from "./pace";
+import * as fair from "./fair-start";
 import * as inServer from "../in-server";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -503,13 +504,19 @@ async function bringIn(ctx: KindContext): Promise<void> {
     const overGround = hillside ? await ctx.atLeast([1, 19, 4]) : false;
     const respawns = await respawnKeyOf(ctx);
     const linesIn = (one: stored.Entrant): string[] => {
+        // Their own effects off where they come back with them (`fair-start`).
+        const fresh = fair.clearLines(one.name, one.stash);
         if (hillside)
-            return hillService.enterLines(ctx.run, one.name, one.side, overGround, language);
+            return [
+                ...fresh,
+                ...hillService.enterLines(ctx.run, one.name, one.side, overGround, language)
+            ];
         // In, and nothing more: the kit, the side's colors and the theme are
         // handed out at "Go!", to everybody at once (`goLines`). Only where a
         // death brings them back goes with them now, where the server can say
         // so as they respawn (`respawnLines`).
         return [
+            ...fresh,
             ...arena.enter(one.name, spotsOf(ctx.run).get(lower(one.name))!),
             ...(respawns ? respawnLines(ctx.run, respawns, [one]) : []),
             ...(duelling ? [duel.joinTeam(one.name, one.side)] : []),
@@ -528,6 +535,10 @@ async function bringIn(ctx: KindContext): Promise<void> {
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
     await stashAll(ctx, true);
+    // Everybody in whole and fed, the same as the rest (`fair-start`): only
+    // now, once what they came in with is kept for good.
+    const even = ctx.run.entrants.flatMap((one) => fair.evenLines(one.name, one.stash));
+    if (even.length > 0) await ctx.server.sayAll(even);
     // Too few left once those kept out are: called off, and everybody brought
     // in sent back with their things.
     const needed = catalog.joinersNeeded(run.preset);
