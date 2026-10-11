@@ -413,11 +413,22 @@ export function levelOf(setting: CallQuality, auto: CallLevel): CallLevel {
  * The device itself is the exception, and is exact for the reason it always was:
  * quietly opening a camera nobody chose is worse than saying it could not.
  */
-export function cameraConstraints(level: CallLevel, deviceId?: string): MediaTrackConstraints {
+export function cameraConstraints(
+    level: CallLevel,
+    deviceId?: string,
+    /** The size the camera is delivering now, when it is already open. */
+    shape?: { readonly width?: number; readonly height?: number } | null
+): MediaTrackConstraints {
     const rung = CAMERA_LADDER.rungs[level];
+    // One edge, never both. A width and a height together name a shape as well
+    // as a size, and a camera of any other shape is cropped to it: a 4:3 webcam
+    // lost its top and bottom, and a phone held upright sent a strip across its
+    // middle - a face cut off at the forehead and chin. The rung's long edge is
+    // the size; the camera keeps its own shape. Upright once it is known to be,
+    // so the long edge is the one that runs up the picture.
+    const upright = Boolean(shape?.width && shape?.height && shape.height > shape.width);
     const size = {
-        width: { ideal: rung.width },
-        height: { ideal: rung.height },
+        ...(upright ? { height: { ideal: rung.width } } : { width: { ideal: rung.width } }),
         frameRate: { ideal: rung.frameRate }
     };
     // A device named here is somebody choosing one now, and is exact. Otherwise
@@ -434,11 +445,21 @@ export function cameraConstraints(level: CallLevel, deviceId?: string): MediaTra
  * resolution" means here - and on Safari it is the only thing that works, since
  * naming any resolution there caps the capture far below what was asked for.
  */
-export function screenConstraints(level: CallLevel): MediaTrackConstraints {
+export function screenConstraints(
+    level: CallLevel,
+    /** The size the screen is being captured at now, when it already is. */
+    shape?: { readonly width?: number; readonly height?: number } | null
+): MediaTrackConstraints {
     const rung = SCREEN_LADDER.rungs[level];
+    // One edge, for the reason the camera gets one: a 16:10 laptop, an
+    // ultrawide or a monitor turned upright keeps its own shape rather than
+    // being cut to the rung's.
+    const upright = Boolean(shape?.width && shape?.height && shape.height > shape.width);
     return {
         ...(rung.width && rung.height
-            ? { width: { ideal: rung.width }, height: { ideal: rung.height } }
+            ? upright
+                ? { height: { ideal: rung.width } }
+                : { width: { ideal: rung.width } }
             : {}),
         frameRate: { ideal: rung.frameRate }
     };

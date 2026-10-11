@@ -56,7 +56,7 @@ import { QuietMicNotice } from "./quiet-mic-notice";
 import { SlowConnectionNotice } from "@/components/connection-banner";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
-import { FACE_MAX, useFaceSize, useTileFit } from "./call-grid";
+import { FACE_MAX, fillsTile, useFaceSize, useTileFit } from "./call-grid";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
     REACTIONS,
@@ -2273,6 +2273,35 @@ function Tile({
     const [volume] = useCallVolume(volumeKey ?? "");
 
     /**
+     * The picture's shape and the tile's, as width over height.
+     *
+     * Read from the video itself, and again whenever it changes size - a phone
+     * turned on its side, a camera swapped, a quality step - because the tile
+     * decides from them whether your own picture is trimmed to fill it or shown
+     * whole. See `fillsTile`.
+     */
+    const [pictureShape, setPictureShape] = useState<number | null>(null);
+    const [tileShape, setTileShape] = useState<number | null>(null);
+    useEffect(() => {
+        const node = frame.current;
+        if (!node || typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(([entry]) => {
+            const box = entry?.contentRect;
+            setTileShape(box && box.height > 0 ? box.width / box.height : null);
+        });
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, []);
+    const onShape = (element: HTMLVideoElement) => {
+        const { videoWidth, videoHeight } = element;
+        const picture = videoHeight > 0 ? videoWidth / videoHeight : null;
+        setPictureShape(picture);
+        if (!zoomable) return;
+        const box = frame.current?.getBoundingClientRect();
+        look.measure(picture, box && box.height > 0 ? box.width / box.height : null);
+    };
+
+    /**
      * Full screen, on the tile rather than on the video inside it.
      *
      * A `<video>` taken full screen by the browser draws nothing but the video:
@@ -2416,18 +2445,10 @@ function Tile({
                 // No transition on this. It is dragged and wheeled, and an eased
                 // transform lags a finger by its own duration.
                 style={zoomable ? { transform: look.transform } : undefined}
-                onLoadedMetadata={
-                    zoomable
-                        ? (event) => {
-                              const { videoWidth, videoHeight } = event.currentTarget;
-                              const box = frame.current?.getBoundingClientRect();
-                              look.measure(
-                                  videoHeight > 0 ? videoWidth / videoHeight : null,
-                                  box && box.height > 0 ? box.width / box.height : null
-                              );
-                          }
-                        : undefined
-                }
+                onLoadedMetadata={(event) => onShape(event.currentTarget)}
+                // Fired when the picture changes size mid-stream: a phone turned
+                // upright, a camera swapped, a quality step.
+                onResize={(event) => onShape(event.currentTarget)}
                 className={cn(
                     zoomable && "origin-center will-change-transform",
                     "size-full",
@@ -2441,7 +2462,11 @@ function Tile({
                     // Your own is always a camera now - the screen you are
                     // sharing has its own tile up on the stage - so this no
                     // longer has to ask which of the two it is holding.
-                    own ? "object-cover" : "object-contain",
+                    // And never stretched: both keep the picture's own shape. Your
+                    // own is trimmed only when its shape is near the tile's - an
+                    // upright phone in a wide tile is shown whole rather than cut
+                    // down to a strip across the face. See `fillsTile`.
+                    own && fillsTile(pictureShape, tileShape) ? "object-cover" : "object-contain",
                     // Yours only. Everybody else's picture is already the right
                     // way round for the person watching it, and flipping what
                     // goes out would turn the writing on your shirt backwards

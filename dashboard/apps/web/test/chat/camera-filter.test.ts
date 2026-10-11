@@ -131,7 +131,7 @@ vi.stubGlobal("window", {
     dispatchEvent: () => true
 });
 
-const { maskCamera } = await import("@/app/(app)/chat/camera-filter");
+const { coverRect, maskCamera } = await import("@/app/(app)/chat/camera-filter");
 
 const track = {
     readyState: "live",
@@ -204,5 +204,29 @@ describe("starting the model", () => {
             scriptArrives = false;
             delete (window as unknown as { SelfieSegmentation?: unknown }).SelfieSegmentation;
         }
+    });
+});
+
+describe("a background picture behind a camera of another shape", () => {
+    // The stored picture is 16:9. Drawn over the frame's own size it was
+    // squashed behind a 4:3 webcam and an upright phone.
+    it("keeps the picture's shape and covers the frame", () => {
+        for (const [width, height] of [
+            [640, 480],
+            [1280, 720],
+            [720, 1280]
+        ] as const) {
+            const at = coverRect(1280, 720, width, height);
+            expect(at.width / at.height).toBeCloseTo(1280 / 720, 6);
+            expect(at.width).toBeGreaterThanOrEqual(width - 1e-6);
+            expect(at.height).toBeGreaterThanOrEqual(height - 1e-6);
+            // Centred, so the excess falls off both edges equally.
+            expect(at.x * 2 + at.width).toBeCloseTo(width, 6);
+            expect(at.y * 2 + at.height).toBeCloseTo(height, 6);
+        }
+    });
+
+    it("draws over the frame while the picture has no size yet", () => {
+        expect(coverRect(0, 0, 640, 480)).toEqual({ x: 0, y: 0, width: 640, height: 480 });
     });
 });

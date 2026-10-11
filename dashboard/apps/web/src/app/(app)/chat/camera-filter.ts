@@ -276,7 +276,10 @@ export async function maskCamera(
 
         staging.globalCompositeOperation = "destination-over";
         if (picture) {
-            staging.drawImage(picture, 0, 0, width, height);
+            // Covering the frame, never stretched to it: the stored picture is
+            // wide, and a 4:3 webcam or an upright phone squashed it.
+            const at = coverRect(picture.naturalWidth, picture.naturalHeight, width, height);
+            staging.drawImage(picture, at.x, at.y, at.width, at.height);
         } else {
             staging.filter = `blur(${blur}px)`;
             // Drawn larger than the canvas by the width of the blur, which is
@@ -514,6 +517,29 @@ function tickerScript(): string {
  * glass - the freeze arrives first and what stays on screen is the frame
  * before. Two frames, because one only means the next paint was scheduled.
  */
+/**
+ * Where to draw a picture so it covers a frame of another shape without being
+ * stretched: scaled by the larger of the two ratios and centred, so the excess
+ * falls off the edges. A picture with no size yet is drawn over the frame.
+ */
+export function coverRect(
+    sourceWidth: number,
+    sourceHeight: number,
+    width: number,
+    height: number
+): { x: number; y: number; width: number; height: number } {
+    if (sourceWidth <= 0 || sourceHeight <= 0) return { x: 0, y: 0, width, height };
+    const scale = Math.max(width / sourceWidth, height / sourceHeight);
+    const drawnWidth = sourceWidth * scale;
+    const drawnHeight = sourceHeight * scale;
+    return {
+        x: (width - drawnWidth) / 2,
+        y: (height - drawnHeight) / 2,
+        width: drawnWidth,
+        height: drawnHeight
+    };
+}
+
 export function afterPaint(): Promise<void> {
     if (typeof requestAnimationFrame !== "function") return Promise.resolve();
     return new Promise((resolve) => {
