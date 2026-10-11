@@ -343,3 +343,86 @@ describe("the ring's rules", () => {
         expect(hill.INSIDE_SCORE).toBe("pe_kin");
     });
 });
+
+describe("the king of the ring's own look", () => {
+    const radius = 10;
+    const half = radius + hill.MARGIN;
+    const at = (one: { box: { x1: number; y1: number; z1: number } }) =>
+        `${one.box.x1 - place.x},${one.box.y1 - place.y},${one.box.z1 - place.z}`;
+
+    it("edges the floor in sculk, burns soul fire on its corners and sets a skull in each side looking in", () => {
+        const decor = hill.platformDecor(place, radius, hill.DEATH);
+        const blockAt = new Map(decor.map((one) => [at(one), one.block]));
+        for (const [dx, dz] of [
+            [-half, -half],
+            [half, -half],
+            [-half, half],
+            [half, half]
+        ] as const) {
+            expect(blockAt.get(`${dx},0,${dz}`)).toBe(hill.DEATH.corner);
+            expect(blockAt.get(`${dx},1,${dz}`)).toBe("minecraft:soul_campfire");
+        }
+        expect(blockAt.get(`0,1,${-half}`)).toBe("minecraft:wither_skeleton_skull[rotation=0]");
+        expect(blockAt.get(`0,1,${half}`)).toBe("minecraft:wither_skeleton_skull[rotation=8]");
+        expect(blockAt.get(`${-half},1,0`)).toBe("minecraft:wither_skeleton_skull[rotation=12]");
+        expect(blockAt.get(`${half},1,0`)).toBe("minecraft:wither_skeleton_skull[rotation=4]");
+        expect(decor.filter((one) => one.block === hill.DEATH.edge)).toHaveLength(4);
+        expect(decor.some((one) => one.block === hill.DEATH.ring)).toBe(true);
+        // Everything it builds is on its list, so it all comes down again.
+        const listed = new Set(hill.lookBlocks(hill.DEATH));
+        for (const one of decor) expect(listed.has(one.block.replace(/\[.*$/, ""))).toBe(true);
+    });
+
+    it("never draws the ring onto the sculk, wherever it drifts", () => {
+        for (let seed = 0; seed < 40; seed += 1) {
+            const settings = {
+                seed: `look-${seed}`,
+                radius,
+                players: 6,
+                rounds: 3,
+                shrinks: true,
+                moves: true
+            };
+            for (let ms = 0; ms <= 3 * 60_000; ms += 2_000) {
+                const ring = hill.ringAt(settings, 3 * 60_000, ms);
+                const center = hill.ringCenter(place, ring);
+                for (const cell of hill.ringBlocks(center, ring.radius)) {
+                    expect(Math.abs(cell.x - place.x)).toBeLessThan(half);
+                    expect(Math.abs(cell.z - place.z)).toBeLessThan(half);
+                }
+            }
+        }
+    });
+
+    it("redraws the ring in its own blocks, and keeps the plain one for a platform built before", () => {
+        const floor = { ...place, y: place.y - 1 };
+        const lines = hill.redrawLines(floor, radius, floor, 6, hill.DEATH);
+        expect(lines[0]).toMatch(/ minecraft:deepslate_tiles replace minecraft:ochre_froglight$/);
+        expect(
+            lines
+                .slice(1)
+                .every((line) =>
+                    line.endsWith(" minecraft:ochre_froglight replace minecraft:deepslate_tiles")
+                )
+        ).toBe(true);
+        expect(hill.lookOf([...hill.lookBlocks(hill.DEATH), hill.FIRE])).toBe(hill.DEATH);
+        expect(hill.lookOf([...hill.PLATFORM_BLOCKS, hill.FIRE])).toBe(hill.PLAIN);
+        expect(hill.lookBlocks(hill.PLAIN)).toEqual([...hill.PLATFORM_BLOCKS]);
+    });
+
+    it("drifts souls and ash over it, and beats a heart through the double points only", () => {
+        const calm = hill.ambientLines(place, radius, false);
+        expect(calm.some((line) => line.includes("particle minecraft:sculk_soul"))).toBe(true);
+        expect(calm.some((line) => line.includes("particle minecraft:ash"))).toBe(true);
+        expect(calm.some((line) => line.includes("heartbeat"))).toBe(false);
+        expect(
+            hill
+                .ambientLines(place, radius, true)
+                .some((line) =>
+                    line.includes(
+                        "playsound minecraft:entity.warden.heartbeat ambient @a[tag=pe_arena]"
+                    )
+                )
+        ).toBe(true);
+    });
+});
