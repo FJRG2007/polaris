@@ -372,6 +372,42 @@ describe("mail about the safety of an account", () => {
         expect(isDisposableSecurityMail(message("Your password has been updated"))).toBe(false);
     });
 
+    it("never sweeps a password change or an account recovery in any language", () => {
+        for (const subject of [
+            "Bestätigung Ihrer Passwortänderung",
+            "Passwort ändern",
+            "Confirmation de changement de mot de passe",
+            "Confirmação de alteração de senha",
+            "Conferma cambio password",
+            "Account recovery request for your account",
+            "Someone started account recovery",
+            "Recover your account",
+            "Recuperación de cuenta",
+            "Recuperar tu cuenta"
+        ]) {
+            expect(categoriseMail(message(subject)), subject).toBe("security");
+            expect(isDisposableSecurityMail(message(subject)), subject).toBe(false);
+        }
+    });
+
+    it("never sweeps a secure link that does not say it signs in", () => {
+        for (const subject of [
+            "Secure link to your statement",
+            "Your secure link to view the document",
+            "Tu enlace seguro a Claude.ai está aquí",
+            "Votre lien sécurisé",
+            "Ihr sicherer Link",
+            "Il tuo link sicuro",
+            "Seu link seguro"
+        ]) {
+            expect(categoriseMail(message(subject)), subject).toBe("security");
+            expect(isDisposableSecurityMail(message(subject)), subject).toBe(false);
+        }
+        expect(isDisposableSecurityMail(message("Secure link to log in"))).toBe(true);
+        expect(isDisposableSecurityMail(message("Your sign-in link for Polaris"))).toBe(true);
+        expect(isDisposableSecurityMail(message("Forgot your password?"))).toBe(true);
+    });
+
     it("is never swept, however old it gets", () => {
         // The whole reason the two halves are told apart: a code is worthless
         // within the hour, and this is the most important mail of somebody's
