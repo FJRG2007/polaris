@@ -15,7 +15,8 @@
         "RespawnChargeMixin",
         "SectionBlocksUpdateAccessor",
         "TrackedEntityMixin",
-        "ServerLevelMixin"
+        "ServerLevelMixin",
+        "FluidSpreadMixin"
     ],
     "injectors": {
         "defaultRequire": 0

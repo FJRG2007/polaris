@@ -59,6 +59,7 @@ import * as arenaService from "./kinds/arena-service";
 import * as pace from "./kinds/pace";
 import * as arena from "./kinds/arena";
 import * as outsiders from "./kinds/outsiders";
+import * as inServer from "./in-server";
 import * as stashService from "./kinds/stash-service";
 import * as search from "./place-search";
 import * as hillService from "./kinds/hill-service";
@@ -1399,6 +1400,7 @@ async function keepOutsidersOut(
         run.stage
     );
     const held = run.heldOut ?? [];
+    await guardSpace(server, run.id, volume);
     if (!volume && !held.some((one) => one.holding)) return;
     const near = volume ? commands.readWhere(await server.say([outsiders.nearRead(volume)])) : [];
     const out = outsiders.outsidersOf(near, insidersOf(run));
@@ -1422,6 +1424,38 @@ async function keepOutsidersOut(
         await persist(installedAppId, loop);
     }
     if (result.lines.length > 0) await server.sayAll(result.lines);
+}
+
+/** When each run's space was last handed to the plugin or mod, and as what. */
+const guarded = new Map<string, { at: number; line: string }>();
+
+/**
+ * The run's space handed to the Polaris plugin or mod (`polaris guard`), which
+ * refuses what the tick cannot: a blow, an arrow, an explosion, a piston, a
+ * fluid from outside. Again as soon as it changes and every half minute, so a
+ * server restarted in between has it back; it lets itself go after ten minutes
+ * without, so one whose clear never came cannot stay.
+ */
+async function guardSpace(
+    server: ServerContainer,
+    runId: string,
+    volume: stage.Volume | null
+): Promise<void> {
+    if (!volume || !(await inServer.capabilities(server)).has("guard")) return;
+    const line = inServer.guardSet(inServer.guardKey(runId), volume);
+    const last = guarded.get(runId);
+    const now = Date.now();
+    if (last && last.line === line && now - last.at < inServer.GUARD_EVERY_MS) return;
+    await server.say([line]);
+    if (guarded.size >= 256) guarded.delete(guarded.keys().next().value!);
+    guarded.set(runId, { at: now, line });
+}
+
+/** The run's space let go (`guardSpace`). */
+async function unguardSpace(server: ServerContainer, runId: string): Promise<void> {
+    guarded.delete(runId);
+    if ((await inServer.capabilities(server)).has("guard"))
+        await server.say([inServer.guardClear(inServer.guardKey(runId))]).catch(() => "");
 }
 
 /** One tick of a run that has begun. */
@@ -4873,6 +4907,7 @@ async function finish(
             // Everybody back where they were before the results are read to
             // them and before the rules they held are put back.
             await bringBack(server);
+            await unguardSpace(server, run.id).catch(() => undefined);
             await server.sayAll([...lines, ...cleanupOf(run)]);
             // What they dealt in it is not a fight the next event should wait out.
             await playing
@@ -4902,7 +4937,10 @@ async function finish(
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
         if (arenaLeftover === undefined && catalog.playsInArena(preset))
             arenaLeftover = arenaService.leftoverOf(run, run.gamerules);
-        if (server) await server.sayAll(cleanupOf(run)).catch(() => undefined);
+        if (server) {
+            await unguardSpace(server, run.id).catch(() => undefined);
+            await server.sayAll(cleanupOf(run)).catch(() => undefined);
+        }
     } finally {
         releaseSidebar(loop.ownerId, installedAppId);
         await dropLink(loop);
@@ -5083,8 +5121,9 @@ async function cleanUpLater(
     run: stored.EventRun
 ): Promise<void> {
     await withServerContainer(ownerId, installedAppId, async (later) => {
-        if (later.running)
-            await chunks.sparing(later, () => chunks.heldBefore(run)).sayAll(cleanupOf(run));
+        if (!later.running) return;
+        await unguardSpace(later, run.id).catch(() => undefined);
+        await chunks.sparing(later, () => chunks.heldBefore(run)).sayAll(cleanupOf(run));
     }).catch(() => undefined);
 }
 

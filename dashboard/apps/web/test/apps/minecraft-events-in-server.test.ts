@@ -41,6 +41,12 @@ describe("capabilities", () => {
         ).toEqual(new Set(["stash"]));
     });
 
+    it("counts the guard, which the plugin answers too", () => {
+        expect(
+            inServer.parseCaps('{"ok":true,"polaris":"0.4.0","caps":["respawn","guard"]}')
+        ).toEqual(new Set(["respawn", "guard"]));
+    });
+
     it("is nothing on a server without the mod", () => {
         expect(inServer.parseCaps("Unknown or incomplete command, see below for error")).toEqual(
             new Set()
@@ -179,5 +185,18 @@ describe("batches", () => {
         const lines = ["fill 0 0 0 9 9 9 stone"];
         expect(await inServer.build(server, lines)).toBe(true);
         expect(sent.slice(-1)).toEqual(lines);
+    });
+});
+
+describe("the guard on an event's space", () => {
+    it("is one key a run, and marks its box low corner first, either way round", () => {
+        expect(inServer.guardKey("run-1")).toBe(inServer.guardKey("run-1"));
+        expect(inServer.guardKey("run-1")).not.toBe(inServer.guardKey("run-2"));
+        expect(inServer.guardKey("run-1")).toMatch(/^pg[0-9a-f]{24}$/);
+        const key = inServer.guardKey("run-1");
+        expect(inServer.guardSet(key, { x1: 20, y1: 160, z1: -5, x2: -10, y2: 150, z2: 9 })).toBe(
+            `polaris guard set ${key} -10 150 -5 20 160 9`
+        );
+        expect(inServer.guardClear(key)).toBe(`polaris guard clear ${key}`);
     });
 });

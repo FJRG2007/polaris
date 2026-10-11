@@ -30,8 +30,17 @@ own play).
   Who takes part is told by the event tags and by name (joined and not kept
   out, taken in and not yet sent back). An event taking somebody in who was
   held writes down the mode they had before (`outsiders.trueMode`). This is
-  the half with no restart; hits, explosions, pistons and fluids are the
-  mod's.
+  the half with no restart. The other half is the Polaris mod's or plugin's
+  guard, used when `polaris caps` lists `guard` (it is new, so it takes one
+  server restart after the update): the tick sends the space with
+  `polaris guard set <key> <corners>` (`inServer.guardSet`, again on a change
+  and every `GUARD_EVERY_MS`) and `polaris guard clear <key>` at the end; a
+  box not set again lets itself go after ten minutes. In it, anybody without
+  an event tag - operators and creative players too - cannot break, place or
+  use a block, hit, shoot or splash an entrant, pour or light anything over
+  it, ride into it, blow it up from outside, push into it with a piston, or
+  let a fluid flow into it. Fire spreading in by itself is stopped by the
+  plugin only.
 - **Everything it changes is written down before it is changed** (game rules,
   the time of day) on the run, so whatever ends the event - its end, a call-off,
   a Polaris restart - puts back exactly that.

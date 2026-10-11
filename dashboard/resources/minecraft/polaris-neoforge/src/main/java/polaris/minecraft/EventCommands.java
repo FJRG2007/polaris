@@ -31,13 +31,15 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  *
  * - {@code polaris respawn set <key> <player> <dimension> <x> <y> <z> <yaw>},
  *   {@code list <key>}, {@code clear <key>} ({@link EventRespawn}).
+ * - {@code polaris guard set <key> <x1> <y1> <z1> <x2> <y2> <z2>},
+ *   {@code clear <key>}, {@code list} ({@link EventGuard}).
  * - {@code polaris sounds status|refresh} ({@link SoundPack}).
  *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
     /** What `polaris caps` lists; the dashboard checks each by name. */
-    static final String[] CAPS = {"stash", "batch", "seek", "respawn"};
+    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard"};
 
     private final String version;
 
@@ -77,6 +79,21 @@ final class EventCommands {
                                 .executes(context -> answer(context, server -> EventRespawn.list(key(context))))))
                         .then(Commands.literal("clear").then(Commands.argument("key", StringArgumentType.word())
                                 .executes(context -> answer(context, server -> EventRespawn.clear(key(context)))))))
+                .then(Commands.literal("guard")
+                        .then(Commands.literal("set").then(Commands.argument("key", StringArgumentType.word())
+                                .then(corner("x1").then(corner("y1").then(corner("z1")
+                                        .then(corner("x2").then(corner("y2").then(corner("z2")
+                                                .executes(context -> answer(context, server -> EventGuard.set(
+                                                        key(context),
+                                                        IntegerArgumentType.getInteger(context, "x1"),
+                                                        IntegerArgumentType.getInteger(context, "y1"),
+                                                        IntegerArgumentType.getInteger(context, "z1"),
+                                                        IntegerArgumentType.getInteger(context, "x2"),
+                                                        IntegerArgumentType.getInteger(context, "y2"),
+                                                        IntegerArgumentType.getInteger(context, "z2"))))))))))))
+                        .then(Commands.literal("clear").then(Commands.argument("key", StringArgumentType.word())
+                                .executes(context -> answer(context, server -> EventGuard.clear(key(context))))))
+                        .then(Commands.literal("list").executes(context -> answer(context, server -> EventGuard.list()))))
                 .then(Commands.literal("batch")
                         .then(Commands.literal("run").then(Commands.argument("key", StringArgumentType.word())
                                 .executes(context -> answer(context, server -> EventBatch.run(
@@ -102,6 +119,12 @@ final class EventCommands {
                 .then(Commands.argument("key", StringArgumentType.word())
                         .executes(context -> answer(context, server -> action.apply(
                                 server, StringArgumentType.getString(context, "player"), key(context)))));
+    }
+
+    /** One corner coordinate of a guarded box, within the world's border. */
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, Integer> corner(
+            String name) {
+        return Commands.argument(name, IntegerArgumentType.integer(-30_000_000, 30_000_000));
     }
 
     private static String key(CommandContext<CommandSourceStack> context) {
