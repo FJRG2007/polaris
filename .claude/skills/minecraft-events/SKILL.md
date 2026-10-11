@@ -42,6 +42,9 @@ the code. If a rule changes, change it in the doc.
   (`parkour-layout.reaches`), the order is enforced in the game as well, and
   the generator is measured over thousands of seeds before it ships. A layout
   change bumps its design version.
+- How a map looks, and where players can hide in it: start from "Set
+  dressing and hiding tricks" in the doc. Add a trick there, checked against
+  the game's rules, before using a new one.
 
 ## Before calling it done
 
