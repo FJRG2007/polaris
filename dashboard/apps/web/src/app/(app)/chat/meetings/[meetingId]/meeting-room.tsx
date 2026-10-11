@@ -40,12 +40,12 @@ import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import {
     ArrowLeft,
-    Crown,
+    Check,
     Link2,
     LogOut,
     Loader2,
+    MoreHorizontal,
     Pencil,
-    UserMinus,
     UserPlus,
     Video
 } from "lucide-react";
@@ -57,7 +57,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Switch,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
     cn
 } from "@polaris/ui";
 import {
@@ -92,6 +96,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     /** Whether the name and hour are being changed. */
     const [editing, setEditing] = useState(false);
     const [copied, setCopied] = useState(false);
+    /** Who the host is about to show out, until they confirm it. */
+    const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
 
     const load = useCallback(async () => {
         const result = await listMeetingsAction();
@@ -181,6 +187,40 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
         (person) => person.admission === "admitted"
     );
 
+    /** The two doors, set from the "more" menu. */
+    const setOptions = async (options: { approveGuests?: boolean; requireAccount?: boolean }) => {
+        const result = await runAction(
+            () => setMeetingOptionsAction({ meetingId, ...options }),
+            setError
+        );
+        if (!result?.error) await load();
+    };
+    const doors = host ? (
+        <MeetingDoors
+            approveGuests={about?.approveGuests ?? true}
+            requireAccount={about?.requireAccount ?? false}
+            onChange={(options) => void setOptions(options)}
+        />
+    ) : null;
+    /** What the host's right-click on somebody in the room offers: hand the room
+     *  over, or show them out. Nothing on their own face. */
+    const hostSeat = (seatId: string) => {
+        if (!host) return undefined;
+        const person = admitted.find((entry) => entry.id === seatId);
+        if (!person || person.userId === viewerId) return undefined;
+        return {
+            guest: person.guest,
+            onMakeHost: async () => {
+                const result = await runAction(
+                    () => transferHostAction(meetingId, person.id),
+                    setError
+                );
+                if (!result?.error) await load();
+            },
+            onRemove: () => setRemoving({ id: person.id, name: person.name })
+        };
+    };
+
     if (gone) {
         return (
             <Empty
@@ -256,6 +296,26 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             >
                                 <Pencil className="size-3.5" />
                             </Button>
+                            {/* In the call the doors are in its own "more" menu,
+                                beside recording; before anybody has joined,
+                                here. */}
+                            {!inCall && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            size="icon-xs"
+                                            variant="secondary"
+                                            title={t("meetingRoom.hosting")}
+                                            aria-label={t("meetingRoom.hosting")}
+                                        >
+                                            <MoreHorizontal className="size-3.5" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-72">
+                                        {doors}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                             <Button size="xs" variant="danger" onClick={() => setEnding(true)}>
                                 <LogOut className="size-3.5" />
                                 {t("meetingRoom.end")}
@@ -282,6 +342,8 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             call={call}
                             meetingId={meetingId}
                             viewerId={viewerId}
+                            hostSeat={hostSeat}
+                            moreItems={doors}
                             onLeave={() => {
                                 leaveCall();
                                 void load();
@@ -305,21 +367,6 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             {waiting ? t("meetingRoom.waitingToBeLetIn") : t("meetingRoom.join")}
                         </Button>
                     </div>
-                )}
-
-                {host && (
-                    <HostPanel
-                        meetingId={meetingId}
-                        about={about}
-                        people={admitted.map((person) => ({
-                            id: person.id,
-                            name: person.name,
-                            guest: person.guest,
-                            self: person.userId === viewerId
-                        }))}
-                        onChanged={load}
-                        onError={setError}
-                    />
                 )}
             </div>
 
@@ -359,6 +406,39 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
             />
 
             <ConfirmDeleteDialog
+                open={removing !== null}
+                onOpenChange={(next) => !next && setRemoving(null)}
+                name={removing?.name ?? ""}
+                kind="person"
+                requireTyping={false}
+                title={
+                    removing
+                        ? t("meetingRoom.removeQuestion", { name: removing.name })
+                        : t("meetingRoom.removeThem")
+                }
+                question={t.rich("meetingRoom.removeConfirm", {
+                    name: removing?.name ?? "",
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
+                })}
+                description={t("meetingRoom.theyAreDroppedFromThe")}
+                confirmLabel={t("meetingRoom.remove")}
+                onConfirm={async () => {
+                    const person = removing;
+                    setRemoving(null);
+                    if (!person) return;
+                    const result = await runAction(
+                        () => removeFromMeetingAction(meetingId, person.id),
+                        setError
+                    );
+                    if (!result?.error) await load();
+                }}
+            />
+
+            <ConfirmDeleteDialog
                 open={ending}
                 onOpenChange={(next) => !next && setEnding(false)}
                 name={about?.title ?? t("meetingRoom.thisMeeting")}
@@ -395,166 +475,59 @@ const LOBBY_POLL_MS = 3000;
 const OUTSIDE_POLL_MS = 8000;
 
 /**
- * The host's own controls.
- *
- * Two doors and a roster. The doors are the decisions somebody makes once, when
- * they realise the link went further than they meant; the roster is the one they
- * make in the moment, about a person who is in the room.
+ * The meeting's two doors, as items of a "more" menu: the decisions somebody
+ * makes once, when they realise the link went further than they meant. Each one
+ * says what it does under its name, and stays open on a press so the other can
+ * be set next.
  */
-function HostPanel({
-    meetingId,
-    about,
-    people,
-    onChanged,
-    onError
+function MeetingDoors({
+    approveGuests,
+    requireAccount,
+    onChange
 }: {
-    meetingId: string;
-    about: MeetingSummary | null;
-    people: readonly { id: string; name: string; guest: boolean; self: boolean }[];
-    onChanged: () => void | Promise<void>;
-    onError: (message: string) => void;
+    approveGuests: boolean;
+    requireAccount: boolean;
+    onChange: (options: { approveGuests?: boolean; requireAccount?: boolean }) => void;
 }) {
     const t = useTranslations("chat");
-    const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
-
-    const set = async (options: { approveGuests?: boolean; requireAccount?: boolean }) => {
-        const result = await runAction(
-            () => setMeetingOptionsAction({ meetingId, ...options }),
-            onError
-        );
-        if (!result?.error) await onChanged();
-    };
+    const door = (checked: boolean, label: string, hint: string, change: () => void) => (
+        <DropdownMenuItem
+            role="menuitemcheckbox"
+            aria-checked={checked}
+            onSelect={(event) => {
+                event.preventDefault();
+                change();
+            }}
+            className="items-start"
+        >
+            <Check
+                className={cn("mt-0.5 size-3.5 shrink-0", checked ? "opacity-100" : "opacity-0")}
+            />
+            <span className="min-w-0">
+                {label}
+                <span className="block text-[0.6875rem] text-muted-foreground">{hint}</span>
+            </span>
+        </DropdownMenuItem>
+    );
 
     return (
-        // Held short on a phone, where it shares the screen with the call and the
-        // chat; the people in it scroll inside.
-        <section className="max-h-[25dvh] shrink-0 overflow-y-auto overscroll-contain border-t border-border px-4 py-3 lg:max-h-none">
-            <h2 className="text-xs font-medium text-muted-foreground">
+        <>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
                 {t("meetingRoom.hosting")}
-            </h2>
-
-            <div className="mt-2 flex flex-col gap-2">
-                <label className="flex items-center justify-between gap-4">
-                    <span className="text-xs">
-                        {t("meetingRoom.letPeopleInYourself")}
-                        <span className="block text-[0.6875rem] text-muted-foreground">
-                            {t("meetingRoom.anybodyOnTheLinkWaits")}
-                        </span>
-                    </span>
-                    <Switch
-                        aria-label={t("meetingRoom.letPeopleInYourself")}
-                        checked={about?.approveGuests ?? true}
-                        onChange={(next) => void set({ approveGuests: next })}
-                    />
-                </label>
-                <label className="flex items-center justify-between gap-4">
-                    <span className="text-xs">
-                        {t("meetingRoom.polarisAccountsOnly")}
-                        <span className="block text-[0.6875rem] text-muted-foreground">
-                            {t("meetingRoom.theLinkNamesTheMeeting")}
-                        </span>
-                    </span>
-                    <Switch
-                        aria-label={t("meetingRoom.polarisAccountsOnly")}
-                        checked={about?.requireAccount ?? false}
-                        onChange={(next) => void set({ requireAccount: next })}
-                    />
-                </label>
-            </div>
-
-            {people.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-1">
-                    {people.map((person) => (
-                        <li key={person.id} className="flex items-center gap-2">
-                            <span className="min-w-0 flex-1 truncate text-xs">
-                                {person.name}
-                                {person.guest && (
-                                    <span className="text-muted-foreground">
-                                        {t("meetingRoom.guestSuffix")}
-                                    </span>
-                                )}
-                            </span>
-                            {!person.self && (
-                                <>
-                                    {/* A guest cannot be handed the room: they
-                                        are a name typed into a link, and the
-                                        host can end it, lock it and remove
-                                        people. */}
-                                    <Button
-                                        size="icon-xs"
-                                        variant="ghost"
-                                        title={
-                                            person.guest
-                                                ? t("meetingRoom.onlySomebodyWithAPolaris")
-                                                : t("meetingRoom.makeHost", { name: person.name })
-                                        }
-                                        aria-label={t("meetingRoom.makeHost", {
-                                            name: person.name
-                                        })}
-                                        disabled={person.guest}
-                                        onClick={async () => {
-                                            const result = await runAction(
-                                                () => transferHostAction(meetingId, person.id),
-                                                onError
-                                            );
-                                            if (!result?.error) await onChanged();
-                                        }}
-                                    >
-                                        <Crown className="size-3.5" />
-                                    </Button>
-                                    <Button
-                                        size="icon-xs"
-                                        variant="ghost"
-                                        title={t("meetingRoom.removeNamed", { name: person.name })}
-                                        aria-label={t("meetingRoom.removeNamed", {
-                                            name: person.name
-                                        })}
-                                        onClick={() =>
-                                            setRemoving({ id: person.id, name: person.name })
-                                        }
-                                    >
-                                        <UserMinus className="size-3.5" />
-                                    </Button>
-                                </>
-                            )}
-                        </li>
-                    ))}
-                </ul>
+            </DropdownMenuLabel>
+            {door(
+                approveGuests,
+                t("meetingRoom.letPeopleInYourself"),
+                t("meetingRoom.anybodyOnTheLinkWaits"),
+                () => onChange({ approveGuests: !approveGuests })
             )}
-
-            <ConfirmDeleteDialog
-                open={removing !== null}
-                onOpenChange={(next) => !next && setRemoving(null)}
-                name={removing?.name ?? ""}
-                kind="person"
-                requireTyping={false}
-                title={
-                    removing
-                        ? t("meetingRoom.removeQuestion", { name: removing.name })
-                        : t("meetingRoom.removeThem")
-                }
-                question={t.rich("meetingRoom.removeConfirm", {
-                    name: removing?.name ?? "",
-                    strong: (chunks) => (
-                        <span key="name" className="font-medium text-foreground">
-                            {chunks}
-                        </span>
-                    )
-                })}
-                description={t("meetingRoom.theyAreDroppedFromThe")}
-                confirmLabel={t("meetingRoom.remove")}
-                onConfirm={async () => {
-                    const person = removing;
-                    setRemoving(null);
-                    if (!person) return;
-                    const result = await runAction(
-                        () => removeFromMeetingAction(meetingId, person.id),
-                        onError
-                    );
-                    if (!result?.error) await onChanged();
-                }}
-            />
-        </section>
+            {door(
+                requireAccount,
+                t("meetingRoom.polarisAccountsOnly"),
+                t("meetingRoom.theLinkNamesTheMeeting"),
+                () => onChange({ requireAccount: !requireAccount })
+            )}
+        </>
     );
 }
 

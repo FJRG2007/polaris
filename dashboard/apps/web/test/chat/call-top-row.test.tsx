@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * The row at the top of a call: the raised hand, recording and adding somebody.
+ * The row at the top of a call: the raised hand, and a "more" menu with
+ * recording and adding somebody.
  *
  * The hand used to sit in the control bar, which had grown past what reads at a
  * glance; it is in the top row now, beside the other things nobody reaches for
@@ -11,7 +12,7 @@
  */
 
 import { CallRoom } from "@/app/(app)/chat/call-room";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { CallState } from "@/app/(app)/chat/use-call";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -92,15 +93,25 @@ function room(props: { viewerId?: string; mayRecord?: boolean }) {
     );
 }
 
-/** The record button, found by the title it carries before a recording starts (the test reads the catalogue keys). */
-const recordButton = () => document.querySelector('button[title$="writeThisCallToA"]');
+/** The "more" menu, opened, when the row has one. */
+function openMore(): void {
+    const more = screen.queryByRole("button", { name: /moreForThisCall/ });
+    if (!more) return;
+    fireEvent.pointerDown(more, { button: 0, ctrlKey: false, pointerType: "mouse" });
+}
+
+/** The record item, found by the title it carries before a recording starts (the test reads the catalogue keys). */
+const recordButton = () => {
+    openMore();
+    return document.querySelector('[title$="writeThisCallToA"]');
+};
 
 describe("the top row of a call", () => {
     it("holds the raised hand, outside the control bar", () => {
         room({ viewerId: "alan" });
         const hand = screen.getByRole("button", { name: /raiseYourHand/ });
         expect(hand.parentElement).toBe(
-            screen.getByRole("button", { name: /addPeople/ }).parentElement
+            screen.getByRole("button", { name: /moreForThisCall/ }).parentElement
         );
     });
 

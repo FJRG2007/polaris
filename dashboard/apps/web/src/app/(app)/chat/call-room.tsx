@@ -72,7 +72,7 @@ import { HandStrip } from "./call-hands-panel";
 import { useCallVolume } from "./call-volumes";
 import { MicLevelMeter } from "./mic-level-meter";
 import { GAIN_MAX, GAIN_MIN, useMicGain } from "./mic-gain";
-import { PersonMenu, StreamMenu } from "./call-menus";
+import { PersonMenu, StreamMenu, type SeatHosting } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
@@ -119,6 +119,7 @@ import {
     MicOff,
     Minimize2,
     MonitorUp,
+    MoreHorizontal,
     Smile,
     MonitorX,
     PhoneOff,
@@ -180,7 +181,9 @@ export function CallRoom({
      *  it. True in a direct message or a group, which are between equals: the
      *  person who happened to ring first is not the one who owns the call.
      *  Everybody is told while it runs either way - see `call-recorder`. */
-    mayRecord = false
+    mayRecord = false,
+    hostSeat,
+    moreItems
 }: {
     meetingId: string;
     /**
@@ -213,6 +216,12 @@ export function CallRoom({
     viewerId?: string;
     mayInvite?: boolean;
     mayRecord?: boolean;
+    /** What the host of a meeting may do to the person on a seat, on their
+     *  right-click. Absent for anybody who is not hosting. */
+    hostSeat?: (seatId: string) => SeatHosting | undefined;
+    /** More for the call's "more" menu, after recording and adding people:
+     *  the host's doors, in a meeting. */
+    moreItems?: React.ReactNode;
 }) {
     const t = useTranslations("chat");
     const ts = useTranslations("shortcuts");
@@ -465,6 +474,7 @@ export function CallRoom({
                         reactions={reactionsFor(person.id)}
                         {...combining(person.id)}
                         {...moderating(person.id)}
+                        hosting={hostSeat?.(person.id)}
                         // The same key a tile uses, so turning somebody down in a
                         // conversation and turning them down in a room are the
                         // one decision: their account where they have one, their
@@ -684,59 +694,92 @@ export function CallRoom({
                         )}
                     </button>
                 )}
-                {canRecord && (
+                {/* A recording running, said up here and nowhere bigger: the
+                    time on the button that stops it for whoever is recording,
+                    a red mark for everybody else. What it means is in its
+                    title rather than in a banner taking the room's height. */}
+                {call.recording ? (
                     <button
                         type="button"
-                        onClick={() => (call.recording ? held?.recording.stop() : setAsking(true))}
-                        aria-pressed={call.recording}
-                        aria-label={
-                            call.recording
-                                ? t("callRoom.stopRecording")
-                                : t("callRoom.recordThisCall")
-                        }
+                        onClick={() => held?.recording.stop()}
+                        aria-pressed
+                        aria-label={t("callRoom.stopRecording")}
                         // What does not move. The time runs in the button
                         // itself; a tooltip carrying it changed every second,
                         // and a browser hides one whose text changes.
-                        title={
-                            call.recording
-                                ? t("callRoom.stopRecording")
-                                : t("callRoom.writeThisCallToA")
-                        }
-                        className={cn(
-                            "flex items-center gap-1.5 rounded transition-colors",
-                            call.recording
-                                ? "border border-danger-edge bg-danger-soft px-2 py-1 text-danger hover:border-danger"
-                                : "p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        )}
+                        title={t("callRoom.youAreRecordingThisCall")}
+                        className="flex items-center gap-1.5 rounded border border-danger-edge bg-danger-soft px-2 py-1 text-danger transition-colors hover:border-danger"
                     >
-                        {call.recording ? (
-                            <>
-                                <Circle
-                                    aria-hidden
-                                    className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
-                                />
-                                <span className="text-xs font-medium tabular-nums">
-                                    {clock(held?.recording.seconds ?? 0)}
-                                </span>
-                                <Square aria-hidden className="size-3 shrink-0 fill-current" />
-                            </>
-                        ) : (
-                            <RecordGlyph />
-                        )}
+                        <Circle
+                            aria-hidden
+                            className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
+                        />
+                        <span className="text-xs font-medium tabular-nums">
+                            {clock(held?.recording.seconds ?? 0)}
+                        </span>
+                        <Square aria-hidden className="size-3 shrink-0 fill-current" />
                     </button>
+                ) : (
+                    recorded && (
+                        <span
+                            role="status"
+                            title={t("callRoom.recordedBy", { name: recordedBy })}
+                            className="flex items-center gap-1.5 rounded border border-danger-edge bg-danger-soft px-2 py-1 text-xs font-medium text-danger"
+                        >
+                            <Circle aria-hidden className="size-2.5 shrink-0 fill-current" />
+                            <span className="sr-only">
+                                {t("callRoom.recordedBy", { name: recordedBy })}
+                            </span>
+                            <span aria-hidden>{t("callRoom.recShort")}</span>
+                        </span>
+                    )
                 )}
-                {viewerId && (mayInvite || canShare) && (
-                    <button
-                        type="button"
-                        onClick={() => setInviting(true)}
-                        aria-label={
-                            mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
-                        }
-                        title={mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")}
-                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                        <UserPlus className="size-4" />
-                    </button>
+                {/* Everything else about the call that is not reached for
+                    mid-sentence: starting a recording, bringing somebody in,
+                    and what the caller adds - a meeting's doors. */}
+                {((canRecord && !call.recording) ||
+                    (viewerId && (mayInvite || canShare)) ||
+                    moreItems) && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                aria-label={t("callRoom.moreForThisCall")}
+                                title={t("callRoom.moreForThisCall")}
+                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <MoreHorizontal className="size-4" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-72">
+                            {canRecord && !call.recording && (
+                                <DropdownMenuItem
+                                    title={t("callRoom.writeThisCallToA")}
+                                    onSelect={() => setAsking(true)}
+                                >
+                                    <RecordGlyph />
+                                    {t("callRoom.recordThisCall")}
+                                </DropdownMenuItem>
+                            )}
+                            {viewerId && (mayInvite || canShare) && (
+                                <DropdownMenuItem onSelect={() => setInviting(true)}>
+                                    <UserPlus className="size-4" />
+                                    {mayInvite
+                                        ? t("callRoom.addPeople")
+                                        : t("callRoom.shareALinkToThis")}
+                                </DropdownMenuItem>
+                            )}
+                            {moreItems && (
+                                <>
+                                    {((canRecord && !call.recording) ||
+                                        (viewerId && (mayInvite || canShare))) && (
+                                        <DropdownMenuSeparator />
+                                    )}
+                                    {moreItems}
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
             </div>
 
@@ -788,20 +831,6 @@ export function CallRoom({
                     micOn={call.micOn}
                 />
                 <QuietMicNotice micOn={call.micOn} />
-
-                {/* Said before anything else on the screen, and to everybody: a
-                call being written down is the one fact in a room that changes
-                what people are willing to say in it. */}
-                {recorded && (
-                    <p className="flex shrink-0 items-center gap-2 rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
-                        <Circle className="size-3 shrink-0 fill-current" />
-                        <span className="min-w-0 flex-1">
-                            {call.recording
-                                ? t("callRoom.youAreRecordingThisCall")
-                                : t("callRoom.recordedBy", { name: recordedBy })}
-                        </span>
-                    </p>
-                )}
             </div>
 
             <CombineStrip call={call} />
@@ -1054,6 +1083,7 @@ export function CallRoom({
                                     volumeKey={person?.userId ?? personId}
                                     {...combining(personId)}
                                     {...moderating(personId)}
+                                    hosting={hostSeat?.(personId)}
                                 />
                             );
                         })()
@@ -1189,6 +1219,7 @@ export function CallRoom({
                                 onFocus={() => focus(`camera:${person.id}`)}
                                 {...combining(person.id)}
                                 {...moderating(person.id)}
+                                hosting={hostSeat?.(person.id)}
                                 // Their account where they have one, so turning
                                 // somebody down holds across calls; their seat
                                 // where they do not, which lasts as long as the
@@ -1976,6 +2007,7 @@ function Face({
     combineAsked = false,
     combineLocked = false,
     moderation,
+    hosting,
     volumeKey
 }: {
     name: string;
@@ -2002,6 +2034,8 @@ function Face({
     combineLocked?: boolean;
     /** Mute, deafen and disconnect, for a reader who moderates the call. */
     moderation?: SeatModeration;
+    /** Make host and remove, for the host of a meeting. */
+    hosting?: SeatHosting;
     /** Who this face's volume is remembered against. Absent on your own, which
      *  has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -2086,6 +2120,7 @@ function Face({
             combineAsked={combineAsked}
             combineLocked={combineLocked}
             moderation={moderation}
+            hosting={hosting}
         >
             {face}
         </PersonMenu>
@@ -2122,6 +2157,7 @@ function Tile({
     combineLocked = false,
     streamMenu,
     moderation,
+    hosting,
     volumeKey
 }: {
     stream: MediaStream | null;
@@ -2194,6 +2230,8 @@ function Tile({
     streamMenu?: StreamMenuFor;
     /** Mute, deafen and disconnect, for a reader who moderates the call. */
     moderation?: SeatModeration;
+    /** Make host and remove, for the host of a meeting. */
+    hosting?: SeatHosting;
     /** Who this tile's volume is remembered against. Absent on your own tile,
      *  which has no volume to set - it is never played back. */
     volumeKey?: string;
@@ -2589,6 +2627,7 @@ function Tile({
             combineAsked={combineAsked}
             combineLocked={combineLocked}
             moderation={moderation}
+            hosting={hosting}
         >
             {tile}
         </PersonMenu>

@@ -371,6 +371,8 @@
         "expandTheCallToThe": "Expand the call to the whole column",
         "stopRecording": "Stop recording",
         "recordThisCall": "Record this call",
+        "moreForThisCall": "More for this call",
+        "recShort": "REC",
         "writeThisCallToA": "Write this call to a video file in this browser",
         "addPeople": "Add people",
         "shareALinkToThis": "Share a link to this call",
