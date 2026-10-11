@@ -196,3 +196,16 @@ export function usePresence(id: string | null | undefined): PresenceOf | null {
     if (!id || !store) return null;
     return store.people.get(id) ?? null;
 }
+
+const NOBODY: ReadonlyMap<string, PresenceOf> = new Map();
+
+/**
+ * Everybody the store has an answer for, as it stands.
+ *
+ * For a list that has to sort people by presence, which needs the answer for
+ * rows that are not drawn - those come from the list's own snapshot - and the
+ * fresher one for the rows that are. Asks about nobody: only a drawn face does.
+ */
+export function useKnownPresence(): ReadonlyMap<string, PresenceOf> {
+    return useContext(Context)?.people ?? NOBODY;
+}

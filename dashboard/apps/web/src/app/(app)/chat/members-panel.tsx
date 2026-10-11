@@ -14,10 +14,13 @@
  * have a membership row. Anything narrower would be a lie: everybody in the
  * space can read that channel.
  *
- * Ordered by standing and then by name - the owner, the administrators, then
- * everybody else - because that ordering answers the second question people
- * come here with, which is who to ask. Presence rides on the avatar the same way
- * it does everywhere else in Polaris, so a room also says who is around.
+ * In a space it is split into who is around and who is not, each by name - see
+ * `roster-groups`. A group keeps the order by standing, the owner first: it is a
+ * handful of people and the question there is whose group it is. Presence rides
+ * on the avatar the same way it does everywhere else in Polaris.
+ *
+ * Only the rows on screen are drawn, so a space of thousands costs what a space
+ * of thirty does once it is loaded.
  *
  * Pressing somebody opens a direct message with them, because that is what
  * clicking a person's name in a room is for.
@@ -27,20 +30,22 @@ import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Crown, Users, X } from "lucide-react";
 import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
 import { NicknameDialog } from "./nickname-dialog";
 import { nameplateCss } from "@/lib/profile-style-css";
-import { usePresence } from "@/components/presence-store";
+import { useKnownPresence, usePresence } from "@/components/presence-store";
 import { presenceLine } from "@/components/activity-card";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
+import { rosterItems, type ChatRosterMember, type RosterItem } from "@/lib/chat/roster-groups";
 import { useChatPane } from "./use-chat-pane";
 import { resetPaneLayout } from "./pane-preferences";
 import { PersonName, platedRow, usePersonNameplate } from "@/components/person-name";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
     Dialog,
     DialogContent,
@@ -66,9 +71,10 @@ const MEMBERS_PANE = { min: 208, max: 420, fallback: 240 };
  *  preference about a screen, not a fact about an account. */
 const REMEMBERED = "polaris.chat.members";
 
-/** Where a role sorts. Lower comes first; anything unrecognised sorts last
- *  rather than crashing the list. */
-const RANK: Record<string, number> = { owner: 0, admin: 1, member: 2 };
+/** What a row is assumed to take before it has been measured: a face and a
+ *  name, and a heading somewhat less. Measured for real once drawn. */
+const ROW_GUESS = 40;
+const HEADING_GUESS = 32;
 
 /** The caption beside a name. Members get none: a list where every second line
  *  says "member" is a list nobody reads. Neither does the owner - a crown sits
@@ -77,7 +83,7 @@ const RANK: Record<string, number> = { owner: 0, admin: 1, member: 2 };
 const ROLE_WORDS: Record<string, string> = { admin: "Admin" };
 
 interface Roster {
-    readonly members: readonly ChatMemberView[];
+    readonly members: readonly ChatRosterMember[];
     readonly loading: boolean;
 }
 
@@ -125,11 +131,11 @@ export function useMembersPanel(): {
  *   somebody clicks through, to draw a column that is not there.
  */
 function useRoster(channelId: string, ownerId: string | null, showing: boolean): Roster {
-    const [members, setMembers] = useState<readonly ChatMemberView[] | null>(null);
+    const [members, setMembers] = useState<readonly ChatRosterMember[] | null>(null);
 
     const load = useCallback(async () => {
         if (!showing) return;
-        const result = await actions.listMembersAction(channelId);
+        const result = await actions.listRosterAction(channelId);
         setMembers(result.members ?? []);
     }, [channelId, showing]);
 
@@ -149,22 +155,19 @@ function useRoster(channelId: string, ownerId: string | null, showing: boolean):
         )
     );
 
-    const sorted = useMemo(() => {
-        const rows = (members ?? []).map((member) =>
-            // A group has no roles of its own - the one thing there is to say
-            // about somebody in one is whether the group is theirs.
-            member.userId === ownerId && member.role === "member"
-                ? { ...member, role: "owner" }
-                : member
-        );
-        return rows.sort(
-            (left, right) =>
-                (RANK[left.role] ?? 9) - (RANK[right.role] ?? 9) ||
-                left.name.localeCompare(right.name)
-        );
-    }, [members, ownerId]);
+    const owned = useMemo(
+        () =>
+            (members ?? []).map((member) =>
+                // A group has no roles of its own - the one thing there is to say
+                // about somebody in one is whether the group is theirs.
+                member.userId === ownerId && member.role === "member"
+                    ? { ...member, role: "owner" }
+                    : member
+            ),
+        [members, ownerId]
+    );
 
-    return { members: sorted, loading: members === null };
+    return { members: owned, loading: members === null };
 }
 
 function MemberRows({
@@ -173,9 +176,10 @@ function MemberRows({
     viewerId,
     channel,
     onMention,
-    onChanged
+    onChanged,
+    className
 }: {
-    members: readonly ChatMemberView[];
+    members: readonly ChatRosterMember[];
     loading: boolean;
     viewerId: string;
     /** The room being looked at, which is what decides who may do what to whom -
@@ -183,17 +187,36 @@ function MemberRows({
     channel: ChatChannelView;
     onMention: (text: string) => void;
     onChanged: () => void;
+    /** The scrolling box's own shape, which differs between the column and the
+     *  dialog. */
+    className: string;
 }) {
+    const t = useTranslations("chat");
     const [error, setError] = useState("");
     const direct = useOpenDirect(setError);
     /** Whose nickname is being changed. Held here rather than in the menu: the
      *  menu is unmounted the moment an item is chosen, and a dialog opened by
      *  something that is about to disappear never appears. */
     const [naming, setNaming] = useState<MenuPerson | null>(null);
+    // The fresher answer for whoever is drawn; the snapshot the list came with
+    // for everybody else.
+    const known = useKnownPresence();
+    const items = useMemo(
+        () => rosterItems(members, known, channel.spaceId !== null),
+        [members, known, channel.spaceId]
+    );
+    const scroller = useRef<HTMLDivElement>(null);
+    const rows = useVirtualizer({
+        count: items.length,
+        getScrollElement: () => scroller.current,
+        estimateSize: (index) => (items[index]?.kind === "heading" ? HEADING_GUESS : ROW_GUESS),
+        getItemKey: (index) => items[index]?.key ?? index,
+        overscan: 8
+    });
 
     if (loading) {
         return (
-            <div className="flex flex-col gap-2 p-3" aria-hidden="true">
+            <div className={cn("flex flex-col gap-2 p-3", className)} aria-hidden="true">
                 {[0, 1, 2, 3].map((row) => (
                     <div key={row} className="flex items-center gap-2">
                         <Skeleton className="size-7 rounded-full" />
@@ -214,23 +237,44 @@ function MemberRows({
                     {error}
                 </p>
             )}
-            <ul className="flex flex-col gap-0.5 p-2">
-                {members.map((member) => (
-                    <MemberRow
-                        key={member.userId}
-                        member={member}
-                        you={member.userId === viewerId}
-                        channel={channel}
-                        viewerId={viewerId}
-                        busy={direct.busy}
-                        onOpen={() => void direct.open(member.userId)}
-                        onMention={onMention}
-                        onNickname={setNaming}
-                        onChanged={onChanged}
-                        onError={setError}
-                    />
-                ))}
-            </ul>
+            <div ref={scroller} className={cn("overscroll-contain", className)}>
+                <ul className="relative m-2" style={{ height: rows.getTotalSize() }}>
+                    {rows.getVirtualItems().map((row) => {
+                        const item = items[row.index] as RosterItem;
+                        return (
+                            <li
+                                key={row.key}
+                                data-index={row.index}
+                                ref={rows.measureElement}
+                                className="absolute inset-x-0 top-0 pb-0.5"
+                                style={{ transform: `translateY(${row.start}px)` }}
+                            >
+                                {item.kind === "heading" ? (
+                                    <h3 className="truncate px-2 pb-1 pt-3 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                                        {item.section === "online"
+                                            ? t("members.onlineCount", { count: item.count })
+                                            : t("members.offlineCount", { count: item.count })}
+                                    </h3>
+                                ) : (
+                                    <MemberRow
+                                        member={item.member}
+                                        away={item.away}
+                                        you={item.member.userId === viewerId}
+                                        channel={channel}
+                                        viewerId={viewerId}
+                                        busy={direct.busy}
+                                        onOpen={() => void direct.open(item.member.userId)}
+                                        onMention={onMention}
+                                        onNickname={setNaming}
+                                        onChanged={onChanged}
+                                        onError={setError}
+                                    />
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
 
             <NicknameDialog
                 open={naming !== null}
@@ -251,6 +295,7 @@ function MemberRows({
  */
 function MemberRow({
     member,
+    away,
     you,
     channel,
     viewerId,
@@ -262,6 +307,9 @@ function MemberRow({
     onError
 }: {
     member: ChatMemberView;
+    /** Not around, in a list split by presence: drawn faint, below the people
+     *  who could answer now. */
+    away: boolean;
     you: boolean;
     channel: ChatChannelView;
     viewerId: string;
@@ -291,83 +339,78 @@ function MemberRow({
     // card is where messaging them is.
     const press = usePersonPress();
     return (
-        <li key={member.userId}>
-            <MemberMenu
-                member={member}
-                channel={channel}
-                viewerId={viewerId}
-                onMention={onMention}
-                onNickname={onNickname}
-                onChanged={onChanged}
-                onError={onError}
+        <MemberMenu
+            member={member}
+            channel={channel}
+            viewerId={viewerId}
+            onMention={onMention}
+            onNickname={onNickname}
+            onChanged={onChanged}
+            onError={onError}
+        >
+            <button
+                type="button"
+                disabled={press ? false : you || busy}
+                title={
+                    press
+                        ? t("messageList.viewProfile", { name: member.name })
+                        : you
+                          ? member.name
+                          : t("messageList.messageNamed", { name: member.name })
+                }
+                onClick={(event) =>
+                    press
+                        ? press({ id: member.userId, name: member.name }, event.currentTarget)
+                        : onOpen()
+                }
+                className={cn(
+                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
+                    you && !press ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
+                    away && "opacity-50 hover:opacity-100 focus-visible:opacity-100",
+                    // A plate replaces the row's own hover tint
+                    // rather than being tinted by it.
+                    plate && platedRow(plate, "hover:bg-transparent")
+                )}
+                // The plate somebody chose, drawn behind their
+                // whole row - which is where a nameplate goes,
+                // and the only place in a list narrow enough for
+                // a pill around a name to look like a mistake.
+                style={plate ? nameplateCss(plate) : undefined}
             >
-                <button
-                    type="button"
-                    disabled={press ? false : you || busy}
-                    title={
-                        press
-                            ? t("messageList.viewProfile", { name: member.name })
-                            : you
-                              ? member.name
-                              : t("messageList.messageNamed", { name: member.name })
-                    }
-                    onClick={(event) =>
-                        press
-                            ? press({ id: member.userId, name: member.name }, event.currentTarget)
-                            : onOpen()
-                    }
-                    className={cn(
-                        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                        you && !press
-                            ? "cursor-default"
-                            : "hover:bg-card-hover disabled:opacity-70",
-                        // A plate replaces the row's own hover tint
-                        // rather than being tinted by it.
-                        plate && platedRow(plate, "hover:bg-transparent")
-                    )}
-                    // The plate somebody chose, drawn behind their
-                    // whole row - which is where a nameplate goes,
-                    // and the only place in a list narrow enough for
-                    // a pill around a name to look like a mistake.
-                    style={plate ? nameplateCss(plate) : undefined}
-                >
-                    <Avatar decorated person={{ id: member.userId, name: member.name }} size={28} />
-                    <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-1">
-                            <PersonName
-                                id={member.userId}
-                                name={member.name}
-                                className="truncate text-sm"
-                            >
-                                {you && (
-                                    <span
-                                        className={plate ? "opacity-80" : "text-muted-foreground"}
-                                    >
-                                        {" "}
-                                        {t("members.you")}
-                                    </span>
-                                )}
-                            </PersonName>
-                            {member.role === "owner" && (
-                                <Crown
-                                    role="img"
-                                    aria-label={t("members.owner")}
-                                    className="size-3.5 text-warning"
-                                />
+                <Avatar decorated person={{ id: member.userId, name: member.name }} size={28} />
+                <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1">
+                        <PersonName
+                            id={member.userId}
+                            name={member.name}
+                            className="truncate text-sm"
+                        >
+                            {you && (
+                                <span className={plate ? "opacity-80" : "text-muted-foreground"}>
+                                    {" "}
+                                    {t("members.you")}
+                                </span>
                             )}
-                        </span>
-                        {under && (
-                            <span
-                                className="block truncate text-[0.6875rem] text-muted-foreground"
-                                title={under}
-                            >
-                                {under}
-                            </span>
+                        </PersonName>
+                        {member.role === "owner" && (
+                            <Crown
+                                role="img"
+                                aria-label={t("members.owner")}
+                                className="size-3.5 text-warning"
+                            />
                         )}
                     </span>
-                </button>
-            </MemberMenu>
-        </li>
+                    {under && (
+                        <span
+                            className="block truncate text-[0.6875rem] text-muted-foreground"
+                            title={under}
+                        >
+                            {under}
+                        </span>
+                    )}
+                </span>
+            </button>
+        </MemberMenu>
     );
 }
 
@@ -416,16 +459,15 @@ export function ChannelMembers({
                             {heading}
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
-                        <MemberRows
-                            members={members}
-                            loading={loading}
-                            viewerId={viewerId}
-                            channel={channel}
-                            onMention={onMention}
-                            onChanged={refresh}
-                        />
-                    </div>
+                    <MemberRows
+                        className="h-[60vh] overflow-y-auto"
+                        members={members}
+                        loading={loading}
+                        viewerId={viewerId}
+                        channel={channel}
+                        onMention={onMention}
+                        onChanged={refresh}
+                    />
                 </DialogContent>
             </Dialog>
         );
@@ -465,16 +507,15 @@ export function ChannelMembers({
                         <X className="size-4" />
                     </button>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                    <MemberRows
-                        members={members}
-                        loading={loading}
-                        viewerId={viewerId}
-                        channel={channel}
-                        onMention={onMention}
-                        onChanged={refresh}
-                    />
-                </div>
+                <MemberRows
+                    className="min-h-0 flex-1 overflow-y-auto"
+                    members={members}
+                    loading={loading}
+                    viewerId={viewerId}
+                    channel={channel}
+                    onMention={onMention}
+                    onChanged={refresh}
+                />
             </aside>
         </>
     );

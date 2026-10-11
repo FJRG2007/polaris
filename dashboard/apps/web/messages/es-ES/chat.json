@@ -1474,6 +1474,8 @@
         "hideTheMembers": "Ocultar miembros",
         "heading": "Miembros",
         "headingCount": "Miembros - {count}",
+        "onlineCount": "En línea - {count}",
+        "offlineCount": "Desconectados - {count}",
         "you": "(tú)"
     },
     "typing": {

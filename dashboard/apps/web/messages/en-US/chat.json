@@ -1474,6 +1474,8 @@
         "hideTheMembers": "Hide the members",
         "heading": "Members",
         "headingCount": "Members - {count}",
+        "onlineCount": "Online - {count}",
+        "offlineCount": "Offline - {count}",
         "you": "(you)"
     },
     "typing": {
