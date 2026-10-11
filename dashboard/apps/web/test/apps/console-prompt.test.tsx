@@ -155,8 +155,10 @@ describe("running one", () => {
         await user.click(screen.getByRole("button", { name: "Player" }));
         const search = await screen.findByPlaceholderText("Search players");
         await user.type(search, "al");
+        // Who is on comes first; what was typed stays offered for somebody who is not.
         expect(screen.getAllByRole("menuitem").map((option) => option.textContent)).toEqual([
-            "Alex"
+            "Alex",
+            'Use "al"'
         ]);
         await user.click(screen.getByRole("menuitem", { name: "Alex" }));
         fireEvent.click(screen.getByRole("button", { name: "Run" }));
