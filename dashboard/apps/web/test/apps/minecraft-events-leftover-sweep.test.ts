@@ -196,6 +196,28 @@ describe("a stage left over at the end", () => {
         for (const key of OUTSIDE) expect(after.has(key)).toBe(true);
     });
 
+    it("waits to sweep while a newer run holds a column of the proved volume", async () => {
+        const live = [{ x1: 19, z1: 19, x2: 40, z2: 40 }];
+        const { server, blocks, lines } = world(seeded());
+        const kept = await settle(
+            server,
+            leftover(volume),
+            { items: "components", top: 319 },
+            "en-US",
+            live
+        );
+        expect(kept).toMatchObject({ boxes: [], proved: volume, area: stage.areaOf(volume) });
+        expect(blocks.get("14,101,14")).toBe(FOREIGN);
+        expect(lines.some((line) => / fill (-?\d+ ){6}minecraft:air$/.test(line))).toBe(false);
+        expect(lines.some((line) => /@e\[type=minecraft:item,x=/.test(line))).toBe(false);
+        const { server: after, blocks: swept } = world(Object.fromEntries(blocks));
+        const apart = [{ x1: 20, z1: 0, x2: 40, z2: 40 }];
+        expect(
+            await settle(after, kept!, { items: "components", top: 319 }, "en-US", apart)
+        ).toBeNull();
+        expect(swept.get("14,101,14")).toBeUndefined();
+    });
+
     it("carries the proof from the run to its leftover, and an old run's as none", () => {
         const proved = { ...stage.EMPTY_STAGE, boxes: [floor], proved: volume };
         expect(stage.leftoverOf("run-1", proved)?.proved).toEqual(volume);
@@ -235,6 +257,17 @@ describe("an arena taken down", () => {
         expect(blocks.get("14,101,14")).toBeUndefined();
         expect(blocks.get("15,109,19")).toBeUndefined();
         for (const key of OUTSIDE) expect(blocks.has(key)).toBe(true);
+    });
+
+    it("keeps a proved arena standing while a newer run holds a column of its box", async () => {
+        const { server, blocks, lines } = world(seeded());
+        const kept = await closeArena(server, left(true), null, [{ x1: 0, z1: 0, x2: 10, z2: 10 }]);
+        expect(kept).toMatchObject({ id: "run-arena", entrants: [] });
+        expect(blocks.get("14,101,14")).toBe(FOREIGN);
+        expect(blocks.get("10,100,10")).toBe(floor.block);
+        expect(lines.some((line) => / fill (-?\d+ ){6}minecraft:air/.test(line))).toBe(false);
+        expect(await closeArena(server, kept!, null, [])).toBeNull();
+        expect(blocks.get("14,101,14")).toBeUndefined();
     });
 
     it("never sweeps an arena with no proof written down", async () => {

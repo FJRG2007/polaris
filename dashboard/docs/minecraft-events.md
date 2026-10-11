@@ -1787,7 +1787,11 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   leftover with none (from before this, or a probe that failed) keeps the
   per-block removal alone; never past the volume's own corners, and never
   with `destroy`. A slice that does not answer keeps the proof and the area
-  held, and is swept again on a later sweep. A treasure hunt's chests and the
+  held, and is swept again on a later sweep - but never while a newer run
+  holds a column it shares (`stage.sweepHeld`): site search does not steer
+  clear of a volume still to be swept, so a later event can stand in it, and
+  a plain `fill air` there would take that event's blocks and items with it.
+  The sweep waits for that run to end. A treasure hunt's chests and the
   hill on the world's own ground stand on ground, not proved air, and keep the
   per-block removal.
 - **Players arrive and leave an arena one by one, seconds apart.** Each

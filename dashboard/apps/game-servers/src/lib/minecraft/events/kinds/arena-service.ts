@@ -1353,7 +1353,8 @@ function releases(left: stored.ArenaLeftover): string[] {
 export async function closeArena(
     server: ServerContainer,
     left: stored.ArenaLeftover,
-    language: speech.Speech | null = null
+    language: speech.Speech | null = null,
+    live: readonly stage.Area[] = []
 ): Promise<stored.ArenaLeftover | null> {
     memories.delete(left.id);
     arrival.forget(left.id);
@@ -1498,6 +1499,8 @@ export async function closeArena(
             return { ...left, entrants: remaining, gamerules: {} };
         }
         if (left.arena) {
+            if (left.arena.proved && stage.sweepHeld(left.arena.proved, live))
+                return { ...left, entrants: [], gamerules: {} };
             // A batch still building it would put blocks back after the teardown.
             if (left.arena.batch) await inServer.cancelBatch(server, left.arena.batch);
             await server.sayAll([

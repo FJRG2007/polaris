@@ -5107,9 +5107,11 @@ async function settleArenaLeftovers(
     const settled = new Map<string, stored.ArenaLeftover | null>();
     await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return;
+        const run = stored.readEventState((await readRow(installedAppId))?.config ?? {}).run;
         for (const one of leftovers) {
             const spared = chunks.sparing(server, () => chunks.heldBefore(one));
-            settled.set(one.id, await arenaService.closeArena(spared, one, language));
+            const live = run && run.id !== one.id ? liveColumns(run) : [];
+            settled.set(one.id, await arenaService.closeArena(spared, one, language, live));
         }
     }).catch((error: unknown) =>
         console.warn("polaris: settling an event's arena failed", installedAppId, String(error))
@@ -5739,6 +5741,32 @@ async function sweepOne(
     }
 }
 
+/**
+ * The columns a live run holds or is putting something up in: its place and
+ * the column it is trying, its stage, the site and box of its arena. A
+ * leftover's proved volume over any of them is not swept until it ends
+ * (`stage.sweepHeld`).
+ */
+function liveColumns(run: stored.EventRun | null): stage.Area[] {
+    if (!run) return [];
+    const column = (at: { x: number; z: number }): stage.Area => ({
+        x1: Math.floor(at.x),
+        z1: Math.floor(at.z),
+        x2: Math.floor(at.x),
+        z2: Math.floor(at.z)
+    });
+    return [
+        ...(run.place ? [column(run.place)] : []),
+        ...(run.target ? [column(run.target)] : []),
+        ...(run.stage?.origin ? [column(run.stage.origin)] : []),
+        ...(run.stage?.area ? [run.stage.area] : []),
+        ...(run.stage?.proved ? [stage.areaOf(run.stage.proved)] : []),
+        ...(run.stage?.boxes ?? []).map(stage.areaOf),
+        ...(run.site ? [stage.areaOf(run.site)] : []),
+        ...(run.arena ? [stage.areaOf(run.arena.box)] : [])
+    ];
+}
+
 /** Every arena left from an event that is over, settled as far as it can be now. */
 async function settleStageLeftovers(
     ownerId: string,
@@ -5751,10 +5779,11 @@ async function settleStageLeftovers(
         const due = current.stageLeftovers.filter((one) => one.runId !== current.run?.id);
         if (due.length === 0) return null;
         const flavour = await stageFlavour(server);
+        const live = liveColumns(current.run);
         const after = new Map<string, stage.Leftover | null>();
         for (const one of due) {
             const spared = chunks.sparing(server, () => chunks.heldBefore(one));
-            after.set(one.runId, await stageService.settle(spared, one, flavour, language));
+            after.set(one.runId, await stageService.settle(spared, one, flavour, language, live));
         }
         return after;
     });

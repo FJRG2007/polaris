@@ -2454,7 +2454,8 @@ export async function settle(
     server: ServerContainer,
     leftover: stage.Leftover,
     flavour: stage.Flavour,
-    language: speech.Speech
+    language: speech.Speech,
+    live: readonly stage.Area[] = []
 ): Promise<stage.Leftover | null> {
     let saved = leftover.saved;
     if (saved.length > 0) {
@@ -2531,7 +2532,7 @@ export async function settle(
     // nothing past it. A run with no proof written down keeps the per-box
     // removal alone. A slice that did not answer leaves it to sweep again.
     let proved = leftover.proved;
-    if (boxes.length === 0 && proved) {
+    if (boxes.length === 0 && proved && !stage.sweepHeld(proved, live)) {
         const said = await pace.answered(
             server,
             [...(area ? [stage.holdArea(area)] : []), ...stage.sweepFills(proved)],

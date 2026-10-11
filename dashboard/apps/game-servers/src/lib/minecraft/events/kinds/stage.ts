@@ -368,6 +368,25 @@ export function sweepLines(volume: Volume): string[] {
     return [...sweepFills(volume), dropsGone(volume)];
 }
 
+/**
+ * Whether a proved volume shares a column with anything a live run holds: its
+ * sweep waits for that run to end, since site search never steers clear of a
+ * volume still to be swept and a plain `fill air` would take the live run's
+ * blocks with it.
+ */
+export function sweepHeld(volume: Volume, live: readonly Area[]): boolean {
+    const own = areaOf(volume);
+    return live.some((other) => {
+        const columns = areaOf({ ...other, y1: 0, y2: 0 });
+        return (
+            own.x1 <= columns.x2 &&
+            columns.x1 <= own.x2 &&
+            own.z1 <= columns.z2 &&
+            columns.z1 <= own.z2
+        );
+    });
+}
+
 function yRange(volume: Volume): { y1: number; y2: number } {
     return { y1: Math.min(volume.y1, volume.y2), y2: Math.max(volume.y1, volume.y2) };
 }
