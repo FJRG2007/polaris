@@ -2892,6 +2892,7 @@
         "paused": "Paused while an event runs. They come back when it ends.",
         "blocked": "Seasonal decorations are turned off for the whole of Polaris in Admin settings.",
         "needsRestart": "This server needs a restart to load the decorations.",
+        "unavailable": "This server has no Polaris plugin or mod to show them.",
         "notSaved": "That could not be saved. Try again."
     }
 }

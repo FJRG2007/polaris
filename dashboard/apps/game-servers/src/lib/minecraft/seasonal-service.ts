@@ -16,18 +16,32 @@ import { host } from "@polaris/app-host";
 import { readSchedule } from "./schedule";
 import { readEventState } from "./events/state";
 import { withServerContainer } from "./service";
-import { capabilities } from "./events/in-server";
+import { capsReading, forgetCapabilities } from "./events/in-server";
 import { readEventsConfig } from "./events/catalog";
 
 const { readInstallConfig, patchInstallConfig } = host.appsInstallConfig;
 const { seasonsAllowed } = host.seasonalService;
 
-/** How long a server whose jar cannot decorate is left before it is asked again:
- *  an older jar answers the same until the server restarts on a newer one. */
+/** How long a server that cannot decorate is left before it is asked again: an
+ *  older jar, or no Polaris at all, answers the same until the server restarts. */
 const NO_JAR_RETRY_MS = 30 * 60_000;
 
-/** Per server, the last line it took, or when it was found without the jar. */
-const told = new Map<string, { readonly line: string } | { readonly noJarAt: number }>();
+/** Servers told at once on a sweep: each is a console trip or two. */
+const SWEEP_CONCURRENCY = 8;
+
+/** Per server, the last line it took, or when its Polaris jar was found too old
+ *  to decorate, or when it answered with no Polaris jar at all. */
+const told = new Map<
+    string,
+    { readonly line: string } | { readonly oldJarAt: number } | { readonly noJarAt: number }
+>();
+
+/** When a server was found unable to decorate, if it was. */
+function cannotSince(last: ReturnType<typeof told.get>): number | null {
+    if (last && "oldJarAt" in last) return last.oldJarAt;
+    if (last && "noJarAt" in last) return last.noJarAt;
+    return null;
+}
 
 interface ServerRow {
     readonly id: string;
@@ -59,7 +73,8 @@ export function decorationOf(
 async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolean> {
     const line = seasonal.seasonCommand(decorationOf(readInstallConfig(row.config), allowed, now));
     const last = told.get(row.id);
-    if (last && "noJarAt" in last && now.getTime() - last.noJarAt < NO_JAR_RETRY_MS) return false;
+    const cannot = cannotSince(last);
+    if (cannot !== null && now.getTime() - cannot < NO_JAR_RETRY_MS) return false;
     if (last && "line" in last && last.line === line && line === seasonal.seasonCommand(null))
         return false;
     return withServerContainer(row.ownerId, row.id, async (server) => {
@@ -68,14 +83,29 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             told.set(row.id, { line: seasonal.seasonCommand(null) });
             return false;
         }
-        if (!(await capabilities(server)).has("season")) {
-            told.set(row.id, { noJarAt: now.getTime() });
+        const reading = await capsReading(server);
+        // Nobody answered, as a console that is still starting does: asked
+        // again on the next pass, not taken for a server without the jar.
+        if (reading.answer === "none") {
+            forgetCapabilities(row.id);
+            return false;
+        }
+        if (!reading.caps.has("season")) {
+            told.set(
+                row.id,
+                reading.answer === "polaris"
+                    ? { oldJarAt: now.getTime() }
+                    : { noJarAt: now.getTime() }
+            );
             return false;
         }
         await server.say([line]);
         told.set(row.id, { line });
         return true;
-    }).catch(() => false);
+    }).catch((caught: unknown) => {
+        console.error(`[minecraft-seasonal] could not tell ${row.id} the season:`, caught);
+        return false;
+    });
 }
 
 /** Every Minecraft server, told what to show. */
@@ -92,7 +122,14 @@ export async function sweepSeasons(now: Date = new Date()): Promise<{ told: numb
         seasonsAllowed().catch(() => true)
     ]);
     let count = 0;
-    for (const row of rows) if (await tell(row, allowed, now)) count += 1;
+    let next = 0;
+    const worker = async () => {
+        while (next < rows.length) {
+            const row = rows[next++]!;
+            if (await tell(row, allowed, now)) count += 1;
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(SWEEP_CONCURRENCY, rows.length) }, worker));
     return { told: count };
 }
 
@@ -110,6 +147,8 @@ export interface SeasonalView {
     /** The server's jar was found too old to decorate: it needs a restart to
      *  load the one Polaris keeps on it. */
     readonly needsRestart: boolean;
+    /** The server answered with no Polaris plugin or mod to draw them. */
+    readonly unavailable: boolean;
 }
 
 export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
@@ -126,7 +165,8 @@ export async function seasonalView(installedAppId: string): Promise<SeasonalView
         season: seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config))),
         blocked: !allowed,
         paused: readEventState(config).run !== null,
-        needsRestart: last !== undefined && "noJarAt" in last
+        needsRestart: last !== undefined && "oldJarAt" in last,
+        unavailable: last !== undefined && "noJarAt" in last
     };
 }
 

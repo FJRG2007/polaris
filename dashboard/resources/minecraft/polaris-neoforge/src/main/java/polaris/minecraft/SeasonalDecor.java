@@ -27,6 +27,7 @@ import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.SnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -43,7 +44,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * world: nothing reaches a region file, and a chunk the game loads again shows
  * the world as it is. Pumpkins take the place of a grass block in the ground (the
  * same full block underfoot, so nobody walks into one); cobwebs hang under the
- * leaves of a natural tree, at least three blocks clear of the ground; in winter
+ * leaves of a natural tree, at least three blocks clear of the ground, and a
+ * player's game loses one before they can reach it ({@link #websNear}); in winter
  * a thin layer of snow, which nothing collides with, lies on some grass and snow
  * falls around a player standing under the open sky. Only on ground whose every
  * neighbour is natural - a block anybody placed nearby, a path, a fence, keeps
@@ -92,6 +94,10 @@ final class SeasonalDecor {
     private static final int AVOID_PAD = 16;
     private static final int AVOID_KEPT = 64;
     private static final long MAX_HOLD_SECONDS = 24 * 60 * 60;
+    /** How near a cobweb a player comes before their game loses it, in blocks, and
+     *  how much further each block they moved in the last tick takes that. */
+    private static final double WEB_REACH = 6;
+    private static final double WEB_REACH_PER_SPEED = 12;
 
     /** One block a player's game was told is something else, and what it really was. */
     private record Fake(BlockPos pos, BlockState real, BlockState shown) {}
@@ -99,6 +105,8 @@ final class SeasonalDecor {
     private static final class Seen {
         ResourceKey<Level> dimension;
         final Map<Long, List<Fake>> chunks = new HashMap<>();
+        /** Where the player was on the last tick, for how fast they move. */
+        Vec3 last;
     }
 
     private static Season season;
@@ -192,6 +200,7 @@ final class SeasonalDecor {
                 return;
             }
             ticks++;
+            if (season == Season.HALLOWEEN) websNear(server);
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(server, true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(server, false);
             if (ticks % PASS_TICKS == 0) pass(server, ticks % RESEND_TICKS == 0);
@@ -290,6 +299,43 @@ final class SeasonalDecor {
     /** The block as it really is now, which is what the player's game shows after. */
     private static void restore(ServerPlayer player, Fake fake) {
         player.connection.send(new ClientboundBlockUpdatePacket(player.serverLevel(), fake.pos()));
+    }
+
+    /**
+     * Take a cobweb down for a player about to reach it, on every tick. A web
+     * slows whoever is in it, and their game would move them as slowed while the
+     * server, which holds air there, would not. The faster they go the earlier it
+     * goes; it stays down until the chunk is decided again.
+     */
+    private static void websNear(MinecraftServer server) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            Seen one = seen.get(player.getUUID());
+            if (one == null || one.dimension != player.serverLevel().dimension()) continue;
+            Vec3 center = player.getBoundingBox().getCenter();
+            double speed = one.last == null ? 0 : center.distanceTo(one.last);
+            one.last = center;
+            double reach = WEB_REACH + speed * WEB_REACH_PER_SPEED;
+            double reachSq = reach * reach;
+            ChunkPos at = player.chunkPosition();
+            int span = 1 + (int) Math.ceil(reach / 16);
+            for (int dx = -span; dx <= span; dx++) {
+                for (int dz = -span; dz <= span; dz++) {
+                    long key = ChunkPos.asLong(at.x + dx, at.z + dz);
+                    List<Fake> fakes = one.chunks.get(key);
+                    if (fakes == null || fakes.isEmpty()) continue;
+                    List<Fake> kept = null;
+                    for (int i = 0; i < fakes.size(); i++) {
+                        Fake fake = fakes.get(i);
+                        boolean near = fake.shown().is(Blocks.COBWEB)
+                                && center.distanceToSqr(Vec3.atCenterOf(fake.pos())) <= reachSq;
+                        if (near && kept == null) kept = new ArrayList<>(fakes.subList(0, i));
+                        if (near) restore(player, fake);
+                        else if (kept != null) kept.add(fake);
+                    }
+                    if (kept != null) one.chunks.put(key, kept);
+                }
+            }
+        }
     }
 
     private static void particles(MinecraftServer server, boolean snow) {

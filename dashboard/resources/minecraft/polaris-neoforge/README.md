@@ -112,7 +112,9 @@ online player's state (`loaded`, `pending`, `declined`, `failed`).
 ## Seasonal decorations
 
 Around Halloween some grass in the ground shows as a pumpkin or a jack
-o'lantern and cobwebs hang under natural trees; in winter snow falls round
+o'lantern and cobwebs hang under natural trees, gone from a player's game
+before they can reach one (a web slows whoever is in it, and the server holds
+air there); in winter snow falls round
 players under the open sky and a thin layer lies on some grass. The dashboard
 decides the season from Polaris's own dates and the server's time zone, and
 says so with `polaris season set <halloween|winter> <seconds>` (repeated while

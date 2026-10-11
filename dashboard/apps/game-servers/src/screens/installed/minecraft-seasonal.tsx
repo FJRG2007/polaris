@@ -78,15 +78,17 @@ export function MinecraftSeasonal({
           ? t("seasonal.blocked")
           : !view.on
             ? t("seasonal.offHere")
-            : view.needsRestart
-              ? t("seasonal.needsRestart")
-              : view.paused && view.season
-                ? t("seasonal.paused")
-                : view.showing === "halloween"
-                  ? t("seasonal.showingHalloween")
-                  : view.showing === "winter"
-                    ? t("seasonal.showingWinter")
-                    : t("seasonal.waiting");
+            : view.unavailable
+              ? t("seasonal.unavailable")
+              : view.needsRestart
+                ? t("seasonal.needsRestart")
+                : view.paused && view.season
+                  ? t("seasonal.paused")
+                  : view.showing === "halloween"
+                    ? t("seasonal.showingHalloween")
+                    : view.showing === "winter"
+                      ? t("seasonal.showingWinter")
+                      : t("seasonal.waiting");
 
     return (
         <Card>

@@ -29,6 +29,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 /**
  * The season Polaris says it is, drawn on each player's screen and nowhere else -
@@ -43,7 +44,8 @@ import org.bukkit.scheduler.BukkitTask;
  * never set in the world: nothing reaches a region file, and a chunk the game
  * loads again shows the world as it is. Pumpkins take the place of a grass block
  * in the ground (the same full block underfoot), cobwebs hang under the leaves of
- * a natural tree at least three blocks clear of the ground, and in winter a thin
+ * a natural tree at least three blocks clear of the ground - and a player's game
+ * loses one before they can reach it ({@link #websNear}) - and in winter a thin
  * layer of snow, which nothing collides with, lies on some grass while snow falls
  * round a player under the open sky. Only on ground whose every neighbour is
  * natural, and only on leaves the game grew (a player's are persistent). While an
@@ -84,6 +86,10 @@ final class SeasonalDecor implements Listener {
     private static final int SNOW_TICKS = 5;
     private static final int ASH_TICKS = 40;
     private static final long MAX_HOLD_SECONDS = 24 * 60 * 60;
+    /** How near a cobweb a player comes before their game loses it, in blocks, and
+     *  how much further each block they moved in the last tick takes that. */
+    private static final double WEB_REACH = 6;
+    private static final double WEB_REACH_PER_SPEED = 12;
 
     /** One block a player's game was told is something else, and what it really was. */
     private record Fake(Location at, BlockData real, BlockData shown) {}
@@ -91,6 +97,8 @@ final class SeasonalDecor implements Listener {
     private static final class Seen {
         UUID world;
         final Map<Long, List<Fake>> chunks = new HashMap<>();
+        /** Where the player was on the last tick, for how fast they move. */
+        Vector last;
     }
 
     private final Plugin plugin;
@@ -167,6 +175,7 @@ final class SeasonalDecor implements Listener {
                 return;
             }
             ticks++;
+            if (season == Season.HALLOWEEN) websNear();
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(false);
             if (ticks % PASS_TICKS == 0) pass(ticks % RESEND_TICKS == 0);
@@ -257,6 +266,44 @@ final class SeasonalDecor implements Listener {
             }
         }
         seen.clear();
+    }
+
+    /**
+     * Take a cobweb down for a player about to reach it, on every tick. A web
+     * slows whoever is in it, and their game would move them as slowed while the
+     * server, which holds air there, would not. The faster they go the earlier it
+     * goes; it stays down until the chunk is decided again.
+     */
+    private void websNear() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            Seen one = seen.get(player.getUniqueId());
+            if (one == null || !player.getWorld().getUID().equals(one.world)) continue;
+            Vector center = player.getBoundingBox().getCenter();
+            double speed = one.last == null ? 0 : center.distance(one.last);
+            one.last = center;
+            double reach = WEB_REACH + speed * WEB_REACH_PER_SPEED;
+            double reachSq = reach * reach;
+            int atX = player.getLocation().getBlockX() >> 4;
+            int atZ = player.getLocation().getBlockZ() >> 4;
+            int span = 1 + (int) Math.ceil(reach / 16);
+            for (int dx = -span; dx <= span; dx++) {
+                for (int dz = -span; dz <= span; dz++) {
+                    long key = chunkKey(atX + dx, atZ + dz);
+                    List<Fake> fakes = one.chunks.get(key);
+                    if (fakes == null || fakes.isEmpty()) continue;
+                    List<Fake> kept = null;
+                    for (int i = 0; i < fakes.size(); i++) {
+                        Fake fake = fakes.get(i);
+                        boolean near = fake.shown().getMaterial() == Material.COBWEB
+                                && center.distanceSquared(fake.at().clone().add(0.5, 0.5, 0.5).toVector()) <= reachSq;
+                        if (near && kept == null) kept = new ArrayList<>(fakes.subList(0, i));
+                        if (near) player.sendBlockChange(fake.at(), fake.at().getBlock().getBlockData());
+                        else if (kept != null) kept.add(fake);
+                    }
+                    if (kept != null) one.chunks.put(key, kept);
+                }
+            }
+        }
     }
 
     private void particles(boolean snow) {

@@ -4,8 +4,9 @@
  * Pinned: in season a running server with the jar is told on every pass, so a
  * restart is caught; out of season it is told to clear once and then left
  * alone; the operator's switch and the server's own switch clear it; a server
- * whose jar cannot decorate is not asked again on every pass; and a stopped or
- * Bedrock server is never sent anything.
+ * whose jar cannot decorate is not asked again on every pass, and says whether a
+ * restart helps; a console that did not answer is asked again on the next pass;
+ * and a stopped or Bedrock server is never sent anything.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,15 +21,20 @@ let allowed = true;
 let running = true;
 let edition: "java" | "bedrock" = "java";
 let caps = new Set<string>(["season"]);
+/** Who answered `polaris caps`. */
+let answer: "polaris" | "other" | "none" = "polaris";
 /** Whether an event is running on the server; the stored run itself is the
  *  events' business and is stood in for here. */
 let eventRunning = false;
+/** The servers a sweep finds; one by default. */
+let rows: { id: string; ownerId: string; config: string }[] | null = null;
 const sent: string[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
-            findMany: async () => [{ id: INSTALL, ownerId: OWNER, config: JSON.stringify(config) }],
+            findMany: async () =>
+                rows ?? [{ id: INSTALL, ownerId: OWNER, config: JSON.stringify(config) }],
             findUnique: async () => ({
                 id: INSTALL,
                 ownerId: OWNER,
@@ -65,7 +71,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/in-server", () => ({
-    capabilities: async () => caps
+    capsReading: async () => ({ caps, answer }),
+    forgetCapabilities: () => undefined
 }));
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/state", () => ({
@@ -84,7 +91,9 @@ beforeEach(() => {
     running = true;
     edition = "java";
     caps = new Set(["season"]);
+    answer = "polaris";
     eventRunning = false;
+    rows = null;
     sent.length = 0;
 });
 
@@ -142,6 +151,55 @@ describe("the seasons sweep", () => {
         expect(sent).toEqual([]);
         await sweepSeasons(new Date(HALLOWEEN.getTime() + 31 * 60_000));
         expect(sent).toEqual(["polaris season set halloween 3600"]);
+    });
+
+    it("asks a console that did not answer again on the next pass", async () => {
+        const { sweepSeasons, seasonalView } = await service();
+        answer = "none";
+        caps = new Set();
+        await sweepSeasons(HALLOWEEN);
+        expect(await seasonalView(INSTALL)).toMatchObject({
+            needsRestart: false,
+            unavailable: false
+        });
+        answer = "polaris";
+        caps = new Set(["season"]);
+        await sweepSeasons(new Date(HALLOWEEN.getTime() + 2 * 60_000));
+        expect(sent).toEqual(["polaris season set halloween 3600"]);
+    });
+
+    it("says a restart helps only where an older Polaris jar answered", async () => {
+        const { sweepSeasons, seasonalView } = await service();
+        caps = new Set(["stash"]);
+        await sweepSeasons(HALLOWEEN);
+        expect(await seasonalView(INSTALL)).toMatchObject({
+            needsRestart: true,
+            unavailable: false
+        });
+    });
+
+    it("says a server with no Polaris jar cannot show them", async () => {
+        const { sweepSeasons, seasonalView } = await service();
+        answer = "other";
+        caps = new Set();
+        await sweepSeasons(HALLOWEEN);
+        expect(await seasonalView(INSTALL)).toMatchObject({
+            needsRestart: false,
+            unavailable: true
+        });
+        expect(sent).toEqual([]);
+    });
+
+    it("tells every server in a sweep", async () => {
+        const { sweepSeasons } = await service();
+        const many = Array.from({ length: 20 }, (_, index) => ({
+            id: `server-${index}`,
+            ownerId: OWNER,
+            config: JSON.stringify(config)
+        }));
+        rows = many;
+        expect(await sweepSeasons(HALLOWEEN)).toEqual({ told: 20 });
+        expect(sent).toHaveLength(20);
     });
 });
 

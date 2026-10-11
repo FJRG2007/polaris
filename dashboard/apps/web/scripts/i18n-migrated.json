@@ -1511,6 +1511,8 @@
         "game-servers/src/screens/installed/minecraft-client-mods.tsx",
         "game-servers/src/screens/installed/minecraft-join-password.tsx",
         "game-servers/src/screens/installed/minecraft-panel.tsx",
+        "game-servers/src/screens/installed/minecraft-seasonal.tsx",
+        "game-servers/src/screens/installed/seasonal-actions.ts",
         "game-servers/src/screens/installed/minecraft-sidebar.tsx",
         "game-servers/src/screens/installed/sidebar-line-editor.tsx",
         "game-servers/src/components/card-boundary.tsx",

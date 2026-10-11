@@ -51,37 +51,60 @@ export function replyObject(reply: string): Record<string, unknown> | null {
 
 /** What `polaris caps` says this server can do; nothing for any other answer. */
 export function parseCaps(reply: string): ReadonlySet<Capability> {
+    return readCaps(reply).caps;
+}
+
+/**
+ * What a server answered `polaris caps` with: what it can do, and who answered -
+ * a Polaris jar, something else (no jar, or one older than the command), or
+ * nobody (the console failed or said nothing, as one does while it starts).
+ */
+export interface CapsReading {
+    readonly caps: ReadonlySet<Capability>;
+    readonly answer: "polaris" | "other" | "none";
+}
+
+export function readCaps(reply: string): CapsReading {
+    if (stripFormatting(reply).trim() === "") return { caps: new Set(), answer: "none" };
     const parsed = capsSchema.safeParse(replyObject(reply));
-    if (!parsed.success) return new Set();
-    return new Set(
-        parsed.data.caps.filter((cap): cap is Capability =>
-            ["stash", "batch", "seek", "respawn", "guard", "season"].includes(cap)
-        )
-    );
+    if (!parsed.success) return { caps: new Set(), answer: "other" };
+    return {
+        caps: new Set(
+            parsed.data.caps.filter((cap): cap is Capability =>
+                ["stash", "batch", "seek", "respawn", "guard", "season"].includes(cap)
+            )
+        ),
+        answer: "polaris"
+    };
 }
 
 const CAPS_TTL_MS = 60_000;
 /** Per server, the answer - or the question still out, so players stashed at
  *  once share one ask rather than a trip each. */
-const known = new Map<
-    string,
-    { readonly at: number; readonly caps: Promise<ReadonlySet<Capability>> }
->();
+const known = new Map<string, { readonly at: number; readonly reading: Promise<CapsReading> }>();
+
+/** What this server answered `polaris caps` with, remembered for a minute. */
+export async function capsReading(
+    server: ServerContainer,
+    now: number = Date.now()
+): Promise<CapsReading> {
+    if (server.edition !== "java") return { caps: new Set(), answer: "other" };
+    const cached = known.get(server.installedAppId);
+    if (cached && now - cached.at < CAPS_TTL_MS) return cached.reading;
+    const reading = server
+        .say(["polaris caps"])
+        .catch(() => "")
+        .then(readCaps);
+    known.set(server.installedAppId, { at: now, reading });
+    return reading;
+}
 
 /** What this server's Polaris mod can do now; empty where it has none. */
 export async function capabilities(
     server: ServerContainer,
     now: number = Date.now()
 ): Promise<ReadonlySet<Capability>> {
-    if (server.edition !== "java") return new Set();
-    const cached = known.get(server.installedAppId);
-    if (cached && now - cached.at < CAPS_TTL_MS) return cached.caps;
-    const caps = server
-        .say(["polaris caps"])
-        .catch(() => "")
-        .then(parseCaps);
-    known.set(server.installedAppId, { at: now, caps });
-    return caps;
+    return (await capsReading(server, now)).caps;
 }
 
 /** Forget what a server could do: it is restarting, or answered as if it could not. */
