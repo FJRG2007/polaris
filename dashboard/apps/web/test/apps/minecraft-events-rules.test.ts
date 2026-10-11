@@ -222,8 +222,9 @@ describe("hide and seek's time to seek", () => {
         expect(catalog.playSeconds(fresh, 30)).toBe(90 + 9 * 60);
         // A size chosen by hand wins over the count.
         expect(catalog.playSeconds(seek({ house: "large" }), 2)).toBe(90 + 9 * 60);
-        // Before anybody joined, the smallest: what the screen and the draw plan for.
-        expect(catalog.runMinutes(fresh)).toBe(Math.ceil((90 + 5 * 60) / 60));
+        // Before anybody joined, the largest it may grow to: what the screen and the draw plan for.
+        expect(catalog.runMinutes(fresh)).toBe(Math.ceil((90 + 9 * 60) / 60));
+        expect(catalog.runMinutes(seek({ house: "small" }))).toBe(Math.ceil((90 + 5 * 60) / 60));
         // Set by hand: those minutes to seek, after the hiding.
         const set = seek({ seekMinutes: 12, hideSeconds: 60 });
         expect(catalog.playSeconds(set, 30)).toBe(60 + 12 * 60);

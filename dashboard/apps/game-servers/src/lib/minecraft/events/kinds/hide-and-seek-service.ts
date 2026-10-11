@@ -403,8 +403,8 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                             )
                           : seekMessages.hideBar(
                                 (releaseAt - now) / 1000,
-                                readyHere(state, here),
-                                hidersHere(state, here).length,
+                                readyHere(run, state, here),
+                                hidersHere(run, state, here).length,
                                 language
                             )) + boost
                     : state.released
@@ -442,15 +442,25 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     return hiders.length === 0 ? said.ALL_FOUND : null;
 }
 
-/** The hiders on the server, by their names as they joined. */
-function hidersHere(state: hs.SeekState, here: ReadonlyMap<string, unknown>): string[] {
-    return [...here.keys()].filter((name) => !hs.seeks(state, name));
+/** This run's hiders on the server, by their names as they joined. */
+function hidersHere(
+    run: stored.EventRun,
+    state: hs.SeekState,
+    here: ReadonlyMap<string, unknown>
+): string[] {
+    return run.entrants
+        .map((one) => one.name)
+        .filter((name) => !hs.seeks(state, name) && here.has(lower(name)));
 }
 
-/** How many hiders on the server are ready. */
-function readyHere(state: hs.SeekState, here: ReadonlyMap<string, unknown>): number {
+/** How many of this run's hiders on the server are ready. */
+function readyHere(
+    run: stored.EventRun,
+    state: hs.SeekState,
+    here: ReadonlyMap<string, unknown>
+): number {
     const ready = new Set(state.ready.map(lower));
-    return hidersHere(state, here).filter((name) => ready.has(lower(name))).length;
+    return hidersHere(run, state, here).filter((name) => ready.has(lower(name))).length;
 }
 
 /**

@@ -2149,7 +2149,8 @@ export function runMinutes(preset: EventPreset): number {
         const options = preset.options as EventOptions<"gathering">;
         return options.rounds * options.roundMinutes;
     }
-    if (preset.kind === "hide-and-seek") return Math.ceil(playSeconds(preset) / 60);
+    if (preset.kind === "hide-and-seek")
+        return Math.ceil(playSeconds(preset, Number.POSITIVE_INFINITY) / 60);
     return preset.minutes;
 }
 
