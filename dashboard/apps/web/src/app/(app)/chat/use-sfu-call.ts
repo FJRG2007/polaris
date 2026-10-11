@@ -79,6 +79,7 @@ import {
 import { useMicGain } from "./mic-gain";
 import { useVoiceSettings, voiceSettings } from "./voice-settings";
 import { playCallSound } from "@/lib/call-sounds";
+import * as arrivals from "./call-arrivals";
 import { shareSound } from "./call-share-sound";
 import { withCameraDevice } from "./camera-device";
 import { callMuted, setCallMuted } from "./call-muted";
@@ -129,6 +130,10 @@ const KEEPALIVE_MS = 10_000;
  *  devices in the room. Long enough for whoever caused the change to have
  *  finished joining, so they are playing their tone while everybody listens. */
 const LISTEN_AFTER_MS = 400;
+
+/** How long arrivals and departures are gathered into one toast. The chime is
+ *  not held for it. */
+const ARRIVAL_BATCH_MS = 600;
 
 /**
  * How many times in a row the seat may fail to be kept before this stops asking.
@@ -1406,6 +1411,65 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         playCallSound(name);
     }, []);
 
+    /**
+     * Somebody arrived, or somebody left.
+     *
+     * Sounded rather than only drawn: whoever is in a call is usually looking at
+     * something else, which is the whole reason to be on a call rather than in a
+     * document together. And drawn as well as sounded, because a chime says
+     * that somebody moved and not who.
+     *
+     * Two sources report it - the roster and the call server - and
+     * `call-arrivals` keeps them to one announcement each. The chime is played
+     * on the first change; the toast waits a moment so that several people
+     * walking in together read as one line rather than a stack of them.
+     */
+    const presence = useRef<arrivals.Presence | null>(null);
+    const batch = useRef<{
+        joined: string[];
+        left: string[];
+        timer: ReturnType<typeof setTimeout>;
+    } | null>(null);
+    const words = useRef(t);
+    words.current = t;
+    const announceChange = useCallback(
+        (change: arrivals.PresenceChange) => {
+            presence.current = change.state;
+            if (change.joined.length === 0 && change.left.length === 0) return;
+            if (batch.current) {
+                batch.current.joined.push(...change.joined);
+                batch.current.left.push(...change.left);
+                return;
+            }
+            sound(change.joined.length > 0 ? "join" : "leave");
+            const held = {
+                joined: [...change.joined],
+                left: [...change.left],
+                timer: setTimeout(() => {
+                    batch.current = null;
+                    const notice = arrivals.arrivalNotice(held.joined, held.left);
+                    if (!notice) return;
+                    toastRef.current.show({
+                        key: "call-arrivals",
+                        title: words.current(`callRoom.arrivals.${notice.key}`, {
+                            name: notice.name,
+                            others: notice.others
+                        })
+                    });
+                }, ARRIVAL_BATCH_MS)
+            };
+            batch.current = held;
+        },
+        [sound]
+    );
+    useEffect(
+        () => () => {
+            if (batch.current) clearTimeout(batch.current.timer);
+            batch.current = null;
+        },
+        []
+    );
+
     /** Open the devices, connect, publish, and take it all down again. */
     useEffect(() => {
         if (!meetingId) return;
@@ -1643,7 +1707,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 .on(RoomEvent.TrackUnmuted, onMuteChanged)
                 .on(RoomEvent.ParticipantAttributesChanged, () => resortStates())
                 .on(RoomEvent.DataReceived, onData)
-                .on(RoomEvent.ParticipantConnected, () => {
+                .on(RoomEvent.ParticipantConnected, (participant) => {
                     resort();
                     resortStates();
                     // Somebody left out of the rules receives nothing, so the
@@ -1665,10 +1729,23 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     // are in exactly the same race, and losing it is quieter but
                     // no less wrong.
                     announce();
+                    // A seat the call server dropped and took back.
+                    if (presence.current) {
+                        announceChange(
+                            arrivals.fromMediaJoined(presence.current, participant.identity)
+                        );
+                    }
                 })
-                .on(RoomEvent.ParticipantDisconnected, () => {
+                .on(RoomEvent.ParticipantDisconnected, (participant) => {
                     resort();
                     resortStates();
+                    // Gone now, which the roster only says once the seat is
+                    // swept - see `call-arrivals`.
+                    if (presence.current) {
+                        announceChange(
+                            arrivals.fromMediaLeft(presence.current, participant.identity)
+                        );
+                    }
                 })
                 .on(RoomEvent.ActiveSpeakersChanged, onSpeakers)
                 // A moderator's mute lifted reaches the media server's side of
@@ -3541,24 +3618,32 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     }, [listening, meetingId, rescan]);
 
     /**
-     * Somebody arrived, or somebody left.
+     * The roster's side of who arrived and who left - see `announceChange`.
      *
-     * Sounded rather than only drawn: whoever is in a call is usually looking at
-     * something else, which is the whole reason to be on a call rather than in a
-     * document together. The first roster is not announced - joining a call of
-     * four is not four people arriving.
+     * The first roster of a call is not announced - joining a call of four is
+     * not four people arriving - and neither is the room emptying around this
+     * browser when it is the one that left.
      */
-    const roster = useRef<readonly string[] | null>(null);
+    const rosterOf = useRef<string | null>(null);
     useEffect(() => {
-        const inside = (meeting?.participants ?? [])
-            .filter((person) => person.admission === "admitted")
-            .map((person) => person.id);
-        const before = roster.current;
-        roster.current = inside;
-        if (before === null) return;
-        if (inside.some((id) => !before.includes(id))) sound("join");
-        else if (before.some((id) => !inside.includes(id))) sound("leave");
-    }, [meeting, sound]);
+        const inside = new Map(
+            (meeting?.participants ?? [])
+                .filter((person) => person.admission === "admitted")
+                .map((person) => [person.id, person.name] as const)
+        );
+        const self = me.current;
+        if (!meeting || meeting.ended || (self !== null && !inside.has(self))) {
+            presence.current = null;
+            rosterOf.current = null;
+            return;
+        }
+        if (!presence.current || rosterOf.current !== meeting.id) {
+            presence.current = arrivals.startPresence(inside);
+            rosterOf.current = meeting.id;
+            return;
+        }
+        announceChange(arrivals.fromRoster(presence.current, inside, self));
+    }, [meeting, announceChange]);
 
     /**
      * Follow what a moderator has put on this seat, as the roster reports it.

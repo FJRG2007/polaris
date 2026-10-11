@@ -18,6 +18,10 @@
  *   ringing telephone in one window has hushed it in this browser, and the card
  *   is still there in all of them because they have not said no yet.
  *
+ * And one thing about a call that already stopped: **missed-cleared** - the
+ * missed call from a conversation was dealt with, by calling back, joining, or
+ * dismissing it, and no tab goes on showing it.
+ *
  * Messages arrive unvalidated - a tab still running a previous build of Polaris
  * is on this channel too - so they are parsed before they are believed.
  */
@@ -27,10 +31,16 @@ import { z } from "zod";
 /** The channel name. Scoped per account by the peer channel itself. */
 export const CALLS_CHANNEL = "chat.calls";
 
-export const callTabMessageSchema = z.object({
-    kind: z.enum(["settled", "silenced"]),
-    meetingId: z.string().min(1).max(100)
-});
+export const callTabMessageSchema = z.union([
+    z.object({
+        kind: z.enum(["settled", "silenced"]),
+        meetingId: z.string().min(1).max(100)
+    }),
+    z.object({
+        kind: z.literal("missed-cleared"),
+        channelId: z.string().min(1).max(100)
+    })
+]);
 
 /** One call, dealt with somewhere in this browser. */
 export type CallTabMessage = z.infer<typeof callTabMessageSchema>;

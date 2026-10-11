@@ -36,8 +36,14 @@ vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
     }
 }));
 
+/** What this tab told the others, and the way the others talk to it. */
+const posted: unknown[] = [];
+let fromPeer: ((message: unknown) => void) | null = null;
 vi.mock("@/lib/shared-stream", () => ({
-    openPeerChannel: () => ({ post: () => undefined, close: () => undefined })
+    openPeerChannel: (_name: string, _scope: string, onMessage: (message: unknown) => void) => {
+        fromPeer = onMessage;
+        return { post: (message: unknown) => void posted.push(message), close: () => undefined };
+    }
 }));
 
 vi.mock("@/lib/desktop-notify", () => ({
@@ -81,6 +87,8 @@ const gaveUp = (meetingId: string, channelId = "c1") => ({
 beforeEach(() => {
     onFrame = null;
     session = null;
+    fromPeer = null;
+    posted.length = 0;
 });
 
 afterEach(() => {
@@ -128,6 +136,66 @@ describe("a missed call while the reader is on the phone", () => {
         expect(screen.queryByText("Grace is calling")).toBeTruthy();
         await act(async () => onFrame?.(gaveUp("m9", "c2"), { owner: true }));
 
+        expect(screen.queryByText("Missed call")).toBeTruthy();
+    });
+});
+
+describe("a missed call that was answered somewhere else", () => {
+    /** A card for Grace's missed call, on screen. */
+    async function missedOne(): Promise<void> {
+        render(<IncomingCalls viewerId="ada" />, { wrapper: MessagesWrapper });
+        await act(async () => onFrame?.(ring("m1"), { owner: true }));
+        await act(async () => onFrame?.(gaveUp("m1"), { owner: true }));
+        expect(screen.queryByText("Missed call")).toBeTruthy();
+    }
+
+    it("goes when the reader calls back from another device", async () => {
+        await missedOne();
+        await act(async () =>
+            onFrame?.({ ...ring("m2"), userId: "ada", name: "Ada", count: 1 }, { owner: true })
+        );
+        expect(screen.queryByText("Missed call")).toBeNull();
+    });
+
+    it("goes when the reader joins a call there from another device", async () => {
+        await missedOne();
+        await act(async () =>
+            onFrame?.(
+                { ...ring("m2"), state: "moved", userId: "ada", name: "Ada", count: 2 },
+                { owner: true }
+            )
+        );
+        expect(screen.queryByText("Missed call")).toBeNull();
+    });
+
+    it("gives way to a later call ringing in the same conversation", async () => {
+        await missedOne();
+        await act(async () => onFrame?.(ring("m2"), { owner: true }));
+        expect(screen.queryByText("Missed call")).toBeNull();
+        expect(screen.queryByText("Grace is calling")).toBeTruthy();
+    });
+
+    it("goes when another tab dealt with it, and a dismissal here tells the others", async () => {
+        await missedOne();
+        await act(async () => fromPeer?.({ kind: "missed-cleared", channelId: "c1" }));
+        expect(screen.queryByText("Missed call")).toBeNull();
+
+        await act(async () => onFrame?.(ring("m3"), { owner: true }));
+        await act(async () => onFrame?.(gaveUp("m3"), { owner: true }));
+        expect(screen.queryByText("Missed call")).toBeTruthy();
+        await act(async () => screen.getByRole("button", { name: "Dismiss" }).click());
+        expect(screen.queryByText("Missed call")).toBeNull();
+        expect(posted).toContainEqual({ kind: "missed-cleared", channelId: "c1" });
+    });
+
+    it("keeps a missed call from another conversation", async () => {
+        await missedOne();
+        await act(async () =>
+            onFrame?.(
+                { ...ring("m2", "c2"), state: "moved", userId: "ada", name: "Ada", count: 2 },
+                { owner: true }
+            )
+        );
         expect(screen.queryByText("Missed call")).toBeTruthy();
     });
 });

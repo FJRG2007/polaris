@@ -162,13 +162,15 @@ describe("this browser's own half", () => {
         );
     });
 
-    it("names deafening rather than blaming the other end for it", () => {
+    it("leaves deafening to the headphones button rather than blaming the other end", () => {
         const deaf = working({
             deafened: true,
             others: [heard({ carrying: false, arriving: false })]
         });
         const report = diagnoseCall(deaf);
-        expect(report.headline).toContain("deafened yourself");
+        // No banner: the hint over the headphones button says it.
+        expect(report.ok).toBe(true);
+        expect(report.headline).toBe("");
         expect(row(deaf, "Sound here")).toBe("Deafened");
     });
 
@@ -476,7 +478,14 @@ describe("whether somebody's audio has carried a sound", () => {
     it("stays true through a long silence once they have been heard", () => {
         // Spoke once, then listened for a minute without muting.
         expect(
-            carriedSound({ before: true, energyBefore: 5, energyNow: 5, lastSpokeAt: undefined, at, within: 6_000 })
+            carriedSound({
+                before: true,
+                energyBefore: 5,
+                energyNow: 5,
+                lastSpokeAt: undefined,
+                at,
+                within: 6_000
+            })
         ).toBe(true);
     });
 
@@ -497,13 +506,27 @@ describe("whether somebody's audio has carried a sound", () => {
 
     it("counts sound measured here", () => {
         expect(
-            carriedSound({ before: false, energyBefore: 1, energyNow: 1.4, lastSpokeAt: undefined, at, within: 6_000 })
+            carriedSound({
+                before: false,
+                energyBefore: 1,
+                energyNow: 1.4,
+                lastSpokeAt: undefined,
+                at,
+                within: 6_000
+            })
         ).toBe(true);
     });
 
     it("is false only for audio that has never carried anything", () => {
         expect(
-            carriedSound({ before: false, energyBefore: 0, energyNow: 0, lastSpokeAt: undefined, at, within: 6_000 })
+            carriedSound({
+                before: false,
+                energyBefore: 0,
+                energyNow: 0,
+                lastSpokeAt: undefined,
+                at,
+                within: 6_000
+            })
         ).toBe(false);
         // A report from before they were being watched is not about this call.
         expect(

@@ -32,6 +32,8 @@ import { RecordingPanel } from "./recording-panel";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { rememberCall, takeRememberedCall } from "./call-resume";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
+import { ControlHint } from "./control-hint";
+import { useMutedSpeech } from "./muted-speech";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CallHoldContext, useCallHold, type CallHold, type CallSession } from "./call-hold";
 import { AlertTriangle, Hand, Headphones, HeadphoneOff, Mic, MicOff, PhoneOff } from "lucide-react";
@@ -213,8 +215,17 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
     // The room this bar is about, wherever it is drawn in full: a conversation
     // for a call, the meeting itself for a meeting. Either way the bar is a way
     // back to a place the reader is already standing in, so it stays away.
-    if (!session) return null;
-    if (session.channelId === onScreen || session.meetingId === onScreen) return null;
+    const shown =
+        session !== null && session.channelId !== onScreen && session.meetingId !== onScreen;
+    // Talking into a muted microphone, said here too: the bar is where somebody
+    // is while they look something up, and the room - which says it as well -
+    // is not drawn while the bar is. See `muted-speech`.
+    const talkingMuted = useMutedSpeech(
+        call.localStream?.getAudioTracks()[0] ?? null,
+        shown && !call.micOn && call.audioRole !== "companion"
+    );
+    const micButton = useRef<HTMLButtonElement>(null);
+    if (!session || !shown) return null;
 
     const others = (call.meeting?.participants ?? []).filter(
         (person) => person.admission === "admitted" && person.id !== call.participantId
@@ -311,7 +322,16 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                     </span>
                 )}
 
+                <ControlHint
+                    anchor={micButton}
+                    hint={
+                        talkingMuted
+                            ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
+                            : null
+                    }
+                />
                 <button
+                    ref={micButton}
                     type="button"
                     onClick={call.toggleMic}
                     aria-label={call.micOn ? t("callSession.mute") : t("callSession.unmute")}

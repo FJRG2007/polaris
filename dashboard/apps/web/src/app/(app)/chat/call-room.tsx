@@ -76,6 +76,8 @@ import { PersonMenu, StreamMenu, type SeatHosting } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
+import { ControlHint, type ControlHintText } from "./control-hint";
+import { useMutedSpeech } from "./muted-speech";
 import type { SeatModeration } from "./call-moderation-menu";
 import { callBareFaces, directLayout, type CallPlace } from "./call-band";
 import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
@@ -229,6 +231,19 @@ export function CallRoom({
     const deafenKey = useShortcutHint("chat.toggleDeafen");
     const withKey = (label: string) =>
         deafenKey ? ts("withKey", { action: label, keys: deafenKey }) : label;
+    // Said over the buttons rather than in a banner: the state is a word above
+    // the control that changes it, and talking into a muted microphone is the
+    // one moment it is worth more than a word - see `muted-speech`.
+    const muted = !call.micOn && call.audioRole !== "companion";
+    const talkingMuted = useMutedSpeech(call.localStream?.getAudioTracks()[0] ?? null, muted);
+    const micHint: ControlHintText | null = talkingMuted
+        ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
+        : muted
+          ? { text: t("callRoom.hints.muted"), tone: "state" }
+          : null;
+    const deafenHint: ControlHintText | null = call.deafened
+        ? { text: t("callRoom.hints.deafened"), tone: "state" }
+        : null;
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
     /** Whether this browser can share a screen. Asked after mounting, as the
@@ -1245,6 +1260,7 @@ export function CallRoom({
                             : undefined
                     }
                     icon={call.micOn ? <Mic className="size-4" /> : <MicOff className="size-4" />}
+                    hint={micHint}
                     variant={call.micOn ? "secondary" : "danger"}
                     pressed={!call.micOn}
                     onClick={call.toggleMic}
@@ -1347,6 +1363,7 @@ export function CallRoom({
                             <Headphones className="size-4" />
                         )
                     }
+                    hint={deafenHint}
                     variant={call.deafened ? "danger" : "secondary"}
                     pressed={call.deafened}
                     onClick={call.toggleDeafen}
@@ -1479,9 +1496,13 @@ function Split({
     backgroundProblem,
     look,
     onLook,
-    title
+    title,
+    hint
 }: {
     label: string;
+    /** A word drawn over the control while its state needs saying - "Muted",
+     *  "Deafened" - or a warning that has to be seen now. */
+    hint?: ControlHintText | null;
     /** What the tooltip says, where it is worth more words than the accessible
      *  name - deafening is the one that needs explaining. */
     title?: string;
@@ -1561,9 +1582,11 @@ function Split({
         onLook !== undefined ||
         onMirror !== undefined;
     const showing = ladder && level ? ladder.rungs[level] : null;
+    const anchor = useRef<HTMLSpanElement>(null);
 
     return (
-        <span className="flex items-center">
+        <span ref={anchor} className="flex items-center">
+            <ControlHint anchor={anchor} hint={hint ?? null} />
             {/* The icon alone. What it does is in the title and in the
                 accessible name, which is where a person who needs the words
                 looks and where a screen reader reads from - the shape is what

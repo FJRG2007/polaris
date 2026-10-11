@@ -120,7 +120,10 @@ export function carriedSound(reading: {
     readonly within: number;
 }): boolean {
     if (reading.before || reading.energyNow > reading.energyBefore) return true;
-    return reading.lastSpokeAt instanceof Date && reading.lastSpokeAt.getTime() >= reading.at - reading.within;
+    return (
+        reading.lastSpokeAt instanceof Date &&
+        reading.lastSpokeAt.getTime() >= reading.at - reading.within
+    );
 }
 
 /** Everything the verdict is reached from. */
@@ -427,12 +430,10 @@ export function diagnoseCall(facts: CallAudioFacts): CallAudioReport {
         );
     }
 
-    if (facts.deafened) {
-        return said(
-            "You have deafened yourself, so you hear nobody.",
-            "Press the headphones button."
-        );
-    }
+    // Deafened on purpose. Nothing below is a fault while it holds, and the
+    // reader is told where they are already looking: a hint over the headphones
+    // button says it, so a banner repeating it only took space from the call.
+    if (facts.deafened) return { ...UNKNOWN_AUDIO, lines };
 
     // Quiet on purpose, and none of the questions below are this reader's to
     // answer: nothing is played here because the device beside this one is

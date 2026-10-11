@@ -461,7 +461,18 @@
             "surprise": "Surprised",
             "heart": "Love it"
         },
-        "sentLevel": "What others hear"
+        "sentLevel": "What others hear",
+        "hints": {
+            "muted": "Muted",
+            "deafened": "Deafened",
+            "talkingMuted": "You're muted - nobody can hear you"
+        },
+        "arrivals": {
+            "joined": "{name} joined",
+            "left": "{name} left",
+            "joinedMany": "{name} and {others, plural, one {# other} other {# others}} joined",
+            "leftMany": "{name} and {others, plural, one {# other} other {# others}} left"
+        }
     },
     "meetingRoom": {
         "meeting": "Meeting",

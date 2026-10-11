@@ -12,7 +12,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { leavesMissedCall, ringDecision, roomAfter } from "@/lib/chat/ring-decision";
+import {
+    answersMissedCall,
+    leavesMissedCall,
+    ringDecision,
+    roomAfter
+} from "@/lib/chat/ring-decision";
 
 const ME = "user-me";
 const THEM = "user-them";
@@ -140,6 +145,25 @@ describe("what a call that stopped ringing leaves behind", () => {
     // The frame that says it is over reaches every tab, the one that dealt with
     // it included.
     it("leaves nothing for a call this browser had already settled", () => {
-        expect(leavesMissedCall({ ...FROM_THEM, wasRinging: false, inChannelId: null })).toBe(false);
+        expect(leavesMissedCall({ ...FROM_THEM, wasRinging: false, inChannelId: null })).toBe(
+            false
+        );
+    });
+});
+
+describe("what answers a missed call", () => {
+    it("is the reader calling back or taking a seat there, on any device", () => {
+        expect(answersMissedCall({ state: "ringing", userId: ME, count: 1 }, ME)).toBe(true);
+        expect(answersMissedCall({ state: "moved", userId: ME, count: 2 }, ME)).toBe(true);
+    });
+
+    it("is a later call ringing in the same conversation", () => {
+        expect(answersMissedCall({ state: "ringing", userId: THEM, count: 1 }, ME)).toBe(true);
+    });
+
+    it("is not somebody else moving, an empty actor, or a call ending", () => {
+        expect(answersMissedCall({ state: "moved", userId: THEM, count: 2 }, ME)).toBe(false);
+        expect(answersMissedCall({ state: "moved", userId: "", count: 1 }, "")).toBe(false);
+        expect(answersMissedCall({ state: "ended", userId: ME, count: 0 }, ME)).toBe(false);
     });
 });

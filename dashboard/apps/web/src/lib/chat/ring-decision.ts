@@ -105,6 +105,21 @@ export function leavesMissedCall(input: {
     return input.channelId !== input.inChannelId;
 }
 
+/**
+ * Whether a frame answers a missed call from the conversation it is about.
+ *
+ * Two things do. The reader acting in a call there - starting one, which is
+ * calling back, or taking a seat in one - on any of their devices: each frame
+ * names who moved, so a desk that missed a call hears about the phone that
+ * returned it. And a later call ringing there: it is the newer word from the
+ * same people, and if it is missed too it leaves a card of its own.
+ */
+export function answersMissedCall(frame: CallFrameFacts, viewerId: string): boolean {
+    if (frame.state === "ringing") return true;
+    if (frame.state === "ended" || frame.count === 0) return false;
+    return frame.userId !== "" && frame.userId === viewerId;
+}
+
 export function ringDecision(frame: CallFrameFacts, viewerId: string): RingDecision {
     if (frame.state === "ringing") {
         // Your own call. The frame is addressed to the conversation, and the
