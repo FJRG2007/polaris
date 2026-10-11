@@ -521,7 +521,7 @@ async function start(): Promise<void> {
         },
         true
     );
-    // Enter in a login box with no form around it, which neither of the two
+    // Enter in a login box that no form submits, which neither of the two
     // above ever sees.
     document.addEventListener(
         "keydown",
