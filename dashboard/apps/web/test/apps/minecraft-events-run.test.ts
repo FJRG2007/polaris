@@ -12699,7 +12699,9 @@ describe("hide and seek", () => {
         expect(given()).toHaveLength(1);
         const [holder] = game().freezeGiven;
         expect(holder).not.toBe(seeker);
-        expect(given()[0]).toBe(arena.giveMarked(holder!, hs.FREEZE_ITEM, 1, run.marker!));
+        expect(given()[0]).toBe(
+            arena.giveMarked(holder!, hs.FREEZE_ITEM, 1, run.marker!, hs.FREEZE_EXTRAS)
+        );
         expect(world.sent).toContain("scoreboard players set #len polaris_frz 100");
         expect(
             world.sent.some(

@@ -305,9 +305,12 @@ export function pickaxeLine(name: string, items: Flavour["items"]): string {
 
 /**
  * What a broken shelter block let fall, made marked again and placeable on the
- * arena, before anybody can pick it up plain (a block's drop waits ten ticks,
- * the quick look comes every eight): the block comes back to whoever broke it,
- * as the kit it was. Never what somebody threw.
+ * arena, and only then let go to be picked up: the data pack holds every
+ * unmarked drop the tick it lands (`FUNCTIONS.step`), because the quick look
+ * is not on time for a drop's ten ticks - it skips while the last one is still
+ * on its way - and a block picked up plain could not be placed again. The
+ * block comes back to whoever broke it, as the kit it was. Never what somebody
+ * threw.
  */
 export function reclaimLines(acid: Acid, items: Flavour["items"]): string[] {
     const { x, z } = acid.center;
@@ -319,7 +322,7 @@ export function reclaimLines(acid: Acid, items: Flavour["items"]): string[] {
         y2: acid.floor + ROOF - 1,
         z2: z + acid.half
     };
-    return [reclaimBrokenDrops(inside, markerOf(items), PLACE_ON)];
+    return [reclaimBrokenDrops(inside, markerOf(items), PLACE_ON, true)];
 }
 
 // ------------------------------------------------------------------ the weather
@@ -493,6 +496,18 @@ export const FASTEST_BITE = 2;
  *  written in the function itself. */
 const SIZES = Object.values(HALF);
 
+/**
+ * Every drop inside the walls with no mark, no tag and no thrower - a broken
+ * shelter block's - kept where it lies until the quick look makes it kit again
+ * (`reclaimLines`): from the stand over the middle, the box `reclaimLines`
+ * looks in. A mark is looked for in both spellings, so the line reads the same
+ * on every version.
+ */
+function holdDrops(half: number): string {
+    const unmarked = `nbt=!{Item:{tag:{polaris_event:1b}}},nbt=!{Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}`;
+    return `as @e[type=minecraft:armor_stand,tag=${SKY_TAG}] at @s positioned ~-${half + 0.5} ~-${ROOF - 1.5} ~-${half + 0.5} as @e[type=minecraft:item,tag=,dx=${2 * half},dy=${ROOF - 2},dz=${2 * half},${unmarked}] unless data entity @s Thrower run data merge entity @s {PickupDelay:32767s}`;
+}
+
 /** Acid an antidote takes away, and beats an umbrella keeps the rain off. */
 export const CURE = 35;
 export const UMBRELLA_BEATS = 20;
@@ -571,7 +586,10 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
                     `execute if score ${score("half")} matches ${half} if score ${score("rain")} matches ${rain === 3 ? "3.." : rain} as @e[type=minecraft:armor_stand,tag=${SKY_TAG}] at @s run particle minecraft:item_slime ~ ~ ~ ${half / 2} 0 ${half / 2} 0 ${half * 2 * rain} normal`
             )
         ),
-        `execute as @e[type=minecraft:item,tag=${CRATE_TAG}] at @s run function polaris:acid/crate`
+        `execute as @e[type=minecraft:item,tag=${CRATE_TAG}] at @s run function polaris:acid/crate`,
+        ...SIZES.map(
+            (half) => `execute if score ${score("half")} matches ${half} ${holdDrops(half)}`
+        )
     ],
     beat: [
         `scoreboard players set ${score("t")} 0`,

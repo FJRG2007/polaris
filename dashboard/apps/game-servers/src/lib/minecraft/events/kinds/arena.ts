@@ -253,6 +253,9 @@ export interface KitExtras {
      *  component is spelled from 1.20.5: with `levels`, or as a plain map from
      *  1.21.5. A tag before 1.20.5 whichever is given. */
     readonly silkTouch?: "levels" | "map";
+    /** What a potion holds (`minecraft:water`): one without it is shown as an
+     *  "Uncraftable Potion". */
+    readonly potion?: string;
 }
 
 /** What every piece of kit that can wear out is given: it lasts the event. */
@@ -269,6 +272,7 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
         if (extras.silkTouch === "levels")
             parts.push(`minecraft:enchantments={levels:{"${SILK_TOUCH}":1}}`);
         if (extras.silkTouch === "map") parts.push(`minecraft:enchantments={"${SILK_TOUCH}":1}`);
+        if (extras.potion) parts.push(`minecraft:potion_contents={potion:"${extras.potion}"}`);
         // A tag rather than the blocks again: the list twice outgrew one command.
         if (extras.miningSpeed)
             parts.push(
@@ -281,6 +285,7 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
     if (extras.breaks) parts.push(`CanDestroy:${list(extras.breaks)}`);
     if (extras.unbreakable) parts.push("Unbreakable:1b");
     if (extras.silkTouch) parts.push(`Enchantments:[{id:"${SILK_TOUCH}",lvl:1s}]`);
+    if (extras.potion) parts.push(`Potion:"${extras.potion}"`);
     return `${id}{${parts.join(",")}}`;
 }
 
@@ -367,15 +372,21 @@ export function killBrokenDrops(box: Box, marker: Marker): string {
  * What a block broken in the box let fall, made kit again: marked and placeable
  * on `placeOn`, as it was handed out, so it stacks with the rest and is taken
  * back with it. Never what somebody threw (it has a `Thrower`), and never an
- * item the event summoned itself (it has a tag).
+ * item the event summoned itself (it has a tag). `release`: picked up at once,
+ * for a drop the data pack held back until now (`acid-rain.FUNCTIONS`).
  */
-export function reclaimBrokenDrops(box: Box, marker: Marker, placeOn: readonly string[]): string {
+export function reclaimBrokenDrops(
+    box: Box,
+    marker: Marker,
+    placeOn: readonly string[],
+    release = false
+): string {
     const list = `[${placeOn.map((one) => `"${one}"`).join(",")}]`;
     const item =
         marker === "components"
             ? `{components:{"minecraft:custom_data":{${MARK}},"minecraft:can_place_on":{blocks:${list}}}}`
             : `{tag:{${MARK},CanPlaceOn:${list}}}`;
-    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},tag=,nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run data merge entity @s {Item:${item}}`;
+    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},tag=,nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run data merge entity @s {Item:${item}${release ? ",PickupDelay:0s" : ""}}`;
 }
 
 /**

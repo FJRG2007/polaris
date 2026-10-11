@@ -628,6 +628,33 @@ describe("hide and seek's rules", () => {
         expect(hs.nextReveal(0, release, null, end)).toBeNull();
     });
 
+    it("takes what the house lets fall the tick it lands, before a hider or a seeker can pick it up", () => {
+        const tick = panels.FUNCTIONS.tick!;
+        for (const side of hs.SIDE_TAGS) {
+            const line = tick.find(
+                (one) => one.includes(`tag=${side}]`) && one.endsWith("run kill @s")
+            )!;
+            expect(line).toBeDefined();
+            expect(line).toContain(`@e[type=minecraft:item,distance=..${panels.DROP_NEAR},tag=,`);
+            // Never the kit, in either spelling, nor what somebody threw.
+            expect(line).toContain("nbt=!{Item:{tag:{polaris_event:1b}}}");
+            expect(line).toContain(
+                'nbt=!{Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}'
+            );
+            expect(line).toContain("unless data entity @s Thrower");
+        }
+        expect([...panels.SIDE_TAGS].sort()).toEqual([...hs.SIDE_TAGS].sort());
+    });
+
+    it("hands a freeze potion that holds water, never an uncraftable one", () => {
+        expect(arena.giveMarked("Ana", hs.FREEZE_ITEM, 1, "components", hs.FREEZE_EXTRAS)).toBe(
+            'give Ana minecraft:splash_potion[minecraft:custom_data={polaris_event:1b},minecraft:potion_contents={potion:"minecraft:water"}] 1'
+        );
+        expect(arena.giveMarked("Ana", hs.FREEZE_ITEM, 1, "tag", hs.FREEZE_EXTRAS)).toBe(
+            'give Ana minecraft:splash_potion{polaris_event:1b,Potion:"minecraft:water"} 1'
+        );
+    });
+
     it("hands the freeze potions once, inside the seeking and never near its end, to hiders drawn from the run", () => {
         const release = 1_000_000;
         const end = release + 300_000;

@@ -2050,6 +2050,8 @@ export function effectsOff(name?: string): string[] {
  * at the end like any other, thrown or not.
  */
 export const FREEZE_ITEM = "minecraft:splash_potion";
+/** Water in it: a splash potion that holds nothing is an "Uncraftable Potion". */
+export const FREEZE_EXTRAS = { potion: "minecraft:water" } as const;
 /** Where in the seeking the potions are handed out: between these fractions
  *  of it, and never in the last `FREEZE_QUIET` seconds. */
 export const FREEZE_EARLIEST = 0.15;

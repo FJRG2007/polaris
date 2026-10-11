@@ -429,7 +429,9 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             state.freezeGiven = holders;
             lines.push(
                 ...hs.freezeArmLines(options.freezeSeconds),
-                ...holders.map((name) => arena.giveMarked(name, hs.FREEZE_ITEM, 1, run.marker!)),
+                ...holders.map((name) =>
+                    arena.giveMarked(name, hs.FREEZE_ITEM, 1, run.marker!, hs.FREEZE_EXTRAS)
+                ),
                 ...holders.map((name) =>
                     arena.tellTo(
                         name,

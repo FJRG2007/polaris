@@ -669,6 +669,28 @@ describe("a shelter in the acid rain", () => {
         expect(acid.reclaimLines(one, "nbt")[0]).toContain("CanPlaceOn:[");
     });
 
+    it("holds a broken block's drop until it is kit again, so nobody picks it up unplaceable", () => {
+        const one = built();
+        const step = acid.FUNCTIONS.step!.join("\n");
+        // Every tick, in the pack: not left to a quick look that can come late.
+        const hold = acid.FUNCTIONS.step!.find(
+            (line) => line.includes(`matches ${one.half} `) && line.includes("PickupDelay:32767s")
+        )!;
+        expect(hold).toBeDefined();
+        expect(hold).toContain(
+            `positioned ~-${one.half + 0.5} ~-${acid.ROOF - 1.5} ~-${one.half + 0.5} as @e[type=minecraft:item,tag=,dx=${2 * one.half},dy=${acid.ROOF - 2},dz=${2 * one.half},`
+        );
+        expect(hold).toContain("nbt=!{Item:{tag:{polaris_event:1b}}}");
+        expect(hold).toContain(
+            'nbt=!{Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}'
+        );
+        expect(hold).toContain("unless data entity @s Thrower");
+        expect(step).not.toContain("[minecraft:");
+        // Made kit, then let go.
+        for (const items of ["components", "nbt"] as const)
+            expect(acid.reclaimLines(one, items)[0]).toContain(",PickupDelay:0s}");
+    });
+
     it("never makes a supply crate into kit", () => {
         const [line] = acid.reclaimLines(built(), "components");
         expect(line).toMatch(/@e\[type=minecraft:item,[^\]]*,tag=,/);

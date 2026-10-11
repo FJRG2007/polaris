@@ -183,6 +183,20 @@ export type Facing = (typeof FACINGS)[number];
 
 /** The seekers' tag (`hide-and-seek.SIDE_TAGS`): on a server team or ours. */
 const SEEKER_TAG = "pe_seeker";
+/** The two sides' tags, hiders' and seekers', as `hide-and-seek.SIDE_TAGS`. */
+export const SIDE_TAGS = [SEEKER_TAG, "pe_hider"] as const;
+/** As near a player as a dropped item is looked for, past where one is picked up. */
+export const DROP_NEAR = 6;
+/**
+ * Whatever the house let fall near somebody playing it - a block knocked off,
+ * popped or broken - gone the tick it lands, before its ten ticks are out and
+ * anybody can pick it up. The quick look's own sweep (`arena.killBrokenDrops`)
+ * goes over RCON and skips a turn while the last is on its way, so on its own
+ * it let a hider walk off with what fell. Never the kit (marked, in either
+ * spelling), what somebody threw (it has a `Thrower`) or an item the event
+ * summoned (it has a tag).
+ */
+const DROPPED = `@e[type=minecraft:item,distance=..${DROP_NEAR},tag=,nbt=!{Item:{tag:{polaris_event:1b}}},nbt=!{Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}]`;
 /** How near a thrown splash potion has to come to a seeker to freeze them. */
 export const FREEZE_REACH = 3;
 /**
@@ -240,7 +254,11 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
             (field) =>
                 `execute as @a[tag=${IN_ARENA},tag=${SEEKER_TAG}] at @s if entity ${THROWN(field)} run scoreboard players operation @s ${FROZEN} = #len ${FROZEN}`
         ),
-        `execute as @a[tag=${IN_ARENA},scores={${FROZEN}=1..}] at @s run function polaris:panel/frozen`
+        `execute as @a[tag=${IN_ARENA},scores={${FROZEN}=1..}] at @s run function polaris:panel/frozen`,
+        ...SIDE_TAGS.map(
+            (side) =>
+                `execute as @a[tag=${IN_ARENA},tag=${side}] at @s as ${DROPPED} unless data entity @s Thrower run kill @s`
+        )
     ],
     // Unable to walk (Slowness 10, as in the cage) or to strike (Weakness 100,
     // as a hider), a second at a time, so it ends a second after the count.
