@@ -24,7 +24,11 @@ export const locationInputSchema = z
             context.addIssue({ code: "custom", path: ["path"], message: "shareInvalid" });
         if (value.protocol === "nfs" && (!value.path.startsWith("/") || value.path.includes("..")))
             context.addIssue({ code: "custom", path: ["path"], message: "exportInvalid" });
-        if (/[\u0000-\u001f\u007f]/.test(`${value.host}${value.path}${value.username ?? ""}${value.domain ?? ""}`))
+        if (
+            /[\u0000-\u001f\u007f]/.test(
+                `${value.host}${value.path}${value.username ?? ""}${value.domain ?? ""}`
+            )
+        )
             context.addIssue({ code: "custom", path: ["path"], message: "pathInvalid" });
     });
 
@@ -48,7 +52,9 @@ export type LocationError = (typeof LOCATION_ERRORS)[number];
 
 /** A schema issue's message as one of the known reasons. */
 export function locationError(message: string | undefined): LocationError {
-    return (LOCATION_ERRORS as readonly string[]).includes(message ?? "") ? (message as LocationError) : "pathInvalid";
+    return (LOCATION_ERRORS as readonly string[]).includes(message ?? "")
+        ? (message as LocationError)
+        : "pathInvalid";
 }
 
 /**
@@ -83,10 +89,13 @@ export function normalizeLocationInput(raw: {
     return {
         name: text(raw.name),
         protocol,
-        host: text(raw.host).replace(/^[\\/]+/, "").replace(/\/+$/, ""),
+        host: text(raw.host)
+            .replace(/^[\\/]+/, "")
+            .replace(/\/+$/, ""),
         path,
         username: optional(raw.username),
-        password: typeof raw.password === "string" && raw.password.length > 0 ? raw.password : undefined,
+        password:
+            typeof raw.password === "string" && raw.password.length > 0 ? raw.password : undefined,
         domain: optional(raw.domain)
     };
 }

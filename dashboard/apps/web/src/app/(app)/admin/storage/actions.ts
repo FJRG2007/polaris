@@ -14,7 +14,11 @@ import { getTranslations } from "@/lib/i18n/request";
 import * as moves from "@/lib/storage-moves/service";
 import { createConnectionSchema } from "@polaris/core";
 import { createConnection } from "@/lib/storage-service";
-import { locationError, locationInputSchema, normalizeLocationInput } from "@/lib/storage-moves/location-input";
+import {
+    locationError,
+    locationInputSchema,
+    normalizeLocationInput
+} from "@/lib/storage-moves/location-input";
 
 const idSchema = z.string().uuid();
 
@@ -50,7 +54,9 @@ export async function addLocationAction(input: unknown): Promise<{ id?: string; 
         normalizeLocationInput((input ?? {}) as Record<string, unknown>)
     );
     if (!parsed.success) {
-        return { error: t(`storage.form.errors.${locationError(parsed.error.issues[0]?.message)}`) };
+        return {
+            error: t(`storage.form.errors.${locationError(parsed.error.issues[0]?.message)}`)
+        };
     }
     const value = parsed.data;
     const connection = createConnectionSchema.safeParse(
@@ -64,7 +70,10 @@ export async function addLocationAction(input: unknown): Promise<{ id?: string; 
                       ...(value.domain ? { domain: value.domain } : {}),
                       ...(value.username ? { username: value.username } : {})
                   },
-                  credentials: { kind: "smb", ...(value.password ? { password: value.password } : {}) }
+                  credentials: {
+                      kind: "smb",
+                      ...(value.password ? { password: value.password } : {})
+                  }
               }
             : {
                   name: value.name,
@@ -130,7 +139,10 @@ export async function answerMoveAction(input: unknown): Promise<{ error?: string
     if (done === "shared") return { error: t("storage.errors.originShared") };
     await recordAudit({
         actorId: admin.id,
-        action: parsed.data.answer === "remove" ? "storage.move.remove-original" : "storage.move.keep-original",
+        action:
+            parsed.data.answer === "remove"
+                ? "storage.move.remove-original"
+                : "storage.move.keep-original",
         targetType: "storage-move",
         targetId: parsed.data.id
     });

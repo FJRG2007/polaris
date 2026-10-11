@@ -28,7 +28,9 @@ export type Placement =
     | { readonly kind: "nas"; readonly source: string; readonly connectionId: string };
 
 /** A storage location a volume can be moved to. */
-export type Location = { readonly kind: "server" } | { readonly kind: "nas"; readonly connectionId: string };
+export type Location =
+    | { readonly kind: "server" }
+    | { readonly kind: "nas"; readonly connectionId: string };
 
 export const MOVE_STATES = [
     "queued",
@@ -85,7 +87,8 @@ export function nextState(state: MoveState, event: MoveEvent): MoveState {
         if (next) return next;
     }
     if (event === "fail") {
-        if (["queued", "stopping", "copying", "switching", "starting"].includes(state)) return "rolling-back";
+        if (["queued", "stopping", "copying", "switching", "starting"].includes(state))
+            return "rolling-back";
         // A rollback that fails still ends: the reason is recorded beside it.
         if (state === "rolling-back") return "failed";
         // Emptying the original failed: the move itself stands, and the original
@@ -107,7 +110,10 @@ export type RollbackStep = "remove-copier" | "clear-copy" | "restore-volume" | "
  * left where it is. The app is started only if it was meant to be running, and
  * only after its volume points at the original again.
  */
-export function rollbackSteps(context: { switched: boolean; wasRunning: boolean | null }): RollbackStep[] {
+export function rollbackSteps(context: {
+    switched: boolean;
+    wasRunning: boolean | null;
+}): RollbackStep[] {
     const steps: RollbackStep[] = ["remove-copier"];
     steps.push(context.switched ? "restore-volume" : "clear-copy");
     if (context.wasRunning) steps.push("start-app");
@@ -115,12 +121,17 @@ export function rollbackSteps(context: { switched: boolean; wasRunning: boolean 
 }
 
 export function locationOf(placement: Placement): Location {
-    return placement.kind === "nas" ? { kind: "nas", connectionId: placement.connectionId } : { kind: "server" };
+    return placement.kind === "nas"
+        ? { kind: "nas", connectionId: placement.connectionId }
+        : { kind: "server" };
 }
 
 export function sameLocation(left: Location, right: Location): boolean {
     if (left.kind !== right.kind) return false;
-    return left.kind === "server" || left.connectionId === (right as { connectionId: string }).connectionId;
+    return (
+        left.kind === "server" ||
+        left.connectionId === (right as { connectionId: string }).connectionId
+    );
 }
 
 /** A Volume row's fields as a placement, or null for one this cannot move. */
@@ -131,7 +142,8 @@ export function placementOf(row: {
     connectionId: string | null;
 }): Placement | null {
     const source = row.source ?? row.name;
-    if (row.kind === "nas") return row.connectionId ? { kind: "nas", source, connectionId: row.connectionId } : null;
+    if (row.kind === "nas")
+        return row.connectionId ? { kind: "nas", source, connectionId: row.connectionId } : null;
     if (row.kind === "bind") return { kind: "bind", source, connectionId: null };
     if (row.kind === "volume") return { kind: "volume", source, connectionId: null };
     return null;
@@ -140,7 +152,8 @@ export function placementOf(row: {
 /** Parse a placement stored as JSON on a move row, refusing anything malformed. */
 export function parsePlacement(json: string): Placement {
     const value = JSON.parse(json) as { kind?: unknown; source?: unknown; connectionId?: unknown };
-    if (typeof value.source !== "string" || value.source.length === 0) throw new Error("Malformed placement");
+    if (typeof value.source !== "string" || value.source.length === 0)
+        throw new Error("Malformed placement");
     if (value.kind === "nas" && typeof value.connectionId === "string")
         return { kind: "nas", source: value.source, connectionId: value.connectionId };
     if (value.kind === "bind" || value.kind === "volume")
@@ -149,7 +162,10 @@ export function parsePlacement(json: string): Placement {
 }
 
 function pathOf(source: string): string {
-    return source.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
+    return source
+        .replace(/\\/g, "/")
+        .replace(/\/+/g, "/")
+        .replace(/^\/|\/$/g, "");
 }
 
 /** A placement's source and every folder above it, outermost first. A named
@@ -214,17 +230,28 @@ export function copierName(moveId: string): string {
  * real docker name (`dockerName`), which is what the app's container uses - it
  * carries the compose project's prefix the row does not.
  */
-export function composeVolume(placement: Placement, target: string, dockerName?: string): ComposeSpecVolume {
+export function composeVolume(
+    placement: Placement,
+    target: string,
+    dockerName?: string
+): ComposeSpecVolume {
     if (placement.kind === "volume") {
         if (!dockerName) throw new Error("A named volume needs its docker name to be mounted");
         return { source: dockerName, target, kind: "volume" };
     }
-    if (placement.kind === "nas") return { source: `${placement.connectionId}/${placement.source}`, target, kind: "nas" };
+    if (placement.kind === "nas")
+        return { source: `${placement.connectionId}/${placement.source}`, target, kind: "nas" };
     return { source: placement.source, target, kind: "bind" };
 }
 
 /** Exit codes of the copy script, and what each one means. */
-export const COPY_EXIT = { ok: 0, mismatch: 3, noSpace: 4, unreadable: 10, unwritable: 11 } as const;
+export const COPY_EXIT = {
+    ok: 0,
+    mismatch: 3,
+    noSpace: 4,
+    unreadable: 10,
+    unwritable: 11
+} as const;
 
 /**
  * The copy, then the check, in one line of busybox sh (a container's command may
@@ -236,7 +263,8 @@ export const COPY_EXIT = { ok: 0, mismatch: 3, noSpace: 4, unreadable: 10, unwri
  * failure for a copy that is complete, and the manifest is the real answer.
  */
 export function copyScript(): string {
-    const manifest = "find . ! -type d -exec stat -c '%s %n' {} + | LC_ALL=C sort | md5sum | cut -d' ' -f1";
+    const manifest =
+        "find . ! -type d -exec stat -c '%s %n' {} + | LC_ALL=C sort | md5sum | cut -d' ' -f1";
     const bytes = "find . -type f -exec stat -c %s {} + | awk '{s+=$1} END {printf \"%d\", s}'";
     return [
         "cd /from || exit 10",
@@ -266,7 +294,9 @@ export function cleanupScript(): string {
 }
 
 function oneShot(name: string, script: string, volumes: ComposeSpecVolume[]): ComposeSpec {
-    const named = volumes.filter((volume) => volume.kind === "volume").map((volume) => volume.source);
+    const named = volumes
+        .filter((volume) => volume.kind === "volume")
+        .map((volume) => volume.source);
     return {
         project: name,
         services: [
@@ -292,7 +322,12 @@ function oneShot(name: string, script: string, volumes: ComposeSpecVolume[]): Co
 }
 
 /** The one-off container that copies `from` into `to` and checks the copy. */
-export function copySpec(moveId: string, from: Placement, to: Placement, dockerName?: string): ComposeSpec {
+export function copySpec(
+    moveId: string,
+    from: Placement,
+    to: Placement,
+    dockerName?: string
+): ComposeSpec {
     return oneShot(copierName(moveId), copyScript(), [
         composeVolume(from, "/from", dockerName),
         composeVolume(to, "/to")
@@ -301,7 +336,9 @@ export function copySpec(moveId: string, from: Placement, to: Placement, dockerN
 
 /** The one-off container that empties the original after a confirmed move. */
 export function cleanupSpec(moveId: string, from: Placement, dockerName?: string): ComposeSpec {
-    return oneShot(`${copierName(moveId)}-clean`, cleanupScript(), [composeVolume(from, "/from", dockerName)]);
+    return oneShot(`${copierName(moveId)}-clean`, cleanupScript(), [
+        composeVolume(from, "/from", dockerName)
+    ]);
 }
 
 export interface CopyReport {
@@ -337,18 +374,26 @@ export type CopyFailure = "mismatch" | "noSpace" | "unreadable" | "unwritable" |
  * Whether the copy can be trusted, from its exit code and what it printed. Both
  * must agree: an exit of 0 without the verified marker is not a verified copy.
  */
-export function copyOutcome(exitCode: number, report: CopyReport): { ok: true } | { ok: false; failure: CopyFailure } {
+export function copyOutcome(
+    exitCode: number,
+    report: CopyReport
+): { ok: true } | { ok: false; failure: CopyFailure } {
     if (exitCode === COPY_EXIT.ok && report.verified && !report.mismatch) return { ok: true };
     if (exitCode === COPY_EXIT.noSpace) return { ok: false, failure: "noSpace" };
     if (exitCode === COPY_EXIT.unreadable) return { ok: false, failure: "unreadable" };
     if (exitCode === COPY_EXIT.unwritable) return { ok: false, failure: "unwritable" };
-    if (exitCode === COPY_EXIT.mismatch || report.mismatch) return { ok: false, failure: "mismatch" };
+    if (exitCode === COPY_EXIT.mismatch || report.mismatch)
+        return { ok: false, failure: "mismatch" };
     return { ok: false, failure: "copy" };
 }
 
 /** How far the copy is, 0-100, or null while the size is not known yet. */
-export function progressPercent(copied: number | null | undefined, total: number | null | undefined): number | null {
-    if (total === null || total === undefined || copied === null || copied === undefined) return null;
+export function progressPercent(
+    copied: number | null | undefined,
+    total: number | null | undefined
+): number | null {
+    if (total === null || total === undefined || copied === null || copied === undefined)
+        return null;
     if (total <= 0) return 100;
     return Math.max(0, Math.min(99, Math.floor((copied / total) * 100)));
 }
