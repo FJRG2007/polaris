@@ -62,7 +62,9 @@ describe("counting pulls", () => {
     });
 
     it("counts uses of the rod with a statistic criterion the server accepts", () => {
-        expect(tug.SETUP).toContain(`scoreboard objectives add ${tug.PULLS} minecraft.used:minecraft.carrot_on_a_stick`);
+        expect(tug.SETUP).toContain(
+            `scoreboard objectives add ${tug.PULLS} minecraft.used:minecraft.carrot_on_a_stick`
+        );
     });
 });
 
