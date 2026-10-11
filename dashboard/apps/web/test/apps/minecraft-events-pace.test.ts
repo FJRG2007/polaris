@@ -52,6 +52,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 }));
 
 const pace = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/pace");
+const stage = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage");
+const downhill = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/downhill-race"
+);
 const { stashIn, giveBack, vitalsSettled } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
 );
@@ -343,5 +347,42 @@ describe("block work, paced", () => {
         expect(await pace.allLoaded(loaded(true), box)).toBe(false);
         expect(trips).toHaveLength(2);
         expect(trips[0]).toHaveLength(2);
+    });
+
+    it("asks a box wider than one trip's columns in several, so a downhill road comes down in trips", async () => {
+        // A downhill race's road spans ~100 chunk columns and ~1,500 boxes:
+        // refused the batched teardown, it went one round trip a box.
+        const track = downhill.course({ steepness: "steep" }, "b", { x: 300, z: -120 }, 90);
+        const bounds = stage.boundsOf(track.boxes)!;
+        const columns =
+            (Math.floor(bounds.x2 / 16) - Math.floor(bounds.x1 / 16) + 1) *
+            (Math.floor(bounds.z2 / 16) - Math.floor(bounds.z1 / 16) + 1);
+        expect(columns).toBeGreaterThan(64);
+        const asking = (unloadedAt: number | null) =>
+            ({
+                ...(server as object),
+                sayEach: async (argvs: readonly (readonly string[])[]) => {
+                    const trip = trips.length;
+                    trips.push(argvs.map((argv) => argv.join(" ")));
+                    return argvs.map((_, at) =>
+                        trip * 64 + at === unloadedAt
+                            ? "That position is not loaded"
+                            : "No blocks were filled"
+                    );
+                }
+            }) as never;
+        expect(await pace.allLoaded(asking(null), bounds)).toBe(true);
+        expect(trips).toHaveLength(Math.ceil(columns / 64));
+        expect(trips.flat()).toHaveLength(columns);
+        expect(Math.max(...trips.map((one) => one.length))).toBeLessThanOrEqual(64);
+        trips = [];
+        // A column out in the second trip: not loaded, and nothing asked past it.
+        expect(await pace.allLoaded(asking(70), bounds)).toBe(false);
+        expect(trips).toHaveLength(2);
+        // Too wide to be worth asking: the slow way, nothing asked.
+        trips = [];
+        const huge = { x1: 0, y1: 64, z1: 0, x2: 16 * 40, z2: 16 * 40 };
+        expect(await pace.allLoaded(asking(null), huge)).toBe(false);
+        expect(trips).toHaveLength(0);
     });
 });

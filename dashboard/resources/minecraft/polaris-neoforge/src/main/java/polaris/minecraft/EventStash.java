@@ -43,8 +43,11 @@ import net.neoforged.neoforge.attachment.AttachmentType;
  * every one a player could otherwise carry in out of sight of them: the stack
  * held on the cursor, what lies in a crafting grid (their own, or a table's
  * left open), and the trash slot a mod adds to the inventory screen
- * ({@link #TRASH}) - each kept as a loose stack ({@link #LOOSE}) that comes back
- * into any free slot, or at their feet as theirs. Once all that is taken an
+ * ({@link #TRASH}). The cursor's and the grids' are kept as loose stacks
+ * ({@link #LOOSE}) that come back into any free slot, or at their feet as
+ * theirs; the trash slot's ({@link #TRASHED}) goes back into the trash slot -
+ * never into the bag, where a stack the player threw away would turn up again
+ * after every event. Once all that is taken an
  * open screen is closed, in the same tick: what one gives back on closing (an
  * anvil's, a grindstone's, a trade's) and what one throws down (a beacon's
  * payment) is kept in the same stash - the file written again, whole, before
@@ -77,6 +80,9 @@ final class EventStash {
     /** A stack kept from no slot of the 41 - the cursor, a crafting grid, the
      *  trash slot - given back wherever there is room. */
     static final int LOOSE = -1000;
+    /** The stack the trash slot held: given back to the trash slot, never to the
+     *  bag (into the bag only where the trash slot mod is gone). */
+    static final int TRASHED = -1001;
     /**
      * Where the trash slot mod keeps its one stack on a player: its library's
      * data under NeoForge's persisted player data, as an item stack's own tag
@@ -150,7 +156,13 @@ final class EventStash {
         CompoundTag trash = trashOf(player);
         if (trash != null) {
             ItemStack trashed = ItemStack.parseOptional(registries, trash.getCompound(TRASH));
-            loose(trashed, registries, items, emptied, () -> trash.put(TRASH, new CompoundTag()));
+            if (!trashed.isEmpty() && !isKit(trashed)) {
+                CompoundTag entry = new CompoundTag();
+                entry.putInt("slot", TRASHED);
+                entry.put("item", trashed.save(registries));
+                items.add(entry);
+                emptied.add(() -> trash.put(TRASH, new CompoundTag()));
+            }
         }
         List<Integer> taken = new ArrayList<>();
         for (int slot : SLOTS) {
@@ -307,6 +319,14 @@ final class EventStash {
             int slot = entry.getInt("slot");
             if (slot == LOOSE) {
                 displaced.add(stack.get());
+                continue;
+            }
+            if (slot == TRASHED) {
+                // Back where it was thrown away. What the trash slot took in
+                // during the event was thrown away too, and gives way.
+                CompoundTag trash = trashOf(player);
+                if (trash != null) trash.put(TRASH, stack.get().save(registries));
+                else displaced.add(stack.get());
                 continue;
             }
             ItemStack now = get(inventory, slot);

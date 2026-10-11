@@ -306,34 +306,45 @@ function columnsOf(box: { x1: number; z1: number; x2: number; z2: number }): [nu
     return columns;
 }
 
-/** No more chunk columns than this are asked about at once. */
+/** No more chunk columns than this are asked about in one trip. */
 const COLUMNS_ASKED = 64;
 
+/** No more trips than this are spent asking: past it, the slow way is quicker. */
+const COLUMN_TRIPS = 16;
+
 /**
- * Whether every chunk under `box` is loaded now, asked in one trip: a fill of
- * one block of air over air in each column - which changes nothing and answers
- * "No blocks were filled" where the chunk is in, and "not loaded" where it is
- * not. False where it cannot be asked in one trip, so the caller takes the
- * slow, one-at-a-time way it always did.
+ * Whether every chunk under `box` is loaded now: a fill of one block of air
+ * over air in each column - which changes nothing and answers "No blocks were
+ * filled" where the chunk is in, and "not loaded" where it is not - asked
+ * `COLUMNS_ASKED` columns a trip. A downhill race's road spans a hundred
+ * columns; asked only when it fit one trip, its fifteen hundred boxes were
+ * taken out one round trip each. False at the first column not in, or where it
+ * cannot be asked at all, so the caller takes the slow, one-at-a-time way it
+ * always did.
  */
 export async function allLoaded(
     server: ServerContainer,
     box: { x1: number; y1: number; z1: number; x2: number; z2: number }
 ): Promise<boolean> {
     const columns = columnsOf(box);
-    if (!server.sayEach || columns.length > COLUMNS_ASKED) return false;
+    const sayEach = server.sayEach;
+    if (!sayEach || columns.length > COLUMNS_ASKED * COLUMN_TRIPS) return false;
     const y = box.y1;
-    const replies = await server
-        .sayEach(
-            columns.map(([x, z]) => [
-                `execute in minecraft:overworld run fill ${x} ${y} ${z} ${x} ${y} ${z} minecraft:air replace minecraft:air`
-            ])
+    for (let from = 0; from < columns.length; from += COLUMNS_ASKED) {
+        const replies = await sayEach(
+            columns
+                .slice(from, from + COLUMNS_ASKED)
+                .map(([x, z]) => [
+                    `execute in minecraft:overworld run fill ${x} ${y} ${z} ${x} ${y} ${z} minecraft:air replace minecraft:air`
+                ])
+        ).catch(() => null);
+        if (
+            replies === null ||
+            !replies.every((reply) => reply !== null && stage.fillCount(reply) !== null)
         )
-        .catch(() => null);
-    return (
-        replies !== null &&
-        replies.every((reply) => reply !== null && stage.fillCount(reply) !== null)
-    );
+            return false;
+    }
+    return true;
 }
 
 /**
