@@ -108,7 +108,9 @@ describe("scrolling past the held window", () => {
         const source = await sync;
         const older = source.slice(source.indexOf("async function fetchOlderNow"));
         const body = older.slice(0, older.indexOf("\n}\n"));
-        expect(body).toContain("(await storeMessages(client, account, folder, fetched, false)) > 0");
+        expect(body).toContain(
+            "(await storeMessages(client, account, folder, fetched, false)) > 0"
+        );
         expect(body).toContain("readOnly: true");
         const route = await readFile(`${SRC}app/api/mail/threads/route.ts`, "utf8");
         expect(route).toContain('page.cursor === "" && reachesForOlder(list)');

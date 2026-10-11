@@ -195,9 +195,7 @@ describe("opening one", () => {
     it("still fetches it when it is not held, and keeps it from then on", async () => {
         const messages = await readFile(`${SRC}lib/mailbox/messages.ts`, "utf8");
         const load = messages.slice(messages.indexOf("export async function loadBody"));
-        expect(load).toContain(
-            "if (message.bodyText !== null || message.bodyHtml !== null) {"
-        );
+        expect(load).toContain("if (message.bodyText !== null || message.bodyHtml !== null) {");
         expect(load).toContain("data: { bodyText: body.text, bodyHtml: body.html }");
     });
 });

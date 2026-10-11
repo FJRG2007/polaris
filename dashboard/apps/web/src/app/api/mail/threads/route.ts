@@ -42,7 +42,10 @@ export async function GET(request: Request): Promise<Response> {
     // list says it could not be loaded rather than showing an empty mailbox,
     // which reads as "you have no mail".
     if (!parsed.success) {
-        return NextResponse.json({ error: (await readerWords("api"))("errors.listLoadFailed") }, { status: 400 });
+        return NextResponse.json(
+            { error: (await readerWords("api"))("errors.listLoadFailed") },
+            { status: 400 }
+        );
     }
 
     const { cursor, query, ...narrow } = parsed.data;
