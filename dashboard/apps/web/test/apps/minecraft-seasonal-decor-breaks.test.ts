@@ -18,9 +18,13 @@ function source(path: string): string {
 }
 
 const NEO_DECOR = source("polaris-neoforge/src/main/java/polaris/minecraft/SeasonalDecor.java");
-const NEO_HALLOWEEN = source("polaris-neoforge/src/main/java/polaris/minecraft/SeasonalHalloween.java");
+const NEO_HALLOWEEN = source(
+    "polaris-neoforge/src/main/java/polaris/minecraft/SeasonalHalloween.java"
+);
 const PAPER_DECOR = source("polaris-paper/src/main/java/polaris/minecraft/SeasonalDecor.java");
-const PAPER_HALLOWEEN = source("polaris-paper/src/main/java/polaris/minecraft/SeasonalHalloween.java");
+const PAPER_HALLOWEEN = source(
+    "polaris-paper/src/main/java/polaris/minecraft/SeasonalHalloween.java"
+);
 const BROKEN = source("polaris-common/src/main/java/polaris/minecraft/BrokenDecor.java");
 
 /** A method of the class, from its signature to its closing brace. */
@@ -46,7 +50,9 @@ describe("a decoration a player hits", () => {
         for (const decor of [NEO_DECOR, PAPER_DECOR]) {
             const takeDown = body(decor, "takeDown(");
             expect(takeDown).toMatch(/broken\.add\(/);
-            expect(takeDown).toMatch(/writeBroken\(\)/);
+            // Marked, not written: a row knocked down is one write, not one each.
+            expect(takeDown).toMatch(/brokenDirty = true/);
+            expect(takeDown).not.toMatch(/writeBroken\(\)/);
             expect(takeDown).toMatch(/for \((ServerPlayer|Player) other :/);
             // A real block only drawn snowy is the player digging: left to the game.
             expect(takeDown).toContain("redrawn(hit)");
@@ -62,7 +68,9 @@ describe("a decoration a player hits", () => {
     });
 
     it("keeps the trap pumpkins, now fired by the take-down instead of a break", () => {
-        expect(NEO_DECOR).toContain("SeasonalHalloween.trap(player, player.serverLevel(), event.getPos())");
+        expect(NEO_DECOR).toContain(
+            "SeasonalHalloween.trap(player, player.serverLevel(), event.getPos())"
+        );
         expect(PAPER_HALLOWEEN).toContain("decor.onPumpkinTaken(this::trap);");
         for (const halloween of [NEO_HALLOWEEN, PAPER_HALLOWEEN]) {
             expect(halloween).not.toMatch(/BreakEvent/);
@@ -72,6 +80,24 @@ describe("a decoration a player hits", () => {
 });
 
 describe("the broken list", () => {
+    it("is written every few seconds while it changes, and before it is let go", () => {
+        for (const decor of [NEO_DECOR, PAPER_DECOR]) {
+            expect(decor).toMatch(/if \(ticks % FLUSH_TICKS == 0\) flushBroken\(\);/);
+            expect(decor).toMatch(/if \(brokenDirty\) writeBroken\(\);/);
+            // Written, it is clean again, whether or not the write went through.
+            expect(body(decor, "void writeBroken()")).toContain("brokenDirty = false;");
+        }
+        // Switched off, and the server going down: nothing knocked down is lost.
+        expect(body(NEO_DECOR, "static JsonObject clear(MinecraftServer server)")).toContain(
+            "flushBroken();"
+        );
+        expect(
+            body(NEO_DECOR, "public void onServerStopping(ServerStoppingEvent event)")
+        ).toContain("flushBroken();");
+        expect(body(PAPER_DECOR, "private JsonObject clear()")).toContain("flushBroken();");
+        expect(body(PAPER_DECOR, "void stop()")).toContain("flushBroken();");
+    });
+
     it("is kept per season beside the world and dropped for another season or a stale one", () => {
         const keepFor = body(BROKEN, "boolean keepFor(String next, long now)");
         expect(keepFor).toContain("season.equals(next) && now - since <= KEPT_MILLIS");
