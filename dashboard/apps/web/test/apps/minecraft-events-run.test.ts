@@ -14257,15 +14257,21 @@ describe("an arena dressed for the season", () => {
                     )
                 )
         );
+        const sceneryRemovals = new Set(
+            run.stage!.boxes.filter((box) => box.scenery).map(stageKit.removeLine)
+        );
         for (const [index, line] of seasonDecor.decorLines(pieces).entries()) {
             const at = world.sent.indexOf(line);
             expect(at, line).toBeGreaterThan(lastBuilt);
             // Taken out at the end, before any of the floors.
             const gone = world.sent.indexOf(removal(pieces[index]!, pieces[index]!.block), at);
             expect(gone, line).toBeGreaterThan(at);
+            // The spleef's own snow, not the snow islands of a frost scenery round it.
             const firstFloor = world.sent.findIndex(
                 (sent, where) =>
-                    where > at && sent.endsWith(" minecraft:air replace minecraft:snow_block")
+                    where > at &&
+                    sent.endsWith(" minecraft:air replace minecraft:snow_block") &&
+                    !sceneryRemovals.has(sent)
             );
             expect(gone).toBeLessThan(firstFloor);
         }

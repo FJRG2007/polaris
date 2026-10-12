@@ -172,7 +172,10 @@ const boxSchema = z.object({
     x2: z.number().int(),
     y2: z.number().int(),
     z2: z.number().int(),
-    block: z.enum(ARENA_BLOCKS)
+    block: z.enum(ARENA_BLOCKS),
+    /** Biome scenery round the structure (`scenery.ts`), never part of the game:
+     *  whatever finds a game's own blocks by what they are made of passes it by. */
+    scenery: z.literal(true).optional()
 });
 
 /** A box of blocks, corners included, and what it is (or will be) filled with. */

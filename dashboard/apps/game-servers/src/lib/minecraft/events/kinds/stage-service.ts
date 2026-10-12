@@ -2648,6 +2648,13 @@ async function handShovel(
  * on - only where its block still is. Answers what could not be done yet: a
  * player who is offline, a box whose chunks did not load. Safe to run again.
  */
+/** A structure's own boxes, without the scenery round it: what a game's blocks
+ *  are found among by what they are made of (a frost island's snow is not a
+ *  spleef floor, a nether island's netherrack not a maze). */
+function ownBoxes(boxes: readonly stage.Box[]): stage.Box[] {
+    return boxes.filter((one) => !one.scenery);
+}
+
 export async function settle(
     server: ServerContainer,
     leftover: stage.Leftover,
@@ -2664,7 +2671,7 @@ export async function settle(
         );
         const here = saved.filter((one) => online.has(one.name.toLowerCase()));
         // A maze's racers' minimaps given back too, whenever they come home.
-        const after = netherMaze.isMaze(leftover.boxes)
+        const after = netherMaze.isMaze(ownBoxes(leftover.boxes))
             ? (one: string) => [...radarBack(one), netherMaze.leaveTeam(one)]
             : undefined;
         const owed = await returnAll(server, here, flavour.items, language, undefined, after);
@@ -2679,14 +2686,15 @@ export async function settle(
         // Snowballs stop breaking a spleef floor, and a TNT run's fuses go out,
         // before it goes: nothing for any other arena, or for a game that
         // already ended.
+        const own = ownBoxes(boxes);
         const stop = [
-            ...snowballPack.stopLines(boxes),
-            ...tntRun.stopLines(boxes),
-            ...dropper.stopLines(boxes),
-            ...boatRace.stopLines(boxes),
-            ...netherMaze.stopLines(boxes),
-            ...acidRain.stopLines(boxes),
-            ...elytraRace.stopLines(boxes, flavour.items)
+            ...snowballPack.stopLines(own),
+            ...tntRun.stopLines(own),
+            ...dropper.stopLines(own),
+            ...boatRace.stopLines(own),
+            ...netherMaze.stopLines(own),
+            ...acidRain.stopLines(own),
+            ...elytraRace.stopLines(own, flavour.items)
         ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
@@ -2698,7 +2706,7 @@ export async function settle(
                 stage.floatDown(bounds, 60),
                 ...stage.fallProofOver(bounds),
                 // A boat race's boats - summoned or put down - go with its track.
-                ...(boatRace.isTrack(boxes) ? boatRace.boatsGone(bounds) : [])
+                ...(boatRace.isTrack(own) ? boatRace.boatsGone(bounds) : [])
             ]);
         // Latest first, and nothing after a box that would not come out: what
         // is built later can rest on - or, a dropper's water, be held in by -

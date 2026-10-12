@@ -176,7 +176,7 @@ function box(
     z2: number,
     block: ArenaBlock
 ): Box {
-    return { x1, y1, z1, x2, y2, z2, block };
+    return { x1, y1, z1, x2, y2, z2, block, scenery: true };
 }
 
 /** A square of one block, `r` each way from its middle, `h` high. */
