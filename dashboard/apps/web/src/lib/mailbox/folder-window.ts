@@ -28,16 +28,33 @@ export function confirmedGone<T extends { uid: bigint | number }>(
  * The uids among the server's newest `window` that are not held here, newest
  * first. `serverUids` is what the server lists for the newest window, in any
  * order; `held` is what the cache has for the folder.
+ *
+ * Nothing at or past `cursor` - the uid the arrivals pass reads from next. That
+ * mail has not arrived here yet, and whatever stores it decides whether the
+ * filters, the junk check and the away reply ever see it: put back as old mail,
+ * a message that came in between two passes was filed by nothing.
  */
 export function missingFromWindow(
     serverUids: readonly number[],
     held: ReadonlySet<number>,
-    window: number
+    window: number,
+    cursor: number = Number.POSITIVE_INFINITY
 ): number[] {
     return [...new Set(serverUids)]
         .sort((left, right) => right - left)
         .slice(0, window)
-        .filter((uid) => !held.has(uid));
+        .filter((uid) => !held.has(uid) && uid < cursor);
+}
+
+/**
+ * Where the arrivals pass reads from next: past what it fetched, and past what
+ * the server said was next when the pass began - never past a message it has
+ * not stored. The server's own count moves while a pass runs, and moving the
+ * cursor to it would step over whatever came in after the fetch, which then
+ * only ever came back as old mail.
+ */
+export function nextCursor(seenAtStart: number, fetchedUids: readonly number[]): number {
+    return fetchedUids.reduce((next, uid) => Math.max(next, uid + 1), seenAtStart);
 }
 
 /**

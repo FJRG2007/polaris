@@ -10,7 +10,12 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { confirmedGone, missingFromWindow, reachesForOlder } from "@/lib/mailbox/folder-window";
+import {
+    confirmedGone,
+    missingFromWindow,
+    nextCursor,
+    reachesForOlder
+} from "@/lib/mailbox/folder-window";
 
 const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 const sync = readFile(`${SRC}lib/mailbox/sync.ts`, "utf8");
@@ -51,7 +56,7 @@ describe("the newest window", () => {
     it("is refilled on every pass, and as old mail rather than arrivals", async () => {
         const source = await sync;
         expect(source).toContain(
-            "await refillWindow(client, account, folder, mailbox.exists, extraHeaders);"
+            "await refillWindow(client, account, folder, mailbox.exists, extraHeaders, cursor);"
         );
         expect(source).toContain("await storeMessages(client, account, folder, fetched, false);");
         expect(source).toContain("if (isNew && arrivals) {");
@@ -70,6 +75,42 @@ describe("the newest window", () => {
         const body = refill.slice(0, refill.indexOf("\n}\n"));
         expect(body).toContain("unstored.get(folder.id)");
         expect(source).toContain("if (stored === 0) return 0;");
+    });
+});
+
+describe("mail that arrives while a pass runs", () => {
+    // A filter set to bin every failed-build notice stopped firing: a notice
+    // that came in after the arrivals fetch was put back as old mail by the
+    // window refill (or by scrolling to the end of the inbox), and the cursor
+    // then stepped past it, so no filter ever saw it.
+    it("is never put back as old mail: nothing at or past the cursor", () => {
+        expect(missingFromWindow([10, 11, 12, 13], new Set([10]), 400, 12)).toEqual([11]);
+    });
+
+    it("moves the cursor only past what the pass stored", () => {
+        expect(nextCursor(12, [])).toBe(12);
+        expect(nextCursor(12, [12, 13])).toBe(14);
+        // A fetch of "12:*" with nothing new answers with the last message.
+        expect(nextCursor(12, [9])).toBe(12);
+    });
+
+    it("reads the server's next uid before fetching, not after the pass", async () => {
+        const source = await sync;
+        const pass = source.slice(source.indexOf("async function syncFolder("));
+        const body = pass.slice(0, pass.indexOf("\n}\n"));
+        expect(body.indexOf("const seenNext = mailbox.uidNext;")).toBeGreaterThan(-1);
+        expect(body.indexOf("const seenNext = mailbox.uidNext;")).toBeLessThan(
+            body.indexOf("fetchSince(")
+        );
+        expect(body).toContain("uidNext: BigInt(cursor),");
+        expect(body).not.toContain("uidNext: BigInt(mailbox.uidNext)");
+    });
+
+    it("is left to the arrivals pass when scrolling reaches for older mail", async () => {
+        const source = await sync;
+        const older = source.slice(source.indexOf("async function fetchOlderNow"));
+        const body = older.slice(0, older.indexOf("\n}\n"));
+        expect(body).toContain("Number(folder.uidNext)");
     });
 });
 
