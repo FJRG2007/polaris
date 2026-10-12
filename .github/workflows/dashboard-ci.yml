@@ -254,6 +254,11 @@ jobs:
       # at it: the same commit passed on one run and died with "JavaScript heap
       # out of memory" on the next. The runner has 16 GB, so the build gets room
       # instead of a coin toss.
+      #
+      # The checks job runs ESLint over the same sources in this same run, so the
+      # build skips its own copy (next.config.mjs). It keeps its type check, which
+      # alone sees the route types Next generates during the build.
       - run: npm run build -w @polaris/web
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          POLARIS_BUILD_SKIP_LINT: "1"
