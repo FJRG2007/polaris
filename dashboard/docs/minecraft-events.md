@@ -1335,6 +1335,52 @@ Everything below is part of the arena's own boxes: built into air with
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                  |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                                                                                                                                                         |
 
+## Biome scenery round the sky events
+
+Separate from the season's dressing (`kinds/arena-decor.ts`), which sits on the
+structure itself: `kinds/scenery.ts` draws a world round it, so the event looks
+as if it is played inside a biome. Each run draws one theme from its id:
+
+| Theme  | Pieces                                                                                                                                                |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Jungle | jungle trees on moss islands (mossy cobblestone before 1.17) with a light in the crown, ruined mossy columns, melon islands                           |
+| Nether | huge crimson or warped fungi on netherrack and blackstone islands, basalt columns with magma, lavafalls sealed in glass, lava basins with a glass lid |
+| End    | end stone islands with chorus plants, purpur pillars with end rods, obsidian spires                                                                   |
+| Frost  | packed ice spikes with blue tips, snow islands with a sea lantern                                                                                     |
+| Mesa   | banded terracotta hoodoos, red sandstone islands                                                                                                      |
+
+Which kinds get it (`stage-service.sceneryOf`): parkour (its course's own theme
+for jungle, nether and frost; end or mesa round a classic course), spleef, TNT
+run (no jungle, no lava), boat race, downhill race, elytra race (both races
+beside the track only, nothing under it) and the nether maze (always the
+Nether). Not acid rain (its weather and lightning reach round the arena), not
+the dropper (its shaft is too tall to prove a ring round it cheaply), and not
+the arena kinds (`arena-service`: sky wars, glass bridge and the rest prove a
+single box, which is also the play box).
+
+Rules it keeps, all asserted in `test/apps/minecraft-events-scenery.test.ts`:
+
+- **Off the play space.** Every block is in a ring `BAND` wide round the play
+  volume, at least `GAP` (8) blocks of air from it on every side and never
+  over or under it: nothing a player can jump or fall onto, no parkour
+  shortcut, nothing in an elytra's way, nothing inside a fall's catch box.
+- **Proved air.** The ring and the play volume are proved empty together, as
+  one volume, and that is the volume swept at the end. When the ring is not
+  empty air the run turns its scenery off (`stage.scenery`) and proves the
+  structure bare instead of giving up the site. A volume over `MOST_VOLUME`, or
+  more than `MOST_GROWTH` times the bare one, is built bare.
+- **Nothing that moves.** No gravity block, no vines, grass, saplings, bamboo,
+  coral or plain ice; leaves persistent. Lava only as a source sealed on every
+  side by its shell, built after it and taken out before it, only in the Nether
+  theme, which has nothing that burns.
+- **Version-aware.** `scenery.Era`: Nether-update blocks from 1.16, moss from
+  1.17; everything else since 1.13.
+- **Bounded.** At most `MOST_BOXES` boxes and `MOST_BLOCKS` blocks a run.
+- **Taken down.** Every piece is a box in the stage's state, written with the
+  rest, built first (one batch, `keep`) and taken out latest first by its own
+  block; none of its blocks is one of the season's, so the two never share a
+  cell.
+
 ## In-server work (the Polaris mod)
 
 Big servers do event work inside the game, in the tick, not over a console
