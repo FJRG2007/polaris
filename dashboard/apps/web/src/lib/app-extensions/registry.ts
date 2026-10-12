@@ -110,6 +110,15 @@ export function releaseImageFor(
     return storedImage;
 }
 
+/** The environment apps lay over a release that runs this image, every deploy.
+ *  Empty when no app has an opinion about it. */
+export function releaseEnvFor(imageRef: string | undefined): Record<string, string> {
+    return Object.assign(
+        {},
+        ...extensions().map((extension) => extension.releaseEnv?.(imageRef) ?? {})
+    );
+}
+
 /** Whether an install's settings describe a server that loads plugins. Null when
  *  no app knows the catalog app. */
 export function isPluginServer(

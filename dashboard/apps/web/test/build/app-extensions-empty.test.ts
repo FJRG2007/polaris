@@ -31,6 +31,10 @@ describe("the app extension registry with nothing installed", () => {
         );
     });
 
+    it("adds nothing to a release's environment", () => {
+        expect(registry.releaseEnvFor("itzg/minecraft-server:java21")).toEqual({});
+    });
+
     it("has no opinion about plugin servers", () => {
         expect(registry.isPluginServer("minecraft", new Map([["TYPE", "PAPER"]]))).toBeNull();
     });
