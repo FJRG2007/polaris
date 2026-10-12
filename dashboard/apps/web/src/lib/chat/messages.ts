@@ -51,6 +51,7 @@ import {
 } from "./access";
 import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
+import { MAX_REREAD } from "./reread-limit";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -342,6 +343,7 @@ export async function readSince(
               select: { createdAt: true }
           })
         : null;
+    if (afterId && !cursor) return { messages: [], newerThan: afterId };
 
     const rows = await prisma.chatMessage.findMany({
         where: {
@@ -360,9 +362,6 @@ export async function readSince(
         newerThan: rows.length > PAGE ? (page[page.length - 1]?.id ?? null) : null
     };
 }
-
-/** The most messages one re-read takes: the most a screen holds at once. */
-export const MAX_REREAD = 200;
 
 /**
  * The messages a screen already holds, read again after the live channel said

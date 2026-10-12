@@ -162,4 +162,10 @@ describe("downwards, back out of it", () => {
         expect(page.messages).toEqual([]);
         expect(page.newerThan).toBeNull();
     });
+
+    it("answers nothing, not the start of the channel, after a message that is gone", async () => {
+        const page = await readSince(actor, "c1", "deleted");
+        expect(page.messages).toEqual([]);
+        expect(page.newerThan).toBe("deleted");
+    });
 });

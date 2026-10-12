@@ -60,3 +60,11 @@ export function applyChanged(
     }
     return moved ? next : held;
 }
+
+/** `ids` cut into runs of at most `size`, in order: one re-read each. */
+export function inBatches(ids: readonly string[], size: number): string[][] {
+    const batches: string[][] = [];
+    for (let start = 0; start < ids.length; start += size)
+        batches.push(ids.slice(start, start + size));
+    return batches;
+}

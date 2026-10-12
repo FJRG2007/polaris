@@ -28,6 +28,7 @@ import * as polls from "@/lib/chat/polls";
 import * as pins from "@/lib/chat/pins";
 import * as webhooks from "@/lib/chat/webhooks";
 import { confirmAge } from "@/lib/chat/age-gate";
+import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -206,7 +207,7 @@ export async function readSinceAction(
 
 const rereadSchema = z.object({
     channelId: z.string().min(1).max(64),
-    messageIds: z.array(z.string().min(1).max(64)).max(messages.MAX_REREAD)
+    messageIds: z.array(z.string().min(1).max(64)).max(MAX_REREAD)
 });
 
 /** Messages already on screen, read again because the live channel said they

@@ -58,7 +58,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { applyChanged, changedTargets } from "./message-changes";
+import { MAX_REREAD } from "@/lib/chat/reread-limit";
+import { applyChanged, changedTargets, inBatches } from "./message-changes";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
 import type { SendOutcome, SendProgress } from "./outgoing";
@@ -966,9 +967,17 @@ export function ChannelView({
         async (named: readonly string[]) => {
             const asked = changedTargets(held.current, named);
             if (asked.length === 0) return;
-            const result = await actions.rereadAction({ channelId, messageIds: asked });
-            if (!result.messages) return;
-            const next = applyChanged(held.current, asked, result.messages);
+            const results = await Promise.all(
+                inBatches(asked, MAX_REREAD).map((messageIds) =>
+                    actions.rereadAction({ channelId, messageIds })
+                )
+            );
+            const fresh: ChatMessageView[] = [];
+            for (const result of results) {
+                if (!result.messages) return;
+                fresh.push(...result.messages);
+            }
+            const next = applyChanged(held.current, asked, fresh);
             if (next === held.current) return;
             if (next.length === 0) {
                 void load();
@@ -996,10 +1005,10 @@ export function ChannelView({
         useCallback(
             (frame) => {
                 if (frame.kind === "posted" && frame.channels.includes(channelId)) {
-                    void catchUp();
-                    checkCall();
                     const named = frame.changed?.[channelId];
-                    if (named) void freshenChanged(named);
+                    if (named) void freshenChanged(named).finally(() => void catchUp());
+                    else void catchUp();
+                    checkCall();
                 }
                 pinFrames.current(frame);
                 // Somebody caught up in here. Their own screens take a count

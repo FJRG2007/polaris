@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { ChatMessageView } from "../../src/lib/chat/messages";
-import { applyChanged, changedTargets } from "../../src/app/(app)/chat/message-changes";
+import { applyChanged, changedTargets, inBatches } from "../../src/app/(app)/chat/message-changes";
 
 function message(id: string, extra: Partial<ChatMessageView> = {}): ChatMessageView {
     return { id, body: `body ${id}`, deleted: false, quote: null, ...extra } as ChatMessageView;
@@ -57,5 +57,18 @@ describe("applying what came back", () => {
 
     it("hands back the same window when nothing it holds was asked about", () => {
         expect(applyChanged(held, ["z"], [])).toBe(held);
+    });
+});
+
+describe("re-reads larger than one request takes", () => {
+    it("splits a full window into requests the server accepts, in order", () => {
+        const ids = Array.from({ length: 450 }, (_, index) => `m${index}`);
+        const batches = inBatches(ids, 200);
+        expect(batches.map((batch) => batch.length)).toEqual([200, 200, 50]);
+        expect(batches.flat()).toEqual(ids);
+    });
+
+    it("asks nothing for nothing", () => {
+        expect(inBatches([], 200)).toEqual([]);
     });
 });
