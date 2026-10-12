@@ -169,9 +169,14 @@ public record WinterPlan(
         return VALUABLE.contains(itemId);
     }
 
-    /** One of the lines players read, in the server's language; {@code %s} is where a name goes. */
+    /** One of the lines players read, in the server's language: for what everybody sees, like a name over a head. */
     public String words(Line line) {
         return spanish ? line.spanish : line.english;
+    }
+
+    /** One of the lines players read, in the language of the player whose client reports {@code clientLocale}; {@code %s} is where a name goes. */
+    public String words(Line line, String clientLocale) {
+        return PlayerLanguage.spanish(clientLocale, spanish) ? line.spanish : line.english;
     }
 
     /** What players read: chat, titles, and the names over heads and on presents. */

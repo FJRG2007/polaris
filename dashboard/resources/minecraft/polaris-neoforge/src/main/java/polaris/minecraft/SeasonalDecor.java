@@ -1,6 +1,8 @@
 package polaris.minecraft;
 
 import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,9 +29,12 @@ import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.SnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.level.ChunkWatchEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -54,9 +59,18 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  *
  * Sparse and the same each time: every chunk is decided from the world's seed
  * and its coordinates alone, so a pumpkin never moves. A few chunks around each
- * player are decided per second, within a budget, and what was sent is sent
- * again now and then - a chunk the player's game loaded again gets it back,
- * and a block that changed since loses it.
+ * player are decided per second, within a budget. A chunk sent to a player's
+ * game again (which wipes what it was shown there) gets its decorations back
+ * straight after it, and what was sent is sent again now and then - a block
+ * that changed since loses it.
+ *
+ * A decoration a player hits comes down on that first hit, for everybody, and
+ * stays down for the rest of the season ({@link BrokenDecor}, kept beside the
+ * world): the hit is called off, so the real block under it - the grass under a
+ * pumpkin, the leaves under a light - is neither broken nor dropped. Left to the
+ * game, the hit broke that real block instead (a hole, and dirt), or nothing at
+ * all where the decoration stood in air, and the next time the chunk was
+ * decided the decoration stood there again.
  *
  * Server thread only: the commands and the tick both run there.
  */
@@ -101,6 +115,8 @@ final class SeasonalDecor {
     /** Halloween chunks with a pumpkin, and of those, the ones with two, in percent. */
     private static final int PUMPKIN_CHUNKS = 45;
     private static final int TWO_PUMPKIN_CHUNKS = 30;
+    /** Where the decorations players knocked down are kept, beside the world. */
+    private static final String BROKEN_FILE = "polaris-season-broken.json";
 
     /** One block a player's game was told is something else, and what it really was. */
     private record Fake(BlockPos pos, BlockState real, BlockState shown) {}
@@ -120,6 +136,8 @@ final class SeasonalDecor {
     /** {minX, minZ, maxX, maxZ}, padded, oldest first. */
     private static final ArrayDeque<long[]> avoided = new ArrayDeque<>();
     private static int ticks;
+    private static BrokenDecor broken = new BrokenDecor();
+    private static Path brokenFile;
 
     // ------------------------------------------------------------------ commands
 
@@ -134,6 +152,7 @@ final class SeasonalDecor {
         }
         season = next;
         told = true;
+        keepBroken(server, next);
         untilMillis = System.currentTimeMillis() + Math.min(Math.max(seconds, 1), MAX_HOLD_SECONDS) * 1000L;
         SeasonalMobs.configure(server, spawns, golems);
         return status();
@@ -168,6 +187,7 @@ final class SeasonalDecor {
         for (Seen one : seen.values()) for (List<Fake> fakes : one.chunks.values()) blocks += fakes.size();
         reply.addProperty("players", seen.size());
         reply.addProperty("blocks", blocks);
+        reply.addProperty("broken", broken.size());
         SeasonalMobs.status(reply);
         return reply;
     }
@@ -300,16 +320,7 @@ final class SeasonalDecor {
             ChunkPos pos = new ChunkPos(chunk.getKey());
             if (Math.abs(pos.x - at.x) > RADIUS || Math.abs(pos.z - at.z) > RADIUS) continue;
             if (chunk.getValue().isEmpty() || !level.hasChunk(pos.x, pos.z)) continue;
-            List<Fake> kept = new ArrayList<>(chunk.getValue().size());
-            for (Fake fake : chunk.getValue()) {
-                if (level.getBlockState(fake.pos()) == fake.real()) {
-                    show(player, fake);
-                    kept.add(fake);
-                } else {
-                    restore(player, fake);
-                }
-            }
-            chunk.setValue(kept);
+            chunk.setValue(showStill(player, level, chunk.getValue()));
         }
     }
 
@@ -323,28 +334,117 @@ final class SeasonalDecor {
     }
 
     /**
-     * Whether this player is shown a pumpkin at {@code pos}; if so it is taken
-     * down for them (their game shows the real block again) and not shown again
-     * until the chunk is decided anew. For {@link SeasonalHalloween}'s traps.
+     * A player hit a decoration they are shown: it comes down for everybody and
+     * is remembered as broken for the rest of the season. Thin snow takes the
+     * snowy look of the ground under it along. Returns what was shown there, or
+     * null when nothing was - and for a real block only drawn differently (the
+     * snowy grass), which the player is digging and is left to the game.
      */
-    static boolean takePumpkin(ServerPlayer player, BlockPos pos) {
+    static BlockState takeDown(ServerPlayer player, BlockPos pos) {
         Seen one = seen.get(player.getUUID());
-        if (one == null || one.dimension != player.serverLevel().dimension()) return false;
-        long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
-        List<Fake> fakes = one.chunks.get(key);
-        if (fakes == null) return false;
-        for (int i = 0; i < fakes.size(); i++) {
-            Fake fake = fakes.get(i);
-            if (!fake.pos().equals(pos) || !pumpkin(fake.shown())) continue;
-            List<Fake> kept = new ArrayList<>(fakes);
-            kept.remove(i);
-            one.chunks.put(key, kept);
-            restore(player, fake);
-            return true;
+        if (one == null || one.dimension != player.serverLevel().dimension()) return null;
+        List<Fake> fakes = one.chunks.get(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4));
+        if (fakes == null) return null;
+        Fake hit = null;
+        for (Fake fake : fakes) if (fake.pos().equals(pos)) hit = fake;
+        if (hit == null || redrawn(hit)) return null;
+        if (broken.add(pos.asLong())) writeBroken();
+        BlockPos under = hit.shown().is(Blocks.SNOW) ? pos.below() : null;
+        for (ServerPlayer other : player.serverLevel().getServer().getPlayerList().getPlayers()) {
+            Seen theirs = seen.get(other.getUUID());
+            if (theirs == null || theirs.dimension != one.dimension) continue;
+            drop(other, theirs, pos);
+            if (under != null) drop(other, theirs, under);
         }
-        return false;
+        return hit.shown();
     }
 
+    /** A real block only drawn in another state of itself, as grass drawn snowy. */
+    private static boolean redrawn(Fake fake) {
+        return fake.shown().is(fake.real().getBlock());
+    }
+
+    private static void drop(ServerPlayer player, Seen one, BlockPos pos) {
+        long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
+        List<Fake> fakes = one.chunks.get(key);
+        if (fakes == null) return;
+        List<Fake> kept = new ArrayList<>(fakes.size());
+        for (Fake fake : fakes) {
+            if (fake.pos().equals(pos)) restore(player, fake);
+            else kept.add(fake);
+        }
+        if (kept.size() != fakes.size()) one.chunks.put(key, kept);
+    }
+
+    /**
+     * The first hit on a decoration takes it down and is called off, so the real
+     * block under it stays as it is and drops nothing. Before the game's own
+     * checks: a decoration standing in air never reaches them at all.
+     */
+    @SubscribeEvent
+    public void onHit(PlayerInteractEvent.LeftClickBlock event) {
+        if (season == null || event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        BlockState shown = takeDown(player, event.getPos());
+        if (shown == null) return;
+        event.setCanceled(true);
+        if (pumpkin(shown)) SeasonalHalloween.trap(player, player.serverLevel(), event.getPos());
+    }
+
+    /** A chunk sent to a player's game again wiped what it was shown there: show it again, after it. */
+    @SubscribeEvent
+    public void onChunkSent(ChunkWatchEvent.Sent event) {
+        if (season == null) return;
+        ServerPlayer player = event.getPlayer();
+        Seen one = seen.get(player.getUUID());
+        if (one == null || one.dimension != event.getLevel().dimension()) return;
+        long key = event.getPos().toLong();
+        List<Fake> fakes = one.chunks.get(key);
+        if (fakes == null || fakes.isEmpty()) return;
+        one.chunks.put(key, showStill(player, event.getLevel(), fakes));
+    }
+
+    /** Show again what is still true, and put back what changed underneath; what is still shown. */
+    private static List<Fake> showStill(ServerPlayer player, ServerLevel level, List<Fake> fakes) {
+        List<Fake> kept = new ArrayList<>(fakes.size());
+        for (Fake fake : fakes) {
+            if (level.getBlockState(fake.pos()) == fake.real()) {
+                show(player, fake);
+                kept.add(fake);
+            } else {
+                restore(player, fake);
+            }
+        }
+        return kept;
+    }
+
+    /** The broken list for this season, read from beside the world the first time. */
+    private static void keepBroken(MinecraftServer server, Season next) {
+        if (brokenFile == null) {
+            brokenFile = server.getWorldPath(LevelResource.ROOT).resolve(BROKEN_FILE);
+            try {
+                broken = BrokenDecor.read(brokenFile);
+            } catch (IOException unreadable) {
+                PolarisMod.LOG.warn("Polaris could not read {}; decorations broken before come back", brokenFile, unreadable);
+            }
+        }
+        if (broken.keepFor(next.name().toLowerCase(Locale.ROOT), System.currentTimeMillis())) writeBroken();
+    }
+
+    private static void writeBroken() {
+        if (brokenFile == null) return;
+        try {
+            broken.write(brokenFile);
+        } catch (IOException failed) {
+            PolarisMod.LOG.warn("Polaris could not write {}", brokenFile, failed);
+        }
+    }
+
+    /** Whether a decoration was knocked down: itself, or the ground drawn snowy under thin snow that was. */
+    private static boolean wasBroken(Fake fake) {
+        if (broken.contains(fake.pos().asLong())) return true;
+        return redrawn(fake) && broken.contains(fake.pos().above().asLong());
+    }
     private static boolean pumpkin(BlockState state) {
         return state.is(Blocks.PUMPKIN) || state.is(Blocks.CARVED_PUMPKIN) || state.is(Blocks.JACK_O_LANTERN);
     }
@@ -464,6 +564,7 @@ final class SeasonalDecor {
             // Christmas: more snow, and lights on the trees (SeasonalWinterDecor).
             SeasonalWinterDecor.decide(level, cx, cz, (pos, shown) -> fakes.add(new Fake(pos, level.getBlockState(pos), shown)));
         }
+        fakes.removeIf(SeasonalDecor::wasBroken);
         return fakes;
     }
 

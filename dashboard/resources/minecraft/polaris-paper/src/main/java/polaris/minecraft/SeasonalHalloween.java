@@ -49,7 +49,6 @@ import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -145,6 +144,7 @@ final class SeasonalHalloween implements Listener {
     SeasonalHalloween(Plugin plugin, SeasonalDecor decor) {
         this.plugin = plugin;
         this.decor = decor;
+        decor.onPumpkinTaken(this::trap);
     }
 
     void start() {
@@ -307,11 +307,16 @@ final class SeasonalHalloween implements Listener {
         if (!halloween() || event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.NATURAL) return;
         LivingEntity mob = event.getEntity();
         World world = mob.getWorld();
-        if (world.getEnvironment() != World.Environment.NORMAL) return;
-        long time = world.getTime();
-        if (time < 13_000 || time > 23_000) return;
         if (!(mob instanceof Monster) || mob instanceof Phantom || mob instanceof Witch) return;
         SeasonalMobs mobs = decor.mobs();
+        // The Nether and the End have no night of their own: the blood night is
+        // the overworld's, and it doubles their spawns too. Witches stay at home.
+        if (world.getEnvironment() != World.Environment.NORMAL) {
+            if (bloodActive) mobs.queueExtra(world, mob.getType(), event.getLocation());
+            return;
+        }
+        long time = world.getTime();
+        if (time < 13_000 || time > 23_000) return;
         if (settings.witchPercent() > 0 && random.nextInt(100 * 100) < WITCH_BASE * settings.witchPercent()) {
             mobs.queueExtra(world, EntityType.WITCH, event.getLocation());
         }
@@ -387,21 +392,17 @@ final class SeasonalHalloween implements Listener {
     // ------------------------------------------------------------------ trap pumpkins
 
     /**
-     * A player breaking a decorative pumpkin is breaking the grass under it: the
-     * break is called off (the ground stays) and their game shows the grass again.
+     * A decorative pumpkin a player knocked down ({@link SeasonalDecor#takeDown}),
+     * which may have been a trap. The hit on it was already called off, so the
+     * grass under it stays.
      */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onBreak(BlockBreakEvent event) {
+    private void trap(Player player, Block block) {
         if (!halloween() || settings.trapPercent() == 0) return;
-        Player player = event.getPlayer();
-        Block block = event.getBlock();
         World world = block.getWorld();
         Random trap = new Random(world.getSeed() ^ pack(block.getX(), block.getY(), block.getZ()) * 0x9E3779B97F4A7C15L ^ 0x7A3C0FFEEL);
         if (trap.nextInt(100 * 100) >= TRAP_BASE * settings.trapPercent()) return;
         Integer last = trapAt.get(player.getUniqueId());
         if (last != null && ticks - last < TRAP_COOLDOWN) return;
-        if (!decor.takePumpkin(player, block)) return;
-        event.setCancelled(true);
         trapAt.put(player.getUniqueId(), ticks);
         Location at = block.getLocation().add(0.5, 1, 0.5);
         world.spawnParticle(Particle.LARGE_SMOKE, at, 16, 0.4, 0.4, 0.4, 0.02);
@@ -422,27 +423,34 @@ final class SeasonalHalloween implements Listener {
         }
         int key = settings.bloodKey();
         if (key == 0 || key == bloodDone || !night) return;
-        // Only a night that has most of itself left, with somebody here to see it.
-        if (world.getTime() > 18_000 || world.getPlayers().isEmpty()) return;
+        // Only a night that has most of itself left, with somebody here to see it -
+        // in any world, since the blood night reaches all of them.
+        if (world.getTime() > 18_000 || Bukkit.getOnlinePlayers().isEmpty()) return;
         bloodActive = true;
         bloodDone = key;
         save();
-        broadcast(ChatColor.DARK_RED + settings.words(HalloweenSettings.Line.BLOOD_START));
+        broadcast(HalloweenSettings.Line.BLOOD_START, ChatColor.DARK_RED);
     }
 
     private void endBloodNight() {
         bloodActive = false;
-        broadcast(ChatColor.GRAY + settings.words(HalloweenSettings.Line.BLOOD_END));
+        broadcast(HalloweenSettings.Line.BLOOD_END, ChatColor.GRAY);
     }
 
-    private static void broadcast(String line) {
-        for (Player player : Bukkit.getOnlinePlayers()) player.sendMessage(line);
+    /** Every player online gets the line in their own language. */
+    private void broadcast(HalloweenSettings.Line line, ChatColor color) {
+        for (Player player : Bukkit.getOnlinePlayers()) player.sendMessage(color + words(player, line));
+    }
+
+    /** A line for one player, in their client's language. */
+    private String words(Player player, HalloweenSettings.Line line) {
+        return settings.words(line, player.getLocale());
     }
 
     private void fog() {
         Particle.DustOptions red = new Particle.DustOptions(Color.fromRGB(0x8A, 0x03, 0x03), 3.0f);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.getWorld().getEnvironment() != World.Environment.NORMAL || player.getGameMode() == GameMode.SPECTATOR) continue;
+            if (player.getGameMode() == GameMode.SPECTATOR) continue;
             Location at = player.getLocation();
             player.spawnParticle(Particle.DUST, at.getX(), at.getY() + 1, at.getZ(), 10, 9, 2, 9, 0, red);
         }
@@ -481,6 +489,7 @@ final class SeasonalHalloween implements Listener {
                 equipment.setHelmet(new ItemStack(lit ? Material.JACK_O_LANTERN : Material.CARVED_PUMPKIN));
                 equipment.setHelmetDropChance(0f);
             }
+            // A name over a head is seen by everybody at once, so it stays in the server's language.
             villager.setCustomName(ChatColor.GOLD + settings.words(HalloweenSettings.Line.TRICK_NAME));
             villager.setCustomNameVisible(true);
             villager.addScoreboardTag(TAG);
@@ -498,7 +507,7 @@ final class SeasonalHalloween implements Listener {
         ItemStack held = player.getInventory().getItemInMainHand();
         Material type = held.getType();
         if (type != Material.PUMPKIN && type != Material.CARVED_PUMPKIN && type != Material.JACK_O_LANTERN) {
-            actionBar(player, settings.words(HalloweenSettings.Line.TRICK_ASK));
+            actionBar(player, words(player, HalloweenSettings.Line.TRICK_ASK));
             return;
         }
         int given = treatsGiven.getOrDefault(villager.getUniqueId(), 0);
@@ -509,7 +518,7 @@ final class SeasonalHalloween implements Listener {
         if (random.nextInt(100) < TRICK_SCARE_CHANCE) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0));
             world.playSound(villager.getLocation(), "minecraft:entity.witch.celebrate", 1f, 1f);
-            actionBar(player, ChatColor.DARK_PURPLE + settings.words(HalloweenSettings.Line.TRICK_SCARE));
+            actionBar(player, ChatColor.DARK_PURPLE + words(player, HalloweenSettings.Line.TRICK_SCARE));
             return;
         }
         int roll = random.nextInt(100);
@@ -520,7 +529,7 @@ final class SeasonalHalloween implements Listener {
         for (ItemStack left : player.getInventory().addItem(treat).values()) world.dropItemNaturally(player.getLocation(), left);
         world.playSound(villager.getLocation(), "minecraft:entity.villager.yes", 1f, 1f);
         world.spawnParticle(Particle.HAPPY_VILLAGER, villager.getLocation().add(0, 1.8, 0), 6, 0.3, 0.3, 0.3, 0);
-        actionBar(player, ChatColor.GOLD + settings.words(HalloweenSettings.Line.TRICK_TREAT));
+        actionBar(player, ChatColor.GOLD + words(player, HalloweenSettings.Line.TRICK_TREAT));
     }
 
     private static void actionBar(Player player, String line) {
@@ -549,6 +558,7 @@ final class SeasonalHalloween implements Listener {
                 equipment.setHelmetDropChance(0f);
                 equipment.setItemInMainHand(new ItemStack(Material.BOW));
             }
+            // A name over a head is seen by everybody at once, so it stays in the server's language.
             spawned.setCustomName(ChatColor.GOLD + settings.words(HalloweenSettings.Line.HORSEMAN));
             spawned.setCustomNameVisible(true);
             spawned.addScoreboardTag(TAG);

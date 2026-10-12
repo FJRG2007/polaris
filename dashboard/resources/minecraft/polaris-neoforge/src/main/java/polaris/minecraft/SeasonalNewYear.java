@@ -3,11 +3,13 @@ package polaris.minecraft;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.util.ArrayDeque;
 import java.util.List;
+import java.util.function.Function;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
@@ -73,26 +75,26 @@ final class SeasonalNewYear {
             if (second > 0 && second != shown) {
                 shown = second;
                 if (second == WinterPlan.COUNTDOWN_SECONDS) {
-                    broadcast(server, Component.literal(plan.words(WinterPlan.Line.NEW_YEAR_SOON)).withStyle(ChatFormatting.GOLD));
+                    broadcast(server, player -> words(plan, player, WinterPlan.Line.NEW_YEAR_SOON).withStyle(ChatFormatting.GOLD));
                 }
-                title(server, Component.literal(Integer.toString(second)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), null);
+                Component count = Component.literal(Integer.toString(second)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
+                title(server, player -> count, null);
             } else if (second == 0) {
                 shown = 0;
             }
             if (WinterPlan.celebrating(now, plan.newYearAt()) && once(server, SeasonalWinterStore.NEW_YEAR_DONE, plan.newYearAt())) {
-                title(server, Component.literal(plan.words(WinterPlan.Line.NEW_YEAR)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
-                        Component.literal(plan.words(WinterPlan.Line.NEW_YEAR_GIFT)).withStyle(ChatFormatting.YELLOW));
-                broadcast(server, Component.literal(plan.words(WinterPlan.Line.NEW_YEAR_ALL)).withStyle(ChatFormatting.GOLD));
+                title(server, player -> words(plan, player, WinterPlan.Line.NEW_YEAR).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                        player -> words(plan, player, WinterPlan.Line.NEW_YEAR_GIFT).withStyle(ChatFormatting.YELLOW));
+                broadcast(server, player -> words(plan, player, WinterPlan.Line.NEW_YEAR_ALL).withStyle(ChatFormatting.GOLD));
                 show(server);
                 gift(server, rockets(4), new ItemStack(Items.COOKIE, 4));
             }
             if (plan.sparkles() && WinterPlan.lastHour(now, plan.newYearAt()) && ticks % SPARKLE_TICKS == 0) sparkle(server);
         }
         if (plan.eve() && WinterPlan.celebrating(now, plan.eveAt()) && once(server, SeasonalWinterStore.EVE_DONE, plan.eveAt())) {
-            title(server, Component.literal(plan.words(WinterPlan.Line.CHRISTMAS)).withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
-                    Component.literal(plan.words(WinterPlan.Line.CHRISTMAS_GIFT)).withStyle(ChatFormatting.GREEN));
-            broadcast(server, Component.literal(plan.words(WinterPlan.Line.CHRISTMAS_ALL))
-                    .withStyle(ChatFormatting.RED));
+            title(server, player -> words(plan, player, WinterPlan.Line.CHRISTMAS).withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+                    player -> words(plan, player, WinterPlan.Line.CHRISTMAS_GIFT).withStyle(ChatFormatting.GREEN));
+            broadcast(server, player -> words(plan, player, WinterPlan.Line.CHRISTMAS_ALL).withStyle(ChatFormatting.RED));
             show(server);
             gift(server, new ItemStack(Items.CAKE), new ItemStack(Items.COOKIE, 8));
         }
@@ -116,15 +118,21 @@ final class SeasonalNewYear {
         return stack;
     }
 
-    private static void broadcast(MinecraftServer server, Component message) {
-        server.getPlayerList().broadcastSystemMessage(message, false);
+    /** A line for one player, in their client's language. */
+    private static MutableComponent words(WinterPlan plan, ServerPlayer player, WinterPlan.Line line) {
+        return Component.literal(plan.words(line, player.clientInformation().language()));
     }
 
-    private static void title(MinecraftServer server, Component title, Component subtitle) {
+    /** Every player online gets the message made for them, so each reads their own language. */
+    private static void broadcast(MinecraftServer server, Function<ServerPlayer, Component> message) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) player.sendSystemMessage(message.apply(player));
+    }
+
+    private static void title(MinecraftServer server, Function<ServerPlayer, Component> title, Function<ServerPlayer, Component> subtitle) {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             player.connection.send(new ClientboundSetTitlesAnimationPacket(0, 30, 10));
-            if (subtitle != null) player.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
-            player.connection.send(new ClientboundSetTitleTextPacket(title));
+            if (subtitle != null) player.connection.send(new ClientboundSetSubtitleTextPacket(subtitle.apply(player)));
+            player.connection.send(new ClientboundSetTitleTextPacket(title.apply(player)));
         }
     }
 

@@ -3,6 +3,7 @@ package polaris.minecraft;
 import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
@@ -69,24 +70,25 @@ final class SeasonalNewYear {
             int second = WinterPlan.countdown(now, plan.newYearAt());
             if (second > 0 && second != shown) {
                 shown = second;
-                if (second == WinterPlan.COUNTDOWN_SECONDS) broadcast(ChatColor.GOLD + plan.words(WinterPlan.Line.NEW_YEAR_SOON));
-                title(ChatColor.GOLD + "" + ChatColor.BOLD + second, "");
+                if (second == WinterPlan.COUNTDOWN_SECONDS) broadcast(player -> ChatColor.GOLD + words(plan, player, WinterPlan.Line.NEW_YEAR_SOON));
+                String count = ChatColor.GOLD + "" + ChatColor.BOLD + second;
+                title(player -> count, player -> "");
             } else if (second == 0) {
                 shown = 0;
             }
             if (WinterPlan.celebrating(now, plan.newYearAt()) && once(SeasonalWinterStore.NEW_YEAR_DONE, plan.newYearAt())) {
-                title(ChatColor.GOLD + "" + ChatColor.BOLD + plan.words(WinterPlan.Line.NEW_YEAR),
-                        ChatColor.YELLOW + plan.words(WinterPlan.Line.NEW_YEAR_GIFT));
-                broadcast(ChatColor.GOLD + plan.words(WinterPlan.Line.NEW_YEAR_ALL));
+                title(player -> ChatColor.GOLD + "" + ChatColor.BOLD + words(plan, player, WinterPlan.Line.NEW_YEAR),
+                        player -> ChatColor.YELLOW + words(plan, player, WinterPlan.Line.NEW_YEAR_GIFT));
+                broadcast(player -> ChatColor.GOLD + words(plan, player, WinterPlan.Line.NEW_YEAR_ALL));
                 show();
                 gift(rockets(4), new ItemStack(Material.COOKIE, 4));
             }
             if (plan.sparkles() && WinterPlan.lastHour(now, plan.newYearAt()) && ticks % SPARKLE_TICKS == 0) sparkle();
         }
         if (plan.eve() && WinterPlan.celebrating(now, plan.eveAt()) && once(SeasonalWinterStore.EVE_DONE, plan.eveAt())) {
-            title(ChatColor.RED + "" + ChatColor.BOLD + plan.words(WinterPlan.Line.CHRISTMAS),
-                    ChatColor.GREEN + plan.words(WinterPlan.Line.CHRISTMAS_GIFT));
-            broadcast(ChatColor.RED + plan.words(WinterPlan.Line.CHRISTMAS_ALL));
+            title(player -> ChatColor.RED + "" + ChatColor.BOLD + words(plan, player, WinterPlan.Line.CHRISTMAS),
+                    player -> ChatColor.GREEN + words(plan, player, WinterPlan.Line.CHRISTMAS_GIFT));
+            broadcast(player -> ChatColor.RED + words(plan, player, WinterPlan.Line.CHRISTMAS_ALL));
             show();
             gift(new ItemStack(Material.CAKE), new ItemStack(Material.COOKIE, 8));
         }
@@ -114,12 +116,18 @@ final class SeasonalNewYear {
         return stack;
     }
 
-    private static void broadcast(String message) {
-        for (Player player : Bukkit.getOnlinePlayers()) player.sendMessage(message);
+    /** A line for one player, in their client's language. */
+    private static String words(WinterPlan plan, Player player, WinterPlan.Line line) {
+        return plan.words(line, player.getLocale());
     }
 
-    private static void title(String title, String subtitle) {
-        for (Player player : Bukkit.getOnlinePlayers()) player.sendTitle(title, subtitle, 0, 30, 10);
+    /** Every player online gets the message made for them, so each reads their own language. */
+    private static void broadcast(Function<Player, String> message) {
+        for (Player player : Bukkit.getOnlinePlayers()) player.sendMessage(message.apply(player));
+    }
+
+    private static void title(Function<Player, String> title, Function<Player, String> subtitle) {
+        for (Player player : Bukkit.getOnlinePlayers()) player.sendTitle(title.apply(player), subtitle.apply(player), 0, 30, 10);
     }
 
     private static void gift(ItemStack... items) {

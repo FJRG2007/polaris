@@ -90,9 +90,14 @@ record HalloweenSettings(
         return day >= 20_000_101 && day <= 99_991_231 ? day : 0;
     }
 
-    /** One of the lines players read, in the server's language. */
+    /** One of the lines players read, in the server's language: for what everybody sees, like a name over a head. */
     String words(Line line) {
         return spanish ? line.spanish : line.english;
+    }
+
+    /** One of the lines players read, in the language of the player whose client reports {@code clientLocale}. */
+    String words(Line line, String clientLocale) {
+        return PlayerLanguage.spanish(clientLocale, spanish) ? line.spanish : line.english;
     }
 
     /** What players read: chat, names over heads, and the lines above the hotbar. */

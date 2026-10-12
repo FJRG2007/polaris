@@ -2155,9 +2155,12 @@ export function minScoreOf(preset: EventPreset): number {
  * Whether the event happens on the surface of the Overworld - a chest, a boss, a
  * circle, a finish line, a night - and so only counts the players who are there.
  * A player in the Nether cannot reach a chest in the Overworld, and a mining
- * rush or a trivia game does not care where anybody is.
+ * rush or a trivia game does not care where anybody is. An event held in the
+ * sky takes its players up from whichever world they are in and sends them back
+ * there after, so it counts them all (`plan.playersFor`).
  */
 export function needsOverworld(preset: EventPreset): boolean {
+    if (heldWhere(preset) === "sky") return false;
     switch (preset.kind) {
         case "supply-drop":
         case "world-boss":
@@ -2166,15 +2169,6 @@ export function needsOverworld(preset: EventPreset): boolean {
         case "treasure-hunt":
         case "waves":
         case "meteor-shower":
-        case "parkour":
-        case "spleef":
-        case "tnt-run":
-        case "boat-race":
-        case "dropper":
-        case "nether-maze":
-        case "acid-rain":
-        case "elytra-race":
-        case "downhill-race":
         case "village-defense":
             return true;
         case "explorer":

@@ -336,6 +336,7 @@ final class SeasonalWinter {
         golem.moveTo(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5, level.random.nextFloat() * 360f, 0f);
         golem.setPumpkin(pumpkin);
         golem.addTag(tag);
+        // Names over heads are seen by everybody at once, so they stay in the server's language.
         if (!pumpkin) golem.setCustomName(Component.literal(plan.words(WinterPlan.Line.SNOWMAN)).withStyle(ChatFormatting.AQUA));
         level.addFreshEntity(golem);
     }
@@ -402,6 +403,7 @@ final class SeasonalWinter {
         santa.setVillagerData(santa.getVillagerData().setType(VillagerType.SNOW)
                 .setProfession(VillagerProfession.CLERIC).setLevel(5));
         santa.setOffers(santaOffers());
+        // A name over a head is seen by everybody at once, so it stays in the server's language.
         santa.setCustomName(Component.literal(plan.words(WinterPlan.Line.SANTA)).withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
         santa.setCustomNameVisible(true);
         santa.setInvulnerable(true);
@@ -409,7 +411,7 @@ final class SeasonalWinter {
         overworld.addFreshEntity(santa);
         SeasonalWinterStore.data(server).putLong(SeasonalWinterStore.SANTA_NIGHT, night + 1);
         SeasonalWinterStore.save(server);
-        visited.sendSystemMessage(Component.literal(plan.words(WinterPlan.Line.SANTA_VISITS))
+        visited.sendSystemMessage(Component.literal(plan.words(WinterPlan.Line.SANTA_VISITS, visited.clientInformation().language()))
                 .withStyle(ChatFormatting.RED));
     }
 

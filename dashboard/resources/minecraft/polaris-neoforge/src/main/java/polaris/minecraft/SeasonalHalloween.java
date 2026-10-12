@@ -70,7 +70,6 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -87,7 +86,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - Trap pumpkins: a decorative pumpkin a player breaks may let out bats or a
  *   baby zombie; the ground under it, which is all that is really there, stays.
  * - Blood night: once a season, on the night the dashboard names - red fog,
- *   a second spawn for every natural one, double loot and experience.
+ *   a second spawn for every natural one, double loot and experience. The
+ *   night is the overworld's, but it reaches every dimension: somebody in the
+ *   Nether is under the same blood night as everybody else.
  * - Trick or treat: a villager in a pumpkin that takes one and gives a treat,
  *   or a short scare; three at most, then it goes.
  * - Phantoms: a few at night over players under the open sky, slept or not,
@@ -317,11 +318,17 @@ final class SeasonalHalloween {
         if (SeasonalDecor.season() != SeasonalDecor.Season.HALLOWEEN || event.isSpawnCancelled()) return;
         if (event.getSpawnType() != EntitySpawnReason.NATURAL || SeasonalMobs.spawningExtra()) return;
         ServerLevel level = event.getLevel().getLevel();
-        if (level.dimension() != Level.OVERWORLD || !level.isNight()) return;
         Mob mob = event.getEntity();
         if (!(mob instanceof Monster) || mob.getType().getCategory() != MobCategory.MONSTER
                 || mob instanceof Phantom || mob instanceof Witch) return;
         BlockPos pos = BlockPos.containing(event.getX(), event.getY(), event.getZ());
+        // The Nether and the End have no night of their own: the blood night is
+        // the overworld's, and it doubles their spawns too. Witches stay at home.
+        if (level.dimension() != Level.OVERWORLD) {
+            if (bloodActive) SeasonalMobs.queueExtra(level, mob.getType(), pos);
+            return;
+        }
+        if (!level.isNight()) return;
         if (settings.witchPercent() > 0 && level.random.nextInt(100 * 100) < WITCH_BASE * settings.witchPercent()) {
             SeasonalMobs.queueExtra(level, EntityType.WITCH, pos);
         }
@@ -408,20 +415,16 @@ final class SeasonalHalloween {
     // ------------------------------------------------------------------ trap pumpkins
 
     /**
-     * A player breaking a decorative pumpkin is breaking the grass under it: the
-     * break is called off (the ground stays) and their game shows the grass again.
+     * A decorative pumpkin a player knocked down ({@link SeasonalDecor#takeDown}),
+     * which may have been a trap. The hit on it was already called off, so the
+     * grass under it stays.
      */
-    @SubscribeEvent
-    public void onBreak(BlockEvent.BreakEvent event) {
+    static void trap(ServerPlayer player, ServerLevel level, BlockPos pos) {
         if (SeasonalDecor.season() != SeasonalDecor.Season.HALLOWEEN || settings.trapPercent() == 0) return;
-        if (!(event.getPlayer() instanceof ServerPlayer player) || !(event.getLevel() instanceof ServerLevel level)) return;
-        BlockPos pos = event.getPos();
         Random trap = new Random(level.getSeed() ^ pos.asLong() * 0x9E3779B97F4A7C15L ^ 0x7A3C0FFEEL);
         if (trap.nextInt(100 * 100) >= TRAP_BASE * settings.trapPercent()) return;
         Integer last = trapAt.get(player.getUUID());
         if (last != null && ticks - last < TRAP_COOLDOWN) return;
-        if (!SeasonalDecor.takePumpkin(player, pos)) return;
-        event.setCanceled(true);
         trapAt.put(player.getUUID(), ticks);
         double x = pos.getX() + 0.5;
         double y = pos.getY() + 1;
@@ -449,26 +452,37 @@ final class SeasonalHalloween {
         int key = settings.bloodKey();
         if (key == 0 || key == bloodDone || !night) return;
         long time = level.getDayTime() % 24_000L;
-        // Only a night that has most of itself left, with somebody here to see it.
-        if (time > 18_000 || level.players().isEmpty()) return;
+        // Only a night that has most of itself left, with somebody here to see it -
+        // in any dimension, since the blood night reaches all of them.
+        if (time > 18_000 || server.getPlayerList().getPlayers().isEmpty()) return;
         bloodActive = true;
         bloodDone = key;
         save();
-        server.getPlayerList().broadcastSystemMessage(
-                Component.literal(settings.words(HalloweenSettings.Line.BLOOD_START)).withStyle(ChatFormatting.DARK_RED), false);
+        tell(server, HalloweenSettings.Line.BLOOD_START, ChatFormatting.DARK_RED);
     }
 
     private static void endBloodNight(MinecraftServer server) {
         bloodActive = false;
-        server.getPlayerList().broadcastSystemMessage(
-                Component.literal(settings.words(HalloweenSettings.Line.BLOOD_END)).withStyle(ChatFormatting.GRAY), false);
+        tell(server, HalloweenSettings.Line.BLOOD_END, ChatFormatting.GRAY);
+    }
+
+    /** Every player online gets the line in their own language. */
+    private static void tell(MinecraftServer server, HalloweenSettings.Line line, ChatFormatting style) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(Component.literal(words(player, line)).withStyle(style));
+        }
+    }
+
+    /** A line for one player, in their client's language. */
+    private static String words(ServerPlayer player, HalloweenSettings.Line line) {
+        return settings.words(line, player.clientInformation().language());
     }
 
     private static void fog(MinecraftServer server) {
         DustParticleOptions red = new DustParticleOptions(0x8A0303, 3.0f);
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerLevel level = player.serverLevel();
-            if (level.dimension() != Level.OVERWORLD || player.isSpectator()) continue;
+            if (player.isSpectator()) continue;
             level.sendParticles(player, red, false, false, player.getX(), player.getY() + 1, player.getZ(), 10, 9, 2, 9, 0);
         }
     }
@@ -505,6 +519,7 @@ final class SeasonalHalloween {
         villager.setVillagerData(villager.getVillagerData().setProfession(VillagerProfession.NITWIT));
         villager.setItemSlot(EquipmentSlot.HEAD, new ItemStack(level.random.nextBoolean() ? Items.CARVED_PUMPKIN : Items.JACK_O_LANTERN));
         villager.setDropChance(EquipmentSlot.HEAD, 0f);
+        // A name over a head is seen by everybody at once, so it stays in the server's language.
         villager.setCustomName(Component.literal(settings.words(HalloweenSettings.Line.TRICK_NAME)).withStyle(ChatFormatting.GOLD));
         villager.setCustomNameVisible(true);
         villager.addTag(TAG);
@@ -522,7 +537,7 @@ final class SeasonalHalloween {
         if (!(villager.level() instanceof ServerLevel level)) return;
         ItemStack held = player.getItemInHand(InteractionHand.MAIN_HAND);
         if (!(held.is(Items.PUMPKIN) || held.is(Items.CARVED_PUMPKIN) || held.is(Items.JACK_O_LANTERN))) {
-            player.displayClientMessage(Component.literal(settings.words(HalloweenSettings.Line.TRICK_ASK)), true);
+            player.displayClientMessage(Component.literal(words(player, HalloweenSettings.Line.TRICK_ASK)), true);
             return;
         }
         int given = treatsGiven.getOrDefault(villager.getUUID(), 0);
@@ -533,7 +548,7 @@ final class SeasonalHalloween {
         if (random.nextInt(100) < TRICK_SCARE_CHANCE) {
             player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 60));
             level.playSound(null, villager.blockPosition(), SoundEvents.WITCH_CELEBRATE, SoundSource.NEUTRAL, 1f, 1f);
-            player.displayClientMessage(Component.literal(settings.words(HalloweenSettings.Line.TRICK_SCARE)).withStyle(ChatFormatting.DARK_PURPLE), true);
+            player.displayClientMessage(Component.literal(words(player, HalloweenSettings.Line.TRICK_SCARE)).withStyle(ChatFormatting.DARK_PURPLE), true);
             return;
         }
         int roll = random.nextInt(100);
@@ -544,7 +559,7 @@ final class SeasonalHalloween {
         if (!player.getInventory().add(treat)) player.drop(treat, false);
         level.playSound(null, villager.blockPosition(), SoundEvents.VILLAGER_YES, SoundSource.NEUTRAL, 1f, 1f);
         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 1.8, villager.getZ(), 6, 0.3, 0.3, 0.3, 0);
-        player.displayClientMessage(Component.literal(settings.words(HalloweenSettings.Line.TRICK_TREAT)).withStyle(ChatFormatting.GOLD), true);
+        player.displayClientMessage(Component.literal(words(player, HalloweenSettings.Line.TRICK_TREAT)).withStyle(ChatFormatting.GOLD), true);
     }
 
     private static void horseman(ServerLevel level, List<ServerPlayer> outside) {
@@ -567,6 +582,7 @@ final class SeasonalHalloween {
         rider.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.JACK_O_LANTERN));
         rider.setDropChance(EquipmentSlot.HEAD, 0f);
         rider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        // A name over a head is seen by everybody at once, so it stays in the server's language.
         rider.setCustomName(Component.literal(settings.words(HalloweenSettings.Line.HORSEMAN)).withStyle(ChatFormatting.GOLD));
         rider.setCustomNameVisible(true);
         rider.addTag(TAG);
