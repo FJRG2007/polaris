@@ -212,7 +212,9 @@ export async function sourceSharedWith(
     const allowed = [...(await allowedBy(viewer, "activity", ids))];
     const settings = await activitySettingsFor(allowed);
     return new Set(
-        allowed.filter((id) => core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, source))
+        allowed.filter((id) =>
+            core.activitySourceOn(settings.get(id) ?? core.DEFAULT_ACTIVITY_SETTINGS, source)
+        )
     );
 }
 
@@ -222,9 +224,10 @@ const ORDER: Record<core.ActivitySource, number> = { minecraft: 0, game: 1, spot
 /**
  * What each of these people is doing, as this reader may be told.
  *
- * Only ever asked about people the caller is drawing as here: somebody offline
- * or invisible to this reader is doing nothing as far as they know, and that
- * rule lives in the caller because it is the one that decided the dot.
+ * Asked about people the caller is drawing as here, and about those offline by
+ * their sessions alone, whom a Minecraft server here can still show as around.
+ * Somebody invisible or hidden from this reader is never passed: that rule
+ * lives in the caller because it is the one that decided the dot.
  */
 export async function activitiesFor(
     viewer: { id: string; isAdmin: boolean },
