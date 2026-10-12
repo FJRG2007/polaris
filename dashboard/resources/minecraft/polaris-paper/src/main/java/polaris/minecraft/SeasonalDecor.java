@@ -95,6 +95,9 @@ final class SeasonalDecor implements Listener {
     private static final int NEW_PER_PASS = 16;
     private static final int PASS_TICKS = 20;
     private static final int RESEND_TICKS = 600;
+    /** How often the decorations knocked down since the last write are written, so a
+     *  player breaking a row of them costs one write instead of one each. */
+    private static final int FLUSH_TICKS = 200;
     private static final int SNOW_TICKS = 5;
     private static final int ASH_TICKS = 40;
     private static final long MAX_HOLD_SECONDS = 24 * 60 * 60;
@@ -130,6 +133,8 @@ final class SeasonalDecor implements Listener {
     private final SeasonalMobs mobs = new SeasonalMobs(this);
     private BrokenDecor broken = new BrokenDecor();
     private Path brokenFile;
+    /** Knocked down since the list was last written. */
+    private boolean brokenDirty;
     private BiConsumer<Player, Block> pumpkinTaken = (player, block) -> {};
 
     SeasonalDecor(Plugin plugin) {
@@ -156,6 +161,7 @@ final class SeasonalDecor implements Listener {
         timer = null;
         revertAll();
         mobs.revert();
+        flushBroken();
         season = null;
     }
 
@@ -201,6 +207,7 @@ final class SeasonalDecor implements Listener {
 
     private JsonObject clear() {
         revertAll();
+        flushBroken();
         mobs.revert();
         season = null;
         told = true;
@@ -237,6 +244,7 @@ final class SeasonalDecor implements Listener {
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(false);
             if (ticks % PASS_TICKS == 0) pass(ticks % RESEND_TICKS == 0);
+            if (ticks % FLUSH_TICKS == 0) flushBroken();
             mobs.tick();
         } catch (RuntimeException failed) {
             // A tick must never fail over a decoration: put everything back and stop.
@@ -339,7 +347,7 @@ final class SeasonalDecor implements Listener {
         Fake hit = null;
         for (Fake fake : fakes) if (same(fake.at(), block.getX(), block.getY(), block.getZ())) hit = fake;
         if (hit == null || redrawn(hit)) return null;
-        if (broken.add(blockKey(block.getX(), block.getY(), block.getZ()))) writeBroken();
+        if (broken.add(blockKey(block.getX(), block.getY(), block.getZ()))) brokenDirty = true;
         boolean snow = hit.shown().getMaterial() == Material.SNOW;
         for (Player other : Bukkit.getOnlinePlayers()) {
             Seen theirs = seen.get(other.getUniqueId());
@@ -403,7 +411,12 @@ final class SeasonalDecor implements Listener {
         if (broken.keepFor(next.name().toLowerCase(Locale.ROOT), System.currentTimeMillis())) writeBroken();
     }
 
+    private void flushBroken() {
+        if (brokenDirty) writeBroken();
+    }
+
     private void writeBroken() {
+        brokenDirty = false;
         if (brokenFile == null) return;
         try {
             broken.write(brokenFile);
