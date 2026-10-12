@@ -787,7 +787,7 @@ export async function startEvent(input: {
                 active,
                 count: seen.size,
                 needed,
-                overworld: catalog.needsOverworld(preset) ? "yes" : "no"
+                overworld: catalog.countedWhere(preset)
             })
         );
     }
@@ -5790,7 +5790,13 @@ async function sweepOne(
         const needed = catalog.activeNeeded(preset, settings.settings);
         const ready = activeFor(preset);
         if (ready < needed) {
-            const where = catalog.needsOverworld(preset) ? " in the Overworld" : "";
+            const counted = catalog.countedWhere(preset);
+            const where =
+                counted === "yes"
+                    ? " in the Overworld"
+                    : counted === "sky"
+                      ? " (somebody has to be in the Overworld to hold it near)"
+                      : "";
             await skip(
                 installedAppId,
                 preset,

@@ -1979,7 +1979,7 @@
             "switchedOff": "Ese evento está desactivado",
             "notRunning": "El servidor no está en marcha",
             "nobodyOn": "No hay nadie en el servidor",
-            "tooFewActive": "{overworld, select, yes {Solo {active} de los {count} jugadores conectados están activos en el mundo normal; este evento espera a {needed}} other {Solo {active} de los {count} jugadores conectados están activos; este evento espera a {needed}}}",
+            "tooFewActive": "{overworld, select, yes {Solo {active} de los {count} jugadores conectados están activos en el mundo normal; este evento espera a {needed}} sky {Solo {active} de los {count} jugadores conectados pueden jugar: este evento se monta en el cielo junto a alguien del mundo normal, y espera a {needed}} other {Solo {active} de los {count} jugadores conectados están activos; este evento espera a {needed}}}",
             "notNow": "Ahora no: {reason}",
             "peaceful": "El servidor está en Pacífico, donde los mobs hostiles desaparecen nada más aparecer. Pon la dificultad en Fácil o más alta en Reglas antes.",
             "pvpBlocked": "El jugador contra jugador está Bloqueado en este servidor, y este evento lo necesita. Permítelo en Ajustes antes.",
@@ -2110,7 +2110,7 @@
             "outsideHours": "Fuera de las horas en que se sortean eventos",
             "anotherOn": "Otro evento en marcha",
             "busyNow": "Esperando: {reason}",
-            "players": "{overworld, select, yes {{needed, plural, one {Esperando a # jugador activo en el mundo normal ({have} ahora)} other {Esperando a # jugadores activos en el mundo normal ({have} ahora)}}} other {{needed, plural, one {Esperando a # jugador activo ({have} ahora)} other {Esperando a # jugadores activos ({have} ahora)}}}}",
+            "players": "{overworld, select, yes {{needed, plural, one {Esperando a # jugador activo en el mundo normal ({have} ahora)} other {Esperando a # jugadores activos en el mundo normal ({have} ahora)}}} sky {{needed, plural, one {Esperando a # jugador activo, con alguien en el mundo normal ({have} ahora)} other {Esperando a # jugadores activos, con alguien en el mundo normal ({have} ahora)}}} other {{needed, plural, one {Esperando a # jugador activo ({have} ahora)} other {Esperando a # jugadores activos ({have} ahora)}}}}",
             "couldNotStart": "El evento sorteado no pudo empezar",
             "settling": "Listo - empieza tras otra comprobación",
             "serverDown": "El servidor no responde"

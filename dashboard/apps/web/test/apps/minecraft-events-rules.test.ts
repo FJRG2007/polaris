@@ -1099,7 +1099,7 @@ describe("what the draw can pick now", () => {
         });
         expect(choices.map((one) => one.preset.id)).toEqual(["fish"]);
         expect(skipped.map((one) => [one.presetId, english(one.reason)])).toEqual([
-            ["duel", "Waiting for 2 active players (1 now)"],
+            ["duel", "Waiting for 2 active players, with somebody in the Overworld (1 now)"],
             ["quiz", "Switched off"]
         ]);
     });
@@ -1215,12 +1215,17 @@ describe("fights and worlds", () => {
             expect(plan.playersFor(sky, mixed, 5, 60_000)).toHaveLength(2);
             // Nobody in the Overworld to place it near: nobody can play it.
             expect(plan.playersFor(sky, allAway, 5, 60_000)).toHaveLength(0);
+            // And the waiting line says so, rather than that nobody is active.
+            expect(catalog.countedWhere(sky)).toBe("sky");
         }
         const fixed = {
             ...parkour,
             options: { ...parkour.options, place: { mode: "fixed", x: 0, z: 0 } }
         } as catalog.EventPreset;
         expect(plan.playersFor(fixed, allAway, 5, 60_000)).toHaveLength(2);
+        expect(catalog.countedWhere(fixed)).toBe("no");
+        expect(catalog.countedWhere(landBoss as catalog.EventPreset)).toBe("yes");
+        expect(catalog.countedWhere(catalog.newPreset("gathering", "g"))).toBe("no");
         // On the land, the Nether still does not count.
         expect(catalog.needsOverworld(landBoss as catalog.EventPreset)).toBe(true);
         expect(plan.playersFor(landBoss as catalog.EventPreset, mixed, 5, 60_000)).toHaveLength(1);

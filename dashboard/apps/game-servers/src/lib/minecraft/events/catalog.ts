@@ -2159,6 +2159,19 @@ export function minScoreOf(preset: EventPreset): number {
  * sky takes its players up from whichever world they are in and sends them back
  * there after, so it counts them all (`plan.playersFor`).
  */
+/**
+ * Which players an event counts, as the `overworld` select of the lines that
+ * say it is waiting for more: `yes` those in the Overworld, `sky` everybody but
+ * only once somebody is in the Overworld to hold it near (a sky event with no
+ * fixed spot, `plan.playersFor`), `no` everybody.
+ */
+export function countedWhere(preset: EventPreset): "yes" | "sky" | "no" {
+    if (needsOverworld(preset)) return "yes";
+    if (heldWhere(preset) !== "sky") return "no";
+    const place = (preset.options as { place?: { mode: string } }).place;
+    return place?.mode === "fixed" ? "no" : "sky";
+}
+
 export function needsOverworld(preset: EventPreset): boolean {
     if (heldWhere(preset) === "sky") return false;
     switch (preset.kind) {

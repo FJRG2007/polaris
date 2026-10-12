@@ -1979,7 +1979,7 @@
             "switchedOff": "That event is switched off",
             "notRunning": "The server is not running",
             "nobodyOn": "Nobody is on the server",
-            "tooFewActive": "{overworld, select, yes {Only {active} of the {count} players on are active in the Overworld; this event waits for {needed}} other {Only {active} of the {count} players on are active; this event waits for {needed}}}",
+            "tooFewActive": "{overworld, select, yes {Only {active} of the {count} players on are active in the Overworld; this event waits for {needed}} sky {Only {active} of the {count} players on can play: this event is held in the sky near somebody in the Overworld, and waits for {needed}} other {Only {active} of the {count} players on are active; this event waits for {needed}}}",
             "notNow": "Not now: {reason}",
             "peaceful": "The server is on Peaceful, where hostile mobs vanish as soon as they appear. Set the difficulty to Easy or harder under Rules first.",
             "pvpBlocked": "Player versus player is Blocked on this server, and this event needs it. Allow it under Settings first.",
@@ -2110,7 +2110,7 @@
             "outsideHours": "Outside the hours events are drawn in",
             "anotherOn": "Another event is on",
             "busyNow": "Waiting: {reason}",
-            "players": "{overworld, select, yes {{needed, plural, one {Waiting for # active player in the Overworld ({have} now)} other {Waiting for # active players in the Overworld ({have} now)}}} other {{needed, plural, one {Waiting for # active player ({have} now)} other {Waiting for # active players ({have} now)}}}}",
+            "players": "{overworld, select, yes {{needed, plural, one {Waiting for # active player in the Overworld ({have} now)} other {Waiting for # active players in the Overworld ({have} now)}}} sky {{needed, plural, one {Waiting for # active player, with somebody in the Overworld ({have} now)} other {Waiting for # active players, with somebody in the Overworld ({have} now)}}} other {{needed, plural, one {Waiting for # active player ({have} now)} other {Waiting for # active players ({have} now)}}}}",
             "couldNotStart": "The drawn event could not start",
             "settling": "Ready - starting after one more check",
             "serverDown": "The server is not answering"

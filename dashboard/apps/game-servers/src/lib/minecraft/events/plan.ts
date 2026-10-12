@@ -13,6 +13,7 @@ import {
     activeNeeded,
     heldWhere,
     needsOverworld,
+    countedWhere,
     runMinutes,
     type EventPreset,
     type EventSettings,
@@ -165,9 +166,7 @@ export function playersFor(
     now: number
 ): Seen[] {
     const active = activePlayers(seen, afkMinutes, now);
-    const overworld = active.filter(
-        (one) => one.dimension === null || one.dimension === OVERWORLD
-    );
+    const overworld = active.filter((one) => one.dimension === null || one.dimension === OVERWORLD);
     if (heldWhere(preset) === "sky") {
         const place = (preset.options as { place?: { mode: string } }).place;
         return place?.mode === "fixed" || overworld.length > 0 ? active : [];
@@ -350,7 +349,7 @@ export function drawable(input: {
                 reason: gameMessage("minecraft", "events.waiting.players", {
                     needed,
                     have,
-                    overworld: needsOverworld(preset) ? "yes" : "no"
+                    overworld: countedWhere(preset)
                 })
             });
             continue;
@@ -485,7 +484,7 @@ export function decideRandom(input: {
             .map((entry) => ({
                 needed: activeNeeded(entry.preset, settings),
                 have: count(entry.preset),
-                overworld: needsOverworld(entry.preset) ? "yes" : "no"
+                overworld: countedWhere(entry.preset)
             }))
             .sort((left, right) => left.needed - left.have - (right.needed - right.have))[0]!;
         return {
