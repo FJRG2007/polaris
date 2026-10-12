@@ -26,14 +26,21 @@ const score = customDef({ id: "f2", slot: "cNum2", label: "Score", kind: "number
 
 describe("field input", () => {
     it("normalizes the name and drops choices of a kind without them", () => {
-        const parsed = fieldInputSchema.parse({ label: "  Lead   source ", kind: "text", options: ["a"] });
+        const parsed = fieldInputSchema.parse({
+            label: "  Lead   source ",
+            kind: "text",
+            options: ["a"]
+        });
         expect(parsed).toEqual({ label: "Lead source", kind: "text", options: [] });
     });
 
     it("refuses a select with no choices or the same choice twice", () => {
-        expect(fieldInputSchema.safeParse({ label: "S", kind: "select", options: [] }).success).toBe(false);
         expect(
-            fieldInputSchema.safeParse({ label: "S", kind: "select", options: ["Web", " web "] }).success
+            fieldInputSchema.safeParse({ label: "S", kind: "select", options: [] }).success
+        ).toBe(false);
+        expect(
+            fieldInputSchema.safeParse({ label: "S", kind: "select", options: ["Web", " web "] })
+                .success
         ).toBe(false);
     });
 
@@ -95,7 +102,12 @@ describe("custom fields in a list", () => {
             filter: {
                 conjunction: "and",
                 rules: [
-                    { id: "a", key: "cText1", operator: "isAnyOf", value: [{ id: "Web", name: "" }] },
+                    {
+                        id: "a",
+                        key: "cText1",
+                        operator: "isAnyOf",
+                        value: [{ id: "Web", name: "" }]
+                    },
                     { id: "b", key: "cNum2", operator: "greaterThan", value: 2.5 }
                 ]
             }
@@ -108,7 +120,14 @@ describe("custom fields in a list", () => {
         const where = listWhere("companies", shelf, {
             filter: {
                 conjunction: "and",
-                rules: [{ id: "a", key: "cText1", operator: "isAnyOf", value: [{ id: "Web", name: "" }] }]
+                rules: [
+                    {
+                        id: "a",
+                        key: "cText1",
+                        operator: "isAnyOf",
+                        value: [{ id: "Web", name: "" }]
+                    }
+                ]
             }
         });
         expect(JSON.stringify(where)).not.toContain("cText1");
@@ -123,7 +142,13 @@ describe("custom fields in a list", () => {
     it("keeps a view's column for an added field and groups by an added choice", () => {
         const config = readConfig(
             "companies",
-            { columns: [{ key: "name", width: 200, hidden: false, aggregate: null }, { key: "cText1", width: 170, hidden: false, aggregate: null }], groupBy: "cText1" },
+            {
+                columns: [
+                    { key: "name", width: 200, hidden: false, aggregate: null },
+                    { key: "cText1", width: 170, hidden: false, aggregate: null }
+                ],
+                groupBy: "cText1"
+            },
             [source]
         );
         expect(config.columns.map((column) => column.key)).toContain("cText1");

@@ -101,7 +101,9 @@ export function FieldsDialog({
                         onDone={(saved, created) => {
                             setEditing(null);
                             if (created) {
-                                toast.show({ title: t("customFields.created", { name: saved.label }) });
+                                toast.show({
+                                    title: t("customFields.created", { name: saved.label })
+                                });
                                 onCreated(saved);
                             } else onChanged();
                         }}
@@ -223,7 +225,9 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
             : []
     );
     const removed =
-        field && parsed.success ? choiceChanges(field.options, parsed.data.options, renames).removed : [];
+        field && parsed.success
+            ? choiceChanges(field.options, parsed.data.options, renames).removed
+            : [];
     const forbidden = t("errors.forbidden", { verb: "delete", object });
     const removeDenied = removed.length > 0 && !canDelete;
     const blocked = busy || !parsed.success || nameTaken || unchanged || removeDenied;
@@ -324,7 +328,9 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
                                 onChange={(event) =>
                                     setRows(
                                         rows.map((one, at) =>
-                                            at === index ? { ...one, text: event.target.value } : one
+                                            at === index
+                                                ? { ...one, text: event.target.value }
+                                                : one
                                         )
                                     )
                                 }

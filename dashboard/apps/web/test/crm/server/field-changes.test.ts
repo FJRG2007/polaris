@@ -101,19 +101,27 @@ function savedConfig(): Record<string, unknown> {
 describe("choiceChanges", () => {
     it("carries a reworded choice over and removes only what is gone", () => {
         expect(
-            choiceChanges(["Enterprse", "Small", "Mid"], ["Enterprise", "Small"], [
-                { from: "Enterprse", to: "Enterprise" },
-                { from: "Small", to: "Small" }
-            ])
+            choiceChanges(
+                ["Enterprse", "Small", "Mid"],
+                ["Enterprise", "Small"],
+                [
+                    { from: "Enterprse", to: "Enterprise" },
+                    { from: "Small", to: "Small" }
+                ]
+            )
         ).toEqual({ renamed: [{ from: "Enterprse", to: "Enterprise" }], removed: ["Mid"] });
     });
 
     it("never renames onto a choice that was already there, or one choice twice", () => {
         expect(
-            choiceChanges(["A", "B"], ["B", "C"], [
-                { from: "A", to: "B" },
-                { from: "A", to: "C" }
-            ])
+            choiceChanges(
+                ["A", "B"],
+                ["B", "C"],
+                [
+                    { from: "A", to: "B" },
+                    { from: "A", to: "C" }
+                ]
+            )
         ).toEqual({ renamed: [{ from: "A", to: "C" }], removed: [] });
         expect(choiceChanges(["A", "B"], ["B"], [{ from: "A", to: "B" }])).toEqual({
             renamed: [],
@@ -189,9 +197,9 @@ describe("adding a field", () => {
     beforeEach(() => vi.clearAllMocks());
 
     it("takes the next free slot when another field took its slot at the same moment", async () => {
-        db.crmField.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
-            { ...tier, slot: "cText1", position: 1 }
-        ]);
+        db.crmField.findMany
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([{ ...tier, slot: "cText1", position: 1 }]);
         db.crmField.create
             .mockRejectedValueOnce(Object.assign(new Error("unique"), { code: "P2002" }))
             .mockImplementationOnce(async (...args: unknown[]) => {

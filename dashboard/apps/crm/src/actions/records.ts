@@ -315,7 +315,11 @@ export async function createFieldAction(input: unknown): Promise<Outcome<{ field
     const parsed = z.object({ object, field: fieldInputSchema }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
-        field: await fields.createField(await requireCrmActor(), parsed.data.object, parsed.data.field)
+        field: await fields.createField(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.field
+        )
     }));
 }
 

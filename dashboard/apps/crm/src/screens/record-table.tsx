@@ -261,8 +261,7 @@ export function RecordTable(props: TableProps) {
         );
     };
 
-    const groupLabel = (field: FieldDef, value: string) =>
-        optionLabel(t, object, field, value);
+    const groupLabel = (field: FieldDef, value: string) => optionLabel(t, object, field, value);
 
     const DraftEditor = props.draft ? editorFor(primary) : null;
     const totalWidth = BOX_WIDTH + fields.reduce((sum, { column }) => sum + column.width, 0);

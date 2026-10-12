@@ -15,7 +15,13 @@ import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import { useMemo, useState, type FormEvent } from "react";
 import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
-import { fieldsOf, type CrmObject, type FieldDef, type FieldValue, type Ref } from "../model/objects";
+import {
+    fieldsOf,
+    type CrmObject,
+    type FieldDef,
+    type FieldValue,
+    type Ref
+} from "../model/objects";
 import {
     Button,
     Dialog,

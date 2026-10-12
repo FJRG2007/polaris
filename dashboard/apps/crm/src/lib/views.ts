@@ -242,7 +242,10 @@ export async function saveViewConfig(
     const where = { id: viewId, shelf: actor.shelf.key, object };
     const result = await prisma.crmView.updateMany({
         where,
-        data: { config: JSON.stringify(clean), ...(kind ? { kind: kindFor(object, kind, custom) } : {}) }
+        data: {
+            config: JSON.stringify(clean),
+            ...(kind ? { kind: kindFor(object, kind, custom) } : {})
+        }
     });
     const row =
         result.count > 0 ? await prisma.crmView.findFirst({ where, select: VIEW_SELECT }) : null;

@@ -184,7 +184,11 @@ export function ruleComplete(
 }
 
 /** How many whole rules a filter holds, inside groups too. */
-export function activeRules(object: CrmObject, filter: ViewFilter, custom: readonly FieldDef[] = []): number {
+export function activeRules(
+    object: CrmObject,
+    filter: ViewFilter,
+    custom: readonly FieldDef[] = []
+): number {
     return filter.rules.reduce(
         (sum, item) =>
             sum +
@@ -202,7 +206,11 @@ export function optionChoice(option: string): Ref {
     return { id: option, name: "" };
 }
 
-function readRule(object: CrmObject, raw: unknown, custom: readonly FieldDef[] = []): FilterRule | null {
+function readRule(
+    object: CrmObject,
+    raw: unknown,
+    custom: readonly FieldDef[] = []
+): FilterRule | null {
     const rule = ruleSchema.safeParse(raw);
     if (!rule.success) return null;
     const field = fieldOf(object, rule.data.key, custom);
@@ -225,7 +233,11 @@ function readRule(object: CrmObject, raw: unknown, custom: readonly FieldDef[] =
  * operator cannot use is emptied, so the rule waits for one; a group left with
  * no rules is dropped. Anything unreadable is no filter.
  */
-export function readFilter(object: CrmObject, raw: unknown, custom: readonly FieldDef[] = []): ViewFilter {
+export function readFilter(
+    object: CrmObject,
+    raw: unknown,
+    custom: readonly FieldDef[] = []
+): ViewFilter {
     const parsed = z
         .object({ conjunction: z.enum(CONJUNCTIONS), rules: z.array(z.unknown()) })
         .safeParse(raw);

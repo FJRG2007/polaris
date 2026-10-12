@@ -36,7 +36,9 @@ type FieldRow = { id: string; slot: string; label: string; kind: string; options
 function readOptions(raw: string): string[] {
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((one): one is string => typeof one === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((one): one is string => typeof one === "string")
+            : [];
     } catch {
         return [];
     }
@@ -44,7 +46,13 @@ function readOptions(raw: string): string[] {
 
 function toField(row: FieldRow): CustomField | null {
     if (!validStored(row.kind, row.slot)) return null;
-    return { id: row.id, slot: row.slot, label: row.label, kind: row.kind, options: readOptions(row.options) };
+    return {
+        id: row.id,
+        slot: row.slot,
+        label: row.label,
+        kind: row.kind,
+        options: readOptions(row.options)
+    };
 }
 
 /** The fields added to a kind of record on a shelf, in the order they were added. */
@@ -133,7 +141,8 @@ async function rewriteViews(
             }
         };
         const config = JSON.stringify(readConfig(object, moved, after));
-        if (config !== view.config) await tx.crmView.update({ where: { id: view.id }, data: { config } });
+        if (config !== view.config)
+            await tx.crmView.update({ where: { id: view.id }, data: { config } });
     }
 }
 
@@ -153,9 +162,10 @@ export async function createField(
         if (sameLabel(existing, input.label)) await refuse("fieldNameTaken");
         const family = slotFamily(input.kind);
         const taken = new Set(rows.map((row) => row.slot));
-        const slot = Array.from({ length: SLOT_FAMILIES[family] }, (_, index) => `${family}${index + 1}`).find(
-            (candidate) => !taken.has(candidate)
-        );
+        const slot = Array.from(
+            { length: SLOT_FAMILIES[family] },
+            (_, index) => `${family}${index + 1}`
+        ).find((candidate) => !taken.has(candidate));
         if (!slot) return refuse("fieldSlots");
         const position = Math.max(0, ...rows.map((row) => row.position)) + 1;
         try {

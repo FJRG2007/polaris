@@ -49,7 +49,11 @@ export const fieldInputSchema = z
         input.options.forEach((option, index) => {
             const key = option.toLowerCase();
             if (seen.has(key)) {
-                context.addIssue({ code: "custom", path: ["options", index], message: "duplicate" });
+                context.addIssue({
+                    code: "custom",
+                    path: ["options", index],
+                    message: "duplicate"
+                });
             }
             seen.add(key);
         });
@@ -118,5 +122,8 @@ export function customDef(field: CustomField): FieldDef {
 /** Whether a stored row still describes a field: a known kind in the slot
  *  family that kind is kept in. */
 export function validStored(kind: string, slot: string): kind is CustomKind {
-    return (CUSTOM_KINDS as readonly string[]).includes(kind) && slotOf(slot) === slotFamily(kind as CustomKind);
+    return (
+        (CUSTOM_KINDS as readonly string[]).includes(kind) &&
+        slotOf(slot) === slotFamily(kind as CustomKind)
+    );
 }

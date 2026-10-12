@@ -314,8 +314,7 @@ function RuleEditor({
     const t = useCrmT();
     const custom = useCustomFields();
     const field = fieldOf(object, rule.key, custom)!;
-    const fieldName = (one: FieldDef) =>
-        fieldLabel(t, object, one);
+    const fieldName = (one: FieldDef) => fieldLabel(t, object, one);
     const operand = filters.operandOf(field.kind, rule.operator);
     return (
         <div className="flex flex-wrap items-center gap-2">
@@ -323,7 +322,10 @@ function RuleEditor({
                 value={rule.key}
                 aria-label={t("filters.field")}
                 className="h-8 w-40 min-w-0"
-                options={fieldsOf(object, custom).map((one) => ({ value: one.key, label: fieldName(one) }))}
+                options={fieldsOf(object, custom).map((one) => ({
+                    value: one.key,
+                    label: fieldName(one)
+                }))}
                 onValueChange={(key) => {
                     const next = fieldOf(object, key, custom);
                     if (!next || key === rule.key) return;

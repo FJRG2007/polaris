@@ -135,10 +135,7 @@ export function CellPicker({ object, field, value, people, onPick, onClose }: Pi
         [people, search]
     );
     const options = (field.options ?? []).filter((option) =>
-        menuSearchMatches(
-            optionLabel(t, object, field, option),
-            search
-        )
+        menuSearchMatches(optionLabel(t, object, field, option), search)
     );
     const clearable = field.kind !== "select" && selected !== null;
 

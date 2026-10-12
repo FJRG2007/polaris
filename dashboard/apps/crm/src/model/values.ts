@@ -156,7 +156,9 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             if (typeof value !== "number" || !Number.isFinite(value)) return no("number");
             // A number somebody added may be any amount, kept to four places.
             if (field.custom) {
-                return Math.abs(value) < MAX_AMOUNT ? ok(Math.round(value * 10_000) / 10_000) : no("number");
+                return Math.abs(value) < MAX_AMOUNT
+                    ? ok(Math.round(value * 10_000) / 10_000)
+                    : no("number");
             }
             if (!Number.isInteger(value) || value < 0 || value > 2_000_000_000) {
                 return no("wholeNumber");

@@ -66,7 +66,11 @@ export function listWhere(
     const narrowed = [
         searchWhere(object, options.search ?? ""),
         options.filter
-            ? filterWhere(object, readFilter(object, options.filter, options.custom), options.custom)
+            ? filterWhere(
+                  object,
+                  readFilter(object, options.filter, options.custom),
+                  options.custom
+              )
             : {},
         options.group ? groupWhere(object, options.group) : {}
     ].filter((part) => Object.keys(part).length > 0);
@@ -99,7 +103,12 @@ function nullableSlot(column: string): boolean {
 }
 
 function order(column: string, direction: "asc" | "desc"): Record<string, unknown> {
-    return { [column]: NULLABLE.has(column) || nullableSlot(column) ? { sort: direction, nulls: "last" } : direction };
+    return {
+        [column]:
+            NULLABLE.has(column) || nullableSlot(column)
+                ? { sort: direction, nulls: "last" }
+                : direction
+    };
 }
 
 const REF_ORDER: Readonly<Record<string, string>> = {

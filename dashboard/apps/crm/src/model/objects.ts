@@ -167,7 +167,10 @@ export function fieldOf(
     key: string,
     custom: readonly FieldDef[] = []
 ): FieldDef | undefined {
-    return FIELDS[object].find((field) => field.key === key) ?? custom.find((field) => field.key === key);
+    return (
+        FIELDS[object].find((field) => field.key === key) ??
+        custom.find((field) => field.key === key)
+    );
 }
 
 /** The field a record is named by. */

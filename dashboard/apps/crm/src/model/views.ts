@@ -86,7 +86,10 @@ export function groupable(field: FieldDef): boolean {
 }
 
 /** The fields a kind of record can be grouped or drawn as a board by. */
-export function groupFields(object: CrmObject, custom: readonly FieldDef[] = []): readonly FieldDef[] {
+export function groupFields(
+    object: CrmObject,
+    custom: readonly FieldDef[] = []
+): readonly FieldDef[] {
     return fieldsOf(object, custom).filter(groupable);
 }
 
@@ -132,7 +135,11 @@ export function defaultConfig(object: CrmObject, custom: readonly FieldDef[] = [
  * by a field that cannot group is no grouping. Anything unreadable is the
  * default.
  */
-export function readConfig(object: CrmObject, raw: unknown, custom: readonly FieldDef[] = []): ViewConfig {
+export function readConfig(
+    object: CrmObject,
+    raw: unknown,
+    custom: readonly FieldDef[] = []
+): ViewConfig {
     const base = defaultConfig(object, custom);
     const parsed = z
         .object({
@@ -187,7 +194,11 @@ export function readConfig(object: CrmObject, raw: unknown, custom: readonly Fie
     };
 }
 
-function readGroupKey(object: CrmObject, raw: unknown, custom: readonly FieldDef[] = []): string | null {
+function readGroupKey(
+    object: CrmObject,
+    raw: unknown,
+    custom: readonly FieldDef[] = []
+): string | null {
     if (typeof raw !== "string") return null;
     const field = fieldOf(object, raw, custom);
     return field && groupable(field) ? field.key : null;

@@ -92,7 +92,11 @@ function compareRule(column: string, field: FieldDef, rule: FilterRule): Where {
 }
 
 /** One whole rule as a `where`. */
-export function ruleWhere(object: CrmObject, rule: FilterRule, custom: readonly FieldDef[] = []): Where | null {
+export function ruleWhere(
+    object: CrmObject,
+    rule: FilterRule,
+    custom: readonly FieldDef[] = []
+): Where | null {
     const field = fieldOf(object, rule.key, custom);
     if (!field || !ruleComplete(object, rule, custom)) return null;
     const spec = columnOf(object, field.key);
@@ -129,7 +133,8 @@ export function ruleWhere(object: CrmObject, rule: FilterRule, custom: readonly 
                     // nothing is exactly 2.5.
                     const value = rule.value as number;
                     // A custom number is a decimal, compared as it is.
-                    if (field.custom || Number.isInteger(value)) return compareRule(spec.column, field, rule);
+                    if (field.custom || Number.isInteger(value))
+                        return compareRule(spec.column, field, rule);
                     if (rule.operator === "is") return { id: { in: [] } };
                     const whole =
                         rule.operator === "greaterThan" ? Math.floor(value) : Math.ceil(value);
@@ -150,7 +155,11 @@ function joined(conjunction: Conjunction, parts: Where[]): Where | null {
 }
 
 /** A whole filter as a `where`; an empty object when it narrows nothing. */
-export function filterWhere(object: CrmObject, filter: ViewFilter, custom: readonly FieldDef[] = []): Where {
+export function filterWhere(
+    object: CrmObject,
+    filter: ViewFilter,
+    custom: readonly FieldDef[] = []
+): Where {
     const parts: Where[] = [];
     for (const item of filter.rules) {
         if (isGroup(item)) {

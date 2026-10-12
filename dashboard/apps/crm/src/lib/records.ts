@@ -73,11 +73,7 @@ export async function listRecords(
     };
 }
 
-function requireGroupable(
-    object: CrmObject,
-    key: string,
-    custom: readonly FieldDef[]
-): FieldDef {
+function requireGroupable(object: CrmObject, key: string, custom: readonly FieldDef[]): FieldDef {
     const field = fieldOf(object, key, custom);
     if (!field || !groupable(field)) throw new Error(`crm: ${object} cannot group by ${key}`);
     return field;
@@ -112,7 +108,10 @@ export async function listGroups(
     const column = groupColumn(object, key);
     const counted = (await table(object).groupBy({
         by: [column],
-        where: { ...listWhere(object, actor.shelf, { ...options, custom }), [column]: { in: values } },
+        where: {
+            ...listWhere(object, actor.shelf, { ...options, custom }),
+            [column]: { in: values }
+        },
         _count: { _all: true }
     })) as Record<string, unknown>[];
     const totals = new Map(
@@ -126,7 +125,11 @@ export async function listGroups(
                 const value = groups[at]!.value;
                 groups[at] = {
                     value,
-                    ...(await listRecords(actor, object, { ...options, custom, group: { key, value } }))
+                    ...(await listRecords(actor, object, {
+                        ...options,
+                        custom,
+                        group: { key, value }
+                    }))
                 };
             })
         );

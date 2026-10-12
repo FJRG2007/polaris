@@ -90,8 +90,7 @@ export function Board(props: BoardProps) {
         .map((column) => fieldOf(object, column.key, custom))
         .filter((one): one is FieldDef => Boolean(one) && !one!.primary && one!.key !== field.key)
         .slice(0, CARD_FIELDS);
-    const label = (value: string) =>
-        optionLabel(t, object, field, value);
+    const label = (value: string) => optionLabel(t, object, field, value);
     const byId = new Map(groups.flatMap((group) => group.rows).map((row) => [row.id, row]));
 
     const open = (record: CrmRecord, one: FieldDef) => {
