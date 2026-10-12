@@ -72,9 +72,14 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
             installedAppId: id,
             running,
             edition,
+            // As the console tool does: `say` is one command, its words joined
+            // with spaces; `sayAll` is one command per line.
             say: async (argv: string[]) => {
                 sent.push(argv.join(" "));
                 return '{"ok":true}';
+            },
+            sayAll: async (lines: string[]) => {
+                sent.push(...lines);
             }
         })
 }));
@@ -270,10 +275,10 @@ describe("the seasonal mobs", () => {
         config = { seasonalNightSpawns: 2 };
         const { sweepSeasons, seasonalView } = await service();
         await sweepSeasons(HALLOWEEN);
-        expect(sent).toEqual(["polaris season set halloween 3600 200 0"]);
+        expect(sent).toEqual(["polaris season set halloween 3600 200 100"]);
         expect(await seasonalView(INSTALL)).toMatchObject({
             nightSpawns: 2,
-            snowGolems: 0,
+            snowGolems: 1,
             mobsNeedRestart: false
         });
     });
@@ -308,7 +313,7 @@ describe("the seasonal mobs", () => {
         const { sweepSeasons } = await service();
         await sweepSeasons(HALLOWEEN);
         await sweepSeasons(NOVEMBER);
-        expect(sent).toEqual(["polaris season set halloween 3600 100 0", "polaris season clear"]);
+        expect(sent).toEqual(["polaris season set halloween 3600 100 100", "polaris season clear"]);
     });
 });
 
@@ -317,9 +322,21 @@ describe("the Halloween extras", () => {
         caps = new Set(["season", "season-halloween"]);
         const { sweepSeasons } = await service();
         await sweepSeasons(HALLOWEEN);
-        expect(sent).toHaveLength(1);
-        expect(sent[0]).toContain("polaris season halloween ");
-        expect(sent[0]).toContain(` left=${14 * 86_400 - 12 * 3600} `);
+        expect(sent).toHaveLength(2);
+        expect(sent[0]).toBe("polaris season set halloween 3600");
+        expect(sent[1]).toMatch(/^polaris season halloween /);
+        expect(sent[1]).toContain(` left=${14 * 86_400 - 12 * 3600} `);
+    });
+
+    it("reach a jar that takes them as commands of their own, the season first", async () => {
+        // What the live jar lists. Sent as one line, the season and the extras
+        // were refused together and the server showed nothing all season.
+        caps = new Set(["season", "season-mobs", "season-halloween"]);
+        const { sweepSeasons } = await service();
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toHaveLength(2);
+        expect(sent[0]).toBe("polaris season set halloween 3600 100 100");
+        for (const line of sent) expect(line.match(/polaris /g)).toHaveLength(1);
     });
 
     it("take the graveyards down at once when switched off, but not for an event", async () => {
@@ -333,18 +350,18 @@ describe("the Halloween extras", () => {
         allowed = false;
         await sweepSeasons(HALLOWEEN);
         await sweepSeasons(HALLOWEEN);
-        expect(sent).toHaveLength(1);
-        expect(sent[0]).toMatch(
-            /^polaris season halloween .* graves=0 left=0 .*polaris season clear$/
-        );
+        expect(sent).toHaveLength(2);
+        expect(sent[0]).toMatch(/^polaris season halloween .* graves=0 left=0 /);
+        expect(sent[1]).toBe("polaris season clear");
         allowed = true;
         sent.length = 0;
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(HALLOWEEN);
         try {
             await setSeasonal(OWNER, INSTALL, { on: false });
-            expect(sent).toHaveLength(1);
-            expect(sent[0]).toMatch(/ graves=0 left=0 .*polaris season clear$/);
+            expect(sent).toHaveLength(2);
+            expect(sent[0]).toMatch(/^polaris season halloween .* graves=0 left=0 /);
+            expect(sent[1]).toBe("polaris season clear");
         } finally {
             vi.useRealTimers();
         }

@@ -1,7 +1,7 @@
 /**
  * A Minecraft server dressed for the time of year: pumpkins and cobwebs around
  * Halloween, with monsters wearing pumpkins and a few more of them at night;
- * snow through winter, with snow golems about the cold places.
+ * snow through winter; and snow golems about through both.
  *
  * The dates are Polaris's own (`seasonOn` in @polaris/core), read on the
  * server's wall clock in its events' time zone, so a server decorates on the
@@ -78,17 +78,20 @@ export function decorationNow(inputs: SeasonInputs): Decoration | null {
 /** Where a server keeps how many more monsters come out on a Halloween night. */
 export const NIGHT_SPAWNS_KEY = "seasonalNightSpawns";
 
-/** Where a server keeps how many snow golems wander its cold places in winter. */
+/** Where a server keeps how many snow golems wander near its players through
+ *  Halloween and winter. */
 export const SNOW_GOLEMS_KEY = "seasonalSnowGolems";
 
 /** Halloween night spawns, as a multiple of the usual: 1 adds none. */
 export const NIGHT_SPAWN_CHOICES = [1, 1.25, 1.5, 2, 3] as const;
 
-/** Winter snow golems, as a multiple of the usual few: 0 brings none. */
+/** Seasonal snow golems, as a multiple of the usual few: 0 brings none. */
 export const SNOW_GOLEM_CHOICES = [0, 0.5, 1, 2, 3] as const;
 
 export const DEFAULT_NIGHT_SPAWNS = 1;
-export const DEFAULT_SNOW_GOLEMS = 0;
+/** The usual few, unless a server chose otherwise. Read with the setting rather
+ *  than stored, so every server that never chose gets them; a stored 0 stays none. */
+export const DEFAULT_SNOW_GOLEMS = 1;
 
 /** The jar capability that takes the mob settings on the season line. */
 export const MOBS_CAP = "season-mobs";

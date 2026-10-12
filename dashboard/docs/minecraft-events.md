@@ -1509,7 +1509,7 @@ A new kind follows all of them. A change to an old kind must not undo one.
   laid over the stored settings on every deploy by `minecraftReleaseEnv` in
   `minecraft/runtime.ts`), existing ones from their next restart, settings save
   or reset; `sendCommandFeedback` stays as it was, since players' own commands
-  need it (`2eea038e2`).
+  need it (`0f14f2d07`).
 - **Something RCON cannot see in time runs inside the game.** A snowball
   hitting the spleef floor lasts 2-3 ticks, and the fastest RCON look is 8.
   So the check is a data pack of vanilla commands, enabled with `/datapack`

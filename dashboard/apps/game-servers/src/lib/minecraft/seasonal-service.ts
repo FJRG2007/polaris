@@ -177,7 +177,11 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         // Switched off is not paused: the graveyards come down with the rest.
         if (switchedOff && hasHalloween)
             lines.unshift(await halloweenCommandFor(row.ownerId, config, now, true));
-        await server.say(lines);
+        // Each line its own command. `say` takes one command's words, and the
+        // console tool joins them with spaces: handed the season and Halloween
+        // lines together it sent one long line the jar refused as a whole, so
+        // no season reached it at all.
+        await server.sayAll(lines);
         told.set(row.id, {
             line,
             mobsMissing: decoration !== null && !mobs,
@@ -234,7 +238,7 @@ export interface SeasonalView {
     readonly unavailable: boolean;
     /** Halloween night spawns, as a multiple of the usual. */
     readonly nightSpawns: number;
-    /** Winter snow golems, as a multiple of the usual few. */
+    /** Halloween and winter snow golems, as a multiple of the usual few. */
     readonly snowGolems: number;
     /** The server's jar shows the decorations but predates the seasonal mobs:
      *  a restart loads the one that brings them. */
