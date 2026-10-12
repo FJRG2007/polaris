@@ -27,7 +27,16 @@ the code. If a rule changes, change it in the doc.
   listed in step 1 raise no compiler error when one is missed.
 - A new or reshaped option: it has a default, and a saved event of the old
   shape still parses (`z.preprocess`) and plays as it did. A run already in
-  progress keeps whatever it drew.
+  progress keeps whatever it drew. A default that is widened (more shapes,
+  more variants switched on) also reaches saved events still on the old
+  default (`migratePreset` plus a revision marker), or no existing server
+  ever sees it.
+- Anything players are meant to see (scenery, the season's pieces, a map's
+  decoration) is never dropped silently to make a build fit: look for a site
+  with room for it, and fall back to bare only when the run could not be
+  played otherwise. Anything drawn per run (a shape, a theme, where a goal or
+  a key room goes) is random across every place it could go, not fixed to
+  the obvious one.
 - Anything said to players: English and Spanish, in the shared palette,
   within `COMMAND_BYTES_MAX`. Anything on screen goes through
   `messages/{en-US,es-ES}/minecraft.json`, never a literal.

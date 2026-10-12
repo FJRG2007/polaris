@@ -636,8 +636,9 @@ left out.
   (`RECENT_KEPT`) come after all the others.
 - **Parkour** is laid out from the run's id, so every run is a new course,
   30 jumps by default (10 to 60). It takes one of five shapes, drawn among
-  those switched on (`shapes`; every one on a new event, rows and tower on
-  one saved before the others existed): rows climbing back and forth, a tower
+  those switched on (`shapes`; every one by default, and on one saved while
+  rows and tower were the default and still on exactly those two, since
+  `shapesRevision` marks a choice made after): rows climbing back and forth, a tower
   climbed round its four sides (`parkour-layout.TOWER_SIDE`), a line of long
   rows (`LINE_ROW`), a snake winding across its way and on
   (`SNAKE_WIDTH`, `SNAKE_STEP`), or a spiral winding outward, each lap
@@ -1377,8 +1378,10 @@ Rules it keeps, all asserted in `test/apps/minecraft-events-scenery.test.ts`:
   shortcut, nothing in an elytra's way, nothing inside a fall's catch box.
 - **Proved air.** The ring and the play volume are proved empty together, as
   one volume, and that is the volume swept at the end. When the ring is not
-  empty air the run turns its scenery off (`stage.scenery`) and proves the
-  structure bare instead of giving up the site. A volume over `MOST_VOLUME`, or
+  empty air the site is given up for another with room for the scenery too;
+  only on the last site the search may try (`StageTools.lastSite`) does the
+  run turn its scenery off (`stage.scenery`) and prove the structure bare
+  rather than fail. A volume over `MOST_VOLUME`, or
   more than `MOST_GROWTH` times the bare one, is built bare.
 - **Nothing that moves.** No gravity block, no vines, grass, saplings, bamboo,
   coral or plain ice; leaves persistent. Lava only as a source sealed on every
@@ -1949,6 +1952,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   preset is read with `asBegun` (`state.ts`) instead, which only fills in
   the fields a run from before shapes was missing and leaves its length as
   it was (`30036f9f8`).
+- **The scenery was missing from most runs, with nothing saying why.** A
+  ring that was not empty air dropped the scenery on the spot, and at a
+  parkour's 30 blocks the ring reaches down to the treetops and hillsides
+  of ordinary ground, so the operator saw the season's few corner pieces and
+  no world round the course. Anything a feature shows players is found room
+  for - another site - and only given up when the alternative is not
+  playing at all (`b56bb2208`).
 
 ### The Events screen
 
@@ -1985,6 +1995,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   in is on (`catalog.joinsWhileOn`); an arena's sides, a spleef's and an acid
   rain's are made once at the start. Who brought whom is kept on the run
   (`run.forced`), shown under it, and audited (`games.events.force-join`).
+- **A new default reaches events already saved, not only new ones.** New
+  parkour shapes were switched on for new events, while every saved parkour
+  - including the default one each server is seeded with - kept the old two,
+  written back explicitly on its first save so it looked like a choice. A
+  default that changes is migrated in `migratePreset` for presets still on
+  the old default, with a marker (`shapesRevision`) so a later choice of the
+  same values is kept (`b56bb2208`).
 - **Done on a new event saves it as it opens.** The same guard that holds
   Done disabled until a saved event is changed also held it disabled for
   one just added, where nothing has to change first - its defaults are a
