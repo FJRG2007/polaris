@@ -643,7 +643,12 @@ export function decorSpots(box: Box, steps: number): decor.Spot[] {
         { x, y: top, z: south, kind: "stand" },
         ...Array.from(
             { length: south - north - 1 },
-            (_, step): decor.Spot => ({ x, y: top, z: north + 1 + step, kind: "garland" })
+            (_, step): decor.Spot => ({
+                x,
+                y: top,
+                z: north + 1 + step,
+                kind: "garland"
+            })
         )
     ]);
 }

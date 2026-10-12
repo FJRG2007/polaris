@@ -416,7 +416,12 @@ export function decorSpots(box: Box, length: number): decor.Spot[] {
     return [0, 1].flatMap((side) =>
         [inner(length), outer(length)].flatMap((reach) =>
             [center.z - HALF_Z, center.z + HALF_Z].map(
-                (z): decor.Spot => ({ x: center.x + sign(side) * reach, y, z, kind: "stand" })
+                (z): decor.Spot => ({
+                    x: center.x + sign(side) * reach,
+                    y,
+                    z,
+                    kind: "stand"
+                })
             )
         )
     );
