@@ -322,6 +322,42 @@ describe("the Halloween extras", () => {
         expect(sent[0]).toContain(` left=${14 * 86_400 - 12 * 3600} `);
     });
 
+    it("take the graveyards down at once when switched off, but not for an event", async () => {
+        caps = new Set(["season", "season-halloween"]);
+        const { sweepSeasons, setSeasonal } = await service();
+        eventRunning = true;
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toEqual(["polaris season clear"]);
+        eventRunning = false;
+        sent.length = 0;
+        allowed = false;
+        await sweepSeasons(HALLOWEEN);
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toHaveLength(1);
+        expect(sent[0]).toMatch(
+            /^polaris season halloween .* graves=0 left=0 .*polaris season clear$/
+        );
+        allowed = true;
+        sent.length = 0;
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(HALLOWEEN);
+        try {
+            await setSeasonal(OWNER, INSTALL, { on: false });
+            expect(sent).toHaveLength(1);
+            expect(sent[0]).toMatch(/ graves=0 left=0 .*polaris season clear$/);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("send nothing extra when switched off out of season", async () => {
+        caps = new Set(["season", "season-halloween"]);
+        allowed = false;
+        const { sweepSeasons } = await service();
+        await sweepSeasons(NOVEMBER);
+        expect(sent).toEqual(["polaris season clear"]);
+    });
+
     it("merge a save into what another writer stored meanwhile", async () => {
         vi.useFakeTimers({ toFake: ["Date"] });
         vi.setSystemTime(HALLOWEEN);

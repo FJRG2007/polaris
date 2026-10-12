@@ -43,7 +43,14 @@ const SWEEP_CONCURRENCY = 8;
  *  it answered with no Polaris jar at all. */
 const told = new Map<
     string,
-    | { readonly line: string; readonly mobsMissing?: boolean; readonly halloweenMissing?: boolean }
+    | {
+          readonly line: string;
+          readonly mobsMissing?: boolean;
+          readonly halloweenMissing?: boolean;
+          /** Out of season or paused, whether the jar has nothing left to take
+           *  down for a switch-off (told so, or cannot take the line). */
+          readonly offTold?: boolean;
+      }
     | { readonly oldJarAt: number }
     | { readonly noJarAt: number }
 >();
@@ -81,19 +88,37 @@ export function decorationOf(
     });
 }
 
-/** The Halloween line for one server, in its own language. */
+/**
+ * The Halloween line for one server, in its own language. Switched off, it
+ * carries graves off and no season left, so the jar takes its graveyards down
+ * now instead of keeping them to the season's end as it does for a restart or
+ * an event's pause.
+ */
 async function halloweenCommandFor(
     ownerId: string,
     config: Record<string, unknown>,
-    now: Date
+    now: Date,
+    switchedOff = false
 ): Promise<string> {
     const language = await homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+    const settings = halloween.halloweenSettings(config);
+    if (switchedOff) return halloween.halloweenCommand({ ...settings, graves: 0 }, 0, language, 0);
     return halloween.halloweenCommand(
-        halloween.halloweenSettings(config),
+        settings,
         halloween.bloodNightKey(now, zoneOf(config)),
         language,
         halloween.halloweenSecondsLeft(now, zoneOf(config))
     );
+}
+
+/** Halloween is on the calendar but the server's switch or the deployment's is off. */
+function halloweenSwitchedOff(
+    config: Record<string, unknown>,
+    allowed: boolean,
+    now: Date
+): boolean {
+    if (allowed && seasonal.seasonalOn(config)) return false;
+    return seasonal.decorationFor(seasonal.seasonInZone(now, zoneOf(config))) === "halloween";
 }
 
 /** Tell one server. A line it already took out of season is not sent again. */
@@ -104,7 +129,15 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
     const last = told.get(row.id);
     const again = askAgainAt(last);
     if (again !== null && now.getTime() < again) return false;
-    if (!decoration && last && "line" in last && last.line === clearLine) return false;
+    const switchedOff = !decoration && halloweenSwitchedOff(config, allowed, now);
+    if (
+        !decoration &&
+        last &&
+        "line" in last &&
+        last.line === clearLine &&
+        (!switchedOff || last.offTold === true)
+    )
+        return false;
     return withServerContainer(row.ownerId, row.id, async (server) => {
         // A server that is down has nothing up, and starts with nothing.
         if (!server.running || server.edition !== "java") {
@@ -135,16 +168,21 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             mobs ? seasonal.seasonalMobs(config) : null
         );
         const lines = [line];
+        const hasHalloween = reading.caps.has(halloween.HALLOWEEN_CAP);
         const halloweenLine =
-            decoration === "halloween" && reading.caps.has(halloween.HALLOWEEN_CAP)
+            decoration === "halloween" && hasHalloween
                 ? await halloweenCommandFor(row.ownerId, config, now)
                 : null;
         if (halloweenLine) lines.push(halloweenLine);
+        // Switched off is not paused: the graveyards come down with the rest.
+        if (switchedOff && hasHalloween)
+            lines.unshift(await halloweenCommandFor(row.ownerId, config, now, true));
         await server.say(lines);
         told.set(row.id, {
             line,
             mobsMissing: decoration !== null && !mobs,
-            halloweenMissing: decoration === "halloween" && !halloweenLine
+            halloweenMissing: decoration === "halloween" && !halloweenLine,
+            offTold: switchedOff || !hasHalloween
         });
         return true;
     }).catch((caught: unknown) => {
