@@ -2154,7 +2154,7 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   `Can't keep up! ... Running Nms behind` only appears past about 2 seconds, so
   a shorter hitch leaves no trace there.
 - **What froze the live server**, from the lines just before each `Can't keep
-  up`: a world save (`save-all` before a world copy, about 2.5 s), a teleport
+up`: a world save (`save-all` before a world copy, about 2.5 s), a teleport
   far into ungenerated land (chunk generation), and `/locate` run by hand (2-4 s
   each). None of these came from an event or the challenges.
 - **Frames dropping on one player's screen leave nothing in the server log.**
