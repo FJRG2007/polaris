@@ -26,6 +26,7 @@ import { networksForService } from "./deploy/service-networks";
 import { prepareDeployNames, recordLiveNames } from "./deploy/private-names";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
 import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
+import { NO_REASON } from "./deploy/failure-reason";
 import {
     clusterNodeNames,
     dbPlanImages,
@@ -666,7 +667,11 @@ export async function deployDatabase(
         } catch (error) {
             await prisma.deployment.update({
                 where: { id: deployment.id },
-                data: { status: "failed" }
+                data: {
+                    status: "failed",
+                    error: (error instanceof Error && error.message.trim()) || NO_REASON,
+                    finishedAt: new Date()
+                }
             });
             await prisma.managedDatabase.update({
                 where: { id: db.id },

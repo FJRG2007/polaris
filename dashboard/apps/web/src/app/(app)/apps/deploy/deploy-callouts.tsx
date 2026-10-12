@@ -9,6 +9,7 @@
 
 import { Button, cn } from "@polaris/ui";
 import { LikelyCause } from "./likely-cause";
+import { DeployFailureLine } from "./deploy-failure";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { deployFreshnessAction, imageUpdateAction } from "./glance-actions";
@@ -17,15 +18,6 @@ import type { DeployFreshness } from "@/lib/deploy/freshness";
 import type { DeploymentSummary } from "@/lib/deploy-service";
 import { FAILED_DEPLOY_STATUSES } from "@/lib/deploy/attention";
 import { ArrowUpRight, CircleAlert, GitCommitHorizontal, Loader2, PackageCheck } from "lucide-react";
-
-/** The first line of an error that says something, for a callout that has one line. */
-function firstErrorLine(error: string | null): string | null {
-    const line = error
-        ?.split(/\r?\n/)
-        .map((part) => part.trim())
-        .find((part) => part.length > 0);
-    return line ?? null;
-}
 
 // A minute, like the server's own cache: reopening the panel does not ask again.
 const FRESHNESS_TTL_MS = 60_000;
@@ -149,7 +141,6 @@ export function DeployCallouts({
     const imageUpdate = useImageUpdate(applicationId, active?.id ?? null);
 
     const failed = latest && FAILED_DEPLOY_STATUSES.includes(latest.status) ? latest : null;
-    const errorLine = failed ? firstErrorLine(failed.error) : null;
     // A build already on its way brings the branch head with it.
     const behind = !moving && freshness && freshness.behindBy > 0 ? freshness : null;
 
@@ -173,11 +164,7 @@ export function DeployCallouts({
                     title={t("callouts.failed")}
                     detail={
                         <>
-                            {errorLine && (
-                                <span className="line-clamp-2 break-words font-mono text-danger-ink" title={errorLine}>
-                                    {errorLine}
-                                </span>
-                            )}
+                            <DeployFailureLine status={failed.status} error={failed.error} />
                             {active && active.id !== failed.id && <span>{t("callouts.previousLive")}</span>}
                         </>
                     }

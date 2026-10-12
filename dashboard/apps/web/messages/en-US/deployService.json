@@ -455,6 +455,14 @@
         "deployLatest": "Deploy latest",
         "newerImage": "A newer image is published"
     },
+    "failure": {
+        "failedTitle": "Why it failed",
+        "stoppedTitle": "Why it stopped",
+        "restarted": "The build was cut off because Polaris restarted, for example during an update. Nothing in the service caused it: redeploy to build it again.",
+        "canceled": "Someone stopped it before it finished.",
+        "timedOut": "It was stopped after {minutes} minutes without finishing.",
+        "noReason": "It failed without giving a reason. The build log shows how far it got."
+    },
     "buildMachine": {
         "title": "Build on",
         "hint": "Another machine builds the image and sends it here, so a small server can run what it could not build.",

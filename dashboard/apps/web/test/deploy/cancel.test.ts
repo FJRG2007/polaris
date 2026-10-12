@@ -27,6 +27,10 @@ const deploymentUpdateMany = vi.fn(async (args: unknown) => {
     return { count: 1 };
 });
 const notifyDeployFinished = vi.fn(async () => undefined);
+const noteOnDeploy = vi.fn(async (id: string, line: string) => {
+    void id;
+    void line;
+});
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -40,9 +44,15 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/notifications/deploy-events", () => ({ notifyDeployFinished }));
+vi.mock("@/lib/deploy/log-file", () => ({
+    deployLogDir: () => "/tmp/deploy-logs",
+    deployLogPath: (id: string) => `/tmp/deploy-logs/${id}.log`,
+    noteOnDeploy
+}));
 
 const { cancelDeployment, recoverAbandonedDeployments } = await import("@/lib/deploy-service");
 const { TERMINAL_DEPLOY_STATUSES } = await import("@/lib/deploy/status");
+const { CANCELED_REASON, RESTARTED_REASON } = await import("@/lib/deploy/failure-reason");
 
 beforeEach(() => {
     found = { status: "deploying" };
@@ -51,6 +61,7 @@ beforeEach(() => {
     deploymentUpdateMany.mockResolvedValue({ count: 1 });
     updateMany.mockClear();
     notifyDeployFinished.mockClear();
+    noteOnDeploy.mockClear();
 });
 
 describe("cancelling a deploy", () => {
@@ -104,6 +115,22 @@ describe("recovering after a restart", () => {
         // and nothing else will ever move it off that.
         expect(args.where.id.in).toEqual(["dep-1", "dep-2"]);
         expect(args.data.status).toBe("failed");
+    });
+
+    it("stores a reason the screen recognises and ends each log with it", async () => {
+        // The log stopped wherever the build was when the process went away, with no
+        // error in it; without a last line it reads as a build that simply froze.
+        await recoverAbandonedDeployments();
+        const [args] = deploymentUpdateMany.mock.calls[0] as [{ data: { error: string } }];
+        expect(args.data.error).toBe(RESTARTED_REASON);
+        expect(noteOnDeploy.mock.calls.map(([id]) => id)).toEqual(["dep-1", "dep-2"]);
+        expect(noteOnDeploy.mock.calls[0]?.[1]).toMatch(/restarted.*Redeploy/s);
+    });
+
+    it("stores the cancel the screen recognises", async () => {
+        await cancelDeployment("dep-1", "owner-1");
+        const [args] = deploymentUpdateMany.mock.calls[0] as [{ data: { error: string } }];
+        expect(args.data.error).toBe(CANCELED_REASON);
     });
 
     it("writes nothing when nothing was in flight", async () => {

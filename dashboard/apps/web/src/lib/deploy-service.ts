@@ -35,7 +35,8 @@ import { noteAppDeleted } from "@/lib/deploy/host-resources";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
-import { deployLogDir, deployLogPath } from "./deploy/log-file";
+import { deployLogDir, deployLogPath, noteOnDeploy } from "./deploy/log-file";
+import { CANCELED_REASON, NO_REASON, RESTARTED_REASON, timedOutReason } from "./deploy/failure-reason";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";
@@ -4584,8 +4585,7 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
     running.get(deploymentId)?.abort(new Error("cancelled"));
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
-        // i18n-ignore stored with the deployment, written once in the default language
-        error: "Canceled",
+        error: CANCELED_REASON,
         finishedAt: new Date()
     });
     await dropReleaseDomain(deploymentId);
@@ -4613,11 +4613,18 @@ export async function recoverAbandonedDeployments(): Promise<void> {
         where: { id: { in: abandoned.map((row) => row.id) } },
         data: {
             status: "failed",
-            // i18n-ignore stored with the deployment, written once in the default language
-            error: "Polaris restarted while this deploy was running",
+            error: RESTARTED_REASON,
             finishedAt: new Date()
         }
     });
+    // The log is where the operator looks, and it stops wherever the build was when
+    // the process went away - mid-install, with no error in it. Its last line says why.
+    for (const row of abandoned)
+        await noteOnDeploy(
+            row.id,
+            // i18n-ignore written into the deploy log, which is kept in one language
+            `\n[error] ${RESTARTED_REASON}, so the build was cut off. Redeploy to build it again.`
+        );
     console.warn(
         `polaris: ${abandoned.length} deploy(s) were interrupted by a restart and are marked failed`
     );
@@ -4760,7 +4767,8 @@ export async function executeDeployment(
             // Kept only when what ran is a pinned release image; a release that
             // could not be pinned deployed all the same, with nothing to roll to.
             imageKept: result.ok && isReleaseImage(result.imageTag),
-            error: result.error,
+            // A failure always carries a reason, so the screen has something to say.
+            error: result.ok ? result.error : result.error?.trim() || NO_REASON,
             finishedAt: new Date()
         });
         if (result.ok && scaledRelease) await settleScaleInPlace(deploymentId, scaledRelease);
@@ -4775,8 +4783,7 @@ export async function executeDeployment(
         log(Buffer.from(`\n[error] ${error instanceof Error ? error.message : String(error)}\n`));
         await settleDeployment(deploymentId, {
             status: "failed",
-            // i18n-ignore stored with the deployment, written once in the default language
-            error: error instanceof Error ? error.message : "deploy failed",
+            error: (error instanceof Error && error.message.trim()) || NO_REASON,
             finishedAt: new Date()
         });
         await abandonRelease(deploymentId, ports).catch(() => undefined);
@@ -4831,11 +4838,7 @@ async function settleCancelled(
     const timedOut = reason instanceof Error && reason.message === "timed out";
     const settled = await settleDeployment(deploymentId, {
         status: "cancelled",
-        error: timedOut
-            ? // i18n-ignore stored with the deployment, written once in the default language
-              `Stopped after ${DEPLOY_DEADLINE_MS / 60_000} minutes without finishing`
-            : // i18n-ignore stored with the deployment, written once in the default language
-              "Canceled",
+        error: timedOut ? timedOutReason(DEPLOY_DEADLINE_MS / 60_000) : CANCELED_REASON,
         finishedAt: new Date()
     });
     await abandonRelease(deploymentId).catch(() => undefined);

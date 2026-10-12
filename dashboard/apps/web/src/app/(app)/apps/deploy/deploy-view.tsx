@@ -10,6 +10,7 @@
 
 import { FilesPanel } from "./files-panel";
 import { dbTone, StatusPill } from "./status-pill";
+import { DeployFailureNote } from "./deploy-failure";
 import * as deployActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { NewFolderForm } from "./upload-source";
@@ -2217,6 +2218,7 @@ export function DeploymentLogs({
     const t = useTranslations("deploy");
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
+    const [error, setError] = useState<string | null>(null);
     // Keep onDone out of the effect deps: it is recreated every render, and calling
     // it (a state update) here would otherwise re-run the effect and loop.
     const onDoneRef = useRef(onDone);
@@ -2233,9 +2235,14 @@ export function DeploymentLogs({
             });
             if (!active) return;
             if (res.ok) {
-                const data = (await res.json()) as { status: string; log: string };
+                const data = (await res.json()) as {
+                    status: string;
+                    error: string | null;
+                    log: string;
+                };
                 setLog(data.log);
                 setStatus(data.status);
+                setError(data.error ?? null);
                 if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
                     if (!done) {
                         done = true;
@@ -2255,12 +2262,15 @@ export function DeploymentLogs({
     }, [deploymentId]);
 
     return (
-        <LogViewer
-            log={log}
-            name={deploymentId}
-            storageKey="deployment"
-            header={<StatusPill tone={dbTone(status)} label={t("view.status", { status })} />}
-        />
+        <div className="flex flex-col gap-2">
+            <DeployFailureNote status={status} error={error} />
+            <LogViewer
+                log={log}
+                name={deploymentId}
+                storageKey="deployment"
+                header={<StatusPill tone={dbTone(status)} label={t("view.status", { status })} />}
+            />
+        </div>
     );
 }
 

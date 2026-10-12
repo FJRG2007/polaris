@@ -24,6 +24,7 @@ import { VariablesEditor } from "./variables-editor";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { RuntimeLogs } from "@/components/runtime-logs";
+import { DeployFailureLine, DeployFailureNote } from "./deploy-failure";
 import { deploySteps } from "@/lib/deploy/deploy-steps";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
@@ -795,6 +796,8 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                 app={app}
                 deploymentId={logsFor}
                 deployment={deployment}
+                onRedeploy={can("deploy.run") ? deploy : undefined}
+                redeploying={busy}
                 onBack={() => setLogsFor(null)}
                 onDone={() => {
                     reload();
@@ -1002,6 +1005,10 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                                                     <p className="truncate text-xs text-muted-foreground">
                                                         {deploySubtitle(deployment, app, format, t)}
                                                     </p>
+                                                    <DeployFailureLine
+                                                        status={deployment.status}
+                                                        error={deployment.error}
+                                                    />
                                                     {!isSettled(deployment) && (
                                                         <InFlightSteps
                                                             deploymentId={deployment.id}
@@ -1260,12 +1267,17 @@ function DeploymentLogsView({
     app,
     deploymentId,
     deployment,
+    onRedeploy,
+    redeploying,
     onBack,
     onDone
 }: {
     app: ProjectApp;
     deploymentId: string;
     deployment: DepSummary | null;
+    /** Start a new deploy of this service; absent for readers who may not deploy. */
+    onRedeploy?: () => void;
+    redeploying?: boolean;
     onBack: () => void;
     onDone: () => void;
 }) {
@@ -1351,10 +1363,26 @@ function DeploymentLogsView({
                 ))}
             </ScrollRow>
 
+            {/* Why it did not go live, above every tab, so no tab is a log that
+                just stops. The build log carries its own, next to the output. */}
+            {deployment && cat !== "Build Logs" && (
+                <DeployFailureNote
+                    status={deployment.status}
+                    error={deployment.error}
+                    onRedeploy={onRedeploy}
+                    redeploying={redeploying}
+                />
+            )}
+
             {cat === "Details" ? (
                 <DetailsPanel app={app} deployment={deployment} />
             ) : cat === "Build Logs" ? (
-                <LogStream deploymentId={deploymentId} onDone={onDone} />
+                <LogStream
+                    deploymentId={deploymentId}
+                    onDone={onDone}
+                    onRedeploy={onRedeploy}
+                    redeploying={redeploying}
+                />
             ) : cat === "Deploy Logs" ? (
                 <RuntimeLogView
                     appId={app.id}
@@ -1468,7 +1496,6 @@ function DetailsPanel({ app, deployment }: { app: ProjectApp; deployment: DepSum
                     <span className="min-w-0 flex-1 break-words">{value}</span>
                 </div>
             ))}
-            {deployment?.error && <p className="py-2 text-sm text-danger">{deployment.error}</p>}
         </div>
     );
 }
@@ -1494,9 +1521,20 @@ function LivePill() {
     );
 }
 
-function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () => void }) {
+function LogStream({
+    deploymentId,
+    onDone,
+    onRedeploy,
+    redeploying
+}: {
+    deploymentId: string;
+    onDone: () => void;
+    onRedeploy?: () => void;
+    redeploying?: boolean;
+}) {
     const [log, setLog] = useState("");
     const [status, setStatus] = useState("queued");
+    const [error, setError] = useState<string | null>(null);
     const [live, setLive] = useState(true);
     const onDoneRef = useRef(onDone);
     onDoneRef.current = onDone;
@@ -1505,6 +1543,11 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
         let active = true;
         let done = false;
         let timer: ReturnType<typeof setTimeout>;
+        // A redeploy from here swaps the deployment under this view; what the last
+        // one said must not stand in for the new one while its first answer is due.
+        setLog("");
+        setStatus("queued");
+        setError(null);
         setLive(true);
         async function poll(): Promise<void> {
             const res = await fetch(`/api/deploy/deployments/${deploymentId}/log`, {
@@ -1512,9 +1555,14 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
             });
             if (!active) return;
             if (res.ok) {
-                const data = (await res.json()) as { status: string; log: string };
+                const data = (await res.json()) as {
+                    status: string;
+                    error: string | null;
+                    log: string;
+                };
                 setLog(data.log);
                 setStatus(data.status);
+                setError(data.error ?? null);
                 // The build stream is terminal once the deployment leaves the build phase
                 // (running) or ends in failure; stop polling and drop the live indicator.
                 if (["running", "failed", "cancelled", "rolled_back"].includes(data.status)) {
@@ -1541,6 +1589,12 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
                 <DeployStepper steps={deploySteps(status, log)} />
             </div>
             {live && <LivePill />}
+            <DeployFailureNote
+                status={status}
+                error={error}
+                onRedeploy={onRedeploy}
+                redeploying={redeploying}
+            />
             <LogViewer
                 log={log}
                 name={deploymentId}
