@@ -70,7 +70,6 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -408,20 +407,16 @@ final class SeasonalHalloween {
     // ------------------------------------------------------------------ trap pumpkins
 
     /**
-     * A player breaking a decorative pumpkin is breaking the grass under it: the
-     * break is called off (the ground stays) and their game shows the grass again.
+     * A decorative pumpkin a player knocked down ({@link SeasonalDecor#takeDown}),
+     * which may have been a trap. The hit on it was already called off, so the
+     * grass under it stays.
      */
-    @SubscribeEvent
-    public void onBreak(BlockEvent.BreakEvent event) {
+    static void trap(ServerPlayer player, ServerLevel level, BlockPos pos) {
         if (SeasonalDecor.season() != SeasonalDecor.Season.HALLOWEEN || settings.trapPercent() == 0) return;
-        if (!(event.getPlayer() instanceof ServerPlayer player) || !(event.getLevel() instanceof ServerLevel level)) return;
-        BlockPos pos = event.getPos();
         Random trap = new Random(level.getSeed() ^ pos.asLong() * 0x9E3779B97F4A7C15L ^ 0x7A3C0FFEEL);
         if (trap.nextInt(100 * 100) >= TRAP_BASE * settings.trapPercent()) return;
         Integer last = trapAt.get(player.getUUID());
         if (last != null && ticks - last < TRAP_COOLDOWN) return;
-        if (!SeasonalDecor.takePumpkin(player, pos)) return;
-        event.setCanceled(true);
         trapAt.put(player.getUUID(), ticks);
         double x = pos.getX() + 0.5;
         double y = pos.getY() + 1;

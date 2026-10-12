@@ -1,6 +1,8 @@
 package polaris.minecraft;
 
 import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.HeightMap;
@@ -26,6 +29,8 @@ import org.bukkit.block.data.type.Snow;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -54,7 +59,14 @@ import org.bukkit.util.Vector;
  * Sparse and the same each time: every chunk is decided from the world's seed
  * and its coordinates alone. A few chunks round each player are decided per
  * second, within a budget, and what was sent is sent again now and then - a
- * chunk the game loaded again gets it back, a block that changed loses it.
+ * chunk the game loaded again gets it back, a block that changed loses it. A
+ * chunk past the view distance is forgotten, as the player's game forgot it, so
+ * it is decided and shown again as soon as they come back.
+ *
+ * A decoration a player hits comes down on that first hit, for everybody, and
+ * stays down for the rest of the season ({@link BrokenDecor}, kept beside the
+ * world): the hit is called off, so the real block under it is neither broken
+ * nor dropped.
  *
  * Main thread only: the command and the timer both run there.
  */
@@ -93,6 +105,8 @@ final class SeasonalDecor implements Listener {
     /** Halloween chunks with a pumpkin, and of those, the ones with two, in percent. */
     private static final int PUMPKIN_CHUNKS = 45;
     private static final int TWO_PUMPKIN_CHUNKS = 30;
+    /** Where the decorations players knocked down are kept, beside the world. */
+    private static final String BROKEN_FILE = "polaris-season-broken.json";
 
     /** One block a player's game was told is something else, and what it really was. */
     private record Fake(Location at, BlockData real, BlockData shown) {}
@@ -114,6 +128,9 @@ final class SeasonalDecor implements Listener {
     private int ticks;
     private final Random particles = new Random();
     private final SeasonalMobs mobs = new SeasonalMobs(this);
+    private BrokenDecor broken = new BrokenDecor();
+    private Path brokenFile;
+    private BiConsumer<Player, Block> pumpkinTaken = (player, block) -> {};
 
     SeasonalDecor(Plugin plugin) {
         this.plugin = plugin;
@@ -173,6 +190,7 @@ final class SeasonalDecor implements Listener {
             }
             season = next;
             told = true;
+            keepBroken(next);
             untilMillis = System.currentTimeMillis() + seconds * 1000L;
             mobs.configure(spawns, golems);
             if (timer == null) timer = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1, 1);
@@ -200,6 +218,7 @@ final class SeasonalDecor implements Listener {
         for (Seen one : seen.values()) for (List<Fake> fakes : one.chunks.values()) blocks += fakes.size();
         reply.addProperty("players", seen.size());
         reply.addProperty("blocks", blocks);
+        reply.addProperty("broken", broken.size());
         mobs.status(reply);
         return reply;
     }
@@ -250,8 +269,9 @@ final class SeasonalDecor implements Listener {
             if (world.getEnvironment() != World.Environment.NORMAL) continue;
             int atX = player.getLocation().getBlockX() >> 4;
             int atZ = player.getLocation().getBlockZ() >> 4;
-            one.chunks.keySet().removeIf(key -> Math.abs(chunkX(key) - atX) > FORGET
-                    || Math.abs(chunkZ(key) - atZ) > FORGET);
+            int forget = Math.min(FORGET, Bukkit.getViewDistance());
+            one.chunks.keySet().removeIf(key -> Math.abs(chunkX(key) - atX) > forget
+                    || Math.abs(chunkZ(key) - atZ) > forget);
             if (resend) resend(player, world, one, atX, atZ);
             budget -= decorateAround(player, world, one, atX, atZ, Math.min(budget, NEW_PER_PLAYER));
             if (budget <= 0 && !resend) break;
@@ -269,6 +289,7 @@ final class SeasonalDecor implements Listener {
                     long key = chunkKey(cx, cz);
                     if (one.chunks.containsKey(key) || !world.isChunkLoaded(cx, cz)) continue;
                     List<Fake> fakes = decide(world, cx, cz, season);
+                    fakes.removeIf(this::wasBroken);
                     one.chunks.put(key, fakes);
                     for (Fake fake : fakes) player.sendBlockChange(fake.at(), fake.shown());
                     done++;
@@ -298,32 +319,110 @@ final class SeasonalDecor implements Listener {
         }
     }
 
-    /**
-     * Whether this player is shown a pumpkin on this block; if so it is taken
-     * down for them (their game shows the real block again) and not shown again
-     * until the chunk is decided anew. For {@link SeasonalHalloween}'s traps.
-     */
-    boolean takePumpkin(Player player, Block block) {
-        Seen one = seen.get(player.getUniqueId());
-        if (one == null || !player.getWorld().getUID().equals(one.world)) return false;
-        long key = chunkKey(block.getX() >> 4, block.getZ() >> 4);
-        List<Fake> fakes = one.chunks.get(key);
-        if (fakes == null) return false;
-        for (int i = 0; i < fakes.size(); i++) {
-            Fake fake = fakes.get(i);
-            Material shown = fake.shown().getMaterial();
-            boolean pumpkin = shown == Material.PUMPKIN || shown == Material.CARVED_PUMPKIN || shown == Material.JACK_O_LANTERN;
-            if (!pumpkin || fake.at().getBlockX() != block.getX() || fake.at().getBlockY() != block.getY()
-                    || fake.at().getBlockZ() != block.getZ()) continue;
-            List<Fake> kept = new ArrayList<>(fakes);
-            kept.remove(i);
-            one.chunks.put(key, kept);
-            player.sendBlockChange(fake.at(), block.getBlockData());
-            return true;
-        }
-        return false;
+    /** Called with a decorative pumpkin a player knocked down: {@link SeasonalHalloween}'s traps. */
+    void onPumpkinTaken(BiConsumer<Player, Block> then) {
+        pumpkinTaken = then;
     }
 
+    /**
+     * A player hit a decoration they are shown: it comes down for everybody and
+     * is remembered as broken for the rest of the season. Thin snow takes the
+     * snowy look of the ground under it along. Returns what was shown there, or
+     * null when nothing was - and for a real block only drawn differently (the
+     * snowy grass), which the player is digging and is left to the game.
+     */
+    BlockData takeDown(Player player, Block block) {
+        Seen one = seen.get(player.getUniqueId());
+        if (one == null || !player.getWorld().getUID().equals(one.world)) return null;
+        List<Fake> fakes = one.chunks.get(chunkKey(block.getX() >> 4, block.getZ() >> 4));
+        if (fakes == null) return null;
+        Fake hit = null;
+        for (Fake fake : fakes) if (same(fake.at(), block.getX(), block.getY(), block.getZ())) hit = fake;
+        if (hit == null || redrawn(hit)) return null;
+        if (broken.add(blockKey(block.getX(), block.getY(), block.getZ()))) writeBroken();
+        boolean snow = hit.shown().getMaterial() == Material.SNOW;
+        for (Player other : Bukkit.getOnlinePlayers()) {
+            Seen theirs = seen.get(other.getUniqueId());
+            if (theirs == null || !one.world.equals(theirs.world)) continue;
+            drop(other, theirs, block.getX(), block.getY(), block.getZ());
+            if (snow) drop(other, theirs, block.getX(), block.getY() - 1, block.getZ());
+        }
+        return hit.shown();
+    }
+
+    /** A real block only drawn in another state of itself, as grass drawn snowy. */
+    private static boolean redrawn(Fake fake) {
+        return fake.shown().getMaterial() == fake.real().getMaterial();
+    }
+
+    private static boolean same(Location at, int x, int y, int z) {
+        return at.getBlockX() == x && at.getBlockY() == y && at.getBlockZ() == z;
+    }
+
+    private static void drop(Player player, Seen one, int x, int y, int z) {
+        long key = chunkKey(x >> 4, z >> 4);
+        List<Fake> fakes = one.chunks.get(key);
+        if (fakes == null) return;
+        List<Fake> kept = new ArrayList<>(fakes.size());
+        for (Fake fake : fakes) {
+            if (same(fake.at(), x, y, z)) player.sendBlockChange(fake.at(), fake.at().getBlock().getBlockData());
+            else kept.add(fake);
+        }
+        if (kept.size() != fakes.size()) one.chunks.put(key, kept);
+    }
+
+    /**
+     * The first hit on a decoration takes it down and is called off, so the real
+     * block under it stays as it is and drops nothing. Left to the game, the hit
+     * broke that real block instead (a hole, and dirt), or nothing at all where
+     * the decoration stood in air, and the decoration stood there again the next
+     * time its chunk was decided.
+     */
+    @EventHandler
+    public void onHit(PlayerInteractEvent event) {
+        if (season == null || event.getAction() != Action.LEFT_CLICK_BLOCK || event.getClickedBlock() == null) return;
+        Block block = event.getClickedBlock();
+        BlockData shown = takeDown(event.getPlayer(), block);
+        if (shown == null) return;
+        event.setCancelled(true);
+        Material kind = shown.getMaterial();
+        if (kind == Material.PUMPKIN || kind == Material.CARVED_PUMPKIN || kind == Material.JACK_O_LANTERN)
+            pumpkinTaken.accept(event.getPlayer(), block);
+    }
+
+    /** The broken list for this season, read from beside the world the first time. */
+    private void keepBroken(Season next) {
+        if (brokenFile == null && !Bukkit.getWorlds().isEmpty()) {
+            brokenFile = Bukkit.getWorlds().get(0).getWorldFolder().toPath().resolve(BROKEN_FILE);
+            try {
+                broken = BrokenDecor.read(brokenFile);
+            } catch (IOException unreadable) {
+                plugin.getLogger().warning("Polaris could not read " + brokenFile + "; decorations broken before come back: " + unreadable);
+            }
+        }
+        if (broken.keepFor(next.name().toLowerCase(Locale.ROOT), System.currentTimeMillis())) writeBroken();
+    }
+
+    private void writeBroken() {
+        if (brokenFile == null) return;
+        try {
+            broken.write(brokenFile);
+        } catch (IOException failed) {
+            plugin.getLogger().warning("Polaris could not write " + brokenFile + ": " + failed);
+        }
+    }
+
+    /** Whether a decoration was knocked down: itself, or the ground drawn snowy under thin snow that was. */
+    private boolean wasBroken(Fake fake) {
+        Location at = fake.at();
+        if (broken.contains(blockKey(at.getBlockX(), at.getBlockY(), at.getBlockZ()))) return true;
+        return redrawn(fake) && broken.contains(blockKey(at.getBlockX(), at.getBlockY() + 1, at.getBlockZ()));
+    }
+
+    /** A block position in one long, laid out as the game's own. */
+    private static long blockKey(int x, int y, int z) {
+        return ((long) x & 0x3FFFFFFL) << 38 | ((long) z & 0x3FFFFFFL) << 12 | (long) y & 0xFFFL;
+    }
     /** Everything a player was shown taken down, to be decided again on the next pass. */
     void redraw() {
         revertAll();
