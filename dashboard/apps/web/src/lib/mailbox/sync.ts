@@ -465,7 +465,10 @@ async function syncFolder(
             ? await fetchSince(client, known, extraHeaders)
             : await fetchNewest(client, mailbox.exists, extraHeaders);
         if (arrived.length > 0) await storeMessages(client, account, folder, arrived);
-        const cursor = nextCursor(seenNext, arrived.map((message) => message.uid));
+        const cursor = nextCursor(
+            seenNext,
+            arrived.map((message) => message.uid)
+        );
 
         // What has arrived, and a few of whatever is still only a headline.
         await warmBodies(client, account, folder, edge);
