@@ -28,6 +28,7 @@ import * as polls from "@/lib/chat/polls";
 import * as pins from "@/lib/chat/pins";
 import * as webhooks from "@/lib/chat/webhooks";
 import { confirmAge } from "@/lib/chat/age-gate";
+import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -202,6 +203,25 @@ export async function readSinceAction(
     const me = await actor();
     const result = await guard(() => messages.readSince(me, channelId, afterId));
     return result.error ? { error: result.error } : { page: result.value };
+}
+
+const rereadSchema = z.object({
+    channelId: z.string().min(1).max(64),
+    messageIds: z.array(z.string().min(1).max(64)).max(MAX_REREAD)
+});
+
+/** Messages already on screen, read again because the live channel said they
+ *  changed in place. An id missing from the answer is a message that is gone. */
+export async function rereadAction(
+    input: unknown
+): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {
+    const me = await actor();
+    const parsed = rereadSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
+    const result = await guard(() =>
+        messages.readChanged(me, parsed.data.channelId, parsed.data.messageIds)
+    );
+    return result.error ? { error: result.error } : { messages: result.value };
 }
 
 export async function readThreadAction(

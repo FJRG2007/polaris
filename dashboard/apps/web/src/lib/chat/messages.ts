@@ -51,6 +51,7 @@ import {
 } from "./access";
 import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
+import { MAX_REREAD } from "./reread-limit";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -342,6 +343,7 @@ export async function readSince(
               select: { createdAt: true }
           })
         : null;
+    if (afterId && !cursor) return { messages: [], newerThan: afterId };
 
     const rows = await prisma.chatMessage.findMany({
         where: {
@@ -359,6 +361,33 @@ export async function readSince(
         messages: await decorateMessages(actor, page),
         newerThan: rows.length > PAGE ? (page[page.length - 1]?.id ?? null) : null
     };
+}
+
+/**
+ * The messages a screen already holds, read again after the live channel said
+ * they changed in place - an edit, a reaction, a deletion.
+ *
+ * Only the ones still in the conversation's own list come back; an id that is
+ * not returned is a message that is gone, which is how a screen learns to take
+ * one out without trace. Same access and age checks as the page that drew
+ * them, and the ids are asked for inside this conversation only, so naming one
+ * from elsewhere returns nothing.
+ */
+export async function readChanged(
+    actor: ChatActor,
+    channelId: string,
+    messageIds: readonly string[]
+): Promise<ChatMessageView[]> {
+    await requireChannel(actor, channelId);
+    await requireAgeCleared(actor, channelId);
+    const ids = [...new Set(messageIds)].slice(0, MAX_REREAD);
+    if (ids.length === 0) return [];
+    const rows = await prisma.chatMessage.findMany({
+        where: { channelId, parentId: null, id: { in: ids } },
+        orderBy: { createdAt: "asc" },
+        select: MESSAGE_SELECT
+    });
+    return decorateMessages(actor, rows);
 }
 
 /**
@@ -751,7 +780,12 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
             data: { body: input.body, editedAt }
         });
     });
-    publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+    publishChatChange({
+        channelId: message.channelId,
+        kind: "posted",
+        actorId: actor.id,
+        messageIds: [input.messageId]
+    });
 
     // An edit can put a link in a message that did not have one.
     unfurlLater(input.body);
@@ -1016,7 +1050,14 @@ export async function remove(
             }
         });
     }
-    publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+    // The root of a reply is named too: its count of replies just went down,
+    // and it is the one of the two the conversation's own list is drawing.
+    publishChatChange({
+        channelId: message.channelId,
+        kind: "posted",
+        actorId: actor.id,
+        messageIds: message.parentId ? [messageId, message.parentId] : [messageId]
+    });
 }
 
 /** Put an emoji on a message, or take yours back off. Returns whether it is on
@@ -1063,7 +1104,12 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
             data: { messageId: input.messageId, userId: actor.id, emoji: stored }
         });
 
-    publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+    publishChatChange({
+        channelId: message.channelId,
+        kind: "posted",
+        actorId: actor.id,
+        messageIds: [input.messageId]
+    });
     return !existing;
 }
 

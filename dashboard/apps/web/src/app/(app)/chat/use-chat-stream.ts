@@ -22,7 +22,16 @@ import { useSessionScope } from "@/components/session-scope";
 const STREAM_PATH = "/api/chat/stream";
 
 const frameSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("posted"), seq: z.number(), channels: z.array(z.string()) }),
+    z.object({
+        kind: z.literal("posted"),
+        seq: z.number(),
+        channels: z.array(z.string()),
+        // Messages that changed in place - edited, reacted to, deleted - by
+        // conversation. An empty list means too many to name: read again
+        // everything held. Absent from a server before this, and on a frame
+        // where only new messages arrived.
+        changed: z.record(z.string(), z.array(z.string())).optional()
+    }),
     z.object({ kind: z.literal("channels") }),
     // A message was pinned or unpinned in a conversation this reader reaches.
     z.object({ kind: z.literal("pins"), channelId: z.string() }),

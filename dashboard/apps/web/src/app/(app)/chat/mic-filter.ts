@@ -120,6 +120,41 @@ export interface FilteredMic {
      * and nothing happened. Ramped, because a step in gain is a click.
      */
     readonly setGain: (gain: number) => void;
+    /**
+     * Be told, once, that the graph has stopped making sound.
+     *
+     * A context can be suspended or interrupted mid-call - the audio device
+     * changes, the machine sleeps, another program takes the output - and a
+     * worklet starved of CPU falls behind the clock. Either way the track stays
+     * live and the publication stays up, so nobody can hear this person and
+     * nothing anywhere says so: the server sees packets whose timestamps drift
+     * away from the wall clock, and the only cure anybody found was leaving the
+     * call and coming back. The caller rebuilds the graph instead.
+     */
+    readonly onStall: (listener: () => void) => void;
+}
+
+/** How often a running graph is checked for having stopped. */
+const STALL_CHECK_MS = 2_000;
+
+/** How far the graph's clock may fall behind the wall's over one check before
+ *  it counts as stopped: a context running normally keeps pace within a few
+ *  milliseconds, and one that is suspended does not move at all. */
+const STALL_RATIO = 0.5;
+
+/** How many checks in a row it must fail - one slow check is a busy moment,
+ *  three is six seconds of nobody hearing this person. */
+const STALL_CHECKS = 3;
+
+/**
+ * Whether a graph is keeping time, from two readings of its clock.
+ *
+ * Pure so the rule can be asserted without an audio stack.
+ */
+export function keepingTime(audioSeconds: number, wallMs: number, running: boolean): boolean {
+    if (!running) return false;
+    if (wallMs <= 0) return true;
+    return (audioSeconds * 1000) / wallMs >= STALL_RATIO;
 }
 
 /**
@@ -269,7 +304,38 @@ export async function filterMic(
     volume.connect(limiter);
     limiter.connect(sink);
 
+    // Watched from here on, for as long as the graph is up. A suspended context
+    // is asked to resume first, which is all an interruption usually needs; a
+    // graph still not keeping time after that is reported once, and rebuilt by
+    // whoever is publishing it.
+    let stallListener: (() => void) | null = null;
+    let stalled = false;
+    let misses = 0;
+    let lastAudio = context.currentTime;
+    let lastWall = Date.now();
+    const watch = setInterval(() => {
+        const now = Date.now();
+        const ok = keepingTime(
+            context.currentTime - lastAudio,
+            now - lastWall,
+            context.state === "running"
+        );
+        lastAudio = context.currentTime;
+        lastWall = now;
+        if (ok) {
+            misses = 0;
+            return;
+        }
+        if (context.state !== "running" && context.state !== "closed")
+            void context.resume().catch(() => undefined);
+        misses += 1;
+        if (misses < STALL_CHECKS || stalled) return;
+        stalled = true;
+        stallListener?.();
+    }, STALL_CHECK_MS);
+
     const teardown = () => {
+        clearInterval(watch);
         if (timer) clearInterval(timer);
         built?.dispose();
         source.disconnect();
@@ -297,6 +363,10 @@ export async function filterMic(
         problem: built ? null : (problem ?? null),
         setGain: (next: number) => {
             if (Number.isFinite(next) && next >= 0) ramp(volume.gain, next, context);
+        },
+        onStall: (listener: () => void) => {
+            stallListener = listener;
+            if (stalled) listener();
         },
         stop: async () => {
             teardown();

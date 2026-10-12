@@ -49,11 +49,19 @@ let heardAmplitude = 0;
 
 const gains: (FakeNode & { gain: FakeParam })[] = [];
 
+/** Every context built, so a test can move its clock. */
+const contexts: FakeContext[] = [];
+
 class FakeContext {
     state = "suspended";
     currentTime = 0;
+    resumes = 0;
+    constructor() {
+        contexts.push(this);
+    }
     readonly audioWorklet = { addModule: async () => {} };
     async resume(): Promise<void> {
+        this.resumes += 1;
         this.state = "running";
     }
     async close(): Promise<void> {
@@ -97,7 +105,7 @@ vi.stubGlobal("AudioContext", FakeContext);
 vi.stubGlobal("AudioNode", FakeNode);
 vi.stubGlobal("MediaStream", class {});
 
-const { filterMic } = await import("@/app/(app)/chat/mic-filter");
+const { filterMic, keepingTime } = await import("@/app/(app)/chat/mic-filter");
 const { dbToGain, START_GAIN_DB, MAX_GAIN_DB } = await import("@/app/(app)/chat/mic-leveller");
 
 const track = { id: "device", enabled: true } as unknown as MediaStreamTrack;
@@ -166,5 +174,65 @@ describe("a volume-only graph", () => {
         expect(leveller?.gain.value).toBe(1);
         expect(volume?.gain.value).toBe(1.5);
         await built?.stop();
+    });
+});
+
+/**
+ * A filter that stops making sound mid-call.
+ *
+ * Reported as one person nobody could hear until they left and rejoined: the
+ * server saw their packets with timestamps drifting from the wall clock, which is
+ * a graph that stopped keeping time while its track stayed live.
+ */
+describe("a filter that stops", () => {
+    /** Run the graph's clock alongside the wall's, or hold it still. */
+    function tick(context: FakeContext, seconds: number, moving: boolean): void {
+        for (let step = 0; step < seconds / 2; step += 1) {
+            if (moving) context.currentTime += 2;
+            vi.advanceTimersByTime(2_000);
+        }
+    }
+
+    it("is not reported while it keeps time", async () => {
+        const built = await filterMic(track, "enhanced", null, 1);
+        const context = contexts.at(-1)!;
+        let stalls = 0;
+        built?.onStall(() => (stalls += 1));
+        tick(context, 30, true);
+        expect(stalls).toBe(0);
+        await built?.stop();
+    });
+
+    it("is reported once when its clock stops, after asking it to resume", async () => {
+        const built = await filterMic(track, "enhanced", null, 1);
+        const context = contexts.at(-1)!;
+        let stalls = 0;
+        built?.onStall(() => (stalls += 1));
+        context.state = "interrupted";
+        const resumedBefore = context.resumes;
+        tick(context, 4, false);
+        expect(stalls).toBe(0);
+        tick(context, 30, false);
+        expect(stalls).toBe(1);
+        expect(context.resumes).toBeGreaterThan(resumedBefore);
+        await built?.stop();
+    });
+
+    it("forgives one slow moment", async () => {
+        const built = await filterMic(track, "enhanced", null, 1);
+        const context = contexts.at(-1)!;
+        let stalls = 0;
+        built?.onStall(() => (stalls += 1));
+        tick(context, 4, false);
+        tick(context, 30, true);
+        expect(stalls).toBe(0);
+        await built?.stop();
+    });
+
+    it("keeps time only while running and at least half as fast as the wall", () => {
+        expect(keepingTime(2, 2_000, true)).toBe(true);
+        expect(keepingTime(0.9, 2_000, true)).toBe(false);
+        expect(keepingTime(2, 2_000, false)).toBe(false);
+        expect(keepingTime(0, 0, true)).toBe(true);
     });
 });
