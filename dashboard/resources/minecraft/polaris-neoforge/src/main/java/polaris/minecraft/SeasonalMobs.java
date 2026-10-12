@@ -249,7 +249,9 @@ final class SeasonalMobs {
             }
             ServerLevel level = server.getLevel(extra.dimension());
             BlockPos pos = extra.pos();
-            if (level == null || !level.isNight() || !level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) continue;
+            // The overworld's night, wherever the spawn was: the Nether's blood
+            // night spawns have no night of their own to wait for.
+            if (level == null || !server.overworld().isNight() || !level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) continue;
             double x = pos.getX() + 0.5;
             double z = pos.getZ() + 0.5;
             if (level.getNearestPlayer(x, pos.getY(), z, PLAYER_CLEARANCE, false) != null) continue;

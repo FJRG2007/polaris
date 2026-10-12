@@ -257,7 +257,10 @@ final class SeasonalMobs implements Listener {
             }
             World world = Bukkit.getWorld(extra.world());
             Location at = extra.at();
-            if (world == null || !night(world)) continue;
+            // The overworld's night, wherever the spawn was: the Nether's blood
+            // night spawns have no night of their own to wait for.
+            World primary = Bukkit.getWorlds().isEmpty() ? null : Bukkit.getWorlds().get(0);
+            if (world == null || primary == null || !night(primary)) continue;
             if (!world.isChunkLoaded(at.getBlockX() >> 4, at.getBlockZ() >> 4)) continue;
             Block feet = world.getBlockAt(at);
             if (!feet.isPassable() || !feet.getRelative(BlockFace.UP).isPassable()) continue;
