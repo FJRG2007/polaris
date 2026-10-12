@@ -36,6 +36,7 @@ import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
 import * as pace from "./pace";
 import * as decor from "./arena-decor";
+import * as scenery from "./scenery";
 import * as catalog from "../catalog";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -110,6 +111,9 @@ export interface StageTools {
     /** The season what it builds now is dressed for (`arena-decor`); null out
      *  of season, or with it switched off. */
     dressing(): Promise<decor.Dressing | null>;
+    /** What of the biome scenery (`scenery.ts`) this server's version can
+     *  show; a structure is built bare without it. */
+    sceneryEra?(): Promise<scenery.Era>;
 }
 
 /** How many looks the area gets to load before the site is given up: three
@@ -365,6 +369,71 @@ export function stageDecor(
     const layout = layoutAt(run, origin, origin.y);
     const { spots, rules } = decorOf(layout);
     return decor.fitted(decor.piecesFor(spots, dressing, rules), layout.boxes, layout.volume);
+}
+
+/** How far under a structure its scenery reaches, when it is not built near the ground. */
+const SCENERY_DROP = 12;
+/** The era a server that could not be asked is taken to be: the blocks every
+ *  supported version has. */
+const OLDEST_SCENERY: scenery.Era = { nether: false, caves: false };
+
+/**
+ * The biome a structure's scenery is drawn in and how, or null for a kind
+ * with none: an acid rain's weather and lightning reach round its arena.
+ * Nothing that burns round a TNT floor, and no lava near one either; a parkour
+ * course is surrounded by its own theme's world, a nether maze by the Nether.
+ */
+function sceneryOf(
+    layout: Layout
+): { allowed: readonly scenery.Theme[]; course?: string; options: scenery.Options } | null {
+    const all = scenery.THEMES;
+    const options = { drop: SCENERY_DROP, lava: true };
+    switch (layout.kind) {
+        case "parkour":
+            return (all as readonly string[]).includes(layout.course.theme)
+                ? { allowed: all, course: layout.course.theme, options }
+                : { allowed: ["end", "mesa"], options };
+        case "dropper":
+            // Its shaft stands a little over the ground: nothing goes under it.
+            return { allowed: all, options: { ...options, drop: 0 } };
+        case "tnt-run":
+            return {
+                allowed: all.filter((theme) => theme !== "jungle"),
+                options: { ...options, lava: false }
+            };
+        case "nether-maze":
+            return { allowed: ["nether"], options };
+        case "acid-rain":
+            return null;
+        case "boat-race":
+        case "elytra-race":
+            // A track that long is a big volume already: its scenery stands
+            // beside it and rises from its foot, never under it.
+            return { allowed: all, options: { ...options, drop: 0 } };
+        case "spleef":
+            return { allowed: all, options };
+    }
+}
+
+/** The volume proved for a structure built with its scenery round it; null
+ *  for a kind with none, or one too big to be worth proving. */
+export function stageSceneryVolume(run: EventRun, origin: Point): stage.Volume | null {
+    const layout = layoutAt(run, origin, origin.y);
+    const plan = sceneryOf(layout);
+    return plan ? scenery.sceneryVolume(layout.volume, plan.options.drop) : null;
+}
+
+/**
+ * The scenery's boxes for a structure built at `origin`, in the order they
+ * go in, every one outside the volume played in. Pure: the same run, origin
+ * and era always give the same boxes.
+ */
+export function stageScenery(run: EventRun, origin: Point, era: scenery.Era): stage.Box[] {
+    const layout = layoutAt(run, origin, origin.y);
+    const plan = sceneryOf(layout);
+    if (!plan) return [];
+    const theme = scenery.themeFor(run.id, plan.allowed, plan.course);
+    return scenery.sceneryBoxes(layout.volume, theme, era, run.id, plan.options);
 }
 
 /** The structure a run builds at `origin`: its boxes and the volume it takes. */
@@ -630,11 +699,16 @@ async function raise(
             await tools.giveUpSite(ground, "tooHigh");
             return;
         }
-        const area = stage.areaOf(layoutAt(loop.run, ground, y).volume);
+        // With the ring its scenery stands in, where this server can show it.
+        const outer = tools.sceneryEra
+            ? stageSceneryVolume(loop.run, { x: ground.x, y, z: ground.z })
+            : null;
+        const area = stage.areaOf(outer ?? layoutAt(loop.run, ground, y).volume);
         // Written down before the area is held, so whatever ends the event
         // lets go of it.
         change(loop, {
             origin: { x: ground.x, y, z: ground.z },
+            scenery: outer !== null,
             design:
                 preset.kind === "dropper"
                     ? dropper.DESIGN
@@ -656,15 +730,29 @@ async function raise(
     }
 
     const layout = layoutAt(loop.run, origin, origin.y);
-    if (!(await provedEmpty(loop, server, tools, layout.volume))) return;
+    // The ring round it proved with it, while it is still wanted; when it is
+    // not empty air the structure is proved again, and built, bare.
+    const outer = state(loop).scenery ? stageSceneryVolume(loop.run, origin) : null;
+    if (!(await provedEmpty(loop, server, tools, outer ?? layout.volume, outer !== null))) return;
 
     // The season's pieces, worked out before anything is written down so they
     // are written with the rest: built last, so taken down first.
     const pieces = stageDecor(loop.run, origin, await tools.dressing().catch(() => null));
+    // The scenery round it after them: built last of all, so taken down first.
+    const surround =
+        outer && tools.sceneryEra
+            ? stageScenery(loop.run, origin, await tools.sceneryEra().catch(() => OLDEST_SCENERY))
+            : [];
     // Written down first, then built - into air only.
     const before = state(loop).boxes;
-    change(loop, { boxes: [...before, ...layout.boxes, ...pieces.map(decorBox)] });
+    change(loop, {
+        boxes: [...before, ...layout.boxes, ...pieces.map(decorBox), ...surround]
+    });
     await tools.persist();
+    // The scenery first, in one go: a few small boxes, none of them part of
+    // the game, so a box the server refused is only missing from the view -
+    // and still taken out by its own block.
+    if (surround.length > 0) await server.sayAll(surround.map(stage.buildLine));
     // Built a paced trip at a time (`pace.buildPacer`), every box counted.
     const counts = await pace.answered(
         server,
@@ -701,7 +789,10 @@ async function provedEmpty(
     loop: StageLoop,
     server: ServerContainer,
     tools: StageTools,
-    volume: stage.Volume
+    volume: stage.Volume,
+    /** Whether a volume that is not empty gives up only the scenery's ring,
+     *  not the site: the structure's own volume is proved next, bare. */
+    bareNext = false
 ): Promise<boolean> {
     const probes = stage.probeBoxes(volume);
     const kept = state(loop).boxes;
@@ -741,6 +832,11 @@ async function provedEmpty(
     // The probe would not come out again: it stays written down, with the area
     // it needs held, for the end of the event to take out.
     if (!cleared) throw new CalledOff("The air it needs could not be checked");
+    if (bareNext) {
+        change(loop, { scenery: false, waits: 0 });
+        await tools.persist();
+        return false;
+    }
     // Not empty - a tree, a hill, something of somebody's - or never loaded:
     // somewhere else.
     const ground = loop.run.place;

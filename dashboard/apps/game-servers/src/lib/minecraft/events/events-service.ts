@@ -4512,7 +4512,11 @@ function stageTools(
             return items === "components" ? "item_components" : "item";
         },
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
-        dressing: () => dressingFor(installedAppId, server)
+        dressing: () => dressingFor(installedAppId, server),
+        sceneryEra: async () => ({
+            nether: await serverAtLeast(server, [1, 16]).catch(() => false),
+            caves: await serverAtLeast(server, [1, 17]).catch(() => false)
+        })
     };
 }
 

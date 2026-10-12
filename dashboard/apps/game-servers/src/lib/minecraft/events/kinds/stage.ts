@@ -123,7 +123,33 @@ export const ARENA_BLOCKS = [
     "minecraft:black_terracotta",
     "minecraft:red_terracotta",
     "minecraft:green_terracotta",
-    "minecraft:spruce_log"
+    "minecraft:spruce_log",
+    // The biome scenery round a structure (`scenery.SCENERY_BLOCKS`) that the
+    // list does not already hold.
+    "minecraft:jungle_leaves[persistent=true]",
+    "minecraft:moss_block",
+    "minecraft:melon",
+    "minecraft:nether_wart_block",
+    "minecraft:obsidian",
+    "minecraft:basalt",
+    "minecraft:blackstone",
+    "minecraft:crimson_stem",
+    "minecraft:warped_stem",
+    "minecraft:warped_wart_block",
+    "minecraft:shroomlight",
+    "minecraft:end_stone",
+    "minecraft:end_stone_bricks",
+    "minecraft:purpur_block",
+    "minecraft:purpur_pillar",
+    "minecraft:end_rod",
+    "minecraft:chorus_plant",
+    "minecraft:terracotta",
+    "minecraft:orange_terracotta",
+    "minecraft:yellow_terracotta",
+    "minecraft:white_terracotta",
+    "minecraft:brown_terracotta",
+    "minecraft:light_gray_terracotta",
+    "minecraft:red_sandstone"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];
@@ -220,6 +246,11 @@ export const stageSchema = z.object({
      *  only one ever swept whole at the end (`sweepLines`). Null for a run
      *  from before it was kept, and for one whose probe never passed. */
     proved: volumeSchema.nullable().default(null),
+    /** Whether the biome scenery round it (`scenery.ts`) is wanted: its ring is
+     *  held and proved with the structure, and built once that passes. Turned
+     *  off for the run when the ring is not empty air, and false for a run
+     *  from before it was kept. */
+    scenery: z.boolean().default(false),
     /** The players inside, until each one is sent back. */
     saved: z.array(savedSchema).default([]),
     racers: z.array(racerSchema).default([]),
