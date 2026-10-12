@@ -276,11 +276,9 @@ describe("the pack", () => {
         const make = async () => {
             const zip = new JSZip();
             const date = new Date("2000-01-01T00:00:00Z");
-            zip.file("pack.mcmeta", packMeta("x"), { date, compression: "STORE" });
-            zip.file("assets/polaris/sounds.json", soundsJson(sounds), {
-                date,
-                compression: "STORE"
-            });
+            const options = { date, compression: "STORE", createFolders: false } as const;
+            zip.file("pack.mcmeta", packMeta("x"), options);
+            zip.file("assets/polaris/sounds.json", soundsJson(sounds), options);
             return zip.generateAsync({ type: "uint8array", platform: "UNIX" });
         };
         expect(Buffer.from(await make()).equals(Buffer.from(await make()))).toBe(true);
