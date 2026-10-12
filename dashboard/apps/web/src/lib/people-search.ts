@@ -10,10 +10,16 @@
  * single letter: a picker that fills itself with everybody on the instance the
  * moment it opens is a user directory, and an instance is not always a company
  * where everybody may know everybody.
+ *
+ * **Only friends autocomplete.** A few letters find a friend by their name or
+ * their handle; anybody else is found only by typing their whole username. A
+ * partial match on strangers is a directory with extra steps - two letters at a
+ * time, it lists every account on the instance.
  */
 
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { blockedBetween } from "@/lib/blocks";
+import { friendIds } from "@/lib/friends-service";
 import { discoverableBy } from "@/lib/privacy-service";
 import { like } from "@/lib/rich-text/mention-service";
 
@@ -36,6 +42,25 @@ export interface FoundPeople {
     readonly withheld: number;
 }
 
+/**
+ * Who a search for `term` may match: a friend by any part of their name or
+ * handle, and anybody else only by their whole username. Never the address -
+ * matching on it would confirm a guessed one.
+ */
+export function matchingPeople(term: string, friends: readonly string[]) {
+    const contains = like(term);
+    // Usernames are stored lowercased, so an exact match is a plain equality.
+    const handle = term.replace(/^@/, "").toLowerCase();
+    return {
+        OR: [
+            ...(friends.length > 0
+                ? [{ id: { in: [...friends] }, OR: [{ name: contains }, { username: contains }] }]
+                : []),
+            { username: handle }
+        ]
+    };
+}
+
 export async function findPeople(
     viewer: { id: string },
     query: string,
@@ -53,12 +78,12 @@ export async function findPeople(
     const term = query.trim();
     if (term.length < SHORTEST_SEARCH) return { people: [], withheld: 0 };
 
-    const contains = like(term);
+    const friends = await friendIds(viewer.id);
     const found = await prisma.user.findMany({
         where: {
             id: { not: viewer.id },
             ...VISIBLE_USER,
-            OR: [{ name: contains }, { email: contains }, { username: contains }]
+            ...matchingPeople(term, [...friends])
         },
         select: { id: true, name: true, username: true },
         orderBy: { name: "asc" },
@@ -98,8 +123,7 @@ export async function findPeople(
             id: person.id,
             // The handle rather than the address when an account has no name.
             // A search that can be typed into by anybody is the last place to
-            // hand one back - and it matches on the address above, so a result
-            // shaped like one would confirm a guess.
+            // hand one back.
             name: person.name || (person.username ? `@${person.username}` : "Somebody")
         })),
         withheld: candidates.length - people.length

@@ -359,11 +359,11 @@
     "picker": {
         "remove": "Remove {name}",
         "full": "That is as many as this holds",
-        "placeholder": "Name, email or username",
+        "placeholder": "A friend's name, or a full username",
         "label": "Add people",
         "withheld": "{count, plural, one {One account matches but does not have Chat.} other {# accounts match but do not have Chat.}}",
         "withheldHint": "An administrator can turn it on for them under People.",
-        "typeSomething": "Type a name, an email or a username.",
+        "typeSomething": "Type a friend's name, or somebody's full username.",
         "looking": "Looking",
         "nobody": "Nobody found."
     },

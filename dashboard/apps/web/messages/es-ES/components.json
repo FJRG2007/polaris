@@ -359,11 +359,11 @@
     "picker": {
         "remove": "Quitar a {name}",
         "full": "No caben más",
-        "placeholder": "Nombre, correo o usuario",
+        "placeholder": "Nombre de un amigo o usuario completo",
         "label": "Añadir gente",
         "withheld": "{count, plural, one {Una cuenta coincide pero no tiene Chat.} other {# cuentas coinciden pero no tienen Chat.}}",
         "withheldHint": "Un administrador puede activárselo en Personas.",
-        "typeSomething": "Escribe un nombre, un correo o un usuario.",
+        "typeSomething": "Escribe el nombre de un amigo o el usuario completo de alguien.",
         "looking": "Buscando",
         "nobody": "No se ha encontrado a nadie."
     },

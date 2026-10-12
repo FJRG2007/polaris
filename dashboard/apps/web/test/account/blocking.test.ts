@@ -78,6 +78,10 @@ vi.mock("@/lib/rich-text/mention-service", () => ({
     like: (term: string) => ({ contains: term })
 }));
 
+vi.mock("@/lib/friends-service", () => ({
+    friendIds: async () => new Set<string>()
+}));
+
 vi.mock("@/lib/privacy-service", () => ({
     discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) => new Set(userIds)
 }));
@@ -93,16 +97,14 @@ vi.mock("@polaris/db", () => ({
                 accounts.find((person) => person.id === where.id) ?? null,
             findMany: async ({ where }: { where: Record<string, unknown> }) => {
                 const not = (where.id as { not?: string } | undefined)?.not;
-                const term = (
-                    (where.OR as { name?: { contains: string } }[] | undefined)?.[0]?.name
-                        ?.contains ?? ""
-                ).toLowerCase();
+                // Nobody here is a friend, so the search can only match a whole
+                // username - see `matchingPeople`.
+                const handle = (where.OR as { username?: unknown }[] | undefined)?.find(
+                    (clause) => typeof clause.username === "string"
+                )?.username;
                 return accounts.filter((person) => {
                     if (person.id === not) return false;
-                    if (!term) return true;
-                    return [person.name, person.email, person.username].some((field) =>
-                        field.toLowerCase().includes(term)
-                    );
+                    return handle === undefined || person.username === handle;
                 });
             }
         },
