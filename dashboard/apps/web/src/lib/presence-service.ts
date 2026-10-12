@@ -20,6 +20,11 @@
  * see whether they are at their desk: `lastSeen` is a per-account setting, and
  * somebody who has turned it off reads as offline to everybody it is off for.
  * An administrator sees through it, as they do everywhere else.
+ *
+ * **A game server here counts.** Somebody playing on a Minecraft server Polaris
+ * runs is around even with no tab open, so `auto` that works out as offline
+ * becomes idle, with the server's card - unless their activity or its Minecraft
+ * switch is hidden from this reader, in which case nothing changes.
  */
 
 import { prisma } from "@polaris/db";
@@ -138,6 +143,9 @@ export async function presenceFor(
     const now = Date.now();
     const at = new Date(now);
     const answer = new Map<string, PresenceView>();
+    // Gone by their sessions alone, with nothing chosen to say so - the only
+    // people a game server here can speak for.
+    const away = new Set<string>();
     for (const person of people) {
         const mine = person.id === viewer.id;
         const inCall = calls.get(person.id) ?? null;
@@ -165,6 +173,7 @@ export async function presenceFor(
             at
         );
         const status = statusOf(held.choice, seen.get(person.id), now);
+        if (status === "offline" && held.choice === "auto") away.add(person.id);
         answer.set(person.id, {
             status,
             // Only while they are actually here. Both halves matter: a status
@@ -180,20 +189,43 @@ export async function presenceFor(
     }
 
     // Asked only about the people drawn as here, which on most screens is a
-    // handful of the faces - and never about anybody offline or invisible.
+    // handful of the faces - and never about anybody invisible or hidden from
+    // this reader. Those offline by their sessions alone are asked too, in the
+    // same call: somebody on a Minecraft server here is around even with no
+    // Polaris tab open.
     const here = [...answer].filter(([, view]) => view.status !== "offline").map(([id]) => id);
-    if (here.length > 0) {
-        const doing = await activitiesFor(viewer, here, at).catch((caught: unknown) => {
+    if (here.length > 0 || away.size > 0) {
+        const doing = await activitiesFor(viewer, [...here, ...away], at).catch((caught: unknown) => {
             // The dot is worth more than the card beside it, and a failure here
             // must not take the dots down with it.
             console.error("polaris: could not read what people are doing:", caught);
             return new Map<string, core.ActivityView[]>();
         });
+        const byId = new Map(people.map((person) => [person.id, person]));
         for (const [id, activity] of doing) {
             const view = answer.get(id);
-            if (view) answer.set(id, { ...view, activity });
+            if (!view) continue;
+            if (!away.has(id)) {
+                answer.set(id, { ...view, activity });
+                continue;
+            }
+            // Idle rather than online: they are at a game, not at this screen,
+            // so a message will wait. Only the server is said - anything else
+            // still on file was reported by a computer nobody is watching here.
+            // activitiesFor has already applied the activity audience and the
+            // Minecraft switch, so hiding either keeps them offline.
+            const playing = activity.filter((item) => item.source === "minecraft");
+            if (playing.length === 0) continue;
+            const person = byId.get(id);
+            answer.set(id, {
+                ...view,
+                status: "idle",
+                note: person && core.statusInForce(person, at) ? person.statusText.trim() : "",
+                activity: playing
+            });
         }
     }
+    return answer;
     return answer;
 }
 
