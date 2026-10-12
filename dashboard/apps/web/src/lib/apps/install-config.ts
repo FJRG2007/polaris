@@ -18,11 +18,18 @@ export { readInstallConfig, type InstallConfig } from "./install-config-value";
 const PATCH_TRIES = 5;
 
 /** Merge keys into an install's config, leaving the rest of it alone - including
- *  whatever another writer changed between the read and the write. */
-export async function patchInstallConfig(installedAppId: string, patch: InstallConfig): Promise<void> {
+ *  whatever another writer changed between the read and the write. A patch that
+ *  depends on what is stored (a key holding an object) is a function of the
+ *  config, called again on each read so it merges into the latest one. */
+export async function patchInstallConfig(
+    installedAppId: string,
+    patch: InstallConfig | ((config: InstallConfig) => InstallConfig)
+): Promise<void> {
     for (let attempt = 1; ; attempt += 1) {
         const row = await prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } });
-        const data = { config: JSON.stringify({ ...readInstallConfig(row?.config), ...patch }) };
+        const current = readInstallConfig(row?.config);
+        const changes = typeof patch === "function" ? patch(current) : patch;
+        const data = { config: JSON.stringify({ ...current, ...changes }) };
         if (!row || attempt >= PATCH_TRIES) {
             await prisma.installedApp.update({ where: { id: installedAppId }, data });
             return;

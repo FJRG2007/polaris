@@ -151,11 +151,34 @@ export function bloodNightKey(now: Date, timeZone: string): number {
     return wall.year * 10_000 + wall.month * 100 + wall.day;
 }
 
+/**
+ * Seconds until the Halloween season ends on the server's clock - midnight
+ * after its last day - or 0 out of it. The jar keeps graveyards up until then,
+ * across a restart or an event that pauses the season.
+ */
+export function halloweenSecondsLeft(now: Date, timeZone: string): number {
+    const zone =
+        timeZone !== core.AUTOMATIC_TIME_ZONE && core.isTimeZone(timeZone) ? timeZone : "UTC";
+    const wall = core.wallClock(now, zone);
+    const today = new Date(wall.year, wall.month - 1, wall.day, 12);
+    if (core.seasonOn(today) !== "halloween") return 0;
+    const last = core.seasonLastDay(today);
+    if (!last) return 0;
+    const days = Math.round(
+        (Date.UTC(last.getFullYear(), last.getMonth(), last.getDate()) -
+            Date.UTC(wall.year, wall.month - 1, wall.day)) /
+            86_400_000
+    );
+    const elapsed = wall.hours * 3600 + wall.minutes * 60 + wall.seconds;
+    return Math.max(1, (days + 1) * 86_400 - elapsed);
+}
+
 /** The console line that tells the jar this server's Halloween settings. */
 export function halloweenCommand(
     settings: HalloweenSettings,
     bloodKey: number,
-    language: "en" | "es"
+    language: "en" | "es",
+    secondsLeft = 0
 ): string {
     const flag = (on: boolean) => (on ? 1 : 0);
     const percent = (multiple: number) => Math.round(multiple * 100);
@@ -170,6 +193,7 @@ export function halloweenCommand(
         `trick=${flag(settings.trickOrTreat)}`,
         `phantoms=${flag(settings.phantoms)}`,
         `graves=${percent(settings.graves)}`,
+        `left=${Math.max(0, Math.floor(secondsLeft))}`,
         `lang=${language}`
     ].join(" ");
 }

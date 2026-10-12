@@ -93,8 +93,10 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - Phantoms: a few at night over players under the open sky, slept or not,
  *   hitting half as hard.
  * - Graves: small graveyards on wild grass far from anything built, written
- *   down in the world folder so they come down after the season even across a
- *   restart. A chest somebody filled with their own things is left standing.
+ *   down in the world folder with the moment the dashboard says the season
+ *   ends, and taken down only once it has passed - not on a restart, nor while
+ *   an event pauses the season. A chest somebody filled with their own things
+ *   is left standing.
  *
  * Every mob this adds carries {@link #TAG}: it never comes back from disk, and the
  * season ending takes it away. Server thread only.
@@ -154,6 +156,8 @@ final class SeasonalHalloween {
     private static Path stateFile;
     private static final List<Graveyard> graveyards = new ArrayList<>();
     private static int bloodDone;
+    /** When the dashboard last said the season ends, in epoch millis; 0 until told. */
+    private static long seasonEndsMillis;
     private static boolean bloodActive;
     private static long horsemanNight = -1;
     /** The night's visitors still about, counted once a sweep and as each comes. */
@@ -176,7 +180,14 @@ final class SeasonalHalloween {
             reply.addProperty("why", "usage");
             return reply;
         }
+        if (!loaded) load(server);
         settings = next;
+        if (next.secondsLeft() > 0) {
+            long ends = System.currentTimeMillis() + next.secondsLeft() * 1000L;
+            boolean moved = Math.abs(ends - seasonEndsMillis) > 60_000;
+            seasonEndsMillis = ends;
+            if (moved) save();
+        }
         return status();
     }
 
@@ -204,7 +215,7 @@ final class SeasonalHalloween {
                 wasOn = on;
             }
             if (!on) {
-                if (!graveyards.isEmpty() && ticks % SWEEP_TICKS == 0) takeGraveyardsDown(server);
+                if (!graveyards.isEmpty() && ticks % SWEEP_TICKS == 0 && seasonOver()) takeGraveyardsDown(server);
                 return;
             }
             if (bloodActive && ticks % FOG_TICKS == 0) fog(server);
@@ -225,7 +236,11 @@ final class SeasonalHalloween {
         swarmedDusk.clear();
         trapAt.clear();
         treatsGiven.clear();
-        takeGraveyardsDown(server);
+    }
+
+    /** The season's end the dashboard gave has passed, or it never gave one. */
+    private static boolean seasonOver() {
+        return seasonEndsMillis == 0 || System.currentTimeMillis() >= seasonEndsMillis;
     }
 
     private static void sweep(MinecraftServer server) {
@@ -716,6 +731,7 @@ final class SeasonalHalloween {
         try {
             JsonObject root = JsonParser.parseString(Files.readString(stateFile, StandardCharsets.UTF_8)).getAsJsonObject();
             bloodDone = root.has("bloodDone") ? root.get("bloodDone").getAsInt() : 0;
+            seasonEndsMillis = root.has("seasonEnds") ? root.get("seasonEnds").getAsLong() : 0;
             if (root.has("graveyards")) {
                 for (JsonElement element : root.getAsJsonArray("graveyards")) {
                     JsonObject one = element.getAsJsonObject();
@@ -738,6 +754,7 @@ final class SeasonalHalloween {
         if (stateFile == null) return;
         JsonObject root = new JsonObject();
         root.addProperty("bloodDone", bloodDone);
+        root.addProperty("seasonEnds", seasonEndsMillis);
         JsonArray list = new JsonArray();
         for (Graveyard graveyard : graveyards) {
             JsonObject one = new JsonObject();

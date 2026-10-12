@@ -22,13 +22,14 @@ record HalloweenSettings(
         boolean trickOrTreat,
         boolean phantoms,
         int gravePercent,
-        boolean spanish) {
+        boolean spanish,
+        int secondsLeft) {
 
     /** The most any amount takes, in percent of the usual. */
     static final int MAX_PERCENT = 300;
 
     /** Nothing on: what a jar does before the dashboard has said anything. */
-    static final HalloweenSettings OFF = new HalloweenSettings(0, 0, false, false, 0, 0, false, false, 0, false);
+    static final HalloweenSettings OFF = new HalloweenSettings(0, 0, false, false, 0, 0, false, false, 0, false, 0);
 
     /** The settings in {@code key=value} words; null when there are none to read. */
     static HalloweenSettings parse(String[] words) {
@@ -43,6 +44,7 @@ record HalloweenSettings(
         boolean phantoms = false;
         int graves = 0;
         boolean spanish = false;
+        int left = 0;
         for (String word : words) {
             int equals = word.indexOf('=');
             if (equals <= 0) return null;
@@ -59,12 +61,13 @@ record HalloweenSettings(
                 case "phantoms" -> phantoms = flag(value);
                 case "graves" -> graves = percent(value);
                 case "lang" -> spanish = value.equalsIgnoreCase("es");
+                case "left" -> left = whole(value);
                 default -> {
                     // A key from a newer dashboard: skipped, the rest still read.
                 }
             }
         }
-        return new HalloweenSettings(witches, bats, treats, horseman, traps, blood, trick, phantoms, graves, spanish);
+        return new HalloweenSettings(witches, bats, treats, horseman, traps, blood, trick, phantoms, graves, spanish, left);
     }
 
     private static int whole(String value) {

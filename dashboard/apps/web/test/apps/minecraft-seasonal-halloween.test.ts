@@ -86,15 +86,37 @@ describe("the blood night", () => {
     });
 });
 
+describe("the season's end", () => {
+    it("is midnight after its last day on the server's clock", () => {
+        expect(halloween.halloweenSecondsLeft(new Date("2026-11-02T23:00:00Z"), "UTC")).toBe(3600);
+        expect(halloween.halloweenSecondsLeft(new Date("2026-11-01T00:00:00Z"), "UTC")).toBe(
+            2 * 86_400
+        );
+        expect(halloween.halloweenSecondsLeft(new Date("2026-10-07T00:00:00Z"), "UTC")).toBe(
+            27 * 86_400
+        );
+    });
+
+    it("is 0 out of the season, and follows the server's zone", () => {
+        expect(halloween.halloweenSecondsLeft(new Date("2026-11-03T00:00:00Z"), "UTC")).toBe(0);
+        expect(halloween.halloweenSecondsLeft(new Date("2026-10-06T12:00:00Z"), "UTC")).toBe(0);
+        // 23:30 on 2 November in UTC is already the 3rd, out of the season, in Madrid.
+        expect(
+            halloween.halloweenSecondsLeft(new Date("2026-11-02T23:30:00Z"), "Europe/Madrid")
+        ).toBe(0);
+    });
+});
+
 describe("the line the jar is told", () => {
     it("names every setting, with amounts as percentages", () => {
         const line = halloween.halloweenCommand(
             { ...halloween.DEFAULT_HALLOWEEN, witches: 2, phantoms: true, graves: 1 },
             20261031,
-            "es"
+            "es",
+            3600
         );
         expect(line).toBe(
-            "polaris season halloween witches=200 bats=100 treats=1 horseman=1 traps=100 blood=20261031 trick=1 phantoms=1 graves=100 lang=es"
+            "polaris season halloween witches=200 bats=100 treats=1 horseman=1 traps=100 blood=20261031 trick=1 phantoms=1 graves=100 left=3600 lang=es"
         );
     });
 

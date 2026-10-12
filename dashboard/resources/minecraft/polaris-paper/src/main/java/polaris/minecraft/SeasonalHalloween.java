@@ -74,8 +74,9 @@ import org.bukkit.scheduler.BukkitTask;
  *
  * Every mob this adds carries {@link #TAG}: it never comes back from disk, and
  * the season ending takes it away. Graveyards are written down in the main
- * world's folder so they come down after the season even across a restart; a
- * chest somebody filled with their own things is left standing.
+ * world's folder with the moment the dashboard says the season ends, and come
+ * down only once it has passed - not on a restart, nor while an event pauses
+ * the season; a chest somebody filled with their own things is left standing.
  */
 final class SeasonalHalloween implements Listener {
     static final String TAG = "polaris_halloween";
@@ -128,6 +129,8 @@ final class SeasonalHalloween implements Listener {
     private Path stateFile;
     private final List<Graveyard> graveyards = new ArrayList<>();
     private int bloodDone;
+    /** When the dashboard last said the season ends, in epoch millis; 0 until told. */
+    private long seasonEndsMillis;
     private boolean bloodActive;
     private long horsemanNight = -1;
     /** The night's visitors still about, counted once a sweep and as each comes. */
@@ -159,7 +162,14 @@ final class SeasonalHalloween implements Listener {
     JsonObject configure(String[] words) {
         HalloweenSettings next = HalloweenSettings.parse(words);
         if (next == null) return SoundPack.refused("usage");
+        if (!loaded) load();
         settings = next;
+        if (next.secondsLeft() > 0) {
+            long ends = System.currentTimeMillis() + next.secondsLeft() * 1000L;
+            boolean moved = Math.abs(ends - seasonEndsMillis) > 60_000;
+            seasonEndsMillis = ends;
+            if (moved) save();
+        }
         return status();
     }
 
@@ -189,7 +199,7 @@ final class SeasonalHalloween implements Listener {
                 wasOn = on;
             }
             if (!on) {
-                if (!graveyards.isEmpty() && ticks % SWEEP_TICKS == 0) takeGraveyardsDown();
+                if (!graveyards.isEmpty() && ticks % SWEEP_TICKS == 0 && seasonOver()) takeGraveyardsDown();
                 return;
             }
             if (bloodActive && ticks % FOG_TICKS == 0) fog();
@@ -213,7 +223,11 @@ final class SeasonalHalloween implements Listener {
         swarmedDusk.clear();
         trapAt.clear();
         treatsGiven.clear();
-        takeGraveyardsDown();
+    }
+
+    /** The season's end the dashboard gave has passed, or it never gave one. */
+    private boolean seasonOver() {
+        return seasonEndsMillis == 0 || System.currentTimeMillis() >= seasonEndsMillis;
     }
 
     private void sweep() {
@@ -710,6 +724,7 @@ final class SeasonalHalloween implements Listener {
         try {
             JsonObject root = JsonParser.parseString(Files.readString(stateFile, StandardCharsets.UTF_8)).getAsJsonObject();
             bloodDone = root.has("bloodDone") ? root.get("bloodDone").getAsInt() : 0;
+            seasonEndsMillis = root.has("seasonEnds") ? root.get("seasonEnds").getAsLong() : 0;
             if (root.has("graveyards")) {
                 for (JsonElement element : root.getAsJsonArray("graveyards")) {
                     JsonObject one = element.getAsJsonObject();
@@ -732,6 +747,7 @@ final class SeasonalHalloween implements Listener {
         if (stateFile == null) return;
         JsonObject root = new JsonObject();
         root.addProperty("bloodDone", bloodDone);
+        root.addProperty("seasonEnds", seasonEndsMillis);
         JsonArray list = new JsonArray();
         for (Graveyard graveyard : graveyards) {
             JsonObject one = new JsonObject();

@@ -91,7 +91,8 @@ async function halloweenCommandFor(
     return halloween.halloweenCommand(
         halloween.halloweenSettings(config),
         halloween.bloodNightKey(now, zoneOf(config)),
-        language
+        language,
+        halloween.halloweenSecondsLeft(now, zoneOf(config))
     );
 }
 
@@ -249,17 +250,15 @@ export async function setSeasonal(
     if (patch.on !== undefined) changes[seasonal.SEASONAL_KEY] = patch.on ? null : false;
     if (patch.nightSpawns !== undefined) changes[seasonal.NIGHT_SPAWNS_KEY] = patch.nightSpawns;
     if (patch.snowGolems !== undefined) changes[seasonal.SNOW_GOLEMS_KEY] = patch.snowGolems;
-    if (patch.halloween !== undefined) {
-        const current = await prisma.installedApp.findUnique({
-            where: { id: installedAppId },
-            select: { config: true }
-        });
-        changes[halloween.HALLOWEEN_KEY] = halloween.patchHalloween(
-            readInstallConfig(current?.config),
-            patch.halloween
-        );
-    }
-    await patchInstallConfig(installedAppId, changes);
+    const halloweenPatch = patch.halloween;
+    await patchInstallConfig(installedAppId, (config) =>
+        halloweenPatch === undefined
+            ? changes
+            : {
+                  ...changes,
+                  [halloween.HALLOWEEN_KEY]: halloween.patchHalloween(config, halloweenPatch)
+              }
+    );
     // Asked again now rather than when the last answer runs out, so a server
     // restarted onto a newer jar is reached on the switch.
     told.delete(installedAppId);
