@@ -35,6 +35,7 @@ import * as fair from "./fair-start";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
 import * as pace from "./pace";
+import * as decor from "./arena-decor";
 import * as catalog from "../catalog";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -106,6 +107,9 @@ export interface StageTools {
     boatWay(): Promise<boatRace.BoatWay>;
     /** Whose run a kept bag belongs to, for its database copy. */
     readonly stashOwner: stashService.StashOwner;
+    /** The season what it builds now is dressed for (`arena-decor`); null out
+     *  of season, or with it switched off. */
+    dressing(): Promise<decor.Dressing | null>;
 }
 
 /** How many looks the area gets to load before the site is given up: three
@@ -312,6 +316,76 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
         boxes: floor.boxes,
         volume: floor.volume,
         reach: floor.reach
+    };
+}
+
+/**
+ * Where a structure's season's pieces may go (`arena-decor`), and what they
+ * must not be: nothing that burns where there is fire, lava or lightning, and
+ * no cobweb anywhere somebody races, flies or falls past.
+ */
+function decorOf(layout: Layout): { spots: decor.Spot[]; rules: decor.Rules } {
+    switch (layout.kind) {
+        case "parkour":
+            return { spots: parkour.decorSpots(layout.course), rules: { exposed: true } };
+        case "spleef":
+            return { spots: spleef.decorSpots(layout.arena), rules: {} };
+        case "tnt-run":
+            return { spots: tntRun.decorSpots(layout.arena), rules: { fireproof: true } };
+        case "dropper":
+            return { spots: dropper.decorSpots(layout.shaft), rules: { exposed: true } };
+        case "boat-race":
+            return { spots: boatRace.decorSpots(layout.track.boxes), rules: { exposed: true } };
+        case "nether-maze":
+            return {
+                spots: netherMaze.decorSpots(layout.maze),
+                rules: { fireproof: true, exposed: true }
+            };
+        case "acid-rain":
+            return {
+                spots: acidRain.decorSpots(layout.acid),
+                rules: { fireproof: true, exposed: true }
+            };
+        case "elytra-race":
+            return { spots: elytraRace.decorSpots(layout.course), rules: { exposed: true } };
+    }
+}
+
+/**
+ * The season's pieces for a structure built at `origin`, kept to what its own
+ * boxes leave room for inside the volume proved empty; none out of season.
+ * Pure: the same run, origin and season always give the same pieces.
+ */
+export function stageDecor(
+    run: EventRun,
+    origin: Point,
+    dressing: decor.Dressing | null
+): decor.Piece[] {
+    if (!dressing) return [];
+    const layout = layoutAt(run, origin, origin.y);
+    const { spots, rules } = decorOf(layout);
+    return decor.fitted(decor.piecesFor(spots, dressing, rules), layout.boxes, layout.volume);
+}
+
+/** The structure a run builds at `origin`: its boxes and the volume it takes. */
+export function stageLayout(
+    run: EventRun,
+    origin: Point
+): { boxes: readonly stage.Box[]; volume: stage.Volume } {
+    return layoutAt(run, origin, origin.y);
+}
+
+/** A piece written down as a box of the stage's, taken out by its own block
+ *  (`stage.removeLine`) - latest first, so before what holds it up. */
+export function decorBox(piece: decor.Piece): stage.Box {
+    return {
+        x1: piece.x,
+        y1: piece.y,
+        z1: piece.z,
+        x2: piece.x,
+        y2: piece.y,
+        z2: piece.z,
+        block: piece.block as stage.ArenaBlock
     };
 }
 
@@ -584,9 +658,12 @@ async function raise(
     const layout = layoutAt(loop.run, origin, origin.y);
     if (!(await provedEmpty(loop, server, tools, layout.volume))) return;
 
+    // The season's pieces, worked out before anything is written down so they
+    // are written with the rest: built last, so taken down first.
+    const pieces = stageDecor(loop.run, origin, await tools.dressing().catch(() => null));
     // Written down first, then built - into air only.
     const before = state(loop).boxes;
-    change(loop, { boxes: [...before, ...layout.boxes] });
+    change(loop, { boxes: [...before, ...layout.boxes, ...pieces.map(decorBox)] });
     await tools.persist();
     // Built a paced trip at a time (`pace.buildPacer`), every box counted.
     const counts = await pace.answered(
@@ -599,6 +676,8 @@ async function raise(
     );
     change(loop, { built: true });
     if (!whole) throw new CalledOff("Its structure could not be built whole");
+    // Each into air, or in place of the block it names - never part of the game.
+    if (pieces.length > 0) await server.sayAll(decor.decorLines(pieces));
 
     const brought = await admit(loop, server, tools, state(loop).joined, now, lines, needed);
     if (brought < needed) {

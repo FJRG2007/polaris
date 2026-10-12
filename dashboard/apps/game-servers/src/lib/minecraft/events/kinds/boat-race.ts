@@ -47,6 +47,7 @@
 import type { EventOptions } from "../catalog";
 import type { Box, Spot, Volume } from "./stage";
 import { seeded } from "../trivia-bank";
+import * as decor from "./arena-decor";
 
 /** How tracks are laid out now, written onto the stage when one is built. */
 export const DESIGN = 2;
@@ -1402,4 +1403,14 @@ export function progressOf(track: Track, passed: number): { lap: number; gate: n
         lap: Math.min(track.laps, Math.floor((passed - 1) / gates) + 1),
         gate: (passed - 1) % gates
     };
+}
+
+/** Where the season's pieces go (`arena-decor`): on top of each gate's posts,
+ *  over the arch nobody reaches from the ice - a downhill race's too. */
+export function decorSpots(boxes: readonly Box[]): decor.Spot[] {
+    return boxes
+        .filter(
+            (one) => one.block === POST && one.x1 === one.x2 && one.z1 === one.z2 && one.y2 > one.y1
+        )
+        .map((one): decor.Spot => ({ x: one.x1, y: one.y2 + 1, z: one.z1, kind: "stand" }));
 }

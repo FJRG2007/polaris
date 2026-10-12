@@ -30,6 +30,7 @@ import type { Marker } from "../state";
 import { giveMarked, giveMarkedUnlessHeld, reclaimBrokenDrops, type Spot } from "./arena";
 import { seeded, shuffled } from "../trivia-bank";
 import type { EventOptions, Language } from "../catalog";
+import * as decor from "./arena-decor";
 
 /** The floor of every plot. Not in the kit, so it cannot be broken. */
 export const FLOOR = "minecraft:white_stained_glass";
@@ -423,4 +424,12 @@ export function themeFor(
         shuffled(THEMES, random)[0] as Readonly<Record<Language, string>>,
         language
     );
+}
+
+/** Where the season's pieces go (`arena-decor`): in the barrier over the
+ *  platform's four outer corners, a full block where a full block was. */
+export function decorSpots(box: Box): decor.Spot[] {
+    return decor
+        .corners(box.x1, box.z1, box.x2, box.z2, box.y1 + 2)
+        .map((at): decor.Spot => ({ ...at, kind: "set", replaces: "minecraft:barrier" }));
 }

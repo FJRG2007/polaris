@@ -302,6 +302,7 @@ export const glassBridge: ArenaGame = {
     reach: (run) => glass.reachOf(optionsOf(run).steps),
     box: (run, place) => glass.bridgeBox(place, place.y + arena.ALTITUDE, optionsOf(run).steps),
     fills: (run, box) => glass.bridgeFills(box, optionsOf(run).steps),
+    decorSpots: (run, box) => glass.decorSpots(box, optionsOf(run).steps),
     blocks: () => [...glass.BRIDGE_BLOCKS],
     kit: () => [],
     // The events data pack breaks the glass (`glass-bridge.FUNCTIONS`): put on

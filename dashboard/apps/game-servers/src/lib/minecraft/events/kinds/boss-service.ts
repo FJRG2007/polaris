@@ -14,6 +14,7 @@
 
 import * as boss from "./boss";
 import * as stage from "./stage";
+import * as decor from "./arena-decor";
 import * as outsiders from "./outsiders";
 import * as catalog from "../catalog";
 import * as speech from "../../speech";
@@ -378,8 +379,12 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
         await placeEntry(ctx);
         if (!(await provedEmpty(ctx, memory))) return;
         const boxes = boss.arenaBoxes(origin);
+        // The season's pieces, written down with the arena and built after it.
+        const pieces = boss.arenaDecor(origin, await ctx.dressing().catch(() => null));
         // Written down first, then built - into air only.
-        changeStage(ctx, { boxes: [...stageOf(ctx).boxes, ...boxes] });
+        changeStage(ctx, {
+            boxes: [...stageOf(ctx).boxes, ...boxes, ...pieces.map(stageService.decorBox)]
+        });
         await ctx.persist();
         let whole = true;
         for (const box of boxes) {
@@ -392,6 +397,8 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
         changeStage(ctx, { built: true });
         await ctx.persist();
         if (!whole) throw new stageService.CalledOff("Its arena could not be built whole");
+        // Each only in place of the pillar's light it names.
+        if (pieces.length > 0) await ctx.server.sayAll(decor.decorLines(pieces));
     }
     if (!(await summon(ctx, memory, boss.arenaCenter(origin), []))) {
         throw new stageService.CalledOff("The boss could not be summoned in its arena");

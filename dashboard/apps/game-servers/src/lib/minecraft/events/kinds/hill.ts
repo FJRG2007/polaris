@@ -18,6 +18,7 @@ import { seeded } from "../trivia-bank";
 import type { Box, Point } from "../state";
 import { IN_ARENA, type Spot } from "./arena";
 import { HILL_HEALTH, HILL_INSIDE, SCORE } from "../commands";
+import * as decor from "./arena-decor";
 
 /** The platform's block: plain, cheap, and nothing the sea has. */
 export const PLATFORM_BLOCK = "minecraft:smooth_stone";
@@ -1081,4 +1082,38 @@ export const OVERWORLD_BIOMES = [
 /** Whether the platform's air is in this biome. */
 export function biomeTest(place: Point, biome: string): string {
     return `execute in minecraft:overworld if biome ${place.x} ${place.y + 2} ${place.z} ${biome}`;
+}
+
+/** Where the season's pieces go (`arena-decor`): a carpet on each corner of
+ *  the plain platform, where anybody can walk over it. The court has its own
+ *  lanterns there already. */
+export function decorSpots(place: Point, radius: number, look: Look): decor.Spot[] {
+    if (look !== PLAIN) return [];
+    const half = radius + MARGIN;
+    return decor
+        .corners(place.x - half, place.z - half, place.x + half, place.z + half, place.y + 1)
+        .map((at): decor.Spot => ({ ...at, kind: "flat" }));
+}
+
+/**
+ * The season's pieces for a platform about to go up, kept to what its look
+ * and floor leave room for inside the air proved for it (`proofBox`). Under a
+ * storm (`stormy`), nothing that burns. None out of season.
+ */
+export function platformPieces(
+    place: Point,
+    radius: number,
+    look: Look,
+    dressing: decor.Dressing | null,
+    stormy: boolean
+): decor.Piece[] {
+    const own = [
+        ...platformDecor(place, radius, look),
+        { box: platformBox(place, radius), block: look.floor }
+    ].map((one) => ({ ...one.box, block: one.block }));
+    return decor.fitted(
+        decor.piecesFor(decorSpots(place, radius, look), dressing, { fireproof: stormy }),
+        own,
+        proofBox(place, radius, look)
+    );
 }

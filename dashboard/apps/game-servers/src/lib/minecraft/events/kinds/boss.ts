@@ -53,6 +53,7 @@ import {
     equipLines as equipped,
     text
 } from "../commands";
+import * as decor from "./arena-decor";
 
 type Options = catalog.EventOptions<"world-boss">;
 type BossKind = catalog.BossKind;
@@ -1331,3 +1332,24 @@ export function isPlayer(name: string): boolean {
 }
 
 export const BOSS_SELECTOR = BOSS;
+
+/** Where the season's pieces go (`arena-decor`): set into the corners' pillars
+ *  of light, a full block where a full block was. */
+export function decorSpots(origin: Point): decor.Spot[] {
+    const v = arenaVolume(origin);
+    return [v.y1 + 3, v.y1 + 7].flatMap((y) =>
+        decor
+            .corners(v.x1, v.z1, v.x2, v.z2, y)
+            .map((at): decor.Spot => ({ ...at, kind: "set", replaces: PILLAR_BLOCK }))
+    );
+}
+
+/** The season's pieces for the sky arena at `origin`, kept to its own pillars:
+ *  nothing that burns, whatever the boss brings. None out of season. */
+export function arenaDecor(origin: Point, dressing: decor.Dressing | null): decor.Piece[] {
+    return decor.fitted(
+        decor.piecesFor(decorSpots(origin), dressing, { fireproof: true }),
+        arenaBoxes(origin),
+        arenaVolume(origin)
+    );
+}

@@ -180,6 +180,7 @@ export const tugOfWar: ArenaGame = {
     box: (run, place) => tug.arenaBox(place, place.y + arena.ALTITUDE, lengthOf(run)),
     built: () => ({ design: tug.DESIGN }),
     fills: (run, box) => tug.arenaFills(box, lengthOf(run)),
+    decorSpots: (run, box) => tug.decorSpots(box, lengthOf(run)),
     blocks: () => [...tug.ARENA_BLOCKS],
     kit: () => [tug.ROD],
     teams: 2,

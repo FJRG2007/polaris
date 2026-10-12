@@ -26,6 +26,7 @@ import { z } from "zod";
 import type { Box } from "../state";
 import type { Spot } from "./arena";
 import type { Fill } from "./arena-game";
+import * as decor from "./arena-decor";
 
 /** The layout's version, written into the run when it is built. */
 export const DESIGN = 1;
@@ -405,4 +406,18 @@ export function arenaFills(box: Box, length: number): Fill[] {
     }
     add(MARKER, center.x, floorY + 1, center.z, center.x, floorY + 1, center.z);
     return fills;
+}
+
+/** Where the season's pieces go (`arena-decor`): on the light over each corner
+ *  of each pen, over the glass nobody climbs. */
+export function decorSpots(box: Box, length: number): decor.Spot[] {
+    const center = centerOf(box);
+    const y = floorOf(box) + WALL + 1;
+    return [0, 1].flatMap((side) =>
+        [inner(length), outer(length)].flatMap((reach) =>
+            [center.z - HALF_Z, center.z + HALF_Z].map(
+                (z): decor.Spot => ({ x: center.x + sign(side) * reach, y, z, kind: "stand" })
+            )
+        )
+    );
 }

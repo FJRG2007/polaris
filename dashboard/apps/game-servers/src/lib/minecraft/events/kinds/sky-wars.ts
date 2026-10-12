@@ -38,6 +38,7 @@ import type { Box, Marker } from "../state";
 import { reachAcross } from "./parkour-layout";
 import type { EventOptions } from "../catalog";
 import { seeded, shuffled } from "../trivia-bank";
+import * as decor from "./arena-decor";
 
 /** The layout's version, written into the run when it is built. */
 export const DESIGN = 1;
@@ -1182,4 +1183,13 @@ export function hitBy(
         return best;
     };
     return nearestOf(struck, 6) ?? nearestOf(shot, Number.POSITIVE_INFINITY);
+}
+
+/** Where the season's pieces go (`arena-decor`): on the corners of the
+ *  gallery's lid, over the fight and out of it. */
+export function decorSpots(layout: Layout, at: Placed): decor.Spot[] {
+    const gallery = galleryFloor(layout, at);
+    return decor
+        .corners(gallery.x1 - 1, gallery.z1 - 1, gallery.x2 + 1, gallery.z2 + 1, gallery.y1 + 4)
+        .map((one): decor.Spot => ({ ...one, kind: "stand" }));
 }

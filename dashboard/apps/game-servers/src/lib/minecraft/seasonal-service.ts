@@ -24,7 +24,9 @@ import * as halloween from "./seasonal-halloween";
 import { homeLanguage } from "./speech-service";
 
 const { readInstallConfig, patchInstallConfig } = host.appsInstallConfig;
-const { seasonsAllowed } = host.seasonalService;
+/** The deployment's switch, read from the host when asked rather than as this
+ *  loads: the events loop loads this too, for an arena's season. */
+const seasonsAllowed = () => host.seasonalService.seasonsAllowed();
 
 /** How long a server with no Polaris jar at all is left before it is asked again:
  *  it answers the same until somebody adds one. */
@@ -100,6 +102,39 @@ export function decorationOf(
 /** The language a server's players read what the jar says in. */
 function serverLanguage(ownerId: string, config: Record<string, unknown>): Promise<"en" | "es"> {
     return homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+}
+
+/**
+ * The season an event's arena is dressed for (`events/kinds/arena-decor`): the
+ * server's own, under the same switches, read whether or not an event is
+ * running - the event is what it dresses. Null out of season, switched off, or
+ * when it cannot be read: an arena is never held up by its decorations.
+ */
+export async function eventDecoration(
+    installedAppId: string,
+    now: Date = new Date()
+): Promise<seasonal.Decoration | null> {
+    try {
+        const [row, allowed] = await Promise.all([
+            prisma.installedApp.findUnique({
+                where: { id: installedAppId },
+                select: { config: true }
+            }),
+            seasonsAllowed().catch(() => true)
+        ]);
+        if (!row) return null;
+        const config = readInstallConfig(row.config);
+        return seasonal.decorationNow({
+            now,
+            timeZone: zoneOf(config),
+            allowed,
+            serverOn: seasonal.seasonalOn(config),
+            eventRunning: false
+        });
+    } catch (error) {
+        console.warn("polaris: the season for an event could not be read", String(error));
+        return null;
+    }
 }
 
 /**
