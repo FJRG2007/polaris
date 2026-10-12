@@ -126,12 +126,12 @@ final class SeasonalWinterGifts {
         known.bornTick = ticks;
         ItemStack taken = steal(player, known);
         if (taken.isEmpty()) {
-            player.sendSystemMessage(words(WinterPlan.Line.ELF_FOUND_NOTHING).withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(words(player, WinterPlan.Line.ELF_FOUND_NOTHING).withStyle(ChatFormatting.GREEN));
             return;
         }
         elf.setItemSlot(EquipmentSlot.MAINHAND, taken.copy());
         elf.setDropChance(EquipmentSlot.MAINHAND, 0f);
-        player.sendSystemMessage(words(WinterPlan.Line.ELF_STOLE, taken.getHoverName()).withStyle(ChatFormatting.GREEN));
+        player.sendSystemMessage(words(player, WinterPlan.Line.ELF_STOLE, taken.getHoverName()).withStyle(ChatFormatting.GREEN));
     }
 
     /** An elf with something runs: it chases nobody. */
@@ -202,7 +202,8 @@ final class SeasonalWinterGifts {
         level.setBlock(spot, Blocks.BARREL.defaultBlockState().setValue(BarrelBlock.FACING, Direction.UP), 3);
         if (!(level.getBlockEntity(spot) instanceof BarrelBlockEntity barrel)) return;
         ItemStack named = new ItemStack(Items.BARREL);
-        named.set(DataComponents.CUSTOM_NAME, words(WinterPlan.Line.PRESENT_FOR, player.getName())
+        // Named for the one player it is for, so in that player's language.
+        named.set(DataComponents.CUSTOM_NAME, words(player, WinterPlan.Line.PRESENT_FOR, player.getName())
                 .withStyle(ChatFormatting.RED));
         barrel.applyComponentsFromItemStack(named);
         fill(barrel, level.random);
@@ -215,7 +216,7 @@ final class SeasonalWinterGifts {
         SeasonalWinterStore.list(server, SeasonalWinterStore.PRESENTS).add(where);
         gifted.putInt(who, plan.day());
         SeasonalWinterStore.save(server);
-        player.sendSystemMessage(words(WinterPlan.Line.PRESENT_WAITING)
+        player.sendSystemMessage(words(player, WinterPlan.Line.PRESENT_WAITING)
                 .withStyle(ChatFormatting.RED));
     }
 
@@ -315,18 +316,19 @@ final class SeasonalWinterGifts {
         AttributeInstance health = elf.getAttribute(Attributes.MAX_HEALTH);
         if (health != null) health.setBaseValue(ELF_HEALTH);
         elf.setHealth(ELF_HEALTH);
-        elf.setCustomName(words(WinterPlan.Line.ELF).withStyle(ChatFormatting.GREEN));
+        // A name over a head is seen by everybody at once, so it stays in the server's language.
+        elf.setCustomName(Component.literal(SeasonalWinter.plan().words(WinterPlan.Line.ELF)).withStyle(ChatFormatting.GREEN));
         elf.addTag(ELF_TAG);
         if (level.addFreshEntity(elf)) elves.put(elf.getUUID(), new Elf(elf.getUUID(), level.dimension(), ticks));
     }
 
-    /** A line in the server's language; a name goes where it has one, as the reader's game shows it. */
-    private static MutableComponent words(WinterPlan.Line line) {
-        return Component.literal(SeasonalWinter.plan().words(line));
+    /** A line in the reader's own language; a name goes where it has one, as the reader's game shows it. */
+    private static MutableComponent words(ServerPlayer reader, WinterPlan.Line line) {
+        return Component.literal(SeasonalWinter.plan().words(line, reader.clientInformation().language()));
     }
 
-    private static MutableComponent words(WinterPlan.Line line, Component name) {
-        String words = SeasonalWinter.plan().words(line);
+    private static MutableComponent words(ServerPlayer reader, WinterPlan.Line line, Component name) {
+        String words = SeasonalWinter.plan().words(line, reader.clientInformation().language());
         int at = words.indexOf("%s");
         if (at < 0) return Component.literal(words);
         return Component.literal(words.substring(0, at)).append(name).append(words.substring(at + 2));
@@ -418,13 +420,13 @@ final class SeasonalWinterGifts {
                 Long told = toldFull.get(owner);
                 if (told == null || now - told > 600) {
                     toldFull.put(owner, now);
-                    player.sendSystemMessage(words(WinterPlan.Line.ELF_NEEDS_ROOM, name).withStyle(ChatFormatting.GREEN));
+                    player.sendSystemMessage(words(player, WinterPlan.Line.ELF_NEEDS_ROOM, name).withStyle(ChatFormatting.GREEN));
                 }
                 continue;
             }
             owed.remove(i);
             changed = true;
-            player.sendSystemMessage(words(WinterPlan.Line.ELF_GAVE_BACK, name).withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(words(player, WinterPlan.Line.ELF_GAVE_BACK, name).withStyle(ChatFormatting.GREEN));
         }
         if (changed) SeasonalWinterStore.save(server);
     }

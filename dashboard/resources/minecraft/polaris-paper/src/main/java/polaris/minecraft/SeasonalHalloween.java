@@ -429,16 +429,22 @@ final class SeasonalHalloween implements Listener {
         bloodActive = true;
         bloodDone = key;
         save();
-        broadcast(ChatColor.DARK_RED + settings.words(HalloweenSettings.Line.BLOOD_START));
+        broadcast(HalloweenSettings.Line.BLOOD_START, ChatColor.DARK_RED);
     }
 
     private void endBloodNight() {
         bloodActive = false;
-        broadcast(ChatColor.GRAY + settings.words(HalloweenSettings.Line.BLOOD_END));
+        broadcast(HalloweenSettings.Line.BLOOD_END, ChatColor.GRAY);
     }
 
-    private static void broadcast(String line) {
-        for (Player player : Bukkit.getOnlinePlayers()) player.sendMessage(line);
+    /** Every player online gets the line in their own language. */
+    private void broadcast(HalloweenSettings.Line line, ChatColor color) {
+        for (Player player : Bukkit.getOnlinePlayers()) player.sendMessage(color + words(player, line));
+    }
+
+    /** A line for one player, in their client's language. */
+    private String words(Player player, HalloweenSettings.Line line) {
+        return settings.words(line, player.getLocale());
     }
 
     private void fog() {
@@ -483,6 +489,7 @@ final class SeasonalHalloween implements Listener {
                 equipment.setHelmet(new ItemStack(lit ? Material.JACK_O_LANTERN : Material.CARVED_PUMPKIN));
                 equipment.setHelmetDropChance(0f);
             }
+            // A name over a head is seen by everybody at once, so it stays in the server's language.
             villager.setCustomName(ChatColor.GOLD + settings.words(HalloweenSettings.Line.TRICK_NAME));
             villager.setCustomNameVisible(true);
             villager.addScoreboardTag(TAG);
@@ -500,7 +507,7 @@ final class SeasonalHalloween implements Listener {
         ItemStack held = player.getInventory().getItemInMainHand();
         Material type = held.getType();
         if (type != Material.PUMPKIN && type != Material.CARVED_PUMPKIN && type != Material.JACK_O_LANTERN) {
-            actionBar(player, settings.words(HalloweenSettings.Line.TRICK_ASK));
+            actionBar(player, words(player, HalloweenSettings.Line.TRICK_ASK));
             return;
         }
         int given = treatsGiven.getOrDefault(villager.getUniqueId(), 0);
@@ -511,7 +518,7 @@ final class SeasonalHalloween implements Listener {
         if (random.nextInt(100) < TRICK_SCARE_CHANCE) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0));
             world.playSound(villager.getLocation(), "minecraft:entity.witch.celebrate", 1f, 1f);
-            actionBar(player, ChatColor.DARK_PURPLE + settings.words(HalloweenSettings.Line.TRICK_SCARE));
+            actionBar(player, ChatColor.DARK_PURPLE + words(player, HalloweenSettings.Line.TRICK_SCARE));
             return;
         }
         int roll = random.nextInt(100);
@@ -522,7 +529,7 @@ final class SeasonalHalloween implements Listener {
         for (ItemStack left : player.getInventory().addItem(treat).values()) world.dropItemNaturally(player.getLocation(), left);
         world.playSound(villager.getLocation(), "minecraft:entity.villager.yes", 1f, 1f);
         world.spawnParticle(Particle.HAPPY_VILLAGER, villager.getLocation().add(0, 1.8, 0), 6, 0.3, 0.3, 0.3, 0);
-        actionBar(player, ChatColor.GOLD + settings.words(HalloweenSettings.Line.TRICK_TREAT));
+        actionBar(player, ChatColor.GOLD + words(player, HalloweenSettings.Line.TRICK_TREAT));
     }
 
     private static void actionBar(Player player, String line) {
@@ -551,6 +558,7 @@ final class SeasonalHalloween implements Listener {
                 equipment.setHelmetDropChance(0f);
                 equipment.setItemInMainHand(new ItemStack(Material.BOW));
             }
+            // A name over a head is seen by everybody at once, so it stays in the server's language.
             spawned.setCustomName(ChatColor.GOLD + settings.words(HalloweenSettings.Line.HORSEMAN));
             spawned.setCustomNameVisible(true);
             spawned.addScoreboardTag(TAG);
