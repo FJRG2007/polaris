@@ -2523,11 +2523,54 @@ describe("a spleef floor", () => {
             expect([...decayed], `${rings} rings`).toEqual([...shrunk]);
         }
         expect(sweeps(0)).toHaveLength(floor.floors.length);
-        // Every floor closes in.
-        for (const each of floor.floors)
-            expect(spleef.shrinkLines(floor, 1).some((line) => line.includes(` ${each} `))).toBe(
-                true
+        // Only the top floor closes in at first.
+        const touched = (lines: string[], y: number) =>
+            lines.some((line) => line.includes(` ${y} `));
+        const [top, middle, bottom] = floor.floors as [number, number, number];
+        expect(touched(spleef.shrinkLines(floor, 1), top)).toBe(true);
+        expect(touched(spleef.shrinkLines(floor, size + 1), middle)).toBe(false);
+        expect(touched(spleef.shrinkLines(floor, size + 1), bottom)).toBe(false);
+    });
+
+    it("closes the floors in one at a time, top first, each starting once the one over it is gone", () => {
+        const size = 4;
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size, height: 30 },
+            { x: 10, z: -20 },
+            80
+        );
+        const whole = size + 1;
+        expect(floor.floors).toHaveLength(spleef.LAYERS);
+        for (let rings = 0; rings <= spleef.LAYERS * whole + 2; rings += 1) {
+            const each = floor.floors.map((_, index) => spleef.floorRings(floor, rings, index));
+            // One floor at most part-way; every floor over it gone, every one under it whole.
+            const going = each.findIndex((one) => one > 0 && one < whole);
+            expect(each.filter((one) => one > 0 && one < whole).length).toBeLessThanOrEqual(1);
+            each.forEach((one, index) => {
+                if (going >= 0 && index < going) expect(one).toBe(whole);
+                if (going >= 0 && index > going) expect(one).toBe(0);
+            });
+            expect(each.reduce((sum, one) => sum + one, 0)).toBe(
+                Math.min(rings, spleef.LAYERS * whole)
             );
+            // The lines of a floor are those of that floor's own rings.
+            const lines = spleef.shrinkLines(floor, rings);
+            floor.floors.forEach((at, index) => {
+                const own = lines.filter((line) => line.includes(` ${at} `));
+                if (each[index] === 0) expect(own).toEqual([]);
+                else expect(own.length).toBeGreaterThan(0);
+            });
+        }
+        // The middle starts the look after the top is gone, and the bottom last.
+        expect(spleef.floorRings(floor, whole, 1)).toBe(0);
+        expect(spleef.floorRings(floor, whole + 1, 1)).toBe(1);
+        expect(spleef.floorRings(floor, 2 * whole + 1, 2)).toBe(1);
+        // A decay look over RCON keeps a floor not closing yet whole, its red ring included.
+        const sweep = spleef
+            .decayLines(floor, "in", 1)
+            .filter((line) => line.includes(" run fill "));
+        expect(sweep).toHaveLength(floor.floors.length);
+        expect(sweep[1]).toContain(`fill ${10 - size} ${floor.floors[1]} ${-20 - size}`);
     });
 
     it("spreads players over the snow, never onto a wall", () => {

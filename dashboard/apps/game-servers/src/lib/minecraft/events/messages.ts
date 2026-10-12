@@ -1312,8 +1312,8 @@ export function spleefOut(name: string, left: number, language: Language): strin
 
 export function spleefShrinking(language: Language): string {
     return language === "es"
-        ? `${WARN}La pista se cierra: el borde rojo cae el siguiente.`
-        : `${WARN}The floors are closing in: the red edge goes next.`;
+        ? `${WARN}La pista se cierra, de arriba abajo: el borde rojo cae el siguiente.`
+        : `${WARN}The floors are closing in, top first: the red edge goes next.`;
 }
 
 export function spleefShrinkingTitle(language: Language): string {

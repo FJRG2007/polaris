@@ -260,7 +260,10 @@ left out.
   lowest. Each run is played one way, drawn among those switched on in the
   editor (`variants`, all three by default): shovels (break the snow), a
   vanishing floor (the snow underfoot turns red, then goes on the next look),
-  or snowballs (each one breaks the snow it hits).
+  or snowballs (each one breaks the snow it hits). From `SHRINK_AFTER_MS` the
+  floors close in from their walls one at a time, the top one first
+  (`spleef.floorRings`): whoever is left drops to the next floor, and the game
+  lasts until the last floor is gone.
 - **TNT run** is spleef's arena with TNT for snow and no tool: `layers` floors
   (2-4) `LAYER_GAP` apart, one wall round all of them - a colored concrete rim
   at each floor's height, lit at the corners, clear glass between - so the only

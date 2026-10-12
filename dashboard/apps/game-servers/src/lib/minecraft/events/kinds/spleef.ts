@@ -16,8 +16,10 @@
  * crouched there, or kept to an untouched corner, used to make the rest dig
  * the whole floor blind. So every player inside glows - seen through the snow
  * - and from `SHRINK_AFTER_MS` after the start the floors close in from the
- * walls, a ring every `SHRINK_EVERY_MS`, the next ring turning red first,
- * until there is no floor left (`shrinkLines`).
+ * walls one at a time, the top one first, a ring every `SHRINK_EVERY_MS`, the
+ * next ring turning red first, until it is gone and the one under it starts:
+ * whoever is left drops to the next floor down, and the game runs on until
+ * there is no floor left (`shrinkLines`).
  *
  * Built only into air, taken out only where its own blocks still are.
  */
@@ -200,15 +202,19 @@ export function warnBoxes(arena: Arena): Box[] {
  * floors, only where it is still the arena's snow. With `rings` closed in, the
  * red ring the floors close in to next is left for `shrinkLines` to take.
  */
-export function decayLines(arena: Arena, inArena: string, rings = 0): string[] {
+export function decayLines(arena: Arena, inArena: string, total = 0): string[] {
     const r = arena.size;
     const { x, z } = arena.center;
-    const s = rings > 0 ? r - rings - 1 : r;
     return [
-        ...(s < 0 ? [] : (arena.floors ?? [arena.floor])).map(
-            (at) =>
-                `execute in minecraft:overworld run fill ${x - s} ${at} ${z - s} ${x + s} ${at} ${z + s} minecraft:air replace ${WARN}`
-        ),
+        ...(arena.floors ?? [arena.floor]).flatMap((at, index) => {
+            const rings = floorRings(arena, total, index);
+            const s = rings > 0 ? r - rings - 1 : r;
+            return s < 0
+                ? []
+                : [
+                      `execute in minecraft:overworld run fill ${x - s} ${at} ${z - s} ${x + s} ${at} ${z + s} minecraft:air replace ${WARN}`
+                  ];
+        }),
         `execute in minecraft:overworld as @a[tag=${inArena}] at @s if block ~ ~-1 ~ ${FLOOR} if entity @s[x=${x - r},dx=${2 * r},z=${z - r},dz=${2 * r},y=${arena.floors?.at(-1) ?? arena.floor},dy=${arena.floor - (arena.floors?.at(-1) ?? arena.floor) + 2}] run setblock ~ ~-1 ~ ${WARN}`
     ];
 }
@@ -216,22 +222,34 @@ export function decayLines(arena: Arena, inArena: string, rings = 0): string[] {
 /** How many snowballs a player is topped up to in the snowball game. */
 export const SNOWBALLS = 16;
 
-/** How many rings of every floor have gone `elapsed` after the start, from the
- *  wall in: none before `SHRINK_AFTER_MS`, then one more each `SHRINK_EVERY_MS`. */
+/** How many rings have gone `elapsed` after the start, counted across the
+ *  floors top first (`floorRings`): none before `SHRINK_AFTER_MS`, then one
+ *  more each `SHRINK_EVERY_MS`. */
 export function shrunk(elapsed: number): number {
     if (elapsed < SHRINK_AFTER_MS) return 0;
     return Math.floor((elapsed - SHRINK_AFTER_MS) / SHRINK_EVERY_MS) + 1;
 }
 
 /**
- * Every floor with its outer `rings` gone and the ring inside them turned red,
+ * How many of `rings` - counted across the floors - one floor has lost, the top
+ * one (`index` 0) first: a floor starts closing in only once every floor over it
+ * is gone, which takes its `size` rings and the middle.
+ */
+export function floorRings(arena: Arena, rings: number, index: number): number {
+    const whole = arena.size + 1;
+    return Math.max(0, Math.min(whole, rings - index * whole));
+}
+
+/**
+ * Every floor, the top one first (`floorRings`), with its outer rings gone and
+ * the ring inside them turned red,
  * as a warning - only the arena's own snow, white or red, is ever touched, so
  * the walls and a floor already dug stay as they are. Everything gone up to
  * here goes again on every look, so a missed look is caught up on the next.
  * With every ring gone, so is the middle.
  */
-export function shrinkLines(arena: Arena, rings: number): string[] {
-    if (rings <= 0) return [];
+export function shrinkLines(arena: Arena, total: number): string[] {
+    if (total <= 0) return [];
     const r = arena.size;
     const { x, z } = arena.center;
     const lines: string[] = [];
@@ -245,7 +263,9 @@ export function shrinkLines(arena: Arena, rings: number): string[] {
         from: string
     ) =>
         `execute in minecraft:overworld run fill ${x1} ${at} ${z1} ${x2} ${at} ${z2} ${to} replace ${from}`;
-    for (const at of arena.floors ?? [arena.floor]) {
+    for (const [index, at] of (arena.floors ?? [arena.floor]).entries()) {
+        const rings = floorRings(arena, total, index);
+        if (rings <= 0) continue;
         if (rings > r) {
             for (const block of [FLOOR, WARN])
                 lines.push(fill(x - r, z - r, x + r, z + r, at, "minecraft:air", block));
