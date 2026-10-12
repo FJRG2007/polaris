@@ -844,10 +844,11 @@ async function arenaTick(
             .map((one) => one.name);
         if (stepping.length > 0) await admit(ctx, stepping, arenaWay(origin), lines);
     } else if (state.direct) {
-        // No beam: everybody in the Overworld taken up, once each.
+        // No beam: everybody taken up, once each - from the Nether or the End
+        // too, sent back there at the end (`stage.returnLine`).
         const taken = new Set(state.taken);
         const fresh = commands
-            .readWhere(await server.say([boss.NOT_UP]))
+            .readWhere(await server.say([boss.NOT_UP_ANY_WORLD]))
             .map((one) => one.name)
             .filter((name) => !taken.has(lower(name)));
         if (fresh.length > 0) await admit(ctx, fresh, arenaWay(origin), lines);

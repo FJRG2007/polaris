@@ -1184,6 +1184,47 @@ describe("fights and worlds", () => {
             plan.playersFor(catalog.newPreset("mining-rush", "m"), moved, 5, 60_000)
         ).toHaveLength(1);
     });
+
+    it("counts players in the Nether for an event in the sky, placed by the Overworld's", () => {
+        const both = [...here, { name: "Bo", x: 0, y: 64, z: 0 }];
+        const turned = new Map([...facing, ["Bo", { yaw: 0, pitch: 0 }]]);
+        const nether = (dimensions: Map<string, string>) => {
+            const first = plan.observe(new Map(), both, turned, 0, { dimensions });
+            const moved = both.map((one) => ({ ...one, x: 9 }));
+            return plan.observe(first, moved, turned, 60_000);
+        };
+        const mixed = nether(
+            new Map([
+                ["Ana", "minecraft:the_nether"],
+                ["Bo", "minecraft:overworld"]
+            ])
+        );
+        const allAway = nether(
+            new Map([
+                ["Ana", "minecraft:the_nether"],
+                ["Bo", "minecraft:the_end"]
+            ])
+        );
+        const parkour = catalog.newPreset("parkour", "p");
+        const duel = catalog.newPreset("team-duel", "d");
+        const arenaBoss = catalog.newPreset("world-boss", "b");
+        const skyBoss = { ...arenaBoss, options: { ...arenaBoss.options, arena: true } };
+        const landBoss = { ...arenaBoss, options: { ...arenaBoss.options, arena: false } };
+        for (const sky of [parkour, duel, skyBoss] as catalog.EventPreset[]) {
+            expect(catalog.needsOverworld(sky)).toBe(false);
+            expect(plan.playersFor(sky, mixed, 5, 60_000)).toHaveLength(2);
+            // Nobody in the Overworld to place it near: nobody can play it.
+            expect(plan.playersFor(sky, allAway, 5, 60_000)).toHaveLength(0);
+        }
+        const fixed = {
+            ...parkour,
+            options: { ...parkour.options, place: { mode: "fixed", x: 0, z: 0 } }
+        } as catalog.EventPreset;
+        expect(plan.playersFor(fixed, allAway, 5, 60_000)).toHaveLength(2);
+        // On the land, the Nether still does not count.
+        expect(catalog.needsOverworld(landBoss as catalog.EventPreset)).toBe(true);
+        expect(plan.playersFor(landBoss as catalog.EventPreset, mixed, 5, 60_000)).toHaveLength(1);
+    });
 });
 
 describe("a saved event that no longer reads whole", () => {
