@@ -46,48 +46,123 @@ export const FLOOR = 4;
 export const MOST_IMPOSTORS = 3;
 export const PER_IMPOSTOR = 3;
 
-/** The station's layout version, written into the run as it is built. */
-export const DESIGN = 1;
+/** The station's layout version, written into the run as it is built: from 2
+ *  (`FURNISHED_SINCE`) bigger rooms, a bridge looking out on space, a dark
+ *  room, and every room furnished for what it is. */
+export const DESIGN = 2;
+export const FURNISHED_SINCE = 2;
 
 // ------------------------------------------------------------------ the station
 
-/** A room's side, walls included: a 9 by 9 floor inside. */
-export const ROOM = 11;
-/** The corridor between two rooms, wall to wall. */
-const GAP = 4;
-const PITCH = ROOM + GAP;
+/** How a design is measured, each length from a room's corner. */
+interface Geometry {
+    /** A room's side, walls included. */
+    readonly room: number;
+    /** The corridor between two rooms, wall to wall. */
+    readonly gap: number;
+    /** How high a wall stands over the floor; the roof is on top of it. */
+    readonly wall: number;
+    /** A corridor's two side walls, across the side of a room it goes through. */
+    readonly door: readonly [number, number];
+    /** A working room's two stations. */
+    readonly stations: readonly (readonly [number, number])[];
+    /** A vent, and where whoever comes out of it stands. */
+    readonly vent: {
+        readonly x: number;
+        readonly z: number;
+        readonly outX: number;
+        readonly outZ: number;
+    };
+    /** The middle of the meeting room's table. */
+    readonly table: number;
+    /** How far out from the table the seats' ring is. */
+    readonly seats: number;
+    /** Where a room's ceiling has a light, across and along. */
+    readonly lights: readonly number[];
+}
+
+const GEOMETRY_1: Geometry = {
+    room: 11,
+    gap: 4,
+    wall: 4,
+    door: [3, 7],
+    stations: [
+        [2, 2],
+        [8, 8]
+    ],
+    vent: { x: 8, z: 2, outX: 7, outZ: 3 },
+    table: 5,
+    seats: 3,
+    lights: [3, 7]
+};
+/** A 13 by 13 floor inside, a block higher, the stations clear of the
+ *  bridge's window along the top of its room. */
+const GEOMETRY_2: Geometry = {
+    room: 15,
+    gap: 5,
+    wall: 5,
+    door: [5, 9],
+    stations: [
+        [3, 11],
+        [11, 11]
+    ],
+    vent: { x: 11, z: 3, outX: 10, outZ: 4 },
+    table: 7,
+    seats: 4,
+    lights: [3, 7, 11]
+};
+
+/** How a design is measured: a run built on an older one keeps its own. */
+function geometryOf(design: number): Geometry {
+    return design >= FURNISHED_SINCE ? GEOMETRY_2 : GEOMETRY_1;
+}
+
+/** A room's side, walls included, as rooms are built now. */
+export const ROOM = GEOMETRY_2.room;
 export const COLS = 3;
-/** How high a wall stands over the floor; the roof is on top of it. */
-const WALL = 4;
 /** The meeting room: the middle of the second row. */
 const MEETING = { col: 1, row: 1 } as const;
+/** The bridge, from `FURNISHED_SINCE`: the middle of the first row, its top
+ *  side the station's edge. */
+const BRIDGE = { col: 1, row: 0 } as const;
+/** The bridge's rows given to space - the backdrop and the dark in front of
+ *  it - before its window. */
+const SPACE_ROWS = 2;
 
 /** Rows of rooms for this many players. */
 export function rowsFor(players: number): number {
     return players <= 8 ? 3 : 4;
 }
 
-function sizeOf(rows: number): { width: number; depth: number } {
-    return { width: COLS * PITCH - GAP, depth: rows * PITCH - GAP };
+function sizeOf(rows: number, g: Geometry): { width: number; depth: number } {
+    const pitch = g.room + g.gap;
+    return { width: COLS * pitch - g.gap, depth: rows * pitch - g.gap };
 }
 
 /** How far from its center the ground under it is judged. */
-export function reachOf(players: number): number {
-    const { width, depth } = sizeOf(rowsFor(players));
+export function reachOf(players: number, design = DESIGN): number {
+    const { width, depth } = sizeOf(rowsFor(players), geometryOf(design));
     return Math.ceil(Math.max(width, depth) / 2) + 2;
 }
 
 /** The box the station takes: its floor at `floorY`, its roof on top. */
-export function stationBox(center: { x: number; z: number }, floorY: number, players: number): Box {
-    const { width, depth } = sizeOf(rowsFor(players));
+export function stationBox(
+    center: { x: number; z: number },
+    floorY: number,
+    players: number,
+    design = DESIGN
+): Box {
+    const g = geometryOf(design);
+    const { width, depth } = sizeOf(rowsFor(players), g);
     const x1 = Math.round(center.x) - Math.floor(width / 2);
     const z1 = Math.round(center.z) - Math.floor(depth / 2);
-    return { x1, y1: floorY, z1, x2: x1 + width - 1, y2: floorY + WALL + 1, z2: z1 + depth - 1 };
+    return { x1, y1: floorY, z1, x2: x1 + width - 1, y2: floorY + g.wall + 1, z2: z1 + depth - 1 };
 }
 
 /** The rows a built station has, from its box. */
-export function rowsOf(box: Box): number {
-    return Math.round((box.z2 - box.z1 + 1 + GAP) / PITCH);
+export function rowsOf(box: Box, design = DESIGN): number {
+    const g = geometryOf(design);
+    return Math.round((box.z2 - box.z1 + 1 + g.gap) / (g.room + g.gap));
 }
 
 export const STATION_KINDS = ["switch", "button", "scan"] as const;
@@ -109,6 +184,8 @@ export const ROOM_NAMES = [
     "radio"
 ] as const;
 export type RoomName = (typeof ROOM_NAMES)[number];
+/** What any room is called: a working room's name, the meeting room or the bridge. */
+export type PlaceName = RoomName | "meeting" | "bridge";
 
 export interface Room {
     readonly index: number;
@@ -117,8 +194,10 @@ export interface Room {
     /** Its corner, walls included. */
     readonly x: number;
     readonly z: number;
-    readonly name: RoomName | "meeting";
+    readonly name: PlaceName;
     readonly floor: string;
+    /** Left unlit, its floor dark glass (`FURNISHED_SINCE`). */
+    readonly dark?: boolean;
 }
 
 export interface Station {
@@ -142,13 +221,26 @@ export interface Vent {
     readonly outZ: number;
 }
 
+/** A piece of a room's furnishing, standing on its floor, `high` blocks tall. */
+export interface Prop {
+    readonly x: number;
+    readonly z: number;
+    readonly high: number;
+    readonly block: string;
+}
+
 export interface Layout {
     readonly box: Box;
+    readonly design: number;
     readonly rows: number;
     readonly rooms: readonly Room[];
     readonly meeting: Room;
     readonly stations: readonly Station[];
     readonly vents: readonly Vent[];
+    /** What furnishes the rooms, from `FURNISHED_SINCE`. */
+    readonly props: readonly Prop[];
+    /** Where the bridge's sky has a star, by `dx,dy` along its backdrop. */
+    readonly stars: ReadonlySet<string>;
 }
 
 const WALL_BLOCK = "minecraft:light_gray_concrete";
@@ -164,6 +256,12 @@ const SWITCH = "minecraft:lever";
 const BUTTON = "minecraft:oak_button";
 const PLATE = "minecraft:heavy_weighted_pressure_plate";
 const VENT = "minecraft:iron_trapdoor";
+/** The dark room's floor: dark, and nothing spawns on glass. */
+const DARK_FLOOR = "minecraft:black_stained_glass";
+const BRIDGE_FLOOR = "minecraft:polished_andesite";
+/** Space past the bridge's window: black, a star here and there. */
+const SPACE = "minecraft:black_concrete";
+const WINDOW = "minecraft:glass";
 /** A room's own floor, drawn for it. */
 const ROOM_FLOORS = [
     "minecraft:white_concrete",
@@ -186,6 +284,131 @@ const EMERGENCY_FLOOR = `${EMERGENCY}[face=floor,facing=north,powered=false]`;
 const EMERGENCY_ON = `${EMERGENCY}[powered=true]`;
 const VENT_SHUT = `${VENT}[half=bottom,open=false,facing=north]`;
 
+/** Furnishing that stands on the block under it: taken down before anything. */
+const STANDING = [
+    "minecraft:potted_red_tulip",
+    "minecraft:potted_fern",
+    "minecraft:potted_dandelion",
+    "minecraft:potted_cactus",
+    "minecraft:potted_white_tulip",
+    "minecraft:skeleton_skull",
+    "minecraft:wither_skeleton_skull",
+    "minecraft:redstone_torch",
+    "minecraft:end_rod",
+    "minecraft:brewing_stand",
+    "minecraft:daylight_detector"
+] as const;
+
+/**
+ * What furnishes each room, from `FURNISHED_SINCE`: blocks every version from
+ * 1.13 has, none that falls, flows, spreads, burns on its own, takes power or
+ * moves anything. One is drawn for each spot; a `tall` one stands two high.
+ */
+const FURNISHING: Readonly<
+    Record<RoomName | "bridge" | "dark", { tall: readonly string[]; low: readonly string[] }>
+> = {
+    engine: {
+        tall: ["minecraft:iron_bars"],
+        low: [
+            "minecraft:furnace",
+            "minecraft:iron_block",
+            "minecraft:coal_block",
+            "minecraft:cauldron"
+        ]
+    },
+    greenhouse: {
+        tall: ["minecraft:oak_leaves[persistent=true]", "minecraft:birch_leaves[persistent=true]"],
+        low: [
+            "minecraft:potted_red_tulip",
+            "minecraft:potted_fern",
+            "minecraft:potted_dandelion",
+            "minecraft:hay_block"
+        ]
+    },
+    library: {
+        tall: ["minecraft:bookshelf"],
+        low: ["minecraft:enchanting_table", "minecraft:crafting_table"]
+    },
+    kitchen: {
+        tall: [],
+        low: [
+            "minecraft:furnace",
+            "minecraft:cauldron",
+            "minecraft:crafting_table",
+            "minecraft:melon",
+            "minecraft:pumpkin"
+        ]
+    },
+    workshop: {
+        tall: ["minecraft:iron_bars"],
+        low: [
+            "minecraft:crafting_table",
+            "minecraft:iron_block",
+            "minecraft:furnace",
+            "minecraft:chiseled_stone_bricks"
+        ]
+    },
+    observatory: {
+        tall: ["minecraft:quartz_pillar", WINDOW],
+        low: ["minecraft:end_rod", "minecraft:beacon"]
+    },
+    cargo: {
+        tall: ["minecraft:oak_log"],
+        low: ["minecraft:hay_block", "minecraft:coal_block", "minecraft:dried_kelp_block"]
+    },
+    lab: {
+        tall: [WINDOW],
+        low: [
+            "minecraft:brewing_stand",
+            "minecraft:cauldron",
+            "minecraft:potted_cactus",
+            "minecraft:purpur_block"
+        ]
+    },
+    archive: {
+        tall: ["minecraft:bookshelf"],
+        low: ["minecraft:crafting_table", "minecraft:chiseled_stone_bricks"]
+    },
+    armory: {
+        tall: ["minecraft:iron_bars"],
+        low: ["minecraft:iron_block", "minecraft:chiseled_stone_bricks"]
+    },
+    infirmary: {
+        tall: [],
+        low: [
+            "minecraft:white_wool",
+            "minecraft:red_wool",
+            "minecraft:cauldron",
+            "minecraft:potted_white_tulip"
+        ]
+    },
+    radio: {
+        tall: [],
+        low: [
+            "minecraft:note_block",
+            "minecraft:jukebox",
+            "minecraft:redstone_lamp",
+            "minecraft:daylight_detector"
+        ]
+    },
+    bridge: {
+        tall: [],
+        low: ["minecraft:redstone_lamp", "minecraft:daylight_detector", CONSOLE]
+    },
+    // Nothing a mob spawns on: glass, bars, skulls and a dim red light.
+    dark: {
+        tall: [DARK_FLOOR, "minecraft:iron_bars"],
+        low: [
+            "minecraft:skeleton_skull",
+            "minecraft:wither_skeleton_skull",
+            "minecraft:redstone_torch"
+        ]
+    }
+};
+/** How many pieces furnish a room at the most. */
+const PROPS_PER_ROOM = 10;
+const bareId = (id: string) => id.replace(/\[.*$/, "");
+
 /** Every kind of block the station is built of. */
 export const STATION_BLOCKS: readonly string[] = [
     // What stands on something first, so it comes down before what holds it.
@@ -194,59 +417,86 @@ export const STATION_BLOCKS: readonly string[] = [
     EMERGENCY,
     PLATE,
     VENT,
+    ...STANDING,
     CONSOLE,
     TABLE,
     TABLE_MIDDLE,
+    // The rest of the furnishing: on the floor, or on its own kind.
+    ...new Set(
+        Object.values(FURNISHING)
+            .flatMap((one) => [...one.tall, ...one.low])
+            .map(bareId)
+            .filter(
+                (id) =>
+                    !(STANDING as readonly string[]).includes(id) &&
+                    ![CONSOLE, WINDOW, DARK_FLOOR].includes(id)
+            )
+    ),
     LIGHT,
     ROOF,
     WALL_BLOCK,
+    SPACE,
+    WINDOW,
     CORRIDOR_FLOOR,
     MEETING_FLOOR,
+    DARK_FLOOR,
     ...ROOM_FLOORS
 ];
 
 /** Where a room's corner is, by its column and row. */
-function roomCorner(box: Box, col: number, row: number): { x: number; z: number } {
-    return { x: box.x1 + col * PITCH, z: box.z1 + row * PITCH };
+function roomCorner(box: Box, col: number, row: number, g: Geometry): { x: number; z: number } {
+    return { x: box.x1 + col * (g.room + g.gap), z: box.z1 + row * (g.room + g.gap) };
 }
 
 /**
  * The station's rooms, stations and vents, from the run's id: which room is
  * which, its floor, what each of its two corners is, and which rooms have a
  * vent and where it leads. A vent leads to the one it is paired with, both
- * ways; two pairs on three rows, three on four.
+ * ways; two pairs on three rows, three on four. From `FURNISHED_SINCE` the
+ * middle of the first row is the bridge, one other room is dark, and every
+ * room but the meeting room is furnished (`furnishing`).
  */
-export function layoutFor(seed: string, box: Box): Layout {
-    const rows = rowsOf(box);
-    const random = seeded(`${seed}-impostor-${DESIGN}`);
+export function layoutFor(seed: string, box: Box, design = DESIGN): Layout {
+    const g = geometryOf(design);
+    const furnished = design >= FURNISHED_SINCE;
+    const rows = rowsOf(box, design);
+    const random = seeded(`${seed}-impostor-${design}`);
     const names = shuffled(ROOM_NAMES, random);
     const rooms: Room[] = [];
     let named = 0;
     for (let row = 0; row < rows; row += 1)
         for (let col = 0; col < COLS; col += 1) {
-            const corner = roomCorner(box, col, row);
+            const corner = roomCorner(box, col, row, g);
             const meeting = col === MEETING.col && row === MEETING.row;
+            const bridge = furnished && col === BRIDGE.col && row === BRIDGE.row;
             rooms.push({
                 index: rooms.length,
                 col,
                 row,
                 ...corner,
-                name: meeting ? "meeting" : names[named++ % names.length]!,
+                name: meeting ? "meeting" : bridge ? "bridge" : names[named++ % names.length]!,
                 floor: meeting
                     ? MEETING_FLOOR
-                    : ROOM_FLOORS[Math.floor(random() * ROOM_FLOORS.length)]!
+                    : bridge
+                      ? BRIDGE_FLOOR
+                      : ROOM_FLOORS[Math.floor(random() * ROOM_FLOORS.length)]!
             });
         }
+    if (furnished) {
+        // One room left in the dark, never the bridge.
+        const dark = shuffled(
+            rooms.filter((one) => one.name !== "meeting" && one.name !== "bridge"),
+            random
+        )[0]!;
+        rooms[dark.index] = { ...dark, floor: DARK_FLOOR, dark: true };
+    }
     const meeting = rooms.find((one) => one.name === "meeting")!;
     const working = rooms.filter((one) => one !== meeting);
     const stations: Station[] = [];
     // Every kind in turn, shuffled, so each is played on every station.
     let kinds: StationKind[] = [];
     for (const room of working)
-        for (const [dx, dz] of [
-            [2, 2],
-            [8, 8]
-        ] as const) {
+        for (const [dx, dz] of g.stations) {
             if (kinds.length === 0) kinds = shuffled(STATION_KINDS, random);
             stations.push({
                 id: stations.length,
@@ -257,24 +507,90 @@ export function layoutFor(seed: string, box: Box): Layout {
             });
         }
     const pairs = rows <= 3 ? 2 : 3;
-    const vented = shuffled(working, random).slice(0, pairs * 2);
+    // The bridge's window is where its vent would go: none there.
+    const vented = shuffled(
+        working.filter((one) => one.name !== "bridge"),
+        random
+    ).slice(0, pairs * 2);
     const vents: Vent[] = vented.map((room, index) => ({
         room: room.index,
-        x: room.x + 8,
-        z: room.z + 2,
+        x: room.x + g.vent.x,
+        z: room.z + g.vent.z,
         to: index % 2 === 0 ? index + 1 : index - 1,
-        outX: room.x + 7,
-        outZ: room.z + 3
+        outX: room.x + g.vent.outX,
+        outZ: room.z + g.vent.outZ
     }));
-    return { box, rows, rooms, meeting, stations, vents };
+    const bare: Layout = {
+        box,
+        design,
+        rows,
+        rooms,
+        meeting,
+        stations,
+        vents,
+        props: [],
+        stars: new Set()
+    };
+    if (!furnished) return bare;
+    const stars = new Set<string>();
+    for (let dx = 1; dx < g.room - 1; dx += 1)
+        for (let dy = 1; dy <= g.wall; dy += 1) if (random() < 0.22) stars.add(`${dx},${dy}`);
+    return { ...bare, props: furnishing(bare, random), stars };
 }
 
-export type Cell = "void" | "wall" | "corridor" | number;
+/**
+ * What furnishes each room but the meeting room: up to `PROPS_PER_ROOM` pieces
+ * of its own kind (`FURNISHING`) along the inside of its walls - never within
+ * a block of a station, a vent or where a vent lets out, never within two of
+ * a doorway, and never along the bridge's window.
+ */
+function furnishing(layout: Layout, random: () => number): Prop[] {
+    const g = geometryOf(layout.design);
+    const plan = planOf(layout);
+    const { box } = layout;
+    const cell = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
+    const kept = [
+        ...layout.stations,
+        ...layout.vents,
+        ...layout.vents.map((vent) => ({ x: vent.outX, z: vent.outZ }))
+    ];
+    const props: Prop[] = [];
+    for (const room of layout.rooms) {
+        if (room.name === "meeting") continue;
+        const kind = room.dark ? FURNISHING.dark : FURNISHING[room.name];
+        const spots: { x: number; z: number }[] = [];
+        for (let dx = 1; dx < g.room - 1; dx += 1)
+            for (let dz = 1; dz < g.room - 1; dz += 1) {
+                if (dx !== 1 && dz !== 1 && dx !== g.room - 2 && dz !== g.room - 2) continue;
+                const x = room.x + dx;
+                const z = room.z + dz;
+                if (cell(x, z) !== room.index || cell(x, z - 1) === "window") continue;
+                if (kept.some((one) => Math.abs(one.x - x) <= 1 && Math.abs(one.z - z) <= 1))
+                    continue;
+                let byDoor = false;
+                for (let ax = -2; ax <= 2; ax += 1)
+                    for (let az = -2; az <= 2; az += 1)
+                        if (cell(x + ax, z + az) === "corridor") byDoor = true;
+                if (!byDoor) spots.push({ x, z });
+            }
+        const choices = [...kind.tall, ...kind.low];
+        for (const spot of shuffled(spots, random).slice(0, PROPS_PER_ROOM)) {
+            const block = choices[Math.floor(random() * choices.length)]!;
+            props.push({ ...spot, block, high: kind.tall.includes(block) ? 2 : 1 });
+        }
+    }
+    return props;
+}
+
+export type Cell = "void" | "wall" | "corridor" | "space" | "window" | number;
 
 /** The station from above: each column a wall, a corridor, a room's floor
- *  (its index) or nothing, with `x1`, `z1` at [0][0]. */
+ *  (its index), the bridge's space or window, or nothing, with `x1`, `z1` at
+ *  [0][0]. */
 export function planOf(layout: Layout): Cell[][] {
     const { box, rooms } = layout;
+    const g = geometryOf(layout.design);
+    const side = g.room;
     const width = box.x2 - box.x1 + 1;
     const depth = box.z2 - box.z1 + 1;
     const plan: Cell[][] = Array.from({ length: width }, () =>
@@ -285,26 +601,33 @@ export function planOf(layout: Layout): Cell[][] {
         if (at(x, z) !== undefined) plan[x - box.x1]![z - box.z1] = cell;
     };
     for (const room of rooms)
-        for (let dx = 0; dx < ROOM; dx += 1)
-            for (let dz = 0; dz < ROOM; dz += 1) {
-                const edge = dx === 0 || dz === 0 || dx === ROOM - 1 || dz === ROOM - 1;
+        for (let dx = 0; dx < side; dx += 1)
+            for (let dz = 0; dz < side; dz += 1) {
+                const edge = dx === 0 || dz === 0 || dx === side - 1 || dz === side - 1;
                 set(room.x + dx, room.z + dz, edge ? "wall" : room.index);
             }
-    // A corridor three wide to every room beside, through both walls.
+    // The bridge's top rows: space, behind a window the width of the room.
+    for (const room of rooms)
+        if (room.name === "bridge")
+            for (let dx = 1; dx < side - 1; dx += 1)
+                for (let dz = 1; dz <= SPACE_ROWS + 1; dz += 1)
+                    set(room.x + dx, room.z + dz, dz <= SPACE_ROWS ? "space" : "window");
+    // A corridor to every room beside, through both walls.
+    const [from, to] = g.door;
     for (const room of rooms) {
         const east = rooms.find((one) => one.row === room.row && one.col === room.col + 1);
         if (east)
-            for (let x = room.x + ROOM - 1; x <= east.x; x += 1)
-                for (let dz = 3; dz <= 7; dz += 1) {
-                    const side = dz === 3 || dz === 7;
+            for (let x = room.x + side - 1; x <= east.x; x += 1)
+                for (let dz = from; dz <= to; dz += 1) {
+                    const side = dz === from || dz === to;
                     if (!side) set(x, room.z + dz, "corridor");
                     else if (at(x, room.z + dz) === "void") set(x, room.z + dz, "wall");
                 }
         const south = rooms.find((one) => one.col === room.col && one.row === room.row + 1);
         if (south)
-            for (let z = room.z + ROOM - 1; z <= south.z; z += 1)
-                for (let dx = 3; dx <= 7; dx += 1) {
-                    const side = dx === 3 || dx === 7;
+            for (let z = room.z + side - 1; z <= south.z; z += 1)
+                for (let dx = from; dx <= to; dx += 1) {
+                    const side = dx === from || dx === to;
                     if (!side) set(room.x + dx, z, "corridor");
                     else if (at(room.x + dx, z) === "void") set(room.x + dx, z, "wall");
                 }
@@ -347,7 +670,8 @@ function rectangles(
 
 /** The middle of the meeting room's floor. */
 export function tableAt(layout: Layout): { x: number; z: number } {
-    return { x: layout.meeting.x + 5, z: layout.meeting.z + 5 };
+    const middle = geometryOf(layout.design).table;
+    return { x: layout.meeting.x + middle, z: layout.meeting.z + middle };
 }
 
 /** The emergency button, on the middle of the table. */
@@ -357,20 +681,23 @@ export function emergencyAt(layout: Layout): { x: number; y: number; z: number }
 }
 
 /** Whether a room's ceiling has a light over this column of it. */
-function lit(dx: number, dz: number): boolean {
-    return (dx === 3 || dx === 7) && (dz === 3 || dz === 7);
+function lit(g: Geometry, room: Room, dx: number, dz: number): boolean {
+    return !room.dark && g.lights.includes(dx) && g.lights.includes(dz);
 }
 
 /**
  * What it is built of, each only into air: the floor, the walls, the lights
- * and the roof; then the table and the consoles, then what stands on them and
- * the plates and vents on the floor; and last one stretch of corridor floor,
- * nothing on it, its first corner the proof that the blocks stayed. The floor
- * goes in before anything stands on it, or a switch put into air with nothing
- * under it would drop as an item.
+ * and the roof, and the bridge's space and window; then the table and the
+ * consoles, then what stands on them, the plates and vents on the floor and
+ * the rooms' furnishing; and last one stretch of corridor floor, nothing on
+ * it, its first corner the proof that the blocks stayed. The floor goes in
+ * before anything stands on it, or a switch put into air with nothing under
+ * it would drop as an item.
  */
 export function stationFills(layout: Layout): Fill[] {
     const { box } = layout;
+    const g = geometryOf(layout.design);
+    const wall = g.wall;
     const plan = planOf(layout);
     const y0 = box.y1;
     const fills: Fill[] = [];
@@ -397,31 +724,74 @@ export function stationFills(layout: Layout): Fill[] {
         for (const rect of rectangles(plan, (cell) => cell === room.index))
             fills.push(flat(rect, room.floor, y0));
     for (const rect of rectangles(plan, (cell) => cell === "wall"))
-        fills.push(flat(rect, WALL_BLOCK, y0, y0 + WALL));
+        fills.push(flat(rect, WALL_BLOCK, y0, y0 + wall));
     for (const rect of corridors) fills.push(flat(rect, CORRIDOR_FLOOR, y0));
     // Lights in the roof, then the roof round them.
     for (const room of layout.rooms)
-        for (let dx = 1; dx < ROOM - 1; dx += 1)
-            for (let dz = 1; dz < ROOM - 1; dz += 1)
-                if (lit(dx, dz))
+        for (let dx = 1; dx < g.room - 1; dx += 1)
+            for (let dz = 1; dz < g.room - 1; dz += 1)
+                if (
+                    lit(g, room, dx, dz) &&
+                    plan[room.x + dx - box.x1]?.[room.z + dz - box.z1] === room.index
+                )
                     fills.push({
                         box: {
                             x1: room.x + dx,
                             z1: room.z + dz,
                             x2: room.x + dx,
                             z2: room.z + dz,
-                            y1: y0 + WALL + 1,
-                            y2: y0 + WALL + 1
+                            y1: y0 + wall + 1,
+                            y2: y0 + wall + 1
                         },
                         block: LIGHT
                     });
     const underLight = (cell: Cell, x: number, z: number) => {
         if (typeof cell !== "number") return false;
         const room = layout.rooms[cell]!;
-        return lit(box.x1 + x - room.x, box.z1 + z - room.z);
+        return lit(g, room, box.x1 + x - room.x, box.z1 + z - room.z);
     };
-    for (const rect of rectangles(plan, (cell, x, z) => cell !== "void" && !underLight(cell, x, z)))
-        fills.push(flat(rect, ROOF, y0 + WALL + 1));
+    const bridgeTop = (cell: Cell) => cell === "space" || cell === "window";
+    for (const rect of rectangles(
+        plan,
+        (cell, x, z) => cell !== "void" && !bridgeTop(cell) && !underLight(cell, x, z)
+    ))
+        fills.push(flat(rect, ROOF, y0 + wall + 1));
+    // The bridge's view: a black sky with its stars against the station's
+    // edge, dark glass under the space in front of it, the window the whole
+    // height of the room, and black over all three.
+    for (const rect of rectangles(plan, (cell) => cell === "window"))
+        fills.push(flat(rect, WINDOW, y0, y0 + wall));
+    for (const rect of rectangles(plan, bridgeTop)) fills.push(flat(rect, SPACE, y0 + wall + 1));
+    const bridge = layout.rooms.find((one) => one.name === "bridge");
+    if (bridge)
+        for (let dx = 1; dx < g.room - 1; dx += 1) {
+            const x = bridge.x + dx;
+            const z = bridge.z + 1;
+            fills.push(
+                flat({ x1: x - box.x1, z1: z - box.z1, x2: x - box.x1, z2: z - box.z1 }, SPACE, y0)
+            );
+            for (let dy = 1; dy <= wall; dy += 1)
+                fills.push(
+                    flat(
+                        { x1: x - box.x1, z1: z - box.z1, x2: x - box.x1, z2: z - box.z1 },
+                        layout.stars.has(`${dx},${dy}`) ? LIGHT : SPACE,
+                        y0 + dy
+                    )
+                );
+            for (let dz = 2; dz <= SPACE_ROWS; dz += 1)
+                fills.push(
+                    flat(
+                        {
+                            x1: x - box.x1,
+                            z1: bridge.z + dz - box.z1,
+                            x2: x - box.x1,
+                            z2: bridge.z + dz - box.z1
+                        },
+                        DARK_FLOOR,
+                        y0
+                    )
+                );
+        }
     // The table, the button on it.
     const table = tableAt(layout);
     const one = (x: number, y: number, z: number, block: string): Fill => ({
@@ -453,6 +823,9 @@ export function stationFills(layout: Layout): Fill[] {
         );
     }
     for (const vent of layout.vents) fills.push(one(vent.x, y0 + 1, vent.z, VENT_SHUT));
+    for (const prop of layout.props)
+        for (let dy = 1; dy <= prop.high; dy += 1)
+            fills.push(one(prop.x, y0 + dy, prop.z, prop.block));
     if (proof) fills.push(flat(proof, CORRIDOR_FLOOR, y0));
     return fills;
 }
@@ -472,7 +845,7 @@ function yawTowards(from: { x: number; z: number }, to: { x: number; z: number }
 function seatRing(layout: Layout): { x: number; z: number }[] {
     const table = tableAt(layout);
     const ring: { x: number; z: number }[] = [];
-    const r = 3;
+    const r = geometryOf(layout.design).seats;
     for (let dx = -r; dx <= r; dx += 1) ring.push({ x: table.x + dx, z: table.z - r });
     for (let dz = -r + 1; dz <= r; dz += 1) ring.push({ x: table.x + r, z: table.z + dz });
     for (let dx = r - 1; dx >= -r; dx -= 1) ring.push({ x: table.x + dx, z: table.z + r });
@@ -1184,7 +1557,7 @@ export const BALLOT_PER_LINE = 3;
  *  other room, a full block in place of the wall's - nothing seen through,
  *  nothing in the way. */
 export function decorSpots(layout: Layout): decor.Spot[] {
-    const y = layout.box.y1 + WALL;
+    const y = layout.box.y1 + geometryOf(layout.design).wall;
     return layout.rooms
         .filter((room) => room.index % 2 === 0)
         .map(

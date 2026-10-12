@@ -52,7 +52,7 @@ function stationOf(run: stored.EventRun): { layout: im.Layout; plan: im.Cell[][]
     let found = layouts.get(key);
     if (!found) {
         if (layouts.size >= 8) layouts.delete(layouts.keys().next().value!);
-        const layout = im.layoutFor(run.id, box);
+        const layout = im.layoutFor(run.id, box, designOf(run));
         found = { layout, plan: im.planOf(layout) };
         layouts.set(key, found);
     }
@@ -105,6 +105,12 @@ function builtOf(run: stored.EventRun): Partial<im.ImpostorState> {
     return parsed.success ? parsed.data : {};
 }
 
+/** The design its station was built on: a run from before one was written
+ *  down is on the first. */
+function designOf(run: stored.EventRun): number {
+    return builtOf(run).design ?? im.DESIGN;
+}
+
 function eraOf(run: stored.EventRun): im.Era {
     return builtOf(run).era ?? im.OLDEST;
 }
@@ -143,7 +149,7 @@ function seatOf(run: stored.EventRun, name: string): arena.Spot {
 function taskOf(layout: im.Layout, id: number): said.Task {
     const station = layout.stations[id]!;
     return {
-        room: layout.rooms[station.room]!.name as im.RoomName,
+        room: layout.rooms[station.room]!.name as said.Task["room"],
         kind: station.kind
     };
 }
@@ -784,12 +790,12 @@ export const impostor: ArenaGame = {
     box: (run, place) => im.stationBox(place, place.y + arena.ALTITUDE, run.joined.length),
     prepare,
     built: (run) => ({
-        design: builtOf(run).design ?? im.DESIGN,
+        design: designOf(run),
         era: eraOf(run),
-        rows: run.arena ? im.rowsOf(run.arena.box) : im.rowsFor(run.joined.length)
+        rows: run.arena ? im.rowsOf(run.arena.box, designOf(run)) : im.rowsFor(run.joined.length)
     }),
-    fills: (run, box) => im.stationFills(im.layoutFor(run.id, box)),
-    decorSpots: (run, box) => im.decorSpots(im.layoutFor(run.id, box)),
+    fills: (run, box) => im.stationFills(im.layoutFor(run.id, box, designOf(run))),
+    decorSpots: (run, box) => im.decorSpots(im.layoutFor(run.id, box, designOf(run))),
     blocks: () => im.stationBlocks(),
     kit: () => [],
     hits: true,

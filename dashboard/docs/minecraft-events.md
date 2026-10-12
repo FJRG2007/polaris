@@ -848,11 +848,16 @@ left out.
   (`hs.scoresOf`: the time to hide is everybody's); finds only break a tie
   (`hs.tiebreakOf`). The chat's results and the podium are the same ranking.
 - **Impostor** (`impostor`) is a station of rooms built in the sky: three
-  columns of rooms, 11 by 11 inside, three rows up to eight players and four
-  past, joined by corridors three wide, round a meeting room in the middle of
-  the second row with a table and a stone button on it (`impostor.layoutFor`,
-  `planOf`; the room names, which room is which and which console is where are
-  drawn from the run's id). At least four play (`IMPOSTOR_FLOOR`,
+  columns of rooms, 15 by 15 inside and five blocks high, three rows up to
+  eight players and four past, joined by corridors, round a meeting room in the
+  middle of the second row with a table and a stone button on it
+  (`impostor.layoutFor`, `planOf`; the room names, which room is which and which
+  console is where are drawn from the run's id). The top middle room is the
+  bridge, its far wall one window of glass on black space and stars; one other
+  room is dark, with no light in its roof; every room but the meeting room is
+  furnished for what it is (`FURNISHING`), never in front of a console, a vent
+  or a way through. A station built before this (`DESIGN` 1: rooms 11 across,
+  four high, nothing in them) keeps its layout for a run that was already going. At least four play (`IMPOSTOR_FLOOR`,
   `catalog.playersFloor`): the editor refuses fewer, the preset schema too,
   and fewer joined by the end of the countdown calls it off. The impostors
   (`impostors`, 1 by default, never more than three and never more than one
@@ -1348,7 +1353,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                                                                                                    |
 | Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams; from design 5 a hall of stone brick posts up to spruce nests, a slime block pad under a spruce ledge, levers on the walls |
 | Glass bridge     | plain glass panels, a light gray start with a cyan rim, a finish in black and white squares, quartz arches over both ends with hanging lanterns, quartz posts with lanterns at the outer corners, a spruce gallery behind white glass under a barrier roof, a prismarine pool lit by sea lanterns                                                          |
-| Impostor         | each room floored in its own drawn stone, wood or concrete, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents                 |
+| Impostor         | each room floored in its own drawn stone, wood or concrete and furnished for what it is, a bridge with a window on black space and stars, one dark room, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents                 |
 | Tug of war       | a smooth stone field with a white middle line and a red and a blue line, an oak fence rope with a yellow wool marker, red and blue stained glass pens floored in spruce over pools of water, chiseled pillars topped with sea lanterns                                                                                                                     |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                                                                                                                                                          |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                  |

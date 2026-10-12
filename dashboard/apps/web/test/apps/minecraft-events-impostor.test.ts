@@ -26,39 +26,42 @@ function stateWith(overrides: Partial<im.ImpostorState>): im.ImpostorState {
 }
 
 describe("the station", () => {
-    for (const players of [4, 8, 9, 15]) {
-        it(`is built only into its own box, every block once, for ${players}`, () => {
-            const box = im.stationBox(SITE, Y, players);
-            expect(im.rowsOf(box)).toBe(im.rowsFor(players));
-            expect(Math.ceil((box.x2 - box.x1 + 1) / 2)).toBeLessThanOrEqual(im.reachOf(players));
-            for (let seed = 0; seed < SEEDS; seed += 1) {
-                const layout = im.layoutFor(`run-${seed}`, box);
-                const fills = im.stationFills(layout);
-                const seen = new Set<string>();
-                for (const fill of fills) {
-                    const f = fill.box;
-                    expect(f.x1).toBeGreaterThanOrEqual(box.x1);
-                    expect(f.x2).toBeLessThanOrEqual(box.x2);
-                    expect(f.z1).toBeGreaterThanOrEqual(box.z1);
-                    expect(f.z2).toBeLessThanOrEqual(box.z2);
-                    expect(f.y1).toBeGreaterThanOrEqual(box.y1);
-                    expect(f.y2).toBeLessThanOrEqual(box.y2);
-                    expect(im.STATION_BLOCKS).toContain(bare(fill.block));
-                    for (let x = f.x1; x <= f.x2; x += 1)
-                        for (let y = f.y1; y <= f.y2; y += 1)
-                            for (let z = f.z1; z <= f.z2; z += 1) {
-                                const key = `${x},${y},${z}`;
-                                expect(seen.has(key), key).toBe(false);
-                                seen.add(key);
-                            }
+    for (const design of [1, im.DESIGN])
+        for (const players of [4, 8, 9, 15]) {
+            it(`is built only into its own box, every block once, for ${players} on design ${design}`, () => {
+                const box = im.stationBox(SITE, Y, players, design);
+                expect(im.rowsOf(box, design)).toBe(im.rowsFor(players));
+                expect(Math.ceil((box.x2 - box.x1 + 1) / 2)).toBeLessThanOrEqual(
+                    im.reachOf(players, design)
+                );
+                for (let seed = 0; seed < SEEDS; seed += 1) {
+                    const layout = im.layoutFor(`run-${seed}`, box, design);
+                    const fills = im.stationFills(layout);
+                    const seen = new Set<string>();
+                    for (const fill of fills) {
+                        const f = fill.box;
+                        expect(f.x1).toBeGreaterThanOrEqual(box.x1);
+                        expect(f.x2).toBeLessThanOrEqual(box.x2);
+                        expect(f.z1).toBeGreaterThanOrEqual(box.z1);
+                        expect(f.z2).toBeLessThanOrEqual(box.z2);
+                        expect(f.y1).toBeGreaterThanOrEqual(box.y1);
+                        expect(f.y2).toBeLessThanOrEqual(box.y2);
+                        expect(im.STATION_BLOCKS).toContain(bare(fill.block));
+                        for (let x = f.x1; x <= f.x2; x += 1)
+                            for (let y = f.y1; y <= f.y2; y += 1)
+                                for (let z = f.z1; z <= f.z2; z += 1) {
+                                    const key = `${x},${y},${z}`;
+                                    expect(seen.has(key), key).toBe(false);
+                                    seen.add(key);
+                                }
+                    }
+                    // The last fill is the proof: floor, nothing standing on it.
+                    const proof = fills[fills.length - 1]!;
+                    expect(proof.block).toBe("minecraft:gray_concrete");
+                    expect(proof.box.y1).toBe(box.y1);
                 }
-                // The last fill is the proof: floor, nothing standing on it.
-                const proof = fills[fills.length - 1]!;
-                expect(proof.block).toBe("minecraft:gray_concrete");
-                expect(proof.box.y1).toBe(box.y1);
-            }
-        });
-    }
+            });
+        }
 
     it("lists every block it puts down, what stands on something first", () => {
         const layout = im.layoutFor("run", im.stationBox(SITE, Y, 15));
@@ -70,53 +73,172 @@ describe("the station", () => {
     });
 
     it("joins every room, the meeting room in the middle, every seat and station inside", () => {
-        for (const players of [4, 12])
-            for (let seed = 0; seed < SEEDS; seed += 1) {
-                const layout = im.layoutFor(`run-${seed}`, im.stationBox(SITE, Y, players));
-                const plan = im.planOf(layout);
-                // Walk the floor from the table: every room reached.
-                const table = im.tableAt(layout);
-                const start = [table.x - layout.box.x1 + 3, table.z - layout.box.z1];
-                const reached = new Set<string>([start.join(",")]);
-                const queue = [start];
-                while (queue.length > 0) {
-                    const [x, z] = queue.pop()!;
-                    for (const [dx, dz] of [
-                        [1, 0],
-                        [-1, 0],
-                        [0, 1],
-                        [0, -1]
-                    ]) {
-                        const key = `${x! + dx!},${z! + dz!}`;
-                        if (reached.has(key) || !im.walkable(plan[x! + dx!]?.[z! + dz!])) continue;
-                        reached.add(key);
-                        queue.push([x! + dx!, z! + dz!]);
+        for (const design of [1, im.DESIGN])
+            for (const players of [4, 12])
+                for (let seed = 0; seed < SEEDS; seed += 1) {
+                    const layout = im.layoutFor(
+                        `run-${seed}`,
+                        im.stationBox(SITE, Y, players, design),
+                        design
+                    );
+                    const plan = im.planOf(layout);
+                    // Walk the floor from the table: every room reached.
+                    const table = im.tableAt(layout);
+                    const start = [table.x - layout.box.x1 + 3, table.z - layout.box.z1];
+                    const reached = new Set<string>([start.join(",")]);
+                    const queue = [start];
+                    while (queue.length > 0) {
+                        const [x, z] = queue.pop()!;
+                        for (const [dx, dz] of [
+                            [1, 0],
+                            [-1, 0],
+                            [0, 1],
+                            [0, -1]
+                        ]) {
+                            const key = `${x! + dx!},${z! + dz!}`;
+                            if (reached.has(key) || !im.walkable(plan[x! + dx!]?.[z! + dz!]))
+                                continue;
+                            reached.add(key);
+                            queue.push([x! + dx!, z! + dz!]);
+                        }
+                    }
+                    const rooms = new Set<number>();
+                    for (const key of reached) {
+                        const [x, z] = key.split(",").map(Number);
+                        const cell = plan[x!]![z!]!;
+                        if (typeof cell === "number") rooms.add(cell);
+                    }
+                    expect(rooms.size).toBe(layout.rooms.length);
+                    expect(layout.meeting.col).toBe(1);
+                    expect(layout.meeting.row).toBe(1);
+                    for (let seat = 0; seat < players; seat += 1) {
+                        const spot = im.seatSpot(layout, seat, players);
+                        expect(im.inside(layout, spot, plan)).toBe(true);
+                    }
+                    for (const station of layout.stations)
+                        expect(plan[station.x - layout.box.x1]![station.z - layout.box.z1]).toBe(
+                            station.room
+                        );
+                    for (const vent of layout.vents) {
+                        expect(layout.vents[vent.to]!.to).toBe(layout.vents.indexOf(vent));
+                        expect(vent.room).not.toBe(layout.meeting.index);
+                        expect(im.inside(layout, im.ventExit(layout, vent), plan)).toBe(true);
+                        expect(im.ventUnder(layout, im.ventExit(layout, vent))).toBeNull();
                     }
                 }
-                const rooms = new Set<number>();
-                for (const key of reached) {
-                    const [x, z] = key.split(",").map(Number);
-                    const cell = plan[x!]![z!]!;
-                    if (typeof cell === "number") rooms.add(cell);
+    });
+
+    it("keeps a station built on the first design as it was: no bridge, no dark room, nothing furnished", () => {
+        const box = im.stationBox(SITE, Y, 9, 1);
+        expect(box.x2 - box.x1 + 1).toBe(41);
+        expect(box.y2 - box.y1).toBe(5);
+        const layout = im.layoutFor("run", box, 1);
+        expect(layout.rooms.map((room) => room.name)).not.toContain("bridge");
+        expect(layout.rooms.some((room) => room.dark)).toBe(false);
+        expect(layout.props).toEqual([]);
+        expect(layout.stations.slice(0, 2).map((one) => [one.x - box.x1, one.z - box.z1])).toEqual([
+            [2, 2],
+            [8, 8]
+        ]);
+        expect(im.tableAt(layout)).toEqual({ x: box.x1 + 20, z: box.z1 + 20 });
+    });
+
+    it("has a bridge looking out on space, one dark room, and every other room furnished", () => {
+        for (const players of [4, 12])
+            for (let seed = 0; seed < SEEDS; seed += 1) {
+                const box = im.stationBox(SITE, Y, players);
+                const layout = im.layoutFor(`run-${seed}`, box);
+                const plan = im.planOf(layout);
+                const bridge = layout.rooms.find((room) => room.name === "bridge")!;
+                expect([bridge.col, bridge.row]).toEqual([1, 0]);
+                expect(layout.vents.some((vent) => vent.room === bridge.index)).toBe(false);
+                const dark = layout.rooms.filter((room) => room.dark);
+                expect(dark).toHaveLength(1);
+                expect(["meeting", "bridge"]).not.toContain(dark[0]!.name);
+                const at = new Map<string, string>();
+                for (const fill of im.stationFills(layout))
+                    for (let x = fill.box.x1; x <= fill.box.x2; x += 1)
+                        for (let y = fill.box.y1; y <= fill.box.y2; y += 1)
+                            for (let z = fill.box.z1; z <= fill.box.z2; z += 1)
+                                at.set(`${x},${y},${z}`, bare(fill.block));
+                // The window across the bridge, the dark and the stars behind it.
+                for (let x = bridge.x + 1; x < bridge.x + im.ROOM - 1; x += 1) {
+                    expect(at.get(`${x},${Y + 2},${bridge.z + 3}`)).toBe("minecraft:glass");
+                    expect(at.get(`${x},${Y + 2},${bridge.z + 2}`)).toBeUndefined();
+                    expect(at.get(`${x},${Y + 2},${bridge.z + 1}`)).toMatch(
+                        /black_concrete|sea_lantern/
+                    );
                 }
-                expect(rooms.size).toBe(layout.rooms.length);
-                expect(layout.meeting.col).toBe(1);
-                expect(layout.meeting.row).toBe(1);
+                // No light over the dark room.
+                const room = dark[0]!;
+                for (let dx = 1; dx < im.ROOM - 1; dx += 1)
+                    for (let dz = 1; dz < im.ROOM - 1; dz += 1)
+                        expect(at.get(`${room.x + dx},${box.y2},${room.z + dz}`)).toBe(
+                            "minecraft:quartz_block"
+                        );
+                // Every room but the meeting room furnished, never by a station,
+                // a vent or its way out.
+                for (const one of layout.rooms) {
+                    const props = layout.props.filter(
+                        (prop) => plan[prop.x - box.x1]![prop.z - box.z1] === one.index
+                    );
+                    if (one.name === "meeting") expect(props).toEqual([]);
+                    else expect(props.length, one.name).toBeGreaterThan(0);
+                }
+                const kept = [
+                    ...layout.stations,
+                    ...layout.vents,
+                    ...layout.vents.map((vent) => ({ x: vent.outX, z: vent.outZ }))
+                ];
+                for (const prop of layout.props)
+                    for (const one of kept)
+                        expect(
+                            Math.max(Math.abs(one.x - prop.x), Math.abs(one.z - prop.z)),
+                            `${seed} ${prop.x},${prop.z}`
+                        ).toBeGreaterThan(1);
+                // Walked round the furnishing: every station, vent and seat reached.
+                const blocked = new Set(layout.props.map((prop) => `${prop.x},${prop.z}`));
+                for (const station of layout.stations)
+                    if (station.kind !== "scan") blocked.add(`${station.x},${station.z}`);
+                const table = im.tableAt(layout);
+                const start = `${table.x + 2},${table.z}`;
+                const reached = new Set([start]);
+                const queue = [start];
+                const steps = [
+                    [1, 0],
+                    [-1, 0],
+                    [0, 1],
+                    [0, -1]
+                ] as const;
+                while (queue.length > 0) {
+                    const [x, z] = queue.pop()!.split(",").map(Number) as [number, number];
+                    for (const [dx, dz] of steps) {
+                        const next = `${x + dx},${z + dz}`;
+                        if (reached.has(next) || blocked.has(next)) continue;
+                        if (!im.walkable(plan[x + dx - box.x1]?.[z + dz - box.z1])) continue;
+                        reached.add(next);
+                        queue.push(next);
+                    }
+                }
+                const near = (x: number, z: number) =>
+                    reached.has(`${x},${z}`) ||
+                    steps.some(([dx, dz]) => reached.has(`${x + dx},${z + dz}`));
+                for (const station of layout.stations)
+                    expect(near(station.x, station.z), `${seed} station ${station.id}`).toBe(true);
+                for (const vent of layout.vents) {
+                    expect(reached.has(`${vent.x},${vent.z}`)).toBe(true);
+                    expect(reached.has(`${vent.outX},${vent.outZ}`)).toBe(true);
+                }
                 for (let seat = 0; seat < players; seat += 1) {
                     const spot = im.seatSpot(layout, seat, players);
-                    expect(im.inside(layout, spot, plan)).toBe(true);
-                }
-                for (const station of layout.stations)
-                    expect(plan[station.x - layout.box.x1]![station.z - layout.box.z1]).toBe(
-                        station.room
-                    );
-                for (const vent of layout.vents) {
-                    expect(layout.vents[vent.to]!.to).toBe(layout.vents.indexOf(vent));
-                    expect(vent.room).not.toBe(layout.meeting.index);
-                    expect(im.inside(layout, im.ventExit(layout, vent), plan)).toBe(true);
-                    expect(im.ventUnder(layout, im.ventExit(layout, vent))).toBeNull();
+                    expect(reached.has(`${spot.x},${spot.z}`)).toBe(true);
                 }
             }
+    });
+
+    it("names the bridge in both languages", () => {
+        expect(said.roomName("bridge", "en")).toBe("Bridge");
+        expect(said.roomName("bridge", "es")).toBe("Puente de mando");
     });
 
     it("gives every seat its own place round the table", () => {

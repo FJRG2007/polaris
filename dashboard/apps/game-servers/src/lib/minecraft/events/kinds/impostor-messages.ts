@@ -5,7 +5,7 @@
 
 import type { Language } from "../catalog";
 import { PALETTE, mark } from "../messages";
-import type { RoomName, StationKind } from "./impostor";
+import type { PlaceName, StationKind } from "./impostor";
 
 const { bad: BAD, good: GOOD, warn: WARN, info: INFO } = PALETTE;
 
@@ -15,8 +15,9 @@ export const CREW_VOTED = "Every impostor was voted out";
 export const IMPOSTORS_OUTNUMBERED = "The impostors were as many as the crew";
 export const IMPOSTORS_TIME = "The time ran out with an impostor aboard";
 
-const ROOMS: Readonly<Record<RoomName | "meeting", Readonly<Record<Language, string>>>> = {
+const ROOMS: Readonly<Record<PlaceName, Readonly<Record<Language, string>>>> = {
     meeting: { en: "Meeting room", es: "Sala de reuniones" },
+    bridge: { en: "Bridge", es: "Puente de mando" },
     engine: { en: "Engine room", es: "Sala de motores" },
     greenhouse: { en: "Greenhouse", es: "Invernadero" },
     library: { en: "Library", es: "Biblioteca" },
@@ -37,13 +38,13 @@ const KINDS: Readonly<Record<StationKind, Readonly<Record<Language, string>>>> =
     scan: { en: "stand on the plate", es: "quédate en la placa" }
 };
 
-export function roomName(room: RoomName | "meeting", language: Language): string {
+export function roomName(room: PlaceName, language: Language): string {
     return ROOMS[room][language];
 }
 
 /** One task: the room it is in and what kind of station it is. */
 export interface Task {
-    readonly room: RoomName;
+    readonly room: Exclude<PlaceName, "meeting">;
     readonly kind: StationKind;
 }
 
