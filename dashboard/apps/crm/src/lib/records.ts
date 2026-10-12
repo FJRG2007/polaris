@@ -12,7 +12,7 @@ import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
 import { host } from "@polaris/app-host";
-import { listOrder, listWhere, searchWhere, type ListScope } from "./query";
+import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
 import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import { recordSelect, table, toRecord, writable, writeData } from "./columns";
@@ -88,11 +88,15 @@ export interface RecordGroup extends RecordPage {
     readonly value: string;
 }
 
+/** How many groups' pages a board reads at once. */
+const GROUP_READS = 4;
+
 /**
  * The first page of every group of a list grouped by a field - one per choice
  * of the field, in the field's order, the empty ones too, so a board draws
- * every column. Read one group after the other: a board must not take a
- * connection per column.
+ * every column. The groups are counted in one query and only the ones with
+ * records are read, a few at a time: a board must not take a connection per
+ * column.
  */
 export async function listGroups(
     actor: CrmActor,
@@ -103,16 +107,29 @@ export async function listGroups(
     await requireCan(actor, object, "read");
     const custom = await loadFields(actor.shelf, object);
     const field = requireGroupable(object, key, custom);
-    const groups: RecordGroup[] = [];
     // A choice somebody added may be unset, so its records get a group too.
     const values = [...(field.options ?? []), ...(field.custom ? [""] : [])];
-    for (const value of values) {
-        const page = await listRecords(actor, object, {
-            ...options,
-            custom,
-            group: { key, value }
-        });
-        groups.push({ value, ...page });
+    const column = groupColumn(object, key);
+    const counted = (await table(object).groupBy({
+        by: [column],
+        where: { ...listWhere(object, actor.shelf, { ...options, custom }), [column]: { in: values } },
+        _count: { _all: true }
+    })) as Record<string, unknown>[];
+    const totals = new Map(
+        counted.map((row) => [String(row[column]), (row._count as { _all: number })._all])
+    );
+    const groups: RecordGroup[] = values.map((value) => ({ value, records: [], total: 0 }));
+    const filled = groups.flatMap((group, at) => ((totals.get(group.value) ?? 0) > 0 ? [at] : []));
+    for (let start = 0; start < filled.length; start += GROUP_READS) {
+        await Promise.all(
+            filled.slice(start, start + GROUP_READS).map(async (at) => {
+                const value = groups[at]!.value;
+                groups[at] = {
+                    value,
+                    ...(await listRecords(actor, object, { ...options, custom, group: { key, value } }))
+                };
+            })
+        );
     }
     return groups;
 }

@@ -347,6 +347,8 @@
         "deleteDescription": "Everyone here loses this field and the values every record holds in it.",
         "created": "Field \"{name}\" added.",
         "deleted": "Field \"{name}\" deleted.",
+        "removeChoicesTitle": "Remove {count, plural, one {# choice} other {# choices}}?",
+        "removeChoicesDescription": "Records set to {choices} are left with no value.",
         "empty": "No fields added yet.",
         "invalid": {
             "required": "Give it a name.",

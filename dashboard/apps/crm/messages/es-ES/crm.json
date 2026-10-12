@@ -323,7 +323,7 @@
         "add": "Añadir campo",
         "edit": "Editar campo",
         "name": "Nombre",
-        "namePlaceholder": "Origen del contacto",
+        "namePlaceholder": "Procedencia",
         "kind": "Tipo",
         "kinds": {
             "text": "Texto",
@@ -347,6 +347,8 @@
         "deleteDescription": "Todos aquí pierden este campo y los valores que cada registro tiene en él.",
         "created": "Campo «{name}» añadido.",
         "deleted": "Campo «{name}» eliminado.",
+        "removeChoicesTitle": "¿Quitar {count, plural, one {# opción} other {# opciones}}?",
+        "removeChoicesDescription": "Los registros con {choices} se quedan sin valor.",
         "empty": "Aún no hay campos añadidos.",
         "invalid": {
             "required": "Ponle un nombre.",

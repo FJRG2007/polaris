@@ -11,7 +11,14 @@ import { useState, type FormEvent } from "react";
 import { hostUi } from "@polaris/app-host/client";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { CUSTOM_KINDS, type CrmObject, type CustomKind } from "../model/objects";
-import { FIELD_LABEL_MAX, MAX_OPTIONS, fieldInputSchema, type CustomField } from "../model/fields";
+import {
+    choiceChanges,
+    FIELD_LABEL_MAX,
+    fieldInputSchema,
+    MAX_OPTIONS,
+    normalizeLabel,
+    type CustomField
+} from "../model/fields";
 import {
     Button,
     Dialog,
@@ -21,12 +28,16 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select
+    Select,
+    useToast
 } from "@polaris/ui";
 
 interface FieldsDialogProps {
     readonly object: CrmObject;
     readonly fields: readonly CustomField[];
+    /** Whether the reader may delete records: deleting a field or one of its
+     *  choices loses what the records hold there. */
+    readonly canDelete: boolean;
     /** A field was added: it is put in the view's columns. */
     readonly onCreated: (field: CustomField) => void;
     /** Something changed: the list is read again. */
@@ -34,13 +45,22 @@ interface FieldsDialogProps {
     readonly onClose: () => void;
 }
 
-export function FieldsDialog({ object, fields, onCreated, onChanged, onClose }: FieldsDialogProps) {
+export function FieldsDialog({
+    object,
+    fields,
+    canDelete,
+    onCreated,
+    onChanged,
+    onClose
+}: FieldsDialogProps) {
     const t = useCrmT();
+    const toast = useToast();
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const [editing, setEditing] = useState<CustomField | "new" | null>(
         fields.length > 0 ? null : "new"
     );
     const [failure, setFailure] = useState<string | null>(null);
+    const deleteDenied = canDelete ? null : t("errors.forbidden", { verb: "delete", object });
 
     const remove = async (field: CustomField) => {
         const ok = await confirm({
@@ -56,6 +76,7 @@ export function FieldsDialog({ object, fields, onCreated, onChanged, onClose }: 
                 () => actions.deleteFieldAction({ object, fieldId: field.id }),
                 t("errors.fieldNotDeleted")
             );
+            toast.show({ title: t("customFields.deleted", { name: field.label }) });
             onChanged();
         } catch (caught) {
             setFailure(messageOf(caught));
@@ -73,13 +94,16 @@ export function FieldsDialog({ object, fields, onCreated, onChanged, onClose }: 
                     <FieldForm
                         object={object}
                         field={editing === "new" ? null : editing}
+                        canDelete={canDelete}
                         taken={fields
                             .filter((one) => editing === "new" || one.id !== editing.id)
                             .map((one) => one.label.toLowerCase())}
                         onDone={(saved, created) => {
                             setEditing(null);
-                            if (created) onCreated(saved);
-                            else onChanged();
+                            if (created) {
+                                toast.show({ title: t("customFields.created", { name: saved.label }) });
+                                onCreated(saved);
+                            } else onChanged();
                         }}
                         onCancel={() => (fields.length > 0 ? setEditing(null) : onClose())}
                     />
@@ -115,7 +139,8 @@ export function FieldsDialog({ object, fields, onCreated, onChanged, onClose }: 
                                             size="icon"
                                             variant="ghost"
                                             aria-label={t("customFields.delete")}
-                                            title={t("customFields.delete")}
+                                            title={deleteDenied ?? t("customFields.delete")}
+                                            disabled={!canDelete}
                                             onClick={() => void remove(field)}
                                         >
                                             <Trash2 className="size-4" />
@@ -145,18 +170,29 @@ export function FieldsDialog({ object, fields, onCreated, onChanged, onClose }: 
 interface FieldFormProps {
     readonly object: CrmObject;
     readonly field: CustomField | null;
+    readonly canDelete: boolean;
     /** The other fields' names, lowercased. */
     readonly taken: readonly string[];
     readonly onDone: (field: CustomField, created: boolean) => void;
     readonly onCancel: () => void;
 }
 
-function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
+/** One line of a select's choices: what it reads now, and the saved choice it
+ *  started as, so rewording it keeps the records that hold it. */
+interface ChoiceRow {
+    readonly text: string;
+    readonly from: string | null;
+}
+
+function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldFormProps) {
     const t = useCrmT();
+    const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const [label, setLabel] = useState(field?.label ?? "");
     const [kind, setKind] = useState<CustomKind>(field?.kind ?? "text");
-    const [options, setOptions] = useState<string[]>(
-        field && field.options.length > 0 ? [...field.options] : [""]
+    const [rows, setRows] = useState<ChoiceRow[]>(
+        field && field.options.length > 0
+            ? field.options.map((option) => ({ text: option, from: option }))
+            : [{ text: "", from: null }]
     );
     const [busy, setBusy] = useState(false);
     const [failure, setFailure] = useState<string | null>(null);
@@ -164,7 +200,7 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
     const parsed = fieldInputSchema.safeParse({
         label,
         kind,
-        options: options.filter((one) => one.trim() !== "")
+        options: rows.map((row) => row.text).filter((one) => one.trim() !== "")
     });
     const issue = (path: string): string | null =>
         parsed.success
@@ -175,27 +211,47 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
     const nameIssue = label.trim() === "" ? null : issue("label");
     const nameTaken = parsed.success && taken.includes(parsed.data.label.toLowerCase());
     const optionsIssue =
-        kind === "select" && options.some((one) => one.trim() !== "") ? issue("options") : null;
+        kind === "select" && rows.some((row) => row.text.trim() !== "") ? issue("options") : null;
     const unchanged =
         field !== null &&
         parsed.success &&
         parsed.data.label === field.label &&
         JSON.stringify(parsed.data.options) === JSON.stringify(field.options);
-    const blocked = busy || !parsed.success || nameTaken || unchanged;
+    const renames = rows.flatMap((row) =>
+        row.from !== null && row.text.trim() !== ""
+            ? [{ from: row.from, to: normalizeLabel(row.text) }]
+            : []
+    );
+    const removed =
+        field && parsed.success ? choiceChanges(field.options, parsed.data.options, renames).removed : [];
+    const forbidden = t("errors.forbidden", { verb: "delete", object });
+    const removeDenied = removed.length > 0 && !canDelete;
+    const blocked = busy || !parsed.success || nameTaken || unchanged || removeDenied;
     const say = (code: string) =>
         t(`customFields.invalid.${code}` as Parameters<typeof t>[0], {
             length: FIELD_LABEL_MAX,
             max: MAX_OPTIONS
         });
 
-    const submit = (event: FormEvent) => {
+    const submit = async (event: FormEvent) => {
         event.preventDefault();
         if (blocked || !parsed.success) return;
         const input = parsed.data;
+        if (removed.length > 0) {
+            const ok = await confirm({
+                title: t("customFields.removeChoicesTitle", { count: removed.length }),
+                description: t("customFields.removeChoicesDescription", {
+                    choices: removed.join(", ")
+                }),
+                confirmLabel: t("customFields.save"),
+                danger: true
+            });
+            if (!ok) return;
+        }
         setBusy(true);
         setFailure(null);
         const call = field
-            ? () => actions.updateFieldAction({ object, fieldId: field.id, field: input })
+            ? () => actions.updateFieldAction({ object, fieldId: field.id, field: input, renames })
             : () => actions.createFieldAction({ object, field: input });
         unwrap(call, t("errors.fieldNotSaved"))
             .then((answer) => onDone(answer.field, field === null))
@@ -206,7 +262,7 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-[0.8125rem]">
                 <span className="font-medium">
                     {t("customFields.name")}
@@ -257,18 +313,18 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
                             *
                         </span>
                     </span>
-                    {options.map((option, index) => (
+                    {rows.map((row, index) => (
                         <div key={index} className="flex min-w-0 items-center gap-1">
                             <Input
-                                value={option}
+                                value={row.text}
                                 maxLength={FIELD_LABEL_MAX}
                                 placeholder={t("customFields.optionPlaceholder")}
                                 aria-label={t("customFields.options")}
                                 className="min-w-0 flex-1"
                                 onChange={(event) =>
-                                    setOptions(
-                                        options.map((one, at) =>
-                                            at === index ? event.target.value : one
+                                    setRows(
+                                        rows.map((one, at) =>
+                                            at === index ? { ...one, text: event.target.value } : one
                                         )
                                     )
                                 }
@@ -278,9 +334,13 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
                                 size="icon"
                                 variant="ghost"
                                 aria-label={t("customFields.removeOption")}
-                                title={t("customFields.removeOption")}
-                                disabled={options.length === 1}
-                                onClick={() => setOptions(options.filter((_, at) => at !== index))}
+                                title={
+                                    row.from !== null && !canDelete
+                                        ? forbidden
+                                        : t("customFields.removeOption")
+                                }
+                                disabled={rows.length === 1 || (row.from !== null && !canDelete)}
+                                onClick={() => setRows(rows.filter((_, at) => at !== index))}
                             >
                                 <X className="size-4" />
                             </Button>
@@ -288,13 +348,15 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
                     ))}
                     {optionsIssue ? (
                         <span className="text-[0.75rem] text-danger">{say(optionsIssue)}</span>
+                    ) : removeDenied ? (
+                        <span className="text-[0.75rem] text-danger">{forbidden}</span>
                     ) : null}
                     <Button
                         type="button"
                         variant="ghost"
                         className="self-start"
-                        disabled={options.length >= MAX_OPTIONS}
-                        onClick={() => setOptions([...options, ""])}
+                        disabled={rows.length >= MAX_OPTIONS}
+                        onClick={() => setRows([...rows, { text: "", from: null }])}
                     >
                         <Plus className="size-4" />
                         {t("customFields.addOption")}
@@ -314,6 +376,7 @@ function FieldForm({ object, field, taken, onDone, onCancel }: FieldFormProps) {
                     {field ? t("customFields.save") : t("customFields.create")}
                 </Button>
             </DialogFooter>
+            {confirmElement}
         </form>
     );
 }

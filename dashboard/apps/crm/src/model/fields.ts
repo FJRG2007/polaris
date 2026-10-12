@@ -42,6 +42,7 @@ export const fieldInputSchema = z
     .superRefine((input, context) => {
         if (input.kind !== "select") return;
         if (input.options.length === 0) {
+            // i18n-ignore a code the form reads as customFields.invalid.noOptions
             context.addIssue({ code: "custom", path: ["options"], message: "noOptions" });
         }
         const seen = new Set<string>();
@@ -55,6 +56,43 @@ export const fieldInputSchema = z
     });
 
 export type FieldInput = z.output<typeof fieldInputSchema>;
+
+/**
+ * Choices of a select that were edited rather than replaced: the records that
+ * held `from` hold `to` after the save, instead of being left with no choice.
+ */
+export const choiceRenamesSchema = z
+    .array(z.object({ from: label, to: label }))
+    .max(MAX_OPTIONS)
+    .default([]);
+
+export type ChoiceRename = z.output<typeof choiceRenamesSchema>[number];
+
+/**
+ * What saving a select's choices does to the records: which choices carry
+ * their records over to a new wording, and which are gone and leave their
+ * records with no choice. A rename counts only from a choice that is gone to
+ * one that is new, each once.
+ */
+export function choiceChanges(
+    before: readonly string[],
+    after: readonly string[],
+    renames: readonly ChoiceRename[]
+): { renamed: ChoiceRename[]; removed: string[] } {
+    const renamed: ChoiceRename[] = [];
+    const from = new Set<string>();
+    const to = new Set<string>();
+    for (const rename of renames) {
+        if (from.has(rename.from) || to.has(rename.to)) continue;
+        if (!before.includes(rename.from) || after.includes(rename.from)) continue;
+        if (!after.includes(rename.to) || before.includes(rename.to)) continue;
+        from.add(rename.from);
+        to.add(rename.to);
+        renamed.push(rename);
+    }
+    const removed = before.filter((option) => !after.includes(option) && !from.has(option));
+    return { renamed, removed };
+}
 
 /** One added field as the screens receive it, and as it is stored. */
 export interface CustomField {

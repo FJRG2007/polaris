@@ -1038,6 +1038,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 <FieldsDialog
                     object={object}
                     fields={addedFields ?? []}
+                    canDelete={Boolean(can?.delete)}
                     onChanged={() => opening.refresh()}
                     onCreated={(field) => {
                         // A field just added shows in the view it was added from.

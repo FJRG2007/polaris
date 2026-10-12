@@ -77,11 +77,16 @@ export function listWhere(
     };
 }
 
+/** The column a list is grouped on. */
+export function groupColumn(object: CrmObject, key: string): string {
+    const spec = columnOf(object, key);
+    if (spec.type !== "scalar") throw new Error(`crm: ${object} cannot group by ${key}`);
+    return spec.column;
+}
+
 /** The records of one group. */
 export function groupWhere(object: CrmObject, group: GroupScope): Record<string, unknown> {
-    const spec = columnOf(object, group.key);
-    if (spec.type !== "scalar") throw new Error(`crm: ${object} cannot group by ${group.key}`);
-    return { [spec.column]: group.value };
+    return { [groupColumn(object, group.key)]: group.value };
 }
 
 /** Columns that may hold null, so a sort puts their empty rows last. */

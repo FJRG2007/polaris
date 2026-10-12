@@ -17,7 +17,7 @@ import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { CRM_OBJECTS, type CrmRecord, type Ref } from "../model/objects";
 import { filterSchema } from "../model/filters";
-import { fieldInputSchema, type CustomField } from "../model/fields";
+import { choiceRenamesSchema, fieldInputSchema, type CustomField } from "../model/fields";
 import {
     AGGREGATES,
     MAX_SORTS,
@@ -319,16 +319,20 @@ export async function createFieldAction(input: unknown): Promise<Outcome<{ field
     }));
 }
 
-/** Rename a field, or change a select's choices. */
+/** Rename a field, or change a select's choices, carrying records over to
+ *  the choices given new wording. */
 export async function updateFieldAction(input: unknown): Promise<Outcome<{ field: CustomField }>> {
-    const parsed = z.object({ object, fieldId: id, field: fieldInputSchema }).safeParse(input);
+    const parsed = z
+        .object({ object, fieldId: id, field: fieldInputSchema, renames: choiceRenamesSchema })
+        .safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
         field: await fields.updateField(
             await requireCrmActor(),
             parsed.data.object,
             parsed.data.fieldId,
-            parsed.data.field
+            parsed.data.field,
+            parsed.data.renames
         )
     }));
 }
