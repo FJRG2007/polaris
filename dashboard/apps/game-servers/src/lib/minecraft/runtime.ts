@@ -62,3 +62,26 @@ export function minecraftImageFor(
     if (!managed) return imageRef;
     return `${MINECRAFT_IMAGE}:${javaTagFor(env.VERSION ?? "")}`;
 }
+
+/**
+ * Settings every Minecraft Java server runs with, whatever it was installed with.
+ *
+ * Polaris drives the server over RCON all the time - the sidebar every second,
+ * hundreds of scoreboard commands when the challenges rotate, bossbars - and the
+ * server's default, `broadcast-rcon-to-ops`, echoes each one into every op's chat
+ * as a gray `[Rcon: ...]` line. That flood drops the client's frame rate.
+ *
+ * Returned for the deploy to lay over the stored environment, so a server
+ * installed before this gets it the next time it is deployed (every restart,
+ * settings save and reset is one) without anybody editing its settings. The image
+ * writes the variable into an existing `server.properties` on every start, since
+ * `OVERRIDE_SERVER_PROPERTIES` defaults to true.
+ */
+export function minecraftReleaseEnv(
+    imageRef: string | undefined
+): Readonly<Record<string, string>> | undefined {
+    if (!imageRef) return undefined;
+    const repository = imageRef.replace(/^(docker\.io\/)?(library\/)?/, "").split(/[:@]/)[0];
+    if (repository !== MINECRAFT_IMAGE) return undefined;
+    return { BROADCAST_RCON_TO_OPS: "false" };
+}

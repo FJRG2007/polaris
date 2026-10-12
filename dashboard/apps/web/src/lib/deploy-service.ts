@@ -28,7 +28,7 @@ import { appBaseUrl, getPublicIp } from "./domain-service";
 import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
 import { projectEntryWhere } from "./deploy-project-access";
-import { releaseImageFor } from "./app-extensions/registry";
+import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
 import { speaksHttp } from "@/lib/deploy/portless";
 import { noteAppDeleted } from "@/lib/deploy/host-resources";
@@ -2589,6 +2589,9 @@ async function buildAppPlan(
     // Java its release needs, which changes with the release it is set to.
     const storedImage = typeof source.imageRef === "string" ? source.imageRef : undefined;
     const imageRef = releaseImageFor(storedImage, env);
+    // And may decide variables it always runs with, over whatever was stored, so
+    // an install made before one existed gets it on its next deploy.
+    Object.assign(env, releaseEnvFor(imageRef));
     // A locally-targeted messaging hub reaches the web's ingest over the dedicated
     // hub network by service DNS; detected from the install + target here (not
     // persisted), so a remote hub keeps the public URL from its stored env.

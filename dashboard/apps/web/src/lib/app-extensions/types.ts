@@ -87,6 +87,13 @@ export interface AppExtension {
         env: Readonly<Record<string, string>>
     ) => string | undefined;
 
+    /** Variables a release running this image always gets, over the stored
+     *  environment, so an install made before they existed has them on its next
+     *  deploy. Undefined adds nothing. */
+    readonly releaseEnv?: (
+        imageRef: string | undefined
+    ) => Readonly<Record<string, string>> | undefined;
+
     /** Whether an install's settings describe a server that loads plugins, which
      *  decides whether plugin-only settings are kept when it is installed. Null
      *  for a catalog app this extension does not know. */

@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { javaTagFor, minecraftImageFor } from "@polaris-app/game-servers/src/lib/minecraft/runtime";
+import { javaTagFor, minecraftImageFor, minecraftReleaseEnv } from "@polaris-app/game-servers/src/lib/minecraft/runtime";
 
 describe("the runtime a release needs", () => {
     it("is Java 25 from 26.x, and for LATEST, snapshots and the image's default", () => {
@@ -56,5 +56,25 @@ describe("the image a server deploys", () => {
         ).toBe("itzg/minecraft-server:2026.9.1-java21");
         expect(minecraftImageFor("nginx:1.27", { VERSION: "LATEST" })).toBe("nginx:1.27");
         expect(minecraftImageFor(undefined, { VERSION: "LATEST" })).toBeUndefined();
+    });
+});
+
+describe("the settings every Minecraft Java server runs with", () => {
+    it("keep RCON out of the ops' chat on any tag of the image", () => {
+        for (const image of [
+            "itzg/minecraft-server:java21",
+            "itzg/minecraft-server:java25",
+            "itzg/minecraft-server:2026.9.1-java21",
+            "docker.io/itzg/minecraft-server:latest",
+            "itzg/minecraft-server"
+        ]) {
+            expect(minecraftReleaseEnv(image), image).toEqual({ BROADCAST_RCON_TO_OPS: "false" });
+        }
+    });
+
+    it("are nothing for any other image", () => {
+        for (const image of ["nginx:1.27", "itzg/minecraft-bedrock-server:latest", "", undefined]) {
+            expect(minecraftReleaseEnv(image), String(image)).toBeUndefined();
+        }
     });
 });

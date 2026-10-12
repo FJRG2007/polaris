@@ -12,7 +12,7 @@ import { host } from "@polaris/app-host";
 import { gameJobTable } from "./games-jobs";
 import { SOFTWARE_KEY } from "./minecraft/join-guard";
 import type { AppHostTypes } from "@polaris/app-host";
-import { minecraftImageFor } from "./minecraft/runtime";
+import { minecraftImageFor, minecraftReleaseEnv } from "./minecraft/runtime";
 import { isPluginLoader, loaderForType } from "./minecraft/modrinth";
 import { GAME_SERVERS_APP_ID, gameOfServer, isGameManagerApp } from "@polaris/core";
 
@@ -75,6 +75,10 @@ export const gameServersExtension: AppExtension = {
     // A Minecraft server runs the Java its release needs, which changes with the
     // release it is set to.
     releaseImage: minecraftImageFor,
+
+    // Polaris's own RCON traffic stays out of the ops' chat, on servers installed
+    // before that was a setting too.
+    releaseEnv: minecraftReleaseEnv,
 
     pluginServer: (catalogId, env) => {
         if (!gameOfServer(catalogId)) return null;

@@ -55,7 +55,7 @@ const { app, refs, updateApp, findUniqueDeployment, deployed } = vi.hoisted(() =
     refs: { env: {} as Record<string, string>, unresolved: [] as string[] },
     updateApp: vi.fn(async () => undefined),
     findUniqueDeployment: vi.fn(),
-    deployed: [] as Array<{ build: Record<string, unknown> }>
+    deployed: [] as Array<{ build: Record<string, unknown>; env: Record<string, string> }>
 }));
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: dataDir }) }));
@@ -151,7 +151,10 @@ const { gameServersExtension } = await import("@polaris-app/game-servers/src/lib
 
 const { deployApplication, restartFromKeptImage } = await import("@/lib/deploy-service");
 
-async function planOfNextRun(): Promise<{ build: Record<string, unknown> }> {
+async function planOfNextRun(): Promise<{
+    build: Record<string, unknown>;
+    env: Record<string, string>;
+}> {
     await vi.waitFor(() => expect(deployed).toHaveLength(1));
     return deployed[0]!;
 }
@@ -208,5 +211,25 @@ describe("the image kept on the service", () => {
             "refers to nothing"
         );
         expect(updateApp).not.toHaveBeenCalled();
+    });
+});
+
+describe("Polaris's own RCON commands", () => {
+    // The sidebar alone is a command a second, and every one of them showed up in
+    // each op's chat as a gray "[Rcon: ...]" line until the client dropped frames.
+    it("are kept out of the ops' chat on a server installed before that was set", async () => {
+        refs.env = { VERSION: "1.21.4", RCON_PASSWORD: "fixture-password" };
+        await restartFromKeptImage(APP, OWNER, "member-1", "variables");
+        const plan = await planOfNextRun();
+        expect(plan.env.BROADCAST_RCON_TO_OPS).toBe("false");
+        expect(plan.env.VERSION).toBe("1.21.4");
+        expect(plan.env.RCON_PASSWORD).toBe("fixture-password");
+    });
+
+    it("stay out of it even when the stored settings turned the echo on", async () => {
+        refs.env = { VERSION: "LATEST", BROADCAST_RCON_TO_OPS: "true" };
+        await deployApplication(APP, OWNER, "member-1");
+        const plan = await planOfNextRun();
+        expect(plan.env.BROADCAST_RCON_TO_OPS).toBe("false");
     });
 });
