@@ -89,6 +89,7 @@ import { afterPaint, maskCamera, type MaskedCamera } from "./camera-filter";
 import { cameraLook, lookIsPlain, lookKey, useCameraLook, type CameraLook } from "./camera-look";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { holdReload } from "@/lib/reload-safety";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
 import { applyMicCleanup, micCleanup, micConstraints, useMicCleanup } from "./mic-cleanup";
 import { callDevices, isDenial, openMedia, openScreen, refused, settle } from "./call-media";
@@ -1482,6 +1483,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         []
     );
+
+    // A reload leaves the room: the browser hangs up and walks back in seconds
+    // later, which everybody else hears as a drop. So a tab in a call never
+    // takes an update by itself - the card offers it instead.
+    useEffect(() => (meetingId ? holdReload() : undefined), [meetingId]);
 
     /** Open the devices, connect, publish, and take it all down again. */
     useEffect(() => {
