@@ -1007,13 +1007,15 @@ async function sendHome(
         await tools.persist();
     };
     const kind = built(loop.run)?.kind;
-    // A parkour racer off its team, whose push the others no longer need kept off.
+    // A racer off its team, whose push the others no longer need kept off.
     const after =
         kind === "nether-maze"
             ? (one: string) => [...radarBack(one), netherMaze.leaveTeam(one)]
             : kind === "parkour"
               ? (one: string) => [parkour.leaveTeam(one)]
-              : undefined;
+              : kind === "dropper"
+                ? (one: string) => [dropper.leaveTeam(one)]
+                : undefined;
     if (
         !(await returnOne(server, saved, (await tools.flavour()).items, loop.language, keep, after))
     )
