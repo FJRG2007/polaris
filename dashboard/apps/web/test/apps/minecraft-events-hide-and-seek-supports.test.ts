@@ -174,7 +174,17 @@ describe("what hangs on something in a hide and seek house", () => {
             for (const era of ERAS)
                 for (let seed = 0; seed < 12; seed += 1) {
                     for (let draw = 0; draw < 3; draw += 1) {
-                        const house = manor.drawManor(`supports-${seed}`, count, era, draw);
+                        // In and out of season: its rooms, and the touch of it on the rest.
+                        const season = ([null, "halloween", "winter"] as const)[(seed + draw) % 3]!;
+                        const house = manor.drawManor(
+                            `supports-${seed}`,
+                            count,
+                            era,
+                            draw,
+                            false,
+                            manor.DESIGN,
+                            season
+                        );
                         for (const plan of house.rooms) seen.add(plan.template);
                         for (const one of problemsOf(house)) problems.add(one);
                     }
@@ -183,7 +193,7 @@ describe("what hangs on something in a hide and seek house", () => {
                 }
         expect([...problems]).toEqual([]);
         // Every room the library has was drawn, the middle one included.
-        for (const template of [rooms.FOYER, ...rooms.TEMPLATES])
+        for (const template of [rooms.FOYER, ...rooms.TEMPLATES, ...rooms.SEASONAL])
             expect(seen).toContain(template.name);
     }, 120_000);
 

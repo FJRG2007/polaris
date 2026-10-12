@@ -31,6 +31,7 @@ import type * as stored from "../state";
 import * as hitsService from "./hits-service";
 import * as build from "./build-battle";
 import * as said from "./hide-and-seek-messages";
+import { eventDecoration } from "../../seasonal-service";
 import type { ArenaGame, KindContext } from "./arena-game";
 
 const messages = speech.spoken(written);
@@ -78,12 +79,13 @@ function roomsOf(run: stored.EventRun): number {
 function manorOf(run: stored.EventRun): manor.Manor {
     const rooms = roomsOf(run);
     const era = gameOf(run).era ?? model.OLDEST;
+    const season = gameOf(run).season ?? null;
     const design = designOf(run);
-    const key = `${run.id}:${design}:${rooms}:${era.scaffold}:${era.snow}:${era.display}`;
+    const key = `${run.id}:${design}:${rooms}:${era.scaffold}:${era.snow}:${era.display}:${season}`;
     let built = manors.get(key);
     if (!built) {
         if (manors.size >= 8) manors.delete(manors.keys().next().value!);
-        built = manor.manorFor(run.id, rooms, era, design);
+        built = manor.manorFor(run.id, rooms, era, design, season);
         manors.set(key, built);
     }
     return built;
@@ -593,7 +595,9 @@ function readyTick(
     lines.push(commands.say(tag + seekMessages.allReady(language)));
 }
 
-/** What the server can show, asked once before the house is built. */
+/** What the server can show, and the season it is dressed for, asked once
+ *  before the house is built and kept with the run, so the house is drawn the
+ *  same however often it is drawn again. */
 async function prepare(ctx: KindContext): Promise<Record<string, unknown>> {
     const era: model.Era = {
         scaffold: await ctx.atLeast([1, 14]),
@@ -603,6 +607,7 @@ async function prepare(ctx: KindContext): Promise<Record<string, unknown>> {
     return {
         design: manor.DESIGN,
         era,
+        season: await eventDecoration(ctx.server.installedAppId, new Date(ctx.now)),
         rooms: manor.roomsFor(ctx.run.joined.length, optionsOf(ctx.run).house)
     };
 }
@@ -615,6 +620,7 @@ export const hideAndSeek: ArenaGame = {
     built: (run) => ({
         design: gameOf(run).design ?? manor.DESIGN,
         era: gameOf(run).era ?? model.OLDEST,
+        season: gameOf(run).season ?? null,
         rooms: roomsOf(run)
     }),
     fills: (run, box) => manor.manorFills(box, manorOf(run)),

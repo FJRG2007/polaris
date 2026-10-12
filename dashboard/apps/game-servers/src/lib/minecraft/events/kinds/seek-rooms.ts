@@ -28,7 +28,8 @@
  *   player up from (`secret-panels.ts`).
  *
  * A template added in a later design says so (`since`): a house an older
- * design built never draws it, so it is drawn exactly as it was.
+ * design built never draws it, so it is drawn exactly as it was. One made for
+ * a season says which (`season`), and only a house built in it draws it.
  *
  * Every piece of furniture of a kind has the same size wherever it stands,
  * whether or not it hides anything: a hollow crate stack and a full one, a
@@ -40,6 +41,7 @@
 import * as maze from "./seek-maze";
 import type { Era } from "./seek-grid";
 import type { Material } from "./secret-panels";
+import type { Decoration } from "../../seasonal";
 
 export type Side = "north" | "south" | "east" | "west";
 export const SIDES: readonly Side[] = ["north", "south", "east", "west"];
@@ -118,6 +120,9 @@ export interface Canvas {
     /** A launch pad in the floor (from design 5): a slime block the pack
      *  throws whoever stands on it up from. */
     pad(u: number, v: number): void;
+    /** A fish summoned once the house is built (from design 8): only ever
+     *  into water sealed in on every side. */
+    fish(u: number, level: number, v: number): void;
 }
 
 export interface Template {
@@ -127,6 +132,11 @@ export interface Template {
     readonly fits?: (era: Era) => boolean;
     /** The first design that draws it. */
     readonly since?: number;
+    /** The only season a house draws it in (`SEASONAL`); never out of it. */
+    readonly season?: Decoration;
+    /** Whether it holds a fire: the season's touch (`dress`) puts nothing
+     *  that burns in it. */
+    readonly fire?: boolean;
     draw(canvas: Canvas): void;
 }
 
@@ -304,6 +314,7 @@ const KITCHEN: Template = {
 
 const FORGE: Template = {
     name: "forge",
+    fire: true,
     // Nothing that burns within reach of the lava.
     style: {
         face: "minecraft:stone_bricks",
@@ -1009,6 +1020,131 @@ const VILLAGE: Template = {
         tile(c, 6, 12);
     }
 };
+// ------------------------------------------------------------------ design 8
+
+/** From design 8 the house can have an aquarium (`AQUARIUM`). */
+export const AQUARIUM_SINCE = 8;
+
+/** Where a cell of a wall's tank is: `along` the side, `depth` in from it. */
+function onSide(side: Side, along: number, depth: number): [number, number] {
+    if (side === "north") return [along, depth];
+    if (side === "south") return [along, LAST - depth];
+    if (side === "west") return [depth, along];
+    return [LAST - depth, along];
+}
+
+const CORALS = ["tube", "brain", "bubble", "fire", "horn"] as const;
+
+/**
+ * Fish tanks along a room's walls: a back of dark prismarine, a row of water
+ * one deep and four high on a bed of coral a block up, with kelp and sea
+ * pickles in it, glass in front and at both ends, and a lid with lamps in it.
+ * The water starts over anybody's feet, so nothing in the tank reads as a
+ * place to stand that nobody can get to. Only where
+ * every block of a stretch is still free - never across a doorway, a nook or
+ * anything else - so the water is sealed in on every side by blocks of the
+ * tank's own, and nobody ever walks in it.
+ */
+function tanks(c: Canvas): void {
+    for (const side of SIDES) {
+        const fits = (along: number) => {
+            for (let depth = 0; depth <= 2; depth += 1)
+                for (let level = 0; level <= 6; level += 1) {
+                    const [u, v] = onSide(side, along, depth);
+                    if (!c.free(u, level, v)) return false;
+                }
+            return true;
+        };
+        // Stretches of at least three, clear of the corners: a way stays open
+        // into each, past the ends of the tanks either side of it.
+        const runs: [number, number][] = [];
+        for (let along = 4; along <= 9; along += 1) {
+            if (!fits(along)) continue;
+            const last = runs[runs.length - 1];
+            if (last && last[1] === along - 1) last[1] = along;
+            else runs.push([along, along]);
+        }
+        for (const [a, b] of runs) {
+            if (b - a < 2) continue;
+            for (let along = a; along <= b; along += 1) {
+                const end = along === a || along === b;
+                const [bu, bv] = onSide(side, along, 0);
+                const [wu, wv] = onSide(side, along, 1);
+                const [gu, gv] = onSide(side, along, 2);
+                c.set("minecraft:dark_prismarine", bu, 0, bv, bu, 6, bv);
+                c.set("minecraft:dark_prismarine", wu, 0, wv);
+                c.set("minecraft:glass", gu, 1, gv, gu, 5, gv);
+                c.set("minecraft:prismarine_bricks", gu, 0, gv);
+                c.set("minecraft:prismarine_bricks", gu, 6, gv);
+                if (end) {
+                    c.set("minecraft:glass", wu, 2, wv, wu, 5, wv);
+                    c.set("minecraft:prismarine", wu, 1, wv);
+                    c.set("minecraft:prismarine", wu, 6, wv);
+                    continue;
+                }
+                c.set(`minecraft:${CORALS[along % CORALS.length]}_coral_block`, wu, 1, wv);
+                c.set(
+                    along % 2 === 0 ? "minecraft:sea_lantern" : "minecraft:prismarine",
+                    wu,
+                    6,
+                    wv
+                );
+                if (along % 3 === 0) c.set("minecraft:kelp[age=25]", wu, 2, wv);
+                if (along % 3 === 1)
+                    c.set("minecraft:sea_pickle[pickles=3,waterlogged=true]", wu, 2, wv);
+                c.set("minecraft:water", wu, 2, wv, wu, 5, wv);
+            }
+            const [fu, fv] = onSide(side, Math.floor((a + b) / 2), 1);
+            c.fish(fu, 3, fv);
+        }
+    }
+}
+
+/**
+ * An aquarium (design 8): fish tanks along its walls behind glass, a floor of
+ * prismarine and a ceiling of it set with lamps, and in the middle a diving
+ * bell of prismarine bricks with portholes - room for one inside, a cellar
+ * under a hatch in its floor - beside a lamp on a pillar to stare at.
+ */
+const AQUARIUM: Template = {
+    name: "aquarium",
+    since: AQUARIUM_SINCE,
+    style: {
+        face: "minecraft:quartz_block",
+        floor: "minecraft:prismarine_bricks",
+        entrances: ["painting", "veil", "panel"]
+    },
+    draw(c) {
+        // The diving bell, its way in on the south side hung with a banner.
+        c.set("minecraft:cyan_wall_banner[facing=east]", 7, 1, 8, 7, 2, 8);
+        c.clear(6, 1, 5, 8, 3, 7);
+        c.set("minecraft:sea_lantern", 7, 4, 6);
+        c.spot(8, 1, 5);
+        cellar(c, 6, 5, 8, 7);
+        hatch(c, "spruce", 6, 5, "south");
+        c.spot(8, -3, 7);
+        c.set("minecraft:glass", 5, 2, 6);
+        c.set("minecraft:glass", 9, 2, 6);
+        c.set("minecraft:prismarine_bricks", 5, 1, 4, 9, 4, 8);
+        button(c, "minecraft:stone_button", 4, 2, 5, "west");
+        button(c, "minecraft:stone_button", 10, 2, 5, "east");
+        c.set("minecraft:prismarine_bricks", 3, 1, 6, 3, 2, 6);
+        gaze(c, "minecraft:sea_lantern", 3, 3, 6, { u: 3, v: 10 });
+        rug(c, "cyan", 3, 9);
+        tile(c, 4, 3);
+        tanks(c);
+        // The ceiling: prismarine set with lamps, under the house's roof.
+        for (let u = 0; u <= LAST; u += 1)
+            for (let v = 0; v <= LAST; v += 1)
+                c.set(
+                    u % 3 === 1 && v % 3 === 1 ? "minecraft:sea_lantern" : "minecraft:prismarine",
+                    u,
+                    10,
+                    v
+                );
+    }
+};
+
 /** Every template but the foyer, which is only ever the middle room. */
 export const TEMPLATES: readonly Template[] = [
     LIBRARY,
@@ -1026,8 +1162,382 @@ export const TEMPLATES: readonly Template[] = [
     DEEP,
     END,
     BELFRY,
-    VILLAGE
+    VILLAGE,
+    AQUARIUM
 ];
+
+// ------------------------------------------------------------------ the seasons
+
+/**
+ * Rooms only a house built in their season draws (`seek-manor.drawManor`):
+ * the season is the one the server is dressed for (`seasonal.ts`), read once
+ * when the run's house is built and kept with it. Each keeps every rule the
+ * others do - a hiding place or more, keys to find, light everywhere anybody
+ * stands - and nothing in them falls, burns or holds a player: no powder
+ * snow, no sand or gravel, and the one fire, the cabin's hearth, behind bars
+ * with nothing that burns within reach.
+ */
+
+/** A wardrobe three across, two deep and three high, with a door in its
+ *  front and room for one behind it, as the bedroom's. */
+function wardrobe(c: Canvas, block: string, door: string, u: number, v: number): void {
+    c.set(`minecraft:${door}_door[facing=south,half=lower,hinge=left,open=false]`, u + 1, 1, v + 1);
+    c.set(`minecraft:${door}_door[facing=south,half=upper,hinge=left,open=false]`, u + 1, 2, v + 1);
+    c.clear(u + 1, 1, v, u + 1, 2, v);
+    c.spot(u + 1, 1, v);
+    c.set(block, u, 1, v, u + 2, 3, v + 1);
+}
+
+/** A hut five by five with a cellar under a hatch in its floor, its way in on
+ *  the south side hung with a banner, as the village's first house. */
+function hut(c: Canvas, u: number, walls: string, banner: string): void {
+    c.set(`minecraft:${banner}_wall_banner[facing=east]`, u + 2, 1, 6, u + 2, 2, 6);
+    c.clear(u + 1, 1, 3, u + 3, 3, 5);
+    c.set("minecraft:glowstone", u + 2, 4, 4);
+    c.spot(u + 3, 1, 3);
+    cellar(c, u + 1, 3, u + 3, 5);
+    hatch(c, "spruce", u + 1, 3, "south");
+    c.spot(u + 3, -3, 5);
+    c.set(walls, u, 1, 2, u + 4, 4, 6);
+}
+
+/** A shed with a door on its north side and room inside, as the village's
+ *  second house. */
+function shed(c: Canvas, walls: string, door: string): void {
+    c.clear(8, 1, 9, 10, 3, 11);
+    c.set(`minecraft:${door}_door[facing=north,half=lower,hinge=left,open=false]`, 9, 1, 8);
+    c.set(`minecraft:${door}_door[facing=north,half=upper,hinge=left,open=false]`, 9, 2, 8);
+    c.set("minecraft:glowstone", 9, 4, 10);
+    c.spot(10, 1, 11);
+    c.set(walls, 7, 1, 8, 11, 4, 12);
+}
+
+/** A haunted parlour: webs in every corner under the ceiling, two tall
+ *  clocks with room inside, pumpkins on posts and a cellar under a hatch. */
+const PARLOUR: Template = {
+    name: "parlour",
+    season: "halloween",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:dark_oak_planks",
+        floor: "minecraft:dark_oak_planks",
+        entrances: ["door", "painting", "panel"]
+    },
+    draw(c) {
+        // Webs in the corners, up under the ceiling where nobody walks into one.
+        for (const u of [0, LAST])
+            for (const v of [0, LAST]) {
+                c.set("minecraft:cobweb", u, 9, v, u, 10, v);
+                c.set("minecraft:cobweb", u === 0 ? 1 : LAST - 1, 10, v);
+                c.set("minecraft:cobweb", u, 10, v === 0 ? 1 : LAST - 1);
+            }
+        wardrobe(c, "minecraft:dark_oak_planks", "dark_oak", 2, 2);
+        wardrobe(c, "minecraft:dark_oak_planks", "dark_oak", 2, 10);
+        button(c, "minecraft:dark_oak_button", 5, 2, 3, "east");
+        button(c, "minecraft:dark_oak_button", 5, 2, 10, "east");
+        // A table with a pumpkin lantern on it, and pumpkins on posts.
+        c.set("minecraft:dark_oak_fence", 7, 1, 6);
+        gaze(c, "minecraft:jack_o_lantern[facing=south]", 7, 2, 6, { u: 7, v: 10 });
+        c.set("minecraft:dark_oak_fence", 11, 1, 2);
+        c.set("minecraft:carved_pumpkin[facing=south]", 11, 2, 2);
+        c.set("minecraft:dark_oak_fence", 11, 1, 7);
+        gaze(c, "minecraft:skeleton_skull[rotation=4]", 11, 2, 7, { u: 7, v: 8 });
+        // A cellar under a trapdoor in the dark floor, as the library's.
+        cellar(c, 11, 10, 12, 12);
+        hatch(c, "dark_oak", 11, 11, "east");
+        c.spot(12, -3, 12);
+        rug(c, "black", 7, 8);
+        tile(c, 10, 6);
+    }
+};
+
+/** A witch's den: her hut with purple glass in its windows and a cellar
+ *  under it, cauldrons and brewing stands, and a larder with a door. */
+const WITCH: Template = {
+    name: "witch",
+    season: "halloween",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:mossy_stone_bricks",
+        floor: "minecraft:podzol",
+        entrances: ["panel", "painting", "door"]
+    },
+    draw(c) {
+        for (const [u, v] of [
+            [2, 4],
+            [6, 4],
+            [4, 2]
+        ] as const)
+            c.set("minecraft:purple_stained_glass", u, 2, v);
+        hut(c, 2, "minecraft:spruce_planks", "purple");
+        button(c, "minecraft:oak_button", 7, 2, 3, "east");
+        // Her brewing: a row of cauldrons and a stand, and one more by the larder.
+        c.set("minecraft:cauldron", 9, 1, 3, 10, 1, 3);
+        c.set("minecraft:brewing_stand", 11, 1, 3);
+        c.set("minecraft:cauldron", 12, 1, 7);
+        shed(c, "minecraft:mossy_cobblestone", "spruce");
+        button(c, "minecraft:stone_button", 12, 1, 10, "east");
+        c.set("minecraft:oak_fence", 8, 1, 2);
+        gaze(c, "minecraft:jack_o_lantern[facing=south]", 8, 2, 2, { u: 8, v: 6 });
+        rug(c, "purple", 9, 6);
+        tile(c, 5, 11);
+    }
+};
+
+/** A pumpkin patch over a root cellar: rows of pumpkins, a scarecrow to
+ *  stare at, a haystack with a door, and the cellar under a hatch. */
+const PUMPKINS: Template = {
+    name: "pumpkins",
+    season: "halloween",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:spruce_planks",
+        floor: "minecraft:coarse_dirt",
+        entrances: ["door", "panel", "painting"]
+    },
+    draw(c) {
+        // The root cellar, four by four, its ladder under a hatch.
+        cellar(c, 2, 9, 5, 12);
+        hatch(c, "spruce", 2, 10, "east");
+        c.spot(5, -3, 12);
+        c.spot(5, -3, 9);
+        // The patch.
+        for (const [u, v] of [
+            [7, 3],
+            [9, 2],
+            [11, 3],
+            [8, 5],
+            [10, 5]
+        ] as const)
+            c.set("minecraft:pumpkin", u, 1, v);
+        c.set("minecraft:carved_pumpkin[facing=south]", 3, 1, 3);
+        c.set("minecraft:pumpkin", 2, 1, 4);
+        button(c, "minecraft:stone_button", 4, 1, 3, "east");
+        // The scarecrow: a post, a body of hay, arms and a carved head.
+        c.set("minecraft:oak_fence", 5, 1, 6, 5, 2, 6);
+        c.set("minecraft:oak_fence", 5, 3, 5);
+        c.set("minecraft:oak_fence", 5, 3, 7);
+        gaze(c, "minecraft:carved_pumpkin[facing=east]", 5, 4, 6, { u: 9, v: 6 });
+        c.set("minecraft:hay_block", 5, 3, 6);
+        shed(c, "minecraft:hay_block", "spruce");
+        button(c, "minecraft:oak_button", 12, 1, 10, "east");
+        rug(c, "orange", 3, 6);
+        tile(c, 11, 7);
+    }
+};
+
+/** A room of presents round a decorated tree: lights in its branches, room
+ *  to crouch under it, wrapped boxes, two big enough to hide in. */
+const PRESENTS: Template = {
+    name: "presents",
+    season: "winter",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:white_wool",
+        floor: "minecraft:spruce_planks",
+        entrances: ["door", "painting", "veil"]
+    },
+    draw(c) {
+        // The lights, then the trunk and the star, then the branches round them.
+        for (const [u, level, v, light] of [
+            [4, 3, 6, "glowstone"],
+            [8, 3, 6, "sea_lantern"],
+            [6, 3, 4, "sea_lantern"],
+            [6, 4, 8, "glowstone"],
+            [4, 4, 4, "sea_lantern"],
+            [8, 4, 8, "sea_lantern"],
+            [5, 5, 7, "glowstone"],
+            [7, 6, 5, "glowstone"]
+        ] as const)
+            c.set(`minecraft:${light}`, u, level, v);
+        c.set("minecraft:spruce_log", 6, 1, 6, 6, 7, 6);
+        c.set("minecraft:glowstone", 6, 8, 6);
+        const leaves = "minecraft:spruce_leaves[persistent=true]";
+        c.set(leaves, 4, 3, 4, 8, 4, 8);
+        c.set(leaves, 5, 5, 5, 7, 6, 7);
+        for (const [du, dv] of [
+            [-1, 0],
+            [1, 0],
+            [0, -1],
+            [0, 1]
+        ] as const)
+            c.set(leaves, 6 + du, 7, 6 + dv);
+        // Under the branches: presents round the trunk, and room to crouch.
+        c.spot(5, 1, 5);
+        // Wrapped boxes, a bow on each: under the tree and by the walls.
+        for (const [u, v, box, bow] of [
+            [4, 7, "red_wool", "yellow"],
+            [8, 5, "green_wool", "white"],
+            [7, 8, "blue_concrete", "red"],
+            [10, 1, "red_concrete", "white"],
+            [11, 1, "lime_concrete", "red"],
+            [12, 2, "white_wool", "red"],
+            [1, 5, "yellow_concrete", "blue"]
+        ] as const) {
+            c.set(`minecraft:${bow}_carpet`, u, 2, v);
+            c.set(`minecraft:${box}`, u, 1, v);
+        }
+        // Two presents big enough to hide in, a door in the front of each.
+        c.set("minecraft:yellow_carpet", 3, 4, 10, 3, 4, 11);
+        wardrobe(c, "minecraft:red_wool", "spruce", 2, 10);
+        c.set("minecraft:white_carpet", 10, 4, 10, 10, 4, 11);
+        wardrobe(c, "minecraft:green_wool", "spruce", 9, 10);
+        button(c, "minecraft:spruce_button", 5, 2, 10, "east");
+        button(c, "minecraft:spruce_button", 8, 2, 11, "west");
+        // A snowman to stare at.
+        c.set("minecraft:snow_block", 2, 1, 2, 2, 2, 2);
+        gaze(c, "minecraft:carved_pumpkin[facing=south]", 2, 3, 2, { u: 2, v: 6 });
+        rug(c, "red", 11, 6);
+        tile(c, 12, 8);
+    }
+};
+
+/** A cozy cabin (from 1.14, the campfire's release): a hearth with its fire
+ *  behind bars, a window onto the snow, red and white rugs, a coat closet and
+ *  a cellar under a hatch. */
+const CABIN: Template = {
+    name: "cabin",
+    fire: true,
+    season: "winter",
+    since: CLOSETS_SINCE,
+    fits: (era) => era.scaffold,
+    style: {
+        face: "minecraft:spruce_planks",
+        floor: "minecraft:spruce_planks",
+        entrances: ["door", "painting", "panel"]
+    },
+    draw(c) {
+        // The hearth: the fire behind bars, in brick to the ceiling, on a
+        // brick floor. Nothing that burns stands within four of it
+        // (`seek-manor.manorProblems`).
+        c.set("minecraft:campfire[facing=south,lit=true]", 6, 1, 6);
+        c.set("minecraft:iron_bars", 6, 1, 7);
+        c.set("minecraft:bricks", 4, 0, 4, 8, 0, 8);
+        c.set("minecraft:bricks", 5, 1, 5, 7, 3, 6);
+        c.set("minecraft:bricks", 6, 4, 5, 6, 10, 6);
+        button(c, "minecraft:stone_button", 4, 2, 5, "west");
+        // A window onto the snow, on a side with no doorway: glass in a frame
+        // of logs, over everybody's head, and snow piled behind it.
+        const side = (["north", "south"] as const).find((one) => !hasDoor(c, one));
+        if (side) {
+            const v = (at: number) => (side === "north" ? at : LAST - at);
+            c.set("minecraft:glass", 5, 4, v(1), 8, 5, v(1));
+            c.set("minecraft:spruce_log", 4, 3, v(1), 9, 3, v(1));
+            c.set("minecraft:spruce_log", 4, 6, v(1), 9, 6, v(1));
+            c.set("minecraft:spruce_log", 4, 4, v(1), 4, 5, v(1));
+            c.set("minecraft:spruce_log", 9, 4, v(1), 9, 5, v(1));
+            c.set("minecraft:snow_block", 4, 1, v(0), 9, 6, v(0));
+        }
+        // Rugs of red and white, all well away from the fire.
+        rug(c, "red", 7, 11);
+        for (let u = 6; u <= 8; u += 1)
+            for (let v = 10; v <= 12; v += 1)
+                c.set(`minecraft:${(u + v) % 2 === 0 ? "white" : "red"}_carpet`, u, 1, v);
+        wardrobe(c, "minecraft:spruce_planks", "spruce", 2, 10);
+        button(c, "minecraft:spruce_button", 5, 2, 10, "east");
+        cellar(c, 10, 10, 12, 12);
+        hatch(c, "spruce", 10, 11, "east");
+        c.spot(12, -3, 12);
+        // A snowman by the wall to stare at.
+        c.set("minecraft:snow_block", 12, 1, 7, 12, 2, 7);
+        gaze(c, "minecraft:carved_pumpkin[facing=west]", 12, 3, 7, { u: 8, v: 9 });
+        tile(c, 11, 2);
+    }
+};
+
+/** A toy workshop: a stall with a striped roof and a cellar under it,
+ *  workbenches, stacks of toy blocks and a toy cupboard to hide in. */
+const TOYS: Template = {
+    name: "toys",
+    season: "winter",
+    since: CLOSETS_SINCE,
+    style: {
+        face: "minecraft:birch_planks",
+        floor: "minecraft:oak_planks",
+        entrances: ["panel", "door", "painting"]
+    },
+    draw(c) {
+        // The stall's striped roof, round the lamp in its middle.
+        for (let u = 7; u <= 11; u += 1)
+            if (u !== 9) c.set(`minecraft:${u % 2 === 0 ? "red" : "white"}_wool`, u, 4, 2, u, 4, 6);
+        hut(c, 7, "minecraft:spruce_planks", "red");
+        button(c, "minecraft:oak_button", 12, 2, 4, "east");
+        // Workbenches along one side, toy blocks stacked by the other.
+        c.set("minecraft:crafting_table", 2, 1, 6, 4, 1, 6);
+        button(c, "minecraft:oak_button", 5, 1, 6, "east");
+        for (const [u, level, v, block] of [
+            [2, 1, 2, "red_wool"],
+            [3, 1, 2, "blue_wool"],
+            [2, 2, 2, "yellow_wool"],
+            [4, 1, 3, "lime_concrete"],
+            [2, 1, 3, "orange_concrete"]
+        ] as const)
+            c.set(`minecraft:${block}`, u, level, v);
+        wardrobe(c, "minecraft:birch_planks", "oak", 2, 10);
+        button(c, "minecraft:oak_button", 5, 2, 10, "east");
+        // A toy on a post to stare at.
+        c.set("minecraft:spruce_fence", 11, 1, 9);
+        gaze(c, "minecraft:creeper_head[rotation=4]", 11, 2, 9, { u: 7, v: 9 });
+        rug(c, "lime", 7, 10);
+        tile(c, 12, 12);
+    }
+};
+
+/** The seasons' rooms: a house draws them only in their season. */
+export const SEASONAL: readonly Template[] = [PARLOUR, WITCH, PUMPKINS, PRESENTS, CABIN, TOYS];
+
+/** The season's colours, for its banners. */
+const COLOURS: Readonly<Record<Decoration, readonly [string, string]>> = {
+    halloween: ["orange", "purple"],
+    winter: ["red", "green"]
+};
+
+/** The lowest level under a web at level 9 that must hold nothing to stand
+ *  on: whoever stands on it reaches the web with a jump. */
+const WEB_REACH = 5;
+
+/**
+ * A touch of the season for the house's own rooms, while it lasts
+ * (`seek-manor.drawManor`): in each corner, out of everybody's way, webs or
+ * greenery up under the ceiling, a banner in the season's colours, and a
+ * pumpkin lantern or a present on the floor. Only into what the room left
+ * free - never a doorway, a nook, a hiding place or what stands over one -
+ * and nothing that burns in a room with a fire.
+ */
+export function dress(c: Canvas, season: Decoration, template: Template): void {
+    const burns = template.fire !== true;
+    const corners = [
+        [0, 0],
+        [LAST, 0],
+        [0, LAST],
+        [LAST, LAST]
+    ] as const;
+    corners.forEach(([u, v], index) => {
+        const facing: Side = v === 0 ? "south" : "north";
+        const free = (from: number, to: number, a = u, b = v) => {
+            for (let level = from; level <= to; level += 1) if (!c.free(a, level, b)) return false;
+            return true;
+        };
+        const near = [u, u === 0 ? 1 : LAST - 1].flatMap((a) =>
+            [v, v === 0 ? 1 : LAST - 1].map((b) => [a, b] as const)
+        );
+        // Up under the ceiling, with nothing under it anybody stands on.
+        if (free(9, 10) && near.every(([a, b]) => free(WEB_REACH, 8, a, b))) {
+            if (season === "halloween") c.set("minecraft:cobweb", u, 9, v, u, 10, v);
+            else if (burns) c.set("minecraft:spruce_leaves[persistent=true]", u, 9, v, u, 10, v);
+        }
+        // A banner on the wall the corner's side shares with no doorway or nook.
+        if (burns && free(4, 4))
+            c.set(`minecraft:${COLOURS[season][index % 2]}_wall_banner[facing=${facing}]`, u, 4, v);
+        // On the floor of a corner with nothing in, under or over it.
+        if (!free(0, 3)) return;
+        if (season === "halloween") c.set(`minecraft:jack_o_lantern[facing=${facing}]`, u, 1, v);
+        else if (burns) {
+            c.set(`minecraft:${index % 2 === 0 ? "yellow" : "white"}_carpet`, u, 2, v);
+            c.set(`minecraft:${index % 2 === 0 ? "red" : "green"}_wool`, u, 1, v);
+        }
+    });
+}
 
 /** A plain room, for a house that falls back to its bare walls. */
 export const PLAIN: Template = {
