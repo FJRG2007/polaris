@@ -307,11 +307,16 @@ final class SeasonalHalloween implements Listener {
         if (!halloween() || event.getSpawnReason() != CreatureSpawnEvent.SpawnReason.NATURAL) return;
         LivingEntity mob = event.getEntity();
         World world = mob.getWorld();
-        if (world.getEnvironment() != World.Environment.NORMAL) return;
-        long time = world.getTime();
-        if (time < 13_000 || time > 23_000) return;
         if (!(mob instanceof Monster) || mob instanceof Phantom || mob instanceof Witch) return;
         SeasonalMobs mobs = decor.mobs();
+        // The Nether and the End have no night of their own: the blood night is
+        // the overworld's, and it doubles their spawns too. Witches stay at home.
+        if (world.getEnvironment() != World.Environment.NORMAL) {
+            if (bloodActive) mobs.queueExtra(world, mob.getType(), event.getLocation());
+            return;
+        }
+        long time = world.getTime();
+        if (time < 13_000 || time > 23_000) return;
         if (settings.witchPercent() > 0 && random.nextInt(100 * 100) < WITCH_BASE * settings.witchPercent()) {
             mobs.queueExtra(world, EntityType.WITCH, event.getLocation());
         }
@@ -418,8 +423,9 @@ final class SeasonalHalloween implements Listener {
         }
         int key = settings.bloodKey();
         if (key == 0 || key == bloodDone || !night) return;
-        // Only a night that has most of itself left, with somebody here to see it.
-        if (world.getTime() > 18_000 || world.getPlayers().isEmpty()) return;
+        // Only a night that has most of itself left, with somebody here to see it -
+        // in any world, since the blood night reaches all of them.
+        if (world.getTime() > 18_000 || Bukkit.getOnlinePlayers().isEmpty()) return;
         bloodActive = true;
         bloodDone = key;
         save();
@@ -438,7 +444,7 @@ final class SeasonalHalloween implements Listener {
     private void fog() {
         Particle.DustOptions red = new Particle.DustOptions(Color.fromRGB(0x8A, 0x03, 0x03), 3.0f);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.getWorld().getEnvironment() != World.Environment.NORMAL || player.getGameMode() == GameMode.SPECTATOR) continue;
+            if (player.getGameMode() == GameMode.SPECTATOR) continue;
             Location at = player.getLocation();
             player.spawnParticle(Particle.DUST, at.getX(), at.getY() + 1, at.getZ(), 10, 9, 2, 9, 0, red);
         }

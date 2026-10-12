@@ -86,7 +86,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - Trap pumpkins: a decorative pumpkin a player breaks may let out bats or a
  *   baby zombie; the ground under it, which is all that is really there, stays.
  * - Blood night: once a season, on the night the dashboard names - red fog,
- *   a second spawn for every natural one, double loot and experience.
+ *   a second spawn for every natural one, double loot and experience. The
+ *   night is the overworld's, but it reaches every dimension: somebody in the
+ *   Nether is under the same blood night as everybody else.
  * - Trick or treat: a villager in a pumpkin that takes one and gives a treat,
  *   or a short scare; three at most, then it goes.
  * - Phantoms: a few at night over players under the open sky, slept or not,
@@ -316,11 +318,17 @@ final class SeasonalHalloween {
         if (SeasonalDecor.season() != SeasonalDecor.Season.HALLOWEEN || event.isSpawnCancelled()) return;
         if (event.getSpawnType() != EntitySpawnReason.NATURAL || SeasonalMobs.spawningExtra()) return;
         ServerLevel level = event.getLevel().getLevel();
-        if (level.dimension() != Level.OVERWORLD || !level.isNight()) return;
         Mob mob = event.getEntity();
         if (!(mob instanceof Monster) || mob.getType().getCategory() != MobCategory.MONSTER
                 || mob instanceof Phantom || mob instanceof Witch) return;
         BlockPos pos = BlockPos.containing(event.getX(), event.getY(), event.getZ());
+        // The Nether and the End have no night of their own: the blood night is
+        // the overworld's, and it doubles their spawns too. Witches stay at home.
+        if (level.dimension() != Level.OVERWORLD) {
+            if (bloodActive) SeasonalMobs.queueExtra(level, mob.getType(), pos);
+            return;
+        }
+        if (!level.isNight()) return;
         if (settings.witchPercent() > 0 && level.random.nextInt(100 * 100) < WITCH_BASE * settings.witchPercent()) {
             SeasonalMobs.queueExtra(level, EntityType.WITCH, pos);
         }
@@ -444,8 +452,9 @@ final class SeasonalHalloween {
         int key = settings.bloodKey();
         if (key == 0 || key == bloodDone || !night) return;
         long time = level.getDayTime() % 24_000L;
-        // Only a night that has most of itself left, with somebody here to see it.
-        if (time > 18_000 || level.players().isEmpty()) return;
+        // Only a night that has most of itself left, with somebody here to see it -
+        // in any dimension, since the blood night reaches all of them.
+        if (time > 18_000 || server.getPlayerList().getPlayers().isEmpty()) return;
         bloodActive = true;
         bloodDone = key;
         save();
@@ -463,7 +472,7 @@ final class SeasonalHalloween {
         DustParticleOptions red = new DustParticleOptions(0x8A0303, 3.0f);
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerLevel level = player.serverLevel();
-            if (level.dimension() != Level.OVERWORLD || player.isSpectator()) continue;
+            if (player.isSpectator()) continue;
             level.sendParticles(player, red, false, false, player.getX(), player.getY() + 1, player.getZ(), 10, 9, 2, 9, 0);
         }
     }
