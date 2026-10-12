@@ -463,8 +463,6 @@
         },
         "sentLevel": "What others hear",
         "hints": {
-            "muted": "Muted",
-            "deafened": "Deafened",
             "talkingMuted": "You're muted - nobody can hear you"
         },
         "arrivals": {

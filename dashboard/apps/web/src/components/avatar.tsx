@@ -431,7 +431,7 @@ export function Avatar({
                     className="absolute -bottom-0.5 -right-0.5 grid place-items-center rounded-full bg-danger text-danger-foreground ring-2 ring-background"
                     style={{ width: dotSize(size) + 6, height: dotSize(size) + 6 }}
                 >
-                    <Icon className="size-full p-0.5" />
+                    <Icon className="size-[62%]" />
                 </span>
             </span>
         );

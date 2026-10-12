@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * A word over a call control: "Muted" over the microphone, "Deafened" over the
- * headphones, and the short warning when somebody talks into a muted microphone.
+ * A word over a call control: the short warning when somebody talks into a
+ * muted microphone.
  *
  * Drawn in a portal so the strip the controls sit in can never clip it, centred
  * over the button, kept inside the window, and flipped below the button where
