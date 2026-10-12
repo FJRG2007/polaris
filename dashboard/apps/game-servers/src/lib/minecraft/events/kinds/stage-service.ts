@@ -379,7 +379,8 @@ const OLDEST_SCENERY: scenery.Era = { nether: false, caves: false };
 
 /**
  * The biome a structure's scenery is drawn in and how, or null for a kind
- * with none: an acid rain's weather and lightning reach round its arena.
+ * with none: an acid rain's weather and lightning reach round its arena, and a
+ * dropper's shaft is too tall to prove a ring round it cheaply.
  * Nothing that burns round a TNT floor, and no lava near one either; a parkour
  * course is surrounded by its own theme's world, a nether maze by the Nether.
  */
@@ -394,8 +395,8 @@ function sceneryOf(
                 ? { allowed: all, course: layout.course.theme, options }
                 : { allowed: ["end", "mesa"], options };
         case "dropper":
-            // Its shaft stands a little over the ground: nothing goes under it.
-            return { allowed: all, options: { ...options, drop: 0 } };
+            // Its shaft is too tall to prove a ring round it cheaply.
+            return null;
         case "tnt-run":
             return {
                 allowed: all.filter((theme) => theme !== "jungle"),

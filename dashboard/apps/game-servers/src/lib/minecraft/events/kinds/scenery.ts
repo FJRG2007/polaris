@@ -17,9 +17,10 @@
  * picked up: no sand, gravel, concrete powder or dripstone (`stage.GRAVITY_BLOCKS`),
  * no vines, grass, saplings, bamboo or coral, no fire, no plain ice (which
  * melts into water). Leaves are placed persistent, so they never rot. Lava is
- * only ever a source sealed on every side it could flow to - a basin with a
- * glass lid, a fall inside a glass column - built after its shell and so taken
- * out before it, and only in a theme with nothing that burns.
+ * never the fluid: an event puts down no lava, water or fire. What reads as
+ * lava - a basin with a glass lid, a fall inside a glass column - is magma
+ * sealed on every side, built after its shell and so taken out before it, and
+ * only in a theme with nothing that burns.
  *
  * Each piece is a box of the stage's like any other: written down with the
  * rest before it is built (`keep`, into air only), and taken out latest first
@@ -79,7 +80,8 @@ const B = {
     redNetherBricks: "minecraft:red_nether_bricks",
     magma: "minecraft:magma_block",
     wart: "minecraft:nether_wart_block",
-    lava: "minecraft:lava",
+    /** Lava as it is shown: magma, never the fluid an event may not put down. */
+    lava: "minecraft:magma_block",
     glass: "minecraft:glass",
     obsidian: "minecraft:obsidian",
     basalt: "minecraft:basalt",

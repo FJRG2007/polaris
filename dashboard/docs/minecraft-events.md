@@ -1352,13 +1352,13 @@ Separate from the season's dressing (`kinds/arena-decor.ts`), which sits on the
 structure itself: `kinds/scenery.ts` draws a world round it, so the event looks
 as if it is played inside a biome. Each run draws one theme from its id:
 
-| Theme  | Pieces                                                                                                                                                |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Jungle | jungle trees on moss islands (mossy cobblestone before 1.17) with a light in the crown, ruined mossy columns, melon islands                           |
-| Nether | huge crimson or warped fungi on netherrack and blackstone islands, basalt columns with magma, lavafalls sealed in glass, lava basins with a glass lid |
-| End    | end stone islands with chorus plants, purpur pillars with end rods, obsidian spires                                                                   |
-| Frost  | packed ice spikes with blue tips, snow islands with a sea lantern                                                                                     |
-| Mesa   | banded terracotta hoodoos, red sandstone islands                                                                                                      |
+| Theme  | Pieces                                                                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Jungle | jungle trees on moss islands (mossy cobblestone before 1.17) with a light in the crown, ruined mossy columns, melon islands                                        |
+| Nether | huge crimson or warped fungi on netherrack and blackstone islands, basalt columns with magma, lavafalls and lava basins of magma sealed in glass (never the fluid) |
+| End    | end stone islands with chorus plants, purpur pillars with end rods, obsidian spires                                                                                |
+| Frost  | packed ice spikes with blue tips, snow islands with a sea lantern                                                                                                  |
+| Mesa   | banded terracotta hoodoos, red sandstone islands                                                                                                                   |
 
 Which kinds get it (`stage-service.sceneryOf`): parkour (its course's own theme
 for jungle, nether and frost; end or mesa round a classic course), spleef, TNT
