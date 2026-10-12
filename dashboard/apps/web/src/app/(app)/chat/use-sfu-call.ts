@@ -275,6 +275,10 @@ const ARRIVING_WITHIN_MS = 8_000;
  *  a browser that is not going to do it. */
 const MIC_REPAIR_TRIES = 3;
 
+/** A second stall of the microphone filter within this long means the machine
+ *  cannot keep it running, and the raw microphone goes out instead. */
+const STALL_FALLBACK_MS = 2 * 60_000;
+
 /**
  * How long somebody is alone in a call before the room behind it is let go of.
  *
@@ -581,6 +585,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     // The microphone with a model between it and the call, when one is running.
     const filtered = useRef<FilteredMic | null>(null);
     const filterRound = useRef(0);
+    /** What to do when the running filter stops making sound - see `onStall`.
+     *  A ref because the filter is built before the publishing it needs exists. */
+    const recoverMic = useRef<(() => void) | null>(null);
+    /** When the filter last stalled, to tell a one-off from a filter this
+     *  machine cannot keep running. */
+    const lastStall = useRef(0);
     // The camera with a background drawn behind it, on the same terms.
     const masked = useRef<MaskedCamera | null>(null);
     /**
@@ -1220,6 +1230,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // The microphone may have been muted while the model was loading.
         built.track.enabled = track.enabled;
         filtered.current = built;
+        built.onStall(() => {
+            if (filtered.current === built) recoverMic.current?.();
+        });
         setMicFilter(built.using);
         // The gate listens to whichever of the two the reader asked for. Told
         // here because this is where the second one starts existing.
@@ -2857,6 +2870,41 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         },
         [outgoingMic, publish, publishLocalPreview, rememberCleanMic, startFilter]
     );
+
+    /**
+     * Get this person heard again when their filter stops making sound.
+     *
+     * Rebuilt once, which is what leaving and rejoining the call used to do. A
+     * second stall soon after is a machine that cannot keep the model running -
+     * a game holding every core, say - and the raw microphone goes out instead:
+     * a voice without noise suppression is a voice, and a filter that keeps
+     * stopping is silence.
+     */
+    useEffect(() => {
+        recoverMic.current = () => {
+            const now = Date.now();
+            const again = now - lastStall.current < STALL_FALLBACK_MS;
+            lastStall.current = now;
+            void (async () => {
+                if (again) {
+                    filterRound.current += 1;
+                    await filtered.current?.stop();
+                    filtered.current = null;
+                    setMicFilter(null);
+                    setFilteredTrack(null);
+                } else if (!(await startFilter())) {
+                    return;
+                }
+                if (room.current?.state !== CONNECTED) return;
+                await publish(MICROPHONE, outgoingMic());
+                settleMic();
+                publishLocalPreview();
+            })();
+        };
+        return () => {
+            recoverMic.current = null;
+        };
+    }, [outgoingMic, publish, publishLocalPreview, settleMic, startFilter]);
 
     /**
      * The microphone volume, followed during the call.
