@@ -226,7 +226,6 @@ export async function presenceFor(
         }
     }
     return answer;
-    return answer;
 }
 
 /** One person's own, for the picker that sets it, with the moment it lapses. */
