@@ -388,7 +388,7 @@ describe("a parkour saved before it had shapes", () => {
         });
         expect(catalog.optionsSchemas.parkour.parse(old(20))).toMatchObject({
             jumps: 30,
-            shapes: ["rows", "tower"]
+            shapes: [...catalog.PARKOUR_SHAPES]
         });
         expect(catalog.optionsSchemas.parkour.parse(old(25)).jumps).toBe(25);
         // Saved since, with its shapes: twenty is a choice.
@@ -402,6 +402,31 @@ describe("a parkour saved before it had shapes", () => {
             false
         );
         expect(catalog.optionsSchemas.parkour.safeParse(old(61)).success).toBe(false);
+    });
+
+    it("takes every shape while it is still on the two that were the default, and keeps a choice", () => {
+        const saved = (options: Record<string, unknown>) =>
+            catalog.migratePreset({ ...catalog.newPreset("parkour", "p"), options }) as {
+                options: { shapes: readonly string[] };
+            };
+        const base = { place: { mode: "players" }, jumps: 30, difficulty: "medium", height: 30 };
+        expect(saved({ ...base, shapes: ["tower", "rows"] }).options.shapes).toEqual([
+            ...catalog.PARKOUR_SHAPES
+        ]);
+        expect(saved(base).options.shapes).toEqual([...catalog.PARKOUR_SHAPES]);
+        // Chosen since: kept, the old two included.
+        expect(
+            saved({ ...base, shapes: ["rows", "tower"], shapesRevision: 2 }).options.shapes
+        ).toEqual(["rows", "tower"]);
+        expect(saved({ ...base, shapes: ["rows"] }).options.shapes).toEqual(["rows"]);
+        expect(saved({ ...base, shapes: ["rows", "tower", "line"] }).options.shapes).toEqual([
+            "rows",
+            "tower",
+            "line"
+        ]);
+        // Read once, it is marked: what is saved back keeps whatever is chosen next.
+        const read = catalog.optionsSchemas.parkour.parse({ ...base, shapes: ["rows", "tower"] });
+        expect(read).toMatchObject({ shapesRevision: 2 });
     });
 
     it("keeps a race already running on the twenty jumps its course was built with", () => {

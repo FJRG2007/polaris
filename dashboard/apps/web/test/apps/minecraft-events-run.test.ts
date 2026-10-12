@@ -139,6 +139,9 @@ interface World {
     modes: Record<string, number>;
     /** Something already stands in the air over every site. */
     skyTaken: boolean;
+    /** How many tries at a site, the first ones, find something in the ring
+     *  its scenery would stand in, but nothing where the structure goes. */
+    ringTaken: number;
     /** The server's settings file, or null when it cannot be read. */
     properties: string | null;
     /** Files written into the container, by path, and every write in order. */
@@ -305,6 +308,7 @@ const world: World = {
     stuck: [],
     modes: {},
     skyTaken: false,
+    ringTaken: 0,
     properties: "pvp=true\ndifficulty=normal\n",
     files: new Map(),
     writes: [],
@@ -381,7 +385,21 @@ function fillAnswer(line: string): string | null {
     if (fill[8]) return "Successfully filled 1 block(s)";
     if (fill[7] === "minecraft:structure_void" && world.skyTaken)
         return `Successfully filled ${volume - 7} block(s)`;
+    if (fill[7] === "minecraft:structure_void" && ringTaken(x1!, y1!, z1!, x2!, y2!, z2!))
+        return `Successfully filled ${volume - 3} block(s)`;
     return `Successfully filled ${volume} block(s)`;
+}
+
+/** Whether a probe reaches into a scenery ring `world.ringTaken` says is not
+ *  empty: outside the structure's own volume, on one of the first tries. */
+function ringTaken(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): boolean {
+    const run = world.ringTaken > 0 ? state().run : null;
+    const origin = run?.stage?.origin;
+    if (!run || !origin || run.placeTries >= world.ringTaken) return false;
+    const own = ringStage.stageLayout(run, origin).volume;
+    const inside = (x: number, y: number, z: number) =>
+        x >= own.x1 && x <= own.x2 && y >= own.y1 && y <= own.y2 && z >= own.z1 && z <= own.z2;
+    return !(inside(x1, y1, z1) && inside(x2, y2, z2));
 }
 
 /** A player's `Dimension` as the game writes it: a number up to 1.15, a name from 1.16. */
@@ -2163,6 +2181,9 @@ function setUp(
 }
 
 const state = () => readEventState(config);
+const ringStage = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage-service"
+);
 
 /** Advance the clock, letting the loop's ticks run in between. */
 async function play(ms: number): Promise<void> {
@@ -2242,6 +2263,7 @@ beforeEach(() => {
     world.stuck = [];
     world.modes = {};
     world.skyTaken = false;
+    world.ringTaken = 0;
     world.properties = "pvp=true\ndifficulty=normal\n";
     world.files = new Map();
     world.writes = [];
@@ -6739,6 +6761,41 @@ describe("an event built in the air", () => {
             difficulty: "medium" as const,
             height: 30
         }
+    });
+
+    it("looks for another site when its scenery's ring is not empty, and builds it there with its scenery", async () => {
+        world.ringTaken = 1;
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(120_000);
+        const stage = state().run?.stage;
+        expect(stage?.built).toBe(true);
+        expect(stage?.scenery).toBe(true);
+        expect(state().run?.placeLog.filter((one) => one.why === "occupied")).toHaveLength(1);
+        expect(stage?.boxes.some((box) => box.scenery)).toBe(true);
+    });
+
+    it("is built bare only on the last site the search may try", async () => {
+        world.ringTaken = 1_000;
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        for (let step = 0; step < 300 && !state().run?.stage?.built; step++) await play(3_000);
+        const run = state().run;
+        expect(state().history[0]).toBeUndefined();
+        expect(run?.stage?.built).toBe(true);
+        expect(run?.stage?.scenery).toBe(false);
+        expect(run?.stage?.boxes.some((box) => box.scenery)).toBe(false);
+        // Every site before the last given up for one with room for its scenery.
+        expect(run!.placeLog.filter((one) => one.why === "occupied").length).toBe(
+            run!.placeTries
+        );
+        expect(run!.placeTries).toBeGreaterThan(1);
     });
 
     it("goes up over a densely built area: only the air it takes counts", async () => {

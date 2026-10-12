@@ -4491,6 +4491,7 @@ function stageTools(
             return found;
         },
         giveUpSite: (point, why) => retryPlace(installedAppId, loop, server, point, true, why),
+        lastSite: () => loop.run.placeTries + 1 >= placeLimit(loop, true),
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);

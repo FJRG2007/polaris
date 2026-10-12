@@ -25,7 +25,6 @@ import { seeded } from "../trivia-bank";
 import {
     FINISH_BASE as RACE_FINISH,
     PARKOUR_SHAPES,
-    PARKOUR_SHAPES_BEFORE,
     PARKOUR_THEMES,
     type EventOptions
 } from "../catalog";
@@ -175,7 +174,7 @@ const ROLE_BLOCKS: Readonly<Record<"checkpoint" | "finish", Box["block"]>> = {
 
 /** A run's shape: drawn from its id among those the event allows. */
 export function shapeFor(options: EventOptions<"parkour">, seed: string): layout.Shape {
-    const allowed = options.shapes ?? PARKOUR_SHAPES_BEFORE;
+    const allowed = options.shapes ?? PARKOUR_SHAPES;
     const shapes = PARKOUR_SHAPES.filter((shape) => allowed.includes(shape));
     return shuffled(
         shapes.length > 0 ? shapes : PARKOUR_SHAPES,

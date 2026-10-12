@@ -246,6 +246,9 @@ export const PARKOUR_SHAPES = ["rows", "tower", "line", "snake", "spiral"] as co
  *  saved without any reads as, so a race already running keeps its course. A
  *  new event has every shape on (`newPreset`). */
 export const PARKOUR_SHAPES_BEFORE = ["rows", "tower"] as const;
+/** Carried by every parkour saved since a new event's shapes became all of
+ *  them: one without it that still has only the old two never chose them. */
+export const PARKOUR_SHAPES_REVISION = 2;
 /** The sword a team duel hands everybody, alike for all. */
 export const DUEL_KITS = ["wood", "stone", "iron"] as const;
 /** Where a build battle's theme comes from: the built-in list or the operator's. */
@@ -569,7 +572,9 @@ export const optionsSchemas = {
                 .min(1, problem("chooseParkourShape"))
                 .max(PARKOUR_SHAPES.length)
                 .transform((shapes) => PARKOUR_SHAPES.filter((shape) => shapes.includes(shape)))
-                .default([...PARKOUR_SHAPES_BEFORE]),
+                .default([...PARKOUR_SHAPES]),
+            /** Marks shapes saved since every shape was the default (`migratePreset`). */
+            shapesRevision: z.literal(PARKOUR_SHAPES_REVISION).default(PARKOUR_SHAPES_REVISION),
             difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
             /** Drawn for each run, or always one. */
             theme: z.enum(["random", ...PARKOUR_THEMES]).default("random"),
@@ -1698,6 +1703,7 @@ export function oldDefaultMinutes(kind: EventKind): number {
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
     const named = entry as { kind?: unknown; name?: unknown };
+    if (named.kind === "parkour") return everyShape(entry);
     if (named.kind !== "king-of-the-hill") return entry;
     // Named "King of the hill" when it was added, before it became a ring
     // floating in the air: the name it was given, not one anybody chose.
@@ -1714,6 +1720,23 @@ export function migratePreset(entry: unknown): unknown {
     const options = raw.options;
     if (typeof options === "object" && options !== null && "fistsOnly" in options) return raw;
     return { ...raw, minutes: HILL_MINUTES };
+}
+
+/**
+ * A parkour saved before every shape was a new event's default, still on the
+ * two it was given then, takes every shape: those two were nobody's choice. One
+ * saved since carries `shapesRevision`, and keeps the shapes it was given.
+ */
+function everyShape(entry: object): object {
+    const options = (entry as { options?: unknown }).options;
+    if (typeof options !== "object" || options === null || "shapesRevision" in options) return entry;
+    const shapes = (options as { shapes?: unknown }).shapes;
+    const old =
+        shapes === undefined ||
+        (Array.isArray(shapes) &&
+            shapes.length === PARKOUR_SHAPES_BEFORE.length &&
+            PARKOUR_SHAPES_BEFORE.every((shape) => shapes.includes(shape)));
+    return old ? { ...entry, options: { ...options, shapes: [...PARKOUR_SHAPES] } } : entry;
 }
 
 /** A new event of one kind, as the screen adds it. */

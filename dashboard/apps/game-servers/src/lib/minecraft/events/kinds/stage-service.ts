@@ -95,6 +95,9 @@ export interface StageTools {
     /** A site that would not do, for the reason given: let go of, and another
      *  looked for. Throws once there have been too many. */
     giveUpSite(point: Point, why?: PlaceRefusal): Promise<void>;
+    /** Whether giving up the site now would end the search: the last one it
+     *  may try. Without it, every site is taken as the last. */
+    lastSite?(): boolean;
     /** What was said in the chat since the last time this was asked. */
     chat(): Promise<string | null>;
     /** Who, in lower case, is still owed a trip back from an earlier stage or arena. */
@@ -732,7 +735,8 @@ async function raise(
 
     const layout = layoutAt(loop.run, origin, origin.y);
     // The ring round it proved with it, while it is still wanted; when it is
-    // not empty air the structure is proved again, and built, bare.
+    // not empty air another site is looked for, and only on the last one the
+    // search may try is the structure proved again, and built, bare.
     const outer = state(loop).scenery ? stageSceneryVolume(loop.run, origin) : null;
     if (!(await provedEmpty(loop, server, tools, outer ?? layout.volume, outer !== null))) return;
 
@@ -791,8 +795,10 @@ async function provedEmpty(
     server: ServerContainer,
     tools: StageTools,
     volume: stage.Volume,
-    /** Whether a volume that is not empty gives up only the scenery's ring,
-     *  not the site: the structure's own volume is proved next, bare. */
+    /** Whether a volume that is not empty may give up only the scenery's ring
+     *  on the last site the search may try: the structure's own volume is
+     *  proved next, bare. Any site before that is given up for another with
+     *  room for the scenery too. */
     bareNext = false
 ): Promise<boolean> {
     const probes = stage.probeBoxes(volume);
@@ -833,7 +839,7 @@ async function provedEmpty(
     // The probe would not come out again: it stays written down, with the area
     // it needs held, for the end of the event to take out.
     if (!cleared) throw new CalledOff("The air it needs could not be checked");
-    if (bareNext) {
+    if (bareNext && (tools.lastSite?.() ?? true)) {
         change(loop, { scenery: false, waits: 0 });
         await tools.persist();
         return false;
