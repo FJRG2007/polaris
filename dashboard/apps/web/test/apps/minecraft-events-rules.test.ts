@@ -557,6 +557,24 @@ describe("who counts as playing", () => {
         expect(plan.activePlayers(turned, 5, 60_000)).toHaveLength(1);
     });
 
+    it("is not somebody moving about in creative or spectator", () => {
+        const first = plan.observe(new Map(), still, facing, 0);
+        const moved = [{ name: "Ana", x: 14, y: 64, z: 10 }];
+        for (const [mode, counts] of [
+            [0, true],
+            [1, false],
+            [2, true],
+            [3, false]
+        ] as const) {
+            const seen = plan.observe(first, moved, facing, 60_000, { modes: new Map([["Ana", mode]]) });
+            expect(plan.activePlayers(seen, 5, 60_000)).toHaveLength(counts ? 1 : 0);
+        }
+        // A mode that could not be read this time keeps the last one.
+        const creative = plan.observe(first, moved, facing, 60_000, { modes: new Map([["Ana", 1]]) });
+        const unread = plan.observe(creative, [{ name: "Ana", x: 20, y: 64, z: 10 }], facing, 90_000);
+        expect(plan.activePlayers(unread, 5, 90_000)).toHaveLength(0);
+    });
+
     it("is not somebody standing still past the idle time", () => {
         const first = plan.observe(new Map(), still, facing, 0);
         const moved = plan.observe(first, [{ name: "Ana", x: 14, y: 64, z: 10 }], facing, 60_000);

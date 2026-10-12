@@ -13,6 +13,7 @@
 
 import * as plan from "./events/plan";
 import * as commands from "./events/commands";
+import * as stage from "./events/kinds/stage";
 import type { ServerContainer } from "./service";
 import { fresh } from "../fresh";
 
@@ -45,11 +46,13 @@ export async function lookAt(
     }
     const hurt = commands.readScores(await server.say([commands.READ_HURT]));
     const hit = commands.readScores(await server.say([commands.READ_HIT]));
+    const modes = stage.readGameModes(await server.say([stage.GAME_MODES]));
     const now = Date.now();
     const seen = plan.observe(activity.get(installedAppId) ?? new Map(), positions, facing, now, {
         dimensions,
         hurt,
-        hit
+        hit,
+        modes
     });
     activity.set(installedAppId, seen);
     lookedAt.set(installedAppId, now);

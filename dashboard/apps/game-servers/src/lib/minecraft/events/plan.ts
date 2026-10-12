@@ -44,6 +44,9 @@ export interface Seen {
     readonly hit: number | null;
     /** When they were last seen taking or dealing damage. */
     readonly fightingAt: number | null;
+    /** Their game mode as last read (`playerGameType`: 0 survival, 1 creative,
+     *  2 adventure, 3 spectator), or absent when it has not been. */
+    readonly mode?: number | null;
 }
 
 /** What else a look can tell about each player, by name. */
@@ -51,6 +54,7 @@ export interface Readings {
     readonly dimensions?: ReadonlyMap<string, string>;
     readonly hurt?: ReadonlyMap<string, number>;
     readonly hit?: ReadonlyMap<string, number>;
+    readonly modes?: ReadonlyMap<string, number>;
 }
 
 /** How long after the last blow somebody still counts as in a fight. */
@@ -97,6 +101,7 @@ export function observe(
             pitch: turned.pitch,
             since: last?.since ?? now,
             movedAt: moved ? now : (last?.movedAt ?? null),
+            mode: readings.modes?.get(where.name) ?? last?.mode ?? null,
             ...fight(last, readings, where.name, now)
         });
     }
@@ -196,14 +201,27 @@ function angleBetween(left: number, right: number): number {
     return difference > 180 ? 360 - difference : difference;
 }
 
-/** The players who moved within the last `afkMinutes`. */
+/** Whether they are playing the game rather than building in creative or
+ *  watching as a spectator. Not read yet counts as playing. */
+export function inSurvival(one: Seen): boolean {
+    return one.mode === undefined || one.mode === null || one.mode === 0 || one.mode === 2;
+}
+
+/**
+ * The players who moved within the last `afkMinutes`, in survival or adventure.
+ *
+ * What an event counts, places itself around and draws from: somebody in
+ * creative or spectator is on the server without playing it, and an event
+ * started for them is an event nobody plays.
+ */
 export function activePlayers(
     seen: ReadonlyMap<string, Seen>,
     afkMinutes: number,
     now: number
 ): Seen[] {
     return [...seen.values()].filter(
-        (one) => one.movedAt !== null && now - one.movedAt <= afkMinutes * 60_000
+        (one) =>
+            one.movedAt !== null && now - one.movedAt <= afkMinutes * 60_000 && inSurvival(one)
     );
 }
 
