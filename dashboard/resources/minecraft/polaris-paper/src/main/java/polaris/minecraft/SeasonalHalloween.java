@@ -49,7 +49,6 @@ import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -145,6 +144,7 @@ final class SeasonalHalloween implements Listener {
     SeasonalHalloween(Plugin plugin, SeasonalDecor decor) {
         this.plugin = plugin;
         this.decor = decor;
+        decor.onPumpkinTaken(this::trap);
     }
 
     void start() {
@@ -387,21 +387,17 @@ final class SeasonalHalloween implements Listener {
     // ------------------------------------------------------------------ trap pumpkins
 
     /**
-     * A player breaking a decorative pumpkin is breaking the grass under it: the
-     * break is called off (the ground stays) and their game shows the grass again.
+     * A decorative pumpkin a player knocked down ({@link SeasonalDecor#takeDown}),
+     * which may have been a trap. The hit on it was already called off, so the
+     * grass under it stays.
      */
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onBreak(BlockBreakEvent event) {
+    private void trap(Player player, Block block) {
         if (!halloween() || settings.trapPercent() == 0) return;
-        Player player = event.getPlayer();
-        Block block = event.getBlock();
         World world = block.getWorld();
         Random trap = new Random(world.getSeed() ^ pack(block.getX(), block.getY(), block.getZ()) * 0x9E3779B97F4A7C15L ^ 0x7A3C0FFEEL);
         if (trap.nextInt(100 * 100) >= TRAP_BASE * settings.trapPercent()) return;
         Integer last = trapAt.get(player.getUniqueId());
         if (last != null && ticks - last < TRAP_COOLDOWN) return;
-        if (!decor.takePumpkin(player, block)) return;
-        event.setCancelled(true);
         trapAt.put(player.getUniqueId(), ticks);
         Location at = block.getLocation().add(0.5, 1, 0.5);
         world.spawnParticle(Particle.LARGE_SMOKE, at, 16, 0.4, 0.4, 0.4, 0.02);
