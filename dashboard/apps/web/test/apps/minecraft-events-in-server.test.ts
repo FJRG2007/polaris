@@ -8,6 +8,8 @@
  * plain lines everywhere else.
  */
 
+import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as inServer from "@polaris-app/game-servers/src/lib/minecraft/events/in-server";
 import type { ServerContainer } from "@polaris-app/game-servers/src/lib/minecraft/service";
@@ -63,10 +65,28 @@ describe("capabilities", () => {
 
     it("keeps every season capability a jar lists", () => {
         const reply =
-            '{"ok":true,"polaris":"0.5.0+abc","caps":["season","season-mobs","season-halloween","made-up"]}';
+            '{"ok":true,"polaris":"0.5.0+abc","caps":["season","season-mobs","season-halloween","season-winter","made-up"]}';
         expect(inServer.parseCaps(reply)).toEqual(
-            new Set(["season", "season-mobs", "season-halloween"])
+            new Set(["season", "season-mobs", "season-halloween", "season-winter"])
         );
+    });
+
+    it("keeps every capability the mod and the plugin list", () => {
+        // A capability the jar lists but this side drops is a feature no
+        // server is ever told about, with nothing logged.
+        const source = (path: string) =>
+            readFileSync(join(__dirname, "../../../../resources/minecraft", path), "utf8");
+        const mod = /CAPS = \{([^}]*)\}/.exec(
+            source("polaris-neoforge/src/main/java/polaris/minecraft/EventCommands.java")
+        )![1]!;
+        const plugin = source("polaris-paper/src/main/java/polaris/minecraft/PolarisPlugin.java");
+        const listed = [
+            ...[...mod.matchAll(/"([^"]+)"/g)].map((match) => match[1]!),
+            ...[...plugin.matchAll(/caps\.add\("([^"]+)"\)/g)].map((match) => match[1]!)
+        ];
+        expect(listed).toContain("season-winter");
+        const reply = JSON.stringify({ ok: true, polaris: "0.6.0+abc", caps: listed });
+        expect([...inServer.parseCaps(reply)].sort()).toEqual([...new Set(listed)].sort());
     });
 
     it("tells a Polaris jar from another answer and from none", () => {

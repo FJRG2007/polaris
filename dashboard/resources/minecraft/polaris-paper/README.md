@@ -145,6 +145,15 @@ event pauses the season - a chest somebody filled with their own things is
 left standing. A server's own switches are on its Settings tab, next to the
 rest of the season.
 
+### Christmas and New Year's Eve
+
+Listed as the `season-winter` capability and the same as the NeoForge mod's
+(see its README for `polaris season winter key=value ...`): pumpkin snow
+golems, reindeer, grumpy snowmen, more snow and tree lights on players'
+screens, presents, Santa, elves, and the Christmas Eve and New Year's Eve
+midnights. What must survive a restart - presents to take down, items an elf
+holds, midnights already celebrated - is kept in the plugin's `winter.yml`.
+
 ## Configuration
 
 The same four variables as the mod, written by Polaris when the server's

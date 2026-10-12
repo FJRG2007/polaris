@@ -107,6 +107,8 @@ final class SeasonalDecor implements Listener {
     private final Plugin plugin;
     private final Map<UUID, Seen> seen = new HashMap<>();
     private Season season;
+    /** Whether the dashboard has said anything since this plugin started. */
+    private boolean told;
     private long untilMillis;
     private BukkitTask timer;
     private int ticks;
@@ -125,6 +127,11 @@ final class SeasonalDecor implements Listener {
     /** The season showing now, or null. */
     Season season() {
         return season;
+    }
+
+    /** Whether a season or a clear has been said since start: a null season is only known to be none then. */
+    boolean told() {
+        return told;
     }
 
     void stop() {
@@ -165,6 +172,7 @@ final class SeasonalDecor implements Listener {
                 mobs.revert();
             }
             season = next;
+            told = true;
             untilMillis = System.currentTimeMillis() + seconds * 1000L;
             mobs.configure(spawns, golems);
             if (timer == null) timer = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1, 1);
@@ -177,6 +185,7 @@ final class SeasonalDecor implements Listener {
         revertAll();
         mobs.revert();
         season = null;
+        told = true;
         if (timer != null) timer.cancel();
         timer = null;
         return status();
@@ -315,6 +324,11 @@ final class SeasonalDecor implements Listener {
         return false;
     }
 
+    /** Everything a player was shown taken down, to be decided again on the next pass. */
+    void redraw() {
+        revertAll();
+    }
+
     private void revertAll() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             Seen one = seen.get(player.getUniqueId());
@@ -449,6 +463,8 @@ final class SeasonalDecor implements Listener {
                     layers--;
                 }
             }
+            // Christmas: more snow, and lights on the trees (SeasonalWinterDecor).
+            SeasonalWinterDecor.decide(world, cx, cz, (block, shown) -> fakes.add(new Fake(block.getLocation(), block.getBlockData(), shown)));
         }
         return fakes;
     }
@@ -471,7 +487,7 @@ final class SeasonalDecor implements Listener {
     }
 
     /** The top solid block of a column, ignoring leaves, or null at the bottom of the world. */
-    private static Block groundAt(World world, int x, int z) {
+    static Block groundAt(World world, int x, int z) {
         Block top = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
         return top.getY() <= world.getMinHeight() ? null : top;
     }
@@ -503,12 +519,12 @@ final class SeasonalDecor implements Listener {
     }
 
     /** Leaves the game grew: a player's are persistent. */
-    private static boolean wild(BlockData data) {
+    static boolean wild(BlockData data) {
         return data instanceof Leaves leaves && !leaves.isPersistent();
     }
 
     /** Where a cobweb hangs under a natural tree's lowest leaves in this column, or null. */
-    private static Block webUnder(World world, int x, int z) {
+    static Block webUnder(World world, int x, int z) {
         Block at = world.getHighestBlockAt(x, z, HeightMap.MOTION_BLOCKING);
         if (!wild(at.getBlockData())) return null;
         for (int down = 0; down < 8 && wild(at.getRelative(BlockFace.DOWN).getBlockData()); down++)

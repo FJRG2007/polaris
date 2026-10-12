@@ -2983,6 +2983,33 @@
         "asUsual": "As usual",
         "none": "None",
         "times": "{count}x",
-        "mobsNeedRestart": "Restart this server to bring the seasonal mobs. The decorations already show."
+        "mobsNeedRestart": "Restart this server to bring the seasonal mobs. The decorations already show.",
+        "winterTitle": "Christmas and New Year's Eve",
+        "winterHint": "Visitors and surprises from 1 to 26 December, and a countdown to midnight on 31 December. Each one stays near players and leaves when the season ends.",
+        "winterNeedsRestart": "Restart this server to bring Christmas and New Year's Eve. The winter decorations already show.",
+        "winter": {
+            "pumpkinGolems": "Pumpkin snow golems",
+            "pumpkinGolemsHint": "Snow golems wearing carved pumpkins in snowy villages and plains.",
+            "snowCover": "Snow on the ground",
+            "snowCoverHint": "A thin layer of snow on grass around players. Only on their screens.",
+            "reindeer": "Reindeer",
+            "reindeerHint": "Small herds of brown reindeer in taiga forests.",
+            "elves": "Mischievous elves",
+            "elvesHint": "An elf steals one ordinary item and runs. Catch it to get the item back; it is returned anyway if the elf gets away.",
+            "snowmen": "Grumpy snowmen",
+            "snowmenHint": "A rare snowman at night that throws snowballs that slow you down.",
+            "presents": "Presents",
+            "presentsHint": "A named barrel with small gifts under a tree, one per player per day. Gone when the season ends.",
+            "santa": "Santa Claus",
+            "santaHint": "Visits one player's home each night and trades festive things until sunrise.",
+            "lights": "Tree lights",
+            "lightsHint": "Coloured lights and lanterns on trees around players. Only on their screens.",
+            "christmasEve": "Christmas Eve",
+            "christmasEveHint": "Fireworks, a message and a gift for everyone online at midnight on the 24th.",
+            "newYear": "New Year's Eve",
+            "newYearHint": "A ten-second countdown, fireworks around each player and a small gift at midnight.",
+            "sparkles": "Sparkles before midnight",
+            "sparklesHint": "Sparkles around players in the last hour of the year."
+        }
     }
 }

@@ -2983,6 +2983,33 @@
         "asUsual": "Lo normal",
         "none": "Ninguno",
         "times": "{count}x",
-        "mobsNeedRestart": "Reinicia este servidor para traer los mobs de temporada. Las decoraciones ya se ven."
+        "mobsNeedRestart": "Reinicia este servidor para traer los mobs de temporada. Las decoraciones ya se ven.",
+        "winterTitle": "Navidad y Nochevieja",
+        "winterHint": "Visitantes y sorpresas del 1 al 26 de diciembre, y una cuenta atrás a medianoche el 31. Todo aparece cerca de los jugadores y se va al acabar la temporada.",
+        "winterNeedsRestart": "Reinicia este servidor para traer la Navidad y la Nochevieja. La decoración de invierno ya se ve.",
+        "winter": {
+            "pumpkinGolems": "Gólems con calabaza",
+            "pumpkinGolemsHint": "Gólems de nieve con calabaza tallada en aldeas y llanuras nevadas.",
+            "snowCover": "Nieve en el suelo",
+            "snowCoverHint": "Una capa fina de nieve sobre la hierba alrededor de los jugadores. Solo en su pantalla.",
+            "reindeer": "Renos",
+            "reindeerHint": "Pequeñas manadas de renos marrones en la taiga.",
+            "elves": "Elfos traviesos",
+            "elvesHint": "Un elfo roba un objeto corriente y huye. Atrápalo para recuperarlo; si escapa, el objeto vuelve igualmente.",
+            "snowmen": "Muñecos gruñones",
+            "snowmenHint": "Un muñeco de nieve poco común por la noche que lanza bolas que te ralentizan.",
+            "presents": "Regalos",
+            "presentsHint": "Un barril con nombre y pequeños regalos bajo un árbol, uno por jugador al día. Desaparecen al acabar la temporada.",
+            "santa": "Papá Noel",
+            "santaHint": "Visita la casa de un jugador cada noche y vende cosas navideñas hasta el amanecer.",
+            "lights": "Luces de árbol",
+            "lightsHint": "Luces de colores y farolillos en los árboles cerca de los jugadores. Solo en su pantalla.",
+            "christmasEve": "Nochebuena",
+            "christmasEveHint": "Fuegos artificiales, un mensaje y un regalo para todos los conectados a medianoche del 24.",
+            "newYear": "Nochevieja",
+            "newYearHint": "Cuenta atrás de diez segundos, fuegos artificiales alrededor de cada jugador y un pequeño regalo a medianoche.",
+            "sparkles": "Destellos antes de medianoche",
+            "sparklesHint": "Destellos alrededor de los jugadores en la última hora del año."
+        }
     }
 }

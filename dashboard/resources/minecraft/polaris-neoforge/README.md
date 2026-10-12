@@ -168,6 +168,38 @@ it has passed, not on a restart or while an event pauses the season - a chest
 somebody filled with their own things is left standing. A server's own
 switches are on its Settings tab, next to the rest of the season.
 
+### Christmas and New Year's Eve
+
+Listed as the `season-winter` capability. In winter the dashboard also sends
+`polaris season winter key=value ...`: amounts as percentages (`golems`, `snow`,
+`reindeer`, `elves`, `snowmen`, 0-300), switches as 1 or 0 (`presents`, `santa`,
+`lights`, `eve`, `newyear`, `sparkles`), whether it is Christmas on the
+server's clock (`christmas`, 1-26 December), the day (`day`, yyyymmdd) and both
+midnights as epoch milliseconds (`eveat`, `nyat`), and the language players
+read its messages in (`lang`, `en` or `es`). The jar keeps no calendar.
+
+- Snow golems wearing carved pumpkins in snowy villages and plains, reindeer
+  herds in the taiga, and now and then at night a grumpy snowman whose
+  snowballs slow. A few near each player at most; they leave when nobody is
+  near and when the winter ends (tags `polaris_winter_golem`,
+  `polaris_winter_reindeer`, `polaris_winter_snowman`). A tamed reindeer stays.
+- More snow on the grass, and lights and lanterns on natural trees: sent to
+  players' games only, like the other decorations.
+- Presents: a barrel named for a player under a natural tree near them, one
+  per player per day, taken down once the dashboard says Christmas is over or
+  presents are off (or the winter ends) - never by a restart that has not been
+  told yet.
+- Santa: a villager at one player's home once a night, trading until sunrise.
+- Elves: a baby zombie in green that steals one ordinary item and runs. The
+  item is written to `world/polaris/winter.dat` before it is taken and given
+  back whenever the elf is gone - caught, escaped, unloaded or the server
+  stopped - as soon as its owner is online with room.
+- Christmas Eve at midnight: fireworks, a message and a gift for everyone
+  online. New Year's Eve: a ten-second countdown on screen, then fireworks
+  around each player (bounded), a title and a small gift, with optional
+  sparkles through the last hour. Each midnight is celebrated once, even
+  across a restart.
+
 ## Event commands
 
 Always registered, idle until the dashboard runs one. Console and operators only

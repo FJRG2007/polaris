@@ -113,6 +113,8 @@ final class SeasonalDecor {
     }
 
     private static Season season;
+    /** Whether the dashboard has said anything since this jar started. */
+    private static boolean told;
     private static long untilMillis;
     private static final Map<UUID, Seen> seen = new HashMap<>();
     /** {minX, minZ, maxX, maxZ}, padded, oldest first. */
@@ -131,6 +133,7 @@ final class SeasonalDecor {
             SeasonalMobs.revert(server);
         }
         season = next;
+        told = true;
         untilMillis = System.currentTimeMillis() + Math.min(Math.max(seconds, 1), MAX_HOLD_SECONDS) * 1000L;
         SeasonalMobs.configure(server, spawns, golems);
         return status();
@@ -140,6 +143,7 @@ final class SeasonalDecor {
     static JsonObject clear(MinecraftServer server) {
         if (season != null) revertAll(server);
         season = null;
+        told = true;
         SeasonalMobs.revert(server);
         return status();
     }
@@ -147,6 +151,11 @@ final class SeasonalDecor {
     /** The season showing now, or null. */
     static Season season() {
         return season;
+    }
+
+    /** Whether a season or a clear has been said since start: a null season is only known to be none then. */
+    static boolean told() {
+        return told;
     }
 
     /** {@code polaris season status}. */
@@ -196,6 +205,11 @@ final class SeasonalDecor {
         long x0 = (long) chunkX << 4;
         long z0 = (long) chunkZ << 4;
         return x0 + 15 >= box[0] && x0 <= box[2] && z0 + 15 >= box[1] && z0 <= box[3];
+    }
+
+    /** Everything a player was shown taken down, to be decided again on the next pass. */
+    static void redraw(MinecraftServer server) {
+        revertAll(server);
     }
 
     static boolean isAvoided(int chunkX, int chunkZ) {
@@ -447,6 +461,8 @@ final class SeasonalDecor {
                     layers--;
                 }
             }
+            // Christmas: more snow, and lights on the trees (SeasonalWinterDecor).
+            SeasonalWinterDecor.decide(level, cx, cz, (pos, shown) -> fakes.add(new Fake(pos, level.getBlockState(pos), shown)));
         }
         return fakes;
     }
@@ -458,7 +474,7 @@ final class SeasonalDecor {
     }
 
     /** The top solid block of a column, ignoring leaves, or null outside the world. */
-    private static BlockPos groundAt(ServerLevel level, int x, int z) {
+    static BlockPos groundAt(ServerLevel level, int x, int z) {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
         return y <= level.getMinY() ? null : new BlockPos(x, y, z);
     }
@@ -492,12 +508,12 @@ final class SeasonalDecor {
     }
 
     /** Leaves the game grew: a player's are persistent. */
-    private static boolean wild(BlockState state) {
+    static boolean wild(BlockState state) {
         return state.hasProperty(LeavesBlock.PERSISTENT) && !state.getValue(LeavesBlock.PERSISTENT);
     }
 
     /** Where a cobweb hangs under a natural tree's lowest leaves in this column, or null. */
-    private static BlockPos webUnder(ServerLevel level, int x, int z) {
+    static BlockPos webUnder(ServerLevel level, int x, int z) {
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos(x,
                 level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1, z);
         if (!wild(level.getBlockState(at))) return null;

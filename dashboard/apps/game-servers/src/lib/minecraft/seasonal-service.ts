@@ -7,11 +7,13 @@
  * an hour, so a server that restarted picks it up within a pass, and one that
  * lost Polaris takes the decorations down by itself. Out of season a server is
  * told to clear once and then left alone: a jar that just started has nothing
- * up. A server's own switch tells it at once.
+ * up but what it keeps across a restart, so a server that was stopped is told
+ * once it is back. A server's own switch tells it at once.
  */
 
 import { prisma } from "@polaris/db";
 import * as seasonal from "./seasonal";
+import * as winter from "./seasonal-winter";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "./schedule";
 import { readEventState } from "./events/state";
@@ -35,6 +37,10 @@ const NO_JAR_RETRY_MS = 30 * 60_000;
  *  an hour. One console line per pass is the whole cost. */
 const OLD_JAR_RETRY_MS = 90_000;
 
+/** How long a stopped server is left out of season before it is looked at again:
+ *  once it is back it is told to clear, for what its jar kept across the stop. */
+const STOPPED_RETRY_MS = 10 * 60_000;
+
 /** Servers told at once on a sweep: each is a console trip or two. */
 const SWEEP_CONCURRENCY = 8;
 
@@ -50,6 +56,9 @@ const told = new Map<
           /** Out of season or paused, whether the jar has nothing left to take
            *  down for a switch-off (told so, or cannot take the line). */
           readonly offTold?: boolean;
+          readonly winterMissing?: boolean;
+          /** When it was found stopped, so never told the line it is held to. */
+          readonly stoppedAt?: number;
       }
     | { readonly oldJarAt: number }
     | { readonly noJarAt: number }
@@ -88,6 +97,11 @@ export function decorationOf(
     });
 }
 
+/** The language a server's players read what the jar says in. */
+function serverLanguage(ownerId: string, config: Record<string, unknown>): Promise<"en" | "es"> {
+    return homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+}
+
 /**
  * The Halloween line for one server, in its own language. Switched off, it
  * carries graves off and no season left, so the jar takes its graveyards down
@@ -100,7 +114,7 @@ async function halloweenCommandFor(
     now: Date,
     switchedOff = false
 ): Promise<string> {
-    const language = await homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+    const language = await serverLanguage(ownerId, config);
     const settings = halloween.halloweenSettings(config);
     if (switchedOff) return halloween.halloweenCommand({ ...settings, graves: 0 }, 0, language, 0);
     return halloween.halloweenCommand(
@@ -135,13 +149,19 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         last &&
         "line" in last &&
         last.line === clearLine &&
-        (!switchedOff || last.offTold === true)
+        (!switchedOff || last.offTold === true) &&
+        (last.stoppedAt === undefined || now.getTime() < last.stoppedAt + STOPPED_RETRY_MS)
     )
         return false;
     return withServerContainer(row.ownerId, row.id, async (server) => {
-        // A server that is down has nothing up, and starts with nothing.
+        // A server that is down shows nothing; what its jar kept is cleared once it is back.
         if (!server.running || server.edition !== "java") {
-            told.set(row.id, { line: clearLine });
+            told.set(
+                row.id,
+                server.edition === "java"
+                    ? { line: clearLine, stoppedAt: now.getTime() }
+                    : { line: clearLine }
+            );
             return false;
         }
         const reading = await capsReading(server);
@@ -177,6 +197,17 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         // Switched off is not paused: the graveyards come down with the rest.
         if (switchedOff && hasHalloween)
             lines.unshift(await halloweenCommandFor(row.ownerId, config, now, true));
+        // Christmas and New Year ride on the winter, for a jar that takes them.
+        const winterJar = reading.caps.has(winter.WINTER_CAP);
+        if (decoration === "winter" && winterJar) {
+            lines.push(
+                winter.winterCommand(
+                    winter.winterSettings(config),
+                    winter.winterCalendar(now, zoneOf(config)),
+                    await serverLanguage(row.ownerId, config)
+                )
+            );
+        }
         // Each line its own command. `say` takes one command's words, and the
         // console tool joins them with spaces: handed the season and Halloween
         // lines together it sent one long line the jar refused as a whole, so
@@ -186,7 +217,8 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             line,
             mobsMissing: decoration !== null && !mobs,
             halloweenMissing: decoration === "halloween" && !halloweenLine,
-            offTold: switchedOff || !hasHalloween
+            offTold: switchedOff || !hasHalloween,
+            winterMissing: decoration === "winter" && !winterJar
         });
         return true;
     }).catch((caught: unknown) => {
@@ -247,6 +279,11 @@ export interface SeasonalView {
     readonly halloween: halloween.HalloweenSettings;
     /** The jar shows Halloween but predates its extra touches. */
     readonly halloweenNeedsRestart: boolean;
+    /** Christmas and New Year's Eve on this server. */
+    readonly winter: winter.WinterSettings;
+    /** The server's jar shows the winter but predates Christmas and New Year:
+     *  a restart loads the one that brings them. */
+    readonly winterNeedsRestart: boolean;
 }
 
 export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
@@ -269,7 +306,9 @@ export async function seasonalView(installedAppId: string): Promise<SeasonalView
         mobsNeedRestart: last !== undefined && "line" in last && last.mobsMissing === true,
         halloween: halloween.halloweenSettings(config),
         halloweenNeedsRestart:
-            last !== undefined && "line" in last && last.halloweenMissing === true
+            last !== undefined && "line" in last && last.halloweenMissing === true,
+        winter: winter.winterSettings(config),
+        winterNeedsRestart: last !== undefined && "line" in last && last.winterMissing === true
     };
 }
 
@@ -279,6 +318,7 @@ export interface SeasonalPatch {
     readonly nightSpawns?: number;
     readonly snowGolems?: number;
     readonly halloween?: Partial<halloween.HalloweenSettings>;
+    readonly winter?: winter.WinterPatch;
 }
 
 /** Change this server's seasonal settings, and tell it now. */
@@ -293,14 +333,19 @@ export async function setSeasonal(
     if (patch.nightSpawns !== undefined) changes[seasonal.NIGHT_SPAWNS_KEY] = patch.nightSpawns;
     if (patch.snowGolems !== undefined) changes[seasonal.SNOW_GOLEMS_KEY] = patch.snowGolems;
     const halloweenPatch = patch.halloween;
-    await patchInstallConfig(installedAppId, (config) =>
-        halloweenPatch === undefined
-            ? changes
-            : {
-                  ...changes,
-                  [halloween.HALLOWEEN_KEY]: halloween.patchHalloween(config, halloweenPatch)
-              }
-    );
+    const winterPatch =
+        patch.winter !== undefined && Object.keys(patch.winter).length > 0
+            ? patch.winter
+            : undefined;
+    await patchInstallConfig(installedAppId, (config) => ({
+        ...changes,
+        ...(halloweenPatch === undefined
+            ? {}
+            : { [halloween.HALLOWEEN_KEY]: halloween.patchHalloween(config, halloweenPatch) }),
+        ...(winterPatch === undefined
+            ? {}
+            : { [winter.WINTER_KEY]: winter.patchWinter(config, winterPatch) })
+    }));
     // Asked again now rather than when the last answer runs out, so a server
     // restarted onto a newer jar is reached on the switch.
     told.delete(installedAppId);
