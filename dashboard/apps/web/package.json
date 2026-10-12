@@ -60,7 +60,7 @@
         "@tiptap/pm": "3.31.4",
         "@tiptap/react": "3.31.4",
         "@tiptap/starter-kit": "3.31.4",
-        "@univerjs/preset-sheets-core": "0.25.1",
+        "@univerjs/preset-sheets-core": "1.0.3",
         "@univerjs/presets": "0.25.1",
         "@xterm/addon-fit": "0.10.0",
         "@xterm/xterm": "5.5.0",
