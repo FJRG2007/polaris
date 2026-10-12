@@ -36,6 +36,11 @@ const SCOPE_TTL_MS = 10_000;
  *  a comment frame is not delivered to the client as a message. */
 const HEARTBEAT_MS = 25_000;
 
+/** How many changed messages one wake names per conversation. Past this the
+ *  conversation is named with an empty list, which a screen reads as "read
+ *  again everything you hold" - a bounded frame either way. */
+const MAX_CHANGED = 100;
+
 export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     // A non-200 makes EventSource give up rather than reconnect every few
@@ -63,6 +68,11 @@ export async function GET(request: Request): Promise<Response> {
     /** Which channels moved since the last wake, so one frame can name them all
      *  and the tab only refetches the ones it is actually showing. */
     let moved = new Set<string>();
+    /** Messages that changed in place since the last wake, by conversation. A
+     *  wake alone is answered with "what is newer than what I hold", and an
+     *  edit, a reaction or a deletion is not newer - so the frame says which
+     *  ones to read again. An empty set means too many to name. */
+    let changed = new Map<string, Set<string>>();
 
     function stop(): void {
         closed = true;
@@ -91,14 +101,37 @@ export async function GET(request: Request): Promise<Response> {
             }
 
             /** Wake the tab once, however many messages arrived in the window. */
-            function wake(channelId: string): void {
+            function wake(channelId: string, messageIds?: readonly string[]): void {
                 moved.add(channelId);
+                if (messageIds?.length) {
+                    const named = changed.get(channelId);
+                    if (!named) changed.set(channelId, new Set(messageIds));
+                    // Already too many to name: it stays "everything".
+                    else if (named.size > 0) {
+                        for (const id of messageIds) named.add(id);
+                        if (named.size > MAX_CHANGED) named.clear();
+                    }
+                }
                 if (closed || pending) return;
                 pending = setTimeout(() => {
                     pending = null;
                     sequence += 1;
-                    send({ kind: "posted", seq: sequence, channels: [...moved] });
+                    send({
+                        kind: "posted",
+                        seq: sequence,
+                        channels: [...moved],
+                        // Absent when nothing changed in place, which is the
+                        // frame every build before this one sent.
+                        ...(changed.size > 0
+                            ? {
+                                  changed: Object.fromEntries(
+                                      [...changed].map(([id, ids]) => [id, [...ids]])
+                                  )
+                              }
+                            : {})
+                    });
                     moved = new Set();
+                    changed = new Map();
                 }, COALESCE_MS);
             }
 
@@ -262,7 +295,7 @@ export async function GET(request: Request): Promise<Response> {
                             activity: change.activity ?? "typing"
                         });
                     } else {
-                        wake(channelId);
+                        wake(channelId, change.messageIds);
                     }
                     return;
                 }
@@ -278,9 +311,10 @@ export async function GET(request: Request): Promise<Response> {
                 // person has open asks once between them, not once each.
                 if (Date.now() - scope.resolvedAt() < SCOPE_TTL_MS) return;
                 const kind = change.kind;
+                const messageIds = change.messageIds;
                 void scope.refresh().then(() => {
                     if (!closed && kind === "posted" && scope.reachable().has(channelId)) {
-                        wake(channelId);
+                        wake(channelId, messageIds);
                     }
                 });
             });

@@ -31,6 +31,7 @@ import { MessageTime } from "@/components/message-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { ArrowLeft, Hash, Star, Users } from "lucide-react";
+import { useChatStream } from "../use-chat-stream";
 
 /** The filter's value for "every conversation". Radix refuses an empty item. */
 const EVERYWHERE = "all";
@@ -52,6 +53,28 @@ export function SavedView() {
     }, [only]);
 
     useEffect(load, [load]);
+
+    // A saved message its author edited or deleted since the list was read.
+    // Read again in the background, without the skeleton: the list is already
+    // on screen and only one line of it moved.
+    useChatStream(
+        useCallback(
+            (frame) => {
+                if (frame.kind !== "posted" || !frame.changed || !messages?.length) return;
+                const stale = messages.some((message) => {
+                    const named = frame.changed?.[message.channelId];
+                    return (
+                        named !== undefined && (named.length === 0 || named.includes(message.id))
+                    );
+                });
+                if (!stale) return;
+                void starredAction(only ?? undefined).then((result) =>
+                    setMessages(result.messages)
+                );
+            },
+            [messages, only]
+        )
+    );
 
     /** The conversations the list can be narrowed to: every one this reader
      *  has, by name. The one in the address is kept even before the rail has

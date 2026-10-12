@@ -58,6 +58,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useAttention } from "@/components/use-attention";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import type { ChatMessageView } from "@/lib/chat/messages";
+import { applyChanged, changedTargets } from "./message-changes";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
 import type { SendOutcome, SendProgress } from "./outgoing";
@@ -950,6 +951,43 @@ export function ChannelView({
         );
     }, [channelId, viewerId]);
 
+    /**
+     * Messages already on screen that somebody else edited, reacted to or
+     * deleted, read again and swapped in where they are.
+     *
+     * The catch-up cannot do this: it asks for what is newer than the newest
+     * message held, and a changed message is not newer - which is how a
+     * deletion stayed on every other screen until it was reloaded. One that
+     * does not come back is gone, and leaves; a cursor that pointed at it moves
+     * to its neighbour, or the next page would be asked from an id that no
+     * longer exists.
+     */
+    const freshenChanged = useCallback(
+        async (named: readonly string[]) => {
+            const asked = changedTargets(held.current, named);
+            if (asked.length === 0) return;
+            const result = await actions.rereadAction({ channelId, messageIds: asked });
+            if (!result.messages) return;
+            const next = applyChanged(held.current, asked, result.messages);
+            if (next === held.current) return;
+            if (next.length === 0) {
+                void load();
+                return;
+            }
+            const ids = new Set(next.map((message) => message.id));
+            if (olderThanRef.current && !ids.has(olderThanRef.current)) {
+                olderThanRef.current = next[0]?.id ?? null;
+                setOlderThan(olderThanRef.current);
+            }
+            if (newerThanRef.current && !ids.has(newerThanRef.current)) {
+                newerThanRef.current = next[next.length - 1]?.id ?? null;
+                setNewerThan(newerThanRef.current);
+            }
+            show(next);
+        },
+        [channelId, load, show]
+    );
+
     /** Where the pins hear about this conversation's frames - see `usePins`,
      *  which is set up further down and fills this in. */
     const pinFrames = useRef<(frame: ChatFrame) => void>(() => {});
@@ -960,6 +998,8 @@ export function ChannelView({
                 if (frame.kind === "posted" && frame.channels.includes(channelId)) {
                     void catchUp();
                     checkCall();
+                    const named = frame.changed?.[channelId];
+                    if (named) void freshenChanged(named);
                 }
                 pinFrames.current(frame);
                 // Somebody caught up in here. Their own screens take a count
@@ -1004,7 +1044,7 @@ export function ChannelView({
                     ]);
                 }
             },
-            [channelId, catchUp, checkCall]
+            [channelId, catchUp, checkCall, freshenChanged]
         )
     );
 

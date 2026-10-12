@@ -22,7 +22,8 @@ import { useChat } from "./chat-context";
 import { PersonName } from "@/components/person-name";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useChatStream } from "./use-chat-stream";
 import type { ChatSearchHit } from "@/lib/chat/search";
 import { MessageTime } from "@/components/message-time";
 import { referenced } from "./message-references";
@@ -84,6 +85,33 @@ export function SearchPanel({
         setBusy(false);
         setHits(result.hits);
     };
+
+    // A result somebody edited or deleted after the search ran. Asked again
+    // rather than patched, so a deleted message leaves the list and an edited
+    // one is matched against its new words - the server already knows whether
+    // it still answers the question.
+    const asked = useRef(query);
+    asked.current = query;
+    useChatStream(
+        useCallback(
+            (frame) => {
+                if (frame.kind !== "posted" || !frame.changed || !hits?.length) return;
+                const stale = hits.some((hit) => {
+                    const named = frame.changed?.[hit.channelId];
+                    return (
+                        named !== undefined &&
+                        (named.length === 0 || named.includes(hit.message.id))
+                    );
+                });
+                if (!stale) return;
+                const query = asked.current;
+                void searchMessagesAction(query).then((result) => {
+                    if (asked.current === query) setHits(result.hits);
+                });
+            },
+            [hits]
+        )
+    );
 
     // A filter changed while results are on screen: they are now answering a
     // question nobody asked. Cleared rather than silently stale.

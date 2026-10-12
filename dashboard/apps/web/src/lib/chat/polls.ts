@@ -250,7 +250,12 @@ export async function vote(
         }
     });
 
-    publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+    publishChatChange({
+        channelId: message.channelId,
+        kind: "posted",
+        actorId: actor.id,
+        messageIds: [input.messageId]
+    });
 }
 
 /**
@@ -289,5 +294,10 @@ export async function endPoll(
     if (core.pollIsClosed(message.poll, now)) return;
 
     await prisma.chatPoll.update({ where: { messageId }, data: { closedAt: now } });
-    publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
+    publishChatChange({
+        channelId: message.channelId,
+        kind: "posted",
+        actorId: actor.id,
+        messageIds: [messageId]
+    });
 }

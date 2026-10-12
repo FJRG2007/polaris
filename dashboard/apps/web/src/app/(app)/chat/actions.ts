@@ -204,6 +204,25 @@ export async function readSinceAction(
     return result.error ? { error: result.error } : { page: result.value };
 }
 
+const rereadSchema = z.object({
+    channelId: z.string().min(1).max(64),
+    messageIds: z.array(z.string().min(1).max(64)).max(messages.MAX_REREAD)
+});
+
+/** Messages already on screen, read again because the live channel said they
+ *  changed in place. An id missing from the answer is a message that is gone. */
+export async function rereadAction(
+    input: unknown
+): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {
+    const me = await actor();
+    const parsed = rereadSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notSaved") };
+    const result = await guard(() =>
+        messages.readChanged(me, parsed.data.channelId, parsed.data.messageIds)
+    );
+    return result.error ? { error: result.error } : { messages: result.value };
+}
+
 export async function readThreadAction(
     messageId: string
 ): Promise<{ messages?: readonly ChatMessageView[]; error?: string }> {

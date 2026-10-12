@@ -67,6 +67,18 @@ export interface ChatChange {
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */
     readonly unread?: true;
+    /**
+     * Only on `posted`: the messages that changed in place - edited, reacted to,
+     * deleted, voted on - rather than arrived.
+     *
+     * A screen answers a bare `posted` by asking for what is newer than what it
+     * holds, and a message that changed is not newer: without these ids a
+     * deletion, an edit or a reaction reached every other screen as a wake that
+     * fetched nothing, and stayed as it was until somebody reloaded. Ids only,
+     * never what they say: the screen reads them again through the same check
+     * that drew them.
+     */
+    readonly messageIds?: readonly string[];
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
     /** Only on `emoji`: whose list changed. */
