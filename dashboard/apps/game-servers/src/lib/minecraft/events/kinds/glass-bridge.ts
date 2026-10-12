@@ -30,6 +30,7 @@ import type { Box } from "../state";
 import { within, type Spot } from "./arena";
 import type { Fill } from "./arena-game";
 import { seeded, shuffled } from "../trivia-bank";
+import * as decor from "./arena-decor";
 
 /** How many can play. */
 export const MOST = 24;
@@ -628,4 +629,26 @@ export function unhurtLines(name: string): string[] {
         `effect give ${name} minecraft:weakness 3 100 true`,
         `effect give ${name} minecraft:saturation 3 0 true`
     ];
+}
+
+/** Where the season's pieces go (`arena-decor`): on the arches' pillars and
+ *  along their beams, over everybody's heads - never on a panel or a platform. */
+export function decorSpots(box: Box, steps: number): decor.Spot[] {
+    const layout = layoutOf(box, steps);
+    const top = layout.y + ARCH + 1;
+    const north = layout.middleZ - PLATFORM_HALF;
+    const south = layout.middleZ + PLATFORM_HALF;
+    return [layout.start.x2, layout.finish.x1].flatMap((x): decor.Spot[] => [
+        { x, y: top, z: north, kind: "stand" },
+        { x, y: top, z: south, kind: "stand" },
+        ...Array.from(
+            { length: south - north - 1 },
+            (_, step): decor.Spot => ({
+                x,
+                y: top,
+                z: north + 1 + step,
+                kind: "garland"
+            })
+        )
+    ]);
 }

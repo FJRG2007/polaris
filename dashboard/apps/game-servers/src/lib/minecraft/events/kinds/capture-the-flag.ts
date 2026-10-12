@@ -26,6 +26,7 @@ import type { Box } from "../state";
 import type { Spot } from "./arena";
 import { seeded } from "../trivia-bank";
 import type { Fill } from "./arena-game";
+import * as decor from "./arena-decor";
 
 /** The layout's version, written into the run when it is built. */
 export const DESIGN = 1;
@@ -475,4 +476,12 @@ export function droppedLines(name: string): string[] {
 /** Who wins a tie on captures: the one who brought more players low. */
 export function tiebreakOf(state: FlagState, names: readonly string[]): Record<string, number> {
     return Object.fromEntries(names.map((name) => [name, -(state.kills[name] ?? 0)]));
+}
+
+/** Where the season's pieces go (`arena-decor`): in the barrier over each
+ *  corner's post of light, a full block where a full block was. */
+export function decorSpots(box: Box): decor.Spot[] {
+    return decor
+        .corners(box.x1, box.z1, box.x2, box.z2, box.y1 + 4)
+        .map((at): decor.Spot => ({ ...at, kind: "set", replaces: BARRIER }));
 }

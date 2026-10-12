@@ -59,6 +59,8 @@ interface World {
     creative: string[];
     difficulty: string;
     daylightCycle: "true" | "false";
+    /** The deployment's switch for the seasons' decorations. */
+    seasons: boolean;
     /** Whether phantoms come for a player who has not slept. */
     insomnia: "true" | "false";
     /** Each player's own stacks by slot, as `data get entity <p> Inventory` answers
@@ -263,6 +265,7 @@ const world: World = {
     creative: [],
     difficulty: "Normal",
     daylightCycle: "true",
+    seasons: false,
     insomnia: "true",
     inv: {},
     containers: new Map(),
@@ -2035,6 +2038,9 @@ vi.mock("@polaris/app-host", () => ({
         },
         envVarService: {
             listEnvVars: async () => [{ key: "TYPE", value: world.software }]
+        },
+        seasonalService: {
+            seasonsAllowed: async () => world.seasons
         }
     }
 }));
@@ -2193,6 +2199,7 @@ beforeEach(() => {
     world.creative = [];
     world.difficulty = "Normal";
     world.daylightCycle = "true";
+    world.seasons = false;
     world.insomnia = "true";
     world.inv = {};
     stashRows.clear();
@@ -14178,5 +14185,196 @@ describe("impostor", () => {
         expect(world.sent.some((line) => line.includes(" fill ") && line.endsWith(" keep"))).toBe(
             false
         );
+    });
+});
+
+const seasonDecor = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena-decor"
+);
+const seasonStage = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage-service"
+);
+const seasonDuel = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
+);
+describe("an arena dressed for the season", () => {
+    const HALLOWEEN = Date.parse("2026-10-20T12:00:00Z");
+    const dressing = {
+        season: "halloween" as const,
+        era: { lanterns: true, soulLanterns: true }
+    };
+    const floor = () => ({
+        ...newPreset("spleef", "floor"),
+        minutes: 5,
+        options: {
+            place: { mode: "players" as const },
+            size: 6,
+            height: 30,
+            variant: "shovel" as const
+        }
+    });
+    const removal = (piece: { x: number; y: number; z: number }, block: string) =>
+        `execute in minecraft:overworld run fill ${piece.x} ${piece.y} ${piece.z} ${piece.x} ${piece.y} ${piece.z} minecraft:air replace ${block}`;
+    const seasonal = (line: string) =>
+        line.includes(" fill ") &&
+        seasonDecor.DECOR_BLOCKS.some((block) => line.includes(` ${block} `));
+
+    /** A spleef played to its end: Ben and Cy fall through, Ana wins. */
+    async function playSpleef() {
+        world.online = ["Ana", "Ben", "Cy"];
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"], ["Cy", "join"]);
+        await play(44_000);
+        const run = state().run!;
+        const built = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
+        await play(8_000);
+        world.at.Ben = [built.center.x, built.floors.at(-1)! - 3, built.center.z];
+        world.at.Cy = [built.center.x, built.floors.at(-1)! - 3, built.center.z];
+        await play(4_100);
+        return run;
+    }
+
+    it("builds a spleef's pieces after its floors, writes them down first, and takes them out first", async () => {
+        vi.setSystemTime(HALLOWEEN);
+        world.seasons = true;
+        setUp([floor()]);
+        const run = await playSpleef();
+        const origin = run.stage!.origin!;
+        const pieces = seasonStage.stageDecor(run, origin, dressing);
+        expect(pieces.length).toBeGreaterThan(0);
+        // Written down with the stage, right after its own boxes.
+        const own = seasonStage.stageLayout(run, origin).boxes.length;
+        expect(run.stage!.boxes.slice(own, own + pieces.length)).toEqual(
+            pieces.map(seasonStage.decorBox)
+        );
+        const lastBuilt = Math.max(
+            ...seasonStage
+                .stageLayout(run, origin)
+                .boxes.map((box) =>
+                    world.sent.indexOf(
+                        `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} ${box.block} keep`
+                    )
+                )
+        );
+        for (const [index, line] of seasonDecor.decorLines(pieces).entries()) {
+            const at = world.sent.indexOf(line);
+            expect(at, line).toBeGreaterThan(lastBuilt);
+            // Taken out at the end, before any of the floors.
+            const gone = world.sent.indexOf(removal(pieces[index]!, pieces[index]!.block), at);
+            expect(gone, line).toBeGreaterThan(at);
+            const firstFloor = world.sent.findIndex(
+                (sent, where) =>
+                    where > at && sent.endsWith(" minecraft:air replace minecraft:snow_block")
+            );
+            expect(gone).toBeLessThan(firstFloor);
+        }
+        expect(state().run).toBeNull();
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("puts nothing up out of season", async () => {
+        world.seasons = true;
+        setUp([floor()]);
+        const run = await playSpleef();
+        expect(run.stage?.built).toBe(true);
+        expect(world.sent.filter(seasonal)).toEqual([]);
+    });
+
+    it("puts nothing up with the server's own switch off", async () => {
+        vi.setSystemTime(HALLOWEEN);
+        world.seasons = true;
+        setUp([floor()]);
+        config = { ...config, seasonalDecorations: false };
+        const run = await playSpleef();
+        expect(run.stage?.built).toBe(true);
+        expect(world.sent.filter(seasonal)).toEqual([]);
+    });
+
+    it("puts nothing up with the deployment's switch off", async () => {
+        vi.setSystemTime(HALLOWEEN);
+        setUp([floor()]);
+        const run = await playSpleef();
+        expect(run.stage?.built).toBe(true);
+        expect(world.sent.filter(seasonal)).toEqual([]);
+    });
+
+    it("takes a stage's pieces down after a restart caught its end", async () => {
+        vi.setSystemTime(HALLOWEEN);
+        const preset = floor();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const shaped = {
+            id: "interrupted",
+            preset,
+            joined: [],
+            place: site,
+            stage: null,
+            arena: null
+        } as never;
+        const pieces = seasonStage.stageDecor(shaped, site, dressing);
+        expect(pieces.length).toBeGreaterThan(0);
+        const boxes = [
+            ...spleef.arena(preset.options, site, site.y).boxes,
+            ...pieces.map(seasonStage.decorBox)
+        ];
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "interrupted",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 120_000,
+                startsAt: now - 90_000,
+                endsAt: now + 60_000,
+                participants: [],
+                finishing: true,
+                stage: {
+                    origin: site,
+                    area: { x1: 293, z1: -7, x2: 307, z2: 7 },
+                    boxes,
+                    built: true,
+                    saved: [],
+                    racers: []
+                }
+            }
+        };
+        await events.sweepEvents();
+        await events.sweepEvents();
+        for (const piece of pieces) expect(world.sent).toContain(removal(piece, piece.block));
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("dresses a team duel's corners in place of their barrier, and lists them for its teardown", async () => {
+        vi.setSystemTime(HALLOWEEN);
+        world.seasons = true;
+        world.online = ["Ana", "Ben"];
+        setUp([{ ...newPreset("team-duel", "duel"), minutes: 3 }]);
+        await joinAndStart("duel");
+        const run = state().run!;
+        const box = run.arena!.box;
+        const pieces = seasonDecor.fitted(
+            seasonDecor.piecesFor(seasonDuel.decorSpots(box), dressing),
+            seasonDuel.duelFills(box).map((one) => ({ ...one.box, block: one.block })),
+            box
+        );
+        expect(pieces).toHaveLength(4);
+        expect(run.arena!.blocks.slice(0, 2)).toEqual([
+            "minecraft:jack_o_lantern",
+            "minecraft:carved_pumpkin"
+        ]);
+        for (const line of seasonDecor.decorLines(pieces)) {
+            expect(line).toMatch(/ replace minecraft:barrier$/);
+            expect(world.sent).toContain(line);
+        }
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        expect(state().arenaLeftovers).toEqual([]);
+        for (const id of ["minecraft:jack_o_lantern", "minecraft:carved_pumpkin"])
+            expect(world.sent.some((line) => line.endsWith(`minecraft:air replace ${id}`))).toBe(
+                true
+            );
     });
 });

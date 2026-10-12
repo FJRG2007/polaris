@@ -32,6 +32,7 @@ import * as boatRace from "./boat-race";
 import { seeded } from "../trivia-bank";
 import type { EventOptions } from "../catalog";
 import type { Box, Flavour, Spot, Volume } from "./stage";
+import * as decor from "./arena-decor";
 
 /** How courses are laid out now, written onto the stage when one is built. */
 export const DESIGN = 1;
@@ -1045,4 +1046,14 @@ export function progressOf(built: Course, passed: number): { lap: number; ring: 
 /** The ring a racer with `passed` passes flies at next. */
 export function nextRing(built: Course, passed: number): Hoop {
     return built.rings[Math.max(0, passed) % built.rings.length]!;
+}
+
+/** Where the season's pieces go (`arena-decor`): on the corners of the pad's
+ *  rim, over those waiting - never on a ring, a booster or a pillar anybody
+ *  flies by, and no cobweb (`rules`). */
+export function decorSpots(course: Course): decor.Spot[] {
+    const pad = course.pad;
+    return decor
+        .corners(pad.x1 - 1, pad.z1 - 1, pad.x2 + 1, pad.z2 + 1, pad.y1 + 3)
+        .map((one): decor.Spot => ({ ...one, kind: "stand" }));
 }

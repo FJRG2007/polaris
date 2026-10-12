@@ -43,6 +43,7 @@ import * as hitsService from "./hits-service";
 import * as stashService from "./stash-service";
 import * as pace from "./pace";
 import * as fair from "./fair-start";
+import * as decor from "./arena-decor";
 import * as inServer from "../in-server";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -262,6 +263,39 @@ function fillsFor(run: stored.EventRun, box: stored.Box): { box: stored.Box; blo
         : build.platformFills(box, run.joined.length, plotSize(run));
 }
 
+/**
+ * The season's pieces for an arena about to go up (`arena-decor`): where its
+ * kind says they may go, kept to what its fills leave room for inside its box.
+ * None out of season, and none for a kind that names no place for them. Pure.
+ */
+export function arenaDecor(
+    run: stored.EventRun,
+    box: stored.Box,
+    fills: readonly { box: stored.Box; block: string }[],
+    dressing: decor.Dressing | null
+): decor.Piece[] {
+    if (!dressing) return [];
+    const game = gameOf(run.preset.kind);
+    const spots = game
+        ? (game.decorSpots?.(run, box) ?? [])
+        : run.preset.kind === "team-duel"
+          ? duel.decorSpots(box)
+          : build.decorSpots(box);
+    if (spots.length === 0) return [];
+    const own = fills.map((one) => ({ ...one.box, block: one.block }));
+    return decor.fitted(decor.piecesFor(spots, dressing, game?.decorRules), own, box);
+}
+
+/** The season's pieces, for this server and this time of year. */
+async function decorFor(
+    ctx: KindContext,
+    run: stored.EventRun,
+    box: stored.Box,
+    fills: readonly { box: stored.Box; block: string }[]
+): Promise<decor.Piece[]> {
+    return arenaDecor(run, box, fills, await ctx.dressing().catch(() => null));
+}
+
 function blocksFor(run: stored.EventRun, box: stored.Box, fills: { block: string }[]): string[] {
     const game = gameOf(run.preset.kind);
     // Bare ids: a block's state (`[facing=north]`) would keep it out of the
@@ -339,12 +373,19 @@ async function raise(ctx: KindContext): Promise<void> {
         };
     }
     const fills = fillsFor(run, box);
+    const pieces = await decorFor(ctx, run, box, fills);
     // The batch it goes up in is written down with it, so whatever takes it
     // down calls that off first - should this process stop waiting for it.
     const batch = inServer.batchKey();
     // The box just counted as nothing but air is written down as proved: the
     // only one its teardown may sweep whole (`arena.teardown`).
-    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills), batch, proved: box };
+    // The season's pieces listed first: they come down before what holds them.
+    const built: stored.Arena = {
+        box,
+        blocks: [...new Set([...decor.idsOf(pieces), ...blocksFor(run, box, fills)])],
+        batch,
+        proved: box
+    };
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
@@ -380,6 +421,8 @@ async function raise(ctx: KindContext): Promise<void> {
         await giveUpSite(ctx, place, "refused");
         return;
     }
+    // The season's pieces last, each into air or in place of the block it names.
+    if (pieces.length > 0) await ctx.server.sayAll(decor.decorLines(pieces));
     if (game?.decorate && marker)
         await ctx.server.sayAll(game.decorate(ctx.run, box, await syntaxOf(ctx, marker)));
 }

@@ -11,6 +11,7 @@ import { formatDuration } from "../../../figures";
 import * as hill from "./hill";
 import * as arrival from "./arrival";
 import * as arena from "./arena";
+import * as decor from "./arena-decor";
 import * as catalog from "../catalog";
 import * as speech from "../../speech";
 import * as written from "../messages";
@@ -123,6 +124,17 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
         await giveUp(ctx, at, solid > 0 ? "occupied" : "unloaded");
         return false;
     }
+    // The season's pieces (`arena-decor`), on what the platform leaves room
+    // for inside the air just counted. A storm's bolts set alight what burns.
+    const pieces = hill.platformPieces(
+        at,
+        radius,
+        look,
+        await ctx.dressing().catch(() => null),
+        optionsOf(run).fistsOnly
+    );
+    const over = (box: stored.Box): stored.Box =>
+        pieces.length > 0 ? { ...box, y2: Math.max(box.y2, ...pieces.map((one) => one.y)) } : box;
     // Ours, written down before a block goes in.
     const batch = inServer.batchKey();
     // With fists only, the floor and the layers over it a bolt of the storm
@@ -130,12 +142,17 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     const stormy = optionsOf(run).fistsOnly;
     const built: stored.Arena = stormy
         ? {
-              box: look === hill.ROYAL ? proof : { ...floor, y2: floor.y2 + hill.OVER_FLOOR },
-              blocks: [...hill.lookBlocks(look), hill.FIRE],
+              box: over(look === hill.ROYAL ? proof : { ...floor, y2: floor.y2 + hill.OVER_FLOOR }),
+              blocks: [...decor.idsOf(pieces), ...hill.lookBlocks(look), hill.FIRE],
               batch,
               proved: proof
           }
-        : { box: floor, blocks: [...hill.PLATFORM_BLOCKS], batch, proved: proof };
+        : {
+              box: over(floor),
+              blocks: [...decor.idsOf(pieces), ...hill.PLATFORM_BLOCKS],
+              batch,
+              proved: proof
+          };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
     // Paced inside the server where the Polaris mod can (`in-server.build`).
@@ -159,6 +176,7 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
         await giveUp(ctx, at, "refused");
         return false;
     }
+    if (pieces.length > 0) await ctx.server.sayAll(decor.decorLines(pieces));
     // The circle stands on it.
     const top = { ...at, y: at.y + 1 };
     ctx.run = { ...ctx.run, place: top };

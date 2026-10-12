@@ -101,7 +101,29 @@ export const ARENA_BLOCKS = [
     "minecraft:gold_block",
     "minecraft:smooth_quartz",
     "minecraft:polished_diorite",
-    "minecraft:soul_sand"
+    "minecraft:soul_sand",
+    // The season's pieces (`arena-decor.DECOR_BLOCKS`), written down as the
+    // rest of the stage's blocks are.
+    "minecraft:soul_lantern",
+    "minecraft:lantern",
+    "minecraft:orange_carpet",
+    "minecraft:purple_carpet",
+    "minecraft:black_carpet",
+    "minecraft:red_carpet",
+    "minecraft:green_carpet",
+    "minecraft:cobweb",
+    "minecraft:spruce_leaves[persistent=true]",
+    "minecraft:jack_o_lantern",
+    "minecraft:carved_pumpkin",
+    "minecraft:purple_wool",
+    "minecraft:black_wool",
+    "minecraft:red_wool",
+    "minecraft:green_wool",
+    "minecraft:purple_terracotta",
+    "minecraft:black_terracotta",
+    "minecraft:red_terracotta",
+    "minecraft:green_terracotta",
+    "minecraft:spruce_log"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];

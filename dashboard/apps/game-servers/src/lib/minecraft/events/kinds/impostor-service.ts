@@ -789,6 +789,7 @@ export const impostor: ArenaGame = {
         rows: run.arena ? im.rowsOf(run.arena.box) : im.rowsFor(run.joined.length)
     }),
     fills: (run, box) => im.stationFills(im.layoutFor(run.id, box)),
+    decorSpots: (run, box) => im.decorSpots(im.layoutFor(run.id, box)),
     blocks: () => im.stationBlocks(),
     kit: () => [],
     hits: true,

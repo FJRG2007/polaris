@@ -25,6 +25,7 @@
 import type { Box } from "../state";
 import type { Spot } from "./arena";
 import type { EventOptions } from "../catalog";
+import * as decor from "./arena-decor";
 
 export const TEAMS = ["pe_red", "pe_blue"] as const;
 const COLOURS = ["red", "blue"] as const;
@@ -255,4 +256,12 @@ export function creditFor(
         }
     }
     return best;
+}
+
+/** Where the season's pieces go (`arena-decor`): in the barrier over each
+ *  corner's post of light, a full block where a full block was. */
+export function decorSpots(box: Box): decor.Spot[] {
+    return decor
+        .corners(box.x1, box.z1, box.x2, box.z2, box.y1 + 4)
+        .map((at): decor.Spot => ({ ...at, kind: "set", replaces: "minecraft:barrier" }));
 }

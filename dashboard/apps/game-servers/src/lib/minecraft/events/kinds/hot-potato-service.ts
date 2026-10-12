@@ -382,6 +382,7 @@ export const hotPotato: ArenaGame = {
     reach: (run) => potato.reachOf(run.joined.length),
     box: (run, place) => potato.platformBox(place, place.y + arena.ALTITUDE, run.joined.length),
     fills: (run, box) => potato.platformFills(box, run.id),
+    decorSpots: (_run, box) => potato.decorSpots(box),
     blocks: () => [...potato.PLATFORM_BLOCKS],
     kit: () => [potato.POTATO],
     hits: true,

@@ -72,6 +72,8 @@ import * as fishing from "./kinds/boss-fishing";
 import * as impostor from "./kinds/impostor";
 import * as seek from "./kinds/hide-and-seek";
 import * as fishingMessages from "./kinds/boss-fishing-messages";
+import type * as decor from "./kinds/arena-decor";
+import { eventDecoration } from "../seasonal-service";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -2737,6 +2739,7 @@ function kindContext(
         atLeast: (wanted) => serverAtLeast(server, wanted),
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
         tickSeconds: tickMsOf(loop.run.preset.kind) / 1000,
+        dressing: () => dressingFor(installedAppId, server),
         owed: async () => {
             const row = await readRow(installedAppId);
             return row ? stored.owedNames(stored.readEventState(row.config)) : new Set<string>();
@@ -4508,7 +4511,8 @@ function stageTools(
             const { items } = loop.flavour ?? (loop.flavour = await stageFlavour(server));
             return items === "components" ? "item_components" : "item";
         },
-        stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name }
+        stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
+        dressing: () => dressingFor(installedAppId, server)
     };
 }
 
@@ -5500,6 +5504,22 @@ const versionOf = serverVersion;
 async function nameSpelling(server: ServerContainer): Promise<NameSpelling> {
     if (await serverAtLeast(server, [1, 21, 5])) return "text";
     return (await serverAtLeast(server, [1, 20, 5])) ? "json" : "tag";
+}
+
+/**
+ * The season an arena about to go up is dressed for (`kinds/arena-decor`), with
+ * what this server's version can show of it; null out of season or switched
+ * off. Asked once per arena, as it is built.
+ */
+async function dressingFor(
+    installedAppId: string,
+    server: ServerContainer
+): Promise<decor.Dressing | null> {
+    const season = await eventDecoration(installedAppId);
+    if (!season) return null;
+    const lanterns = await serverAtLeast(server, [1, 14]).catch(() => false);
+    const soulLanterns = lanterns && (await serverAtLeast(server, [1, 16]).catch(() => false));
+    return { season, era: { lanterns, soulLanterns } };
 }
 
 async function serverAtLeast(server: ServerContainer, wanted: readonly number[]): Promise<boolean> {

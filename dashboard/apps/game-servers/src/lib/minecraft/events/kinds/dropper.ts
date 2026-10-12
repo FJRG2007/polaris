@@ -62,6 +62,7 @@
 import type { EventOptions } from "../catalog";
 import type { Box, Spot, Volume } from "./stage";
 import { seeded, shuffled } from "../trivia-bank";
+import * as decor from "./arena-decor";
 
 export type Difficulty = EventOptions<"dropper">["difficulty"];
 
@@ -961,4 +962,14 @@ export const SLOW_INSIDE = "effect give @a[tag=pe_in] minecraft:slow_falling 10 
 export function lidGone(shaft: Shaft): string {
     const lid = shaft.lid;
     return `execute in minecraft:overworld run fill ${lid.x1} ${lid.y1} ${lid.z1} ${lid.x2} ${lid.y2} ${lid.z2} minecraft:air replace ${lid.block}`;
+}
+
+/** Where the season's pieces go (`arena-decor`): on the block topping each
+ *  corner of the rail round the lid, over the heads of those waiting on it. */
+export function decorSpots(shaft: Shaft): decor.Spot[] {
+    const outer = HALF + 1;
+    const { x, z } = shaft.center;
+    return decor
+        .corners(x - outer, z - outer, x + outer, z + outer, shaft.top + RAIL + 2)
+        .map((one): decor.Spot => ({ ...one, kind: "stand" }));
 }

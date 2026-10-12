@@ -45,6 +45,7 @@ import * as seekMaze from "./seek-maze";
 import { rectangles } from "./boat-race";
 import type { EventOptions } from "../catalog";
 import type { Box, Spot, Volume } from "./stage";
+import * as decor from "./arena-decor";
 
 /** How mazes are laid out now, written onto the stage when one is built:
  *  2 dresses the goal as a finish (`FINISH_SINCE`), 3 stacks floors joined by
@@ -1458,3 +1459,35 @@ export function backLines(json: string): string[] {
 /** Fire never burns anybody inside for long: whoever was sent out of it is
  *  given Fire Resistance with the rest of the tick's protection. */
 export const COOL_INSIDE = "effect give @a[tag=pe_in] minecraft:fire_resistance 10 0 true";
+
+/** Where the season's pieces go (`arena-decor`): the two corners of the
+ *  starting room furthest from its door, out of the way to it - never in the
+ *  maze, whose walls stay as they are. Nothing that burns, and no cobweb to be
+ *  caught in (`rules`). */
+export function decorSpots(maze: Maze): decor.Spot[] {
+    const cells = (wanted: Tile) =>
+        [...maze.plan.tiles]
+            .filter(([, tile]) => tile === wanted)
+            .map(([at]) => at.split(",").map(Number) as [number, number]);
+    const start = cells("start");
+    const door = cells("door");
+    if (start.length === 0 || door.length === 0) return [];
+    const mean = (values: number[]) => values.reduce((sum, one) => sum + one, 0) / values.length;
+    const doorX = mean(door.map(([x]) => x));
+    const doorZ = mean(door.map(([, z]) => z));
+    const xs = start.map(([x]) => x);
+    const zs = start.map(([, z]) => z);
+    const away = (one: { x: number; z: number }) => Math.hypot(one.x - doorX, one.z - doorZ);
+    return decor
+        .corners(Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs), maze.floor + 1)
+        .sort((a, b) => away(b) - away(a))
+        .slice(0, 2)
+        .map(
+            (one): decor.Spot => ({
+                x: one.x + maze.origin.x,
+                y: one.y,
+                z: one.z + maze.origin.z,
+                kind: "stand"
+            })
+        );
+}

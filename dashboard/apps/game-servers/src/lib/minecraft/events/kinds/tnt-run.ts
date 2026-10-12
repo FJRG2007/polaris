@@ -34,6 +34,7 @@
 import type { Arena } from "./spleef";
 import type { Box, Volume } from "./stage";
 import type { EventOptions } from "../catalog";
+import * as decor from "./arena-decor";
 
 export const FLOOR: Box["block"] = "minecraft:tnt";
 /** Each floor's rim in its own color, top first, so a player knows which floor
@@ -386,4 +387,14 @@ export function floorOf(arena: TntArena, y: number): number {
     const floors = arena.floors.length > 0 ? arena.floors : [arena.floor];
     const first = floors.findIndex((at) => y >= at + 0.5);
     return first === -1 ? floors.length : first + 1;
+}
+
+/** Where the season's pieces go (`arena-decor`): on the light topping each
+ *  corner of the walls - nothing that burns or sparks (`rules`). */
+export function decorSpots(arena: Arena): decor.Spot[] {
+    const outer = arena.size + 1;
+    const { x, z } = arena.center;
+    return decor
+        .corners(x - outer, z - outer, x + outer, z + outer, arena.floor + WALL_HEIGHT + 2)
+        .map((one): decor.Spot => ({ ...one, kind: "stand", room: HEADROOM - WALL_HEIGHT - 1 }));
 }

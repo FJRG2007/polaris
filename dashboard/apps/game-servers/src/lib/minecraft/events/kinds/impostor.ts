@@ -35,6 +35,7 @@ import type { Spot } from "./arena";
 import type { Fill } from "./arena-game";
 import { asciiJson, customNameValue, text } from "../commands";
 import { seeded, shuffled } from "../trivia-bank";
+import * as decor from "./arena-decor";
 
 /** How many can play: a seat each at the table. */
 export const MOST = 15;
@@ -1166,3 +1167,21 @@ export function buttonsLine(
 /** Candidates a ballot line carries at the most: a line stays within what one
  *  command can be with sixteen-letter names. */
 export const BALLOT_PER_LINE = 3;
+
+/** Where the season's pieces go (`arena-decor`): high in one wall of every
+ *  other room, a full block in place of the wall's - nothing seen through,
+ *  nothing in the way. */
+export function decorSpots(layout: Layout): decor.Spot[] {
+    const y = layout.box.y1 + WALL;
+    return layout.rooms
+        .filter((room) => room.index % 2 === 0)
+        .map(
+            (room): decor.Spot => ({
+                x: room.x + 2,
+                y,
+                z: room.z,
+                kind: "set",
+                replaces: WALL_BLOCK
+            })
+        );
+}

@@ -66,6 +66,7 @@ import * as catalog from "../catalog";
 import type { EventOptions } from "../catalog";
 import type { Box, Flavour, Spot, Volume } from "./stage";
 import { giveMarked, reclaimBrokenDrops } from "./arena";
+import * as decor from "./arena-decor";
 
 export type AcidSize = EventOptions<"acid-rain">["size"];
 export type Acidity = EventOptions<"acid-rain">["acidity"];
@@ -882,4 +883,14 @@ export function racerOutLines(name: string): string[] {
         `effect clear ${name} minecraft:poison`,
         `tag ${name} remove ${DRY_TAG}`
     ];
+}
+
+/** Where the season's pieces go (`arena-decor`): on the light in each corner
+ *  of the floor, against the walls - never over anybody's head, and nothing a
+ *  bolt can set alight or a player be caught in (`rules`). */
+export function decorSpots(acid: Acid): decor.Spot[] {
+    const { x, z } = acid.center;
+    return decor
+        .corners(x - acid.half, z - acid.half, x + acid.half, z + acid.half, acid.floor + 1)
+        .map((one): decor.Spot => ({ ...one, kind: "stand" }));
 }

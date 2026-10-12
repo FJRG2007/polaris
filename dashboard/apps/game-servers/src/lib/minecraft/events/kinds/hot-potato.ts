@@ -32,6 +32,7 @@ import type { Box } from "../state";
 import type { Spot } from "./arena";
 import { seeded, shuffled } from "../trivia-bank";
 import type { Fill } from "./arena-game";
+import * as decor from "./arena-decor";
 
 /** How many can play. */
 export const MOST = 24;
@@ -568,4 +569,15 @@ export function boomLines(at: { x: number; y: number; z: number }): string[] {
 export function fuseLine(name: string, secondsLeft: number): string | null {
     if (secondsLeft > 5) return null;
     return `execute as ${name} at @s run playsound minecraft:entity.tnt.primed master @a ~ ~ ~ 1 ${(1 + (5 - secondsLeft) / 5).toFixed(1)}`;
+}
+
+/** Where the season's pieces go (`arena-decor`): on the lights topping the
+ *  walls' corners, out of everybody's reach. */
+export function decorSpots(box: Box): decor.Spot[] {
+    const floor = floorOf(box);
+    const y = box.y1 + WALL + 2;
+    return [
+        ...decor.corners(box.x1, floor.z1 - 1, box.x2, box.z2, y),
+        ...decor.corners(box.x1, box.z1, box.x2, box.z1, y).slice(0, 2)
+    ].map((at): decor.Spot => ({ ...at, kind: "stand" }));
 }

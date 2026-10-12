@@ -13,6 +13,7 @@
  */
 
 import type { Spot } from "./arena";
+import type * as decor from "./arena-decor";
 import type * as stored from "../state";
 import type * as catalog from "../catalog";
 import type * as speech from "../../speech";
@@ -60,6 +61,9 @@ export interface KindContext {
     readonly stashOwner: stashService.StashOwner;
     /** How long one tick is, in seconds: what a second in the circle is counted by. */
     readonly tickSeconds: number;
+    /** The season what it builds now is dressed for (`arena-decor`), with what
+     *  the server can show of it; null out of season, or with it switched off. */
+    dressing(): Promise<decor.Dressing | null>;
 }
 
 /** The event cannot go on, for the reason given. */
@@ -102,6 +106,11 @@ export interface ArenaGame {
     /** What the kind asks the server before it builds - what its version can
      *  show - kept in the run's game state for `fills` and `built` to read. */
     prepare?(ctx: KindContext): Promise<Record<string, unknown>>;
+    /** Where the season's pieces may go (`arena-decor`), off everything played
+     *  on; none when absent. */
+    decorSpots?(run: stored.EventRun, box: stored.Box): decor.Spot[];
+    /** What those pieces must not be (`arena-decor.Rules`). */
+    readonly decorRules?: decor.Rules;
     /** Lines run once the fills are in: what a chest holds, say. */
     decorate?(run: stored.EventRun, box: stored.Box, syntax: ItemSyntax): string[];
     /** Every item it hands out, marked, for taking back. */

@@ -32,6 +32,7 @@ import {
 import { shuffled } from "../trivia-bank";
 import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
 import * as layout from "./parkour-layout";
+import * as decor from "./arena-decor";
 
 export type Role = "start" | "jump" | "checkpoint" | "finish";
 
@@ -682,4 +683,14 @@ export function quickSelectors(course: Course): {
             };
         })
     };
+}
+
+/** Where the season's pieces go (`arena-decor`): on the corners of the net,
+ *  under every platform - a fall onto one is still a fall (`quickSelectors`),
+ *  and nothing on it is in reach of the course. */
+export function decorSpots(course: Course): decor.Spot[] {
+    const net = course.boxes[0]!;
+    return decor
+        .corners(net.x1, net.z1, net.x2, net.z2, net.y1 + 1)
+        .map((one): decor.Spot => ({ ...one, kind: "stand" }));
 }

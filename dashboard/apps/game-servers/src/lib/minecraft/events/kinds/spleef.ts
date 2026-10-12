@@ -25,6 +25,7 @@
 import { SPLEEF_VARIANTS, type EventOptions } from "../catalog";
 import type { Box, Spot, Volume } from "./stage";
 import { seeded, shuffled } from "../trivia-bank";
+import * as decor from "./arena-decor";
 
 export const FLOOR: Box["block"] = "minecraft:snow_block";
 /** What snow somebody stood on becomes in the decay game, just before it goes. */
@@ -276,4 +277,20 @@ export function shrinkLines(arena: Arena, rings: number): string[] {
         for (const [x1, z1, x2, z2] of ring) lines.push(fill(x1, z1, x2, z2, at, WARN, FLOOR));
     }
     return lines;
+}
+
+/** Where the season's pieces go (`arena-decor`): on the light over each corner
+ *  of each floor's walls, outside where anybody plays or falls. */
+export function decorSpots(arena: Arena): decor.Spot[] {
+    const outer = arena.size + 1;
+    const { x, z } = arena.center;
+    return arena.floors.flatMap((at) =>
+        decor.corners(x - outer, z - outer, x + outer, z + outer, at + WALL_HEIGHT + 2).map(
+            (one): decor.Spot => ({
+                ...one,
+                kind: "stand",
+                room: at === arena.floor ? HEADROOM - WALL_HEIGHT - 1 : 2
+            })
+        )
+    );
 }

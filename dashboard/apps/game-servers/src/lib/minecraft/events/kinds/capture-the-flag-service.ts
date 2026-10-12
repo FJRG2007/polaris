@@ -329,6 +329,7 @@ export const captureTheFlag: ArenaGame = {
     box: (_run, place) => ctf.arenaBox(place, place.y + arena.ALTITUDE),
     built: () => ({ design: ctf.DESIGN }),
     fills: (run, box) => ctf.arenaFills(box, ctf.coverFor(run.id)),
+    decorSpots: (_run, box) => ctf.decorSpots(box),
     blocks: () => [...ctf.ARENA_BLOCKS],
     kit: (run) => [...duel.duelKit(optionsOf(run).kit), ...ctf.BANNERS],
     teams: 2,
