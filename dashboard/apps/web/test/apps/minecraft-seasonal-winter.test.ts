@@ -103,14 +103,18 @@ describe("the winter line", () => {
         const calendar = winter.winterCalendar(new Date("2026-12-24T12:00:00Z"), "UTC");
         const eveAt = Date.parse("2026-12-25T00:00:00Z");
         const newYearAt = Date.parse("2027-01-01T00:00:00Z");
-        expect(winter.winterCommand(settings, calendar)).toBe(
-            `polaris season winter golems=100 snow=100 reindeer=100 elves=50 snowmen=0 presents=1 santa=1 lights=1 eve=1 newyear=1 sparkles=0 christmas=1 day=20261224 eveat=${eveAt} nyat=${newYearAt}`
+        expect(winter.winterCommand(settings, calendar, "es")).toBe(
+            `polaris season winter golems=100 snow=100 reindeer=100 elves=50 snowmen=0 presents=1 santa=1 lights=1 eve=1 newyear=1 sparkles=0 christmas=1 day=20261224 eveat=${eveAt} nyat=${newYearAt} lang=es`
         );
     });
 
     it("stays within what one console command may carry", () => {
         const calendar = winter.winterCalendar(new Date("2026-12-24T12:00:00Z"), "UTC");
-        const line = winter.winterCommand({ ...winter.WINTER_DEFAULTS, reindeer: 3 }, calendar);
+        const line = winter.winterCommand(
+            { ...winter.WINTER_DEFAULTS, reindeer: 3 },
+            calendar,
+            "es"
+        );
         expect(line.length).toBeLessThan(256);
         expect(line).not.toMatch(/[\r\n\0]/);
     });

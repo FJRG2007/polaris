@@ -7,6 +7,7 @@ import java.util.function.Predicate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -114,6 +115,7 @@ final class SeasonalWinter {
         }
         WinterPlan before = plan;
         plan = next;
+        presentsGo(server, !next.presentsNow());
         if (before.snow() != next.snow() || before.lights() != next.lights()) SeasonalDecor.redraw(server);
         return status();
     }
@@ -210,7 +212,16 @@ final class SeasonalWinter {
     private static void end(MinecraftServer server) {
         plan = WinterPlan.NONE;
         SeasonalNewYear.forget();
+        presentsGo(server, true);
         sendAway(server, entity -> true);
+    }
+
+    /** Whether the presents are to come down, kept across a restart: a jar not told yet keeps them. */
+    private static void presentsGo(MinecraftServer server, boolean go) {
+        CompoundTag data = SeasonalWinterStore.data(server);
+        if (data.getBoolean(SeasonalWinterStore.PRESENTS_GO) == go) return;
+        data.putBoolean(SeasonalWinterStore.PRESENTS_GO, go);
+        SeasonalWinterStore.save(server);
     }
 
     private static void sweep(MinecraftServer server) {
@@ -322,7 +333,7 @@ final class SeasonalWinter {
         golem.moveTo(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5, level.random.nextFloat() * 360f, 0f);
         golem.setPumpkin(pumpkin);
         golem.addTag(tag);
-        if (!pumpkin) golem.setCustomName(Component.literal("Grumpy Snowman").withStyle(ChatFormatting.AQUA));
+        if (!pumpkin) golem.setCustomName(Component.literal(plan.words(WinterPlan.Line.SNOWMAN)).withStyle(ChatFormatting.AQUA));
         level.addFreshEntity(golem);
     }
 
@@ -338,7 +349,7 @@ final class SeasonalWinter {
                 continue;
             }
             reindeer.setVariant(Variant.BROWN);
-            reindeer.setCustomName(Component.literal("Reindeer"));
+            reindeer.setCustomName(Component.literal(plan.words(WinterPlan.Line.REINDEER)));
             reindeer.addTag(REINDEER_TAG);
             level.addFreshEntity(reindeer);
         }
@@ -388,14 +399,14 @@ final class SeasonalWinter {
         santa.setVillagerData(santa.getVillagerData().setType(VillagerType.SNOW)
                 .setProfession(VillagerProfession.CLERIC).setLevel(5));
         santa.setOffers(santaOffers());
-        santa.setCustomName(Component.literal("Santa").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+        santa.setCustomName(Component.literal(plan.words(WinterPlan.Line.SANTA)).withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
         santa.setCustomNameVisible(true);
         santa.setInvulnerable(true);
         santa.addTag(SANTA_TAG);
         overworld.addFreshEntity(santa);
         SeasonalWinterStore.data(server).putLong(SeasonalWinterStore.SANTA_NIGHT, night + 1);
         SeasonalWinterStore.save(server);
-        visited.sendSystemMessage(Component.literal("Santa is visiting your home tonight. He trades until sunrise.")
+        visited.sendSystemMessage(Component.literal(plan.words(WinterPlan.Line.SANTA_VISITS))
                 .withStyle(ChatFormatting.RED));
     }
 

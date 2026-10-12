@@ -16,6 +16,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -125,14 +126,12 @@ final class SeasonalWinterGifts {
         known.bornTick = ticks;
         ItemStack taken = steal(player, known);
         if (taken.isEmpty()) {
-            player.sendSystemMessage(Component.literal("An elf rummaged through your pockets and found nothing it wanted.")
-                    .withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(words(WinterPlan.Line.ELF_FOUND_NOTHING).withStyle(ChatFormatting.GREEN));
             return;
         }
         elf.setItemSlot(EquipmentSlot.MAINHAND, taken.copy());
         elf.setDropChance(EquipmentSlot.MAINHAND, 0f);
-        player.sendSystemMessage(Component.literal("An elf stole your " + taken.getHoverName().getString()
-                + "! Catch it to get it back.").withStyle(ChatFormatting.GREEN));
+        player.sendSystemMessage(words(WinterPlan.Line.ELF_STOLE, taken.getHoverName()).withStyle(ChatFormatting.GREEN));
     }
 
     /** An elf with something runs: it chases nobody. */
@@ -146,7 +145,7 @@ final class SeasonalWinterGifts {
     /** Presents set out and taken down, elves brought. Every few seconds. */
     static void sweep(MinecraftServer server) {
         WinterPlan plan = SeasonalWinter.plan();
-        if (!plan.presentsNow()) takePresentsDown(server);
+        if (SeasonalWinterStore.data(server).getBoolean(SeasonalWinterStore.PRESENTS_GO)) takePresentsDown(server);
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerLevel level = player.serverLevel();
             if (level.dimension() != Level.OVERWORLD || player.isSpectator()) continue;
@@ -203,7 +202,7 @@ final class SeasonalWinterGifts {
         level.setBlock(spot, Blocks.BARREL.defaultBlockState().setValue(BarrelBlock.FACING, Direction.UP), 3);
         if (!(level.getBlockEntity(spot) instanceof BarrelBlockEntity barrel)) return;
         ItemStack named = new ItemStack(Items.BARREL);
-        named.set(DataComponents.CUSTOM_NAME, Component.literal("Present for " + player.getName().getString())
+        named.set(DataComponents.CUSTOM_NAME, words(WinterPlan.Line.PRESENT_FOR, player.getName())
                 .withStyle(ChatFormatting.RED));
         barrel.applyComponentsFromItemStack(named);
         fill(barrel, level.random);
@@ -216,7 +215,7 @@ final class SeasonalWinterGifts {
         SeasonalWinterStore.list(server, SeasonalWinterStore.PRESENTS).add(where);
         gifted.putInt(who, plan.day());
         SeasonalWinterStore.save(server);
-        player.sendSystemMessage(Component.literal("A present is waiting for you under a tree nearby.")
+        player.sendSystemMessage(words(WinterPlan.Line.PRESENT_WAITING)
                 .withStyle(ChatFormatting.RED));
     }
 
@@ -316,9 +315,21 @@ final class SeasonalWinterGifts {
         AttributeInstance health = elf.getAttribute(Attributes.MAX_HEALTH);
         if (health != null) health.setBaseValue(ELF_HEALTH);
         elf.setHealth(ELF_HEALTH);
-        elf.setCustomName(Component.literal("Elf").withStyle(ChatFormatting.GREEN));
+        elf.setCustomName(words(WinterPlan.Line.ELF).withStyle(ChatFormatting.GREEN));
         elf.addTag(ELF_TAG);
         if (level.addFreshEntity(elf)) elves.put(elf.getUUID(), new Elf(elf.getUUID(), level.dimension(), ticks));
+    }
+
+    /** A line in the server's language; a name goes where it has one, as the reader's game shows it. */
+    private static MutableComponent words(WinterPlan.Line line) {
+        return Component.literal(SeasonalWinter.plan().words(line));
+    }
+
+    private static MutableComponent words(WinterPlan.Line line, Component name) {
+        String words = SeasonalWinter.plan().words(line);
+        int at = words.indexOf("%s");
+        if (at < 0) return Component.literal(words);
+        return Component.literal(words.substring(0, at)).append(name).append(words.substring(at + 2));
     }
 
     private static ItemStack green(net.minecraft.world.item.Item item) {
@@ -398,7 +409,7 @@ final class SeasonalWinterGifts {
             Optional<ItemStack> item = ItemStack.parse(registries, entry.getCompound("item"));
             if (item.isEmpty()) continue;
             ItemStack stack = item.get();
-            String name = stack.getHoverName().getString();
+            Component name = stack.getHoverName();
             player.getInventory().add(stack);
             if (!stack.isEmpty()) {
                 entry.put("item", stack.save(registries));
@@ -407,15 +418,13 @@ final class SeasonalWinterGifts {
                 Long told = toldFull.get(owner);
                 if (told == null || now - told > 600) {
                     toldFull.put(owner, now);
-                    player.sendSystemMessage(Component.literal("An elf is waiting to give back your " + name
-                            + ". Make room in your inventory.").withStyle(ChatFormatting.GREEN));
+                    player.sendSystemMessage(words(WinterPlan.Line.ELF_NEEDS_ROOM, name).withStyle(ChatFormatting.GREEN));
                 }
                 continue;
             }
             owed.remove(i);
             changed = true;
-            player.sendSystemMessage(Component.literal("You got your " + name + " back from the elf.")
-                    .withStyle(ChatFormatting.GREEN));
+            player.sendSystemMessage(words(WinterPlan.Line.ELF_GAVE_BACK, name).withStyle(ChatFormatting.GREEN));
         }
         if (changed) SeasonalWinterStore.save(server);
     }

@@ -12,7 +12,8 @@ import java.util.Set;
  * clock and hands over the day ({@code day}, as yyyymmdd), whether it is
  * Christmas ({@code christmas}), and both midnights as instants ({@code eveat},
  * {@code nyat}, in epoch milliseconds, 0 for none) - so a countdown here lands
- * on the second the players' clocks say midnight.
+ * on the second the players' clocks say midnight. {@code lang} ({@code en} or
+ * {@code es}) is the language players read what it says in.
  *
  * Amounts are whole percentages of the usual few (0 is none, at most
  * {@link #MAX_PERCENT}); switches are 1 or 0.
@@ -20,7 +21,7 @@ import java.util.Set;
 public record WinterPlan(
         int golems, int snow, int reindeer, int elves, int snowmen,
         boolean presents, boolean santa, boolean lights, boolean eve, boolean newYear, boolean sparkles,
-        boolean christmas, int day, long eveAt, long newYearAt) {
+        boolean christmas, int day, long eveAt, long newYearAt, boolean spanish) {
 
     public static final int MAX_PERCENT = 300;
     /** How long after a midnight its celebration may still start: a tick or a restart late. */
@@ -32,7 +33,7 @@ public record WinterPlan(
 
     /** Nothing on: the jar before it is told, or after the winter. */
     public static final WinterPlan NONE = new WinterPlan(0, 0, 0, 0, 0,
-            false, false, false, false, false, false, false, 0, 0, 0);
+            false, false, false, false, false, false, false, 0, 0, 0, false);
 
     /** Items an elf never takes, by id: anything rare, hard-won or one of a kind. */
     private static final Set<String> VALUABLE = Set.of(
@@ -55,7 +56,7 @@ public record WinterPlan(
     public static WinterPlan parse(String[] tokens) {
         int golems = 0, snow = 0, reindeer = 0, elves = 0, snowmen = 0, day = 0;
         boolean presents = false, santa = false, lights = false, eve = false, newYear = false;
-        boolean sparkles = false, christmas = false;
+        boolean sparkles = false, christmas = false, spanish = false;
         long eveAt = 0, newYearAt = 0;
         for (String token : tokens) {
             if (token.isEmpty()) continue;
@@ -79,11 +80,12 @@ public record WinterPlan(
                 case "day" -> day = dayOf(value);
                 case "eveat" -> eveAt = instant(value);
                 case "nyat" -> newYearAt = instant(value);
+                case "lang" -> spanish = language(value);
                 default -> throw new IllegalArgumentException("Unknown setting: " + key);
             }
         }
         return new WinterPlan(golems, snow, reindeer, elves, snowmen,
-                presents, santa, lights, eve, newYear, sparkles, christmas, day, eveAt, newYearAt);
+                presents, santa, lights, eve, newYear, sparkles, christmas, day, eveAt, newYearAt, spanish);
     }
 
     private static int percent(String value) {
@@ -102,6 +104,12 @@ public record WinterPlan(
         int parsed = Integer.parseInt(value);
         if (parsed != 0 && (parsed < 2000_01_01 || parsed > 2999_12_31)) throw new IllegalArgumentException("Not a day: " + value);
         return parsed;
+    }
+
+    private static boolean language(String value) {
+        if (value.equals("es")) return true;
+        if (value.equals("en")) return false;
+        throw new IllegalArgumentException("Not a language: " + value);
     }
 
     private static long instant(String value) {
@@ -159,5 +167,46 @@ public record WinterPlan(
     /** Whether an elf may never take this item, by its id. */
     public static boolean valuable(String itemId) {
         return VALUABLE.contains(itemId);
+    }
+
+    /** One of the lines players read, in the server's language; {@code %s} is where a name goes. */
+    public String words(Line line) {
+        return spanish ? line.spanish : line.english;
+    }
+
+    /** What players read: chat, titles, and the names over heads and on presents. */
+    public enum Line {
+        SNOWMAN("Grumpy Snowman", "Muñeco gruñón"),
+        REINDEER("Reindeer", "Reno"),
+        SANTA("Santa", "Papá Noel"),
+        SANTA_VISITS("Santa is visiting your home tonight. He trades until sunrise.",
+                "Papá Noel visita tu casa esta noche. Comercia hasta el amanecer."),
+        ELF("Elf", "Elfo"),
+        ELF_FOUND_NOTHING("An elf rummaged through your pockets and found nothing it wanted.",
+                "Un elfo ha rebuscado en tus bolsillos y no ha encontrado nada que quisiera."),
+        ELF_STOLE("An elf stole your %s! Catch it to get it back.",
+                "¡Un elfo te ha robado: %s! Atrápalo para recuperarlo."),
+        ELF_NEEDS_ROOM("An elf is waiting to give back your %s. Make room in your inventory.",
+                "Un elfo espera para devolverte: %s. Haz sitio en tu inventario."),
+        ELF_GAVE_BACK("You got your %s back from the elf.", "El elfo te ha devuelto: %s."),
+        PRESENT_FOR("Present for %s", "Regalo para %s"),
+        PRESENT_WAITING("A present is waiting for you under a tree nearby.",
+                "Te espera un regalo bajo un árbol cercano."),
+        NEW_YEAR_SOON("The New Year is ten seconds away!", "¡Quedan diez segundos para el Año Nuevo!"),
+        NEW_YEAR("Happy New Year!", "¡Feliz Año Nuevo!"),
+        NEW_YEAR_GIFT("A small gift is in your inventory", "Tienes un pequeño regalo en el inventario"),
+        NEW_YEAR_ALL("Happy New Year, everyone!", "¡Feliz Año Nuevo a todos!"),
+        CHRISTMAS("Merry Christmas!", "¡Feliz Navidad!"),
+        CHRISTMAS_GIFT("A gift is in your inventory", "Tienes un regalo en el inventario"),
+        CHRISTMAS_ALL("It is midnight on Christmas Eve. Merry Christmas, everyone!",
+                "Es medianoche en Nochebuena. ¡Feliz Navidad a todos!");
+
+        final String english;
+        final String spanish;
+
+        Line(String english, String spanish) {
+            this.english = english;
+            this.spanish = spanish;
+        }
     }
 }

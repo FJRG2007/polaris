@@ -152,9 +152,14 @@ export function winterCalendar(now: Date, timeZone: string): WinterCalendar {
 
 /**
  * The console line with this server's winter, for a jar that lists
- * {@link WINTER_CAP}. Amounts go as whole percentages, switches as 1 or 0.
+ * {@link WINTER_CAP}. Amounts go as whole percentages, switches as 1 or 0, and
+ * `lang` is the language players read its messages in.
  */
-export function winterCommand(settings: WinterSettings, calendar: WinterCalendar): string {
+export function winterCommand(
+    settings: WinterSettings,
+    calendar: WinterCalendar,
+    language: "en" | "es"
+): string {
     const percent = (multiple: number) => Math.round(multiple * 100);
     const flag = (on: boolean) => (on ? 1 : 0);
     const parts = [
@@ -172,7 +177,8 @@ export function winterCommand(settings: WinterSettings, calendar: WinterCalendar
         `christmas=${flag(calendar.christmas)}`,
         `day=${calendar.day}`,
         `eveat=${calendar.eveAt}`,
-        `nyat=${calendar.newYearAt}`
+        `nyat=${calendar.newYearAt}`,
+        `lang=${language}`
     ];
     return `polaris season winter ${parts.join(" ")}`;
 }

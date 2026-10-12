@@ -12,9 +12,10 @@ import org.bukkit.plugin.Plugin;
 /**
  * What Christmas and New Year must remember across a restart, in the plugin's
  * {@code winter.yml}: the presents placed (so they come down when the season
- * ends, even after a restart), who had today's present, the items an elf is
- * holding (so none is ever lost), and which midnights were already celebrated
- * (so nobody gets a gift twice).
+ * ends, even after a restart), whether they are to come down (only once the
+ * dashboard has said so, never because a restart has not been told yet), who
+ * had today's present, the items an elf is holding (so none is ever lost), and
+ * which midnights were already celebrated (so nobody gets a gift twice).
  *
  * Written whole to a temporary name and moved over: never half a file.
  * Server thread only.
@@ -26,6 +27,7 @@ final class SeasonalWinterStore {
     static final String EVE_DONE = "eveDone";
     static final String NEW_YEAR_DONE = "newYearDone";
     static final String SANTA_NIGHT = "santaNight";
+    static final String PRESENTS_GO = "presentsGo";
 
     private final Plugin plugin;
     private YamlConfiguration data;

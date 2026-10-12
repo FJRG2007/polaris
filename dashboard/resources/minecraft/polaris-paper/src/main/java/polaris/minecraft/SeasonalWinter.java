@@ -136,6 +136,7 @@ final class SeasonalWinter implements Listener {
         }
         WinterPlan before = plan;
         plan = next;
+        presentsGo(!next.presentsNow());
         if (before.snow() != next.snow() || before.lights() != next.lights()) decor.redraw();
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
@@ -210,7 +211,15 @@ final class SeasonalWinter implements Listener {
     private void end() {
         plan = WinterPlan.NONE;
         newYear.forget();
+        presentsGo(true);
         sendAway(entity -> true);
+    }
+
+    /** Whether the presents are to come down, kept across a restart: a jar not told yet keeps them. */
+    private void presentsGo(boolean go) {
+        if (store.data().getBoolean(SeasonalWinterStore.PRESENTS_GO) == go) return;
+        store.data().set(SeasonalWinterStore.PRESENTS_GO, go);
+        store.save();
     }
 
     /** Night as the overworld's clock tells it, as the other seasonal touches read it. */
@@ -323,7 +332,7 @@ final class SeasonalWinter implements Listener {
         feet.getWorld().spawn(standAt(feet), Snowman.class, golem -> {
             golem.setDerp(!pumpkin);
             golem.addScoreboardTag(tag);
-            if (!pumpkin) golem.setCustomName(ChatColor.AQUA + "Grumpy Snowman");
+            if (!pumpkin) golem.setCustomName(ChatColor.AQUA + plan.words(WinterPlan.Line.SNOWMAN));
         });
     }
 
@@ -334,7 +343,7 @@ final class SeasonalWinter implements Listener {
             feet.getWorld().spawn(at, Horse.class, reindeer -> {
                 reindeer.setColor(Horse.Color.BROWN);
                 reindeer.setStyle(Horse.Style.NONE);
-                reindeer.setCustomName("Reindeer");
+                reindeer.setCustomName(plan.words(WinterPlan.Line.REINDEER));
                 reindeer.addScoreboardTag(REINDEER_TAG);
             });
         }
@@ -392,14 +401,14 @@ final class SeasonalWinter implements Listener {
             santa.setVillagerLevel(5);
             santa.setVillagerExperience(1);
             santa.setRecipes(santaOffers());
-            santa.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + "Santa");
+            santa.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + plan.words(WinterPlan.Line.SANTA));
             santa.setCustomNameVisible(true);
             santa.setInvulnerable(true);
             santa.addScoreboardTag(SANTA_TAG);
         });
         store.data().set(SeasonalWinterStore.SANTA_NIGHT, night + 1);
         store.save();
-        visited.sendMessage(ChatColor.RED + "Santa is visiting your home tonight. He trades until sunrise.");
+        visited.sendMessage(ChatColor.RED + plan.words(WinterPlan.Line.SANTA_VISITS));
     }
 
     /** Somewhere a villager can stand within a few blocks of a home, or null. */

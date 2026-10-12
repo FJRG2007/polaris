@@ -90,6 +90,11 @@ export function decorationOf(
     });
 }
 
+/** The language a server's players read what the jar says in. */
+function serverLanguage(ownerId: string, config: Record<string, unknown>): Promise<"en" | "es"> {
+    return homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+}
+
 /**
  * The Halloween line for one server, in its own language. Switched off, it
  * carries graves off and no season left, so the jar takes its graveyards down
@@ -102,7 +107,7 @@ async function halloweenCommandFor(
     now: Date,
     switchedOff = false
 ): Promise<string> {
-    const language = await homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+    const language = await serverLanguage(ownerId, config);
     const settings = halloween.halloweenSettings(config);
     if (switchedOff) return halloween.halloweenCommand({ ...settings, graves: 0 }, 0, language, 0);
     return halloween.halloweenCommand(
@@ -185,7 +190,8 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             lines.push(
                 winter.winterCommand(
                     winter.winterSettings(config),
-                    winter.winterCalendar(now, zoneOf(config))
+                    winter.winterCalendar(now, zoneOf(config)),
+                    await serverLanguage(row.ownerId, config)
                 )
             );
         }

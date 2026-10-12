@@ -73,25 +73,25 @@ final class SeasonalNewYear {
             if (second > 0 && second != shown) {
                 shown = second;
                 if (second == WinterPlan.COUNTDOWN_SECONDS) {
-                    broadcast(server, Component.literal("The New Year is ten seconds away!").withStyle(ChatFormatting.GOLD));
+                    broadcast(server, Component.literal(plan.words(WinterPlan.Line.NEW_YEAR_SOON)).withStyle(ChatFormatting.GOLD));
                 }
                 title(server, Component.literal(Integer.toString(second)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), null);
             } else if (second == 0) {
                 shown = 0;
             }
             if (WinterPlan.celebrating(now, plan.newYearAt()) && once(server, SeasonalWinterStore.NEW_YEAR_DONE, plan.newYearAt())) {
-                title(server, Component.literal("Happy New Year!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
-                        Component.literal("A small gift is in your inventory").withStyle(ChatFormatting.YELLOW));
-                broadcast(server, Component.literal("Happy New Year, everyone!").withStyle(ChatFormatting.GOLD));
+                title(server, Component.literal(plan.words(WinterPlan.Line.NEW_YEAR)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                        Component.literal(plan.words(WinterPlan.Line.NEW_YEAR_GIFT)).withStyle(ChatFormatting.YELLOW));
+                broadcast(server, Component.literal(plan.words(WinterPlan.Line.NEW_YEAR_ALL)).withStyle(ChatFormatting.GOLD));
                 show(server);
                 gift(server, rockets(4), new ItemStack(Items.COOKIE, 4));
             }
             if (plan.sparkles() && WinterPlan.lastHour(now, plan.newYearAt()) && ticks % SPARKLE_TICKS == 0) sparkle(server);
         }
         if (plan.eve() && WinterPlan.celebrating(now, plan.eveAt()) && once(server, SeasonalWinterStore.EVE_DONE, plan.eveAt())) {
-            title(server, Component.literal("Merry Christmas!").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
-                    Component.literal("A gift is in your inventory").withStyle(ChatFormatting.GREEN));
-            broadcast(server, Component.literal("It is midnight on Christmas Eve. Merry Christmas, everyone!")
+            title(server, Component.literal(plan.words(WinterPlan.Line.CHRISTMAS)).withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+                    Component.literal(plan.words(WinterPlan.Line.CHRISTMAS_GIFT)).withStyle(ChatFormatting.GREEN));
+            broadcast(server, Component.literal(plan.words(WinterPlan.Line.CHRISTMAS_ALL))
                     .withStyle(ChatFormatting.RED));
             show(server);
             gift(server, new ItemStack(Items.CAKE), new ItemStack(Items.COOKIE, 8));

@@ -408,11 +408,11 @@ describe("Christmas and New Year's Eve", () => {
             [
                 "polaris season set winter 3600 100 100",
                 "polaris season winter golems=100 snow=100 reindeer=100 elves=0 snowmen=100 presents=1 santa=0 lights=1 eve=1 newyear=1 sparkles=1 christmas=1 day=20261220 " +
-                    `eveat=${Date.parse("2026-12-25T00:00:00Z")} nyat=${Date.parse("2027-01-01T00:00:00Z")}`
+                    `eveat=${Date.parse("2026-12-25T00:00:00Z")} nyat=${Date.parse("2027-01-01T00:00:00Z")} lang=en`
             ]
         ]);
         // The jar splits the winter line on spaces and takes every token as
-        // key=value: exactly the fifteen keys it knows, each once.
+        // key=value: exactly the sixteen keys it knows, each once.
         const tokens = sent[1]!.split(" ").slice(3);
         expect(tokens.map((token) => token.split("=")[0])).toEqual([
             "golems",
@@ -429,9 +429,10 @@ describe("Christmas and New Year's Eve", () => {
             "christmas",
             "day",
             "eveat",
-            "nyat"
+            "nyat",
+            "lang"
         ]);
-        for (const token of tokens) expect(token).toMatch(/^[a-z]+=\d+$/);
+        for (const token of tokens) expect(token).toMatch(/^[a-z]+=(\d+|en|es)$/);
         expect(await seasonalView(INSTALL)).toMatchObject({
             winter: { elves: 0, santa: false, presents: true },
             winterNeedsRestart: false

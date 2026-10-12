@@ -69,22 +69,24 @@ final class SeasonalNewYear {
             int second = WinterPlan.countdown(now, plan.newYearAt());
             if (second > 0 && second != shown) {
                 shown = second;
-                if (second == WinterPlan.COUNTDOWN_SECONDS) broadcast(ChatColor.GOLD + "The New Year is ten seconds away!");
+                if (second == WinterPlan.COUNTDOWN_SECONDS) broadcast(ChatColor.GOLD + plan.words(WinterPlan.Line.NEW_YEAR_SOON));
                 title(ChatColor.GOLD + "" + ChatColor.BOLD + second, "");
             } else if (second == 0) {
                 shown = 0;
             }
             if (WinterPlan.celebrating(now, plan.newYearAt()) && once(SeasonalWinterStore.NEW_YEAR_DONE, plan.newYearAt())) {
-                title(ChatColor.GOLD + "" + ChatColor.BOLD + "Happy New Year!", ChatColor.YELLOW + "A small gift is in your inventory");
-                broadcast(ChatColor.GOLD + "Happy New Year, everyone!");
+                title(ChatColor.GOLD + "" + ChatColor.BOLD + plan.words(WinterPlan.Line.NEW_YEAR),
+                        ChatColor.YELLOW + plan.words(WinterPlan.Line.NEW_YEAR_GIFT));
+                broadcast(ChatColor.GOLD + plan.words(WinterPlan.Line.NEW_YEAR_ALL));
                 show();
                 gift(rockets(4), new ItemStack(Material.COOKIE, 4));
             }
             if (plan.sparkles() && WinterPlan.lastHour(now, plan.newYearAt()) && ticks % SPARKLE_TICKS == 0) sparkle();
         }
         if (plan.eve() && WinterPlan.celebrating(now, plan.eveAt()) && once(SeasonalWinterStore.EVE_DONE, plan.eveAt())) {
-            title(ChatColor.RED + "" + ChatColor.BOLD + "Merry Christmas!", ChatColor.GREEN + "A gift is in your inventory");
-            broadcast(ChatColor.RED + "It is midnight on Christmas Eve. Merry Christmas, everyone!");
+            title(ChatColor.RED + "" + ChatColor.BOLD + plan.words(WinterPlan.Line.CHRISTMAS),
+                    ChatColor.GREEN + plan.words(WinterPlan.Line.CHRISTMAS_GIFT));
+            broadcast(ChatColor.RED + plan.words(WinterPlan.Line.CHRISTMAS_ALL));
             show();
             gift(new ItemStack(Material.CAKE), new ItemStack(Material.COOKIE, 8));
         }

@@ -15,9 +15,11 @@ import net.minecraft.world.level.storage.LevelResource;
 /**
  * What Christmas and New Year must remember across a restart, in
  * {@code world/polaris/winter.dat}: the presents placed (so they come down when
- * the season ends, even after a restart), who had today's present, the items
- * an elf is holding (so none is ever lost), and which midnights were already
- * celebrated (so nobody gets a gift twice).
+ * the season ends, even after a restart), whether they are to come down (only
+ * once the dashboard has said so, never because a restart has not been told
+ * yet), who had today's present, the items an elf is holding (so none is ever
+ * lost), and which midnights were already celebrated (so nobody gets a gift
+ * twice).
  *
  * Written whole to a temporary name and moved over, like the event stashes:
  * never half a file. Server thread only.
@@ -29,6 +31,7 @@ final class SeasonalWinterStore {
     static final String EVE_DONE = "eveDone";
     static final String NEW_YEAR_DONE = "newYearDone";
     static final String SANTA_NIGHT = "santaNight";
+    static final String PRESENTS_GO = "presentsGo";
 
     private static CompoundTag data;
 

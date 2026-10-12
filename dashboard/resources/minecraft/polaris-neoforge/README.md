@@ -175,7 +175,8 @@ Listed as the `season-winter` capability. In winter the dashboard also sends
 `reindeer`, `elves`, `snowmen`, 0-300), switches as 1 or 0 (`presents`, `santa`,
 `lights`, `eve`, `newyear`, `sparkles`), whether it is Christmas on the
 server's clock (`christmas`, 1-26 December), the day (`day`, yyyymmdd) and both
-midnights as epoch milliseconds (`eveat`, `nyat`). The jar keeps no calendar.
+midnights as epoch milliseconds (`eveat`, `nyat`), and the language players
+read its messages in (`lang`, `en` or `es`). The jar keeps no calendar.
 
 - Snow golems wearing carved pumpkins in snowy villages and plains, reindeer
   herds in the taiga, and now and then at night a grumpy snowman whose
@@ -185,7 +186,9 @@ midnights as epoch milliseconds (`eveat`, `nyat`). The jar keeps no calendar.
 - More snow on the grass, and lights and lanterns on natural trees: sent to
   players' games only, like the other decorations.
 - Presents: a barrel named for a player under a natural tree near them, one
-  per player per day, taken down when Christmas ends.
+  per player per day, taken down once the dashboard says Christmas is over or
+  presents are off (or the winter ends) - never by a restart that has not been
+  told yet.
 - Santa: a villager at one player's home once a night, trading until sunrise.
 - Elves: a baby zombie in green that steals one ordinary item and runs. The
   item is written to `world/polaris/winter.dat` before it is taken and given
