@@ -109,10 +109,12 @@ alone.
   dashboard's default is 150), a natural night spawn of a monster may bring
   another of its kind to the same spot - never within 24 blocks of a player or
   where 24 monsters are already about.
-- Winter: snow golems turn up 14-30 blocks from a player standing somewhere
-  cold enough to snow, two near each player at 100% of `<golems%>` (0 brings
-  none), some still wearing their pumpkin. They leave no snow trail and leave
-  when no player is within 96 blocks.
+- Halloween and winter: snow golems turn up 14-30 blocks from a player, two
+  near each player at 100% of `<golems%>` (0 brings none). In winter it is
+  somewhere cold enough to snow, some still wearing their pumpkin; through
+  Halloween anywhere not hot enough to melt them (biome temperature under 1.0)
+  and out of the rain, every one with its pumpkin on. They leave no snow trail
+  and leave when no player is within 96 blocks.
 
 Every mob this adds or dresses carries a tag (`polaris_season_head`,
 `polaris_season_golem`). The season ending or changing takes the pumpkins off

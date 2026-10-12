@@ -43,9 +43,11 @@ import org.bukkit.inventory.ItemStack;
  * setting over 100%, each natural night spawn of a monster may bring another of
  * its kind to the same spot, a little later and never past a crowd.
  *
- * Winter: snow golems turn up near players standing somewhere cold enough to
- * snow, some still wearing their pumpkin. They leave no snow behind them, go
- * when nobody is near, and are gone when the winter is.
+ * Halloween and winter: snow golems turn up near players. In winter it is
+ * somewhere cold enough to snow, some still wearing their pumpkin; through
+ * Halloween anywhere not hot enough to melt them and out of the rain, every one
+ * with its pumpkin on. They leave no snow behind them, go when nobody is near,
+ * and are gone when the season is.
  *
  * Every mob this adds or dresses carries a scoreboard tag, so the season ending,
  * the setting going to none, or a chunk loaded out of season puts it all back:
@@ -82,6 +84,8 @@ final class SeasonalMobs implements Listener {
     private static final int GOLEM_PUMPKIN_CHANCE = 40;
     /** Below this a biome's temperature snows rather than rains. */
     private static final double SNOW_TEMPERATURE = 0.15;
+    /** At or above this a biome melts a snow golem, as the desert and savanna do. */
+    private static final double MELTING_TEMPERATURE = 1.0;
 
     private static final int SWEEP_TICKS = 200;
 
@@ -183,7 +187,7 @@ final class SeasonalMobs implements Listener {
     public void onLoad(EntitiesLoadEvent event) {
         for (Entity entity : event.getEntities()) {
             if (entity.getScoreboardTags().contains(GOLEM_TAG)) {
-                if (decor.season() != SeasonalDecor.Season.WINTER || golems == 0) entity.remove();
+                if (!golemSeason() || golems == 0) entity.remove();
             } else if (entity instanceof LivingEntity living && entity.getScoreboardTags().contains(HEAD_TAG)) {
                 if (decor.season() != SeasonalDecor.Season.HALLOWEEN || !night(entity.getWorld())) takeHeadOff(living);
             }
@@ -283,20 +287,20 @@ final class SeasonalMobs implements Listener {
                     takeHeadOff(living);
             }
         }
-        boolean winter = decor.season() == SeasonalDecor.Season.WINTER && golems > 0;
-        sendGolemsAway(!winter);
-        if (!winter) return;
+        boolean bringing = golemSeason() && golems > 0;
+        sendGolemsAway(!bringing);
+        if (!bringing) return;
         int cap = Math.max(1, Math.round(GOLEMS_NEAR * golems / 100f));
         for (Player player : Bukkit.getOnlinePlayers()) {
             World world = player.getWorld();
             if (world.getEnvironment() != World.Environment.NORMAL || player.getGameMode() == GameMode.SPECTATOR) continue;
             Location at = player.getLocation();
-            if (!cold(at.getBlock())) continue;
+            if (!golemWeather(world, at.getBlock(), halloween)) continue;
             int near = world.getNearbyEntities(at, GOLEM_NEAR_RADIUS, GOLEM_NEAR_RADIUS, GOLEM_NEAR_RADIUS,
                     entity -> entity instanceof Snowman && entity.getScoreboardTags().contains(GOLEM_TAG)).size();
             if (near >= cap || random.nextInt(GOLEM_ODDS) != 0) continue;
-            Block feet = golemSpot(world, at);
-            if (feet != null) bringGolem(world, feet);
+            Block feet = golemSpot(world, at, halloween);
+            if (feet != null) bringGolem(world, feet, halloween);
         }
     }
 
@@ -313,12 +317,25 @@ final class SeasonalMobs implements Listener {
         }
     }
 
+    /** The seasons that bring golems. */
+    private boolean golemSeason() {
+        SeasonalDecor.Season season = decor.season();
+        return season == SeasonalDecor.Season.WINTER || season == SeasonalDecor.Season.HALLOWEEN;
+    }
+
     private static boolean cold(Block block) {
         return block.getTemperature() < SNOW_TEMPERATURE;
     }
 
-    /** Somewhere cold, open and natural a little way off, or null. */
-    private Block golemSpot(World world, Location around) {
+    /** Where a golem may turn up: in winter somewhere cold; through Halloween
+     *  anywhere it would not melt, out of the rain that hurts it. */
+    private static boolean golemWeather(World world, Block block, boolean halloween) {
+        if (!halloween) return cold(block);
+        return block.getTemperature() < MELTING_TEMPERATURE && (!world.hasStorm() || cold(block));
+    }
+
+    /** Somewhere the season suits, open and natural a little way off, or null. */
+    private Block golemSpot(World world, Location around, boolean halloween) {
         for (int tries = 0; tries < 6; tries++) {
             double angle = random.nextDouble() * Math.PI * 2;
             int distance = GOLEM_MIN_DISTANCE + random.nextInt(GOLEM_MAX_DISTANCE - GOLEM_MIN_DISTANCE + 1);
@@ -332,14 +349,14 @@ final class SeasonalMobs implements Listener {
                     || (SeasonalDecor.natural(ground) && !under.isAir() && !Tag.LEAVES.isTagged(under));
             if (!naturalGround || !under.isSolid()) continue;
             if (!(feet.getType().isAir() || feet.getType() == Material.SNOW)) continue;
-            if (!feet.getRelative(BlockFace.UP).getType().isAir() || !cold(feet)) continue;
+            if (!feet.getRelative(BlockFace.UP).getType().isAir() || !golemWeather(world, feet, halloween)) continue;
             return feet;
         }
         return null;
     }
 
-    private void bringGolem(World world, Block feet) {
-        boolean pumpkin = random.nextInt(100) < GOLEM_PUMPKIN_CHANCE;
+    private void bringGolem(World world, Block feet, boolean halloween) {
+        boolean pumpkin = halloween || random.nextInt(100) < GOLEM_PUMPKIN_CHANCE;
         Location at = feet.getLocation().add(0.5, 0, 0.5);
         at.setYaw(random.nextFloat() * 360f);
         world.spawn(at, Snowman.class, golem -> {

@@ -109,8 +109,15 @@ describe("the line the jar is told", () => {
 });
 
 describe("the seasonal mobs", () => {
-    it("default to none: an owner turns them on", () => {
-        expect(seasonal.seasonalMobs({})).toEqual({ nightSpawns: 1, snowGolems: 0 });
+    it("default to the usual night and the usual few golems", () => {
+        expect(seasonal.seasonalMobs({})).toEqual({ nightSpawns: 1, snowGolems: 1 });
+    });
+
+    it("keep a stored none: a server that turned the golems off has none", () => {
+        expect(seasonal.seasonalMobs({ [seasonal.SNOW_GOLEMS_KEY]: 0 })).toEqual({
+            nightSpawns: 1,
+            snowGolems: 0
+        });
     });
 
     it("keep a server's own choice", () => {
@@ -128,7 +135,7 @@ describe("the seasonal mobs", () => {
                 [seasonal.NIGHT_SPAWNS_KEY]: 50,
                 [seasonal.SNOW_GOLEMS_KEY]: "3"
             })
-        ).toEqual({ nightSpawns: 1, snowGolems: 0 });
+        ).toEqual({ nightSpawns: 1, snowGolems: 1 });
     });
 
     it("go on the line as whole percentages after the hold", () => {

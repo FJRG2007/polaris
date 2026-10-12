@@ -2979,7 +2979,7 @@
         "nightSpawns": "Monstruos de Halloween",
         "nightSpawnsHint": "Salen más monstruos de noche, con calabazas en la cabeza hasta el amanecer.",
         "snowGolems": "Gólems de nieve",
-        "snowGolemsHint": "Aparecen gólems de nieve cerca de los jugadores en zonas nevadas, algunos aún con su calabaza.",
+        "snowGolemsHint": "Aparecen gólems de nieve cerca de los jugadores en Halloween e invierno.",
         "asUsual": "Lo normal",
         "none": "Ninguno",
         "times": "{count}x",

@@ -46,9 +46,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * setting over 100%, each natural night spawn of a monster may bring another of
  * its kind to the same spot, a little later and never past a crowd.
  *
- * Winter: snow golems turn up near players standing somewhere cold enough to
- * snow, some still wearing their pumpkin. They leave no snow behind them, go
- * when nobody is near, and are gone when the winter is.
+ * Halloween and winter: snow golems turn up near players. In winter it is
+ * somewhere cold enough to snow, some still wearing their pumpkin; through
+ * Halloween anywhere not hot enough to melt them and out of the rain, every one
+ * with its pumpkin on. They leave no snow behind them, go when nobody is near,
+ * and are gone when the season is.
  *
  * Every mob this adds or dresses carries a tag, so the season ending, the
  * setting going to none, or a chunk loaded out of season puts it all back: the
@@ -90,8 +92,10 @@ final class SeasonalMobs {
     private static final double GOLEM_LEAVE_DISTANCE = 96;
     /** One chance in this many per sweep per player that a golem turns up. */
     private static final int GOLEM_ODDS = 4;
-    /** Of the golems, the ones that keep their pumpkin, in percent. */
+    /** Of the winter golems, the ones that keep their pumpkin, in percent. */
     private static final int GOLEM_PUMPKIN_CHANCE = 40;
+    /** At or above this a biome melts a snow golem, as the desert and savanna do. */
+    private static final float MELTING_TEMPERATURE = 1.0f;
 
     private static final int SWEEP_TICKS = 200;
 
@@ -187,7 +191,7 @@ final class SeasonalMobs {
         if (!event.loadedFromDisk() || event.getLevel().isClientSide()) return;
         Entity entity = event.getEntity();
         if (entity.getTags().contains(GOLEM_TAG)) {
-            if (SeasonalDecor.season() != SeasonalDecor.Season.WINTER || golems == 0) event.setCanceled(true);
+            if (!golemSeason() || golems == 0) event.setCanceled(true);
         } else if (entity instanceof Mob mob && mob.getTags().contains(HEAD_TAG)) {
             if (SeasonalDecor.season() != SeasonalDecor.Season.HALLOWEEN || !event.getLevel().isNight()) takeHeadOff(mob);
         }
@@ -269,19 +273,20 @@ final class SeasonalMobs {
                 if (entity instanceof Mob mob && mob.getTags().contains(HEAD_TAG)) takeHeadOff(mob);
             }
         }
-        boolean winter = SeasonalDecor.season() == SeasonalDecor.Season.WINTER && golems > 0;
-        sendGolemsAway(server, !winter);
-        if (!winter) return;
+        boolean bringing = golemSeason() && golems > 0;
+        sendGolemsAway(server, !bringing);
+        if (!bringing) return;
+        boolean halloween = SeasonalDecor.season() == SeasonalDecor.Season.HALLOWEEN;
         int cap = Math.max(1, Math.round(GOLEMS_NEAR * golems / 100f));
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ServerLevel level = player.serverLevel();
             if (level.dimension() != Level.OVERWORLD || player.isSpectator()) continue;
-            if (!cold(level, player.blockPosition())) continue;
+            if (!golemWeather(level, player.blockPosition(), halloween)) continue;
             int near = level.getEntitiesOfClass(SnowGolem.class, player.getBoundingBox().inflate(GOLEM_NEAR_RADIUS),
                     golem -> golem.getTags().contains(GOLEM_TAG)).size();
             if (near >= cap || level.random.nextInt(GOLEM_ODDS) != 0) continue;
-            BlockPos spot = golemSpot(level, player.blockPosition());
-            if (spot != null) bringGolem(level, spot);
+            BlockPos spot = golemSpot(level, player.blockPosition(), halloween);
+            if (spot != null) bringGolem(level, spot, halloween);
         }
     }
 
@@ -295,12 +300,25 @@ final class SeasonalMobs {
         }
     }
 
+    /** The seasons that bring golems. */
+    private static boolean golemSeason() {
+        SeasonalDecor.Season season = SeasonalDecor.season();
+        return season == SeasonalDecor.Season.WINTER || season == SeasonalDecor.Season.HALLOWEEN;
+    }
+
     private static boolean cold(ServerLevel level, BlockPos pos) {
         return level.getBiome(pos).value().coldEnoughToSnow(pos, level.getSeaLevel());
     }
 
-    /** Somewhere cold, open and natural a little way off, or null. */
-    private static BlockPos golemSpot(ServerLevel level, BlockPos around) {
+    /** Where a golem may turn up: in winter somewhere cold; through Halloween
+     *  anywhere it would not melt, out of the rain that hurts it. */
+    private static boolean golemWeather(ServerLevel level, BlockPos pos, boolean halloween) {
+        if (!halloween) return cold(level, pos);
+        return level.getBiome(pos).value().getBaseTemperature() < MELTING_TEMPERATURE && !level.isRainingAt(pos);
+    }
+
+    /** Somewhere the season suits, open and natural a little way off, or null. */
+    private static BlockPos golemSpot(ServerLevel level, BlockPos around, boolean halloween) {
         RandomSource random = level.random;
         for (int tries = 0; tries < 6; tries++) {
             double angle = random.nextDouble() * Math.PI * 2;
@@ -316,18 +334,18 @@ final class SeasonalMobs {
                     || (SeasonalDecor.natural(under) && !under.isAir() && !under.is(BlockTags.LEAVES));
             if (!naturalGround || !under.isFaceSturdy(level, ground, Direction.UP)) continue;
             if (!(at.isAir() || at.is(Blocks.SNOW)) || !level.getBlockState(feet.above()).isAir()) continue;
-            if (!cold(level, feet)) continue;
+            if (!golemWeather(level, feet, halloween)) continue;
             if (!level.noCollision(EntityType.SNOW_GOLEM.getSpawnAABB(x + 0.5, feet.getY(), z + 0.5))) continue;
             return feet;
         }
         return null;
     }
 
-    private static void bringGolem(ServerLevel level, BlockPos feet) {
+    private static void bringGolem(ServerLevel level, BlockPos feet, boolean halloween) {
         SnowGolem golem = EntityType.SNOW_GOLEM.create(level, EntitySpawnReason.EVENT);
         if (golem == null) return;
         golem.moveTo(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5, level.random.nextFloat() * 360f, 0f);
-        golem.setPumpkin(level.random.nextInt(100) < GOLEM_PUMPKIN_CHANCE);
+        golem.setPumpkin(halloween || level.random.nextInt(100) < GOLEM_PUMPKIN_CHANCE);
         golem.addTag(GOLEM_TAG);
         level.addFreshEntity(golem);
     }
