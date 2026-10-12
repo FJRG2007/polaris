@@ -837,5 +837,8 @@ export const impostor: ArenaGame = {
     // Nothing lying about once the station is coming down, for a run that
     // never reached its end too.
     closeLines: () => im.entitiesOff(),
-    owedLines: (_run, name) => [{ reason: "radar", lines: [radarLine(name, RADAR_RESET)] }]
+    owedLines: (_run, name) => [
+        { reason: "radar", lines: [radarLine(name, RADAR_RESET)] },
+        { reason: "impostor-tags", lines: im.tagsOff(name) }
+    ]
 };

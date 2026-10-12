@@ -375,6 +375,15 @@ describe("votes", () => {
 });
 
 describe("the commands", () => {
+    it("owes a player offline at the end every tag the teardown took off the rest", () => {
+        const off = im.tagsOff("Steve");
+        for (const line of im.TEARDOWN) {
+            const tag = /^tag @a(?:\[tag=[\w]+\])? remove (\w+)$/.exec(line)?.[1];
+            if (tag) expect(off).toContain(`tag Steve remove ${tag}`);
+        }
+        expect(off).toContain(`tag Steve remove ${im.GHOST_TAG}`);
+    });
+
     const era: im.Era = {
         interaction: true,
         components: true,

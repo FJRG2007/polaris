@@ -1002,6 +1002,18 @@ export const TEARDOWN = [
     ...hits.TAGS_OFF
 ];
 
+/**
+ * The teardown's tags taken off one player: what `TEARDOWN` could not reach on
+ * somebody offline when the game ended. A ghost tag left on would keep their
+ * chat to ghosts only.
+ */
+export function tagsOff(name: string): string[] {
+    return [
+        ...[LIVE_TAG, GHOST_TAG, IMPOSTOR_TAG].map((tag) => `tag ${name} remove ${tag}`),
+        ...hits.tagsOff(name)
+    ];
+}
+
 /** Onto the players' team, only if they are on none of the server's own. */
 export function joinTeam(name: string): string {
     return `execute if entity @a[name=${name},team=] run team join ${TEAM} ${name}`;
