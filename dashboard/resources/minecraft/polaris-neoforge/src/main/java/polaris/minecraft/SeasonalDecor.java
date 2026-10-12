@@ -35,6 +35,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -102,6 +103,9 @@ final class SeasonalDecor {
     private static final int NEW_PER_PASS = 16;
     private static final int PASS_TICKS = 20;
     private static final int RESEND_TICKS = 600;
+    /** How often the decorations knocked down since the last write are written, so a
+     *  player breaking a row of them costs one write instead of one each. */
+    private static final int FLUSH_TICKS = 200;
     private static final int SNOW_TICKS = 5;
     private static final int ASH_TICKS = 40;
     /** Room kept round what an event built. */
@@ -138,6 +142,8 @@ final class SeasonalDecor {
     private static int ticks;
     private static BrokenDecor broken = new BrokenDecor();
     private static Path brokenFile;
+    /** Knocked down since the list was last written. */
+    private static boolean brokenDirty;
 
     // ------------------------------------------------------------------ commands
 
@@ -161,6 +167,7 @@ final class SeasonalDecor {
     /** {@code polaris season clear}. */
     static JsonObject clear(MinecraftServer server) {
         if (season != null) revertAll(server);
+        flushBroken();
         season = null;
         told = true;
         SeasonalMobs.revert(server);
@@ -253,6 +260,7 @@ final class SeasonalDecor {
             if (season == Season.WINTER && ticks % SNOW_TICKS == 0) particles(server, true);
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(server, false);
             if (ticks % PASS_TICKS == 0) pass(server, ticks % RESEND_TICKS == 0);
+            if (ticks % FLUSH_TICKS == 0) flushBroken();
         } catch (RuntimeException failed) {
             // A tick must never fail over a decoration: put everything back and stop.
             PolarisMod.LOG.error("Polaris seasonal decorations failed and are off until told again", failed);
@@ -264,6 +272,11 @@ final class SeasonalDecor {
                 SeasonalMobs.forget();
             }
         }
+    }
+
+    @SubscribeEvent
+    public void onServerStopping(ServerStoppingEvent event) {
+        flushBroken();
     }
 
     @SubscribeEvent
@@ -348,7 +361,7 @@ final class SeasonalDecor {
         Fake hit = null;
         for (Fake fake : fakes) if (fake.pos().equals(pos)) hit = fake;
         if (hit == null || redrawn(hit)) return null;
-        if (broken.add(pos.asLong())) writeBroken();
+        if (broken.add(pos.asLong())) brokenDirty = true;
         BlockPos under = hit.shown().is(Blocks.SNOW) ? pos.below() : null;
         for (ServerPlayer other : player.serverLevel().getServer().getPlayerList().getPlayers()) {
             Seen theirs = seen.get(other.getUUID());
@@ -431,7 +444,12 @@ final class SeasonalDecor {
         if (broken.keepFor(next.name().toLowerCase(Locale.ROOT), System.currentTimeMillis())) writeBroken();
     }
 
+    private static void flushBroken() {
+        if (brokenDirty) writeBroken();
+    }
+
     private static void writeBroken() {
+        brokenDirty = false;
         if (brokenFile == null) return;
         try {
             broken.write(brokenFile);
