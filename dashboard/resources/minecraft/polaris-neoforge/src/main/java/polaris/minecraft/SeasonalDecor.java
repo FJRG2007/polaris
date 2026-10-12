@@ -113,6 +113,8 @@ final class SeasonalDecor {
     }
 
     private static Season season;
+    /** Whether the dashboard has said anything since this jar started. */
+    private static boolean told;
     private static long untilMillis;
     private static final Map<UUID, Seen> seen = new HashMap<>();
     /** {minX, minZ, maxX, maxZ}, padded, oldest first. */
@@ -131,6 +133,7 @@ final class SeasonalDecor {
             SeasonalMobs.revert(server);
         }
         season = next;
+        told = true;
         untilMillis = System.currentTimeMillis() + Math.min(Math.max(seconds, 1), MAX_HOLD_SECONDS) * 1000L;
         SeasonalMobs.configure(server, spawns, golems);
         return status();
@@ -140,6 +143,7 @@ final class SeasonalDecor {
     static JsonObject clear(MinecraftServer server) {
         if (season != null) revertAll(server);
         season = null;
+        told = true;
         SeasonalMobs.revert(server);
         return status();
     }
@@ -147,6 +151,11 @@ final class SeasonalDecor {
     /** The season showing now, or null. */
     static Season season() {
         return season;
+    }
+
+    /** Whether a season or a clear has been said since start: a null season is only known to be none then. */
+    static boolean told() {
+        return told;
     }
 
     /** {@code polaris season status}. */

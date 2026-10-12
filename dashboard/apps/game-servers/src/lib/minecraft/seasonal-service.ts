@@ -7,7 +7,8 @@
  * an hour, so a server that restarted picks it up within a pass, and one that
  * lost Polaris takes the decorations down by itself. Out of season a server is
  * told to clear once and then left alone: a jar that just started has nothing
- * up. A server's own switch tells it at once.
+ * up but what it keeps across a restart, so a server that was stopped is told
+ * once it is back. A server's own switch tells it at once.
  */
 
 import { prisma } from "@polaris/db";
@@ -36,6 +37,10 @@ const NO_JAR_RETRY_MS = 30 * 60_000;
  *  an hour. One console line per pass is the whole cost. */
 const OLD_JAR_RETRY_MS = 90_000;
 
+/** How long a stopped server is left out of season before it is looked at again:
+ *  once it is back it is told to clear, for what its jar kept across the stop. */
+const STOPPED_RETRY_MS = 10 * 60_000;
+
 /** Servers told at once on a sweep: each is a console trip or two. */
 const SWEEP_CONCURRENCY = 8;
 
@@ -52,6 +57,8 @@ const told = new Map<
            *  down for a switch-off (told so, or cannot take the line). */
           readonly offTold?: boolean;
           readonly winterMissing?: boolean;
+          /** When it was found stopped, so never told the line it is held to. */
+          readonly stoppedAt?: number;
       }
     | { readonly oldJarAt: number }
     | { readonly noJarAt: number }
@@ -142,13 +149,19 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         last &&
         "line" in last &&
         last.line === clearLine &&
-        (!switchedOff || last.offTold === true)
+        (!switchedOff || last.offTold === true) &&
+        (last.stoppedAt === undefined || now.getTime() < last.stoppedAt + STOPPED_RETRY_MS)
     )
         return false;
     return withServerContainer(row.ownerId, row.id, async (server) => {
-        // A server that is down has nothing up, and starts with nothing.
+        // A server that is down shows nothing; what its jar kept is cleared once it is back.
         if (!server.running || server.edition !== "java") {
-            told.set(row.id, { line: clearLine });
+            told.set(
+                row.id,
+                server.edition === "java"
+                    ? { line: clearLine, stoppedAt: now.getTime() }
+                    : { line: clearLine }
+            );
             return false;
         }
         const reading = await capsReading(server);

@@ -143,7 +143,10 @@ final class SeasonalWinter {
     public void onTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
         try {
-            if (SeasonalDecor.season() != SeasonalDecor.Season.WINTER && plan != WinterPlan.NONE) end(server);
+            if (SeasonalDecor.season() != SeasonalDecor.Season.WINTER) {
+                if (plan != WinterPlan.NONE) end(server);
+                else if (SeasonalDecor.told()) presentsGo(server, true);
+            }
             ticks++;
             if (plan != WinterPlan.NONE) SeasonalNewYear.tick(server);
             if (ticks % SNOWMAN_TICKS == 0) {

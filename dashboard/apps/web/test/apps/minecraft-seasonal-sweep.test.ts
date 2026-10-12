@@ -6,7 +6,8 @@
  * alone; the operator's switch and the server's own switch clear it; a server
  * whose jar cannot decorate is not asked again on every pass, and says whether a
  * restart helps; a console that did not answer is asked again on the next pass;
- * and a stopped or Bedrock server is never sent anything.
+ * a stopped or Bedrock server is never sent anything; and a server stopped out
+ * of season is told to clear once it is back, for what its jar kept.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -163,6 +164,18 @@ describe("the seasons sweep", () => {
         edition = "bedrock";
         await sweepSeasons(HALLOWEEN);
         expect(sent).toEqual([]);
+    });
+
+    it("clears a server that was stopped when the season ended, once it is back", async () => {
+        const { sweepSeasons } = await service();
+        running = false;
+        await sweepSeasons(NOVEMBER);
+        running = true;
+        await sweepSeasons(new Date(NOVEMBER.getTime() + 2 * 60_000));
+        expect(sent).toEqual([]);
+        await sweepSeasons(new Date(NOVEMBER.getTime() + 12 * 60_000));
+        await sweepSeasons(new Date(NOVEMBER.getTime() + 24 * 60_000));
+        expect(sent).toEqual(["polaris season clear"]);
     });
 
     it("leaves a server with no Polaris jar alone for a while", async () => {

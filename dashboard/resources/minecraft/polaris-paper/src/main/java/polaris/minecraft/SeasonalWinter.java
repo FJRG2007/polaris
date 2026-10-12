@@ -151,7 +151,10 @@ final class SeasonalWinter implements Listener {
 
     private void tick() {
         try {
-            if (decor.season() != SeasonalDecor.Season.WINTER && plan != WinterPlan.NONE) end();
+            if (decor.season() != SeasonalDecor.Season.WINTER) {
+                if (plan != WinterPlan.NONE) end();
+                else if (decor.told()) presentsGo(true);
+            }
             ticks++;
             if (plan != WinterPlan.NONE) newYear.tick();
             if (ticks % SNOWMAN_TICKS == 0) {

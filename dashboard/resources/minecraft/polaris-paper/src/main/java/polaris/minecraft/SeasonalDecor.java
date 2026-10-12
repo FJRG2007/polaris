@@ -107,6 +107,8 @@ final class SeasonalDecor implements Listener {
     private final Plugin plugin;
     private final Map<UUID, Seen> seen = new HashMap<>();
     private Season season;
+    /** Whether the dashboard has said anything since this plugin started. */
+    private boolean told;
     private long untilMillis;
     private BukkitTask timer;
     private int ticks;
@@ -125,6 +127,11 @@ final class SeasonalDecor implements Listener {
     /** The season showing now, or null. */
     Season season() {
         return season;
+    }
+
+    /** Whether a season or a clear has been said since start: a null season is only known to be none then. */
+    boolean told() {
+        return told;
     }
 
     void stop() {
@@ -165,6 +172,7 @@ final class SeasonalDecor implements Listener {
                 mobs.revert();
             }
             season = next;
+            told = true;
             untilMillis = System.currentTimeMillis() + seconds * 1000L;
             mobs.configure(spawns, golems);
             if (timer == null) timer = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1, 1);
@@ -177,6 +185,7 @@ final class SeasonalDecor implements Listener {
         revertAll();
         mobs.revert();
         season = null;
+        told = true;
         if (timer != null) timer.cancel();
         timer = null;
         return status();
