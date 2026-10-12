@@ -94,7 +94,8 @@ export function DeployFailureNote({
                 <p
                     className={cn(
                         "whitespace-pre-wrap break-words text-sm text-danger-ink",
-                        reason.kind === "text" && "max-h-40 overflow-y-auto font-mono text-xs"
+                        reason.kind === "text" &&
+                            "max-h-40 overflow-y-auto overscroll-contain font-mono text-xs"
                     )}
                 >
                     {reasonText(reason, t)}
