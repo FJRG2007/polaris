@@ -125,6 +125,24 @@ ground and leaves are used, never within reach of a build, and the dashboard
 clears them while an event runs. Each chunk is decided from the world seed, so the
 decorations stay put. A server's own switch is on its Settings tab.
 
+### Halloween extras
+
+Listed as the `season-halloween` capability, told with
+`polaris season halloween key=value ...` (sent after the season line, while the
+season is Halloween): witches on a natural night spawn, bat swarms at dusk,
+treats from pumpkin-headed kills, a rare headless horseman, trap pumpkins,
+one blood night, a trick-or-treat villager, phantoms, and small graveyards.
+Each is its own key, so a jar skips a key it does not know instead of
+refusing the whole line; a jar without the capability is told the season
+alone. Every mob this adds carries `polaris_halloween`: it never comes back
+from disk, and the season ending takes it away. Graveyards are the one part
+written to the world (on wild grass, far from a build); they are written down
+in the main world's folder with the moment the dashboard says the season
+ends and come down only once it has passed, not on a restart or while an
+event pauses the season - a chest somebody filled with their own things is
+left standing. A server's own switches are on its Settings tab, next to the
+rest of the season.
+
 ## Configuration
 
 The same four variables as the mod, written by Polaris when the server's

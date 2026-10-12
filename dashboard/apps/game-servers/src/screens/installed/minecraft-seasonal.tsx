@@ -17,6 +17,7 @@ import { figureLanguage, formatPlain } from "../../lib/figures";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { SeasonalPatch, SeasonalView } from "../../lib/minecraft/seasonal-service";
 import { readSeasonalAction, saveSeasonalAction } from "./seasonal-actions";
+import { MinecraftSeasonalHalloween } from "./minecraft-seasonal-halloween";
 
 const { writeSnapshot } = hostUi.snapshotCache;
 const { useKeptSnapshot } = hostUi.liveRead;
@@ -65,7 +66,7 @@ export function MinecraftSeasonal({
         if (!view) return;
         const before = view;
         setError(null);
-        setView({ ...view, ...patch });
+        setView({ ...view, ...patch, halloween: { ...view.halloween, ...patch.halloween } });
         startTransition(async () => {
             const result = await saveSeasonalAction({ installedAppId, ...patch });
             answered.current = true;
@@ -140,6 +141,21 @@ export function MinecraftSeasonal({
                             onChange={(snowGolems) => save({ snowGolems })}
                         />
                     </div>
+                )}
+                {view && view.on && !view.blocked && (
+                    <MinecraftSeasonalHalloween
+                        installedAppId={installedAppId}
+                        value={view.halloween}
+                        times={times}
+                        Choice={MobChoice}
+                        disabled={!canManage || !heard || pending}
+                        onChange={(halloween) => save({ halloween })}
+                    />
+                )}
+                {view?.on && view.halloweenNeedsRestart && (
+                    <p className="text-xs text-muted-foreground">
+                        {t("seasonalHalloween.needsRestart")}
+                    </p>
                 )}
                 {view?.on && view.mobsNeedRestart && (
                     <p className="text-xs text-muted-foreground">{t("seasonal.mobsNeedRestart")}</p>

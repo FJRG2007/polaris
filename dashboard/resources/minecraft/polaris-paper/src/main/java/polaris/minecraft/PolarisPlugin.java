@@ -25,6 +25,7 @@ public final class PolarisPlugin extends JavaPlugin {
     private LoginGate gate;
     private SoundPack sounds;
     private SeasonalDecor seasonal;
+    private SeasonalHalloween halloween;
 
     @Override
     public void onEnable() {
@@ -42,6 +43,10 @@ public final class PolarisPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(seasonal, this);
         getServer().getPluginManager().registerEvents(seasonal.mobs(), this);
         SeasonalDecor season = seasonal;
+        halloween = new SeasonalHalloween(this, seasonal);
+        getServer().getPluginManager().registerEvents(halloween, this);
+        halloween.start();
+        SeasonalHalloween extras = halloween;
         PluginCommand polaris = getCommand("polaris");
         if (polaris != null) {
             CommandExecutor soundsCommand = sounds != null
@@ -61,6 +66,8 @@ public final class PolarisPlugin extends JavaPlugin {
                     reply = respawns.answer(Arrays.copyOfRange(args, 1, args.length));
                 else if (args[0].equalsIgnoreCase("guard"))
                     reply = guard.answer(Arrays.copyOfRange(args, 1, args.length));
+                else if (args[0].equalsIgnoreCase("season") && args.length > 1 && args[1].equalsIgnoreCase("halloween"))
+                    reply = extras.configure(Arrays.copyOfRange(args, 2, args.length));
                 else if (args[0].equalsIgnoreCase("season"))
                     reply = season.answer(Arrays.copyOfRange(args, 1, args.length));
                 else reply = SoundPack.refused("usage");
@@ -84,7 +91,7 @@ public final class PolarisPlugin extends JavaPlugin {
     }
 
     /** `polaris caps`: what the dashboard may ask of this plugin, as the NeoForge
-     *  mod answers it. Only `respawn`, `guard`, `season` and `season-mobs` here: the rest are the mod's alone. */
+     *  mod answers it. Only `respawn`, `guard`, `season`, `season-mobs` and `season-halloween` here: the rest are the mod's alone. */
     private static JsonObject caps(String version) {
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
@@ -94,6 +101,7 @@ public final class PolarisPlugin extends JavaPlugin {
         caps.add("guard");
         caps.add("season");
         caps.add("season-mobs");
+        caps.add("season-halloween");
         reply.add("caps", caps);
         return reply;
     }
@@ -104,6 +112,8 @@ public final class PolarisPlugin extends JavaPlugin {
         gate = null;
         if (sounds != null) sounds.stop();
         sounds = null;
+        if (halloween != null) halloween.stop();
+        halloween = null;
         if (seasonal != null) seasonal.stop();
         seasonal = null;
         CommandLogFilter.uninstall();

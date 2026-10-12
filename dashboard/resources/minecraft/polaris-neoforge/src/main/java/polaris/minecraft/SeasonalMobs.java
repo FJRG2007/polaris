@@ -132,6 +132,22 @@ final class SeasonalMobs {
         extras.clear();
     }
 
+    /** Whether an extra is being spawned now: it brings none of its own. */
+    static boolean spawningExtra() {
+        return spawningExtra;
+    }
+
+    /**
+     * One more spawn at a spot, placed later under the same caps as the night's
+     * extras ({@link SeasonalHalloween}'s witches and blood night); false when the
+     * queue is already full.
+     */
+    static boolean queueExtra(ServerLevel level, EntityType<?> type, BlockPos pos) {
+        if (extras.size() >= EXTRA_QUEUE) return false;
+        extras.addLast(new Extra(level.dimension(), type, pos.immutable()));
+        return true;
+    }
+
     static void status(JsonObject reply) {
         reply.addProperty("spawnPercent", spawns);
         reply.addProperty("golemPercent", golems);

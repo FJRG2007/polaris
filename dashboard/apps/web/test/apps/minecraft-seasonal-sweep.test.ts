@@ -28,6 +28,8 @@ let answer: "polaris" | "other" | "none" = "polaris";
 let eventRunning = false;
 /** The servers a sweep finds; one by default. */
 let rows: { id: string; ownerId: string; config: string }[] | null = null;
+/** Another writer's change, landing between a save's read and its write. */
+let meanwhile: Record<string, unknown> | null = null;
 const sent: string[] = [];
 
 vi.mock("@polaris/db", () => ({
@@ -49,8 +51,15 @@ vi.mock("@polaris/app-host", () => ({
         appsInstallConfig: {
             readInstallConfig: (raw: unknown) =>
                 typeof raw === "string" ? (JSON.parse(raw) as Record<string, unknown>) : {},
-            patchInstallConfig: async (_id: string, patch: Record<string, unknown>) => {
-                config = { ...config, ...patch };
+            patchInstallConfig: async (
+                _id: string,
+                patch:
+                    | Record<string, unknown>
+                    | ((current: Record<string, unknown>) => Record<string, unknown>)
+            ) => {
+                if (meanwhile) config = { ...config, ...meanwhile };
+                meanwhile = null;
+                config = { ...config, ...(typeof patch === "function" ? patch(config) : patch) };
             }
         },
         seasonalService: { seasonsAllowed: async () => allowed }
@@ -75,6 +84,10 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/in-server", () => ({
     forgetCapabilities: () => undefined
 }));
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/speech-service", () => ({
+    homeLanguage: async () => "en"
+}));
+
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/events/state", () => ({
     readEventState: () => ({ run: eventRunning ? { id: "run" } : null })
 }));
@@ -94,6 +107,7 @@ beforeEach(() => {
     answer = "polaris";
     eventRunning = false;
     rows = null;
+    meanwhile = null;
     sent.length = 0;
 });
 
@@ -295,5 +309,29 @@ describe("the seasonal mobs", () => {
         await sweepSeasons(HALLOWEEN);
         await sweepSeasons(NOVEMBER);
         expect(sent).toEqual(["polaris season set halloween 3600 100 0", "polaris season clear"]);
+    });
+});
+
+describe("the Halloween extras", () => {
+    it("tell the jar when the season ends, so its graveyards outlast a restart", async () => {
+        caps = new Set(["season", "season-halloween"]);
+        const { sweepSeasons } = await service();
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toHaveLength(1);
+        expect(sent[0]).toContain("polaris season halloween ");
+        expect(sent[0]).toContain(` left=${14 * 86_400 - 12 * 3600} `);
+    });
+
+    it("merge a save into what another writer stored meanwhile", async () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(HALLOWEEN);
+        try {
+            const { setSeasonal } = await service();
+            meanwhile = { seasonalHalloween: { witches: 3 } };
+            await setSeasonal(OWNER, INSTALL, { halloween: { graves: 2 } });
+            expect(config.seasonalHalloween).toMatchObject({ witches: 3, graves: 2 });
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

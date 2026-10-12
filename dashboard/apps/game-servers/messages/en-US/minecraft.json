@@ -2941,6 +2941,28 @@
         "onlyManagers": "Only somebody who manages this server can install or remove it.",
         "readFailed": "Could not read Symbiote"
     },
+    "seasonalHalloween": {
+        "title": "Halloween extras",
+        "witches": "Witches",
+        "witchesHint": "More witches among the night's monsters.",
+        "bats": "Bat swarms",
+        "batsHint": "Bats fly out around players at dusk. They do no harm.",
+        "traps": "Trap pumpkins",
+        "trapsHint": "Some decorative pumpkins let out bats or a baby zombie when broken.",
+        "graves": "Graveyards",
+        "gravesHint": "Small graveyards with a chest of minor loot, on wild ground and never on builds. Taken down after the season.",
+        "treats": "Treats",
+        "treatsHint": "Monsters in pumpkins sometimes drop a cookie or a pumpkin pie.",
+        "horseman": "Headless horseman",
+        "horsemanHint": "A rare skeleton rider with a jack o'lantern head. One a night at most.",
+        "bloodNight": "Blood night",
+        "bloodNightHint": "Halloween night brings red fog, more monsters and double loot. Announced in chat.",
+        "trickOrTreat": "Trick or treat",
+        "trickOrTreatHint": "A villager in costume takes a pumpkin and gives a treat, or a short scare.",
+        "phantoms": "Phantoms",
+        "phantomsHint": "Phantoms come out at night even if players slept. They hit softer.",
+        "needsRestart": "Restart this server to bring the Halloween extras."
+    },
     "seasonal": {
         "title": "Seasonal decorations",
         "hint": "Pumpkins and cobwebs around Halloween, snow in winter. The decorations are drawn on players' screens only, and nothing anybody built is touched.",

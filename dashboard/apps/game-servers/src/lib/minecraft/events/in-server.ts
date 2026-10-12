@@ -24,14 +24,22 @@ import { stripFormatting } from "../parse";
 import type { ServerContainer } from "../service";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 
-export type Capability =
-    | "stash"
-    | "batch"
-    | "seek"
-    | "respawn"
-    | "guard"
-    | "season"
-    | "season-mobs";
+const CAPABILITIES = [
+    "stash",
+    "batch",
+    "seek",
+    "respawn",
+    "guard",
+    "season",
+    "season-mobs",
+    "season-halloween"
+] as const;
+
+export type Capability = (typeof CAPABILITIES)[number];
+
+function isCapability(cap: string): cap is Capability {
+    return (CAPABILITIES as readonly string[]).includes(cap);
+}
 
 const capsSchema = z.object({
     ok: z.literal(true),
@@ -76,13 +84,7 @@ export function readCaps(reply: string): CapsReading {
     const parsed = capsSchema.safeParse(replyObject(reply));
     if (!parsed.success) return { caps: new Set(), answer: "other" };
     return {
-        caps: new Set(
-            parsed.data.caps.filter((cap): cap is Capability =>
-                ["stash", "batch", "seek", "respawn", "guard", "season", "season-mobs"].includes(
-                    cap
-                )
-            )
-        ),
+        caps: new Set(parsed.data.caps.filter(isCapability)),
         answer: "polaris"
     };
 }

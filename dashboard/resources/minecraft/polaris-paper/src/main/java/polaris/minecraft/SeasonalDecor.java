@@ -289,6 +289,32 @@ final class SeasonalDecor implements Listener {
         }
     }
 
+    /**
+     * Whether this player is shown a pumpkin on this block; if so it is taken
+     * down for them (their game shows the real block again) and not shown again
+     * until the chunk is decided anew. For {@link SeasonalHalloween}'s traps.
+     */
+    boolean takePumpkin(Player player, Block block) {
+        Seen one = seen.get(player.getUniqueId());
+        if (one == null || !player.getWorld().getUID().equals(one.world)) return false;
+        long key = chunkKey(block.getX() >> 4, block.getZ() >> 4);
+        List<Fake> fakes = one.chunks.get(key);
+        if (fakes == null) return false;
+        for (int i = 0; i < fakes.size(); i++) {
+            Fake fake = fakes.get(i);
+            Material shown = fake.shown().getMaterial();
+            boolean pumpkin = shown == Material.PUMPKIN || shown == Material.CARVED_PUMPKIN || shown == Material.JACK_O_LANTERN;
+            if (!pumpkin || fake.at().getBlockX() != block.getX() || fake.at().getBlockY() != block.getY()
+                    || fake.at().getBlockZ() != block.getZ()) continue;
+            List<Fake> kept = new ArrayList<>(fakes);
+            kept.remove(i);
+            one.chunks.put(key, kept);
+            player.sendBlockChange(fake.at(), block.getBlockData());
+            return true;
+        }
+        return false;
+    }
+
     private void revertAll() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             Seen one = seen.get(player.getUniqueId());
@@ -454,7 +480,7 @@ final class SeasonalDecor implements Listener {
      * A grass block with open air on it, on natural ground, in a 5x5 patch of
      * nothing but natural blocks from one below to one above it.
      */
-    private static boolean naturalGrass(Block ground) {
+    static boolean naturalGrass(Block ground) {
         if (ground.getType() != Material.GRASS_BLOCK) return false;
         if (!ground.getRelative(BlockFace.UP).getType().isAir()) return false;
         if (!Tag.DIRT.isTagged(ground.getRelative(BlockFace.DOWN).getType())) return false;

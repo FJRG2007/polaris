@@ -2941,6 +2941,28 @@
         "onlyManagers": "Solo quien gestiona este servidor puede instalarlo o quitarlo.",
         "readFailed": "No se pudo leer Symbiote"
     },
+    "seasonalHalloween": {
+        "title": "Extras de Halloween",
+        "witches": "Brujas",
+        "witchesHint": "Más brujas entre los monstruos de la noche.",
+        "bats": "Murciélagos",
+        "batsHint": "Salen murciélagos alrededor de los jugadores al anochecer. No hacen daño.",
+        "traps": "Calabazas trampa",
+        "trapsHint": "Algunas calabazas decorativas sueltan murciélagos o un zombi bebé al romperlas.",
+        "graves": "Cementerios",
+        "gravesHint": "Pequeños cementerios con un cofre de botín menor, en terreno salvaje y nunca sobre construcciones. Se retiran al acabar la temporada.",
+        "treats": "Golosinas",
+        "treatsHint": "Los monstruos con calabaza a veces sueltan una galleta o una tarta de calabaza.",
+        "horseman": "Jinete sin cabeza",
+        "horsemanHint": "Un raro jinete esqueleto con cabeza de calabaza. Como mucho uno por noche.",
+        "bloodNight": "Luna de sangre",
+        "bloodNightHint": "La noche de Halloween trae niebla roja, más monstruos y botín doble. Se anuncia en el chat.",
+        "trickOrTreat": "Truco o trato",
+        "trickOrTreatHint": "Un aldeano disfrazado acepta una calabaza y da un premio o un pequeño susto.",
+        "phantoms": "Phantoms",
+        "phantomsHint": "Salen phantoms de noche aunque los jugadores hayan dormido. Hacen menos daño.",
+        "needsRestart": "Reinicia este servidor para traer los extras de Halloween."
+    },
     "seasonal": {
         "title": "Decoración de temporada",
         "hint": "Calabazas y telarañas en Halloween, nieve en invierno. La decoración solo se dibuja en la pantalla de los jugadores y nunca toca lo que alguien construyó.",
