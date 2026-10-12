@@ -463,8 +463,6 @@
         },
         "sentLevel": "Lo que oyen otros",
         "hints": {
-            "muted": "Silencio",
-            "deafened": "Ensordecido",
             "talkingMuted": "Estás silenciado: nadie te oye"
         },
         "arrivals": {

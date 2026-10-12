@@ -231,18 +231,13 @@ export function CallRoom({
     const deafenKey = useShortcutHint("chat.toggleDeafen");
     const withKey = (label: string) =>
         deafenKey ? ts("withKey", { action: label, keys: deafenKey }) : label;
-    // Said over the buttons rather than in a banner: the state is a word above
-    // the control that changes it, and talking into a muted microphone is the
-    // one moment it is worth more than a word - see `muted-speech`.
+    // Said over the microphone only when somebody talks into it while it is
+    // off - see `muted-speech`. Muted and deafened on their own are already the
+    // buttons' red; a word standing over each read as a tooltip stuck open.
     const muted = !call.micOn && call.audioRole !== "companion";
     const talkingMuted = useMutedSpeech(call.localStream?.getAudioTracks()[0] ?? null, muted);
     const micHint: ControlHintText | null = talkingMuted
         ? { text: t("callRoom.hints.talkingMuted"), tone: "warn" }
-        : muted
-          ? { text: t("callRoom.hints.muted"), tone: "state" }
-          : null;
-    const deafenHint: ControlHintText | null = call.deafened
-        ? { text: t("callRoom.hints.deafened"), tone: "state" }
         : null;
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
@@ -1363,7 +1358,6 @@ export function CallRoom({
                             <Headphones className="size-4" />
                         )
                     }
-                    hint={deafenHint}
                     variant={call.deafened ? "danger" : "secondary"}
                     pressed={call.deafened}
                     onClick={call.toggleDeafen}
