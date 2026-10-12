@@ -6,8 +6,13 @@
 
 import type { Language } from "../catalog";
 
-/** Under "Get ready", in the starting room: of a maze of `levels` floors. */
-export function readySubtitle(language: Language, levels = 1): string {
+/** Under "Get ready", in the starting room: of a maze of `levels` floors,
+ *  its goal on any of them or (`anyFloor` false) on the top one. */
+export function readySubtitle(language: Language, levels = 1, anyFloor = false): string {
+    if (levels > 1 && anyFloor)
+        return language === "es"
+            ? "&fLa meta está en el centro de alguna planta: búscala. El fuego y la lava te devuelven"
+            : "&fThe goal is in the middle of one of the floors: find it. Fire and lava send you back";
     if (levels > 1)
         return language === "es"
             ? "&fSube planta a planta hasta el centro de la última: el fuego y la lava te devuelven"

@@ -49,8 +49,9 @@ import * as decor from "./arena-decor";
 
 /** How mazes are laid out now, written onto the stage when one is built:
  *  2 dresses the goal as a finish (`FINISH_SINCE`), 3 stacks floors joined by
- *  stairs and sets traps (`LEVELS_SINCE`). */
-export const DESIGN = 3;
+ *  stairs and sets traps (`LEVELS_SINCE`), 4 puts the goal on any floor
+ *  (`GOAL_ANY_FLOOR_SINCE`). */
+export const DESIGN = 4;
 /** The first design whose goal is a finish booth: a chequered threshold, a
  *  chequered gold floor, chequered walls round it and light over the way in. */
 export const FINISH_SINCE = 2;
@@ -61,6 +62,12 @@ export const FINISH_SINCE = 2;
  * doorways that light and go out on a beat, and soul sand that slows a racer.
  */
 export const LEVELS_SINCE = 3;
+/**
+ * The first design whose goal is in the middle of a floor drawn among all of
+ * them, the ground one included, instead of always the top one: the stairs
+ * still go up to every floor, so finding it means searching them.
+ */
+export const GOAL_ANY_FLOOR_SINCE = 4;
 
 export type MazeSize = EventOptions<"nether-maze">["size"];
 export type Hazards = EventOptions<"nether-maze">["hazards"];
@@ -156,6 +163,8 @@ export interface Plan {
     readonly levels: readonly Level[];
     /** The stair from each floor to the one over it. */
     readonly stairs: readonly Stair[];
+    /** The floor the goal is on, from the ground one up. */
+    readonly goalLevel: number;
 }
 
 /** A room, by its place on the grid of rooms. */
@@ -170,7 +179,7 @@ export interface Level {
     /** The room the floor is come into: the door's on the ground floor, the
      *  stair's from below on every other. */
     readonly arrival: Room;
-    /** The room it is left by: the stair up, or the goal on the top floor. */
+    /** The room it is left by: the stair up, or the middle on the top floor. */
     readonly exit: Room;
     /** The block every safe block of the floor is walked to from. */
     readonly from: string;
@@ -229,7 +238,7 @@ function entryOf(maze: seekMaze.Maze, random: () => number): Plan["entry"] {
 }
 
 /** The tiles of a floor with no hazards yet: rooms, doorways and walls, the
- *  goal on the top floor, and on the ground floor the door and the starting
+ *  goal on its floor, and on the ground floor the door and the starting
  *  room outside it. */
 function plainTiles(
     maze: seekMaze.Maze,
@@ -558,7 +567,8 @@ function placeHazards(
  * The maze for a run: carved from its id, the door on the edge furthest from
  * the middle; from `LEVELS_SINCE` a floor carved over it for each of
  * `LEVELS`, a stair up from the dead end of each furthest from where it is
- * come into, and the goal in the middle of the top one. Then hazards on every
+ * come into, and the goal in the middle of the top one - from
+ * `GOAL_ANY_FLOOR_SINCE`, of a floor drawn among them all. Then hazards on every
  * floor one at a time - any that would cut a block off is left out - until
  * about `DENSITY` of its rooms have one.
  */
@@ -587,9 +597,11 @@ export function plan(
         mazes.push(above);
         arrivals.push({ cx: stair.cx, cz: stair.cz });
     }
+    const goalLevel =
+        design >= GOAL_ANY_FLOOR_SINCE ? Math.floor(random() * count) : count - 1;
     let hazards = 0;
     const levels: Level[] = mazes.map((maze, level) => {
-        const tiles = plainTiles(maze, level === 0 ? entry : null, level === count - 1);
+        const tiles = plainTiles(maze, level === 0 ? entry : null, level === goalLevel);
         const below = stairs[level - 1];
         if (below)
             stepsOf(below).forEach(([x, z], step) => {
@@ -619,7 +631,8 @@ export function plan(
         tiles: levels[0]!.tiles,
         hazards,
         levels,
-        stairs
+        stairs,
+        goalLevel
     };
 }
 
@@ -761,7 +774,6 @@ export function mazeProblems(maze: Plan): string[] {
     const problems: string[] = [];
     const { cells } = maze;
     const middle = (cells - 1) / 2;
-    const top = maze.levels.length - 1;
     maze.levels.forEach((level, index) => {
         // The ground floor's tiles are the plan's own.
         const tiles = index === 0 ? maze.tiles : level.tiles;
@@ -770,7 +782,7 @@ export function mazeProblems(maze: Plan): string[] {
         if (lost.length > 0)
             problems.push(`${lost.length} safe blocks cut off${on}, first ${lost[0]}`);
         const goal = [...tiles].filter(([, tile]) => tile === "goal");
-        const wanted = index === top ? CORRIDOR * CORRIDOR : 0;
+        const wanted = index === maze.goalLevel ? CORRIDOR * CORRIDOR : 0;
         if (goal.length !== wanted) problems.push(`a goal of ${goal.length} blocks${on}`);
         // Every wall at least two thick: between two open blocks along a line,
         // or between one and the outside, never a single block of wall.
@@ -860,7 +872,7 @@ export interface Maze {
     readonly plan: Plan;
     /** The ground floor's height: a player stands a block over it. */
     readonly floor: number;
-    /** The top floor's, where the goal is: the ground floor's in a maze of one. */
+    /** The floor the goal is on (`Plan.goalLevel`): the ground floor's in a maze of one. */
     readonly goalFloor: number;
     /** What is built, in order, floor by floor: under the floor, the floor,
      *  the walls, the hazards on it, the door, the roof and its lights; then
@@ -868,7 +880,7 @@ export interface Maze {
     readonly boxes: readonly Box[];
     /** The glass door, taken out at "Go!". */
     readonly door: Box;
-    /** The middle room of the top floor, in world blocks. */
+    /** The middle room of the goal's floor, in world blocks. */
     readonly goal: {
         readonly x1: number;
         readonly z1: number;
@@ -1121,7 +1133,7 @@ export function maze(
     return {
         plan: made,
         floor: y,
-        goalFloor: floorOf(top),
+        goalFloor: floorOf(made.goalLevel),
         boxes,
         door: door!,
         goal: world({ x1: goalX, z1: goalX, x2: goalX + CORRIDOR - 1, z2: goalX + CORRIDOR - 1 }),
@@ -1193,18 +1205,27 @@ export function levelAt(built: Maze, y?: number): number {
 
 const routes = new WeakMap<Plan, { far: number[][]; rest: number[] }>();
 
-/** Each floor's rooms to its way up, and the rooms from each floor's way up
- *  to the goal: a run's plan never changes, so worked out once. */
+/** Each floor's rooms to its way toward the goal - the stair up under the
+ *  goal's floor, the middle on it, the stair down over it - and the rooms from
+ *  that way on to the goal: a run's plan never changes, so worked out once. */
 function routeOf(made: Plan): { far: number[][]; rest: number[] } {
     const known = routes.get(made);
     if (known) return known;
-    const far = made.levels.map((floor) => distances(floor.maze, floor.exit));
+    const goal = made.goalLevel;
+    const middle = (made.cells - 1) / 2;
+    const at = (level: number, room: Room) =>
+        Math.max(0, far[level]![room.cz * made.cells + room.cx]!);
+    const far = made.levels.map((floor, level) =>
+        distances(
+            floor.maze,
+            level < goal ? floor.exit : level === goal ? { cx: middle, cz: middle } : floor.arrival
+        )
+    );
     const rest = new Array<number>(made.levels.length).fill(0);
-    for (let level = made.levels.length - 2; level >= 0; level -= 1) {
-        const floor = made.levels[level + 1]!;
-        const across = far[level + 1]![floor.arrival.cz * made.cells + floor.arrival.cx]!;
-        rest[level] = rest[level + 1]! + 1 + Math.max(0, across);
-    }
+    for (let level = goal - 1; level >= 0; level -= 1)
+        rest[level] = rest[level + 1]! + 1 + at(level + 1, made.levels[level + 1]!.arrival);
+    for (let level = goal + 1; level < made.levels.length; level += 1)
+        rest[level] = rest[level - 1]! + 1 + at(level - 1, made.levels[level - 1]!.exit);
     const route = { far, rest };
     routes.set(made, route);
     return route;

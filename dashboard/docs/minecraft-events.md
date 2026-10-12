@@ -363,7 +363,11 @@ left out.
   over the climb is left open, and every step keeps four blocks of air over
   it. Whoever is burned on an upper floor goes back to the top of its stair,
   not to the start (the pack's `#up1`/`#up2` heights and a stand on each
-  landing). The same design sets traps: jets of fire across doorways that the
+  landing). From design 4 (`nether-maze.GOAL_ANY_FLOOR_SINCE`) the goal is in
+  the middle of a floor drawn among them all, the ground one included; the
+  stairs still climb to every floor, so finding it means searching them, and
+  a racer's progress counts rooms to that floor - down again from any floor
+  over it (`routeOf`). A run built on design 3 keeps its goal on top. The same design 3 sets traps: jets of fire across doorways that the
   pack lights and puts out on a three-second beat (`JET_PERIOD`), sparking for
   the last part of the dark half, and patches of soul sand that slow a racer
   down. A jet counts as passable for the reachability rule - it is timed, not

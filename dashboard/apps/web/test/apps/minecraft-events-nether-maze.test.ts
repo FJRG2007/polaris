@@ -232,7 +232,9 @@ describe("a deadly nether maze", () => {
                 for (let x = g.x1; x <= g.x2; x += 1)
                     for (let z = g.z1; z <= g.z2; z += 1) {
                         expect(blocks.get(`${x},${G},${z}`)).toMatch(/gold_block|black_concrete/);
-                        expect(blocks.get(`${x},${v.y2},${z}`)).toBe("minecraft:sea_lantern");
+                        expect(blocks.get(`${x},${G + maze.LEVEL_PITCH - 2},${z}`)).toBe(
+                            "minecraft:sea_lantern"
+                        );
                     }
                 const goldAndBlack = [g.x1, g.x1 + 1].map((x) => blocks.get(`${x},${G},${g.z1}`));
                 expect(new Set(goldAndBlack).size).toBe(2);
@@ -311,14 +313,59 @@ describe("a deadly nether maze", () => {
             }
     });
 
-    it("stacks its floors, joined by a stair from a dead end, with the goal on top", () => {
+    it("puts the goal on the top floor up to its third design", () => {
+        for (const size of SIZES)
+            for (let seed = 0; seed < 10; seed += 1) {
+                const built = maze.maze({ size, hazards: "some" }, `t-${seed}`, SITE, Y, 3);
+                const top = built.plan.levels.length - 1;
+                expect(built.plan.goalLevel).toBe(top);
+                expect(built.goalFloor).toBe(Y + top * maze.LEVEL_PITCH);
+            }
+    });
+
+    it("puts the goal on a floor drawn among them all, every one of them drawn", () => {
+        for (const size of SIZES) {
+            const drawn = new Set<number>();
+            for (let seed = 0; seed < 40; seed += 1) {
+                const built = maze.maze({ size, hazards: "some" }, `g-${seed}`, SITE, Y);
+                const { goalLevel, levels } = built.plan;
+                drawn.add(goalLevel);
+                expect(built.goalFloor).toBe(Y + goalLevel * maze.LEVEL_PITCH);
+                // The goal's blocks on its floor only, in the middle room.
+                levels.forEach((level, index) => {
+                    const goal = [...level.tiles.values()].filter((tile) => tile === "goal");
+                    expect(goal.length > 0, `${size} ${seed} floor ${index}`).toBe(
+                        index === goalLevel
+                    );
+                });
+                expect(maze.mazeProblems(built.plan), `${size} ${seed}`).toEqual([]);
+                // Progress leads to the goal's floor: all of it there, less on
+                // any floor over it, where the way is back down.
+                const middleOf = (level: number) => ({
+                    x: built.goal.x1 + 1.5,
+                    y: Y + level * maze.LEVEL_PITCH + 1,
+                    z: built.goal.z1 + 1.5
+                });
+                expect(maze.progressAt(built, middleOf(goalLevel))).toBe(maze.roomsToGo(built));
+                for (let level = goalLevel + 1; level < levels.length; level += 1)
+                    expect(maze.progressAt(built, middleOf(level))!).toBeLessThan(
+                        maze.roomsToGo(built)
+                    );
+            }
+            expect([...drawn].sort()).toEqual(
+                Array.from({ length: maze.LEVELS[size] }, (_, index) => index)
+            );
+        }
+    }, 180_000);
+
+    it("stacks its floors, joined by a stair from a dead end, every floor reached", () => {
         for (const size of SIZES)
             for (let seed = 0; seed < 30; seed += 1) {
                 const built = maze.maze({ size, hazards: "some" }, `f-${seed}`, SITE, Y);
                 const { levels, stairs } = built.plan;
                 expect(levels).toHaveLength(maze.LEVELS[size]);
                 expect(stairs).toHaveLength(levels.length - 1);
-                expect(built.goalFloor).toBe(Y + (levels.length - 1) * maze.LEVEL_PITCH);
+                expect(built.goalFloor).toBe(Y + built.plan.goalLevel * maze.LEVEL_PITCH);
                 expect(built.landings).toHaveLength(stairs.length);
                 const blocks = blocksOf(built.boxes);
                 stairs.forEach((stair, index) => {
@@ -395,7 +442,7 @@ describe("a deadly nether maze", () => {
         for (const size of SIZES)
             for (const level of HAZARDS)
                 for (let seed = 0; seed < 40; seed += 1) {
-                    for (const design of [2, maze.DESIGN]) {
+                    for (const design of [2, 3, maze.DESIGN]) {
                         const built = maze.maze(
                             { size, hazards: level },
                             `w-${seed}`,
@@ -430,9 +477,14 @@ describe("a deadly nether maze", () => {
                 z: built.goal.z1 + 1.5
             })
         ).toBe(maze.roomsToGo(built));
-        // The middle of the ground floor is not the goal of a maze of floors.
+        // The middle of any other floor is not the goal of a maze of floors.
+        const other = built.plan.goalLevel === 0 ? 1 : 0;
         expect(
-            maze.progressAt(built, { x: built.goal.x1 + 1.5, y: Y + 1, z: built.goal.z1 + 1.5 })
+            maze.progressAt(built, {
+                x: built.goal.x1 + 1.5,
+                y: Y + other * maze.LEVEL_PITCH + 1,
+                z: built.goal.z1 + 1.5
+            })
         ).toBeLessThan(maze.roomsToGo(built));
         expect(maze.roomsToGo(built)).toBeGreaterThanOrEqual(3);
     });

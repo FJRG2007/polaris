@@ -870,7 +870,11 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
                 ? downhillMessages.readySubtitle(language)
                 : boatMessages.readySubtitle(language);
         case "nether-maze":
-            return mazeMessages.readySubtitle(language, layout.maze.plan.levels.length);
+            return mazeMessages.readySubtitle(
+                language,
+                layout.maze.plan.levels.length,
+                layout.maze.plan.design >= netherMaze.GOAL_ANY_FLOOR_SINCE
+            );
         case "acid-rain":
             return acidMessages.readySubtitle(language);
         case "elytra-race":
