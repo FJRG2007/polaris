@@ -154,3 +154,29 @@ describe("what the screen says", () => {
         expect(policy.totalBackupBytes([archive(0, 10), archive(1, 32)])).toBe(42);
     });
 });
+
+describe("waiting for an empty server", () => {
+    const daily = { ...policy.DEFAULT_BACKUP_POLICY, every: "daily" as const };
+    const hourly = { ...policy.DEFAULT_BACKUP_POLICY, every: "hourly" as const };
+    const ago = (hours: number) => new Date(NOW.getTime() - hours * HOUR);
+
+    it("waits while somebody is playing and the copy has only just come due", () => {
+        expect(policy.waitsForQuiet(daily, ago(25), NOW, 2)).toBe(true);
+    });
+
+    it("takes it at once on an empty server", () => {
+        expect(policy.waitsForQuiet(daily, ago(25), NOW, 0)).toBe(false);
+    });
+
+    it("stops waiting once it is late by six hours, or half an hourly interval", () => {
+        expect(policy.waitsForQuiet(daily, ago(30), NOW, 3)).toBe(false);
+        expect(policy.waitsForQuiet(hourly, ago(1.4), NOW, 3)).toBe(true);
+        expect(policy.waitsForQuiet(hourly, ago(1.5), NOW, 3)).toBe(false);
+    });
+
+    it("never holds back a first copy, a copy not yet due, or one whose count is unknown", () => {
+        expect(policy.waitsForQuiet(daily, null, NOW, 5)).toBe(false);
+        expect(policy.waitsForQuiet(daily, ago(2), NOW, 5)).toBe(false);
+        expect(policy.waitsForQuiet(daily, ago(25), NOW, null)).toBe(false);
+    });
+});

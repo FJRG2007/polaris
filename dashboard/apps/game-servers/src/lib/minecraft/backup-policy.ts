@@ -126,6 +126,33 @@ export function backupDue(policy: BackupPolicy, newest: Date | null, now: Date):
     return now.getTime() - newest.getTime() >= INTERVALS[policy.every];
 }
 
+/** The longest a due copy waits for the server to empty: half its interval,
+ *  and never more than six hours. */
+const MOST_QUIET_WAIT = 6 * 60 * 60 * 1000;
+
+/**
+ * Whether a due copy should wait for nobody to be on.
+ *
+ * Taking it writes the whole world out first, which holds the server's tick
+ * for a few seconds - nothing to an empty server, a freeze mid-fight to
+ * anybody playing. So a copy that has just come due waits for the server to
+ * empty, and stops waiting once it is late by half its interval (six hours at
+ * most): a server that is never empty still gets its copies, only later.
+ * `online` null means the count could not be read, which never holds a copy
+ * back.
+ */
+export function waitsForQuiet(
+    policy: BackupPolicy,
+    newest: Date | null,
+    now: Date,
+    online: number | null
+): boolean {
+    if (policy.every === "off" || newest === null || !online) return false;
+    const interval = INTERVALS[policy.every];
+    const late = now.getTime() - newest.getTime() - interval;
+    return late >= 0 && late < Math.min(interval / 2, MOST_QUIET_WAIT);
+}
+
 /** When the next one would be taken, for a screen to say it. Null when the
  *  schedule is off. */
 export function nextBackupAt(policy: BackupPolicy, newest: Date | null): Date | null {

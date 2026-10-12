@@ -33,7 +33,12 @@ import * as policy from "./backup-policy";
 import { EVENT_STATE_KEY } from "./events/catalog";
 import { formatBytes, gameOfServer } from "@polaris/core";
 import { OWNED_PROJECTS } from "../games-create";
-import { withServerContainer, type MinecraftEdition, type ServerContainer } from "./service";
+import {
+    onlinePlayers,
+    withServerContainer,
+    type MinecraftEdition,
+    type ServerContainer
+} from "./service";
 import { host } from "@polaris/app-host";
 
 const { listEnvVars, setEnvVars } = host.envVarService;
@@ -1171,9 +1176,19 @@ async function sweepOne(
         return await withServerContainer(ownerId, install.id, async (server) => {
             const existing = await listBackups(server);
             const newest = existing[0] ? new Date(existing[0].createdAt) : null;
-            if (!policy.backupDue(rules, newest, now)) {
-                // Not due, but retention still applies: the operator may have just
-                // lowered the limit, and it should bite without waiting a week.
+            // Due, but with somebody playing: wait for the server to empty,
+            // up to a limit (`waitsForQuiet`), since the copy freezes it.
+            const holding =
+                policy.backupDue(rules, newest, now) &&
+                policy.waitsForQuiet(
+                    rules,
+                    newest,
+                    now,
+                    (await onlinePlayers(ownerId, install.id))?.online ?? null
+                );
+            if (!policy.backupDue(rules, newest, now) || holding) {
+                // Not taken, but retention still applies: the operator may have
+                // just lowered the limit, and it should bite without waiting a week.
                 return {
                     installedAppId: install.id,
                     name: null,
