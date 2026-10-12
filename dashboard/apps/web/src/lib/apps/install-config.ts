@@ -26,7 +26,10 @@ export async function patchInstallConfig(
     patch: InstallConfig | ((config: InstallConfig) => InstallConfig)
 ): Promise<void> {
     for (let attempt = 1; ; attempt += 1) {
-        const row = await prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { config: true } });
+        const row = await prisma.installedApp.findUnique({
+            where: { id: installedAppId },
+            select: { config: true }
+        });
         const current = readInstallConfig(row?.config);
         const changes = typeof patch === "function" ? patch(current) : patch;
         const data = { config: JSON.stringify({ ...current, ...changes }) };
@@ -34,7 +37,10 @@ export async function patchInstallConfig(
             await prisma.installedApp.update({ where: { id: installedAppId }, data });
             return;
         }
-        const written = await prisma.installedApp.updateMany({ where: { id: installedAppId, config: row.config }, data });
+        const written = await prisma.installedApp.updateMany({
+            where: { id: installedAppId, config: row.config },
+            data
+        });
         if (written.count > 0) return;
     }
 }
