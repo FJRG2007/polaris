@@ -38,7 +38,7 @@ import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
-import { confirmedGone, missingFromWindow } from "./folder-window";
+import { confirmedGone, missingFromWindow, nextCursor } from "./folder-window";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
@@ -388,10 +388,13 @@ async function fetchOlderNow(accountId: string, folderId: string): Promise<boole
             for await (const message of client.fetch(`${from}:${mailbox.exists}`, { uid: true })) {
                 listed.push(message.uid);
             }
+            // Below the cursor only: what is past it has not arrived yet, and is
+            // the arrivals pass's to store - with the filters run over it.
             const missing = missingFromWindow(
                 listed,
                 new Set([...held.map((row) => Number(row.uid)), ...skipped]),
-                want
+                want,
+                folder.uidNext === null ? undefined : Number(folder.uidNext)
             ).slice(0, OLDER_BATCH);
             if (missing.length === 0) return false;
             const extraHeaders = folder.role === "inbox" ? await filterHeaderNames(account.id) : [];
@@ -452,6 +455,9 @@ async function syncFolder(
         }
 
         const known = validityMoved ? null : folder.uidNext;
+        // Read before the fetch: the mailbox's count moves under a pass, and the
+        // cursor may only reach what this pass actually stored (`nextCursor`).
+        const seenNext = mailbox.uidNext;
         // The inbox is where filters run, so it also fetches the headers they
         // look at - a header nobody stored is a filter that never matches.
         const extraHeaders = folder.role === "inbox" ? await filterHeaderNames(account.id) : [];
@@ -459,6 +465,10 @@ async function syncFolder(
             ? await fetchSince(client, known, extraHeaders)
             : await fetchNewest(client, mailbox.exists, extraHeaders);
         if (arrived.length > 0) await storeMessages(client, account, folder, arrived);
+        const cursor = nextCursor(
+            seenNext,
+            arrived.map((message) => message.uid)
+        );
 
         // What has arrived, and a few of whatever is still only a headline.
         await warmBodies(client, account, folder, edge);
@@ -466,14 +476,14 @@ async function syncFolder(
         if (!validityMoved) {
             await reconcileFlags(client, folder, mailbox.highestModseq ?? null);
             await reconcileDeletions(client, folder);
-            await refillWindow(client, account, folder, mailbox.exists, extraHeaders);
+            await refillWindow(client, account, folder, mailbox.exists, extraHeaders, cursor);
         }
 
         await prisma.mailFolder.update({
             where: { id: folder.id },
             data: {
                 uidValidity: BigInt(mailbox.uidValidity),
-                uidNext: BigInt(mailbox.uidNext),
+                uidNext: BigInt(cursor),
                 highestModseq: mailbox.highestModseq ?? null,
                 total: mailbox.exists,
                 lastSyncAt: new Date()
@@ -1441,7 +1451,10 @@ async function refillWindow(
     account: AccountRow,
     folder: FolderRow,
     exists: number,
-    extraHeaders: readonly string[]
+    extraHeaders: readonly string[],
+    /** Where the arrivals pass reads from next: nothing at or past it is put
+     *  back here, because it has not arrived yet. */
+    cursor: number
 ): Promise<void> {
     if (exists === 0) return;
     const from = Math.max(1, exists - WINDOW + 1);
@@ -1463,7 +1476,7 @@ async function refillWindow(
     const skipped = [...(unstored.get(folder.id) ?? [])].filter((uid) => listedSet.has(uid));
     unstored.set(folder.id, new Set(skipped));
     const known = new Set([...held.map((row) => Number(row.uid)), ...skipped]);
-    const missing = missingFromWindow(listed, known, WINDOW);
+    const missing = missingFromWindow(listed, known, WINDOW, cursor);
     if (missing.length === 0) return;
     const fetched = await collect(client, missing.join(","), { uid: true }, extraHeaders);
     if (fetched.length > 0) await storeMessages(client, account, folder, fetched, false);
