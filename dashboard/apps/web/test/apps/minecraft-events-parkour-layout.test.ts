@@ -184,6 +184,50 @@ describe("a parkour course's layout", () => {
         expect(courseOf("hard", 30, "running").platforms.some((one) => one.turn)).toBe(true);
     });
 
+    it("counts a checkpoint crossed in the air of a jump, and only from over it", () => {
+        // A racer is 0.6 wide and 1.8 tall; the box a checkpoint is reached in
+        // must take nobody standing on any other platform, its own place or a
+        // moving one's other.
+        const WIDTH = 0.3;
+        const TALL = 1.8;
+        for (const shape of PARKOUR_SHAPES)
+            for (const { difficulty, jumps } of SHAPES)
+                for (let seed = 0; seed < 20; seed += 1) {
+                    const course = courseOf(difficulty, jumps, `cross-${seed}`, undefined, [shape]);
+                    const { reached } = parkour.quickSelectors(course);
+                    for (const one of reached) {
+                        const read = (key: string) =>
+                            Number(
+                                new RegExp(String.raw`[,[]${key}=(-?\d+)`).exec(one.selector)![1]
+                            );
+                        const [x, y, z] = [read("x"), read("y"), read("z")];
+                        const [dx, dy, dz] = [read("dx"), read("dy"), read("dz")];
+                        expect(dy).toBe(one.finish ? 0 : 1);
+                        course.platforms.forEach((other, index) => {
+                            if (index === one.checkpoint) return;
+                            const places =
+                                other.trap === "shift"
+                                    ? [other.z, other.z - parkour.SHIFT_STEP]
+                                    : [other.z];
+                            for (const oz of places) {
+                                const feet = other.y + 1;
+                                const meets =
+                                    other.x - WIDTH < x + dx + 1 &&
+                                    other.x + other.size + WIDTH > x &&
+                                    oz - WIDTH < z + dz + 1 &&
+                                    oz + other.size + WIDTH > z &&
+                                    feet < y + dy + 1 &&
+                                    feet + TALL > y;
+                                expect(
+                                    meets,
+                                    `${shape} ${difficulty} ${jumps} ${seed}: ${index} in ${one.checkpoint}`
+                                ).toBe(false);
+                            }
+                        });
+                    }
+                }
+    });
+
     it("puts the finish at least a few jumps past the last checkpoint", () => {
         for (const jumps of [7, 8, 12, 13, 14, 19, 20, 25, 26])
             for (let seed = 0; seed < 20; seed += 1) {

@@ -635,6 +635,16 @@ export const READ_FINISH_TICKS = `execute as @a[tag=${IN_ARENA},scores={${FINISH
 /** The game's own tick count now: `The time is 123456`. */
 export const READ_GAME_TIME = "time query gametime";
 
+/**
+ * How high over a checkpoint a racer still crosses it, in blocks above the
+ * one they stand in. A sprint over a checkpoint touches it for a tick or two,
+ * fewer than the quick look sees; missed, the next platforms past it read as a
+ * shortcut. A jump tops out a block and a quarter up, and nothing else is
+ * that close over a platform (`parkour-layout.HEAD_ROOM`). The finish is
+ * counted only stood on.
+ */
+const CROSSING_HEIGHT = 1;
+
 /** How far to each side of the course a fall is still caught. */
 const FALL_SIDE = 4;
 /** How far under the net a fall is still caught. */
@@ -647,8 +657,9 @@ const FALL_DEPTH = 64;
  *   checkpoint but the finish) - whoever with that checkpoint is under the
  *   lowest platform's top, with where they go;
  * - `reached`: one per checkpoint and the finish - whoever has the checkpoint
- *   right before it (the start for the first) and is standing over it. One
- *   further back has skipped part of the course, and it does not count.
+ *   right before it (the start for the first) and is standing over it, or for
+ *   a checkpoint anywhere in the air of a jump over it (`CROSSING_HEIGHT`).
+ *   One further back has skipped part of the course, and it does not count.
  * A racer standing on the lowest platforms has their feet a block over `floor`;
  * a box whose top is `floor` catches them only once they are under that.
  */
@@ -675,9 +686,10 @@ export function quickSelectors(course: Course): {
         reached: course.checkpoints.map((checkpoint, at) => {
             const one = course.platforms[checkpoint]!;
             const before = at === 0 ? 0 : course.checkpoints[at - 1]!;
+            const dy = checkpoint === finish ? 0 : CROSSING_HEIGHT;
             return {
                 checkpoint,
-                selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=${before}},x=${one.x},y=${one.y + 1},z=${one.z},dx=${one.size - 1},dy=0,dz=${one.size - 1}]`,
+                selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=${before}},x=${one.x},y=${one.y + 1},z=${one.z},dx=${one.size - 1},dy=${dy},dz=${one.size - 1}]`,
                 finish: checkpoint === finish
             };
         })
