@@ -36,7 +36,12 @@ import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
 import { deployLogDir, deployLogPath, noteOnDeploy } from "./deploy/log-file";
-import { CANCELED_REASON, NO_REASON, RESTARTED_REASON, timedOutReason } from "./deploy/failure-reason";
+import {
+    CANCELED_REASON,
+    NO_REASON,
+    RESTARTED_REASON,
+    timedOutReason
+} from "./deploy/failure-reason";
 import { getFlagsForEnvironment } from "./deploy-project-service";
 import { resolveRegistryLogin } from "./registry-credential-service";
 import { notifyDeployFinished } from "./notifications/deploy-events";

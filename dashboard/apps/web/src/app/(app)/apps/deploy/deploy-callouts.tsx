@@ -17,7 +17,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { DeployFreshness } from "@/lib/deploy/freshness";
 import type { DeploymentSummary } from "@/lib/deploy-service";
 import { FAILED_DEPLOY_STATUSES } from "@/lib/deploy/attention";
-import { ArrowUpRight, CircleAlert, GitCommitHorizontal, Loader2, PackageCheck } from "lucide-react";
+import {
+    ArrowUpRight,
+    CircleAlert,
+    GitCommitHorizontal,
+    Loader2,
+    PackageCheck
+} from "lucide-react";
 
 // A minute, like the server's own cache: reopening the panel does not ask again.
 const FRESHNESS_TTL_MS = 60_000;
@@ -55,7 +61,10 @@ function useFreshness(applicationId: string, sha: string | null): DeployFreshnes
 
 /** Whether the updates scan found a newer image for this release. Read once per
  *  release shown, since the scan only runs every half hour. */
-function useImageUpdate(applicationId: string, deploymentId: string | null): { image: string } | null {
+function useImageUpdate(
+    applicationId: string,
+    deploymentId: string | null
+): { image: string } | null {
     const [value, setValue] = useState<{ image: string } | null>(null);
     useEffect(() => {
         if (!deploymentId) {
@@ -96,7 +105,12 @@ function Callout({
                 tone === "danger" ? "border-danger-edge bg-danger-soft" : "border-border bg-card"
             )}
         >
-            <span className={cn("flex size-4 self-start pt-0.5", tone === "danger" ? "text-danger-ink" : "text-primary")}>
+            <span
+                className={cn(
+                    "flex size-4 self-start pt-0.5",
+                    tone === "danger" ? "text-danger-ink" : "text-primary"
+                )}
+            >
                 {icon}
             </span>
             <div className="min-w-0 flex-1 basis-48">
@@ -165,7 +179,9 @@ export function DeployCallouts({
                     detail={
                         <>
                             <DeployFailureLine status={failed.status} error={failed.error} />
-                            {active && active.id !== failed.id && <span>{t("callouts.previousLive")}</span>}
+                            {active && active.id !== failed.id && (
+                                <span>{t("callouts.previousLive")}</span>
+                            )}
                         </>
                     }
                 >

@@ -78,8 +78,12 @@ describe("cancelling a deploy", () => {
         // The runner can be arriving at its own conclusion at the same moment, so the
         // write is conditional rather than a plain update; first one wins.
         await cancelDeployment("dep-1", "owner-1");
-        const [args] = deploymentUpdateMany.mock.calls[0] as [{ where: { status: { notIn: string[] } } }];
-        expect(args.where.status.notIn).toEqual(expect.arrayContaining(["running", "failed", "cancelled"]));
+        const [args] = deploymentUpdateMany.mock.calls[0] as [
+            { where: { status: { notIn: string[] } } }
+        ];
+        expect(args.where.status.notIn).toEqual(
+            expect.arrayContaining(["running", "failed", "cancelled"])
+        );
     });
 
     it("refuses a deploy that has already finished", async () => {
@@ -145,7 +149,14 @@ describe("the terminal states", () => {
         // Read by four separate decisions - whether a queued job still runs, whether a
         // verdict may be written, whether a screen keeps looking, what a card says the
         // service is doing - and they drifted apart when each kept its own copy.
-        for (const status of ["running", "failed", "cancelled", "rolled_back", "stopped", "removed"]) {
+        for (const status of [
+            "running",
+            "failed",
+            "cancelled",
+            "rolled_back",
+            "stopped",
+            "removed"
+        ]) {
             expect(TERMINAL_DEPLOY_STATUSES.has(status)).toBe(true);
         }
         for (const status of ["queued", "deploying"]) {

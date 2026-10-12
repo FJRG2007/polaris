@@ -52,34 +52,53 @@ export function deploySteps(status: string, log: string): DeployStep[] {
     const kept = /Kept this release as /.test(log);
     const notKept = /could not be kept for an instant rollback/.test(log);
 
-    const source: Marker = rollback
-        ? { started: true, ended: true }
-        : fetch.started
-          ? fetch
-          : pull;
+    const source: Marker = rollback ? { started: true, ended: true } : fetch.started ? fetch : pull;
     const keep: Marker = rollback
         ? { started: true, ended: true }
         : { started: kept || notKept, ended: kept || notKept };
 
-    const rows: Array<{ id: DeployStepId; label: string; mark: Marker; skip: boolean; warn?: boolean }> = [
-        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
-        { id: "queued", label: "Queued", mark: { started: status !== "queued", ended: status !== "queued" }, skip: false },
+    const rows: Array<{
+        id: DeployStepId;
+        label: string;
+        mark: Marker;
+        skip: boolean;
+        warn?: boolean;
+    }> = [
+        {
+            id: "queued",
+            label: "Queued", // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
+            mark: { started: status !== "queued", ended: status !== "queued" },
+            skip: false
+        },
         {
             id: "source",
-            // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
-            label: rollback ? "Kept image" : fetch.started ? "Clone" : pull.started ? "Pull" : "Source",
+            label: rollback
+                ? "Kept image" // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
+                : fetch.started
+                  ? "Clone" // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
+                  : pull.started
+                    ? "Pull" // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
+                    : "Source", // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
             mark: source,
             skip: false
         },
         // An image source and a rollback have nothing to build.
-        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
-        { id: "build", label: "Build", mark: build, skip: rollback || (pull.started && !fetch.started) },
+        {
+            id: "build",
+            label: "Build", // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
+            mark: build,
+            skip: rollback || (pull.started && !fetch.started)
+        },
         // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "keep", label: "Keep", mark: keep, skip: false, warn: notKept && !rollback },
         // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
         { id: "start", label: "Start", mark: start, skip: false },
-        // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
-        { id: "live", label: "Live", mark: { started: status === "running", ended: status === "running" }, skip: false }
+        {
+            id: "live",
+            label: "Live", // i18n-ignore said in the reader's words by the deploy stepper (stepLabel)
+            mark: { started: status === "running", ended: status === "running" },
+            skip: false
+        }
     ];
 
     // A deploy with no step lines at all - the swarm runtime, or one from before
@@ -101,7 +120,8 @@ export function deploySteps(status: string, log: string): DeployStep[] {
         const seconds = row.mark.seconds;
         let state: DeployStepState;
         if (row.skip) state = "skipped";
-        else if (running) state = row.mark.started || !anyMarker || row.id === "live" ? "done" : "skipped";
+        else if (running)
+            state = row.mark.started || !anyMarker || row.id === "live" ? "done" : "skipped";
         else if (failed) {
             if (row.id === "queued") state = "done";
             else if (index < reached || (index === reached && row.mark.ended)) state = "done";
@@ -111,7 +131,12 @@ export function deploySteps(status: string, log: string): DeployStep[] {
         else if (row.mark.ended || (current >= 0 && index < current)) state = "done";
         else state = "pending";
         if (state === "done" && row.warn) state = "warning";
-        steps.push({ id: row.id, label: row.label, state, ...(seconds !== undefined ? { seconds } : {}) });
+        steps.push({
+            id: row.id,
+            label: row.label,
+            state,
+            ...(seconds !== undefined ? { seconds } : {})
+        });
     });
 
     // A failure whose last step had finished (it failed between steps) lands on
