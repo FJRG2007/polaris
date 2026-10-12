@@ -7,7 +7,8 @@
  */
 
 import { useCrmT } from "./i18n";
-import { FIELDS, type CrmObject, type FieldDef } from "../model/objects";
+import { useCustomFields, fieldLabel } from "./custom-fields";
+import { fieldOf, fieldsOf, type CrmObject, type FieldDef } from "../model/objects";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, Rows3, X } from "lucide-react";
 import { MAX_SORTS, groupFields, sortable, type ViewSort } from "../model/views";
 import {
@@ -24,9 +25,14 @@ import {
     DropdownMenuTrigger
 } from "@polaris/ui";
 
-function useFieldName(object: CrmObject) {
+/** What the field under a key is called, an added one too. */
+export function useFieldName(object: CrmObject) {
     const t = useCrmT();
-    return (key: string) => t(`fields.${object}.${key}` as Parameters<typeof t>[0]);
+    const custom = useCustomFields();
+    return (key: string) => {
+        const field = fieldOf(object, key, custom);
+        return field ? fieldLabel(t, object, field) : "";
+    };
 }
 
 export function SortMenu({
@@ -41,9 +47,10 @@ export function SortMenu({
     disabled?: boolean;
 }) {
     const t = useCrmT();
+    const custom = useCustomFields();
     const name = useFieldName(object);
     const full = sorts.length >= MAX_SORTS;
-    const free = FIELDS[object].filter(
+    const free = fieldsOf(object, custom).filter(
         (field) => sortable(field.kind) && !sorts.some((sort) => sort.key === field.key)
     );
     const set = (index: number, next: ViewSort | null) =>
@@ -173,8 +180,9 @@ export function GroupMenu({
     disabled?: boolean;
 }) {
     const t = useCrmT();
+    const custom = useCustomFields();
     const name = useFieldName(object);
-    const fields = groupFields(object);
+    const fields = groupFields(object, custom);
     const none = fields.length === 0;
     const label = value
         ? t(board ? "groups.columnsField" : "groups.buttonField", { field: name(value.key) })

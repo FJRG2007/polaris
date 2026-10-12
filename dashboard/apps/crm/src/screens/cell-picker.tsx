@@ -12,6 +12,7 @@
  */
 
 import { unwrap } from "./call";
+import { optionLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
 import { Check, X } from "lucide-react";
 import * as actions from "../actions/records";
@@ -135,7 +136,7 @@ export function CellPicker({ object, field, value, people, onPick, onClose }: Pi
     );
     const options = (field.options ?? []).filter((option) =>
         menuSearchMatches(
-            t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0]),
+            optionLabel(t, object, field, option),
             search
         )
     );
@@ -168,11 +169,7 @@ export function CellPicker({ object, field, value, people, onPick, onClose }: Pi
                                   <OptionChip
                                       field={field}
                                       option={option}
-                                      label={t(
-                                          `options.${object}.${field.key}.${option}` as Parameters<
-                                              typeof t
-                                          >[0]
-                                      )}
+                                      label={optionLabel(t, object, field, option)}
                                   />
                               </Item>
                           ))

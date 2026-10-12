@@ -8,6 +8,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { useCustomFields } from "./custom-fields";
 import { messageOf } from "./call";
 import { useState, type FormEvent } from "react";
 import type { CrmObject } from "../model/objects";
@@ -185,6 +186,7 @@ function ViewNameDialog({
     onClose: () => void;
 }) {
     const t = useCrmT();
+    const custom = useCustomFields();
     const [name, setName] = useState(initialName);
     const [kind, setKind] = useState<ViewKind | null>(initialKind);
     const [busy, setBusy] = useState(false);
@@ -193,7 +195,7 @@ function ViewNameDialog({
     const duplicate = clean !== "" && taken(clean);
     const unchanged = initialKind === null && clean === normalizeViewName(initialName);
     const blocked = clean === "" || duplicate || unchanged || busy;
-    const boardable = groupFields(object).length > 0;
+    const boardable = groupFields(object, custom).length > 0;
 
     const submit = (event: FormEvent) => {
         event.preventDefault();

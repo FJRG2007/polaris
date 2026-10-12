@@ -13,7 +13,7 @@
 
 import { z } from "zod";
 import { EMPTY_FILTER, filterSchema, readFilter } from "./filters";
-import { FIELDS, fieldOf, type CrmObject, type FieldDef, type FieldKind } from "./objects";
+import { fieldOf, fieldsOf, type CrmObject, type FieldDef, type FieldKind } from "./objects";
 
 /** The totals a column can show under it. */
 export const AGGREGATES = [
@@ -86,8 +86,8 @@ export function groupable(field: FieldDef): boolean {
 }
 
 /** The fields a kind of record can be grouped or drawn as a board by. */
-export function groupFields(object: CrmObject): readonly FieldDef[] {
-    return FIELDS[object].filter(groupable);
+export function groupFields(object: CrmObject, custom: readonly FieldDef[] = []): readonly FieldDef[] {
+    return fieldsOf(object, custom).filter(groupable);
 }
 
 const groupKey = z.string().min(1).max(64).nullable();
@@ -106,9 +106,9 @@ export type ViewConfig = z.infer<typeof viewConfigSchema>;
 
 /** The table a kind of record starts with: every field in its own order, the
  *  rarer ones hidden, a count under the name. */
-export function defaultConfig(object: CrmObject): ViewConfig {
+export function defaultConfig(object: CrmObject, custom: readonly FieldDef[] = []): ViewConfig {
     return {
-        columns: FIELDS[object].map((field) => ({
+        columns: fieldsOf(object, custom).map((field) => ({
             key: field.key,
             width: field.width,
             hidden: Boolean(field.hiddenByDefault),
@@ -132,8 +132,8 @@ export function defaultConfig(object: CrmObject): ViewConfig {
  * by a field that cannot group is no grouping. Anything unreadable is the
  * default.
  */
-export function readConfig(object: CrmObject, raw: unknown): ViewConfig {
-    const base = defaultConfig(object);
+export function readConfig(object: CrmObject, raw: unknown, custom: readonly FieldDef[] = []): ViewConfig {
+    const base = defaultConfig(object, custom);
     const parsed = z
         .object({
             columns: z.array(z.unknown()).optional(),
@@ -150,7 +150,7 @@ export function readConfig(object: CrmObject, raw: unknown): ViewConfig {
     for (const entry of parsed.data.columns ?? []) {
         const column = columnSchema.safeParse(entry);
         if (!column.success || seen.has(column.data.key)) continue;
-        const field = fieldOf(object, column.data.key);
+        const field = fieldOf(object, column.data.key, custom);
         if (!field) continue;
         seen.add(field.key);
         columns.push({
@@ -167,13 +167,13 @@ export function readConfig(object: CrmObject, raw: unknown): ViewConfig {
         if (!seen.has(column.key)) columns.push({ ...column, hidden: true, aggregate: null });
     }
     // The name leads, wherever a stored config put it.
-    const primary = columns.findIndex((column) => fieldOf(object, column.key)?.primary);
+    const primary = columns.findIndex((column) => fieldOf(object, column.key, custom)?.primary);
     if (primary > 0) columns.unshift(...columns.splice(primary, 1));
 
     const sorts: ViewSort[] = [];
     for (const entry of parsed.data.sorts ?? []) {
         const sort = sortSchema.safeParse(entry);
-        const field = sort.success ? fieldOf(object, sort.data.key) : undefined;
+        const field = sort.success ? fieldOf(object, sort.data.key, custom) : undefined;
         if (!sort.success || !field || !sortable(field.kind)) continue;
         if (sorts.some((existing) => existing.key === sort.data.key)) continue;
         if (sorts.length < MAX_SORTS) sorts.push(sort.data);
@@ -181,22 +181,26 @@ export function readConfig(object: CrmObject, raw: unknown): ViewConfig {
     return {
         columns,
         sorts,
-        filter: readFilter(object, parsed.data.filter),
-        groupBy: readGroupKey(object, parsed.data.groupBy),
-        boardBy: readGroupKey(object, parsed.data.boardBy)
+        filter: readFilter(object, parsed.data.filter, custom),
+        groupBy: readGroupKey(object, parsed.data.groupBy, custom),
+        boardBy: readGroupKey(object, parsed.data.boardBy, custom)
     };
 }
 
-function readGroupKey(object: CrmObject, raw: unknown): string | null {
+function readGroupKey(object: CrmObject, raw: unknown, custom: readonly FieldDef[] = []): string | null {
     if (typeof raw !== "string") return null;
-    const field = fieldOf(object, raw);
+    const field = fieldOf(object, raw, custom);
     return field && groupable(field) ? field.key : null;
 }
 
 /** The field a board is drawn by: the view's, or the first that can be one. */
-export function boardField(object: CrmObject, config: ViewConfig): FieldDef | null {
-    const chosen = config.boardBy ? fieldOf(object, config.boardBy) : undefined;
-    return chosen && groupable(chosen) ? chosen : (groupFields(object)[0] ?? null);
+export function boardField(
+    object: CrmObject,
+    config: ViewConfig,
+    custom: readonly FieldDef[] = []
+): FieldDef | null {
+    const chosen = config.boardBy ? fieldOf(object, config.boardBy, custom) : undefined;
+    return chosen && groupable(chosen) ? chosen : (groupFields(object, custom)[0] ?? null);
 }
 
 /** How a view draws its records. */

@@ -217,7 +217,12 @@
         "viewLimit": "Esta lista ya tiene {max} vistas. Borra una antes.",
         "viewNotRenamed": "No se renombró la vista",
         "viewNotDeleted": "No se borró la vista",
-        "notMoved": "No se movió la tarjeta"
+        "notMoved": "No se movió la tarjeta",
+        "fieldMissing": "Ese campo ya no existe.",
+        "fieldSlots": "Esta lista no admite otro campo de este tipo. Elimina uno primero.",
+        "fieldNameTaken": "Ya existe un campo con este nombre.",
+        "fieldNotSaved": "El campo no se guardó",
+        "fieldNotDeleted": "El campo no se eliminó"
     },
     "views": {
         "title": "Vistas",
@@ -309,5 +314,46 @@
         "columnsBy": "Columnas por",
         "none": "Sin agrupar",
         "unavailable": "Aquí no hay opciones fijas por las que agrupar."
+    },
+    "customFields": {
+        "noValue": "Sin valor",
+        "manage": "Campos",
+        "title": "Campos",
+        "intro": "Los campos que añadas aparecen como columnas, filtros y grupos del tablero.",
+        "add": "Añadir campo",
+        "edit": "Editar campo",
+        "name": "Nombre",
+        "namePlaceholder": "Origen del contacto",
+        "kind": "Tipo",
+        "kinds": {
+            "text": "Texto",
+            "number": "Número",
+            "date": "Fecha",
+            "boolean": "Sí / no",
+            "select": "Opción",
+            "url": "Enlace",
+            "email": "Correo",
+            "phone": "Teléfono"
+        },
+        "options": "Opciones",
+        "optionPlaceholder": "Nueva opción",
+        "addOption": "Añadir opción",
+        "removeOption": "Quitar opción",
+        "kindFixed": "El tipo no se puede cambiar una vez creado el campo.",
+        "save": "Guardar",
+        "create": "Añadir campo",
+        "delete": "Eliminar campo",
+        "deleteTitle": "¿Eliminar «{name}»?",
+        "deleteDescription": "Todos aquí pierden este campo y los valores que cada registro tiene en él.",
+        "created": "Campo «{name}» añadido.",
+        "deleted": "Campo «{name}» eliminado.",
+        "empty": "Aún no hay campos añadidos.",
+        "invalid": {
+            "required": "Ponle un nombre.",
+            "tooLong": "Usa hasta {length} caracteres.",
+            "noOptions": "Añade al menos una opción.",
+            "duplicate": "Esta opción ya está.",
+            "tooMany": "Usa hasta {max} opciones."
+        }
     }
 }

@@ -10,6 +10,7 @@
 
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
+import { loadFields } from "./fields";
 import { host } from "@polaris/app-host";
 import { listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
@@ -53,8 +54,9 @@ export async function listRecords(
     options: ListOptions
 ): Promise<RecordPage> {
     await requireCan(actor, object, "read");
-    if (options.group) requireGroupable(object, options.group.key);
-    const where = listWhere(object, actor.shelf, options);
+    const custom = options.custom ?? (await loadFields(actor.shelf, object));
+    if (options.group) requireGroupable(object, options.group.key, custom);
+    const where = listWhere(object, actor.shelf, { ...options, custom });
     const [rows, total] = await Promise.all([
         table(object).findMany({
             where,
@@ -71,8 +73,12 @@ export async function listRecords(
     };
 }
 
-function requireGroupable(object: CrmObject, key: string): FieldDef {
-    const field = fieldOf(object, key);
+function requireGroupable(
+    object: CrmObject,
+    key: string,
+    custom: readonly FieldDef[]
+): FieldDef {
+    const field = fieldOf(object, key, custom);
     if (!field || !groupable(field)) throw new Error(`crm: ${object} cannot group by ${key}`);
     return field;
 }
@@ -95,10 +101,17 @@ export async function listGroups(
     options: Omit<ListOptions, "group" | "offset" | "limit">
 ): Promise<RecordGroup[]> {
     await requireCan(actor, object, "read");
-    const field = requireGroupable(object, key);
+    const custom = await loadFields(actor.shelf, object);
+    const field = requireGroupable(object, key, custom);
     const groups: RecordGroup[] = [];
-    for (const value of field.options ?? []) {
-        const page = await listRecords(actor, object, { ...options, group: { key, value } });
+    // A choice somebody added may be unset, so its records get a group too.
+    const values = [...(field.options ?? []), ...(field.custom ? [""] : [])];
+    for (const value of values) {
+        const page = await listRecords(actor, object, {
+            ...options,
+            custom,
+            group: { key, value }
+        });
         groups.push({ value, ...page });
     }
     return groups;
@@ -120,8 +133,9 @@ export async function moveRecord(
     }
 ): Promise<CrmRecord> {
     await requireCan(actor, object, "edit");
-    requireGroupable(object, move.key);
-    const data = await prepare(actor, object, { [move.key]: move.value });
+    const custom = await loadFields(actor.shelf, object);
+    requireGroupable(object, move.key, custom);
+    const data = await prepare(actor, object, { [move.key]: move.value }, custom);
     const where = { id, ...shelfWhere(actor.shelf), deletedAt: null };
     const position = move.last ? await pastLast(actor, object, id, move) : move.position;
     const result = await table(object).updateMany({
@@ -210,7 +224,7 @@ async function refuseValue(object: CrmObject, field: FieldDef, reason: string): 
     const t = await crmT();
     throw new CrmRefusal(
         t("errors.invalidValue", {
-            field: t(`fields.${object}.${field.key}` as Parameters<typeof t>[0]),
+            field: field.label ?? t(`fields.${object}.${field.key}` as Parameters<typeof t>[0]),
             reason: t(`invalid.${reason}` as Parameters<typeof t>[0])
         })
     );
@@ -224,12 +238,13 @@ async function refuseValue(object: CrmObject, field: FieldDef, reason: string): 
 async function prepare(
     actor: CrmActor,
     object: CrmObject,
-    values: Readonly<Record<string, unknown>>
+    values: Readonly<Record<string, unknown>>,
+    custom: readonly FieldDef[]
 ): Promise<Record<string, unknown>> {
     const data: Record<string, unknown> = {};
     let people: Ref[] | null = null;
     for (const [key, raw] of Object.entries(values)) {
-        const field = writable(object, key);
+        const field = writable(object, key, custom);
         if (!field) {
             const t = await crmT();
             throw new CrmRefusal(t("errors.unknownField"));
@@ -264,7 +279,7 @@ export async function createRecord(
     await requireCan(actor, object, "edit");
     const primary = primaryField(object);
     if (!(primary.key in values)) await refuseValue(object, primary, "required");
-    const data = await prepare(actor, object, values);
+    const data = await prepare(actor, object, values, await loadFields(actor.shelf, object));
     // New rows go to the top of a board column: below everything by position.
     const first = (await table(object).findFirst({
         where: shelfWhere(actor.shelf),
@@ -310,7 +325,7 @@ export async function updateRecords(
 ): Promise<CrmRecord[]> {
     await requireCan(actor, object, "edit");
     if (ids.length === 0) return [];
-    const data = await prepare(actor, object, values);
+    const data = await prepare(actor, object, values, await loadFields(actor.shelf, object));
     const where = { id: { in: [...new Set(ids)] }, ...shelfWhere(actor.shelf), deletedAt: null };
     await table(object).updateMany({ where, data });
     const rows = (await table(object).findMany({ where, select: recordSelect(object) })) as Record<

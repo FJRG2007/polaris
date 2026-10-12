@@ -8,6 +8,7 @@
 
 import { z } from "zod";
 import * as views from "../lib/views";
+import * as fields from "../lib/fields";
 import * as totals from "../lib/totals";
 import * as records from "../lib/records";
 import { MAX_SEARCH } from "../lib/query";
@@ -15,7 +16,8 @@ import type { Abilities } from "../lib/access";
 import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { CRM_OBJECTS, type CrmRecord, type Ref } from "../model/objects";
-import { filterSchema, readFilter } from "../model/filters";
+import { filterSchema } from "../model/filters";
+import { fieldInputSchema, type CustomField } from "../model/fields";
 import {
     AGGREGATES,
     MAX_SORTS,
@@ -57,6 +59,8 @@ export interface ListOpening {
     readonly people: Ref[];
     /** The organization whose CRM this is, or null for the reader's own. */
     readonly shelfName: string | null;
+    /** The fields added to this kind of record here. */
+    readonly fields: CustomField[];
 }
 
 /** Everything a list needs before its rows: its view, what the reader may do,
@@ -74,19 +78,22 @@ export async function openListAction(input: unknown): Promise<Outcome<ListOpenin
                 views: [],
                 can: actor.can,
                 people: [],
-                shelfName: actor.shelf.orgName
+                shelfName: actor.shelf.orgName,
+                fields: []
             };
         }
-        const [all, people] = await Promise.all([
+        const [all, people, added] = await Promise.all([
             views.listViews(actor, parsed.data.object),
-            records.shelfPeople(actor)
+            records.shelfPeople(actor),
+            fields.listFields(actor.shelf, parsed.data.object)
         ]);
         return {
             view: all[0] ?? null,
             views: all,
             can: actor.can,
             people,
-            shelfName: actor.shelf.orgName
+            shelfName: actor.shelf.orgName,
+            fields: added
         };
     });
 }
@@ -110,7 +117,7 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
     return outcome(async () =>
         records.listRecords(await requireCrmActor(), kind, {
             ...options,
-            filter: readFilter(kind, sent)
+            filter: sent
         })
     );
 }
@@ -134,7 +141,7 @@ export async function listGroupsAction(
     return outcome(async () => ({
         groups: await records.listGroups(await requireCrmActor(), kind, key, {
             ...options,
-            filter: readFilter(kind, sent)
+            filter: sent
         })
     }));
 }
@@ -158,7 +165,7 @@ export async function totalsAction(input: unknown): Promise<Outcome<{ totals: to
             await requireCrmActor(),
             parsed.data.object,
             parsed.data.asked,
-            { ...parsed.data, filter: readFilter(parsed.data.object, parsed.data.filter) }
+            parsed.data
         )
     }));
 }
@@ -299,6 +306,39 @@ export async function deleteViewAction(input: unknown): Promise<Outcome<{ delete
     if (!parsed.success) return invalid();
     return outcome(async () => {
         await views.deleteView(await requireCrmActor(), parsed.data.object, parsed.data.viewId);
+        return { deleted: true as const };
+    });
+}
+
+/** Add a field to a kind of record. */
+export async function createFieldAction(input: unknown): Promise<Outcome<{ field: CustomField }>> {
+    const parsed = z.object({ object, field: fieldInputSchema }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        field: await fields.createField(await requireCrmActor(), parsed.data.object, parsed.data.field)
+    }));
+}
+
+/** Rename a field, or change a select's choices. */
+export async function updateFieldAction(input: unknown): Promise<Outcome<{ field: CustomField }>> {
+    const parsed = z.object({ object, fieldId: id, field: fieldInputSchema }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        field: await fields.updateField(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.fieldId,
+            parsed.data.field
+        )
+    }));
+}
+
+/** Remove a field and what the records held in it. */
+export async function deleteFieldAction(input: unknown): Promise<Outcome<{ deleted: true }>> {
+    const parsed = z.object({ object, fieldId: id }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => {
+        await fields.deleteField(await requireCrmActor(), parsed.data.object, parsed.data.fieldId);
         return { deleted: true as const };
     });
 }

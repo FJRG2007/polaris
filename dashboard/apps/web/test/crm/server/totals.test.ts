@@ -12,7 +12,12 @@ const delegate = vi.hoisted(() => ({
 }));
 
 vi.mock("@polaris/db", () => ({
-    prisma: { crmCompany: delegate, crmPerson: delegate, crmOpportunity: delegate },
+    prisma: {
+        crmCompany: delegate,
+        crmPerson: delegate,
+        crmOpportunity: delegate,
+        crmField: { findMany: async () => [] }
+    },
     Prisma: { Decimal: class {} }
 }));
 vi.mock("@polaris/app-host", () => ({

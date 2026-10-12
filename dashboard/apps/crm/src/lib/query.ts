@@ -11,9 +11,9 @@
 
 import type { ViewSort } from "../model/views";
 import { contains, filterWhere } from "./filters";
-import type { ViewFilter } from "../model/filters";
+import { readFilter, type ViewFilter } from "../model/filters";
 import { shelfWhere, type Shelf } from "./access";
-import type { CrmObject } from "../model/objects";
+import { slotOf, type CrmObject, type FieldDef } from "../model/objects";
 import { columnOf, type ColumnSpec } from "./columns";
 
 /** The text columns the search box looks in, per kind of record. */
@@ -52,6 +52,8 @@ export interface ListScope {
     readonly deleted?: boolean;
     readonly filter?: ViewFilter;
     readonly group?: GroupScope;
+    /** The fields added on the shelf, so the filter can name them. */
+    readonly custom?: readonly FieldDef[];
 }
 
 /** The rows a list reads: this shelf, in or out of the trash, matching the
@@ -63,7 +65,9 @@ export function listWhere(
 ): Record<string, unknown> {
     const narrowed = [
         searchWhere(object, options.search ?? ""),
-        options.filter ? filterWhere(object, options.filter) : {},
+        options.filter
+            ? filterWhere(object, readFilter(object, options.filter, options.custom), options.custom)
+            : {},
         options.group ? groupWhere(object, options.group) : {}
     ].filter((part) => Object.keys(part).length > 0);
     return {
@@ -83,8 +87,14 @@ export function groupWhere(object: CrmObject, group: GroupScope): Record<string,
 /** Columns that may hold null, so a sort puts their empty rows last. */
 const NULLABLE = new Set(["employees", "annualRevenue", "amount", "closeDate"]);
 
+/** A number or a day somebody added holds nothing until it is set. */
+function nullableSlot(column: string): boolean {
+    const family = slotOf(column);
+    return family === "cNum" || family === "cDate";
+}
+
 function order(column: string, direction: "asc" | "desc"): Record<string, unknown> {
-    return { [column]: NULLABLE.has(column) ? { sort: direction, nulls: "last" } : direction };
+    return { [column]: NULLABLE.has(column) || nullableSlot(column) ? { sort: direction, nulls: "last" } : direction };
 }
 
 const REF_ORDER: Readonly<Record<string, string>> = {

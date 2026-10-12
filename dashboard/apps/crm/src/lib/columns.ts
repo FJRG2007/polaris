@@ -11,7 +11,9 @@
 
 import { prisma, Prisma } from "@polaris/db";
 import {
+    SLOTS,
     FIELDS,
+    slotOf,
     fieldOf,
     type CrmObject,
     type CrmRecord,
@@ -97,6 +99,9 @@ export const COLUMNS: Readonly<Record<CrmObject, Readonly<Record<string, ColumnS
 };
 
 export function columnOf(object: CrmObject, key: string): ColumnSpec {
+    // A slot column holds a field somebody added: a day, or the value as is.
+    const family = slotOf(key);
+    if (family) return family === "cDate" ? { type: "day", column: key } : scalar(key);
     const spec = COLUMNS[object][key];
     if (!spec) throw new Error(`crm: ${object} has no field ${key}`);
     return spec;
@@ -148,6 +153,7 @@ export function recordSelect(object: CrmObject): Record<string, unknown> {
             Object.assign(select, { [spec.amount]: true, [spec.currency]: true });
         else select[spec.relation] = { select: REF_SELECT[spec.target] };
     }
+    for (const slot of SLOTS) select[slot] = true;
     return select;
 }
 
@@ -194,6 +200,7 @@ export function toRecord(object: CrmObject, row: Record<string, unknown>): CrmRe
     const values: Record<string, FieldValue> = {};
     for (const field of FIELDS[object])
         values[field.key] = readValue(columnOf(object, field.key), row);
+    for (const slot of SLOTS) values[slot] = readValue(columnOf(object, slot), row);
     return {
         id: String(row.id),
         position: Number(row.position ?? 0),
@@ -232,7 +239,11 @@ export function writeData(
 }
 
 /** Whether a field can be written by a person, by its definition. */
-export function writable(object: CrmObject, key: string): FieldDef | null {
-    const field = fieldOf(object, key);
+export function writable(
+    object: CrmObject,
+    key: string,
+    custom: readonly FieldDef[] = []
+): FieldDef | null {
+    const field = fieldOf(object, key, custom);
     return field && !field.readOnly ? field : null;
 }

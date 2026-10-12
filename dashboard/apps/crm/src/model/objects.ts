@@ -45,6 +45,55 @@ export interface FieldDef {
     readonly width: number;
     /** Left out of a new table's columns until somebody adds it. */
     readonly hiddenByDefault?: boolean;
+    /** A field somebody added (`lib/fields`): its key is the slot column it
+     *  is stored in, and it is drawn by `label` rather than a translation. */
+    readonly custom?: boolean;
+    readonly label?: string;
+}
+
+/** The kinds a field somebody adds can be. */
+export const CUSTOM_KINDS = [
+    "text",
+    "number",
+    "date",
+    "boolean",
+    "select",
+    "url",
+    "email",
+    "phone"
+] as const;
+
+export type CustomKind = (typeof CUSTOM_KINDS)[number];
+
+/** The slot columns of each record table, per family, and how many there are. */
+export const SLOT_FAMILIES = { cText: 10, cNum: 5, cDate: 5, cBool: 5 } as const;
+
+export type SlotFamily = keyof typeof SLOT_FAMILIES;
+
+/** The family of slot columns a kind of custom field is stored in. */
+export function slotFamily(kind: CustomKind): SlotFamily {
+    if (kind === "number") return "cNum";
+    if (kind === "date") return "cDate";
+    if (kind === "boolean") return "cBool";
+    return "cText";
+}
+
+/** Every slot column, "cText1" to "cBool5". */
+export const SLOTS: readonly string[] = Object.entries(SLOT_FAMILIES).flatMap(([family, count]) =>
+    Array.from({ length: count }, (_, index) => `${family}${index + 1}`)
+);
+
+/** The family of a slot key, or null for a key that is not one. */
+export function slotOf(key: string): SlotFamily | null {
+    const match = /^(cText|cNum|cDate|cBool)([1-9][0-9]?)$/.exec(key);
+    if (!match) return null;
+    const family = match[1] as SlotFamily;
+    return Number(match[2]) <= SLOT_FAMILIES[family] ? family : null;
+}
+
+/** The fields of a kind of record: its own, then the ones added on the shelf. */
+export function fieldsOf(object: CrmObject, custom: readonly FieldDef[] = []): readonly FieldDef[] {
+    return custom.length === 0 ? FIELDS[object] : [...FIELDS[object], ...custom];
 }
 
 /** An opportunity's stages, first to last. A board draws one column each. */
@@ -113,8 +162,12 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
 };
 
 /** One field of one kind of record, or undefined for a key it does not have. */
-export function fieldOf(object: CrmObject, key: string): FieldDef | undefined {
-    return FIELDS[object].find((field) => field.key === key);
+export function fieldOf(
+    object: CrmObject,
+    key: string,
+    custom: readonly FieldDef[] = []
+): FieldDef | undefined {
+    return FIELDS[object].find((field) => field.key === key) ?? custom.find((field) => field.key === key);
 }
 
 /** The field a record is named by. */

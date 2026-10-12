@@ -217,7 +217,12 @@
         "viewLimit": "This list already has {max} views. Delete one first.",
         "viewNotRenamed": "The view was not renamed",
         "viewNotDeleted": "The view was not deleted",
-        "notMoved": "The card was not moved"
+        "notMoved": "The card was not moved",
+        "fieldMissing": "That field no longer exists.",
+        "fieldSlots": "This list has no room for another field of this type. Delete one first.",
+        "fieldNameTaken": "A field with this name already exists.",
+        "fieldNotSaved": "The field was not saved",
+        "fieldNotDeleted": "The field was not deleted"
     },
     "views": {
         "title": "Views",
@@ -309,5 +314,46 @@
         "columnsBy": "Columns by",
         "none": "No grouping",
         "unavailable": "Nothing here has fixed choices to group by."
+    },
+    "customFields": {
+        "noValue": "No value",
+        "manage": "Fields",
+        "title": "Fields",
+        "intro": "Fields you add show up as columns, filters and board groups.",
+        "add": "Add field",
+        "edit": "Edit field",
+        "name": "Name",
+        "namePlaceholder": "Lead source",
+        "kind": "Type",
+        "kinds": {
+            "text": "Text",
+            "number": "Number",
+            "date": "Date",
+            "boolean": "Yes / no",
+            "select": "Choice",
+            "url": "Link",
+            "email": "Email",
+            "phone": "Phone"
+        },
+        "options": "Choices",
+        "optionPlaceholder": "New choice",
+        "addOption": "Add choice",
+        "removeOption": "Remove choice",
+        "kindFixed": "The type cannot change once the field exists.",
+        "save": "Save",
+        "create": "Add field",
+        "delete": "Delete field",
+        "deleteTitle": "Delete \"{name}\"?",
+        "deleteDescription": "Everyone here loses this field and the values every record holds in it.",
+        "created": "Field \"{name}\" added.",
+        "deleted": "Field \"{name}\" deleted.",
+        "empty": "No fields added yet.",
+        "invalid": {
+            "required": "Give it a name.",
+            "tooLong": "Use up to {length} characters.",
+            "noOptions": "Add at least one choice.",
+            "duplicate": "This choice is already there.",
+            "tooMany": "Use up to {max} choices."
+        }
     }
 }

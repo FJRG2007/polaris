@@ -12,6 +12,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { useCustomFields, fieldLabel, optionLabel } from "./custom-fields";
 import { cn } from "@polaris/ui";
 import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
@@ -78,6 +79,7 @@ export interface BoardProps {
 export function Board(props: BoardProps) {
     const { object, field, groups } = props;
     const t = useCrmT();
+    const custom = useCustomFields();
     const [dragging, setDragging] = useState<string | null>(null);
     const [target, setTarget] = useState<{ value: string; beforeId: string | null } | null>(null);
     const [drafting, setDrafting] = useState<string | null>(null);
@@ -85,11 +87,11 @@ export function Board(props: BoardProps) {
     const primary = primaryField(object);
     const DraftEditor = editorFor(primary);
     const shown = props.columns
-        .map((column) => fieldOf(object, column.key))
+        .map((column) => fieldOf(object, column.key, custom))
         .filter((one): one is FieldDef => Boolean(one) && !one!.primary && one!.key !== field.key)
         .slice(0, CARD_FIELDS);
     const label = (value: string) =>
-        t(`options.${object}.${field.key}.${value}` as Parameters<typeof t>[0]);
+        optionLabel(t, object, field, value);
     const byId = new Map(groups.flatMap((group) => group.rows).map((row) => [row.id, row]));
 
     const open = (record: CrmRecord, one: FieldDef) => {
@@ -112,7 +114,7 @@ export function Board(props: BoardProps) {
         return (
             <div
                 tabIndex={can ? 0 : undefined}
-                aria-label={t(`fields.${object}.${one.key}` as Parameters<typeof t>[0])}
+                aria-label={fieldLabel(t, object, one)}
                 className={cn(
                     "relative flex min-w-0 flex-1 items-center rounded",
                     can && "-mx-1 cursor-text px-1 hover:bg-card-hover",
@@ -194,7 +196,7 @@ export function Board(props: BoardProps) {
         <div
             className="flex min-h-0 flex-1 gap-3 overflow-x-auto overscroll-x-contain pb-1"
             aria-label={t("board.label", {
-                field: t(`fields.${object}.${field.key}` as Parameters<typeof t>[0])
+                field: fieldLabel(t, object, field)
             })}
             role="region"
         >
@@ -349,11 +351,7 @@ export function Board(props: BoardProps) {
                                                     className="flex min-w-0 items-center gap-2 text-[0.75rem]"
                                                 >
                                                     <span className="w-24 shrink-0 truncate text-muted-foreground">
-                                                        {t(
-                                                            `fields.${object}.${one.key}` as Parameters<
-                                                                typeof t
-                                                            >[0]
-                                                        )}
+                                                        {fieldLabel(t, object, one)}
                                                     </span>
                                                     {editable(
                                                         record,
