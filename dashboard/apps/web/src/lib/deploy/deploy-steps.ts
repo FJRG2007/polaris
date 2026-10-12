@@ -10,6 +10,8 @@
  * of a whole log, and the same answer is drawn from a log already on screen.
  */
 
+import { UNSUCCESSFUL_DEPLOY_STATUSES } from "./failure-reason";
+
 export type DeployStepId = "queued" | "source" | "build" | "keep" | "start" | "live";
 export type DeployStepState = "done" | "current" | "failed" | "pending" | "skipped" | "warning";
 
@@ -20,9 +22,6 @@ export interface DeployStep {
     /** How long it took, when the log says. */
     readonly seconds?: number;
 }
-
-/** A status the deploy will not leave. */
-const ENDED_BADLY = new Set(["failed", "cancelled", "rolled_back"]);
 
 interface Marker {
     started: boolean;
@@ -87,7 +86,7 @@ export function deploySteps(status: string, log: string): DeployStep[] {
     // they were written - is drawn from its status.
     const anyMarker = source.started || build.started || keep.started || start.started;
     const running = status === "running" || status === "stopped" || status === "removed";
-    const failed = ENDED_BADLY.has(status);
+    const failed = UNSUCCESSFUL_DEPLOY_STATUSES.includes(status);
 
     const steps: DeployStep[] = [];
     // The furthest step the log reached, which is where a failure happened.

@@ -26,6 +26,7 @@ import { isInFlightStatus } from "@/lib/deploy/status";
 import { RuntimeLogs } from "@/components/runtime-logs";
 import { DeployFailureLine, DeployFailureNote } from "./deploy-failure";
 import { deploySteps } from "@/lib/deploy/deploy-steps";
+import { UNSUCCESSFUL_DEPLOY_STATUSES } from "@/lib/deploy/failure-reason";
 import { ActivityFeed } from "@/components/activity-feed";
 import type { CommentView } from "@/lib/comments/comments";
 import type { ActivityLine } from "@/lib/activity/activity";
@@ -393,7 +394,7 @@ function depBadge(deployment: DepSummary): {
     variant: "success" | "danger" | "warning" | "neutral";
 } {
     if (deployment.isCurrent) return { label: "badge.active", variant: "success" };
-    if (["failed", "cancelled", "rolled_back"].includes(deployment.status))
+    if (UNSUCCESSFUL_DEPLOY_STATUSES.includes(deployment.status))
         return {
             label: deployment.status === "cancelled" ? "badge.cancelled" : "badge.failed",
             variant: "danger"
@@ -980,11 +981,9 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             {historyOpen && (
                                 <ul className="flex flex-col gap-2">
                                     {history.map((deployment) => {
-                                        const failed = [
-                                            "failed",
-                                            "cancelled",
-                                            "rolled_back"
-                                        ].includes(deployment.status);
+                                        const failed = UNSUCCESSFUL_DEPLOY_STATUSES.includes(
+                                            deployment.status
+                                        );
                                         return (
                                             <li
                                                 key={deployment.id}
@@ -1628,8 +1627,7 @@ function RuntimeLogView({
 }) {
     const t = useTranslations("deployService");
     const pending = deployment !== null && !isSettled(deployment);
-    const failed =
-        deployment !== null && ["failed", "cancelled", "rolled_back"].includes(deployment.status);
+    const failed = deployment !== null && UNSUCCESSFUL_DEPLOY_STATUSES.includes(deployment.status);
 
     if (pending || failed) {
         return (

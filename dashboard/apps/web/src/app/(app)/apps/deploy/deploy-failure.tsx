@@ -43,10 +43,14 @@ export function DeployFailureLine({
     const reason = deployFailureReason(status, error);
     if (!reason) return null;
     const text = reasonText(reason, t);
-    const line = text.split(/\r?\n/).find((part) => part.trim()) ?? text;
+    const line =
+        text
+            .split(/\r?\n/)
+            .map((part) => part.trim())
+            .find((part) => part.length > 0) ?? text;
     return (
         <p
-            title={text}
+            title={line}
             className={cn(
                 "truncate text-xs text-danger-ink",
                 reason.kind === "text" && "font-mono",
