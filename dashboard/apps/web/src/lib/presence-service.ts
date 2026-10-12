@@ -195,12 +195,14 @@ export async function presenceFor(
     // Polaris tab open.
     const here = [...answer].filter(([, view]) => view.status !== "offline").map(([id]) => id);
     if (here.length > 0 || away.size > 0) {
-        const doing = await activitiesFor(viewer, [...here, ...away], at).catch((caught: unknown) => {
-            // The dot is worth more than the card beside it, and a failure here
-            // must not take the dots down with it.
-            console.error("polaris: could not read what people are doing:", caught);
-            return new Map<string, core.ActivityView[]>();
-        });
+        const doing = await activitiesFor(viewer, [...here, ...away], at).catch(
+            (caught: unknown) => {
+                // The dot is worth more than the card beside it, and a failure here
+                // must not take the dots down with it.
+                console.error("polaris: could not read what people are doing:", caught);
+                return new Map<string, core.ActivityView[]>();
+            }
+        );
         const byId = new Map(people.map((person) => [person.id, person]));
         for (const [id, activity] of doing) {
             const view = answer.get(id);

@@ -124,14 +124,14 @@ describe("Privacy still decides", () => {
     it("keeps them offline when they chose invisible", async () => {
         people = [person("ada", "invisible")];
         doing.set("ada", [minecraft]);
-        expect((await statusOf("ada"))).toMatchObject({ status: "offline", activity: [] });
+        expect(await statusOf("ada")).toMatchObject({ status: "offline", activity: [] });
         expect(askedAbout).not.toContain("ada");
     });
 
     it("keeps them offline, unasked, when last seen is hidden from this reader", async () => {
         lastSeenHidden.add("ada");
         doing.set("ada", [minecraft]);
-        expect((await statusOf("ada"))).toMatchObject({ status: "offline", activity: [] });
+        expect(await statusOf("ada")).toMatchObject({ status: "offline", activity: [] });
         expect(askedAbout).not.toContain("ada");
     });
 
