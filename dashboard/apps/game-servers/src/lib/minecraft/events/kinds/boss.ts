@@ -551,6 +551,10 @@ export const inLift = entry.inEntry;
 /** Everybody in the Overworld not up yet, for a fight with no beam (`direct`). */
 export const NOT_UP = `execute in minecraft:overworld as @a[distance=0..,tag=!${stage.IN_ARENA},gamemode=!creative,gamemode=!spectator] run data get entity @s Pos`;
 
+/** Everybody not up yet in any world, for a fight in the arena with no beam:
+ *  one in the Nether or the End is taken up too, and sent back there after. */
+export const NOT_UP_ANY_WORLD = `execute as @a[tag=!${stage.IN_ARENA},gamemode=!creative,gamemode=!spectator] run data get entity @s Pos`;
+
 /** Up into the arena: tagged as inside first, then moved, then in adventure
  *  mode, where nothing can be broken or placed. */
 export function admitLines(name: string, spot: stage.Spot): string[] {

@@ -448,6 +448,24 @@ describe("the boss itself", () => {
 });
 
 describe("the sky arena", () => {
+    it("takes everybody up with no beam, from the Nether and the End too", () => {
+        expect(boss.NOT_UP).toContain("execute in minecraft:overworld");
+        expect(boss.NOT_UP_ANY_WORLD.startsWith("execute as @a[")).toBe(true);
+        expect(boss.NOT_UP_ANY_WORLD).not.toContain("distance=");
+        expect(boss.NOT_UP_ANY_WORLD).toContain(`tag=!${stage.IN_ARENA}`);
+        expect(boss.NOT_UP_ANY_WORLD).toContain("gamemode=!spectator");
+        const saved = stage.savedFrom(
+            "Ana",
+            [{ name: "Ana", x: 10.5, y: 70, z: -3.25 }],
+            new Map([["Ana", { yaw: 45, pitch: 10 }]]),
+            new Map([["Ana", "minecraft:the_nether"]]),
+            new Map([["Ana", 0]])
+        )!;
+        expect(stage.returnLine(saved)).toBe(
+            "execute in minecraft:the_nether run tp Ana 10.500 70.000 -3.250 45.0 10.0"
+        );
+    });
+
     const origin = { x: 100, y: 94, z: -40 };
 
     it("is built only inside the volume proved empty, of glass, closed all round", () => {

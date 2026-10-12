@@ -11,6 +11,7 @@ import { gameMessage } from "../../game-message";
 import { parseTime, zonedMoment } from "../schedule";
 import {
     activeNeeded,
+    heldWhere,
     needsOverworld,
     runMinutes,
     type EventPreset,
@@ -150,8 +151,13 @@ export function idleThroughout(seen: ReadonlyMap<string, Seen> | null, since: nu
         .map((one) => one.name);
 }
 
-/** The players who can take part in this event: active, and in the Overworld
- *  when it happens there. Somebody whose world was not read is not held back. */
+/**
+ * The players who can take part in this event: active, and in the Overworld
+ * when it happens there. Somebody whose world was not read is not held back.
+ * One held in the sky takes everybody up from wherever they are, but is placed
+ * near somebody in the Overworld (`events-service.centerFor`): with nobody
+ * there and no fixed point, nobody can play it.
+ */
 export function playersFor(
     preset: EventPreset,
     seen: ReadonlyMap<string, Seen>,
@@ -159,8 +165,14 @@ export function playersFor(
     now: number
 ): Seen[] {
     const active = activePlayers(seen, afkMinutes, now);
-    if (!needsOverworld(preset)) return active;
-    return active.filter((one) => one.dimension === null || one.dimension === OVERWORLD);
+    const overworld = active.filter(
+        (one) => one.dimension === null || one.dimension === OVERWORLD
+    );
+    if (heldWhere(preset) === "sky") {
+        const place = (preset.options as { place?: { mode: string } }).place;
+        return place?.mode === "fixed" || overworld.length > 0 ? active : [];
+    }
+    return needsOverworld(preset) ? overworld : active;
 }
 
 /** Why an automatic event should wait: the active players who are busy, carried
