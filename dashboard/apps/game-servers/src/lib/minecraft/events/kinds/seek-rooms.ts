@@ -1492,6 +1492,10 @@ const COLOURS: Readonly<Record<Decoration, readonly [string, string]>> = {
     winter: ["red", "green"]
 };
 
+/** The lowest level under a web at level 9 that must hold nothing to stand
+ *  on: whoever stands on it reaches the web with a jump. */
+const WEB_REACH = 5;
+
 /**
  * A touch of the season for the house's own rooms, while it lasts
  * (`seek-manor.drawManor`): in each corner, out of everybody's way, webs or
@@ -1510,12 +1514,15 @@ export function dress(c: Canvas, season: Decoration, template: Template): void {
     ] as const;
     corners.forEach(([u, v], index) => {
         const facing: Side = v === 0 ? "south" : "north";
-        const free = (from: number, to: number) => {
-            for (let level = from; level <= to; level += 1) if (!c.free(u, level, v)) return false;
+        const free = (from: number, to: number, a = u, b = v) => {
+            for (let level = from; level <= to; level += 1) if (!c.free(a, level, b)) return false;
             return true;
         };
+        const near = [u, u === 0 ? 1 : LAST - 1].flatMap((a) =>
+            [v, v === 0 ? 1 : LAST - 1].map((b) => [a, b] as const)
+        );
         // Up under the ceiling, with nothing under it anybody stands on.
-        if (free(7, 10)) {
+        if (free(9, 10) && near.every(([a, b]) => free(WEB_REACH, 8, a, b))) {
             if (season === "halloween") c.set("minecraft:cobweb", u, 9, v, u, 10, v);
             else if (burns) c.set("minecraft:spruce_leaves[persistent=true]", u, 9, v, u, 10, v);
         }

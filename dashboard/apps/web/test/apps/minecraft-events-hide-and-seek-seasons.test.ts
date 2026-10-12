@@ -163,6 +163,42 @@ describe("hide and seek's seasonal rooms", () => {
         expect(halloween).toBeGreaterThan(0);
         expect(winter).toBeGreaterThan(0);
     }, 30_000);
+
+    it("hangs its webs out of reach of anywhere a jump starts", () => {
+        const span = model.ROOM + model.WALL;
+        const inRoom = (n: number) => n >= model.WALL && (n - model.WALL) % span < model.ROOM;
+        let webs = 0;
+        for (let seed = 0; seed < 12; seed += 1) {
+            const house = manor.manorFor(
+                `webs-${seed}`,
+                3,
+                model.NEWEST,
+                manor.DESIGN,
+                "halloween"
+            );
+            const { grid } = house;
+            for (let x = 0; x < grid.size; x += 1)
+                for (let z = 0; z < grid.size; z += 1)
+                    for (let level = 0; level < model.ROOF; level += 1) {
+                        if (model.bare(grid.get(x, level, z) ?? "") !== "minecraft:cobweb")
+                            continue;
+                        webs += 1;
+                        for (const spot of house.spots)
+                            if (Math.abs(spot.x - x) <= 1 && Math.abs(spot.z - z) <= 1)
+                                expect(spot.feet + 3, `${x},${level},${z}`).toBeLessThan(level);
+                        for (let dx = -1; dx <= 1; dx += 1)
+                            for (let dz = -1; dz <= 1; dz += 1) {
+                                if (!inRoom(x + dx) || !inRoom(z + dz)) continue;
+                                for (let below = level - 4; below < level; below += 1) {
+                                    const id = model.bare(grid.get(x + dx, below, z + dz) ?? "");
+                                    if (id === "" || id === "minecraft:cobweb") continue;
+                                    expect(id, `${x + dx},${below},${z + dz}`).toBe("");
+                                }
+                            }
+                    }
+        }
+        expect(webs).toBeGreaterThan(0);
+    }, 60_000);
 });
 
 describe("hide and seek's aquarium (design 8)", () => {
