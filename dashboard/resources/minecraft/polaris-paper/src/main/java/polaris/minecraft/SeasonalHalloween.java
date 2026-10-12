@@ -169,6 +169,14 @@ final class SeasonalHalloween implements Listener {
             boolean moved = Math.abs(ends - seasonEndsMillis) > 60_000;
             seasonEndsMillis = ends;
             if (moved) save();
+        } else if (next.gravePercent() == 0) {
+            // Switched off, not paused: no season left to keep the graveyards for, so
+            // they come down now and, where a chunk is not loaded, on a later pass.
+            if (seasonEndsMillis != 0) {
+                seasonEndsMillis = 0;
+                save();
+            }
+            takeGraveyardsDown();
         }
         return status();
     }
