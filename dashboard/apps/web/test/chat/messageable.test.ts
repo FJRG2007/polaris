@@ -42,20 +42,41 @@ const accounts = [
     { id: "gone", name: "Banned Person", email: "gone@example.com", username: "gone", bannedAt: new Date() }
 ];
 
-/** Just enough of the query this test cares about: the exclusions in the `where`
- *  and a "contains" over the three identity columns. */
+/** Who the searcher is friends with - the only people a few letters find. */
+let friends = new Set<string>();
+
+vi.mock("@/lib/friends-service", () => ({ friendIds: async () => friends }));
+
+type Account = (typeof accounts)[number];
+
+/** One clause of the search's `where`, applied to a row in memory: ids, the
+ *  banned filter, nested ORs, and a "contains" or an exact match on a column. */
+function clauseMatches(person: Account, clause: Record<string, unknown>): boolean {
+    for (const [field, rule] of Object.entries(clause)) {
+        if (field === "OR") {
+            if (!(rule as Record<string, unknown>[]).some((inner) => clauseMatches(person, inner))) {
+                return false;
+            }
+        } else if (field === "id") {
+            const id = rule as { in?: string[]; not?: string };
+            if (id.in && !id.in.includes(person.id)) return false;
+            if (id.not === person.id) return false;
+        } else if (field === "bannedAt") {
+            if (rule === null && person.bannedAt !== null) return false;
+        } else if (field === "name" || field === "email" || field === "username") {
+            const value = person[field];
+            const matched =
+                typeof rule === "string"
+                    ? value === rule
+                    : value.toLowerCase().includes((rule as { contains: string }).contains.toLowerCase());
+            if (!matched) return false;
+        }
+    }
+    return true;
+}
+
 function findUsers({ where }: { where: Record<string, unknown> }) {
-    const not = (where.id as { not?: string } | undefined)?.not;
-    const term = ((where.OR as { name?: { contains: string } }[] | undefined)?.[0]?.name?.contains ?? "")
-        .toLowerCase();
-    return accounts.filter((person) => {
-        if (person.id === not) return false;
-        if (where.bannedAt === null && person.bannedAt !== null) return false;
-        if (!term) return true;
-        return [person.name, person.email, person.username].some((field) =>
-            field.toLowerCase().includes(term)
-        );
-    });
+    return accounts.filter((person) => clauseMatches(person, where));
 }
 
 vi.mock("@polaris/db", () => ({
@@ -79,6 +100,7 @@ const access = await import("../../src/lib/chat/access");
 beforeEach(() => {
     withChat = new Set(["ada", "grace"]);
     hidden = new Set();
+    friends = new Set(["grace"]);
 });
 
 describe("who can be messaged", () => {
@@ -121,14 +143,21 @@ describe("who can be messaged", () => {
  * chat, and nobody else.
  */
 describe("finding somebody to talk to", () => {
-    it("finds anybody on the instance, not only people you share work with", async () => {
+    it("finds a friend from part of their name", async () => {
         const found = await access.searchForConversation({ id: "ada" }, "grace");
         expect(found.people.map((person) => person.id)).toEqual(["grace"]);
     });
 
-    it("finds them by their username, which is what a list of people shows", async () => {
+    it("finds anybody else on the instance by their whole username", async () => {
+        friends = new Set();
         const found = await access.searchForConversation({ id: "ada" }, "g1203");
         expect(found.people.map((person) => person.id)).toEqual(["grace"]);
+    });
+
+    it("does not list somebody who is not a friend from part of their name", async () => {
+        friends = new Set();
+        const found = await access.searchForConversation({ id: "ada" }, "Grace");
+        expect(found).toEqual({ people: [], withheld: 0 });
     });
 
     it("leaves out somebody without the chat, and says how many", async () => {
@@ -151,7 +180,7 @@ describe("finding somebody to talk to", () => {
 
     it("never offers a banned account", async () => {
         withChat.add("gone");
-        const found = await access.searchForConversation({ id: "ada" }, "banned");
+        const found = await access.searchForConversation({ id: "ada" }, "gone");
         expect(found.people).toEqual([]);
     });
 });
