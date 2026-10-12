@@ -455,6 +455,14 @@
         "deployLatest": "Desplegar último",
         "newerImage": "Hay una imagen más nueva"
     },
+    "failure": {
+        "failedTitle": "Por qué falló",
+        "stoppedTitle": "Por qué se detuvo",
+        "restarted": "La compilación se cortó porque Polaris se reinició, por ejemplo durante una actualización. El servicio no tiene la culpa: vuelve a desplegarlo para compilarlo de nuevo.",
+        "canceled": "Alguien lo detuvo antes de que terminara.",
+        "timedOut": "Se detuvo tras {minutes} minutos sin terminar.",
+        "noReason": "Falló sin dar un motivo. El registro de compilación muestra hasta dónde llegó."
+    },
     "buildMachine": {
         "title": "Compilar en",
         "hint": "Otra máquina compila la imagen y la envía aquí, para que un servidor pequeño pueda ejecutar lo que no podría compilar.",
