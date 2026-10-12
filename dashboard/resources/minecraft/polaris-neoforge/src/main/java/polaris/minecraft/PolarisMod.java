@@ -53,6 +53,9 @@ public final class PolarisMod {
         NeoForge.EVENT_BUS.register(new SeasonalDecor());
         NeoForge.EVENT_BUS.register(new SeasonalMobs());
         NeoForge.EVENT_BUS.register(new SeasonalHalloween());
+        // Christmas and New Year's Eve on top of the winter; idle until told.
+        NeoForge.EVENT_BUS.register(new SeasonalWinter());
+        NeoForge.EVENT_BUS.register(new SeasonalWinterGifts());
         if (AntiXray.wanted(System.getenv())) {
             AntiXrayLink.start(PolarisConfig.linkFromEnvironment(System.getenv()));
             NeoForge.EVENT_BUS.register(new AntiXray());

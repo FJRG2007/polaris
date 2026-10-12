@@ -26,6 +26,7 @@ public final class PolarisPlugin extends JavaPlugin {
     private SoundPack sounds;
     private SeasonalDecor seasonal;
     private SeasonalHalloween halloween;
+    private SeasonalWinter winter;
 
     @Override
     public void onEnable() {
@@ -42,6 +43,12 @@ public final class PolarisPlugin extends JavaPlugin {
         seasonal = new SeasonalDecor(this);
         getServer().getPluginManager().registerEvents(seasonal, this);
         getServer().getPluginManager().registerEvents(seasonal.mobs(), this);
+        // Christmas and New Year's Eve on top of the winter; idle until told.
+        winter = new SeasonalWinter(this, seasonal);
+        getServer().getPluginManager().registerEvents(winter, this);
+        getServer().getPluginManager().registerEvents(winter.gifts(), this);
+        winter.start();
+        SeasonalWinter christmas = winter;
         SeasonalDecor season = seasonal;
         halloween = new SeasonalHalloween(this, seasonal);
         getServer().getPluginManager().registerEvents(halloween, this);
@@ -68,6 +75,8 @@ public final class PolarisPlugin extends JavaPlugin {
                     reply = guard.answer(Arrays.copyOfRange(args, 1, args.length));
                 else if (args[0].equalsIgnoreCase("season") && args.length > 1 && args[1].equalsIgnoreCase("halloween"))
                     reply = extras.configure(Arrays.copyOfRange(args, 2, args.length));
+                else if (args[0].equalsIgnoreCase("season") && args.length > 1 && args[1].equalsIgnoreCase("winter"))
+                    reply = christmas.answer(Arrays.copyOfRange(args, 2, args.length));
                 else if (args[0].equalsIgnoreCase("season"))
                     reply = season.answer(Arrays.copyOfRange(args, 1, args.length));
                 else reply = SoundPack.refused("usage");
@@ -91,7 +100,7 @@ public final class PolarisPlugin extends JavaPlugin {
     }
 
     /** `polaris caps`: what the dashboard may ask of this plugin, as the NeoForge
-     *  mod answers it. Only `respawn`, `guard`, `season`, `season-mobs` and `season-halloween` here: the rest are the mod's alone. */
+     *  mod answers it. Only `respawn`, `guard`, `season`, `season-mobs`, `season-halloween` and `season-winter` here: the rest are the mod's alone. */
     private static JsonObject caps(String version) {
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
@@ -102,6 +111,7 @@ public final class PolarisPlugin extends JavaPlugin {
         caps.add("season");
         caps.add("season-mobs");
         caps.add("season-halloween");
+        caps.add("season-winter");
         reply.add("caps", caps);
         return reply;
     }
@@ -114,6 +124,8 @@ public final class PolarisPlugin extends JavaPlugin {
         sounds = null;
         if (halloween != null) halloween.stop();
         halloween = null;
+        if (winter != null) winter.stop();
+        winter = null;
         if (seasonal != null) seasonal.stop();
         seasonal = null;
         CommandLogFilter.uninstall();

@@ -10,6 +10,7 @@ import { host } from "@polaris/app-host";
 import { gameWords, messageText } from "../game-words";
 import * as seasonal from "../../lib/minecraft/seasonal";
 import * as halloween from "../../lib/minecraft/seasonal-halloween";
+import * as winter from "../../lib/minecraft/seasonal-winter";
 import { seasonalView, setSeasonal, type SeasonalView } from "../../lib/minecraft/seasonal-service";
 
 const { recordAudit } = host.auditService;
@@ -26,7 +27,8 @@ const saveSchema = z
         on: z.boolean().optional(),
         nightSpawns: oneOf(seasonal.NIGHT_SPAWN_CHOICES).optional(),
         snowGolems: oneOf(seasonal.SNOW_GOLEM_CHOICES).optional(),
-        halloween: halloween.halloweenPatchSchema.optional()
+        halloween: halloween.halloweenPatchSchema.optional(),
+        winter: winter.winterPatchSchema.optional()
     })
     .strict()
     .refine((value) => Object.keys(value).length > 1);

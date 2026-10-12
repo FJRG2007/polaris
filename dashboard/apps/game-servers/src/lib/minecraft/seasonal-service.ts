@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import * as seasonal from "./seasonal";
+import * as winter from "./seasonal-winter";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "./schedule";
 import { readEventState } from "./events/state";
@@ -50,6 +51,7 @@ const told = new Map<
           /** Out of season or paused, whether the jar has nothing left to take
            *  down for a switch-off (told so, or cannot take the line). */
           readonly offTold?: boolean;
+          readonly winterMissing?: boolean;
       }
     | { readonly oldJarAt: number }
     | { readonly noJarAt: number }
@@ -177,6 +179,16 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
         // Switched off is not paused: the graveyards come down with the rest.
         if (switchedOff && hasHalloween)
             lines.unshift(await halloweenCommandFor(row.ownerId, config, now, true));
+        // Christmas and New Year ride on the winter, for a jar that takes them.
+        const winterJar = reading.caps.has(winter.WINTER_CAP);
+        if (decoration === "winter" && winterJar) {
+            lines.push(
+                winter.winterCommand(
+                    winter.winterSettings(config),
+                    winter.winterCalendar(now, zoneOf(config))
+                )
+            );
+        }
         // Each line its own command. `say` takes one command's words, and the
         // console tool joins them with spaces: handed the season and Halloween
         // lines together it sent one long line the jar refused as a whole, so
@@ -186,7 +198,8 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             line,
             mobsMissing: decoration !== null && !mobs,
             halloweenMissing: decoration === "halloween" && !halloweenLine,
-            offTold: switchedOff || !hasHalloween
+            offTold: switchedOff || !hasHalloween,
+            winterMissing: decoration === "winter" && !winterJar
         });
         return true;
     }).catch((caught: unknown) => {
@@ -247,6 +260,11 @@ export interface SeasonalView {
     readonly halloween: halloween.HalloweenSettings;
     /** The jar shows Halloween but predates its extra touches. */
     readonly halloweenNeedsRestart: boolean;
+    /** Christmas and New Year's Eve on this server. */
+    readonly winter: winter.WinterSettings;
+    /** The server's jar shows the winter but predates Christmas and New Year:
+     *  a restart loads the one that brings them. */
+    readonly winterNeedsRestart: boolean;
 }
 
 export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
@@ -269,7 +287,9 @@ export async function seasonalView(installedAppId: string): Promise<SeasonalView
         mobsNeedRestart: last !== undefined && "line" in last && last.mobsMissing === true,
         halloween: halloween.halloweenSettings(config),
         halloweenNeedsRestart:
-            last !== undefined && "line" in last && last.halloweenMissing === true
+            last !== undefined && "line" in last && last.halloweenMissing === true,
+        winter: winter.winterSettings(config),
+        winterNeedsRestart: last !== undefined && "line" in last && last.winterMissing === true
     };
 }
 
@@ -279,6 +299,7 @@ export interface SeasonalPatch {
     readonly nightSpawns?: number;
     readonly snowGolems?: number;
     readonly halloween?: Partial<halloween.HalloweenSettings>;
+    readonly winter?: winter.WinterPatch;
 }
 
 /** Change this server's seasonal settings, and tell it now. */
@@ -293,14 +314,19 @@ export async function setSeasonal(
     if (patch.nightSpawns !== undefined) changes[seasonal.NIGHT_SPAWNS_KEY] = patch.nightSpawns;
     if (patch.snowGolems !== undefined) changes[seasonal.SNOW_GOLEMS_KEY] = patch.snowGolems;
     const halloweenPatch = patch.halloween;
-    await patchInstallConfig(installedAppId, (config) =>
-        halloweenPatch === undefined
-            ? changes
-            : {
-                  ...changes,
-                  [halloween.HALLOWEEN_KEY]: halloween.patchHalloween(config, halloweenPatch)
-              }
-    );
+    const winterPatch =
+        patch.winter !== undefined && Object.keys(patch.winter).length > 0
+            ? patch.winter
+            : undefined;
+    await patchInstallConfig(installedAppId, (config) => ({
+        ...changes,
+        ...(halloweenPatch === undefined
+            ? {}
+            : { [halloween.HALLOWEEN_KEY]: halloween.patchHalloween(config, halloweenPatch) }),
+        ...(winterPatch === undefined
+            ? {}
+            : { [winter.WINTER_KEY]: winter.patchWinter(config, winterPatch) })
+    }));
     // Asked again now rather than when the last answer runs out, so a server
     // restarted onto a newer jar is reached on the switch.
     told.delete(installedAppId);

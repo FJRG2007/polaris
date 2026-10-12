@@ -13,6 +13,7 @@ import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { Card, CardBody, Select, Skeleton, Switch } from "@polaris/ui";
 import * as seasonal from "../../lib/minecraft/seasonal";
+import * as winter from "../../lib/minecraft/seasonal-winter";
 import { figureLanguage, formatPlain } from "../../lib/figures";
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { SeasonalPatch, SeasonalView } from "../../lib/minecraft/seasonal-service";
@@ -66,7 +67,12 @@ export function MinecraftSeasonal({
         if (!view) return;
         const before = view;
         setError(null);
-        setView({ ...view, ...patch, halloween: { ...view.halloween, ...patch.halloween } });
+        setView({
+            ...view,
+            ...patch,
+            halloween: { ...view.halloween, ...patch.halloween },
+            winter: patch.winter ? { ...view.winter, ...patch.winter } : view.winter
+        });
         startTransition(async () => {
             const result = await saveSeasonalAction({ installedAppId, ...patch });
             answered.current = true;
@@ -157,6 +163,20 @@ export function MinecraftSeasonal({
                         {t("seasonalHalloween.needsRestart")}
                     </p>
                 )}
+                {view && view.on && !view.blocked && view.winter && (
+                    <WinterChoices
+                        idPrefix={installedAppId}
+                        settings={view.winter}
+                        times={times}
+                        disabled={!canManage || !heard || pending}
+                        onChange={(patch) => save({ winter: patch })}
+                    />
+                )}
+                {view?.on && view.winterNeedsRestart && (
+                    <p className="text-xs text-muted-foreground">
+                        {t("seasonal.winterNeedsRestart")}
+                    </p>
+                )}
                 {view?.on && view.mobsNeedRestart && (
                     <p className="text-xs text-muted-foreground">{t("seasonal.mobsNeedRestart")}</p>
                 )}
@@ -207,6 +227,67 @@ function MobChoice({
                 disabled={disabled}
             />
             <p className="text-xs text-muted-foreground">{hint}</p>
+        </div>
+    );
+}
+
+/** Christmas and New Year's Eve: how many of each visitor, and what is switched on. */
+function WinterChoices({
+    idPrefix,
+    settings,
+    times,
+    disabled,
+    onChange
+}: {
+    idPrefix: string;
+    settings: winter.WinterSettings;
+    times: (count: number) => string;
+    disabled: boolean;
+    onChange: (patch: winter.WinterPatch) => void;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <div className="flex flex-col gap-3 border-t pt-3">
+            <div className="min-w-0">
+                <p className="text-sm font-medium">{t("seasonal.winterTitle")}</p>
+                <p className="text-xs text-muted-foreground">{t("seasonal.winterHint")}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+                {winter.WINTER_AMOUNTS.map((key) => (
+                    <MobChoice
+                        key={key}
+                        id={`${idPrefix}-winter-${key}`}
+                        label={t(`seasonal.winter.${key}`)}
+                        hint={t(`seasonal.winter.${key}Hint`)}
+                        value={settings[key]}
+                        choices={winter.WINTER_AMOUNT_CHOICES}
+                        none={t("seasonal.none")}
+                        times={times}
+                        disabled={disabled}
+                        onChange={(value) => onChange({ [key]: value })}
+                    />
+                ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+                {winter.WINTER_SWITCHES.map((key) => (
+                    <div key={key} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-xs font-medium">{t(`seasonal.winter.${key}`)}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t(`seasonal.winter.${key}Hint`)}
+                            </p>
+                        </div>
+                        <Switch
+                            checked={settings[key]}
+                            disabled={disabled}
+                            onChange={(on) => {
+                                if (on !== settings[key]) onChange({ [key]: on });
+                            }}
+                            aria-label={t(`seasonal.winter.${key}`)}
+                        />
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

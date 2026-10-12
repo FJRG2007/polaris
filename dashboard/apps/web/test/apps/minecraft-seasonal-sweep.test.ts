@@ -31,6 +31,8 @@ let rows: { id: string; ownerId: string; config: string }[] | null = null;
 /** Another writer's change, landing between a save's read and its write. */
 let meanwhile: Record<string, unknown> | null = null;
 const sent: string[] = [];
+/** Each `sayAll` call's lines, as one batch: one console command per line. */
+const batches: string[][] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -79,6 +81,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
                 return '{"ok":true}';
             },
             sayAll: async (lines: string[]) => {
+                batches.push([...lines]);
                 sent.push(...lines);
             }
         })
@@ -114,6 +117,7 @@ beforeEach(() => {
     rows = null;
     meanwhile = null;
     sent.length = 0;
+    batches.length = 0;
 });
 
 describe("the seasons sweep", () => {
@@ -383,6 +387,97 @@ describe("the Halloween extras", () => {
             meanwhile = { seasonalHalloween: { witches: 3 } };
             await setSeasonal(OWNER, INSTALL, { halloween: { graves: 2 } });
             expect(config.seasonalHalloween).toMatchObject({ witches: 3, graves: 2 });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe("Christmas and New Year's Eve", () => {
+    const CHRISTMAS = new Date("2026-12-20T12:00:00Z");
+
+    it("ride on the winter line to a jar that takes them", async () => {
+        caps = new Set(["season", "season-mobs", "season-winter"]);
+        config = { seasonalWinter: { elves: 0, santa: false } };
+        const { sweepSeasons, seasonalView } = await service();
+        await sweepSeasons(CHRISTMAS);
+        // One `sayAll`, the season first: the jar refuses the winter line
+        // unless it already shows the winter, and the two joined into one
+        // command would be refused whole.
+        expect(batches).toEqual([
+            [
+                "polaris season set winter 3600 100 100",
+                "polaris season winter golems=100 snow=100 reindeer=100 elves=0 snowmen=100 presents=1 santa=0 lights=1 eve=1 newyear=1 sparkles=1 christmas=1 day=20261220 " +
+                    `eveat=${Date.parse("2026-12-25T00:00:00Z")} nyat=${Date.parse("2027-01-01T00:00:00Z")}`
+            ]
+        ]);
+        // The jar splits the winter line on spaces and takes every token as
+        // key=value: exactly the fifteen keys it knows, each once.
+        const tokens = sent[1]!.split(" ").slice(3);
+        expect(tokens.map((token) => token.split("=")[0])).toEqual([
+            "golems",
+            "snow",
+            "reindeer",
+            "elves",
+            "snowmen",
+            "presents",
+            "santa",
+            "lights",
+            "eve",
+            "newyear",
+            "sparkles",
+            "christmas",
+            "day",
+            "eveat",
+            "nyat"
+        ]);
+        for (const token of tokens) expect(token).toMatch(/^[a-z]+=\d+$/);
+        expect(await seasonalView(INSTALL)).toMatchObject({
+            winter: { elves: 0, santa: false, presents: true },
+            winterNeedsRestart: false
+        });
+    });
+
+    it("are told again on every pass, so a restarted server has them back", async () => {
+        caps = new Set(["season", "season-mobs", "season-winter"]);
+        const { sweepSeasons } = await service();
+        await sweepSeasons(CHRISTMAS);
+        await sweepSeasons(CHRISTMAS);
+        expect(batches).toHaveLength(2);
+        for (const batch of batches) {
+            expect(batch).toHaveLength(2);
+            expect(batch[0]).toBe("polaris season set winter 3600 100 100");
+            expect(batch[1]).toMatch(/^polaris season winter /);
+        }
+    });
+
+    it("are left off for an older jar, which says a restart brings them", async () => {
+        caps = new Set(["season", "season-mobs"]);
+        const { sweepSeasons, seasonalView } = await service();
+        await sweepSeasons(CHRISTMAS);
+        expect(sent).toEqual(["polaris season set winter 3600 100 100"]);
+        expect(await seasonalView(INSTALL)).toMatchObject({ winterNeedsRestart: true });
+    });
+
+    it("are not sent at Halloween", async () => {
+        caps = new Set(["season", "season-mobs", "season-winter"]);
+        const { sweepSeasons, seasonalView } = await service();
+        await sweepSeasons(HALLOWEEN);
+        expect(sent).toEqual(["polaris season set halloween 3600 100 100"]);
+        expect(await seasonalView(INSTALL)).toMatchObject({ winterNeedsRestart: false });
+    });
+
+    it("save one setting at a time and keep the others", async () => {
+        caps = new Set(["season", "season-mobs", "season-winter"]);
+        config = { seasonalWinter: { elves: 0 } };
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(CHRISTMAS);
+        try {
+            const { setSeasonal } = await service();
+            const view = await setSeasonal(OWNER, INSTALL, { winter: { reindeer: 2 } });
+            expect(config.seasonalWinter).toMatchObject({ elves: 0, reindeer: 2, santa: true });
+            expect(sent[1]).toContain("reindeer=200 elves=0");
+            expect(view.winter).toMatchObject({ elves: 0, reindeer: 2 });
         } finally {
             vi.useRealTimers();
         }

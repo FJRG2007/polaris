@@ -198,6 +198,11 @@ final class SeasonalDecor {
         return x0 + 15 >= box[0] && x0 <= box[2] && z0 + 15 >= box[1] && z0 <= box[3];
     }
 
+    /** Everything a player was shown taken down, to be decided again on the next pass. */
+    static void redraw(MinecraftServer server) {
+        revertAll(server);
+    }
+
     static boolean isAvoided(int chunkX, int chunkZ) {
         for (long[] box : avoided) if (overlaps(box, chunkX, chunkZ)) return true;
         return false;
@@ -447,6 +452,8 @@ final class SeasonalDecor {
                     layers--;
                 }
             }
+            // Christmas: more snow, and lights on the trees (SeasonalWinterDecor).
+            SeasonalWinterDecor.decide(level, cx, cz, (pos, shown) -> fakes.add(new Fake(pos, level.getBlockState(pos), shown)));
         }
         return fakes;
     }
@@ -458,7 +465,7 @@ final class SeasonalDecor {
     }
 
     /** The top solid block of a column, ignoring leaves, or null outside the world. */
-    private static BlockPos groundAt(ServerLevel level, int x, int z) {
+    static BlockPos groundAt(ServerLevel level, int x, int z) {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
         return y <= level.getMinY() ? null : new BlockPos(x, y, z);
     }
@@ -492,12 +499,12 @@ final class SeasonalDecor {
     }
 
     /** Leaves the game grew: a player's are persistent. */
-    private static boolean wild(BlockState state) {
+    static boolean wild(BlockState state) {
         return state.hasProperty(LeavesBlock.PERSISTENT) && !state.getValue(LeavesBlock.PERSISTENT);
     }
 
     /** Where a cobweb hangs under a natural tree's lowest leaves in this column, or null. */
-    private static BlockPos webUnder(ServerLevel level, int x, int z) {
+    static BlockPos webUnder(ServerLevel level, int x, int z) {
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos(x,
                 level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1, z);
         if (!wild(level.getBlockState(at))) return null;
