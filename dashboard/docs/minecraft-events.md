@@ -1500,6 +1500,16 @@ A new kind follows all of them. A change to an old kind must not undo one.
 - **Keep the operator's chat clean.** `sendCommandFeedback` is held off while
   an event runs commands (`FEEDBACK_RULES`), and is turned off only after the
   news line has gone out (`3716e0438`, `e19b8113a`).
+- **RCON is echoed to every op's chat unless the server is told not to.** The
+  image's server.properties ships `broadcast-rcon-to-ops=true`, so each command
+  Polaris sends shows up for an operator as a gray `[Rcon: ...]` line: two a
+  second from the sidebar, and about 280 at once when the challenges rotate at
+  midnight. That flood was felt as a frame drop "when the challenges appear in
+  chat". Every Java server now runs with it off (`BROADCAST_RCON_TO_OPS=false`,
+  laid over the stored settings on every deploy by `minecraftReleaseEnv` in
+  `minecraft/runtime.ts`), existing ones from their next restart, settings save
+  or reset; `sendCommandFeedback` stays as it was, since players' own commands
+  need it (`2eea038e2`).
 - **Something RCON cannot see in time runs inside the game.** A snowball
   hitting the spleef floor lasts 2-3 ticks, and the fastest RCON look is 8.
   So the check is a data pack of vanilla commands, enabled with `/datapack`
@@ -2135,3 +2145,19 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   whole ring (`hill.startSpots`); knocked off, they come back at the edge as
   before. Nothing shrinks or moves for `hill.GRACE_SECONDS` after "Go!" and
   after each pause, and the ring is still at its smallest by the sprint.
+
+### Finding lag
+
+- **Server first, in numbers.** `neoforge tps` (or `tps` on Paper) over RCON
+  gives ticks per second and milliseconds per tick per world; 20 TPS at well
+  under 50 ms is a healthy server, and the lag is somewhere else. The log line
+  `Can't keep up! ... Running Nms behind` only appears past about 2 seconds, so
+  a shorter hitch leaves no trace there.
+- **What froze the live server**, from the lines just before each `Can't keep
+  up`: a world save (`save-all` before a world copy, about 2.5 s), a teleport
+  far into ungenerated land (chunk generation), and `/locate` run by hand (2-4 s
+  each). None of these came from an event or the challenges.
+- **Frames dropping on one player's screen leave nothing in the server log.**
+  Ask when and what they saw: a jerky picture means their client (heap,
+  graphics, chat flood); being pulled back or blocks slow to break means the
+  server or the network.
