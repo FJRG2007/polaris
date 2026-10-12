@@ -120,6 +120,10 @@ export interface Canvas {
     /** A launch pad in the floor (from design 5): a slime block the pack
      *  throws whoever stands on it up from. */
     pad(u: number, v: number): void;
+    /** A painting hung over a gap (from design 9), as a nook's: at `u`,
+     *  `level`, `v`, one wide and two high, facing `facing`, on what is behind
+     *  it - banners, which hold it up and let a player walk through. */
+    painting(u: number, level: number, v: number, facing: Side): void;
     /** A fish summoned once the house is built (from design 8): only ever
      *  into water sealed in on every side. */
     fish(u: number, level: number, v: number): void;
@@ -218,6 +222,20 @@ function cellar(c: Canvas, u1: number, v1: number, u2: number, v2: number): void
 function hatch(c: Canvas, wood: string, u: number, v: number, facing: Side): void {
     c.set(`minecraft:${wood}_trapdoor[facing=${facing},half=top,open=false]`, u, 0, v);
     c.set(`minecraft:ladder[facing=${facing}]`, u, -3, v, u, -1, v);
+}
+
+/**
+ * A way in one wide on the south side of a little house, at `u`, `v`: banners
+ * of `colour` in the gap, hung on its west side. Up to design 8 that was all,
+ * and the gap stood open with a banner edge-on in it; from design 9
+ * (`PAINTED_SINCE`) a painting hangs over the gap on them, as on a nook's, and
+ * the air in front of it is kept clear for it.
+ */
+function curtain(c: Canvas, colour: string, u: number, v: number): void {
+    c.set(`minecraft:${colour}_wall_banner[facing=east]`, u, 1, v, u, 2, v);
+    if (c.design < PAINTED_SINCE) return;
+    c.clear(u, 1, v + 1, u, 2, v + 1);
+    c.painting(u, 1, v + 1, "south");
 }
 
 // ------------------------------------------------------------------ the library
@@ -982,14 +1000,16 @@ const VILLAGE: Template = {
         entrances: ["door", "painting", "panel"]
     },
     draw(c) {
-        // The first house, its way in hung with a banner curtain.
-        c.set("minecraft:red_wall_banner[facing=east]", 4, 1, 6, 4, 2, 6);
+        // The first house, its way in behind a painting on banners.
+        curtain(c, "red", 4, 6);
         c.clear(3, 1, 3, 5, 3, 5);
         c.set("minecraft:glowstone", 4, 4, 4);
         c.spot(5, 1, 3);
-        cellar(c, 3, 3, 5, 5);
-        hatch(c, "spruce", 3, 3, "south");
-        c.spot(5, -3, 5);
+        if (c.design < PAINTED_SINCE) {
+            cellar(c, 3, 3, 5, 5);
+            hatch(c, "spruce", 3, 3, "south");
+            c.spot(5, -3, 5);
+        }
         c.set("minecraft:spruce_planks", 2, 1, 2, 6, 4, 6);
         // The second, with a door.
         c.clear(8, 1, 9, 10, 3, 11);
@@ -1024,6 +1044,15 @@ const VILLAGE: Template = {
 
 /** From design 8 the house can have an aquarium (`AQUARIUM`). */
 export const AQUARIUM_SINCE = 8;
+
+/**
+ * From design 9 a little house's way in (the village's, the diving bell's, the
+ * huts') is a painting over banners, as a nook's painting is, and the house is
+ * one hiding place, with no cellar under it: a gap hung with a banner alone
+ * stood open, and a hatch inside a house nobody could see into was a hiding
+ * place inside a hiding place.
+ */
+export const PAINTED_SINCE = 9;
 
 /** Where a cell of a wall's tank is: `along` the side, `depth` in from it. */
 function onSide(side: Side, along: number, depth: number): [number, number] {
@@ -1115,14 +1144,16 @@ const AQUARIUM: Template = {
         entrances: ["painting", "veil", "panel"]
     },
     draw(c) {
-        // The diving bell, its way in on the south side hung with a banner.
-        c.set("minecraft:cyan_wall_banner[facing=east]", 7, 1, 8, 7, 2, 8);
+        // The diving bell, its way in on the south side behind a painting.
+        curtain(c, "cyan", 7, 8);
         c.clear(6, 1, 5, 8, 3, 7);
         c.set("minecraft:sea_lantern", 7, 4, 6);
         c.spot(8, 1, 5);
-        cellar(c, 6, 5, 8, 7);
-        hatch(c, "spruce", 6, 5, "south");
-        c.spot(8, -3, 7);
+        if (c.design < PAINTED_SINCE) {
+            cellar(c, 6, 5, 8, 7);
+            hatch(c, "spruce", 6, 5, "south");
+            c.spot(8, -3, 7);
+        }
         c.set("minecraft:glass", 5, 2, 6);
         c.set("minecraft:glass", 9, 2, 6);
         c.set("minecraft:prismarine_bricks", 5, 1, 4, 9, 4, 8);
@@ -1188,16 +1219,19 @@ function wardrobe(c: Canvas, block: string, door: string, u: number, v: number):
     c.set(block, u, 1, v, u + 2, 3, v + 1);
 }
 
-/** A hut five by five with a cellar under a hatch in its floor, its way in on
- *  the south side hung with a banner, as the village's first house. */
+/** A hut five by five, its way in on the south side behind a painting on
+ *  banners, as the village's first house (up to design 8 a banner alone, and
+ *  a cellar under a hatch in its floor). */
 function hut(c: Canvas, u: number, walls: string, banner: string): void {
-    c.set(`minecraft:${banner}_wall_banner[facing=east]`, u + 2, 1, 6, u + 2, 2, 6);
+    curtain(c, banner, u + 2, 6);
     c.clear(u + 1, 1, 3, u + 3, 3, 5);
     c.set("minecraft:glowstone", u + 2, 4, 4);
     c.spot(u + 3, 1, 3);
-    cellar(c, u + 1, 3, u + 3, 5);
-    hatch(c, "spruce", u + 1, 3, "south");
-    c.spot(u + 3, -3, 5);
+    if (c.design < PAINTED_SINCE) {
+        cellar(c, u + 1, 3, u + 3, 5);
+        hatch(c, "spruce", u + 1, 3, "south");
+        c.spot(u + 3, -3, 5);
+    }
     c.set(walls, u, 1, 2, u + 4, 4, 6);
 }
 

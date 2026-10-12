@@ -1217,8 +1217,9 @@ new map:
           with a ladder up to the bell, a hatch to a cellar at its foot, and
           a secret door high up its wall into a chamber only it
           reaches, opened by a key across the room and by a button inside;
-        - a **village** under one roof: a house hung with a banner curtain
-          and a cellar under a hatch, a house with a door, and a well whose
+        - a **village** under one roof: a house whose way in is a painting
+          over banners (up to design 8 a banner curtain alone, and a cellar
+          under a hatch), a house with a door, and a well whose
           water comes up to the top of its rim - so whoever swims up steps
           out onto the rim - and goes down a shaft and along a tunnel two
           high into a dry cave.
@@ -1228,6 +1229,16 @@ new map:
         known from 1.13), and a wall panel can be at any height
         (`Canvas.wallPanel`). A run built by design 6 or earlier draws none of
         them and is the same house it was.
+
+        From design 9 (`seek-rooms.PAINTED_SINCE`) every little house a room
+        draws - the village's, the aquarium's diving bell, the witch's hut,
+        the toy stall - is entered through a painting hung over banners in a
+        one-wide gap (`Canvas.painting`), as a nook's painting is, and is one
+        hiding place with no cellar under it. A wall banner hangs on the
+        gap's side, edge-on to whoever looks in, so a gap hung with banners
+        alone stood visibly open; and a hatch inside a house nobody could see
+        into was a hiding place inside a hiding place. Every banner-hung gap
+        in a house has its painting (`minecraft-events-hide-and-seek-manor.test.ts`).
 
     Every hiding place is proven to have a way out
     (`minecraft-events-hide-and-seek-escape.test.ts`, every design-7 house
@@ -1297,13 +1308,13 @@ teardown, before the blocks they hang on.
 | Fireflies                     | A firefly bush shows fireflies wherever its light level is 13 or lower, covered or not, day or night.                                                                                                                                                                                                                                                                                                                                                                                                                   | 1.21.5 |
 | Hidden light                  | The light block is invisible and has no hitbox (it is placed by command, `level` 0-15, waterloggable): light without a lamp in sight. Light 0 is air.                                                                                                                                                                                                                                                                                                                                                                   | 1.17   |
 | Props with no collision       | `block_display`/`item_display` entities draw any block or item, scaled and turned, with no hitbox and no collision. They are entities, not blocks: summoned with a tag and killed by that tag at teardown.                                                                                                                                                                                                                                                                                                              | 1.19.4 |
-| Curtain                       | A wall banner hangs two blocks tall but has no collision: a doorway hung with one looks closed and is walked through.                                                                                                                                                                                                                                                                                                                                                                                                   | all    |
+| Curtain                       | A wall banner hangs two blocks tall with no collision, on the side of a gap and edge-on to it: it holds up a painting over the gap, not a curtain on its own.                                                                                                                                                                                                                                                                                                                                                           | all    |
 | Painting door                 | A painting has no collision but cannot hang over air: backed by a sign (or an open door) it is a secret doorway. It is an entity: summoned with a tag after its support is built, and killed by that tag before the support is taken, since one whose support goes first drops as an item.                                                                                                                                                                                                                              | all    |
 
-Hiding spots that follow from those: behind a banner curtain, through a
-painting door, under a hay-and-campfire mist, in a bubble column's corner with
+Hiding spots that follow from those: through a painting door on banners or
+a sign, under a hay-and-campfire mist, in a bubble column's corner with
 a way out. Hide and seek's themed rooms (design 7) use the
-curtain (the village), display props (the deep dark's false wall), floating
+painting door on banners (the village, from design 9 with its painting), display props (the deep dark's false wall), floating
 dust and dripping ceilings (the deep dark). Every one still keeps the hiding rules in "Building a map": a way out, nothing
 that traps or hurts.
 

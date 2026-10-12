@@ -297,9 +297,62 @@ describe("hide and seek's manor in the world", () => {
         for (const one of house.paintings.filter((each) => each.door)) {
             const [dx, dz] = rooms.STEP[rooms.opposite(one.facing)];
             for (const level of [1, 2])
-                expect(house.grid.get(one.x + dx, level, one.z + dz)).toMatch(/white_wall_banner/);
+                expect(house.grid.get(one.x + dx, level, one.z + dz)).toMatch(/_wall_banner/);
         }
     });
+
+    it("hangs a painting over every way in that banners hang in, and hides nothing inside another", () => {
+        const templates = new Set<string>();
+        const problems: string[] = [];
+        let gaps = 0;
+        for (const era of [model.NEWEST, model.OLDEST])
+            for (let seed = 0; seed < 8; seed += 1)
+                for (const season of [null, "halloween", "winter"] as const) {
+                    const house = manor.drawManor(
+                        `banners-${seed}`,
+                        4,
+                        era,
+                        0,
+                        false,
+                        manor.DESIGN,
+                        season
+                    );
+                    const hung = new Set(
+                        house.paintings
+                            .filter((one) => one.door)
+                            .map((one) => {
+                                const [dx, dz] = rooms.STEP[rooms.opposite(one.facing)];
+                                return `${one.x + dx},${one.z + dz}`;
+                            })
+                    );
+                    // A way in hung with banners: a wall banner at the feet and
+                    // one over it, the two blocks a player walks through.
+                    for (let x = 0; x < house.size; x += 1)
+                        for (let z = 0; z < house.size; z += 1) {
+                            const feet = house.grid.get(x, 1, z) ?? "";
+                            const head = house.grid.get(x, 2, z) ?? "";
+                            if (!/_wall_banner/.test(feet) || !/_wall_banner/.test(head)) continue;
+                            gaps += 1;
+                            if (!hung.has(`${x},${z}`))
+                                problems.push(`${seed} ${season} ${x},${z}: ${feet} with no painting`);
+                            // A room's little house (its banners coloured; a
+                            // nook's are white) is one hiding place: no cellar
+                            // under it, a hiding place inside another.
+                            if (/white_wall_banner/.test(feet)) continue;
+                            for (const spot of house.spots)
+                                if (
+                                    spot.feet < 1 &&
+                                    Math.abs(spot.x - x) <= 2 &&
+                                    Math.abs(spot.z - z) <= 2
+                                )
+                                    problems.push(`${seed} ${season} ${x},${z}: a cellar under it`);
+                        }
+                    for (const plan of house.rooms) templates.add(plan.template);
+                }
+        expect(problems).toEqual([]);
+        for (const name of ["village", "aquarium", "witch", "toys"]) expect(templates).toContain(name);
+        expect(gaps).toBeGreaterThan(0);
+    }, 120_000);
 
     it("arms its panels and keys with their numbers and holds, and the seekers' way home", () => {
         const lines = manor.armLines(box, house, "world");

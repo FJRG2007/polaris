@@ -46,6 +46,7 @@ function drawn(template: rooms.Template, era: model.Era) {
         hook: () => void (hooks += 1),
         spot: (u, feet, v) => void spots.push([u, feet, v]),
         pad: () => {},
+        painting: () => {},
         fish: () => {}
     };
     template.draw(canvas);

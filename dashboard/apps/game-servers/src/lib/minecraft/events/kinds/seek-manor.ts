@@ -56,7 +56,7 @@ import * as model from "./seek-grid";
 import type { Decoration } from "../../seasonal";
 
 /** The layout's version, written into the run when it is built. */
-export const DESIGN = 8;
+export const DESIGN = 9;
 /** The first design built as a manor: every design from here on is one. */
 export const FIRST = 4;
 /** The most who can play, in the largest house. */
@@ -747,6 +747,17 @@ function canvasOf(
             grid.set(PAD_BLOCK, at.x, 0, at.z);
             grid.pad(at.x, 0, at.z, panels.PAD_RISE);
             draft.pads.push({ x: at.x, z: at.z });
+        },
+        painting(u, level, v, facing) {
+            const at = place.at(u, v);
+            draft.paintings.push({
+                x: at.x,
+                level,
+                z: at.z,
+                facing: place.side(facing),
+                variant: PAINTINGS[Math.floor(random() * PAINTINGS.length)]!,
+                door: true
+            });
         },
         fish(u, level, v) {
             const at = place.at(u, v);
