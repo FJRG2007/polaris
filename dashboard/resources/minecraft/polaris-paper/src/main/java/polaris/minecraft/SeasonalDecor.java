@@ -26,10 +26,14 @@ import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.Snowable;
 import org.bukkit.block.data.type.Leaves;
 import org.bukkit.block.data.type.Snow;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerAnimationEvent;
+import org.bukkit.event.player.PlayerAnimationType;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
@@ -63,10 +67,11 @@ import org.bukkit.util.Vector;
  * chunk past the view distance is forgotten, as the player's game forgot it, so
  * it is decided and shown again as soon as they come back.
  *
- * A decoration a player hits comes down on that first hit, for everybody, and
- * stays down for the rest of the season ({@link BrokenDecor}, kept beside the
- * world): the hit is called off, so the real block under it is neither broken
- * nor dropped.
+ * A decoration a player breaks comes down for everybody and stays down for the
+ * rest of the season ({@link BrokenDecor}, kept beside the world): every hit on
+ * it is called off, so the real block under it is neither broken nor dropped. A
+ * pumpkin takes as long to dig as a real one and drops itself ({@link #onHit});
+ * anything else comes down on the first hit.
  *
  * Main thread only: the command and the timer both run there.
  */
@@ -136,6 +141,30 @@ final class SeasonalDecor implements Listener {
     /** Knocked down since the list was last written. */
     private boolean brokenDirty;
     private BiConsumer<Player, Block> pumpkinTaken = (player, block) -> {};
+
+    /** A pumpkin a player is digging: where, the tick they started and last swung at it, and how much of it each tick takes. */
+    private static final class Dig {
+        final Block block;
+        final BlockData shown;
+        final int since;
+        final double perTick;
+        int swung;
+
+        Dig(Block block, BlockData shown, int since, double perTick) {
+            this.block = block;
+            this.shown = shown;
+            this.since = since;
+            this.perTick = perTick;
+            this.swung = since;
+        }
+    }
+
+    private final Map<UUID, Dig> digs = new HashMap<>();
+    /** How many ticks without a swing at it end a dig: the player let go, or looked away. */
+    private static final int DIG_IDLE_TICKS = 6;
+    /** How much a dig takes each tick of a block of hardness one, by the game's own sum:
+     *  thirty when the hand can harvest it, as anybody can a pumpkin. */
+    private static final double DIG_DIVISOR = 30;
 
     SeasonalDecor(Plugin plugin) {
         this.plugin = plugin;
@@ -245,6 +274,7 @@ final class SeasonalDecor implements Listener {
             if (season == Season.HALLOWEEN && ticks % ASH_TICKS == 0) particles(false);
             if (ticks % PASS_TICKS == 0) pass(ticks % RESEND_TICKS == 0);
             if (ticks % FLUSH_TICKS == 0) flushBroken();
+            dig();
             mobs.tick();
         } catch (RuntimeException failed) {
             // A tick must never fail over a decoration: put everything back and stop.
@@ -254,6 +284,7 @@ final class SeasonalDecor implements Listener {
             } catch (RuntimeException ignored) {
                 season = null;
                 seen.clear();
+                digs.clear();
                 mobs.forget();
             }
         }
@@ -262,6 +293,7 @@ final class SeasonalDecor implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         seen.remove(event.getPlayer().getUniqueId());
+        digs.remove(event.getPlayer().getUniqueId());
     }
 
     private void pass(boolean resend) {
@@ -340,13 +372,9 @@ final class SeasonalDecor implements Listener {
      * snowy grass), which the player is digging and is left to the game.
      */
     BlockData takeDown(Player player, Block block) {
+        Fake hit = shownAt(player, block);
+        if (hit == null) return null;
         Seen one = seen.get(player.getUniqueId());
-        if (one == null || !player.getWorld().getUID().equals(one.world)) return null;
-        List<Fake> fakes = one.chunks.get(chunkKey(block.getX() >> 4, block.getZ() >> 4));
-        if (fakes == null) return null;
-        Fake hit = null;
-        for (Fake fake : fakes) if (same(fake.at(), block.getX(), block.getY(), block.getZ())) hit = fake;
-        if (hit == null || redrawn(hit)) return null;
         if (broken.add(blockKey(block.getX(), block.getY(), block.getZ()))) brokenDirty = true;
         boolean snow = hit.shown().getMaterial() == Material.SNOW;
         for (Player other : Bukkit.getOnlinePlayers()) {
@@ -356,6 +384,17 @@ final class SeasonalDecor implements Listener {
             if (snow) drop(other, theirs, block.getX(), block.getY() - 1, block.getZ());
         }
         return hit.shown();
+    }
+
+    /** The decoration a player is shown at a block, or null - and null for a real block only drawn differently. */
+    private Fake shownAt(Player player, Block block) {
+        Seen one = seen.get(player.getUniqueId());
+        if (one == null || !player.getWorld().getUID().equals(one.world)) return null;
+        List<Fake> fakes = one.chunks.get(chunkKey(block.getX() >> 4, block.getZ() >> 4));
+        if (fakes == null) return null;
+        Fake hit = null;
+        for (Fake fake : fakes) if (same(fake.at(), block.getX(), block.getY(), block.getZ())) hit = fake;
+        return hit == null || redrawn(hit) ? null : hit;
     }
 
     /** A real block only drawn in another state of itself, as grass drawn snowy. */
@@ -380,22 +419,98 @@ final class SeasonalDecor implements Listener {
     }
 
     /**
-     * The first hit on a decoration takes it down and is called off, so the real
-     * block under it stays as it is and drops nothing. Left to the game, the hit
-     * broke that real block instead (a hole, and dirt), or nothing at all where
-     * the decoration stood in air, and the decoration stood there again the next
-     * time its chunk was decided.
+     * Every hit on a decoration is called off, so the real block under it stays
+     * as it is and drops nothing. Left to the game, the hit broke that real block
+     * instead (a hole, and dirt), or nothing at all where the decoration stood in
+     * air, and the decoration stood there again the next time its chunk was
+     * decided.
+     *
+     * A pumpkin is dug like a real one: Bukkit tells only of the first hit, so
+     * the dig goes on while the player keeps swinging at it ({@link #onSwing})
+     * and it comes down, dropping itself, once as long has gone as the tool in
+     * hand takes ({@link #dig}). One dug in a single hit, or hit by a player in
+     * creative, comes down on that hit. Anything else comes down on the first
+     * hit, as before.
      */
     @EventHandler
     public void onHit(PlayerInteractEvent event) {
         if (season == null || event.getAction() != Action.LEFT_CLICK_BLOCK || event.getClickedBlock() == null) return;
+        Player player = event.getPlayer();
         Block block = event.getClickedBlock();
-        BlockData shown = takeDown(event.getPlayer(), block);
-        if (shown == null) return;
+        Fake hit = shownAt(player, block);
+        if (hit == null) return;
         event.setCancelled(true);
+        BlockData shown = hit.shown();
+        boolean creative = player.getGameMode() == GameMode.CREATIVE;
+        if (!pumpkin(shown) || creative) {
+            knockDown(player, block, shown, !creative);
+            return;
+        }
+        double hardness = Math.max(0.05, shown.getMaterial().getHardness());
+        double perTick = toolSpeed(shown, player.getInventory().getItemInMainHand()) / hardness / DIG_DIVISOR;
+        if (perTick >= 1) {
+            knockDown(player, block, shown, true);
+            return;
+        }
+        digs.put(player.getUniqueId(), new Dig(block, shown, ticks, perTick));
+        // The hit called off may have put the real block back on their screen.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (shownAt(player, block) != null) player.sendBlockChange(block.getLocation(), shown);
+        });
+    }
+
+    /** Swinging on at the pumpkin being dug keeps the dig going. */
+    @EventHandler
+    public void onSwing(PlayerAnimationEvent event) {
+        if (event.getAnimationType() != PlayerAnimationType.ARM_SWING) return;
+        Dig dig = digs.get(event.getPlayer().getUniqueId());
+        if (dig == null) return;
+        Block target = event.getPlayer().getTargetBlockExact(6);
+        if (target != null && target.equals(dig.block)) dig.swung = ticks;
+    }
+
+    /** Each tick: a dig left off ends, and a dig long enough brings its pumpkin down. */
+    private void dig() {
+        if (digs.isEmpty()) return;
+        digs.entrySet().removeIf(entry -> {
+            Dig dig = entry.getValue();
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || ticks - dig.swung > DIG_IDLE_TICKS) return true;
+            if ((ticks - dig.since + 1) * dig.perTick < 1) return false;
+            knockDown(player, dig.block, dig.shown, true);
+            return true;
+        });
+    }
+
+    /** Down for everybody; a pumpkin dug out drops itself, and may be a trap. */
+    private void knockDown(Player player, Block block, BlockData shown, boolean dug) {
+        if (takeDown(player, block) == null || !pumpkin(shown)) return;
+        if (dug) block.getWorld().dropItemNaturally(block.getLocation().add(0, 1, 0), new ItemStack(shown.getMaterial()));
+        pumpkinTaken.accept(player, block);
+    }
+
+    /**
+     * How fast a tool digs a block, as the game sums it: the tier of the tool
+     * the block wants, then efficiency. Bukkit has no sum for a block that is
+     * not there; haste and the like are left out.
+     */
+    private static double toolSpeed(BlockData shown, ItemStack hand) {
+        if (hand == null || !shown.isPreferredTool(hand)) return 1;
+        String name = hand.getType().name();
+        double speed = name.startsWith("WOODEN_") ? 2
+                : name.startsWith("STONE_") ? 4
+                : name.startsWith("IRON_") ? 6
+                : name.startsWith("DIAMOND_") ? 8
+                : name.startsWith("NETHERITE_") ? 9
+                : name.startsWith("GOLDEN_") ? 12
+                : 1;
+        int efficiency = hand.getEnchantmentLevel(Enchantment.EFFICIENCY);
+        return speed > 1 && efficiency > 0 ? speed + efficiency * efficiency + 1 : speed;
+    }
+
+    private static boolean pumpkin(BlockData shown) {
         Material kind = shown.getMaterial();
-        if (kind == Material.PUMPKIN || kind == Material.CARVED_PUMPKIN || kind == Material.JACK_O_LANTERN)
-            pumpkinTaken.accept(event.getPlayer(), block);
+        return kind == Material.PUMPKIN || kind == Material.CARVED_PUMPKIN || kind == Material.JACK_O_LANTERN;
     }
 
     /** The broken list for this season, read from beside the world the first time. */
@@ -450,6 +565,7 @@ final class SeasonalDecor implements Listener {
             }
         }
         seen.clear();
+        digs.clear();
     }
 
     /**

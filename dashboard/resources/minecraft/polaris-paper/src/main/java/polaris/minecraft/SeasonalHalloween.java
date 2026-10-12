@@ -35,6 +35,7 @@ import org.bukkit.block.Chest;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
 import org.bukkit.entity.Bat;
+import org.bukkit.entity.Endermite;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -90,6 +91,8 @@ final class SeasonalHalloween implements Listener {
     private static final int MAX_BATS = 64;
     private static final int BAT_LIFE = 1200;
     private static final int TRAP_BAT_LIFE = 600;
+    /** The fewest endermites an infested pumpkin lets out. */
+    private static final int TRAP_MITES = 3;
     private static final int TREAT_CHANCE = 8;
     private static final int HORSEMAN_ODDS = 300;
     private static final int TRAP_BASE = 15;
@@ -406,11 +409,19 @@ final class SeasonalHalloween implements Listener {
         trapAt.put(player.getUniqueId(), ticks);
         Location at = block.getLocation().add(0.5, 1, 0.5);
         world.spawnParticle(Particle.LARGE_SMOKE, at, 16, 0.4, 0.4, 0.4, 0.02);
-        if (trap.nextBoolean()) {
+        int kind = trap.nextInt(3);
+        if (kind == 0) {
             int bats = 2 + trap.nextInt(2);
             for (int i = 0; i < bats; i++) bat(world, at.getX(), at.getY() + 0.5, at.getZ(), BAT_LIFE - TRAP_BAT_LIFE);
-        } else if (at.getBlock().isPassable() && at.clone().add(0, 1, 0).getBlock().isPassable()) {
-            world.spawn(at, Zombie.class, zombie -> zombie.setBaby());
+        } else if (!at.getBlock().isPassable()) {
+            return;
+        } else if (kind == 1) {
+            if (at.clone().add(0, 1, 0).getBlock().isPassable()) world.spawn(at, Zombie.class, zombie -> zombie.setBaby());
+        } else {
+            // An infested pumpkin: endermites, which bite and live two minutes
+            // at most - never silverfish, which would hide in the stone for good.
+            int mites = TRAP_MITES + trap.nextInt(2);
+            for (int i = 0; i < mites; i++) world.spawn(at, Endermite.class);
         }
     }
 

@@ -20,8 +20,10 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -65,13 +67,15 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * straight after it, and what was sent is sent again now and then - a block
  * that changed since loses it.
  *
- * A decoration a player hits comes down on that first hit, for everybody, and
- * stays down for the rest of the season ({@link BrokenDecor}, kept beside the
- * world): the hit is called off, so the real block under it - the grass under a
- * pumpkin, the leaves under a light - is neither broken nor dropped. Left to the
- * game, the hit broke that real block instead (a hole, and dirt), or nothing at
- * all where the decoration stood in air, and the next time the chunk was
- * decided the decoration stood there again.
+ * A decoration a player breaks comes down for everybody and stays down for the
+ * rest of the season ({@link BrokenDecor}, kept beside the world). Every hit on
+ * one is called off, so the real block under it - the grass under a pumpkin,
+ * the leaves under a light - is neither broken nor dropped. Left to the game,
+ * the hit broke that real block instead (a hole, and dirt), or nothing at all
+ * where the decoration stood in air, and the next time the chunk was decided
+ * the decoration stood there again. A pumpkin takes as long to dig as a real
+ * one and drops itself ({@link #onHit}); anything else comes down on the first
+ * hit.
  *
  * Server thread only: the commands and the tick both run there.
  */
@@ -144,6 +148,13 @@ final class SeasonalDecor {
     private static Path brokenFile;
     /** Knocked down since the list was last written. */
     private static boolean brokenDirty;
+
+    /** A pumpkin a player is digging: where, the tick they started, and how much of it each tick takes. */
+    private record Dig(BlockPos pos, long since, float perTick) {}
+
+    private static final Map<UUID, Dig> digs = new HashMap<>();
+    /** How much of a block a dig must have taken when the player's game says it is done, as the game's own check. */
+    private static final float DUG = 0.7f;
 
     // ------------------------------------------------------------------ commands
 
@@ -282,6 +293,7 @@ final class SeasonalDecor {
     @SubscribeEvent
     public void onLeave(PlayerEvent.PlayerLoggedOutEvent event) {
         seen.remove(event.getEntity().getUUID());
+        digs.remove(event.getEntity().getUUID());
     }
 
     private static void pass(MinecraftServer server, boolean resend) {
@@ -344,6 +356,7 @@ final class SeasonalDecor {
             for (List<Fake> fakes : one.chunks.values()) for (Fake fake : fakes) restore(player, fake);
         }
         seen.clear();
+        digs.clear();
     }
 
     /**
@@ -354,13 +367,9 @@ final class SeasonalDecor {
      * snowy grass), which the player is digging and is left to the game.
      */
     static BlockState takeDown(ServerPlayer player, BlockPos pos) {
+        Fake hit = shownAt(player, pos);
+        if (hit == null) return null;
         Seen one = seen.get(player.getUUID());
-        if (one == null || one.dimension != player.serverLevel().dimension()) return null;
-        List<Fake> fakes = one.chunks.get(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4));
-        if (fakes == null) return null;
-        Fake hit = null;
-        for (Fake fake : fakes) if (fake.pos().equals(pos)) hit = fake;
-        if (hit == null || redrawn(hit)) return null;
         if (broken.add(pos.asLong())) brokenDirty = true;
         BlockPos under = hit.shown().is(Blocks.SNOW) ? pos.below() : null;
         for (ServerPlayer other : player.serverLevel().getServer().getPlayerList().getPlayers()) {
@@ -370,6 +379,17 @@ final class SeasonalDecor {
             if (under != null) drop(other, theirs, under);
         }
         return hit.shown();
+    }
+
+    /** The decoration a player is shown at a block, or null - and null for a real block only drawn differently. */
+    private static Fake shownAt(ServerPlayer player, BlockPos pos) {
+        Seen one = seen.get(player.getUUID());
+        if (one == null || one.dimension != player.serverLevel().dimension()) return null;
+        List<Fake> fakes = one.chunks.get(ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4));
+        if (fakes == null) return null;
+        Fake hit = null;
+        for (Fake fake : fakes) if (fake.pos().equals(pos)) hit = fake;
+        return hit == null || redrawn(hit) ? null : hit;
     }
 
     /** A real block only drawn in another state of itself, as grass drawn snowy. */
@@ -390,18 +410,61 @@ final class SeasonalDecor {
     }
 
     /**
-     * The first hit on a decoration takes it down and is called off, so the real
-     * block under it stays as it is and drops nothing. Before the game's own
-     * checks: a decoration standing in air never reaches them at all.
+     * Every hit on a decoration is called off, so the real block under it stays
+     * as it is and drops nothing. Before the game's own checks: a decoration
+     * standing in air never reaches them at all.
+     *
+     * A pumpkin is dug like a real one: the player's game digs what it is shown
+     * and says when it is done, and it comes down then - dropping itself, and
+     * only once as much time has gone as the game would have taken
+     * ({@link #DUG}, from the tool, enchantments and effects in hand). One dug
+     * in a single hit, or hit by a player in creative, comes down on that hit.
+     * Anything else comes down on the first hit, as before: nobody digs a web
+     * or a light out of leaves they cannot reach.
      */
     @SubscribeEvent
     public void onHit(PlayerInteractEvent.LeftClickBlock event) {
-        if (season == null || event.getAction() != PlayerInteractEvent.LeftClickBlock.Action.START) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        BlockState shown = takeDown(player, event.getPos());
-        if (shown == null) return;
+        if (season == null || !(event.getEntity() instanceof ServerPlayer player)) return;
+        PlayerInteractEvent.LeftClickBlock.Action action = event.getAction();
+        if (action == PlayerInteractEvent.LeftClickBlock.Action.CLIENT_HOLD) return;
+        BlockPos pos = event.getPos();
+        Fake hit = shownAt(player, pos);
+        if (hit == null) return;
         event.setCanceled(true);
-        if (pumpkin(shown)) SeasonalHalloween.trap(player, player.serverLevel(), event.getPos());
+        BlockState shown = hit.shown();
+        if (!pumpkin(shown) || player.isCreative()) {
+            if (action == PlayerInteractEvent.LeftClickBlock.Action.START) knockDown(player, pos, shown, !player.isCreative());
+            return;
+        }
+        long now = player.serverLevel().getGameTime();
+        switch (action) {
+            case START -> {
+                float perTick = shown.getDestroyProgress(player, player.serverLevel(), pos);
+                if (perTick >= 1) knockDown(player, pos, shown, true);
+                else digs.put(player.getUUID(), new Dig(pos, now, perTick));
+            }
+            case STOP -> {
+                Dig dig = digs.remove(player.getUUID());
+                if (dig != null && dig.pos().equals(pos) && (now - dig.since() + 1) * dig.perTick() >= DUG) {
+                    knockDown(player, pos, shown, true);
+                } else {
+                    // Too soon: their game took it out already, so it is shown again.
+                    show(player, hit);
+                }
+            }
+            case ABORT -> {
+                Dig dig = digs.get(player.getUUID());
+                if (dig != null && dig.pos().equals(pos)) digs.remove(player.getUUID());
+            }
+            default -> {}
+        }
+    }
+
+    /** Down for everybody; a pumpkin dug out drops itself, and may be a trap. */
+    private static void knockDown(ServerPlayer player, BlockPos pos, BlockState shown, boolean dug) {
+        if (takeDown(player, pos) == null || !pumpkin(shown)) return;
+        if (dug) Block.popResourceFromFace(player.serverLevel(), pos, Direction.UP, new ItemStack(shown.getBlock()));
+        SeasonalHalloween.trap(player, player.serverLevel(), pos);
     }
 
     /** A chunk sent to a player's game again wiped what it was shown there: show it again, after it. */

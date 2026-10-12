@@ -43,6 +43,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ambient.Bat;
 import net.minecraft.world.entity.animal.horse.SkeletonHorse;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Endermite;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.Phantom;
 import net.minecraft.world.entity.monster.Skeleton;
@@ -83,8 +84,10 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - Bats: a swarm round each player under the open sky once a dusk, gone in a minute.
  * - Treats: a pumpkin-headed monster a player kills may drop a cookie or a pie.
  * - The headless horseman: rare, one a night at most, gone at dawn.
- * - Trap pumpkins: a decorative pumpkin a player breaks may let out bats or a
- *   baby zombie; the ground under it, which is all that is really there, stays.
+ * - Trap pumpkins: a decorative pumpkin a player breaks drops itself, and some
+ *   - drawn from where they stand - let out bats, a baby zombie or a swarm of
+ *   endermites that bite and are gone in a couple of minutes; the ground under
+ *   it, which is all that is really there, stays.
  * - Blood night: once a season, on the night the dashboard names - red fog,
  *   a second spawn for every natural one, double loot and experience. The
  *   night is the overworld's, but it reaches every dimension: somebody in the
@@ -117,6 +120,8 @@ final class SeasonalHalloween {
     private static final int MAX_BATS = 64;
     private static final int BAT_LIFE = 1200;
     private static final int TRAP_BAT_LIFE = 600;
+    /** The fewest endermites an infested pumpkin lets out. */
+    private static final int TRAP_MITES = 3;
     /** Of pumpkin-headed kills, the ones that drop a treat, in percent. */
     private static final int TREAT_CHANCE = 8;
     /** One sweep in this many through a night brings the horseman: about one night in three. */
@@ -430,15 +435,26 @@ final class SeasonalHalloween {
         double y = pos.getY() + 1;
         double z = pos.getZ() + 0.5;
         level.sendParticles(ParticleTypes.LARGE_SMOKE, x, y, z, 16, 0.4, 0.4, 0.4, 0.02);
-        if (trap.nextBoolean()) {
+        int kind = trap.nextInt(3);
+        if (kind == 0) {
             int bats = 2 + trap.nextInt(2);
             for (int i = 0; i < bats; i++) bat(level, x, y + 0.5, z, BAT_LIFE - TRAP_BAT_LIFE);
-        } else {
+        } else if (kind == 1) {
             Zombie zombie = EntityType.ZOMBIE.create(level, EntitySpawnReason.EVENT);
             if (zombie == null || !level.noCollision(EntityType.ZOMBIE.getSpawnAABB(x, y, z))) return;
             zombie.setBaby(true);
             zombie.moveTo(x, y, z, level.random.nextFloat() * 360f, 0f);
             level.addFreshEntity(zombie);
+        } else {
+            // An infested pumpkin: endermites, which bite and live two minutes
+            // at most - never silverfish, which would hide in the stone for good.
+            int mites = TRAP_MITES + trap.nextInt(2);
+            for (int i = 0; i < mites; i++) {
+                Endermite mite = EntityType.ENDERMITE.create(level, EntitySpawnReason.EVENT);
+                if (mite == null || !level.noCollision(EntityType.ENDERMITE.getSpawnAABB(x, y, z))) return;
+                mite.moveTo(x, y, z, level.random.nextFloat() * 360f, 0f);
+                level.addFreshEntity(mite);
+            }
         }
     }
 

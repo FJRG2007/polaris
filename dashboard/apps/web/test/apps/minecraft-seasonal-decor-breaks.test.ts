@@ -36,14 +36,46 @@ function body(text: string, signature: string): string {
 }
 
 describe("a decoration a player hits", () => {
-    it("comes down on the first hit, which is called off so the ground under it stays", () => {
+    it("has every hit called off so the ground under it stays", () => {
         const neo = body(NEO_DECOR, "public void onHit(PlayerInteractEvent.LeftClickBlock event)");
         expect(neo).toContain("LeftClickBlock.Action.START");
-        expect(neo).toContain("takeDown(player, event.getPos())");
+        expect(neo).toContain("shownAt(player, pos)");
         expect(neo).toContain("event.setCanceled(true)");
         const paper = body(PAPER_DECOR, "public void onHit(PlayerInteractEvent event)");
         expect(paper).toContain("Action.LEFT_CLICK_BLOCK");
+        expect(paper).toContain("shownAt(player, block)");
         expect(paper).toContain("event.setCancelled(true)");
+    });
+
+    it("is a pumpkin dug as long as a real one, which drops itself; anything else comes down on the first hit", () => {
+        const neo = body(NEO_DECOR, "public void onHit(PlayerInteractEvent.LeftClickBlock event)");
+        // The game's own sum for how much of it a tick digs, and its own check on the finish.
+        expect(neo).toContain("shown.getDestroyProgress(player, player.serverLevel(), pos)");
+        expect(neo).toContain("case STOP ->");
+        expect(neo).toContain("* dig.perTick() >= DUG");
+        expect(neo).toContain("case ABORT ->");
+        expect(NEO_DECOR).toContain("private static final float DUG = 0.7f;");
+        expect(neo).toMatch(/if \(!pumpkin\(shown\) \|\| player\.isCreative\(\)\)/);
+        const neoDown = body(NEO_DECOR, "private static void knockDown(");
+        expect(neoDown).toContain("new ItemStack(shown.getBlock())");
+        expect(neoDown).toContain("SeasonalHalloween.trap(player, player.serverLevel(), pos)");
+        // Bukkit tells only of the first hit: the dig goes on while they swing at it.
+        const paper = body(PAPER_DECOR, "public void onHit(PlayerInteractEvent event)");
+        expect(paper).toContain("toolSpeed(shown, player.getInventory().getItemInMainHand())");
+        expect(paper).toContain("digs.put(");
+        expect(body(PAPER_DECOR, "public void onSwing(PlayerAnimationEvent event)")).toContain(
+            "dig.swung = ticks"
+        );
+        const dig = body(PAPER_DECOR, "private void dig()");
+        expect(dig).toContain("ticks - dig.swung > DIG_IDLE_TICKS");
+        expect(dig).toContain("knockDown(player, dig.block, dig.shown, true)");
+        expect(PAPER_DECOR).toMatch(/\n            dig\(\);\n/);
+        const paperDown = body(PAPER_DECOR, "private void knockDown(");
+        expect(paperDown).toContain("new ItemStack(shown.getMaterial())");
+        expect(paperDown).toContain("pumpkinTaken.accept(player, block)");
+        // Nobody left digging once they leave or the season goes.
+        for (const decor of [NEO_DECOR, PAPER_DECOR])
+            expect(decor).toMatch(/digs\.remove\(event\.get/);
     });
 
     it("is taken down for every player, not only the one who hit it, and remembered", () => {
@@ -55,7 +87,8 @@ describe("a decoration a player hits", () => {
             expect(takeDown).not.toMatch(/writeBroken\(\)/);
             expect(takeDown).toMatch(/for \((ServerPlayer|Player) other :/);
             // A real block only drawn snowy is the player digging: left to the game.
-            expect(takeDown).toContain("redrawn(hit)");
+            expect(takeDown).toContain("shownAt(player, ");
+            expect(body(decor, "Fake shownAt(")).toContain("redrawn(hit)");
         }
     });
 
@@ -68,13 +101,19 @@ describe("a decoration a player hits", () => {
     });
 
     it("keeps the trap pumpkins, now fired by the take-down instead of a break", () => {
-        expect(NEO_DECOR).toContain(
-            "SeasonalHalloween.trap(player, player.serverLevel(), event.getPos())"
-        );
+        expect(NEO_DECOR).toContain("SeasonalHalloween.trap(player, player.serverLevel(), pos)");
         expect(PAPER_HALLOWEEN).toContain("decor.onPumpkinTaken(this::trap);");
         for (const halloween of [NEO_HALLOWEEN, PAPER_HALLOWEEN]) {
             expect(halloween).not.toMatch(/BreakEvent/);
             expect(halloween).not.toContain("takePumpkin");
+        }
+    });
+
+    it("lets out bats, a baby zombie or biting endermites, drawn from where it stood, never silverfish", () => {
+        for (const halloween of [NEO_HALLOWEEN, PAPER_HALLOWEEN]) {
+            expect(halloween).toContain("int kind = trap.nextInt(3);");
+            expect(halloween).toMatch(/Endermite/);
+            expect(halloween).not.toMatch(/Silverfish|SILVERFISH/);
         }
     });
 });
