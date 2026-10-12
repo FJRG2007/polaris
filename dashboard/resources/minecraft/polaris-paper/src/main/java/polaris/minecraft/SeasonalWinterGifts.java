@@ -114,7 +114,7 @@ final class SeasonalWinterGifts implements Listener {
         known.bornTick = ticks;
         ItemStack taken = steal(player, known);
         if (taken == null) {
-            player.sendMessage(ChatColor.GREEN + words(WinterPlan.Line.ELF_FOUND_NOTHING));
+            player.sendMessage(ChatColor.GREEN + words(player, WinterPlan.Line.ELF_FOUND_NOTHING));
             return;
         }
         EntityEquipment equipment = elf.getEquipment();
@@ -122,7 +122,7 @@ final class SeasonalWinterGifts implements Listener {
             equipment.setItemInMainHand(taken.clone());
             equipment.setItemInMainHandDropChance(0f);
         }
-        player.sendMessage(ChatColor.GREEN + words(WinterPlan.Line.ELF_STOLE, nameOf(taken)));
+        player.sendMessage(ChatColor.GREEN + words(player, WinterPlan.Line.ELF_STOLE, nameOf(taken)));
     }
 
     /** An elf with something runs: it chases nobody. */
@@ -188,7 +188,8 @@ final class SeasonalWinterGifts implements Listener {
             spot.setBlockData(facing, true);
         }
         if (!(spot.getState() instanceof Barrel barrel)) return;
-        barrel.setCustomName(ChatColor.RED + words(WinterPlan.Line.PRESENT_FOR, player.getName()));
+        // Named for the one player it is for, so in that player's language.
+        barrel.setCustomName(ChatColor.RED + words(player, WinterPlan.Line.PRESENT_FOR, player.getName()));
         fill(barrel.getSnapshotInventory());
         barrel.update(true, false);
         List<String> presents = new ArrayList<>(data.getStringList(SeasonalWinterStore.PRESENTS));
@@ -196,7 +197,7 @@ final class SeasonalWinterGifts implements Listener {
         data.set(SeasonalWinterStore.PRESENTS, presents);
         data.set(who, plan.day());
         store.save();
-        player.sendMessage(ChatColor.RED + words(WinterPlan.Line.PRESENT_WAITING));
+        player.sendMessage(ChatColor.RED + words(player, WinterPlan.Line.PRESENT_WAITING));
     }
 
     private static final String GIFTED_PATH = SeasonalWinterStore.GIFTED + ".";
@@ -311,7 +312,8 @@ final class SeasonalWinterGifts implements Listener {
                 equipment.setItemInOffHandDropChance(0f);
             }
             elf.setHealth(Math.min(ELF_HEALTH, elf.getHealth()));
-            elf.setCustomName(ChatColor.GREEN + words(WinterPlan.Line.ELF));
+            // A name over a head is seen by everybody at once, so it stays in the server's language.
+            elf.setCustomName(ChatColor.GREEN + SeasonalWinter.plan().words(WinterPlan.Line.ELF));
             elf.addScoreboardTag(ELF_TAG);
         });
         elves.put(spawned.getUniqueId(), new Elf(spawned.getUniqueId(), ticks));
@@ -380,9 +382,9 @@ final class SeasonalWinterGifts implements Listener {
         return !WinterPlan.valuable(stack.getType().getKey().toString());
     }
 
-    /** A line in the server's language, with a name where it has one. */
-    private static String words(WinterPlan.Line line, String... name) {
-        String words = SeasonalWinter.plan().words(line);
+    /** A line in the reader's own language, with a name where it has one. */
+    private static String words(Player reader, WinterPlan.Line line, String... name) {
+        String words = SeasonalWinter.plan().words(line, reader.getLocale());
         return name.length == 0 ? words : words.replace("%s", name[0]);
     }
 
@@ -420,13 +422,13 @@ final class SeasonalWinterGifts implements Listener {
                 Long told = toldFull.get(owner);
                 if (told == null || now - told > 600) {
                     toldFull.put(owner, now);
-                    player.sendMessage(ChatColor.GREEN + words(WinterPlan.Line.ELF_NEEDS_ROOM, name));
+                    player.sendMessage(ChatColor.GREEN + words(player, WinterPlan.Line.ELF_NEEDS_ROOM, name));
                 }
                 continue;
             }
             owed.set(id, null);
             changed = true;
-            player.sendMessage(ChatColor.GREEN + words(WinterPlan.Line.ELF_GAVE_BACK, name));
+            player.sendMessage(ChatColor.GREEN + words(player, WinterPlan.Line.ELF_GAVE_BACK, name));
         }
         if (changed) store.save();
     }

@@ -458,14 +458,24 @@ final class SeasonalHalloween {
         bloodActive = true;
         bloodDone = key;
         save();
-        server.getPlayerList().broadcastSystemMessage(
-                Component.literal(settings.words(HalloweenSettings.Line.BLOOD_START)).withStyle(ChatFormatting.DARK_RED), false);
+        tell(server, HalloweenSettings.Line.BLOOD_START, ChatFormatting.DARK_RED);
     }
 
     private static void endBloodNight(MinecraftServer server) {
         bloodActive = false;
-        server.getPlayerList().broadcastSystemMessage(
-                Component.literal(settings.words(HalloweenSettings.Line.BLOOD_END)).withStyle(ChatFormatting.GRAY), false);
+        tell(server, HalloweenSettings.Line.BLOOD_END, ChatFormatting.GRAY);
+    }
+
+    /** Every player online gets the line in their own language. */
+    private static void tell(MinecraftServer server, HalloweenSettings.Line line, ChatFormatting style) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(Component.literal(words(player, line)).withStyle(style));
+        }
+    }
+
+    /** A line for one player, in their client's language. */
+    private static String words(ServerPlayer player, HalloweenSettings.Line line) {
+        return settings.words(line, player.clientInformation().language());
     }
 
     private static void fog(MinecraftServer server) {
@@ -509,6 +519,7 @@ final class SeasonalHalloween {
         villager.setVillagerData(villager.getVillagerData().setProfession(VillagerProfession.NITWIT));
         villager.setItemSlot(EquipmentSlot.HEAD, new ItemStack(level.random.nextBoolean() ? Items.CARVED_PUMPKIN : Items.JACK_O_LANTERN));
         villager.setDropChance(EquipmentSlot.HEAD, 0f);
+        // A name over a head is seen by everybody at once, so it stays in the server's language.
         villager.setCustomName(Component.literal(settings.words(HalloweenSettings.Line.TRICK_NAME)).withStyle(ChatFormatting.GOLD));
         villager.setCustomNameVisible(true);
         villager.addTag(TAG);
@@ -526,7 +537,7 @@ final class SeasonalHalloween {
         if (!(villager.level() instanceof ServerLevel level)) return;
         ItemStack held = player.getItemInHand(InteractionHand.MAIN_HAND);
         if (!(held.is(Items.PUMPKIN) || held.is(Items.CARVED_PUMPKIN) || held.is(Items.JACK_O_LANTERN))) {
-            player.displayClientMessage(Component.literal(settings.words(HalloweenSettings.Line.TRICK_ASK)), true);
+            player.displayClientMessage(Component.literal(words(player, HalloweenSettings.Line.TRICK_ASK)), true);
             return;
         }
         int given = treatsGiven.getOrDefault(villager.getUUID(), 0);
@@ -537,7 +548,7 @@ final class SeasonalHalloween {
         if (random.nextInt(100) < TRICK_SCARE_CHANCE) {
             player.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 60));
             level.playSound(null, villager.blockPosition(), SoundEvents.WITCH_CELEBRATE, SoundSource.NEUTRAL, 1f, 1f);
-            player.displayClientMessage(Component.literal(settings.words(HalloweenSettings.Line.TRICK_SCARE)).withStyle(ChatFormatting.DARK_PURPLE), true);
+            player.displayClientMessage(Component.literal(words(player, HalloweenSettings.Line.TRICK_SCARE)).withStyle(ChatFormatting.DARK_PURPLE), true);
             return;
         }
         int roll = random.nextInt(100);
@@ -548,7 +559,7 @@ final class SeasonalHalloween {
         if (!player.getInventory().add(treat)) player.drop(treat, false);
         level.playSound(null, villager.blockPosition(), SoundEvents.VILLAGER_YES, SoundSource.NEUTRAL, 1f, 1f);
         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, villager.getX(), villager.getY() + 1.8, villager.getZ(), 6, 0.3, 0.3, 0.3, 0);
-        player.displayClientMessage(Component.literal(settings.words(HalloweenSettings.Line.TRICK_TREAT)).withStyle(ChatFormatting.GOLD), true);
+        player.displayClientMessage(Component.literal(words(player, HalloweenSettings.Line.TRICK_TREAT)).withStyle(ChatFormatting.GOLD), true);
     }
 
     private static void horseman(ServerLevel level, List<ServerPlayer> outside) {
@@ -571,6 +582,7 @@ final class SeasonalHalloween {
         rider.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.JACK_O_LANTERN));
         rider.setDropChance(EquipmentSlot.HEAD, 0f);
         rider.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        // A name over a head is seen by everybody at once, so it stays in the server's language.
         rider.setCustomName(Component.literal(settings.words(HalloweenSettings.Line.HORSEMAN)).withStyle(ChatFormatting.GOLD));
         rider.setCustomNameVisible(true);
         rider.addTag(TAG);

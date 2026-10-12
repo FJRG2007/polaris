@@ -335,6 +335,7 @@ final class SeasonalWinter implements Listener {
         feet.getWorld().spawn(standAt(feet), Snowman.class, golem -> {
             golem.setDerp(!pumpkin);
             golem.addScoreboardTag(tag);
+            // Names over heads are seen by everybody at once, so they stay in the server's language.
             if (!pumpkin) golem.setCustomName(ChatColor.AQUA + plan.words(WinterPlan.Line.SNOWMAN));
         });
     }
@@ -404,6 +405,7 @@ final class SeasonalWinter implements Listener {
             santa.setVillagerLevel(5);
             santa.setVillagerExperience(1);
             santa.setRecipes(santaOffers());
+            // A name over a head is seen by everybody at once, so it stays in the server's language.
             santa.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + plan.words(WinterPlan.Line.SANTA));
             santa.setCustomNameVisible(true);
             santa.setInvulnerable(true);
@@ -411,7 +413,7 @@ final class SeasonalWinter implements Listener {
         });
         store.data().set(SeasonalWinterStore.SANTA_NIGHT, night + 1);
         store.save();
-        visited.sendMessage(ChatColor.RED + plan.words(WinterPlan.Line.SANTA_VISITS));
+        visited.sendMessage(ChatColor.RED + plan.words(WinterPlan.Line.SANTA_VISITS, visited.getLocale()));
     }
 
     /** Somewhere a villager can stand within a few blocks of a home, or null. */
