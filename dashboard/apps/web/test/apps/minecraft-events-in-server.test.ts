@@ -61,6 +61,14 @@ describe("capabilities", () => {
         expect(inServer.parseCaps('{"ok":false}')).toEqual(new Set());
     });
 
+    it("keeps every season capability a jar lists", () => {
+        const reply =
+            '{"ok":true,"polaris":"0.5.0+abc","caps":["season","season-mobs","season-halloween","made-up"]}';
+        expect(inServer.parseCaps(reply)).toEqual(
+            new Set(["season", "season-mobs", "season-halloween"])
+        );
+    });
+
     it("tells a Polaris jar from another answer and from none", () => {
         expect(inServer.readCaps(CAPS).answer).toBe("polaris");
         expect(inServer.readCaps("Unknown or incomplete command, see below for error").answer).toBe(
