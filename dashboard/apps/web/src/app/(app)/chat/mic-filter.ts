@@ -315,14 +315,19 @@ export async function filterMic(
     let lastWall = Date.now();
     const watch = setInterval(() => {
         const now = Date.now();
-        const ok = keepingTime(context.currentTime - lastAudio, now - lastWall, context.state === "running");
+        const ok = keepingTime(
+            context.currentTime - lastAudio,
+            now - lastWall,
+            context.state === "running"
+        );
         lastAudio = context.currentTime;
         lastWall = now;
         if (ok) {
             misses = 0;
             return;
         }
-        if (context.state !== "running" && context.state !== "closed") void context.resume().catch(() => undefined);
+        if (context.state !== "running" && context.state !== "closed")
+            void context.resume().catch(() => undefined);
         misses += 1;
         if (misses < STALL_CHECKS || stalled) return;
         stalled = true;
