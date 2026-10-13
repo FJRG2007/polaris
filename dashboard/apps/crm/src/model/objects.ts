@@ -109,6 +109,13 @@ const UPDATED: FieldDef = {
     width: 160,
     hiddenByDefault: true
 };
+const UPDATED_BY: FieldDef = {
+    key: "updatedBy",
+    kind: "member",
+    readOnly: true,
+    width: 160,
+    hiddenByDefault: true
+};
 const CREATED_BY: FieldDef = {
     key: "createdBy",
     kind: "member",
@@ -132,7 +139,8 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "xUrl", kind: "url", width: 170, hiddenByDefault: true },
         CREATED,
         UPDATED,
-        CREATED_BY
+        CREATED_BY,
+        UPDATED_BY
     ],
     people: [
         { key: "name", kind: "fullName", primary: true, width: 220 },
@@ -145,7 +153,8 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "xUrl", kind: "url", width: 170, hiddenByDefault: true },
         CREATED,
         UPDATED,
-        CREATED_BY
+        CREATED_BY,
+        UPDATED_BY
     ],
     opportunities: [
         { key: "name", kind: "text", primary: true, width: 220 },
@@ -157,7 +166,8 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "owner", kind: "member", width: 170 },
         CREATED,
         UPDATED,
-        CREATED_BY
+        CREATED_BY,
+        UPDATED_BY
     ]
 };
 

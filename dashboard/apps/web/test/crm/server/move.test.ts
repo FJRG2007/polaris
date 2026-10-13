@@ -27,6 +27,7 @@ import { moveRecord } from "@polaris-app/crm/src/lib/records";
 
 const can = { read: true, edit: true, delete: true };
 const actor = {
+    user: { id: "u1", name: "Test User", isAdmin: false },
     shelf: { orgId: null, userId: "u1", key: "user:u1" },
     can: { companies: can, people: can, opportunities: can }
 } as never;

@@ -134,7 +134,7 @@ describe("enforcement", () => {
 });
 
 describe("saving rules", () => {
-    const rule = { object: "companies", rows: "own", hidden: [], readOnly: [] } as const;
+    const rule = { object: "companies" as const, rows: "own" as const, hidden: [] as string[], readOnly: [] as string[] };
 
     it("refuses somebody who does not manage roles", async () => {
         await expect(
@@ -166,5 +166,16 @@ describe("saving rules", () => {
         await expect(
             roleRules.saveRoleRule(ruled({}, true), { ...rule, role: "ghost" })
         ).rejects.toBeInstanceOf(CrmRefusal);
+    });
+});
+
+describe("last updated by", () => {
+    it("names the reader as who last changed the records", async () => {
+        const updateMany = vi.fn(async () => ({ count: 1 }));
+        (db.crmCompany as Record<string, unknown>).updateMany = updateMany;
+        await records.updateRecords(ruled({}), "companies", ["c1"], { city: "X" });
+        expect(updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ updatedById: "u1" }) })
+        );
     });
 });

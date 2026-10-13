@@ -271,7 +271,7 @@ describe("record actions", () => {
         ).toBeNull();
         expect(db.records.updateMany).toHaveBeenCalledWith({
             where: { id: { in: [RECORD] }, orgId: "o1", deletedAt: null },
-            data: { city: "Acme town" }
+            data: { city: "Acme town", updatedById: expect.any(String) }
         });
     });
 

@@ -376,6 +376,9 @@ model User {
     crmOpportunities        CrmOpportunity[] @relation("CrmOpportunityShelf")
     crmOpportunitiesOwned   CrmOpportunity[] @relation("CrmOpportunityOwner")
     crmOpportunitiesCreated CrmOpportunity[] @relation("CrmOpportunityCreatedBy")
+    crmCompaniesUpdated     CrmCompany[]     @relation("CrmCompanyUpdatedBy")
+    crmPeopleUpdated        CrmPerson[]      @relation("CrmPersonUpdatedBy")
+    crmOpportunitiesUpdated CrmOpportunity[] @relation("CrmOpportunityUpdatedBy")
     crmViews                CrmView[]        @relation("CrmViewShelf")
     crmFields               CrmField[]       @relation("CrmFieldShelf")
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
@@ -12789,6 +12792,8 @@ model CrmCompany {
     cBool4                Boolean   @default(false)
     cBool5                Boolean   @default(false)
     createdById           String?   @db.Uuid
+    // Who last changed it; null until somebody does.
+    updatedById String? @db.Uuid
     position              Float     @default(0)
     deletedAt             DateTime?
     createdAt             DateTime  @default(now())
@@ -12798,6 +12803,7 @@ model CrmCompany {
     user          User?            @relation("CrmCompanyShelf", fields: [userId], references: [id], onDelete: Cascade)
     accountOwner  User?            @relation("CrmCompanyAccountOwner", fields: [accountOwnerId], references: [id], onDelete: SetNull)
     createdBy     User?            @relation("CrmCompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy User? @relation("CrmCompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
     people        CrmPerson[]
     opportunities CrmOpportunity[]
 
@@ -12849,6 +12855,8 @@ model CrmPerson {
     cBool4      Boolean   @default(false)
     cBool5      Boolean   @default(false)
     createdById String?   @db.Uuid
+    // Who last changed it; null until somebody does.
+    updatedById String? @db.Uuid
     position    Float     @default(0)
     deletedAt   DateTime?
     createdAt   DateTime  @default(now())
@@ -12858,6 +12866,7 @@ model CrmPerson {
     user          User?            @relation("CrmPersonShelf", fields: [userId], references: [id], onDelete: Cascade)
     company       CrmCompany?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
     createdBy     User?            @relation("CrmPersonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy User? @relation("CrmPersonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
     opportunities CrmOpportunity[]
 
     @@index([orgId, deletedAt])
@@ -12910,6 +12919,8 @@ model CrmOpportunity {
     cBool4           Boolean   @default(false)
     cBool5           Boolean   @default(false)
     createdById      String?   @db.Uuid
+    // Who last changed it; null until somebody does.
+    updatedById String? @db.Uuid
     position         Float     @default(0)
     deletedAt        DateTime?
     createdAt        DateTime  @default(now())
@@ -12921,6 +12932,7 @@ model CrmOpportunity {
     pointOfContact CrmPerson?    @relation(fields: [pointOfContactId], references: [id], onDelete: SetNull)
     owner          User?         @relation("CrmOpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
     createdBy      User?         @relation("CrmOpportunityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy User? @relation("CrmOpportunityUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
     @@index([orgId, deletedAt, stage])
     @@index([userId, deletedAt, stage])

@@ -194,7 +194,7 @@ export async function moveRecord(
     const before = await table(object).findFirst({ where, select: recordSelect(object) });
     const result = await table(object).updateMany({
         where,
-        data: { ...data, position }
+        data: { ...data, position, updatedById: actor.user.id }
     });
     const row =
         result.count > 0
@@ -405,7 +405,7 @@ export async function updateRecords(
         where,
         select: recordSelect(object)
     })) as Record<string, unknown>[];
-    await table(object).updateMany({ where, data });
+    await table(object).updateMany({ where, data: { ...data, updatedById: actor.user.id } });
     const rows = (await table(object).findMany({ where, select: recordSelect(object) })) as Record<
         string,
         unknown

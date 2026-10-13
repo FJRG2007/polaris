@@ -48,7 +48,8 @@ const user = (column: string, relation: string): ColumnSpec => ({
 const COMMON: Readonly<Record<string, ColumnSpec>> = {
     createdAt: scalar("createdAt"),
     updatedAt: scalar("updatedAt"),
-    createdBy: user("createdById", "createdBy")
+    createdBy: user("createdById", "createdBy"),
+    updatedBy: user("updatedById", "updatedBy")
 };
 
 export const COLUMNS: Readonly<Record<CrmObject, Readonly<Record<string, ColumnSpec>>>> = {

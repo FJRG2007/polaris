@@ -32,7 +32,8 @@
             "xUrl": "X",
             "createdAt": "Creado",
             "updatedAt": "Editado",
-            "createdBy": "Creado por"
+            "createdBy": "Creado por",
+            "updatedBy": "Actualizado por"
         },
         "people": {
             "name": "Nombre",
@@ -45,7 +46,8 @@
             "xUrl": "X",
             "createdAt": "Creado",
             "updatedAt": "Editado",
-            "createdBy": "Creado por"
+            "createdBy": "Creado por",
+            "updatedBy": "Actualizado por"
         },
         "opportunities": {
             "name": "Nombre",
@@ -57,7 +59,8 @@
             "owner": "Dueño",
             "createdAt": "Creado",
             "updatedAt": "Editado",
-            "createdBy": "Creado por"
+            "createdBy": "Creado por",
+            "updatedBy": "Actualizado por"
         }
     },
     "options": {
