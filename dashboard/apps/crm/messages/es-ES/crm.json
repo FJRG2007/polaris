@@ -548,5 +548,13 @@
         "requestRefused": "No se puede llegar a esa dirección desde aquí.",
         "requestUnreachable": "La dirección no respondió.",
         "requestFailed": "La dirección respondió {status}."
+    },
+    "favorites": {
+        "add": "Añadir a favoritos",
+        "remove": "Quitar de favoritos",
+        "added": "Añadido a favoritos",
+        "removed": "Quitado de favoritos",
+        "limit": "Ya tienes {max} favoritos aquí. Quita uno primero.",
+        "notSaved": "Los favoritos no cambiaron"
     }
 }

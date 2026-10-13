@@ -17,7 +17,8 @@ const db = vi.hoisted(() => ({
         createMany: vi.fn(async () => ({ count: 1 })),
         deleteMany: vi.fn(async () => ({ count: 1 }))
     },
-    crmLink: { deleteMany: vi.fn(async () => ({ count: 0 })) }
+    crmLink: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    crmFavorite: { deleteMany: vi.fn(async () => ({ count: 0 })) }
 }));
 
 vi.mock("@polaris/db", () => {
@@ -26,7 +27,8 @@ vi.mock("@polaris/db", () => {
         crmPerson: db.records,
         crmOpportunity: db.records,
         crmEvent: db.crmEvent,
-        crmLink: db.crmLink
+        crmLink: db.crmLink,
+        crmFavorite: db.crmFavorite
     };
     client.$transaction = async (run: (tx: unknown) => unknown) => run(client);
     return { prisma: client, Prisma: { Decimal: class {} } };
@@ -80,6 +82,9 @@ describe("the trash", () => {
         });
         expect(db.crmLink.deleteMany).toHaveBeenCalledWith({
             where: { orgId: "o1", recordId: { in: ["c1"] } }
+        });
+        expect(db.crmFavorite.deleteMany).toHaveBeenCalledWith({
+            where: { kind: "record", targetId: { in: ["c1"] } }
         });
     });
 

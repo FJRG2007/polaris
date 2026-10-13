@@ -25,7 +25,18 @@ const state = vi.hoisted(() => ({
     tasks: [] as { id: string; name: string; done: boolean }[],
     refuseTick: false,
     madeNotes: [] as unknown[],
-    ticks: [] as unknown[]
+    ticks: [] as unknown[],
+    favorite: false,
+    pins: [] as unknown[],
+    refusePin: false
+}));
+
+vi.mock("@polaris-app/crm/src/actions/favorites", () => ({
+    setFavoriteAction: async (input: { pinned: boolean }) => {
+        state.pins.push(input);
+        if (state.refusePin) return { ok: false, error: "You already have 50 favorites here." };
+        return { ok: true, pinned: input.pinned };
+    }
 }));
 
 vi.mock("@polaris-app/crm/src/actions/activities", () => ({
@@ -74,7 +85,8 @@ vi.mock("@polaris-app/crm/src/actions/records", () => ({
         can: { companies: state.can, people: state.can, opportunities: state.can },
         people: [],
         related: [],
-        timeline: { events: [], next: null }
+        timeline: { events: [], next: null },
+        favorite: state.favorite
     }),
     restoreRecordsAction: async (input: unknown) => {
         state.restores.push(input);
@@ -104,6 +116,9 @@ beforeEach(() => {
     state.refuseTick = false;
     state.madeNotes = [];
     state.ticks = [];
+    state.favorite = false;
+    state.pins = [];
+    state.refusePin = false;
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
     if (typeof localStorage !== "undefined") localStorage.clear();
 });
@@ -140,6 +155,40 @@ describe("a record in the trash", () => {
         render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
         await screen.findByText(notice);
         expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+    });
+});
+
+describe("pinning a record", () => {
+    beforeEach(() => {
+        state.record = { ...state.record!, deletedAt: null };
+    });
+
+    it("pins it to the rail with the star, and unpins it the same way", async () => {
+        state.favorite = true;
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const star = await screen.findByRole("button", { name: "Remove from favorites" });
+        expect(star.getAttribute("aria-pressed")).toBe("true");
+        await act(async () => {
+            fireEvent.click(star);
+        });
+        await waitFor(() =>
+            expect(state.pins).toEqual([
+                { kind: "record", object: "companies", targetId: ACME, pinned: false }
+            ])
+        );
+        expect(screen.getByRole("button", { name: "Add to favorites" })).toBeTruthy();
+    });
+
+    it("puts the star back when the pin is refused", async () => {
+        state.refusePin = true;
+        state.favorite = true;
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const star = await screen.findByRole("button", { name: "Remove from favorites" });
+        await act(async () => {
+            fireEvent.click(star);
+        });
+        await waitFor(() => expect(state.pins).toHaveLength(1));
+        expect(await screen.findByRole("button", { name: "Remove from favorites" })).toBeTruthy();
     });
 });
 

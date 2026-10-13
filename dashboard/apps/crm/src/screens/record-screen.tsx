@@ -26,7 +26,8 @@ import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { CellDisplay, RefChip } from "./cell-display";
 import type { RecordOpening } from "../lib/record-page";
-import { ArrowLeft, Link2, Maximize2, RotateCcw, ShieldOff } from "lucide-react";
+import { useFavorite } from "./use-favorite";
+import { ArrowLeft, Link2, Maximize2, RotateCcw, ShieldOff, Star } from "lucide-react";
 import { Button, cn, DialogTitle, EmptyState, useToast } from "@polaris/ui";
 import {
     fieldsOf,
@@ -119,6 +120,13 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         setEditing(field.key);
     };
 
+    const favorite = useFavorite(
+        "record",
+        object,
+        record ? id : null,
+        Boolean(opening.data?.favorite)
+    );
+
     const copyLink = () => {
         void navigator.clipboard
             ?.writeText(new URL(recordHref(object, id), window.location.origin).toString())
@@ -165,6 +173,20 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             ) : null}
             {record && canEdit ? (
                 <RunWorkflowMenu object={object} id={id} onRan={opening.refresh} />
+            ) : null}
+            {record && !record.deletedAt ? (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={favorite.toggle}
+                    aria-pressed={favorite.pinned}
+                    aria-label={t(favorite.pinned ? "favorites.remove" : "favorites.add")}
+                    title={t(favorite.pinned ? "favorites.remove" : "favorites.add")}
+                >
+                    <Star
+                        className={cn("size-4", favorite.pinned && "fill-current text-warning")}
+                    />
+                </Button>
             ) : null}
             {record ? (
                 <Button

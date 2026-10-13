@@ -16,7 +16,11 @@ interface Row {
     createdAt: Date;
 }
 
-const db = vi.hoisted(() => ({ rows: [] as Row[], made: 0 }));
+const db = vi.hoisted(() => ({
+    rows: [] as Row[],
+    made: 0,
+    unpinned: [] as unknown[]
+}));
 
 /** The handful of `where` shapes lib/views uses, matched in memory. */
 function matches(row: Row, where: Record<string, unknown>): boolean {
@@ -36,6 +40,12 @@ vi.mock("@polaris/db", () => ({
     Prisma: { Decimal: class {} },
     prisma: {
         crmField: { findMany: async () => [] },
+        crmFavorite: {
+            deleteMany: async (query: unknown) => {
+                db.unpinned.push(query);
+                return { count: 0 };
+            }
+        },
         crmView: {
             findUnique: async ({
                 where
@@ -224,6 +234,8 @@ describe("saved views", () => {
         );
         await views.deleteView(actor(), "people", made.id);
         expect(db.rows.some((row) => row.id === made.id)).toBe(false);
+        // Nobody keeps a pin of a view that is gone.
+        expect(db.unpinned).toContainEqual({ where: { kind: "view", targetId: made.id } });
     });
 
     it("lets nobody without the right to change records touch a view", async () => {

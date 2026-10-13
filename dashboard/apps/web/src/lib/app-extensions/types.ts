@@ -128,6 +128,10 @@ export interface AppExtension {
     /** The reader's next events, for the Overview card, soonest first. */
     readonly upcomingEvents?: (userId: string, limit: number) => Promise<readonly UpcomingEvent[]>;
 
+    /** What this account pinned inside it, for its rail, in order. Only what
+     *  the account may open. */
+    readonly favorites?: (userId: string) => Promise<readonly AppFavorite[]>;
+
     /** Its records whose name matches, for search's `/records`; with no query,
      *  the ones changed most recently. Only what this account may open. */
     readonly searchRecords?: (
@@ -267,6 +271,14 @@ export type AppMcpTool = McpTool<never>;
 
 /** A search provider an app offers `polaris_search`. */
 export type AppMcpSearchProvider = McpSearchProvider;
+
+/** Something pinned inside an app, as its rail lists it. */
+export interface AppFavorite {
+    readonly id: string;
+    /** As the app's reader named it: drawn as it is. */
+    readonly label: string;
+    readonly href: string;
+}
 
 /** One record an app found for search. */
 export interface AppRecordHit {

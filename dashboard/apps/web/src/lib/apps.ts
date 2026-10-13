@@ -166,6 +166,9 @@ export interface AppEntry {
      * (see reachableApps) - an entry with none is always offered.
      */
     requiresApp?: string;
+    /** Whether the app keeps favorites of its own, listed under its rail
+     *  (see the `favorites` extension hook). */
+    favorites?: boolean;
     /** Extra path prefixes this app owns beyond `href`. Only for an app that
      *  lands on one of its own sections rather than on its root - Apps opens on
      *  Deploy and still owns the whole `/apps` subtree. A screen of an app
@@ -356,7 +359,8 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: Handshake,
         href: "/crm",
         permission: "crm.use",
-        requiresApp: "crm"
+        requiresApp: "crm",
+        favorites: true
     },
     {
         id: "notes",

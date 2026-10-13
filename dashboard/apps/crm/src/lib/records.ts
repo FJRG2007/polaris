@@ -519,6 +519,8 @@ export async function destroyRecords(
         await tx.crmLink.deleteMany({
             where: { ...shelfWhere(actor.shelf), recordId: { in: gone } }
         });
+        // Anybody's pin of it goes with it.
+        await tx.crmFavorite.deleteMany({ where: { kind: "record", targetId: { in: gone } } });
         return result.count as number;
     });
     for (const one of cleared) await logEvents(actor, one.object, one.events);

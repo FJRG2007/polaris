@@ -15,6 +15,7 @@ import * as exporter from "../lib/export";
 import * as importer from "../lib/import";
 import * as page from "../lib/record-page";
 import * as timeline from "../lib/timeline";
+import * as favorites from "../lib/favorites";
 import type { TimelinePage } from "../model/timeline";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities } from "../lib/access";
@@ -67,6 +68,8 @@ export interface ListOpening {
     readonly shelfName: string | null;
     /** The fields added to this kind of record here. */
     readonly fields: CustomField[];
+    /** The views the reader pinned to the rail. */
+    readonly favoriteViews?: string[];
 }
 
 /** Everything a list needs before its rows: its view, what the reader may do,
@@ -99,7 +102,12 @@ export async function openListAction(input: unknown): Promise<Outcome<ListOpenin
             can: actor.can,
             people,
             shelfName: actor.shelf.orgName,
-            fields: added
+            fields: added,
+            favoriteViews: await favorites.pinnedAmong(
+                actor,
+                "view",
+                all.map((one) => one.id)
+            )
         };
     });
 }

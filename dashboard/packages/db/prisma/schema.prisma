@@ -381,6 +381,7 @@ model User {
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
     crmLinks                CrmLink[]        @relation("CrmLinkShelf")
     crmWorkflows            CrmWorkflow[]    @relation("CrmWorkflowShelf")
+    crmFavorites            CrmFavorite[]    @relation("CrmFavoriteOwner")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5878,6 +5879,7 @@ model Organization {
     crmEvents        CrmEvent[]
     crmLinks         CrmLink[]
     crmWorkflows     CrmWorkflow[]
+    crmFavorites     CrmFavorite[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -13023,6 +13025,29 @@ model CrmLink {
 
     @@unique([recordId, kind, targetId])
     @@index([recordId, kind, id])
+}
+
+// A CRM record or view somebody pinned to the CRM's rail. Their own: nobody
+// else sees it. Kept per shelf (`orgId` null for their own CRM), so an
+// organization's favorites show while working in it and nowhere else.
+model CrmFavorite {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    orgId     String?  @db.Uuid
+    // record | view
+    kind      String
+    // companies | people | opportunities
+    object    String
+    targetId  String   @db.Uuid
+    position  Float    @default(0)
+    createdAt DateTime @default(now())
+
+    user User          @relation("CrmFavoriteOwner", fields: [userId], references: [id], onDelete: Cascade)
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, kind, targetId])
+    @@index([userId, orgId, position])
+    @@index([targetId])
 }
 
 // A CRM workflow: when something happens to a kind of record (or on a

@@ -23,6 +23,7 @@ export const crmExtension: AppExtension = {
             run: async () => (await import("./workflows")).runDueSchedules()
         }
     ],
+    favorites: async (userId) => (await import("./favorites")).railFavorites(userId),
     searchRecords: async (userId, query, limit) =>
         (await import("./records")).searchAllRecords(userId, query, limit)
 };

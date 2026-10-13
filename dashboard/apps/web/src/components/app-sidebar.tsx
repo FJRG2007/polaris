@@ -28,7 +28,8 @@ import Link from "next/link";
 import { cn } from "@polaris/ui";
 import * as nav from "@/lib/apps";
 import { railApps } from "@/lib/app-launcher";
-import { ChevronLeft, LayoutGrid } from "lucide-react";
+import { ChevronLeft, LayoutGrid, Star } from "lucide-react";
+import { useAppFavorites } from "@/components/use-app-favorites";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { usePathname } from "next/navigation";
 import { hasOrgPermission } from "@polaris/core";
@@ -89,6 +90,8 @@ export function AppSidebar({
     // menu was arranged in, and a way to the rest. Thirty apps in a rail is a
     // list to read; the app menu is where the whole set is searched.
     const onOverview = !subapp && app.id === nav.OVERVIEW_APP_ID;
+    // What the reader pinned inside this app, under its screens.
+    const pinned = useAppFavorites(!subapp && app.favorites ? app.id : null);
     const railIds = onOverview ? railApps({ available: appIds, favorites, arranged: order }) : [];
     const moreApps =
         onOverview && appIds.filter((id) => id !== nav.OVERVIEW_APP_ID).length > railIds.length;
@@ -175,6 +178,23 @@ export function AppSidebar({
                     ))}
                 </div>
             ))}
+            {pinned.length > 0 ? (
+                <div className="mt-4 flex flex-col gap-0.5">
+                    <p className="truncate px-2 pb-1 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
+                        {t("switcher.favorites")}
+                    </p>
+                    {pinned.map((item) => (
+                        <RailLink
+                            key={item.id}
+                            item={{ label: item.label, href: item.href, icon: Star }}
+                            named
+                            pathname={pathname}
+                            sections={[]}
+                            inApp
+                        />
+                    ))}
+                </div>
+            ) : null}
             {moreApps ? (
                 // A button rather than a link: it opens the app menu in the top
                 // bar, which is where every app is. Marked so the phone drawer
@@ -230,11 +250,14 @@ function waitingLabel(appId: string, count: number, t: NamespaceTranslator<"nav"
 
 function RailLink({
     item,
+    named = false,
     pathname,
     sections,
     inApp
 }: {
     item: nav.AppSection;
+    /** A name somebody chose, drawn as it is rather than translated. */
+    named?: boolean;
     pathname: string;
     sections: readonly nav.AppSection[];
     /** Whether this rail is one app's screens rather than the list of apps. */
@@ -243,7 +266,8 @@ function RailLink({
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
     const t = useTranslations("nav");
-    const label = useNavLabel()(item.label);
+    const translate = useNavLabel();
+    const label = named ? item.label : translate(item.label);
     const waiting = useAppUnread();
     const admin = useAdminWaiting();
     // Only where there is something, and on the entry the count is about: an app

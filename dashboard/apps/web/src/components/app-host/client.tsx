@@ -46,6 +46,7 @@ import { useRuntimeLog } from "@/app/(app)/apps/installed/[id]/use-runtime-log";
 import { CONSUMPTION_METRICS, PLAYER_METRICS } from "@/components/metrics-specs";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { mergeUnchanged } from "@/lib/structural-merge";
+import { refreshAppFavorites } from "@/components/use-app-favorites";
 import { useKeptSnapshot, useLiveRead } from "@/components/use-live-resource";
 
 const FilePickerDialog = dynamic(
@@ -141,6 +142,7 @@ export const clientHost = {
         visibleGameTabs
     },
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
+    appFavorites: { refreshAppFavorites },
     avatar: { Avatar },
     brandIcons: { TpLinkMark },
     confirmDialog: { useConfirm },

@@ -15,6 +15,8 @@
  */
 
 import { Board } from "./board";
+import { useFavorite } from "./use-favorite";
+import { useSearchParams } from "next/navigation";
 import { csvFileName } from "../model/csv";
 import { customDef } from "../model/fields";
 import { FieldsDialog } from "./fields-dialog";
@@ -229,6 +231,26 @@ export function ListScreen({ object }: { object: CrmObject }) {
 
     const [chosenId, setChosenId] = useState<string | null>(() => rememberedView(object));
     const view = allViews.find((one) => one.id === chosenId) ?? allViews[0] ?? null;
+    const favorite = useFavorite(
+        "view",
+        object,
+        view?.id ?? null,
+        Boolean(view && opening.data?.favoriteViews?.includes(view.id))
+    );
+
+    // Opened from a pinned view (`?view=<id>`): that view, once the views are
+    // read, and the address goes back to the list's own.
+    const askedView = useSearchParams()?.get("view") ?? null;
+    useEffect(() => {
+        if (!askedView || !opening.data) return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("view");
+        window.history.replaceState(window.history.state, "", url);
+        if (allViews.some((one) => one.id === askedView)) {
+            setChosenId(askedView);
+            rememberView(object, askedView);
+        }
+    }, [askedView, opening.data, allViews, object]);
 
     // How the view is drawn on screen. Changed here first and kept on the
     // server a moment later; a read of the views that lands while a change is
@@ -957,6 +979,8 @@ export function ListScreen({ object }: { object: CrmObject }) {
                             onCreate={createView}
                             onRename={renameView}
                             onDelete={(target) => void deleteView(target)}
+                            pinned={favorite.pinned}
+                            onTogglePin={favorite.toggle}
                         />
                     </div>
                     <SegmentedControl

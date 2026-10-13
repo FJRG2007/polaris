@@ -46,7 +46,20 @@ const state = vi.hoisted(() => ({
     shelfName: null as string | null,
     groups: [] as { value: string; records: CrmRecord[]; total: number }[],
     trashed: [] as CrmRecord[],
-    restores: [] as unknown[]
+    restores: [] as unknown[],
+    favoriteViews: [] as string[],
+    pins: [] as unknown[]
+}));
+
+vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams(window.location.search)
+}));
+
+vi.mock("@polaris-app/crm/src/actions/favorites", () => ({
+    setFavoriteAction: async (input: { pinned: boolean }) => {
+        state.pins.push(input);
+        return { ok: true, pinned: input.pinned };
+    }
 }));
 
 vi.mock("@polaris-app/crm/src/actions/records", () => {
@@ -73,7 +86,8 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
                 views,
                 can: abilities(),
                 people: [],
-                shelfName: state.shelfName
+                shelfName: state.shelfName,
+                favoriteViews: state.favoriteViews
             };
         },
         restoreRecordsAction: async (input: { ids: string[] }) => {
@@ -183,6 +197,9 @@ beforeEach(() => {
     state.shelfName = null;
     state.trashed = [];
     state.restores = [];
+    state.favoriteViews = [];
+    state.pins = [];
+    window.history.replaceState(null, "", "/crm/companies");
     if (typeof localStorage !== "undefined") localStorage.clear();
     // What the tab kept from the last test would paint before the read.
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
@@ -309,6 +326,44 @@ describe("a CRM list", () => {
         await screen.findByText("Acme");
         expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
         expect(window.location.search).toBe("");
+    });
+
+    it("opens the view a pinned link names, and the address goes back to the list's", async () => {
+        const HOT = "66666666-6666-4666-8666-666666666666";
+        state.views = [
+            { id: VIEW_ID, name: "", kind: "table", config: defaultConfig("companies") },
+            { id: HOT, name: "Hot leads", kind: "table", config: defaultConfig("companies") }
+        ];
+        state.favoriteViews = [HOT];
+        window.history.replaceState(null, "", `/crm/companies?view=${HOT}`);
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        expect(
+            await screen.findByRole("button", { name: "Choose a view" }, { timeout: 3000 })
+        ).toBeTruthy();
+        await waitFor(() =>
+            expect(screen.getByRole("button", { name: "Choose a view" }).textContent).toContain(
+                "Hot leads"
+            )
+        );
+        expect(window.location.search).toBe("");
+    });
+
+    it("pins the view on screen to the rail from the view menu", async () => {
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Choose a view" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        const pin = await screen.findByRole("menuitem", { name: "Add to favorites" });
+        await act(async () => {
+            fireEvent.click(pin);
+        });
+        await waitFor(() =>
+            expect(state.pins).toEqual([
+                { kind: "view", object: "companies", targetId: VIEW_ID, pinned: true }
+            ])
+        );
     });
 
     it("offers a reader who may not change records nothing that would", async () => {

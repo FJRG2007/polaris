@@ -548,5 +548,13 @@
         "requestRefused": "That address cannot be reached from here.",
         "requestUnreachable": "The address did not answer.",
         "requestFailed": "The address answered {status}."
+    },
+    "favorites": {
+        "add": "Add to favorites",
+        "remove": "Remove from favorites",
+        "added": "Added to favorites",
+        "removed": "Removed from favorites",
+        "limit": "You already have {max} favorites here. Remove one first.",
+        "notSaved": "Favorites were not changed"
     }
 }
