@@ -73,6 +73,11 @@ export async function GET(request: Request): Promise<Response> {
      *  edit, a reaction or a deletion is not newer - so the frame says which
      *  ones to read again. An empty set means too many to name. */
     let changed = new Map<string, Set<string>>();
+    /** Conversations where something new landed since the last wake, as
+     *  against only changing in place. What notifies is a new message: an edit,
+     *  a reaction or a deletion moves the conversation without saying anything
+     *  new, and announcing it again was every edit pinging the room. */
+    let arrived = new Set<string>();
 
     function stop(): void {
         closed = true;
@@ -103,6 +108,7 @@ export async function GET(request: Request): Promise<Response> {
             /** Wake the tab once, however many messages arrived in the window. */
             function wake(channelId: string, messageIds?: readonly string[]): void {
                 moved.add(channelId);
+                if (!messageIds?.length) arrived.add(channelId);
                 if (messageIds?.length) {
                     const named = changed.get(channelId);
                     if (!named) changed.set(channelId, new Set(messageIds));
@@ -120,6 +126,7 @@ export async function GET(request: Request): Promise<Response> {
                         kind: "posted",
                         seq: sequence,
                         channels: [...moved],
+                        arrived: [...arrived],
                         // Absent when nothing changed in place, which is the
                         // frame every build before this one sent.
                         ...(changed.size > 0
@@ -132,6 +139,7 @@ export async function GET(request: Request): Promise<Response> {
                     });
                     moved = new Set();
                     changed = new Map();
+                    arrived = new Set();
                 }, COALESCE_MS);
             }
 
