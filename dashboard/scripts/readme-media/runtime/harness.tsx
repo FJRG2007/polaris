@@ -75,7 +75,10 @@ function patchFetch(
         // Another site is answered from the scene too, by its full address: a
         // picture never waits on, or tells anything to, the network.
         const local = url.origin === location.origin;
-        if (local && !url.pathname.startsWith("/api/")) return original(input, init);
+        // An app bundle's static assets are files the capture serves, as the
+        // real route serves the staged copy.
+        if (local && (!url.pathname.startsWith("/api/") || url.pathname.startsWith(APP_ASSETS)))
+            return original(input, init);
         const address = local ? url.pathname : `${url.origin}${url.pathname}`;
         const method = (init?.method ?? "GET").toUpperCase();
         const route = table.find((row) => row.method === method && row.match.test(address));
@@ -88,6 +91,9 @@ function patchFetch(
         return answer instanceof Response ? answer : Response.json(answer);
     };
 }
+
+/** Where an installed app's staged assets are served from. */
+const APP_ASSETS = "/api/app-bundles/";
 
 function start() {
     if (params.get("scene") === "__list__") {

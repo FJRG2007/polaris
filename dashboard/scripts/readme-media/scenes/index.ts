@@ -12,6 +12,7 @@ import {
 } from "./chat-more";
 import { drive, driveLinks } from "./drive";
 import { games } from "./games";
+import { gameConsole, gameEvents, gameInventory, gamePlayers } from "./game-server";
 import { callGroup, callMeeting, inCall } from "./in-call";
 import { launcher } from "./launcher";
 import { mail, mailThread } from "./mail";
@@ -46,6 +47,10 @@ export const SCENES: readonly SceneDefinition[] = [
     calendar,
     calendarTime,
     games,
+    gamePlayers,
+    gameInventory,
+    gameEvents,
+    gameConsole,
     office,
     officeDoc,
     vault,
