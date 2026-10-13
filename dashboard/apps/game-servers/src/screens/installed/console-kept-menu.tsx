@@ -14,7 +14,14 @@
  */
 
 import { useMemo, useState } from "react";
-import { BookmarkCheck, CalendarClock, ChevronDown, Copy, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+    BookmarkCheck,
+    CalendarClock,
+    ChevronDown,
+    Copy,
+    MoreHorizontal,
+    Trash2
+} from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -157,7 +164,9 @@ export function KeptCommandsMenu({
                                         {t("console.putItInTheBox")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                        aria-label={t("console.duplicateName", { name: entry.label })}
+                                        aria-label={t("console.duplicateName", {
+                                            name: entry.label
+                                        })}
                                         title={t("console.duplicateName", { name: entry.label })}
                                         onSelect={() => onDuplicate(entry)}
                                     >

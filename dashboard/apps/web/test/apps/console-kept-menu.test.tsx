@@ -141,12 +141,19 @@ describe("duplicating a kept command", () => {
             variables: [{ name: "player", kind: "player" } as never]
         };
         const draft = duplicateDraft(entry, copyName);
-        expect(draft).toEqual({ label: "Bring (copy)", command: entry.command, variables: entry.variables });
+        expect(draft).toEqual({
+            label: "Bring (copy)",
+            command: entry.command,
+            variables: entry.variables
+        });
         expect("id" in draft).toBe(false);
     });
 
     it("cuts a long name so the copy still fits", () => {
-        const draft = duplicateDraft({ id: "x", label: "y".repeat(40), command: "say hi" }, copyName);
+        const draft = duplicateDraft(
+            { id: "x", label: "y".repeat(40), command: "say hi" },
+            copyName
+        );
         expect(draft.label.length).toBeLessThanOrEqual(40);
         expect(draft.label.endsWith(" (copy)")).toBe(true);
     });

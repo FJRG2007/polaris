@@ -55,7 +55,13 @@ export function LiveSoundPlayers({
         let alive = true;
         setLoading(true);
         void actions
-            .liveSoundPlayersAction({ installedAppId, query, filter, offset, limit: LIVE_PAGE_SIZE })
+            .liveSoundPlayersAction({
+                installedAppId,
+                query,
+                filter,
+                offset,
+                limit: LIVE_PAGE_SIZE
+            })
             .then(
                 (answer) => {
                     if (!alive) return;

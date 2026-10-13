@@ -433,10 +433,13 @@ function describe(t: GameText<"minecraft">, details: ItemDetails): string[] {
         lines.push(
             t("inventory.details.stored", { list: details.stored.map(enchantmentText).join(", ") })
         );
-    if (details.potion) lines.push(t("inventory.details.potion", { name: potionLabel(details.potion) }));
+    if (details.potion)
+        lines.push(t("inventory.details.potion", { name: potionLabel(details.potion) }));
     if (details.effects.length > 0)
         lines.push(
-            t("inventory.details.effects", { list: details.effects.map(potionEffectText).join(", ") })
+            t("inventory.details.effects", {
+                list: details.effects.map(potionEffectText).join(", ")
+            })
         );
     if (details.unbreakable) lines.push(t("inventory.details.unbreakable"));
     else if (details.damage !== null)

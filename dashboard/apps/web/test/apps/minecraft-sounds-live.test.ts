@@ -43,7 +43,12 @@ describe("live sounds", () => {
     });
 
     it("searches by name and filters by having the pack", () => {
-        const have = liveSoundsPage(MANY, { query: "player00", filter: "have", offset: 0, limit: 50 });
+        const have = liveSoundsPage(MANY, {
+            query: "player00",
+            filter: "have",
+            offset: 0,
+            limit: 50
+        });
         expect(have.players.length).toBeGreaterThan(0);
         expect(have.players.every((one) => one.state === "loaded")).toBe(true);
         expect(have.players.every((one) => one.name.startsWith("Player00"))).toBe(true);
@@ -53,10 +58,16 @@ describe("live sounds", () => {
     });
 
     it("never hands back more than one page", () => {
-        const page = liveSoundsPage(MANY, { query: "", filter: "all", offset: 4990, limit: 10_000 });
+        const page = liveSoundsPage(MANY, {
+            query: "",
+            filter: "all",
+            offset: 4990,
+            limit: 10_000
+        });
         expect(page.players.length).toBe(10);
         expect(
-            liveSoundsPage(MANY, { query: "", filter: "all", offset: 0, limit: 10_000 }).players.length
+            liveSoundsPage(MANY, { query: "", filter: "all", offset: 0, limit: 10_000 }).players
+                .length
         ).toBe(MAX_LIVE_PAGE);
     });
 });

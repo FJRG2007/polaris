@@ -208,7 +208,9 @@ function TeleportForm({
             }}
         >
             <div>
-                <p className="text-sm font-medium">{t("players.teleportNamed", { name: player })}</p>
+                <p className="text-sm font-medium">
+                    {t("players.teleportNamed", { name: player })}
+                </p>
                 <p className="text-xs text-muted-foreground">{t("players.toAnotherPlayerWhoIs")}</p>
             </div>
             {others.length > 0 && (
@@ -236,7 +238,11 @@ function TeleportForm({
                         onChange={(event) => setDestination(event.target.value)}
                     />
                     <Button type="submit" disabled={!valid || pending}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Locate className="size-4" />}
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Locate className="size-4" />
+                        )}
                         {t("players.teleport")}
                     </Button>
                 </div>

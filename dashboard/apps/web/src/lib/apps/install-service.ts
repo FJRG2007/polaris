@@ -584,9 +584,13 @@ async function isStillInstalled(catalogId: string): Promise<boolean> {
 async function purgeInstallData(installedAppId: string): Promise<void> {
     const where = { where: { installedAppId } };
     await prisma.$transaction(
-        INSTALL_SCOPED_MODELS.map((model) =>
-            (prisma[model] as unknown as { deleteMany: (args: typeof where) => Promise<unknown> })
-                .deleteMany(where) as never
+        INSTALL_SCOPED_MODELS.map(
+            (model) =>
+                (
+                    prisma[model] as unknown as {
+                        deleteMany: (args: typeof where) => Promise<unknown>;
+                    }
+                ).deleteMany(where) as never
         )
     );
 }

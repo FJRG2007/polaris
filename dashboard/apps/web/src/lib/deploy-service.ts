@@ -2420,7 +2420,9 @@ export async function deleteApplication(
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
     // Polymorphic like the env vars: a firewall rule for a service that no longer
     // exists guards nothing, and would be read back onto a new service given the id.
-    await prisma.wafRule.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
+    await prisma.wafRule.deleteMany({
+        where: { scopeType: "application", scopeId: applicationId }
+    });
     if (deleteData) {
         await prisma.analyticsSite.deleteMany({
             where: { scopeType: "application", scopeId: applicationId }
