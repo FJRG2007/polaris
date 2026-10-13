@@ -14,6 +14,7 @@
  */
 
 import JSZip from "jszip";
+import * as live from "./sounds-live";
 import * as rules from "./sounds";
 import { prisma, type Prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
@@ -685,19 +686,25 @@ export interface LiveSounds {
     readonly loaded: boolean;
     /** The pack it is handing out, by checksum. */
     readonly sha1: string;
-    /** Who has it loaded, and who turned it down or could not get it. */
-    readonly players: readonly {
-        readonly name: string;
-        readonly state: "loaded" | "pending" | "declined" | "failed";
-    }[];
+    /** How many have it loaded, and how many turned it down or could not get
+     *  it. The names are read a page at a time with `liveSoundPlayers`. */
+    readonly counts: live.LiveSoundCounts;
 }
 
-const NOT_RUNNING: LiveSounds = { running: false, loaded: false, sha1: "", players: [] };
+const NOT_RUNNING = {
+    running: false,
+    loaded: false,
+    sha1: "",
+    players: [] as live.LiveSoundPlayer[]
+};
 
 const STATES = new Set(["loaded", "pending", "declined", "failed"]);
 
-/** Ask the running server's jar. */
-export async function liveSounds(ownerId: string, installedAppId: string): Promise<LiveSounds> {
+/** Ask the running server's jar, with everybody it names. */
+async function readLiveSounds(
+    ownerId: string,
+    installedAppId: string
+): Promise<Omit<LiveSounds, "counts"> & { players: live.LiveSoundPlayer[] }> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running || server.edition !== "java") return NOT_RUNNING;
         const reply = replyObject(
@@ -713,11 +720,27 @@ export async function liveSounds(ownerId: string, installedAppId: string): Promi
                 if (!one || typeof one !== "object") return [];
                 const { name, state } = one as { name?: unknown; state?: unknown };
                 return typeof name === "string" && typeof state === "string" && STATES.has(state)
-                    ? [{ name, state: state as LiveSounds["players"][number]["state"] }]
+                    ? [{ name, state: state as live.LiveSoundState }]
                     : [];
             })
         };
     });
+}
+
+/** What the running server's jar says, as counts. */
+export async function liveSounds(ownerId: string, installedAppId: string): Promise<LiveSounds> {
+    const { players, ...rest } = await readLiveSounds(ownerId, installedAppId);
+    return { ...rest, counts: live.countLiveSounds(players) };
+}
+
+/** One page of who is on and whether they have the pack, searched by name. */
+export async function liveSoundPlayers(
+    ownerId: string,
+    installedAppId: string,
+    options: Parameters<typeof live.liveSoundsPage>[1]
+): Promise<ReturnType<typeof live.liveSoundsPage>> {
+    const { players } = await readLiveSounds(ownerId, installedAppId);
+    return live.liveSoundsPage(players, options);
 }
 
 /** Tell a running server to fetch the pack again and hand it to everybody on.
