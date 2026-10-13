@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { useCrmT } from "./i18n";
 import { Timeline } from "./timeline";
+import { RecordActivities } from "./record-activities";
 import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
 import { messageOf, unwrap } from "./call";
@@ -333,6 +334,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                             ) : null}
                         </section>
                     ))}
+                    <RecordActivities object={object} id={id} canEdit={canEdit} />
                     <Timeline
                         object={object}
                         id={id}

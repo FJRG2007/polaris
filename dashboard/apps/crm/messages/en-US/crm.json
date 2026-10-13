@@ -407,5 +407,25 @@
         "destroyBody": "Its activity goes with it. Records that point at it will point at nothing.",
         "deletedAt": "Moved here {when}",
         "more": "Show more"
+    },
+    "activities": {
+        "notes": "Notes",
+        "tasks": "Tasks",
+        "noNotes": "No notes yet",
+        "noTasks": "No tasks yet",
+        "addNote": "Add note",
+        "addTask": "Add task",
+        "add": "Add",
+        "noteTitle": "Title",
+        "noteBody": "Note",
+        "noteShelf": "Where to keep it",
+        "myNotes": "My notes",
+        "taskName": "Task",
+        "taskList": "List",
+        "taskDue": "Due date",
+        "done": "Mark {name} done",
+        "unlink": "Remove from this record",
+        "notesOff": "Your account cannot write notes.",
+        "tasksOff": "Your account cannot create tasks."
     }
 }

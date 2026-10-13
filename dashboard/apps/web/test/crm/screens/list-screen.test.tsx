@@ -164,6 +164,17 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
     };
 });
 
+vi.mock("@polaris-app/crm/src/actions/activities", () => ({
+    recordActivitiesAction: async () => ({
+        ok: true,
+        activities: { notes: [], noteShelves: [], tasks: [], taskLists: [] }
+    }),
+    createRecordNoteAction: vi.fn(),
+    createRecordTaskAction: vi.fn(),
+    setRecordTaskDoneAction: vi.fn(),
+    unlinkAction: vi.fn()
+}));
+
 import { ListScreen } from "@polaris-app/crm/src/screens/list-screen";
 
 beforeEach(() => {

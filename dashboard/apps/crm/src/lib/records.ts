@@ -449,7 +449,8 @@ export async function restoreRecords(
  * a list without passing through it first. Every record that pointed at them -
  * a person at their company, a deal at its contact - is cleared in the same
  * transaction and keeps a line on its timeline saying so; their own timeline
- * goes with them. Returns how many went.
+ * and their links to notes, tasks and files go with them (the notes, tasks and
+ * files themselves stay). Returns how many went.
  */
 export async function destroyRecords(
     actor: CrmActor,
@@ -504,6 +505,9 @@ export async function destroyRecords(
             where: { ...where, id: { in: gone } }
         });
         await dropEvents(actor, gone, tx);
+        await tx.crmLink.deleteMany({
+            where: { ...shelfWhere(actor.shelf), recordId: { in: gone } }
+        });
         return result.count as number;
     });
     for (const one of cleared) await logEvents(actor, one.object, one.events);
