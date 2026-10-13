@@ -26,6 +26,7 @@ import { messageOf, unwrap } from "./call";
 import * as filters from "../model/filters";
 import { RecordTable } from "./record-table";
 import { RecordScreen } from "./record-screen";
+import { TrashDialog } from "./trash-dialog";
 import * as actions from "../actions/records";
 import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
@@ -380,6 +381,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const [selected, setSelected] = useState<string[]>([]);
     /** The record open in the side panel. */
     const [peek, setPeek] = useState<string | null>(null);
+    const [trashOpen, setTrashOpen] = useState(false);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
@@ -1034,6 +1036,16 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         <Download className="size-4" />
                         {t("export.button")}
                     </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!readable}
+                        onClick={() => setTrashOpen(true)}
+                        aria-label={t("trashView.title")}
+                        title={t("trashView.title")}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
                 </div>
 
                 {body}
@@ -1114,6 +1126,17 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     />
                 ) : null}
                 {confirmElement}
+                <TrashDialog
+                    object={object}
+                    open={trashOpen}
+                    canDelete={canDelete}
+                    confirm={confirm}
+                    onClose={() => setTrashOpen(false)}
+                    onRestored={() => {
+                        store.refresh();
+                        refreshTotals();
+                    }}
+                />
                 <Dialog open={peek !== null} onOpenChange={(open) => !open && setPeek(null)}>
                     <SheetContent aria-describedby={undefined} className="p-4 sm:w-[38rem]">
                         {peek ? (

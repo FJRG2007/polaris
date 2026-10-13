@@ -395,5 +395,17 @@
         "empty": "Nothing has happened yet",
         "more": "Show older",
         "to": "to"
+    },
+    "trashView": {
+        "title": "Trash",
+        "empty": "The trash is empty",
+        "restore": "Restore",
+        "restored": "Restored",
+        "destroy": "Delete forever",
+        "destroyed": "Deleted for good",
+        "destroyTitle": "Delete {name} for good?",
+        "destroyBody": "Its activity goes with it. Records that point at it will point at nothing.",
+        "deletedAt": "Moved here {when}",
+        "more": "Show more"
     }
 }

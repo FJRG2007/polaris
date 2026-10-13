@@ -395,5 +395,17 @@
         "empty": "Aún no ha pasado nada",
         "more": "Ver más",
         "to": "a"
+    },
+    "trashView": {
+        "title": "Papelera",
+        "empty": "La papelera está vacía",
+        "restore": "Restaurar",
+        "restored": "Restaurado",
+        "destroy": "Borrar",
+        "destroyed": "Borrado",
+        "destroyTitle": "¿Borrar {name} para siempre?",
+        "destroyBody": "Su actividad se borra con él. Lo que apunte a él quedará vacío.",
+        "deletedAt": "Movido aquí {when}",
+        "more": "Ver más"
     }
 }

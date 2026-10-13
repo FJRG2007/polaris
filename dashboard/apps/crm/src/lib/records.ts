@@ -11,7 +11,7 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
-import { logEvents } from "./timeline";
+import { dropEvents, logEvents } from "./timeline";
 import { changesBetween, initialValues } from "../model/timeline";
 import { host } from "@polaris/app-host";
 import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
@@ -410,5 +410,62 @@ export async function trashRecords(
         object,
         found.map((row) => ({ recordId: row.id, kind: "trashed" as const }))
     );
+    return result.count as number;
+}
+
+/** Take records out of the trash. Returns how many came back. */
+export async function restoreRecords(
+    actor: CrmActor,
+    object: CrmObject,
+    ids: readonly string[]
+): Promise<number> {
+    await requireCan(actor, object, "delete");
+    if (ids.length === 0) return 0;
+    const where = {
+        id: { in: [...new Set(ids)] },
+        ...shelfWhere(actor.shelf),
+        deletedAt: { not: null }
+    };
+    const found = (await table(object).findMany({ where, select: { id: true } })) as {
+        id: string;
+    }[];
+    if (found.length === 0) return 0;
+    const result = await table(object).updateMany({
+        where: { ...where, id: { in: found.map((row) => row.id) } },
+        data: { deletedAt: null }
+    });
+    await logEvents(
+        actor,
+        object,
+        found.map((row) => ({ recordId: row.id, kind: "restored" as const }))
+    );
+    return result.count as number;
+}
+
+/**
+ * Delete records for good - only ones already in the trash, so nothing leaves
+ * a list without passing through it first. Whatever pointed at them is left
+ * pointing at nothing (the foreign keys set it null), and their timeline goes
+ * with them. Returns how many went.
+ */
+export async function destroyRecords(
+    actor: CrmActor,
+    object: CrmObject,
+    ids: readonly string[]
+): Promise<number> {
+    await requireCan(actor, object, "delete");
+    if (ids.length === 0) return 0;
+    const where = {
+        id: { in: [...new Set(ids)] },
+        ...shelfWhere(actor.shelf),
+        deletedAt: { not: null }
+    };
+    const found = (await table(object).findMany({ where, select: { id: true } })) as {
+        id: string;
+    }[];
+    if (found.length === 0) return 0;
+    const gone = found.map((row) => row.id);
+    const result = await table(object).deleteMany({ where: { ...where, id: { in: gone } } });
+    await dropEvents(actor, gone);
     return result.count as number;
 }
