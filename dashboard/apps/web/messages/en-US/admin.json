@@ -1374,6 +1374,8 @@
         },
         "setupValue": {
             "label": {
+                "appName": "App name",
+                "appDescription": "App description",
                 "redirectUri": "Redirect URI",
                 "homeUrl": "Home page URL",
                 "privacyUrl": "Privacy policy URL",
@@ -1382,6 +1384,8 @@
                 "domain": "Domain"
             },
             "copy": {
+                "appName": "Copy the app name",
+                "appDescription": "Copy the app description",
                 "redirectUri": "Copy the redirect URI",
                 "homeUrl": "Copy the home page URL",
                 "privacyUrl": "Copy the privacy policy URL",
@@ -1813,7 +1817,7 @@
                 "links": {
                     "0": {
                         "label": "Create an app",
-                        "help": "Any name and description. Paste the redirect URI below into Redirect URIs, and tick Web API where it asks which APIs the app uses."
+                        "help": "Copy each value below into the field of the same name - the home page URL goes in Website - and tick Web API where it asks which APIs the app uses."
                     },
                     "1": {
                         "label": "Add the people who will link",

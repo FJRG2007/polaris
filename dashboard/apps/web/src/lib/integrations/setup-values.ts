@@ -16,6 +16,15 @@ import type { IntegrationSetupValue } from "@/lib/integrations/registry";
  *  this deployment so the operator downloads it without leaving the screen. */
 export const BRAND_LOGO_PATH = "/polaris-mark-128.png";
 
+/** What the vendor's "create an app" form calls this application. Google checks
+ *  the name against the home page, which says Polaris. */
+export const APP_NAME = "Polaris";
+
+/** The one-line description those forms require. Shown to people when they are
+ *  asked to authorize, so it says what Polaris is rather than what it does with
+ *  this one vendor. */
+export const APP_DESCRIPTION = "Community platform";
+
 export type IntegrationSetupValues = Partial<Record<IntegrationSetupValue, string>>;
 
 /** The bare hostname of an address, for the fields that refuse a URL. Falls back
@@ -44,6 +53,8 @@ export function commonSetupValues(baseUrl: string): IntegrationSetupValues {
     const base = baseUrl.replace(/\/+$/, "");
     const pages = publicUrlsOn(base);
     return {
+        appName: APP_NAME,
+        appDescription: APP_DESCRIPTION,
         homeUrl: pages.home,
         privacyUrl: pages.privacy,
         termsUrl: pages.terms,

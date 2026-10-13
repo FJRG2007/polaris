@@ -51,6 +51,17 @@ describe("setup values", () => {
         expect(common.logoUrl).toBe(`${BASE}/polaris-mark-128.png`);
     });
 
+    it("hands over every field Spotify's create-app form requires", () => {
+        // Name, description, website and redirect URI are all required there, so
+        // a step that left any of them to be typed sends the operator to invent
+        // one.
+        const spotify = INTEGRATIONS.find((entry) => entry.slug === "spotify");
+        const values = setupValuesFor("spotify", commonSetupValues(BASE), { oauthApp: true, baseUrl: BASE });
+        expect(spotify?.setupLinks?.[0]?.values).toEqual(["appName", "appDescription", "homeUrl", "redirectUri"]);
+        expect(values.appName).toBe("Polaris");
+        expect(values.appDescription).toBe("Community platform");
+    });
+
     it("hands over the bare hostname for the fields that refuse a URL", () => {
         expect(hostnameOf(BASE)).toBe("polaris.example.com");
         expect(hostnameOf("https://polaris.example.com:8443/x")).toBe("polaris.example.com");
