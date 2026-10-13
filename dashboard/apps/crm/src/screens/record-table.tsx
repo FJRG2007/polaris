@@ -19,7 +19,9 @@ import { CellPicker } from "./cell-picker";
 import type { Total } from "../lib/totals";
 import { editorFor } from "./cell-editors";
 import { HeaderCell } from "./table-header";
-import { ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { recordHref } from "../model/related";
+import { ArrowUpRight, ChevronRight } from "lucide-react";
 import type { RowGroup } from "./use-groups";
 import { CellDisplay, OptionChip } from "./cell-display";
 import type { InputValue } from "../model/values";
@@ -198,6 +200,17 @@ export function RecordTable(props: TableProps) {
             >
                 <div className="flex h-9 min-w-0 items-center overflow-hidden px-2.5">
                     <CellDisplay object={object} field={field} value={value} />
+                    {field.primary && !record.id.startsWith("draft:") ? (
+                        <Link
+                            href={recordHref(object, record.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={t("record.open")}
+                            title={t("record.open")}
+                            className="ml-auto grid size-6 shrink-0 place-items-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
+                        >
+                            <ArrowUpRight className="size-3.5" />
+                        </Link>
+                    ) : null}
                 </div>
                 {Editor ? (
                     <Editor

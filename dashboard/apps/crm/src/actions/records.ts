@@ -12,6 +12,7 @@ import * as fields from "../lib/fields";
 import * as totals from "../lib/totals";
 import * as records from "../lib/records";
 import * as exporter from "../lib/export";
+import * as page from "../lib/record-page";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities } from "../lib/access";
 import { requireCrmActor } from "../lib/access";
@@ -120,6 +121,15 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
             ...options,
             filter: sent
         })
+    );
+}
+
+/** One record's page: the record, its fields and the records that point at it. */
+export async function openRecordAction(input: unknown): Promise<Outcome<page.RecordOpening>> {
+    const parsed = z.object({ object, id }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () =>
+        page.openRecord(await requireCrmActor(), parsed.data.object, parsed.data.id)
     );
 }
 
