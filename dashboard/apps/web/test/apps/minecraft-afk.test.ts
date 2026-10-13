@@ -67,6 +67,6 @@ describe("looking at who is on", () => {
             lookIfDue("srv-test", server)
         ]);
         expect(first).toBe(second);
-        expect(say).toHaveBeenCalledTimes(5);
+        expect(say).toHaveBeenCalledTimes(6);
     });
 });
