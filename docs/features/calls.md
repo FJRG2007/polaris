@@ -50,9 +50,13 @@ chat of its own.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/call-group-light-en-desktop.webp">
-  <img src="../assets/media/call-group-dark-en-desktop.webp" alt="A group chat on a video call that is being recorded">
+  <img src="../assets/media/call-group-dark-en-desktop.webp" alt="A group call with a shared screen watched among the people, being recorded">
 </picture>
 
-Any direct message or group chat can start a voice or video call. A call is
-recorded in the browser of whoever starts it, everybody in it sees that it is,
-and the recording can then be sent to the conversation or thrown away.
+Any direct message or group chat can start a voice or video call. A shared
+screen that is being watched sits as a tile the size of a face beside whoever
+is sharing it, with what it is arriving at (720P 30FPS) and a LIVE mark over
+it - the way a voice client draws a call between a few people - until somebody
+asks to see it bigger, which gives it the whole band back. A call is recorded
+in the browser of whoever starts it, everybody in it sees that it is, and the
+recording can then be sent to the conversation or thrown away.

@@ -75,6 +75,7 @@ import { GAIN_MAX, GAIN_MIN, useMicGain } from "./mic-gain";
 import { PersonMenu, StreamMenu, type SeatHosting } from "./call-menus";
 import { useZoomPan } from "@/components/use-zoom-pan";
 import { setWatchedStreams } from "./call-stream-audio";
+import { useStreamFormat } from "./call-stream-format";
 import { CallDiagnosisPanel } from "./call-diagnosis-panel";
 import { ControlHint, type ControlHintText } from "./control-hint";
 import { useMutedSpeech } from "./muted-speech";
@@ -120,6 +121,7 @@ import {
     Mic,
     MicOff,
     Minimize2,
+    Monitor,
     MonitorUp,
     MoreHorizontal,
     Smile,
@@ -499,9 +501,19 @@ export function CallRoom({
         focused && [...stages.map((stage) => stage.key), ...cameraKeys].includes(focused)
             ? focused
             : null;
+    /**
+     * The streams drawn as tiles among the people rather than above them.
+     *
+     * In a direct message a watched stream sits beside the person sharing it,
+     * the size of a face, until somebody asks to see it bigger - which is how
+     * every voice client draws a call between a few people, and leaves everybody
+     * on screen while it is watched. Everywhere else a share goes up above the
+     * faces, where a room has the space to give it.
+     */
+    const inlineStreams = place === "direct" && live === null ? stages : [];
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
-    const { showing, staged, enlarged } = stagingOf(stages, live);
+    const { showing, staged, enlarged } = stagingOf(inlineStreams.length > 0 ? [] : stages, live);
 
     /**
      * Whether there is a camera sending anywhere in this call, this browser's
@@ -522,10 +534,10 @@ export function CallRoom({
     /** Whether the people in this call are drawn as faces rather than as tiles -
      *  see `call-band`, which owns both of the questions `place` answers and is
      *  where the reasoning lives. */
-    const bareFaces = callBareFaces(place, staged, pictures);
+    const bareFaces = callBareFaces(place, staged, pictures || inlineStreams.length > 0);
     /** How a direct message's call is laid out around what is being watched -
      *  see `directLayout` in `call-band`, which is where the reasoning lives. */
-    const layout = place === "direct" ? directLayout(showing.length > 0, expanded, enlarged) : null;
+    const layout = place === "direct" ? directLayout(stages.length > 0, expanded, enlarged) : null;
     /**
      * Whether the people are drawn under whatever is being watched.
      *
@@ -533,12 +545,11 @@ export function CallRoom({
      * is how anybody knows who is still there. In a direct message the panel is
      * a band a few hundred pixels tall, and a screen worth opening plus a strip
      * of heads under it leaves neither of them a usable size: the screen is the
-     * thing somebody chose to look at, so it gets the band, and the faces come
+     * thing somebody asked to see bigger, so it gets the band, and the faces come
      * back the moment it is let go of. Expanded, there is room for both, and the
      * people are a row under the stream.
      */
-    const peopleShown =
-        !enlarged && !(place === "direct" && staged && layout !== "stream-over-people");
+    const peopleShown = place === "direct" ? !staged || layout === "stream-over-people" : !enlarged;
     /** Offered shares sit among the people, first, rather than in a row above
      *  them. Only where the people are drawn in the main area. */
     const offersInline = place === "direct" && peopleShown;
@@ -547,12 +558,12 @@ export function CallRoom({
     const tileCount =
         1 +
         (admitted ?? []).filter((person) => person.id !== call.participantId).length +
-        (offersInline ? putAway.length : 0);
+        (offersInline ? putAway.length : 0) +
+        inlineStreams.length;
     /** Gap between tiles, in pixels: `gap-2`. */
     const tiles = useTileFit<HTMLDivElement>(tileCount, 8);
-    /** In the band, a stream being watched is all there is: pressing it again
-     *  lets go of it and brings the people back, rather than enlarging a picture
-     *  that already has the whole band. */
+    /** In the band, a stream asked for by name is all there is: pressing it
+     *  again puts it back among the people, which is the way back to say. */
     const letGo = layout === "stream" && !expanded;
 
     /**
@@ -591,13 +602,16 @@ export function CallRoom({
         if (expanded && expandedWatching.current && before.watching && !watching) onExpand?.(false);
     }, [watching, expanded, onExpand]);
 
+    /** A stream among the people is still a picture worth room: the band grows
+     *  for it as it would for a stream above them. */
+    const streamsAmongPeople = inlineStreams.length > 0;
     /** Said out loud rather than worked out again outside, because it is decided
      *  here: what is being watched turns on what somebody in this room asked
      *  for, and that is this component's own. */
     useEffect(() => {
-        onStage?.(staged);
+        onStage?.(staged || streamsAmongPeople);
         return () => onStage?.(false);
-    }, [onStage, staged]);
+    }, [onStage, staged, streamsAmongPeople]);
 
     // The call ending under somebody - the host closing it, or the last other
     // person leaving a one-to-one - is the case that most needs a sound: the
@@ -1028,13 +1042,10 @@ export function CallRoom({
                             name={stage.name}
                             personId={null}
                             focused={letGo || live === stage.key}
-                            onFocus={
-                                letGo
-                                    ? () => setAway((was) => [...was, stage.key])
-                                    : () => focus(stage.key)
-                            }
+                            onFocus={() => focus(stage.key)}
                             backLabel={letGo ? t("callRoom.backToThePeople") : undefined}
                             {...column}
+                            screen
                             // A shared screen is usually text, and the reason
                             // anybody stares at one is to read a line of it.
                             zoomable
@@ -1170,6 +1181,20 @@ export function CallRoom({
                                 cn("size-full", (staged || tiles.fit.width === 0) && "min-h-24")
                             )
                         )}
+                    {inlineStreams.map((stage) => (
+                        <Tile
+                            key={stage.key}
+                            stream={stage.stream}
+                            name={stage.name}
+                            personId={null}
+                            screen
+                            onFocus={() => focus(stage.key)}
+                            {...column}
+                            zoomable
+                            volumeKey={undefined}
+                            streamMenu={streamMenu(stage)}
+                        />
+                    ))}
                     <Tile
                         stream={call.localStream}
                         name={ownName}
@@ -2152,6 +2177,7 @@ function Tile({
     own = false,
     mirrored = false,
     zoomable = false,
+    screen = false,
     guest = false,
     cameraOff = false,
     sharing = false,
@@ -2195,6 +2221,10 @@ function Tile({
      *  For a shared screen, where reading one line of it is the whole reason
      *  anybody is looking. */
     zoomable?: boolean;
+    /** Whether this tile is a shared screen rather than a person: it carries a
+     *  screen beside its name and, over the picture, what it is arriving at
+     *  and the LIVE mark - see `call-stream-format`. */
+    screen?: boolean;
     guest?: boolean;
     cameraOff?: boolean;
     /** Whether this person is sharing a screen. Said on the tile because the
@@ -2409,6 +2439,7 @@ function Tile({
     }, [stream]);
 
     const blank = !stream || cameraOff || !hasVideo;
+    const format = useStreamFormat(video, screen && !blank);
 
     const tile = (
         <div
@@ -2526,7 +2557,9 @@ function Tile({
                     {handPlace !== null && <span>{handPlace}</span>}
                 </span>
             )}
-            <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
+            {/* One line, whatever the tile's width: a long name truncates
+                rather than wrapping into a plate that covers the picture. */}
+            <span className="absolute bottom-1 left-1 flex min-w-0 max-w-[calc(100%-0.5rem)] items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {/* Drawn because this person cannot be heard, yours included,
                     and ahead of the name the way a voice channel's tile carries
                     it - camera on or off. It used to sit on the face when the
@@ -2545,24 +2578,29 @@ function Tile({
                         aria-label={t("callRoom.microphoneOff")}
                     />
                 ) : null}
-                {label ?? name}
-                {guest && <span className="text-muted-foreground">{t("callRoom.guest")}</span>}
+                {screen && <Monitor className="size-3 shrink-0" aria-hidden />}
+                <span className="min-w-0 truncate" title={label ?? name}>
+                    {label ?? name}
+                </span>
+                {guest && (
+                    <span className="shrink-0 text-muted-foreground">{t("callRoom.guest")}</span>
+                )}
                 {sharing && <LiveBadge />}
                 {volumeKey && volume === 0 && (
                     <VolumeX
-                        className="size-3 text-danger"
+                        className="size-3 shrink-0 text-danger"
                         aria-label={t("callRoom.silencedForYou")}
                     />
                 )}
                 {sameRoom && (
                     <Users
-                        className="size-3 text-primary"
+                        className="size-3 shrink-0 text-primary"
                         aria-label={t("callRoom.sharingARoomSMicrophone")}
                     />
                 )}
                 {recording && (
                     <Circle
-                        className="size-3 fill-current text-danger"
+                        className="size-3 shrink-0 fill-current text-danger"
                         aria-label={t("callRoom.recordingThisCall")}
                     />
                 )}
@@ -2576,6 +2614,22 @@ function Tile({
                 leaving Polaris, and the one that used to be missing here. Full
                 screen is the whole display and nothing else, which is what they
                 want when it is a film. */}
+            {screen && !blank && (
+                // What the share is arriving at and that it is live, top right
+                // where every voice client puts it. Out of the way of the three
+                // size buttons, which take the same corner on hover.
+                // Each mark stays on one line; on a tile too narrow for both,
+                // the LIVE mark moves under the format instead of either
+                // breaking or running off the edge.
+                <span className="pointer-events-none absolute right-1 top-1 flex max-w-[calc(100%-0.5rem)] flex-wrap items-center justify-end gap-1 transition-opacity group-focus-within/tile:opacity-0 group-hover/tile:opacity-0">
+                    {format && (
+                        <span className="whitespace-nowrap rounded bg-background/80 px-1 text-[0.625rem] font-bold leading-4 tabular-nums">
+                            {t("callRoom.streamFormat", { height: format.height, fps: format.fps })}
+                        </span>
+                    )}
+                    <LiveBadge />
+                </span>
+            )}
             {!blank && (
                 <span className="absolute right-1 top-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/tile:opacity-100">
                     {onFocus && (

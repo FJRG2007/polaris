@@ -5,6 +5,8 @@ import { getSchema } from "@tiptap/core";
 import type { OfficeKind } from "@polaris/core";
 import { prosemirrorJSONToYXmlFragment } from "y-prosemirror";
 import { OFFICE_FIELD } from "@/lib/office/content";
+import { previewDocument } from "@/lib/office/export";
+import * as preview from "@/lib/office/preview";
 import { documentExtensions } from "@/components/rich-text/document-schema";
 import { TEAM, VIEWER, ago, id } from "./people";
 import type { SceneContext } from "../runtime/scene";
@@ -209,4 +211,95 @@ export function launchPlanContent(ctx: SceneContext): number[] {
         doc.getXmlFragment(OFFICE_FIELD)
     );
     return Array.from(Y.encodeStateAsUpdate(doc));
+}
+
+/**
+ * A tile's preview, as `GET /api/office/:id/preview` answers it. The launch plan
+ * is cut from its own content by the route's `previewDocument`; the rest have no
+ * stored content here, so their first page is written out and cut by the same
+ * helpers the route uses.
+ */
+export function officePreview(ctx: SceneContext, documentId: string): preview.OfficePreview {
+    const say = ctx.say;
+    if (documentId === OPEN_DOCUMENT_ID) {
+        return previewDocument("doc", Uint8Array.from(launchPlanContent(ctx)));
+    }
+    const index = officeDocuments(ctx).findIndex((row) => row.id === documentId);
+    const doc = (...lines: [string, string][]) => ({
+        kind: "doc" as const,
+        blocks: preview.clipBlocks(lines.map(([kind, text]) => ({ kind, text })))
+    });
+    switch (index) {
+        case 1:
+            return {
+                kind: "sheet",
+                rows: preview.clipGrid([
+                    ["", "Q1", "Q2", "Q3", "Q4"],
+                    [say("Hosting", "Alojamiento"), "1,200", "1,200", "1,450", "1,450"],
+                    [say("Tools", "Herramientas"), "640", "640", "700", "720"],
+                    [say("Travel", "Viajes"), "900", "300", "1,100", "400"],
+                    ["Total", "2,740", "2,140", "3,250", "2,570"]
+                ])
+            };
+        case 2:
+            return {
+                kind: "slides",
+                ...preview.clipSlides([
+                    {
+                        lines: [
+                            say("Q1 review", "Revisión del T1"),
+                            say("Checkout shipped on time", "El nuevo pago salió a tiempo"),
+                            say("Support tickets down 18%", "Tickets de soporte -18%")
+                        ]
+                    },
+                    ...Array.from({ length: 11 }, () => ({ lines: [] }))
+                ])
+            };
+        case 4:
+            return doc(
+                ["h1", say("Interview notes", "Notas de entrevistas")],
+                ["h2", say("Asked for most", "Lo más pedido")],
+                ["li", say("Saved carts across devices", "Carritos guardados entre dispositivos")],
+                [
+                    "li",
+                    say("Invoices with the company name", "Facturas con el nombre de la empresa")
+                ],
+                ["li", say("A faster reorder", "Repetir un pedido más rápido")]
+            );
+        case 5:
+            return {
+                kind: "comparison",
+                rows: preview.clipGrid([
+                    [
+                        "",
+                        say("Fee", "Comisión"),
+                        say("Payout", "Cobro"),
+                        say("Countries", "Países")
+                    ],
+                    ["Provider A", "1.4%", say("2 days", "2 días"), "46"],
+                    ["Provider B", "1.9%", say("Next day", "Al día siguiente"), "38"],
+                    ["Provider C", "1.2%", say("7 days", "7 días"), "31"]
+                ])
+            };
+        case 6:
+            return {
+                kind: "sheet",
+                rows: preview.clipGrid([
+                    [say("Candidate", "Candidato"), say("Stage", "Fase"), say("Next", "Siguiente")],
+                    ["C-104", say("Screen", "Filtro"), say("Call Tue", "Llamada mar")],
+                    ["C-117", say("Onsite", "Presencial"), say("Feedback", "Valoración")],
+                    ["C-121", say("Offer", "Oferta"), say("Sign", "Firma")]
+                ])
+            };
+        case 7:
+            return doc(
+                ["h1", say("Onboarding guide", "Guía de bienvenida")],
+                ["p", say("Your first week, day by day.", "Tu primera semana, día a día.")],
+                ["h2", say("Day one", "Primer día")],
+                ["li", say("Accounts and access", "Cuentas y accesos")],
+                ["li", say("Meet the team", "Conocer al equipo")]
+            );
+        default:
+            return { kind: "none" };
+    }
 }

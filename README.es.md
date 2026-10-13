@@ -154,11 +154,13 @@ página con todas sus funciones. Las versiones para móvil están en
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <a href="docs/features/game-servers.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-es-desktop.webp">
         <img src="docs/assets/media/games-dark-es-desktop.webp" alt="Servidores de juegos: Minecraft, ARK y FiveM en tus propias máquinas">
       </picture>
-      <br><sub><b>Servidores de juegos</b>: Minecraft, ARK y FiveM en tus propias máquinas</sub>
+      </a>
+      <br><sub><a href="docs/features/game-servers.es.md"><b>Servidores de juegos</b></a>: Minecraft, ARK y FiveM en tus propias máquinas</sub>
     </td>
   </tr>
 </table>

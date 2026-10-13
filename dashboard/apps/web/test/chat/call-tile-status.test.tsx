@@ -90,7 +90,8 @@ function room(state: { muted?: boolean; deafened?: boolean }) {
 }
 
 /** The plate Alan's name is written in. */
-const plate = () => screen.getByText("Alan", { selector: "span" });
+/** The plate the name sits in; the name is its own span so it can truncate. */
+const plate = () => screen.getByText("Alan", { selector: "span.truncate" }).parentElement;
 
 describe("a tile with the camera off", () => {
     it("says a muted microphone ahead of the name, not on the face", () => {

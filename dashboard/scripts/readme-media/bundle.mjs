@@ -97,6 +97,13 @@ const stubs = {
         build.onResolve({ filter: /^@readme-media\// }, (args) => ({
             path: join(here, "runtime", `${args.path.slice("@readme-media/".length)}.tsx`)
         }));
+        // An app's panel arrives as a bundle the page loads at run time; here it
+        // is the app's own module, imported with the rest.
+        build.onResolve({ filter: /^\.\/runtime$/ }, (args) =>
+            /components[\\/]app-bundles[\\/]mount\.tsx$/.test(args.importer)
+                ? { path: join(here, "runtime", "app-bundles.tsx") }
+                : undefined
+        );
         build.onResolve({ filter: /^next\// }, (args) => ({
             path: join(here, "runtime", "next", `${args.path.slice(5).replace(/\//g, "-")}.tsx`)
         }));

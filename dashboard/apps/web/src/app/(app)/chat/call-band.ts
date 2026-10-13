@@ -66,14 +66,17 @@ export function callBareFaces(place: CallPlace, staged: boolean, pictures: boole
  *
  * Three shapes, the three a voice client draws a call of a few people in:
  *
- * - `people`: nothing is being watched, so the band is the faces, with any
- *   screen that is up offered among them.
- * - `stream`: the stream alone. In the band's ordinary size there is room for a
- *   picture or for a row of heads, not both - the stream is the thing somebody
- *   pressed, so it gets the band, and letting go of it brings the people back.
- *   Also what a stream asked for by name gets once the call is expanded.
- * - `stream-over-people`: the call expanded to the whole column, where there is
- *   room for both - the stream on top and the people in a row under it.
+ * - `people`: the band is the people, and a stream being watched is one more
+ *   tile among them - the size of a face, beside the person sharing it, the way
+ *   every voice client draws a call between a few people. A share that has not
+ *   been opened yet is offered there too.
+ * - `stream`: a stream somebody asked to see bigger, alone. In the band's
+ *   ordinary size there is room for a picture or for a row of heads, not both -
+ *   the stream is the thing somebody pressed, so it gets the band, and pressing
+ *   it again puts it back among the people.
+ * - `stream-over-people`: the same, once the call is expanded to the whole
+ *   column, where there is room for both - the stream on top and the people in
+ *   a row under it.
  *
  * Full screen is not one of these: it is the stream's own tile taken to the
  * whole display, and a tile holds nothing but its picture.
@@ -90,8 +93,8 @@ export function directLayout(
     expanded: boolean,
     enlarged: boolean
 ): DirectLayout {
-    if (!watching) return "people";
-    return expanded && !enlarged ? "stream-over-people" : "stream";
+    if (!watching || !enlarged) return "people";
+    return expanded ? "stream-over-people" : "stream";
 }
 
 /**

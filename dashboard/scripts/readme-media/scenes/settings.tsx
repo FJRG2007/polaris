@@ -9,6 +9,9 @@ import { SecurityView } from "@/app/(app)/account/security/security-view";
 import { SettingsView } from "@/app/(app)/admin/settings/settings-view";
 import { TransferCard } from "@/app/(app)/admin/settings/transfer-card";
 import { SeasonalAdminCard } from "@/app/(app)/admin/settings/seasonal-card";
+import { RolesAdmin } from "@/app/(app)/admin/roles/roles-admin";
+import { DEFAULT_ROLES, PERMISSIONS, expandPermissions, type Permission } from "@polaris/core";
+import type { RoleView } from "@/lib/role-service";
 import { DEPLOYMENT, quietUpdateLog, settingsOverview, updateStatus } from "../fixtures/settings";
 
 export const settings = defineScene({
@@ -128,4 +131,67 @@ export const accountSecurity = defineScene({
             </div>
         </Chrome>
     )
+});
+
+/** A role as `/admin/roles` reads it: the seeded grants, or a list of its own. */
+function role(n: number, name: string, memberCount: number, grants?: Permission[]): RoleView {
+    const seeded = DEFAULT_ROLES[name];
+    const wildcard = seeded?.includes("*") ?? false;
+    const own = grants ?? ((seeded ?? []).filter((one) => one !== "*") as Permission[]);
+    return {
+        id: `00000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`,
+        name,
+        isSystem: Boolean(seeded),
+        wildcard,
+        permissions: wildcard ? [...PERMISSIONS] : expandPermissions(own),
+        memberCount
+    };
+}
+
+/** Who may do what: the seeded roles and one the organization made, each a
+ *  grid of the permissions it holds. */
+export const settingsRoles = defineScene({
+    id: "settings-roles",
+    path: "/admin/roles",
+    render: (ctx) => (
+        <Chrome>
+            <div className="mx-auto flex w-full max-w-4xl flex-col">
+                <PageHeader
+                    title={label(ctx.locale, "admin.roles.page.title")}
+                    description={label(ctx.locale, "admin.roles.page.description")}
+                />
+                <RolesAdmin
+                    roles={[
+                        role(1, "admin", 2),
+                        role(2, "member", 7),
+                        role(3, "support", 2, [
+                            "chat.use",
+                            "chat.attach",
+                            "chat.call",
+                            "inbox.read",
+                            "inbox.manage",
+                            "tasks.read",
+                            "tasks.manage",
+                            "drive.read",
+                            "games.read",
+                            "games.moderate"
+                        ]),
+                        role(4, "viewer", 1),
+                        role(5, "guest", 3)
+                    ]}
+                />
+            </div>
+        </Chrome>
+    ),
+    // The admin card says only that it holds everything; the first grid worth
+    // reading is the member role's, so its card is brought up whole.
+    prepare: () => {
+        const title = [...document.querySelectorAll("h3")].find(
+            (element) => element.textContent?.trim() === "member"
+        );
+        const card = title?.closest<HTMLElement>(".rounded-xl, [class*=rounded]") ?? title;
+        if (!card) throw new Error("no member role");
+        card.style.scrollMarginTop = "4.5rem";
+        card.scrollIntoView({ block: "start" });
+    }
 });

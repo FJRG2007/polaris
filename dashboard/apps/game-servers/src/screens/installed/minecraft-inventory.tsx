@@ -235,7 +235,11 @@ function Section({
     onInspect: (slot: number) => void;
     onCancelPending?: (id: string) => void;
 }) {
-    const template = { gridTemplateColumns: `repeat(${columns}, minmax(${SLOT_MIN}, 1fr))` };
+    // The nine-wide rows have no floor: on a phone the cells shrink with the
+    // dialog rather than pushing the ninth column out of it.
+    const template = {
+        gridTemplateColumns: `repeat(${columns}, minmax(${grow ? "0" : SLOT_MIN}, 1fr))`
+    };
 
     return (
         <div className={grow ? "flex min-w-0 flex-col gap-1" : "flex shrink-0 flex-col gap-1"}>

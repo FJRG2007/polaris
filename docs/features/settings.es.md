@@ -22,6 +22,20 @@ este host. La página muestra dónde se llega a Polaris, sus páginas públicas
 para proveedores OAuth, los temas de temporada y una forma de llevarlo todo a
 otra máquina en un archivo sellado con frase de paso.
 
+## Roles y permisos
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/settings-roles-light-es-desktop.webp">
+  <img src="../assets/media/settings-roles-dark-es-desktop.webp" alt="Los permisos del rol member, marcados aplicación por aplicación">
+</picture>
+
+Cada persona tiene un rol, y un rol es una lista de permisos, aplicación por
+aplicación: quién puede borrar archivos, montar un servidor de correo, dar op
+a jugadores en un servidor de juegos o cambiar los ajustes de la instancia.
+Los roles predefinidos (admin, member, viewer, guest) se pueden reescribir,
+se pueden crear otros, y "Ver como" muestra Polaris tal como lo ve alguien con
+ese rol. Una aplicación que un rol no puede usar ni siquiera aparece.
+
 ## Tu cuenta
 
 <picture>
