@@ -49,6 +49,7 @@ export function NotificationBell() {
         // never reaches the bell it was aimed at.
         <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
             <DropdownMenuTrigger
+                data-tour="shell.notifications"
                 className="relative grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground "
                 aria-label={t("bell.label", { unread })}
                 title={t("bell.title", { unread })}
@@ -142,7 +143,9 @@ export function NotificationBell() {
                                     </DropdownMenuItem>
                                     {!item.read ? (
                                         <DropdownMenuItem
-                                            aria-label={t("bell.markReadNamed", { title: item.title })}
+                                            aria-label={t("bell.markReadNamed", {
+                                                title: item.title
+                                            })}
                                             title={t("bell.markRead")}
                                             // The menu stays open: this is a
                                             // control over the list itself, and

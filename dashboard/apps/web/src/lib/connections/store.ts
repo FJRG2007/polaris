@@ -75,6 +75,10 @@ export interface ConnectionCredential {
     readonly accessToken?: string;
     /** Epoch milliseconds the access token stops being accepted at. */
     readonly expiresAt?: number;
+    /** Which provider application issued this grant, where a person may bring
+     *  their own: a refresh token is only honoured by the client it was issued
+     *  to. Absent on links made before that, which are the deployment's. */
+    readonly clientId?: string;
     /** A personal access token, for the "token" method. */
     readonly token?: string;
     /**

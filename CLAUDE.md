@@ -26,6 +26,21 @@ So:
   precisely, with the values to type, and checked from here so the screen can say
   when they start working.
 
+## Who configures what
+
+**Setting up how Polaris talks to an outside service is the administrator's job,
+never a user's.** A provider app (client id and secret), an API key, a redirect
+address, a developer-dashboard step - all of it lives in the admin screens
+(Integrations), and nothing on a personal screen (account, connections,
+profile) asks a user for it, offers it, or explains it. A user only connects
+or disconnects their own account through what the administrator set up.
+
+- When the administrator's setup is missing or refused, a user is told the
+  administrators know; only an administrator is shown the provider's reason.
+- A provider limit (Spotify's five accounts in development mode, say) is
+  explained on the admin screen with what the administrator can do about it,
+  never answered by handing users a way to bring their own credentials.
+
 ## How a deployment actually gets your change
 
 **An installed Polaris is only ever updated from the Update button in Settings.**

@@ -1,0 +1,114 @@
+/*
+ * The tour popover in Polaris's own look: the elevated surface, border, shadow
+ * and type of a dialog, from the theme tokens, so it follows light and dark.
+ * Doubled class for weight over the library's own sheet, which loads beside this.
+ */
+
+.driver-popover.polaris-tour {
+    font-family: inherit;
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--elevated));
+    border: 1px solid hsl(var(--border-strong));
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-modal);
+    padding: 1rem;
+    min-width: 0;
+    width: min(20rem, calc(100vw - 2rem));
+    max-width: calc(100vw - 2rem);
+}
+
+.driver-popover.polaris-tour .driver-popover-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    padding-right: 1.5rem;
+    overflow-wrap: anywhere;
+}
+
+.driver-popover.polaris-tour .driver-popover-description {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: hsl(var(--muted-foreground));
+    overflow-wrap: anywhere;
+}
+
+.driver-popover.polaris-tour .driver-popover-close-btn {
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.375rem;
+    line-height: 1.75rem;
+    color: hsl(var(--muted-foreground));
+}
+
+.driver-popover.polaris-tour .driver-popover-close-btn:hover,
+.driver-popover.polaris-tour .driver-popover-close-btn:focus-visible {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--card-hover));
+}
+
+.driver-popover.polaris-tour .driver-popover-footer {
+    margin-top: 0.875rem;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.driver-popover.polaris-tour .driver-popover-progress-text {
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+    font-variant-numeric: tabular-nums;
+}
+
+.driver-popover.polaris-tour .driver-popover-navigation-btns {
+    gap: 0.375rem;
+}
+
+.driver-popover.polaris-tour .driver-popover-navigation-btns button + button {
+    margin-left: 0;
+}
+
+.driver-popover.polaris-tour .polaris-tour-skip {
+    margin-right: auto;
+}
+
+.driver-popover.polaris-tour button:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+.driver-popover.polaris-tour .driver-popover-arrow {
+    border-color: hsl(var(--elevated));
+}
+
+.driver-popover.polaris-tour .driver-popover-arrow-side-left {
+    border-top-color: transparent;
+    border-bottom-color: transparent;
+    border-right-color: transparent;
+}
+
+.driver-popover.polaris-tour .driver-popover-arrow-side-right {
+    border-top-color: transparent;
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+}
+
+.driver-popover.polaris-tour .driver-popover-arrow-side-top {
+    border-bottom-color: transparent;
+    border-left-color: transparent;
+    border-right-color: transparent;
+}
+
+.driver-popover.polaris-tour .driver-popover-arrow-side-bottom {
+    border-top-color: transparent;
+    border-left-color: transparent;
+    border-right-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .driver-fade .driver-overlay,
+    .driver-fade .driver-popover {
+        animation: none;
+    }
+}

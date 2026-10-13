@@ -30,7 +30,13 @@ import { cn } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
 import { itemLabel } from "../../lib/minecraft/items";
 import { isMovable, replaceSlot } from "../../lib/minecraft/item-argument";
-import { enchantmentText, itemDetails, type ItemDetails } from "../../lib/minecraft/item-details";
+import {
+    enchantmentText,
+    itemDetails,
+    potionEffectText,
+    potionLabel,
+    type ItemDetails
+} from "../../lib/minecraft/item-details";
 import {
     ARMOUR_SLOTS,
     HOTBAR_SLOTS,
@@ -229,7 +235,11 @@ function Section({
     onInspect: (slot: number) => void;
     onCancelPending?: (id: string) => void;
 }) {
-    const template = { gridTemplateColumns: `repeat(${columns}, minmax(${SLOT_MIN}, 1fr))` };
+    // The nine-wide rows have no floor: on a phone the cells shrink with the
+    // dialog rather than pushing the ninth column out of it.
+    const template = {
+        gridTemplateColumns: `repeat(${columns}, minmax(${grow ? "0" : SLOT_MIN}, 1fr))`
+    };
 
     return (
         <div className={grow ? "flex min-w-0 flex-col gap-1" : "flex shrink-0 flex-col gap-1"}>
@@ -426,6 +436,14 @@ function describe(t: GameText<"minecraft">, details: ItemDetails): string[] {
     if (details.stored.length > 0)
         lines.push(
             t("inventory.details.stored", { list: details.stored.map(enchantmentText).join(", ") })
+        );
+    if (details.potion)
+        lines.push(t("inventory.details.potion", { name: potionLabel(details.potion) }));
+    if (details.effects.length > 0)
+        lines.push(
+            t("inventory.details.effects", {
+                list: details.effects.map(potionEffectText).join(", ")
+            })
         );
     if (details.unbreakable) lines.push(t("inventory.details.unbreakable"));
     else if (details.damage !== null)

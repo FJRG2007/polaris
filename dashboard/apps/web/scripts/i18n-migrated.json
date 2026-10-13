@@ -1114,6 +1114,7 @@
         "web/src/components/accessibility-form.tsx",
         "web/src/components/account-menu.tsx",
         "web/src/components/account-watcher.tsx",
+        "web/src/components/activity-card.tsx",
         "web/src/components/app-chrome.tsx",
         "web/src/components/app-nav.tsx",
         "web/src/components/app-sidebar.tsx",

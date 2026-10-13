@@ -1,0 +1,25 @@
+/* Each screenshot is in the page twice, once per theme, and the one that does not
+   match the reader's theme is hidden: dark is the default, `.light` and a light
+   machine under `.system` turn it the other way. Picked by CSS so the right one
+   is there on the first paint, with no swap after hydration. */
+.light {
+    display: none;
+}
+
+:global(:root.light) .dark {
+    display: none;
+}
+
+:global(:root.light) .light {
+    display: block;
+}
+
+@media (prefers-color-scheme: light) {
+    :global(:root.system) .dark {
+        display: none;
+    }
+
+    :global(:root.system) .light {
+        display: block;
+    }
+}

@@ -5,8 +5,9 @@
  *
  * In a direct message a share is offered, not taken, and the offer sits among
  * the people - first, to their left - rather than in a row above them. Once
- * watched, the stream has the band to itself, and letting go of it brings the
- * people back; with the call expanded, the people are a row under it. Right-clicking
+ * watched, the stream is a tile among the people, the way every voice client
+ * draws a call between a few people; asked for by name it has the band to
+ * itself, and with the call expanded the people are a row under it. Right-clicking
  * the stream mutes it, sets its volume, pops it out and sets how far voices are
  * lowered while it plays; right-clicking a person in a call of two shows
  * combining greyed out.
@@ -146,20 +147,29 @@ describe("a stream in a direct message", () => {
         expect(watchedStreams()).toEqual([]);
     });
 
-    it("shows only the stream once it is watched, and the people again once let go", () => {
+    it("sits among the people once watched, and takes the band only when asked", () => {
         render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
             wrapper: MessagesWrapper
         });
         fireEvent.click(screen.getByTitle("Watch Bo - screen"));
         expect(watchedStreams()).toEqual(["screen:seat-bo"]);
-        expect(document.querySelector("video")).toBeTruthy();
-        // The band holds the picture alone: no faces, no tiles of people.
+        const stream = document.querySelector("video")!;
+        const you = screen.getByText("You");
+        // One grid: the stream first, then the people, the size of a face each.
+        expect(stream.closest(".grid")).toBe(you.closest(".grid"));
+        expect(stream.compareDocumentPosition(you) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByText("Bo")).toBeTruthy();
+        expect(screen.getAllByText("Bo - screen").length).toBeGreaterThan(0);
+
+        // Asked for by name, the band holds the picture alone.
+        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
         expect(screen.queryByText("You")).toBeNull();
 
+        // And pressed again it goes back among the people, still watched.
         fireEvent.click(screen.getByRole("button", { name: "Back to the people" }));
-        expect(watchedStreams()).toEqual([]);
         expect(screen.getByText("You")).toBeTruthy();
-        expect(screen.getByTitle("Watch Bo - screen")).toBeTruthy();
+        expect(watchedStreams()).toEqual(["screen:seat-bo"]);
+        expect(screen.queryByTitle("Watch Bo - screen")).toBeNull();
     });
 
     it("lists the people in a row under the stream once the call is expanded", () => {
@@ -175,17 +185,18 @@ describe("a stream in a direct message", () => {
             { wrapper: MessagesWrapper }
         );
         fireEvent.click(screen.getByTitle("Watch Bo - screen"));
+        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
         const stream = document.querySelector("video")!;
         const you = screen.getByText("You");
         // After the stream in the document, which in a column is under it.
         expect(stream.compareDocumentPosition(you) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(stream.closest(".grid")).not.toBe(you.closest(".grid"));
         expect(screen.getByText("Bo")).toBeTruthy();
 
-        // Asked for by name, the stream takes the call whole.
-        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
-        expect(screen.queryByText("You")).toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "Back to the grid" }));
-        expect(screen.getByText("You")).toBeTruthy();
+        expect(document.querySelector("video")!.closest(".grid")).toBe(
+            screen.getByText("You").closest(".grid")
+        );
     });
 
     it("leaves the speaking ring room in the strip of faces under a stream", () => {
@@ -204,10 +215,22 @@ describe("a stream in a direct message", () => {
             { wrapper: MessagesWrapper }
         );
         fireEvent.click(screen.getByTitle("Watch Bo - screen"));
+        fireEvent.click(screen.getByRole("button", { name: "Make this bigger" }));
         const strip = screen.getByText("You").closest(".grid") as HTMLElement;
         expect(strip.className).toContain("overflow-x-auto");
         // As much room inside its edges as the ring is wide (ring-2: 2px).
         expect(strip.className.split(" ")).toEqual(expect.arrayContaining(["p-0.5"]));
+    });
+
+    it("says it is live on its tile, with a screen beside its name", () => {
+        render(<CallRoom meetingId="m1" place="direct" call={call()} onLeave={() => undefined} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
+        const tile = document
+            .querySelector("video")!
+            .closest("[class*='group/tile']") as HTMLElement;
+        expect(within(tile).getAllByText("Live").length).toBeGreaterThan(0);
     });
 
     it("offers expanding the call, and says which way it goes", () => {

@@ -55,9 +55,13 @@ export const SOUNDBOARD_TOPIC = "polaris.soundboard";
 /**
  * The sounds every call has, whoever is in it.
  *
- * Original, synthesised in the browser (`soundboard-synth`), so they cost
- * nothing to ship, never 404 after an update and owe nobody a licence. The name
+ * Real recordings, each released into the public domain under CC0, shipped
+ * beside the app in `public/sounds/soundboard` as the same 16-bit PCM WAV an
+ * upload becomes. Where each one came from is in `sources.json` there. The name
  * each one is shown under lives in the catalogs, under `soundboard.defaults`.
+ *
+ * The ids are what plays and favourites store (`default:<id>`), so they never
+ * change, whatever recording is behind them.
  */
 export const DEFAULT_SOUNDS = [
     { id: "applause", emoji: "\u{1F44F}" },
@@ -76,6 +80,11 @@ export const DEFAULT_SOUND_IDS = DEFAULT_SOUNDS.map((sound) => sound.id) as [
     DefaultSoundId,
     ...DefaultSoundId[]
 ];
+
+/** Where a default sound's file is served from. */
+export function defaultSoundUrl(id: DefaultSoundId): string {
+    return `/sounds/soundboard/${id}.wav`;
+}
 
 /** The prefix a default sound's reference carries, so it can never be mistaken
  *  for an uploaded one's id. */

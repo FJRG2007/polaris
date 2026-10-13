@@ -163,11 +163,13 @@ the full feature list. Mobile versions are in
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <a href="docs/features/game-servers.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-en-desktop.webp">
         <img src="docs/assets/media/games-dark-en-desktop.webp" alt="Game servers: Minecraft, ARK and FiveM on your own machines">
       </picture>
-      <br><sub><b>Game servers</b>: Minecraft, ARK and FiveM on your own machines</sub>
+      </a>
+      <br><sub><a href="docs/features/game-servers.md"><b>Game servers</b></a>: Minecraft, ARK and FiveM on your own machines</sub>
     </td>
   </tr>
 </table>

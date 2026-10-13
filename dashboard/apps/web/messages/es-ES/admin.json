@@ -1374,6 +1374,8 @@
         },
         "setupValue": {
             "label": {
+                "appName": "Nombre",
+                "appDescription": "Descripción",
                 "redirectUri": "URI de retorno",
                 "homeUrl": "URL de inicio",
                 "privacyUrl": "URL de privacidad",
@@ -1382,6 +1384,8 @@
                 "domain": "Dominio"
             },
             "copy": {
+                "appName": "Copiar el nombre",
+                "appDescription": "Copiar la descripción",
                 "redirectUri": "Copiar la URI de retorno",
                 "homeUrl": "Copiar la URL de inicio",
                 "privacyUrl": "Copiar la URL de privacidad",
@@ -1451,6 +1455,10 @@
         "tenor": {
             "search": "Buscar GIF y stickers",
             "hint": "Añade la búsqueda al selector de Chat. Un GIF elegido se guarda aquí como cualquier otro adjunto, así que nadie que lea una conversación queda expuesto a terceros."
+        },
+        "lastfm": {
+            "switch": "Mostrar lo que registra la gente",
+            "hint": "Permite que cada persona escriba su usuario de Last.fm en Cuentas conectadas y muestra su canción junto a su nombre."
         },
         "oauth": {
             "idLabel": {
@@ -1807,21 +1815,33 @@
             },
             "spotify": {
                 "summary": "Deja que la gente muestre lo que está escuchando y escuche a la vez con otros.",
-                "description": "Crea una app en el panel de desarrolladores de Spotify y todos aquí tendrán un botón Conectar para su propio Spotify. Junto a su nombre, quienes lo compartan verán la canción que suena, y podrán pulsar Escuchar a la vez para oírla en su propio Spotify. Spotify solo deja que una app controle la reproducción de una cuenta Premium, así que Escuchar a la vez lo dice a quien no la tenga; mostrar la canción funciona para todos. Spotify también exige una dirección segura (https) para este Polaris, y deja una app en modo de desarrollo salvo que se apruebe: en ese modo el propietario de la app necesita Premium y solo pueden vincular las cuentas añadidas en User Management, cinco como mucho.",
+                "description": "Crea una app en el panel de desarrolladores de Spotify y todos aquí tendrán un botón Conectar para su propio Spotify. Junto a su nombre, quienes lo compartan verán la canción que suena, y podrán pulsar Escuchar a la vez para oírla en su propio Spotify. Spotify solo deja que una app controle la reproducción de una cuenta Premium, así que Escuchar a la vez lo dice a quien no la tenga; mostrar la canción funciona para todos. Spotify también exige una dirección segura (https) para este Polaris, y deja una app en modo de desarrollo salvo que se apruebe: en ese modo el propietario de la app necesita Premium y solo pueden vincular las cuentas añadidas en User Management, cinco como mucho. Más allá de eso, Last.fm muestra la canción a todos sin límite.",
                 "apiKeyLabel": "Clave secreta",
                 "apiKeyHelp": "En la página Basic Information de la app, en View client secret.",
                 "links": {
                     "0": {
                         "label": "Crear una app",
-                        "help": "Cualquier nombre y descripción. Pega el URI de redirección de abajo en Redirect URIs, y marca Web API donde pregunta qué API usa la app."
+                        "help": "Copia cada valor de abajo en el campo del mismo nombre - la URL de inicio va en Website - y marca Web API donde pregunta qué API usa la app."
                     },
                     "1": {
                         "label": "Añadir a quienes vayan a vincular",
-                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En modo de desarrollo nadie más puede vincular, y quien lo intente lo sabrá por Spotify, no por Polaris."
+                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En casi todas las instalaciones no hay forma de evitar esta lista: Spotify solo la quita (extended quota) a empresas registradas con al menos 250.000 usuarios al mes, y se pide desde la pestaña Quota extension Request de la app. A quien no esté en ella lo rechaza Spotify, no Polaris."
                     },
                     "2": {
                         "label": "Copiar el id y el secreto del cliente",
                         "help": "La app -> Settings -> Basic Information. View client secret lo muestra."
+                    }
+                }
+            },
+            "lastfm": {
+                "summary": "Muestra lo que escucha la gente, para todos, a través de Last.fm.",
+                "description": "Pega una clave de API de Last.fm y cualquiera aquí podrá escribir su usuario de Last.fm en Cuentas conectadas. Junto a su nombre, quienes lo compartan mostrarán la canción que están registrando, desde Spotify o cualquier otro reproductor conectado a Last.fm. A diferencia de una app de Spotify, no tiene límite de cinco personas ni necesita Premium. Escuchar juntos abre la canción en Spotify desde el principio, no sincronizada.",
+                "apiKeyLabel": "Clave API",
+                "apiKeyHelp": "La clave de API que Last.fm muestra para la aplicación. El secreto compartido no hace falta.",
+                "links": {
+                    "0": {
+                        "label": "Crear una cuenta de API",
+                        "help": "Cualquier nombre y descripción; la URL de callback puede quedar vacía. Last.fm muestra la clave de API justo después."
                     }
                 }
             },

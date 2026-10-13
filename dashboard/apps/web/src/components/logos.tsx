@@ -79,6 +79,7 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     epic: brand.EpicGamesMark,
     discord: brand.DiscordMark,
     spotify: brand.SpotifyMark,
+    lastfm: brand.LastfmMark,
     cloudflare: brand.CloudflareMark,
     ngrok: brand.NgrokMark,
     giphy: brand.GiphyMark,

@@ -46,7 +46,11 @@ export const dynamic = "force-dynamic";
 
 /** How long until the handle may change again, the way `usernameCooldownRemaining`
  *  in @polaris/core says it, in the reader's language. */
-function cooldownLeft(allowedAt: Date, now: Date, t: NamespaceTranslator<"accountSecurity">): string {
+function cooldownLeft(
+    allowedAt: Date,
+    now: Date,
+    t: NamespaceTranslator<"accountSecurity">
+): string {
     const left = allowedAt.getTime() - now.getTime();
     const minutes = Math.ceil(left / 60_000);
     if (minutes < 60) return t("duration.minutes", { count: minutes });
@@ -106,8 +110,10 @@ export default async function AccountPage() {
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
-            <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("profile.page.title")}</h1>
+            <div data-tour="settings.profile">
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("profile.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("profile.page.intro")}</p>
             </div>
             <ProfileView

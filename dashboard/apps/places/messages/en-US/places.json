@@ -336,7 +336,7 @@
         "fullscreen": "Fullscreen",
         "leaveFullscreen": "Leave fullscreen",
         "mute": "Mute",
-        "notAnswering": "This camera is not answering",
+        "notAnswering": "Camera not sending a picture - reconnecting",
         "pause": "Pause",
         "picturesOnly": "Pictures only - the live stream would not start<retry>Try again</retry>",
         "play": "Play",

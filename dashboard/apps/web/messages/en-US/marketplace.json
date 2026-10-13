@@ -63,5 +63,25 @@
         "chooseNas": "Choose a NAS",
         "noNas": "No NAS connections yet. Add one in Drive first.",
         "configuration": "Configuration"
+    },
+    "detail": {
+        "back": "All apps",
+        "screenshots": "Screenshots",
+        "screenshotAlt": "{name}, screenshot {index}",
+        "about": "About",
+        "features": "What it does",
+        "information": "Information",
+        "developer": "Developer",
+        "category": "Category",
+        "version": "Version",
+        "image": "Image",
+        "docs": "Documentation",
+        "installs": "Installed",
+        "readOnly": "Installing apps needs permission to manage apps. Ask an admin.",
+        "ownerOnly": "Only the person who installed an app, or an admin, can uninstall it.",
+        "deleteData": "Also delete its data",
+        "deleteDataWarning": "{name} is removed with everything in it: its volumes, settings and what was made in it. This cannot be undone.",
+        "confirmDelete": "Uninstall and delete data",
+        "uninstallFailed": "Could not uninstall the app. Try again."
     }
 }

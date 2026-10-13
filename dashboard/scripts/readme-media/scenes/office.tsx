@@ -6,12 +6,21 @@ import { defineScene } from "../runtime/scene";
 import { OfficeView } from "@/app/(app)/office/office-view";
 import { DocEditor } from "@/app/(app)/office/d/[id]/doc-editor";
 import { DocumentChrome } from "@/app/(app)/office/document-chrome";
-import { OPEN_DOCUMENT_ID, launchPlanContent, officeDocuments } from "../fixtures/office";
+import {
+    OPEN_DOCUMENT_ID,
+    launchPlanContent,
+    officeDocuments,
+    officePreview
+} from "../fixtures/office";
 
 export const office = defineScene({
     id: "office",
     path: "/office",
     actions: (ctx) => ({ listDocumentsAction: () => ({ documents: officeDocuments(ctx) }) }),
+    api: (ctx) => ({
+        "GET /api/office/:id/preview": ({ url }) =>
+            officePreview(ctx, decodeURIComponent(url.pathname.split("/")[3] ?? ""))
+    }),
     render: (ctx) => (
         <Chrome>
             <OfficeView

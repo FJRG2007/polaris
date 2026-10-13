@@ -1364,9 +1364,7 @@ export function FilesView({
                                     {onDelete
                                         ? t("filesView.menu.deletePermanently")
                                         : t("filesView.menu.delete")}
-                                    {onDelete ? null : (
-                                        <ShortcutHint id="drive.delete" />
-                                    )}
+                                    {onDelete ? null : <ShortcutHint id="drive.delete" />}
                                 </ContextMenuItem>
                                 {!many && entry.kind === "dir" ? (
                                     <>
@@ -1894,7 +1892,9 @@ export function FilesView({
                                 disabled={pending}
                                 title={
                                     requestFilesKey
-                                        ? t("filesView.toolbar.requestFilesHint", { shortcut: requestFilesKey })
+                                        ? t("filesView.toolbar.requestFilesHint", {
+                                              shortcut: requestFilesKey
+                                          })
                                         : t("filesView.toolbar.requestFiles")
                                 }
                                 aria-label={t("filesView.toolbar.requestFiles")}
@@ -1913,7 +1913,9 @@ export function FilesView({
                                 disabled={pending}
                                 title={
                                     newFolderKey
-                                        ? t("filesView.toolbar.newFolderHint", { shortcut: newFolderKey })
+                                        ? t("filesView.toolbar.newFolderHint", {
+                                              shortcut: newFolderKey
+                                          })
                                         : t("filesView.toolbar.newFolder")
                                 }
                                 aria-label={t("filesView.toolbar.newFolder")}
@@ -1927,6 +1929,7 @@ export function FilesView({
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
+                                    data-tour="drive.upload"
                                     size="sm"
                                     variant="secondary"
                                     disabled={uploading || !abilities.write}
@@ -1987,6 +1990,7 @@ export function FilesView({
                     <div className="relative min-w-[12rem] flex-1">
                         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
+                            data-tour="drive.search"
                             value={query}
                             onChange={(event) => setQuery(event.target.value)}
                             placeholder={t("filesView.search.placeholder")}

@@ -24,7 +24,7 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { LOCALES, MEDIA_DIR, MOMENT, THEMES, VIEWPORTS, mediaName } from "./variants.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -47,6 +47,10 @@ const MEDIA_ROUTES = [
 /** Where a fixture camera (`fixtures/call.ts`) fetches the person it films. Not
  *  a route of the app: only the harness's own canvas asks for it. */
 const CAMERA = /^\/readme-media\/camera\/([\w-]+)$/;
+/** Where the Game servers app serves its staged Minecraft item pictures. */
+const ITEM_ICON = /^\/api\/app-bundles\/game-servers\/current\/assets\/mcicons\/([\w-]+)\.png$/;
+const ITEM_LIST = "/api/app-bundles/game-servers/current/assets/mcicons/items.json";
+const itemIcons = join(root, "resources", "mcicons", "icons");
 const output = resolve(root, "..", MEDIA_DIR);
 const require = createRequire(join(root, "package.json"));
 const { chromium } = require("playwright");
@@ -90,6 +94,22 @@ function serve() {
         const film = filmed ? join(faces, `${filmed}.camera.webp`) : null;
         if (film && existsSync(film)) {
             res.writeHead(200, { "content-type": "image/webp" }).end(readFileSync(film));
+            return;
+        }
+        // The item list the app stages beside those pictures: every vanilla name.
+        if (path === ITEM_LIST) {
+            const names = readdirSync(itemIcons)
+                .filter((name) => name.startsWith("minecraft_") && name.endsWith(".png"))
+                .map((name) => name.slice("minecraft_".length, -".png".length))
+                .sort();
+            res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(names));
+            return;
+        }
+        // A Minecraft item's picture, from the set the app vendors and stages.
+        const item = ITEM_ICON.exec(path)?.[1];
+        const icon = item ? join(itemIcons, `${item}.png`) : null;
+        if (icon && existsSync(icon)) {
+            res.writeHead(200, { "content-type": "image/png" }).end(readFileSync(icon));
             return;
         }
         const sent = MEDIA_ROUTES.map((route) => route.exec(path)?.[1]).find(Boolean);
@@ -272,9 +292,7 @@ async function run() {
                                     );
                                     await page.waitForTimeout(120);
                                     shots.push(
-                                        await (
-                                            await picture(page, scene, viewport)
-                                        )
+                                        await (await picture(page, scene, viewport))
                                             .resize(VIEWPORTS[viewport].width)
                                             .png()
                                             .toBuffer()

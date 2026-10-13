@@ -93,7 +93,7 @@ export interface GridViewProps {
     /** The current moment; the line across today follows it. */
     readonly now: Date;
     /** Dim the days and hours already gone. */
-    readonly dimPast: boolean;
+    readonly fadePast: boolean;
     /** Changed to scroll a time grid to now (on "Today"). */
     readonly scrollToNowSignal: number;
     readonly slotMinutes: number;
@@ -313,8 +313,8 @@ export default function GridView(props: GridViewProps) {
                   }
                 : event
         );
-        return props.dimPast && todayShown ? [...drawn, elapsedToday(today, nowWall)] : drawn;
-    }, [props.events, props.selectedId, props.dimPast, todayShown, today, nowWall]);
+        return props.fadePast && todayShown ? [...drawn, elapsedToday(today, nowWall)] : drawn;
+    }, [props.events, props.selectedId, props.fadePast, todayShown, today, nowWall]);
 
     // Every week of the month the same height (see month-rows.ts): read again
     // once the events are drawn, when the limit or the window changes, and when
@@ -362,7 +362,7 @@ export default function GridView(props: GridViewProps) {
     return (
         <div
             ref={root}
-            className={`pc-grid h-full min-h-0${props.dimPast ? " pc-dim-past" : ""}`}
+            className={`pc-grid h-full min-h-0${props.fadePast ? " pc-dim-past" : ""}`}
             style={weekFloor}
         >
             <style>{GRID_CSS}</style>

@@ -211,6 +211,14 @@ export class SshPorts implements RuntimePorts {
         await this.run(`docker image rm ${quoteArg(image)}`);
     }
 
+    /** A deleted app's emptied volume, once its containers are down. Only a name
+     *  in the app volume shape reaches the shell, quoted; not forced, so a volume
+     *  something still uses is refused by the engine. */
+    public async removeVolume(name: string): Promise<void> {
+        if (!APP_VOLUME.test(name)) throw new Error("only an app's own volume can be removed");
+        await this.run(`docker volume rm ${quoteArg(name)}`);
+    }
+
     /** `docker image inspect` exits non-zero for an image the machine lacks. */
     public async hasImage(image: string): Promise<boolean> {
         return this.run(`docker image inspect --format '{{.Id}}' ${quoteArg(image)}`).then(
@@ -786,6 +794,9 @@ export class SshPorts implements RuntimePorts {
         }
     }
 }
+
+/** The shape `appVolumeName` gives an app's Docker volume: `polaris-<hash>_<source>`. */
+const APP_VOLUME = /^polaris-[a-z0-9]+_[A-Za-z0-9][A-Za-z0-9_.-]*$/;
 
 /** Where the optimizer is put inside the container, which is the same path the
  *  local daemon runs. */

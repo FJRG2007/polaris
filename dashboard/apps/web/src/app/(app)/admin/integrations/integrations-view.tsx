@@ -162,7 +162,9 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (card.slug === "steam") return SteamDialog;
     // Both GIF services are a key and a switch, so they share the dialog and
     // the action; which one the picker asks is decided where the search is made.
-    if (card.slug === "tenor" || card.slug === "giphy") return TenorDialog;
+    // Last.fm is the same shape: a key, and a switch for what it turns on.
+    if (card.slug === "tenor" || card.slug === "giphy" || card.slug === "lastfm")
+        return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     return null;
@@ -1171,6 +1173,8 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
     const [apiKey, setApiKey] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [saving, startSave] = useTransition();
+    const switchLabel =
+        card.slug === "lastfm" ? t("integrations.lastfm.switch") : t("integrations.tenor.search");
 
     function onSave() {
         setError(null);
@@ -1221,16 +1225,14 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
 
                     <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <span>
-                            <span className="font-medium">{t("integrations.tenor.search")}</span>
+                            <span className="font-medium">{switchLabel}</span>
                             <span className="block text-xs text-muted-foreground">
-                                {t("integrations.tenor.hint")}
+                                {card.slug === "lastfm"
+                                    ? t("integrations.lastfm.hint")
+                                    : t("integrations.tenor.hint")}
                             </span>
                         </span>
-                        <Switch
-                            checked={enabled}
-                            onChange={setEnabled}
-                            aria-label={t("integrations.tenor.search")}
-                        />
+                        <Switch checked={enabled} onChange={setEnabled} aria-label={switchLabel} />
                     </div>
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

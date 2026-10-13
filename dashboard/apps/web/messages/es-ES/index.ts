@@ -17,6 +17,7 @@ import drive from "./drive.json";
 import notes from "./notes.json";
 import tasks from "./tasks.json";
 import tools from "./tools.json";
+import tours from "./tours.json";
 import vault from "./vault.json";
 import watch from "./watch.json";
 import agents from "./agents.json";
@@ -124,6 +125,7 @@ export default {
     tasksViews,
     telemetry,
     tools,
+    tours,
     validation,
     vault,
     watch

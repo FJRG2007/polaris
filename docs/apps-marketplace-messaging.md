@@ -41,6 +41,18 @@ document is the source of truth; keep it current as phases land.
   servers exist, Places pauses and resumes its helper containers, and nothing
   that depends on an uninstalled app keeps running meanwhile (see "Uninstall"
   below).
+- Each app's own page - DONE (f6ce7ff98): a store-style page per app (name,
+  mark, description, screenshots, manifest details), with Install, Configure,
+  Open and Uninstall offered only to a reader allowed to use them.
+- Uninstall with data - DONE (2e3304724, 7de9266c4, 3c91894a6, 92d949ee8): an
+  uninstall plan (`lib/apps/uninstall-plan.ts`) inventories everything an
+  install creates and what uninstalling does with each piece, confirmed by a
+  schema test against the Prisma models. Ticking "also delete its data" on an
+  app's own page wipes and removes its volumes (on SSH hosts too), purges its
+  install-scoped rows in one transaction, and runs each app's
+  `purgeInstallFiles` hook first so files the rows pointed at (camera footage)
+  are deleted before the rows that found them - refused while any remain, so a
+  storage outage never half-deletes an install.
 
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
@@ -141,15 +153,38 @@ derived from installed capabilities.
 
 ### Uninstall
 
-Removing an install never deletes what somebody made with it. The generic path
-(`uninstallApp` in `lib/apps/install-service.ts`) tears down the Deploy
-application if there is one and marks the row removed; two apps need more than
-that, handled by `lib/apps/app-lifecycle.ts`:
+By default, removing an install deletes nothing somebody made with it; ticking
+"also delete its data" on the app's own page deletes it all instead, and
+leaves nothing behind. The generic path (`uninstallApp` in
+`lib/apps/install-service.ts`) tears down the Deploy application if there is
+one and marks the row removed; two apps need more than that, handled by
+`lib/apps/app-lifecycle.ts`:
 
 - **The marketplace's Installed cards each carry a Trash icon** beside the
   link (kept outside the `<Link>` so pressing it never also opens the app),
   confirmed with a dialog naming what the app is about to stop doing
-  (`uninstallDescription` in `marketplace-view.tsx`).
+  (`uninstallDescription` in `marketplace-view.tsx`). An app's own page
+  (`apps/marketplace/[appId]`) offers the same uninstall plus the "also delete
+  its data" checkbox, off by default and turning the confirm button red when
+  ticked.
+- **What each install leaves, and what deleting its data does with each
+  piece, is one inventory** (`lib/apps/uninstall-plan.ts`): every resource the
+  install path creates (rows, files, volumes, domains, edge routes, firewall
+  rules, the deploy target...) has an entry that either removes it or says why
+  it is kept, and a test reads the Prisma schema to fail when a model with an
+  `installedAppId` is missing from it. Deleting data wipes and removes Docker
+  volumes - on a server reached over SSH too (`deploy-service.ts`,
+  `lib/deploy/ports-ssh.ts`), with a quoted, never-forced `volume rm` accepted
+  only for names in the app's own volume shape - and purges every
+  install-scoped row in one transaction.
+- **Files a `purgeInstallFiles` hook before the rows that find them.** Places'
+  camera clips and event stills live on disk or a storage connection, and
+  their rows cascade from the camera, so deleting the rows first would leave
+  files nothing points at. `deleteInstallFootage`
+  (`apps/places/src/lib/recording.ts`) removes them a page and a few files at
+  a time, one connection per storage, before the data purge runs; a file that
+  could not be removed stops the uninstall there rather than silently
+  proceeding, so trying again still finds it.
 - **Game servers is refused while the owner still has a server.** Deleting a
   world is only ever confirmed from inside the server itself, never as a side
   effect of uninstalling the app that runs it - the refusal names up to five

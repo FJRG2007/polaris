@@ -32,3 +32,15 @@ servidor de un juego llega la primera vez que se crea un servidor de ese juego.
 Una app que ejecuta su propio contenedor se instala tal cual o se configura
 antes: su nombre, la máquina donde corre y si cada uno de sus volúmenes vive en
 esa máquina o en un NAS de Drive.
+
+## La página de cada app
+
+Cada app del catálogo tiene su propia página, como la ficha de una tienda: su
+nombre, su marca y su descripción, qué hace, sus propias capturas para tu tema
+y tu idioma, y los datos que conoce su manifiesto - desarrollador, categoría,
+versión, imagen. Instalar, Configurar, Abrir y Desinstalar están en la página
+y solo se ofrecen cuando tienes permiso para usarlos.
+
+Desinstalar también puede borrar los datos de la app - sus volúmenes, ajustes
+y todo lo hecho en ella, incluidos archivos como las grabaciones de cámaras -
+y no deja nada atrás; por defecto los datos se conservan para una reinstalación.

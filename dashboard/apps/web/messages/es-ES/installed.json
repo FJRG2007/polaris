@@ -37,6 +37,7 @@
         "update": "Falló el cambio de estado",
         "ownerOnly": "Solo quien instaló esta aplicación puede quitarla",
         "uninstall": "Falló la desinstalación",
+        "filesLeft": "No se han podido borrar algunos de sus archivos. Comprueba que su almacenamiento está accesible y vuelve a intentarlo. No se ha quitado nada más.",
         "readAccess": "No se ha podido leer quién puede entrar en este servidor",
         "checkDetails": "Revisa los datos y vuelve a intentarlo",
         "give": "No se ha podido dar acceso",

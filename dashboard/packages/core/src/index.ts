@@ -38,6 +38,7 @@ export * from "./profile-style.js";
 export * from "./connection-providers.js";
 export * from "./provider-api-errors.js";
 export * from "./minecraft-name.js";
+export * from "./lastfm-name.js";
 export * from "./mailbox-category.js";
 export * from "./mail-server.js";
 export * from "./mail-server-jmap.js";

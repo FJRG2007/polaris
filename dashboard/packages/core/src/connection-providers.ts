@@ -52,6 +52,7 @@ export type ConnectionProviderSlug =
     | "minecraft"
     | "discord"
     | "spotify"
+    | "lastfm"
     | "vercel"
     | "railway"
     | "aws";
@@ -107,6 +108,12 @@ export interface ConnectionProvider {
      * be called and nothing more, and a verified link replaces it.
      */
     acceptsTypedName?: boolean;
+    /**
+     * Whether a typed name is the only way this service is ever linked. Such a
+     * name is not "not verified" - there is nothing to verify it against - so
+     * the card says nothing about verification at all.
+     */
+    typedOnly?: boolean;
     /** How many accounts one person may link when the operator has set no limit. */
     defaultLimit: number;
     /** What the operator has to connect first, named so the empty state can say it. */
@@ -356,6 +363,21 @@ export const CONNECTION_PROVIDERS: readonly ConnectionProvider[] = [
         signInDefault: false,
         signInWarning:
             "This account is linked to show what you are listening to. Letting it sign in makes it a way into Polaris as well."
+    },
+    {
+        slug: "lastfm",
+        name: "Last.fm",
+        category: "general",
+        summary: "Show what you are listening to, from any player that scrobbles to Last.fm.",
+        description:
+            "Type your Last.fm username and Polaris shows the song you are scrobbling beside your name, to the people your privacy settings allow - no Premium and no invitation needed. To scrobble from Spotify, open Last.fm -> Settings -> Applications and press Connect next to Spotify Scrobbling. Polaris only reads your public recent tracks.",
+        acceptsToken: false,
+        acceptsTypedName: true,
+        typedOnly: true,
+        defaultLimit: 1,
+        requires: "a Last.fm API key",
+        // A name somebody typed proves nothing, and a sign-in needs proof.
+        signInDefault: false
     },
     {
         slug: "dropbox",

@@ -76,6 +76,66 @@ function camera(person: Person, index: number): MediaStream | null {
     return stream;
 }
 
+const screens = new Map<string, MediaStream | null>();
+
+/** A fixture shared screen: the task board (chat attachment 2, cut from the
+ *  tasks picture) on a 1280x720 canvas, sent at 30 frames a second - what a
+ *  720p share arrives at, which the tile reads off the painted frames. */
+function screenShare(person: Person): MediaStream | null {
+    const known = screens.get(person.id);
+    if (known !== undefined) return known;
+    if (typeof document === "undefined" || !("captureStream" in HTMLCanvasElement.prototype)) {
+        return null;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = 1280;
+    canvas.height = 720;
+    const pen = canvas.getContext("2d")!;
+    const picture = new Image();
+    picture.src = `/api/chat/attachments/${id("attachment", 2)}`;
+    const draw = () => {
+        pen.fillStyle = "#f4f4f5";
+        pen.fillRect(0, 0, 1280, 720);
+        if (!picture.complete || picture.naturalWidth === 0) return;
+        const scale = 1280 / picture.naturalWidth;
+        pen.drawImage(picture, 0, 0, 1280, picture.naturalHeight * scale);
+    };
+    draw();
+    picture.onload = draw;
+    setInterval(draw, 1000 / 30);
+    const stream = canvas.captureStream(30);
+    screens.set(person.id, stream);
+    countFramesOnTheSceneClock();
+    return stream;
+}
+
+/**
+ * The tile reads a share's frame rate as frames painted per second of
+ * `performance.now()`. Under the capture's frozen clock a second is stepped
+ * through in a moment, so the real count comes out a fraction of what is sent.
+ * A video playing one of these screens counts its frames on the scene's clock
+ * instead, at the 30 a second the canvas is captured at.
+ */
+function countFramesOnTheSceneClock(): void {
+    const proto = HTMLVideoElement.prototype;
+    const real = proto.getVideoPlaybackQuality;
+    if (typeof real !== "function" || "__sceneClock" in proto) return;
+    Object.defineProperty(proto, "__sceneClock", { value: true });
+    proto.getVideoPlaybackQuality = function (this: HTMLVideoElement) {
+        const measured = real.call(this);
+        const source = this.srcObject;
+        if (!(source instanceof MediaStream) || ![...screens.values()].includes(source)) {
+            return measured;
+        }
+        return {
+            corruptedVideoFrames: measured.corruptedVideoFrames,
+            creationTime: measured.creationTime,
+            droppedVideoFrames: 0,
+            totalVideoFrames: Math.floor((performance.now() / 1000) * 30)
+        };
+    };
+}
+
 /** One kind of call: who is in it, where, and what they have on. */
 export interface CallShape {
     readonly meetingId: string;
@@ -90,6 +150,8 @@ export interface CallShape {
     readonly speaking?: readonly string[];
     /** Hands up. */
     readonly hands?: readonly string[];
+    /** Who is sharing a screen. */
+    readonly screens?: readonly string[];
     readonly standalone?: boolean;
     readonly recording?: boolean;
 }
@@ -128,6 +190,7 @@ export function groupShape(ctx: SceneContext): CallShape {
         people: [VIEWER, TEAM.lena, CREW.grace, CREW.mateo],
         cameras: [TEAM.lena.id, CREW.grace.id],
         speaking: [CREW.grace.id],
+        screens: [TEAM.lena.id],
         recording: true
     };
 }
@@ -194,7 +257,13 @@ export function callState(ctx: SceneContext, shape: CallShape = standupShape(ctx
         localStream: viewerCamera,
         localScreen: null,
         remote,
-        screens: new Map(),
+        screens: new Map(
+            others.flatMap((person) => {
+                if (!has(shape.screens, person.userId)) return [];
+                const stream = screenShare({ id: person.userId, name: person.name });
+                return stream ? [[person.id, stream] as const] : [];
+            })
+        ),
         speaking: new Set(
             participants.filter((one) => has(shape.speaking, one.userId)).map((one) => one.id)
         ),

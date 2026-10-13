@@ -14,7 +14,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
-import { minecraftNameSchema } from "@polaris/core";
+import { lastfmNameSchema, minecraftNameSchema } from "@polaris/core";
+import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
+import { LastfmKeyRefused, LastfmUnknownUser, readLastfmPlaying } from "@/lib/connections/lastfm";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { readGithubAccount } from "@/lib/github-service";
 import { awsIdentity } from "@/lib/integrations/aws-api";
@@ -52,7 +54,12 @@ async function issue(message: string | undefined, fallback: string): Promise<{ e
 const TOKEN_ACCOUNTS: Readonly<
     Record<
         string,
-        (token: string) => Promise<{ accountId: string; label: string; avatarUrl?: string | null; email?: string | null }>
+        (token: string) => Promise<{
+            accountId: string;
+            label: string;
+            avatarUrl?: string | null;
+            email?: string | null;
+        }>
     >
 > = {
     github: async (token) => {
@@ -101,10 +108,12 @@ export async function connectTokenAction(
     if (blocked) return localized({ error: blocked });
 
     const readAccount = TOKEN_ACCOUNTS[provider];
-    if (!readAccount) return { error: (await getTranslations("account"))("connections.errors.noToken") };
+    if (!readAccount)
+        return { error: (await getTranslations("account"))("connections.errors.noToken") };
 
     const parsed = tokenSchema.safeParse(rawToken);
-    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.pasteToken");
+    if (!parsed.success)
+        return issue(parsed.error.issues[0]?.message, "connections.errors.pasteToken");
 
     try {
         const account = await readAccount(parsed.data);
@@ -124,7 +133,10 @@ export async function connectTokenAction(
             return { error: caught.message };
         }
         return {
-            error: caught instanceof Error ? caught.message : (await getTranslations("account"))("connections.errors.connectFailed")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("account"))("connections.errors.connectFailed")
         };
     }
 }
@@ -155,13 +167,16 @@ const awsSchema = z.object({
  * allowed to do, which is a separate question the board asks later and answers in
  * that provider's own words.
  */
-export async function connectAwsAction(input: unknown): Promise<{ error?: string; login?: string }> {
+export async function connectAwsAction(
+    input: unknown
+): Promise<{ error?: string; login?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
 
     const parsed = awsSchema.safeParse(input);
-    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.checkDetails");
+    if (!parsed.success)
+        return issue(parsed.error.issues[0]?.message, "connections.errors.checkDetails");
 
     try {
         const identity = await awsIdentity(parsed.data);
@@ -185,7 +200,10 @@ export async function connectAwsAction(input: unknown): Promise<{ error?: string
             return { error: caught.message };
         }
         return {
-            error: caught instanceof Error ? caught.message : (await getTranslations("account"))("connections.errors.connectFailed")
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("account"))("connections.errors.connectFailed")
         };
     }
 }
@@ -199,13 +217,16 @@ export async function connectAwsAction(input: unknown): Promise<{ error?: string
  * is typed, and stored as not verified, so a server screen that fills the name in
  * from it says so. Typing it again changes it; a proved account replaces it.
  */
-export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error?: string; name?: string }> {
+export async function saveMinecraftNameAction(
+    rawName: unknown
+): Promise<{ error?: string; name?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
 
     const parsed = minecraftNameSchema.safeParse(rawName);
-    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.checkUsername");
+    if (!parsed.success)
+        return issue(parsed.error.issues[0]?.message, "connections.errors.checkUsername");
 
     try {
         const saved = await saveTypedConnection(user.id, "minecraft", parsed.data);
@@ -220,6 +241,49 @@ export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error
     }
 }
 
+/**
+ * Say what one's Last.fm username is, so the song they scrobble shows beside
+ * their name.
+ *
+ * Asked of Last.fm before it is stored: a name with a typo would otherwise sit
+ * on the card showing nothing, with nothing saying why. Without a deployment
+ * key there is nothing to read it with, so nothing is stored.
+ */
+export async function saveLastfmNameAction(
+    rawName: unknown
+): Promise<{ error?: string; name?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+
+    const parsed = lastfmNameSchema.safeParse(rawName);
+    if (!parsed.success)
+        return issue(parsed.error.issues[0]?.message, "connections.errors.lastfmNameShape");
+
+    const t = await getTranslations("account");
+    const apiKey = await lastfmApiKey();
+    if (!apiKey) return { error: t("connections.errors.lastfmUnavailable") };
+    try {
+        await readLastfmPlaying(apiKey, parsed.data);
+    } catch (caught) {
+        if (caught instanceof LastfmUnknownUser)
+            return { error: t("connections.errors.lastfmUnknown") };
+        if (caught instanceof LastfmKeyRefused)
+            return { error: t("connections.errors.lastfmUnavailable") };
+        return { error: t("connections.errors.lastfmUnreachable") };
+    }
+
+    try {
+        const saved = await saveTypedConnection(user.id, "lastfm", parsed.data);
+        revalidatePath(CONNECTIONS_PATH);
+        return { name: saved.label };
+    } catch (caught) {
+        if (caught instanceof ConnectionLimitError) return { error: caught.message };
+        console.error("typed Last.fm name not saved:", caught);
+        return { error: t("connections.errors.usernameNotSaved") };
+    }
+}
+
 /** Forget one linked account. */
 export async function disconnectAccountAction(connectionId: string): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -227,10 +291,12 @@ export async function disconnectAccountAction(connectionId: string): Promise<{ e
     if (blocked) return localized({ error: blocked });
 
     const parsed = connectionIdSchema.safeParse(connectionId);
-    if (!parsed.success) return { error: (await getTranslations("account"))("connections.errors.unknownAccount") };
+    if (!parsed.success)
+        return { error: (await getTranslations("account"))("connections.errors.unknownAccount") };
 
     const removed = await deleteConnection(user.id, parsed.data);
-    if (!removed) return { error: (await getTranslations("account"))("connections.errors.notLinked") };
+    if (!removed)
+        return { error: (await getTranslations("account"))("connections.errors.notLinked") };
     revalidatePath(CONNECTIONS_PATH);
     return {};
 }

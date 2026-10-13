@@ -33,6 +33,7 @@ const db = vi.hoisted(() => ({
 }));
 
 const crmHost = vi.hoisted(() => ({
+    crmReach: vi.fn(async () => ({ notes: true, tasks: true })),
     crmNoteShelves: vi.fn(async (): Promise<unknown> => [{ id: null, name: "" }]),
     crmNotesByIds: vi.fn(async (_actor: unknown, ids: string[]) =>
         ids.map((id) => ({
@@ -125,12 +126,29 @@ describe("notes and tasks on a record", () => {
     });
 
     it("offers a reader who may not edit nowhere to add, and no notes without Notes", async () => {
-        crmHost.crmNoteShelves.mockResolvedValueOnce(null);
+        crmHost.crmReach.mockResolvedValueOnce({ notes: false, tasks: true });
         const opened = await activities.openActivities(actorWith(reader), "companies", RECORD);
         expect(opened.notes).toBeNull();
         expect(opened.noteShelves).toEqual([]);
         expect(opened.taskLists).toEqual([]);
+        expect(crmHost.crmNotesByIds).not.toHaveBeenCalled();
+        expect(crmHost.crmNoteShelves).not.toHaveBeenCalled();
         expect(crmHost.taskListsFor).not.toHaveBeenCalled();
+    });
+
+    it("leaves tasks out, rather than empty, for a reader without Tasks", async () => {
+        crmHost.crmReach.mockResolvedValueOnce({ notes: true, tasks: false });
+        db.crmLink.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ targetId: TASK }]);
+        const opened = await activities.openActivities(actorWith(allowed), "companies", RECORD);
+        expect(opened.tasks).toBeNull();
+        expect(crmHost.tasksByIds).not.toHaveBeenCalled();
+    });
+
+    it("offers no Notes shelf to an editor without Notes", async () => {
+        crmHost.crmReach.mockResolvedValueOnce({ notes: false, tasks: true });
+        const opened = await activities.openActivities(actorWith(allowed), "companies", RECORD);
+        expect(opened.notes).toBeNull();
+        expect(opened.noteShelves).toEqual([]);
     });
 
     it("writes a note in Notes and links it", async () => {

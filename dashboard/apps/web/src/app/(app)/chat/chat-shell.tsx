@@ -139,7 +139,10 @@ function ChatColumns({ children }: { children: ReactNode }) {
             {/* The column of spaces stays on a phone while the list is showing,
                 and steps aside with it once a conversation is open - on a narrow
                 screen the conversation gets the whole width. */}
-            <div className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 shrink-0`}>
+            <div
+                data-tour="chat.spaces"
+                className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 shrink-0`}
+            >
                 <ServerRail />
             </div>
             {/* The width rides a custom property rather than the class, because
@@ -150,6 +153,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 the last message arrived, the unread count - went off it. */}
             <div
                 ref={measure}
+                data-tour="chat.conversations"
                 style={{ "--chat-list": `${drawn}px` } as CSSProperties}
                 className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-r border-border md:w-[var(--chat-list)] md:flex-none`}
             >
@@ -169,6 +173,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 className="hidden md:block"
             />
             <div
+                data-tour="chat.conversation"
                 className={`${inConversation ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}
             >
                 {children}

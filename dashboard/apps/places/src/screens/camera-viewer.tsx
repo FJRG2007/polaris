@@ -57,6 +57,7 @@ import {
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
 import {
     captureFrame,
+    codedShape,
     lastFrame,
     nextTransport,
     preferredTransport,
@@ -67,6 +68,7 @@ import {
 } from "../lib/player";
 import { playLive } from "../lib/live-player";
 import { useReconnect } from "./use-reconnect";
+import { streamBox, streamShape, viewerFrame } from "../lib/viewer-shape";
 
 /**
  * Paced by arrival rather than by a clock, so a slow link stretches the gap
@@ -210,9 +212,11 @@ export function CameraViewer({
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. */
     const [shape, setShape] = useState<number | null>(null);
+    const sizeLogged = useRef(false);
     /** The shape of the surface they are drawn in, measured rather than assumed:
-     *  it is `aspect-video` in the dialog and the whole screen in fullscreen, and
-     *  a box placed against the wrong one of those is a box in the wrong place. */
+     *  in the dialog it follows the picture's own shape (see `viewerFrame`), and
+     *  in fullscreen it is the whole screen - a box placed against the wrong one
+     *  of those is a box in the wrong place. */
     const [surfaceShape, setSurfaceShape] = useState<number | null>(null);
 
     // Only this one: the wall behind the dialog has stopped asking for its own.
@@ -467,11 +471,44 @@ export function CameraViewer({
         else void frame.current?.requestFullscreen().catch(() => setFull(false));
     };
 
-    const surface = full ? "h-dvh object-contain" : "aspect-video object-contain";
+    // The box is the picture's own shape, measured, so neither the still nor
+    // the stream is ever drawn with bands down its sides; 16:9 until measured.
+    const framed = viewerFrame(shape);
+    const surface = full ? "h-dvh object-contain" : "object-contain";
+    const surfaceStyle = full ? undefined : { aspectRatio: framed.aspectRatio };
+
+    /** The stream's own shape, read off its decoded frames as they arrive and
+     *  whenever it changes in-band - never off `videoWidth`/`videoHeight` alone,
+     *  which a camera declaring the wrong pixel shape turns into a stretched box
+     *  (see `streamShape`). Logged once beside the still's so a live check can
+     *  tell what the camera really sends. */
+    const measureVideo = (element: HTMLVideoElement) => {
+        const { videoWidth, videoHeight } = element;
+        if (videoWidth <= 0 || videoHeight <= 0) return;
+        const coded = codedShape(element);
+        // Before its first frame the element has only its own report to give;
+        // the frame follows at once (`onLoadedData`) and is the better one.
+        if (coded === null && element.readyState < 2) return;
+        const picture = still.current;
+        const stillShape =
+            picture && picture.naturalWidth > 0 && picture.naturalHeight > 0
+                ? picture.naturalWidth / picture.naturalHeight
+                : null;
+        setShape(streamShape(stillShape, coded, { width: videoWidth, height: videoHeight }));
+        if (sizeLogged.current || coded === null) return;
+        sizeLogged.current = true;
+        console.debug(
+            `[camera-viewer] video ${videoWidth}x${videoHeight} (decoded shape ${coded.toFixed(3)}), still ${picture?.naturalWidth ?? 0}x${picture?.naturalHeight ?? 0}`
+        );
+    };
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-5xl p-0" showClose={!full}>
+            <DialogContent
+                className="max-w-5xl p-0"
+                style={full ? undefined : { maxWidth: framed.maxWidth }}
+                showClose={!full}
+            >
                 <DialogTitle className="sr-only">{camera.name}</DialogTitle>
                 <div
                     ref={holdFrame}
@@ -538,6 +575,7 @@ export function CameraViewer({
                                 surface,
                                 playing && !held && "invisible"
                             )}
+                            style={surfaceStyle}
                             onLoad={(loaded) => {
                                 setDrawn(true);
                                 const shownSrc = loaded.currentTarget.getAttribute("src");
@@ -576,11 +614,14 @@ export function CameraViewer({
                                         ? undefined
                                         : streamSrc(camera.id, "main", transport)
                                 }
+                                // Its own measured shape, centred, and filled
+                                // exactly: the browser's idea of the stream's
+                                // shape is the one that can be wrong.
                                 className={cn(
-                                    "absolute inset-0 w-full bg-black",
-                                    surface,
+                                    "absolute inset-0 m-auto bg-black object-fill",
                                     (!playing || held) && "invisible"
                                 )}
+                                style={streamBox(shape)}
                                 autoPlay={!paused}
                                 muted={muted}
                                 playsInline
@@ -590,11 +631,13 @@ export function CameraViewer({
                                 onLoadStart={stirred}
                                 onLoadedMetadata={(loaded) => {
                                     stirred();
-                                    const { videoWidth, videoHeight } = loaded.currentTarget;
-                                    if (videoWidth > 0 && videoHeight > 0) {
-                                        setShape(videoWidth / videoHeight);
-                                    }
+                                    measureVideo(loaded.currentTarget);
                                 }}
+                                // The first decoded frame, which is what the
+                                // shape is measured from.
+                                onLoadedData={(loaded) => measureVideo(loaded.currentTarget)}
+                                // A stream can change size in-band; the box follows.
+                                onResize={(resized) => measureVideo(resized.currentTarget)}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
                                 onPlaying={() => {

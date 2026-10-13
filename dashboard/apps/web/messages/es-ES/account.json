@@ -350,7 +350,8 @@
             "taken": "Esa cuenta ya está vinculada a otra cuenta de Polaris.",
             "limit": "Ya has vinculado tantas cuentas de ese servicio como se te permite.",
             "unavailable": "Este Polaris todavía no puede conectar ese servicio.",
-            "error": "El servicio no ha completado la autorización. No has hecho nada mal: este Polaris ya ha avisado a sus administradores."
+            "error": "El servicio no ha completado la autorización. No has hecho nada mal: este Polaris ya ha avisado a sus administradores.",
+            "errorReason": "El servicio rechazó la autorización: {reason}"
         },
         "ofLimit": "{count} de {limit}",
         "badges": {
@@ -403,6 +404,13 @@
             "username": "Usuario",
             "hint": "Java Edition: de 3 a 16 letras, números o guiones bajos."
         },
+        "lastfm": {
+            "changeTitle": "Cambiar tu usuario de Last.fm",
+            "typeTitle": "Escribe tu usuario de Last.fm",
+            "description": "El nombre que aparece en la dirección de tu perfil de Last.fm. Para registrar lo que escuchas en Spotify, abre Last.fm -> Settings -> Applications y pulsa Connect junto a Spotify Scrobbling.",
+            "username": "Usuario",
+            "hint": "Letras, números, guiones o guiones bajos."
+        },
         "token": {
             "accessToken": "Token de acceso",
             "title": "Conectar {provider} con un token",
@@ -421,7 +429,23 @@
             "checkUsername": "Revisa el usuario y reinténtalo",
             "usernameNotSaved": "No se ha podido guardar el nombre de usuario. Vuelve a intentarlo.",
             "unknownAccount": "Cuenta desconocida",
-            "notLinked": "Esa cuenta no está vinculada a tu perfil"
+            "notLinked": "Esa cuenta no está vinculada a tu perfil",
+            "typeLastfmName": "Escribe tu usuario de Last.fm",
+            "lastfmNameShape": "Letras, números, guiones o guiones bajos, entre 2 y 64.",
+            "lastfmUnknown": "Last.fm no tiene ninguna cuenta con ese usuario. Compáralo con la dirección de tu perfil.",
+            "lastfmUnavailable": "Last.fm aún no está configurado en este Polaris. Pide a un administrador que añada una clave de API de Last.fm en Integraciones.",
+            "lastfmUnreachable": "No se pudo contactar con Last.fm. Inténtalo de nuevo en un momento."
+        },
+        "enterUsername": "Escribe tu usuario",
+        "ownApp": {
+            "errors": {
+                "clientIdRequired": "Pega el client id",
+                "clientIdShape": "El client id son letras y números, tal como lo muestra Spotify.",
+                "secretRequired": "Pega el secreto",
+                "secretShape": "El secreto son letras y números, tal como lo muestra Spotify.",
+                "refused": "Spotify no aceptó ese client id y secreto. Cópialos de nuevo desde Basic Information de la app.",
+                "unreachable": "No se pudo contactar con Spotify. Inténtalo de nuevo en un momento."
+            }
         }
     },
     "details": {

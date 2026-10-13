@@ -81,7 +81,7 @@ export function TrashDialog(props: TrashDialogProps) {
             });
             if (!ok) return;
         }
-        const kept = rows;
+        const at = (rows ?? []).findIndex((one) => one.id === record.id);
         setRows((before) => (before ?? []).filter((one) => one.id !== record.id));
         setTotal((count) => count - 1);
         const call = forever ? actions.destroyRecordsAction : actions.restoreRecordsAction;
@@ -93,7 +93,11 @@ export function TrashDialog(props: TrashDialogProps) {
                 });
             })
             .catch((caught) => {
-                setRows(kept);
+                setRows((before) => {
+                    const list = (before ?? []).filter((one) => one.id !== record.id);
+                    list.splice(at < 0 ? 0 : Math.min(at, list.length), 0, record);
+                    return list;
+                });
                 setTotal((count) => count + 1);
                 toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
             });
@@ -101,7 +105,10 @@ export function TrashDialog(props: TrashDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={(next) => !next && props.onClose()}>
-            <DialogContent aria-describedby={undefined} className="flex max-h-[85dvh] flex-col sm:max-w-lg">
+            <DialogContent
+                aria-describedby={undefined}
+                className="flex max-h-[85dvh] flex-col sm:max-w-lg"
+            >
                 <DialogHeader>
                     <DialogTitle>{t("trashView.title")}</DialogTitle>
                 </DialogHeader>
@@ -109,7 +116,10 @@ export function TrashDialog(props: TrashDialogProps) {
                     {rows === null && !error ? (
                         <div className="flex flex-col gap-2 py-2" aria-hidden>
                             {[0, 1, 2].map((at) => (
-                                <span key={at} className="block h-8 animate-pulse rounded bg-muted" />
+                                <span
+                                    key={at}
+                                    className="block h-8 animate-pulse rounded bg-muted"
+                                />
                             ))}
                         </div>
                     ) : rows && rows.length === 0 ? (
@@ -119,9 +129,15 @@ export function TrashDialog(props: TrashDialogProps) {
                             {(rows ?? []).map((record) => {
                                 const name = recordName(object, record) || t("record.untitled");
                                 return (
-                                    <li key={record.id} className="flex min-w-0 items-center gap-2 py-2">
+                                    <li
+                                        key={record.id}
+                                        className="flex min-w-0 items-center gap-2 py-2"
+                                    >
                                         <div className="flex min-w-0 flex-1 flex-col">
-                                            <span className="truncate text-[0.8125rem] font-medium" title={name}>
+                                            <span
+                                                className="truncate text-[0.8125rem] font-medium"
+                                                title={name}
+                                            >
                                                 {name}
                                             </span>
                                             {record.deletedAt ? (
@@ -167,7 +183,12 @@ export function TrashDialog(props: TrashDialogProps) {
                     ) : null}
                 </div>
                 {rows && rows.length < total ? (
-                    <Button variant="ghost" size="sm" disabled={loading} onClick={() => load(rows.length)}>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={loading}
+                        onClick={() => load(rows.length)}
+                    >
                         {t("trashView.more")}
                     </Button>
                 ) : null}

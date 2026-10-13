@@ -47,7 +47,8 @@ export const placesExtension: AppExtension = {
         {
             key: "home-warm",
             // A minute. It only tops up and lets go - a relay already holding
-            // the right cameras is asked one question and told nothing.
+            // the right cameras is asked one question and told nothing - and it
+            // is also what restarts a relay whose camera connection stalled.
             everyMs: Number(process.env.POLARIS_HOME_WARM_MS) || MINUTE,
             // Leased: two runners telling the same relay to warm the same camera
             // is the camera dropped and dialled twice.
@@ -100,6 +101,11 @@ export const placesExtension: AppExtension = {
                   }
                 : {})
         })),
+
+    // Uninstalling with the data deletes the footage files too, not only the
+    // rows that point at them.
+    purgeInstallFiles: async (installedAppId) =>
+        (await import("./recording")).deleteInstallFootage(installedAppId),
 
     onBoot: () => {
         // Bring Places' own containers - the camera relay, the vision worker, the

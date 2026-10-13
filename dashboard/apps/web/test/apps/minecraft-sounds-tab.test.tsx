@@ -6,7 +6,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const SERVER = "00000000-0000-4000-8000-0000000000a1";
 
@@ -28,6 +28,11 @@ vi.mock("@polaris/app-host/client", async () => {
         }
     };
 });
+const livePlayers = vi.fn(async () => ({
+    players: [{ name: "PlayerOne", state: "loaded" }],
+    total: 1
+}));
+
 vi.mock("@polaris-app/game-servers/src/screens/installed/sounds-actions", () => ({
     soundsAction: () =>
         new Promise((resolve) => {
@@ -38,9 +43,10 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/sounds-actions", () => 
             running: true,
             loaded: true,
             sha1: "a".repeat(40),
-            players: [{ name: "Ana", state: "loaded" }]
+            counts: { online: 1, loaded: 1, pending: 0, refused: 0 }
         }
     }),
+    liveSoundPlayersAction: livePlayers,
     updateSoundAction: async () => ({}),
     deleteSoundAction: async () => ({}),
     saveSoundSettingsAction: async () => ({}),
@@ -127,6 +133,22 @@ describe("the Sounds tab", () => {
         );
         expect(screen.getByText("Winner")).toBeTruthy();
         expect(screen.getByText("Players' own arrival sounds")).toBeTruthy();
+    });
+
+    it("counts who has the pack, and reads the names only when asked", async () => {
+        livePlayers.mockClear();
+        draw();
+        answerView({ view: VIEW });
+        await waitFor(() =>
+            expect(screen.getByText("1 of 1 online have the sounds loaded.")).toBeTruthy()
+        );
+        expect(screen.queryByText("PlayerOne")).toBeNull();
+        expect(livePlayers).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "Show who" }));
+        expect(await screen.findByText("PlayerOne")).toBeTruthy();
+        expect(livePlayers).toHaveBeenCalledWith(
+            expect.objectContaining({ query: "", filter: "all", offset: 0, limit: 25 })
+        );
     });
 
     it("says plainly that Bedrock servers cannot play them", () => {

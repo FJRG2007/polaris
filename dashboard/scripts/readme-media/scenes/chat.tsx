@@ -94,6 +94,16 @@ export function chatActions(ctx: SceneContext, channelId: string) {
                 role: index === 0 ? "owner" : "member"
             }))
         }),
+        // The column beside a conversation: the same people, with Sam and Kenji
+        // away so the list shows both of its sections.
+        listRosterAction: () => ({
+            members: membersOf(ctx, channelId).map((one, index) => ({
+                userId: one.id,
+                name: one.name,
+                role: index === 0 ? "owner" : "member",
+                online: one.id !== TEAM.sam.id && one.id !== TEAM.kenji.id
+            }))
+        }),
         spaceEmojiAction: () => ({ list: spaceEmoji(ctx) }),
         profileAction: (_channel: string, userId: string) => ({
             profile: profileOf(ctx, userId)

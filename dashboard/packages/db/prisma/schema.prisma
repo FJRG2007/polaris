@@ -354,6 +354,7 @@ model User {
     activitySettings    UserActivitySettings?
     badgesSeen          UserBadgeSeen[]
     listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
+    ownOAuthApps        UserOAuthApp[]
     listenedAlongWith   SpotifyListenAlong[] @relation("ListenAlongHost")
     mailAccounts        MailAccount[]
     mailLabels          MailLabel[]
@@ -9650,6 +9651,27 @@ model UserActivity {
 
     @@id([userId, source])
     @@index([expiresAt])
+}
+
+// An application somebody registered with a provider themselves, used for their
+// own links instead of the deployment's. Spotify keeps an app in development
+// mode to five allowlisted people, and the app's owner is never one of the
+// five's problem: with their own app, they are the owner. The secret is
+// envelope-encrypted like a link's credential.
+model UserOAuthApp {
+    userId          String   @db.Uuid
+    // Which service: "spotify".
+    provider        String
+    clientId        String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, provider])
 }
 
 // One account's Spotify following another's: "Listen along".

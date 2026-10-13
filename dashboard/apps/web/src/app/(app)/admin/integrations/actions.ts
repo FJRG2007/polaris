@@ -343,13 +343,13 @@ export async function saveLicensedFilterAction(input: {
 export async function saveTenorAction(input: {
     enabled: boolean;
     apiKey?: string;
-    /** `tenor` or `giphy`. Anything else is refused rather than written: this
+    /** `tenor`, `giphy` or `lastfm`. Anything else is refused rather than written: this
      *  writes an integration row, and the slug is the row. */
     slug?: string;
 }): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
-    const slug = input.slug === "giphy" ? "giphy" : "tenor";
+    const slug = input.slug === "giphy" || input.slug === "lastfm" ? input.slug : "tenor";
     const apiKey = input.apiKey?.trim() ? input.apiKey.trim() : undefined;
     try {
         const existing = await getIntegrationState(slug);

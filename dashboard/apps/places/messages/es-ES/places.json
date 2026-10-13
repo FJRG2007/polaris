@@ -336,7 +336,7 @@
         "fullscreen": "Pantalla completa",
         "leaveFullscreen": "Salir de pantalla completa",
         "mute": "Silenciar",
-        "notAnswering": "Esta cámara no responde",
+        "notAnswering": "La cámara no envía imagen - reconectando",
         "pause": "Pausar",
         "picturesOnly": "Solo imágenes: la emisión en directo no ha arrancado<retry>Reintentar</retry>",
         "play": "Reproducir",

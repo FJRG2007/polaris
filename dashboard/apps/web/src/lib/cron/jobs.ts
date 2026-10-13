@@ -41,6 +41,7 @@ import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
+import { pollLastfm } from "@/lib/presence-activity/lastfm-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepStorageMoves } from "@/lib/storage-moves/service";
 import { sweepAppStorage } from "@/lib/storage-moves/app-storage";
@@ -76,6 +77,9 @@ async function syncTrackers(): Promise<number> {
     return ids.length;
 }
 
+/** Mailboxes the sweep works on at once. */
+const MAIL_SYNC_PARALLEL = 4;
+
 /**
  * Every mailbox due a pass, one each.
  *
@@ -83,10 +87,20 @@ async function syncTrackers(): Promise<number> {
  * one: somebody's expired password is not a reason for everybody else's mail to
  * stop arriving. `syncAccount` already answers rather than throwing, and the
  * catch here is the second line rather than the first.
+ *
+ * A few at a time rather than one after another: a server that sits on a
+ * command holds its connection for minutes, and in a single line every mailbox
+ * behind it waited that long too. `syncAccount` keeps one pass per mailbox.
  */
 async function syncMailboxes(): Promise<number> {
     const ids = await accountsToSync();
-    for (const id of ids) await syncAccount(id).catch(() => undefined);
+    const queue = [...ids];
+    const lane = async () => {
+        for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+            await syncAccount(id).catch(() => undefined);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(MAIL_SYNC_PARALLEL, queue.length) }, lane));
     return ids.length;
 }
 
@@ -398,6 +412,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // listen-along song on twice.
         leaseMs: 2 * MINUTE,
         run: () => pollSpotify()
+    },
+    {
+        key: "activity-lastfm",
+        // Every fifteen seconds, and each person is asked at most once in thirty
+        // (longer while nothing plays). Only people here, sharing music, with no
+        // Spotify link of their own. With no Last.fm key connected it reads one row.
+        everyMs: 15_000,
+        // Leased: two runners would ask Last.fm about everybody twice.
+        leaseMs: 2 * MINUTE,
+        run: () => pollLastfm()
     },
     {
         key: "service-desired-state",

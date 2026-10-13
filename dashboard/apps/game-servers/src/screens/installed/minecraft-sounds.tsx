@@ -22,6 +22,8 @@ import { SoundEditDialog, SoundPlayDialog } from "./sound-dialogs";
 import { EncodeError, toGameSound } from "../../lib/minecraft/sound-encode";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { LiveSounds, SoundEntry } from "../../lib/minecraft/sounds-service";
+import type { LiveSoundState } from "../../lib/minecraft/sounds-live";
+import { LiveSoundPlayers } from "./sounds-live-players";
 import {
     Copy,
     MoreHorizontal,
@@ -111,6 +113,8 @@ export function MinecraftSounds({
     const [heard, setHeard] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [live, setLive] = useState<LiveSounds | null>(null);
+    /** The list of who has the pack, read only once it is opened. */
+    const [showingWho, setShowingWho] = useState(false);
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
@@ -374,11 +378,9 @@ export function MinecraftSounds({
     const sounds = view?.library.sounds ?? [];
     const delivery = view?.delivery ?? null;
     const working = pending || busy !== null;
-    const online = live?.players.length ?? 0;
-    const loaded = live?.players.filter((one) => one.state === "loaded").length ?? 0;
-    const declined =
-        live?.players.filter((one) => one.state === "declined" || one.state === "failed").length ??
-        0;
+    const online = live?.counts.online ?? 0;
+    const loaded = live?.counts.loaded ?? 0;
+    const declined = live?.counts.refused ?? 0;
 
     return (
         <div className="flex flex-col gap-4">
@@ -463,25 +465,24 @@ export function MinecraftSounds({
                                         </p>
                                     ) : null}
                                     {online > 0 ? (
-                                        <ul className="flex flex-wrap gap-1">
-                                            {live.players.map((one) => (
-                                                <li key={one.name}>
-                                                    <Badge
-                                                        variant={
-                                                            one.state === "loaded"
-                                                                ? "success"
-                                                                : one.state === "pending"
-                                                                  ? "neutral"
-                                                                  : "danger"
-                                                        }
-                                                        className="max-w-40 truncate"
-                                                        title={`${one.name}: ${stateWords(one.state)}`}
-                                                    >
-                                                        {one.name} - {stateWords(one.state)}
-                                                    </Badge>
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        <Button
+                                            type="button"
+                                            size="xs"
+                                            variant="ghost"
+                                            className="self-start"
+                                            aria-expanded={showingWho}
+                                            onClick={() => setShowingWho((open) => !open)}
+                                        >
+                                            {showingWho
+                                                ? t("sounds.delivery.hideWho")
+                                                : t("sounds.delivery.showWho")}
+                                        </Button>
+                                    ) : null}
+                                    {online > 0 && showingWho ? (
+                                        <LiveSoundPlayers
+                                            installedAppId={installedAppId}
+                                            stateWords={stateWords}
+                                        />
                                     ) : null}
                                 </div>
                             ) : (
@@ -844,7 +845,7 @@ export function MinecraftSounds({
         </div>
     );
 
-    function stateWords(state: LiveSounds["players"][number]["state"]): string {
+    function stateWords(state: LiveSoundState): string {
         switch (state) {
             case "loaded":
                 return t("sounds.delivery.stateLoaded");

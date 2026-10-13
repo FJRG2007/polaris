@@ -37,6 +37,7 @@ export function MobileNav({ children }: { children: ReactNode }) {
         <Dialog open={open} onOpenChange={setOpen}>
             <button
                 type="button"
+                data-tour="shell.menu"
                 onClick={() => setOpen(true)}
                 aria-label={words.openNavigation}
                 className="-ml-1 grid size-9 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"

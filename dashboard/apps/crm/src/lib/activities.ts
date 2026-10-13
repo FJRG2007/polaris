@@ -101,17 +101,18 @@ export async function openActivities(
     });
     if (reached === 0) throw new CrmRefusal((await crmT())("errors.notFound"));
     const editing = actor.can[object].edit;
-    const [noteIds, taskIds, fileIds, shelves, lists, found] = await Promise.all([
+    const [noteIds, taskIds, fileIds, reach, shelves, lists, found] = await Promise.all([
         linkedIds(actor, object, recordId, "note"),
         linkedIds(actor, object, recordId, "task"),
         linkedIds(actor, object, recordId, "file"),
-        host.crmHost.crmNoteShelves(who(actor)),
+        host.crmHost.crmReach(who(actor)),
+        editing ? host.crmHost.crmNoteShelves(who(actor)) : Promise.resolve(null),
         editing ? host.crmHost.taskListsFor(who(actor)) : Promise.resolve(null),
         recordAddresses(actor, object, recordId)
     ]);
     const [notes, tasks, files, mail, events] = await Promise.all([
-        shelves ? host.crmHost.crmNotesByIds(who(actor), noteIds) : Promise.resolve(null),
-        host.crmHost.tasksByIds(who(actor), taskIds),
+        reach.notes ? host.crmHost.crmNotesByIds(who(actor), noteIds) : Promise.resolve(null),
+        reach.tasks ? host.crmHost.tasksByIds(who(actor), taskIds) : Promise.resolve(null),
         host.crmHost.crmDriveFiles(who(actor), fileIds),
         host.crmHost.crmMailWith(who(actor), found, ACTIVITY_LIMIT) as Promise<MailWith[] | null>,
         host.crmHost.crmEventsWith(who(actor), found, ACTIVITY_LIMIT) as Promise<
@@ -120,8 +121,8 @@ export async function openActivities(
     ]);
     return {
         notes: notes ? notes.map((note: LinkedNote) => ({ ...note })) : null,
-        noteShelves: editing ? (shelves ?? []) : [],
-        tasks: tasks.map(toTask),
+        noteShelves: editing && reach.notes ? (shelves ?? []) : [],
+        tasks: tasks ? tasks.map(toTask) : null,
         taskLists: (lists ?? []).map((list: { id: string; name: string; spaceName: string }) => ({
             id: list.id,
             name: list.name,

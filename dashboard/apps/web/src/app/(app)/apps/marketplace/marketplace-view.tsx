@@ -77,7 +77,7 @@ import { validationMessage } from "@/components/i18n/validation-message";
 type Words = NamespaceTranslator<"marketplace">;
 
 /** Each capability's badge, as `capabilities.<key>`. */
-const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
+export const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
     "messaging-hub": "capabilities.messagingHub",
     "messaging-channel": "capabilities.messagingChannel",
     "ai-assistant": "capabilities.aiAssistant",
@@ -92,7 +92,7 @@ const CAPABILITY_KEYS: Record<AppCapability, NamespaceKey<"marketplace">> = {
 /** An install's state, said as `statuses.<status>`; one a newer service adds shows as it came. */
 const STATUSES = new Set(["installing", "running", "stopped", "failed"]);
 
-function statusLabel(t: Words, status: string): string {
+export function statusLabel(t: Words, status: string): string {
     return STATUSES.has(status) ? t(`statuses.${status}` as NamespaceKey<"marketplace">) : status;
 }
 
@@ -108,10 +108,7 @@ export function MarketplaceView({
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
-    const router = useRouter();
     const [wizardApp, setWizardApp] = useState<AppManifest | null>(null);
-    const [installingId, setInstallingId] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [query, setQuery] = useState(initialQuery);
     // In the reader's words, so the cards and the search say what they read. An
     // app or a category named after a screen takes the rail's label for it.
@@ -124,35 +121,7 @@ export function MarketplaceView({
         [words, navLabel]
     );
 
-    /**
-     * One click installs the app the way its manifest describes it: on this
-     * server, with its own defaults, and it opens on the app afterwards. Anyone
-     * who wants a different server or NAS-backed storage has Configure, which is
-     * the same install with the choices exposed.
-     */
-    function install(app: AppManifest): void {
-        setError(null);
-        setInstallingId(app.id);
-        // The manifest as declared: the card is in the reader's words, the install
-        // is the same in every language.
-        void installAppAction(defaultInstallInput(findApp(app.id) ?? app))
-            .then((result) => {
-                if (result.error || !result.installedAppId) {
-                    setError(result.error ?? t("errors.install"));
-                    setInstallingId(null);
-                    return;
-                }
-                // An app that opens somewhere of its own usually adds itself to the
-                // switcher or a rail, and those are drawn by the layout - which a
-                // client navigation keeps. A full load brings them along.
-                if (app.opensAt) window.location.assign(app.opensAt);
-                else router.push(`/apps/installed/${result.installedAppId}`);
-            })
-            .catch(() => {
-                setError(t("errors.install"));
-                setInstallingId(null);
-            });
-    }
+    const { install, installingId, error } = useOneClickInstall();
 
     /** Everything on offer, in one list for the search. */
     const all = useMemo(() => groups.flatMap((group) => group.apps), [groups]);
@@ -243,6 +212,49 @@ export function MarketplaceView({
 }
 
 /**
+ * One click installs the app the way its manifest describes it: on this server,
+ * with its own defaults, and it opens on the app afterwards. Anyone who wants a
+ * different server or NAS-backed storage has Configure, which is the same
+ * install with the choices exposed. The grid and an app's own page share it.
+ */
+export function useOneClickInstall(): {
+    install: (app: AppManifest) => void;
+    installingId: string | null;
+    error: string | null;
+} {
+    const t = useTranslations("marketplace");
+    const router = useRouter();
+    const [installingId, setInstallingId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    function install(app: AppManifest): void {
+        setError(null);
+        setInstallingId(app.id);
+        // The manifest as declared: the card is in the reader's words, the install
+        // is the same in every language.
+        void installAppAction(defaultInstallInput(findApp(app.id) ?? app))
+            .then((result) => {
+                if (result.error || !result.installedAppId) {
+                    setError(result.error ?? t("errors.install"));
+                    setInstallingId(null);
+                    return;
+                }
+                // An app that opens somewhere of its own usually adds itself to the
+                // switcher or a rail, and those are drawn by the layout - which a
+                // client navigation keeps. A full load brings them along.
+                if (app.opensAt) window.location.assign(app.opensAt);
+                else router.push(`/apps/installed/${result.installedAppId}`);
+            })
+            .catch(() => {
+                setError(t("errors.install"));
+                setInstallingId(null);
+            });
+    }
+
+    return { install, installingId, error };
+}
+
+/**
  * Where Open goes for an app that is already installed.
  *
  * Usually the app's own page. An app that runs nothing says where it really
@@ -307,7 +319,7 @@ function ownInstalls(installed: readonly InstalledAppView[]): InstalledAppView[]
  * Nothing anybody made is deleted: the data stays for when the app comes back.
  * An app that runs things of its own says what happens to those.
  */
-function uninstallDescription(t: Words, catalogId: string, name: string): string {
+export function uninstallDescription(t: Words, catalogId: string, name: string): string {
     if (catalogId === "game-servers") return t("uninstall.games", { name });
     if (catalogId === "home") return t("uninstall.home", { name });
     return t("uninstall.other", { name });
@@ -421,7 +433,7 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
  * one when they do not, because "Polaris - published by Polaris" says nothing
  * twice.
  */
-function by(t: Words, from: { developer: string; distributor: string }): string {
+export function by(t: Words, from: { developer: string; distributor: string }): string {
     return from.developer === from.distributor
         ? t("card.by", { developer: from.developer })
         : t("card.byImage", { developer: from.developer, distributor: from.distributor });
@@ -458,7 +470,12 @@ function AppCard({
                 <div className="flex items-start gap-3">
                     <AppMark app={app} size={40} />
                     <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{app.name}</p>
+                        <Link
+                            href={`/apps/marketplace/${app.id}`}
+                            className="block truncate text-sm font-medium hover:underline"
+                        >
+                            {app.name}
+                        </Link>
                         {/* Who is behind it, in the line the category used to
                             have to itself. The category is a heading two inches
                             above; whose software this is was nowhere. */}
@@ -534,7 +551,7 @@ function AppCard({
     );
 }
 
-function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void }) {
+export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () => void }) {
     const t = useTranslations("marketplace");
     const tvalidation = useTranslations("validation");
     const tcommon = useTranslations("common");

@@ -23,16 +23,21 @@
 
 import { refusalOf } from "../refusal";
 import { useMail } from "../mail-shell";
-import { useEffect, useState } from "react";
+import { useMailStream } from "../use-mail-stream";
+import { useEffect, useRef, useState } from "react";
 import type { MailDraftView } from "@/lib/mailbox/compose";
 import { useDisplayFormat } from "@/components/display-format";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, EmptyState, cn, useToast } from "@polaris/ui";
-import { discardDraftAction, retrySendAction } from "../actions";
+import { discardDraftAction, listDraftsAction, retrySendAction } from "../actions";
 import { Pencil, RotateCcw, Send, Trash2, TriangleAlert } from "lucide-react";
 
-export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
+/** How long a burst of "sending" frames is waited out before the list is asked
+ *  for again: a queue sending five messages says so five times. */
+const SENDING_SETTLE_MS = 300;
+
+export function DraftsView({ drafts: initial }: { drafts: MailDraftView[] }) {
     const toast = useToast();
     const format = useDisplayFormat();
     const t = useTranslations("mail");
@@ -50,6 +55,36 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
      *  second message. The server refuses one anyway - the claim is on the row -
      *  and this is what stops the press looking like it did nothing. */
     const [retrying, setRetrying] = useState<string[]>([]);
+    /**
+     * The list, kept here rather than read from the page.
+     *
+     * A message sent from the composer leaves the queue on the server, which
+     * says so on the live channel - and this screen never listened, so a sent
+     * draft sat here until a reload. Each "sending" frame now asks for the list
+     * again, which is one query rather than the whole frame re-rendered.
+     */
+    const [drafts, setDrafts] = useState(initial);
+    useEffect(() => setDrafts(initial), [initial]);
+    const settling = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useMailStream((frame) => {
+        if (frame.kind !== "sending") return;
+        if (settling.current) clearTimeout(settling.current);
+        settling.current = setTimeout(() => {
+            settling.current = null;
+            void listDraftsAction()
+                .then(setDrafts)
+                .catch(() => {
+                    // The list stays as the server last said; the next frame
+                    // asks again.
+                });
+        }, SENDING_SETTLE_MS);
+    });
+    useEffect(
+        () => () => {
+            if (settling.current) clearTimeout(settling.current);
+        },
+        []
+    );
     // The server's own list has moved: whatever this was standing in for is
     // either in it or gone from it.
     useEffect(() => setDiscarded([]), [drafts]);

@@ -113,6 +113,18 @@ describe("InventoryGrid", () => {
         expect(markup).not.toContain("waiting for them to join");
     });
 
+    it("lets the nine-wide rows shrink to a phone while the small sections keep their floor", () => {
+        // A floor on a nine-column row pushed the ninth slot out of a 390px dialog.
+        // The worn and offhand sections are narrow enough to keep theirs.
+        const markup = renderToStaticMarkup(<InventoryGrid items={[]} />);
+        const templates = [...markup.matchAll(/grid-template-columns:([^;"]+)/g)].map((m) => m[1]);
+        const nine = templates.filter((value) => value.startsWith("repeat(9,"));
+        expect(nine.length).toBeGreaterThan(0);
+        for (const value of nine) expect(value.startsWith("repeat(9, minmax(0, 1fr))")).toBe(true);
+        expect(templates).toContain("repeat(4, minmax(2.25rem, 1fr))");
+        expect(templates).toContain("repeat(1, minmax(2.25rem, 1fr))");
+    });
+
     it("says so when the bag is empty, instead of showing a wall of nothing", () => {
         const markup = renderToStaticMarkup(<InventoryGrid items={[]} />);
         expect(markup).toContain("Nothing in it.");

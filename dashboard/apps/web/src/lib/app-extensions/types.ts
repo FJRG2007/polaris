@@ -106,6 +106,11 @@ export interface AppExtension {
     /** When one of its installs is started by hand. */
     readonly afterStart?: (installedAppId: string) => Promise<void>;
 
+    /** Before an install's data is purged: remove the files it wrote outside the
+     *  database (recordings, pictures), while the rows that find them still exist.
+     *  Throws when any file could not be removed, so those rows are kept. */
+    readonly purgeInstallFiles?: (installedAppId: string) => Promise<void>;
+
     /**
      * A container was found running under one of its services that is recorded
      * as stopped. True when the app takes the service as running again - its own

@@ -11,7 +11,8 @@
         "heading": {
             "spotify": "Listening to Spotify",
             "minecraft": "Playing on a server here",
-            "playing": "Playing"
+            "playing": "Playing",
+            "music": "Listening to music"
         },
         "by": "by {artist}",
         "on": "on {album}",
@@ -20,7 +21,9 @@
         "short": {
             "listening": "Listening to {name}",
             "playing": "Playing {name}"
-        }
+        },
+        "openInSpotify": "Play in Spotify",
+        "fromStart": "Starts from the beginning, not in step with them."
     },
     "activityTable": {
         "when": "When",

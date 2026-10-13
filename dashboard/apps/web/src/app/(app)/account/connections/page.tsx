@@ -9,18 +9,28 @@
  */
 
 import { getTranslations } from "@/lib/i18n/request";
-import { requireUser } from "@/lib/session";
+import { requireUser, sessionCan } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
-import { connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
+import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
+import { connectionFailure } from "@/lib/connections/attention";
+import {
+    connectionLinkAvailable,
+    linkScopesSatisfied,
+    missingLinkScopes
+} from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConnectionsPage() {
     const user = await requireUser();
     const t = await getTranslations("account");
-    const linked = await listConnections(user.id);
+    const [linked, lastfmReady, canConfigure] = await Promise.all([
+        listConnections(user.id),
+        lastfmApiKey().then((key) => key !== null),
+        sessionCan(user, "settings.manage")
+    ]);
 
     const providers = await Promise.all(
         CONNECTION_PROVIDERS.map(async (provider) => ({
@@ -35,7 +45,11 @@ export default async function ConnectionsPage() {
             tokenUrl: provider.tokenUrl,
             // Offered whether or not the operator has connected the application
             // behind the verified link: typing a name needs nothing from them.
-            acceptsTypedName: provider.acceptsTypedName ?? false,
+            // Except Last.fm, whose name is only worth typing once the operator
+            // has added the key it is read with; until then the card says so.
+            acceptsTypedName:
+                (provider.acceptsTypedName ?? false) && (provider.slug !== "lastfm" || lastfmReady),
+            typedOnly: provider.typedOnly ?? false,
             requires: provider.requires,
             limit: await connectionLimit(provider.slug),
             // Whether the operator has connected the application this authorizes
@@ -43,11 +57,20 @@ export default async function ConnectionsPage() {
             // is no screen worth sending anybody to, so the card says what to ask
             // for instead of offering a button that fails. An administrator is
             // offered it anyway: theirs is the authorization that proves it.
-            canAuthorize: await connectionLinkAvailable(provider.slug, { admin: user.isAdmin }),
+            canAuthorize: await connectionLinkAvailable(provider.slug, {
+                admin: user.isAdmin,
+                userId: user.id
+            }),
             // Whether the operator allows this service as a way in. Without it,
             // the card says nothing about signing in rather than pointing at a
             // switch that would do nothing.
             canSignIn: await connectionSignInAllowed(provider.slug),
+            // Only whoever configures integrations can act on why the provider
+            // refused, and only they are shown it; everybody else is told the
+            // administrators know.
+            ...(canConfigure
+                ? { lastFailure: (await connectionFailure(provider.slug))?.reason }
+                : {}),
             accounts: linked
                 .filter((account) => account.provider === provider.slug)
                 .map((account) => ({
@@ -66,7 +89,9 @@ export default async function ConnectionsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("connections.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("connections.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("connections.page.intro")}</p>
             </div>
             <ConnectionsView providers={providers} />

@@ -172,3 +172,26 @@ export function captureFrame(video: HTMLVideoElement): string | null {
         return null;
     }
 }
+
+/**
+ * The shape of the pixels a video is actually decoding, width over height.
+ *
+ * Not `videoWidth / videoHeight`: those apply whatever pixel shape the stream
+ * declares, and a camera that declares a wrong one is reported - and drawn - at
+ * the wrong shape. The decoded frame's visible area is the picture as sent.
+ * Null before the first frame, or where the browser cannot hand one over.
+ */
+export function codedShape(video: HTMLVideoElement): number | null {
+    if (typeof VideoFrame === "undefined" || video.readyState < 2) return null;
+    let frame: VideoFrame | null = null;
+    try {
+        frame = new VideoFrame(video);
+        const width = frame.visibleRect?.width ?? frame.codedWidth;
+        const height = frame.visibleRect?.height ?? frame.codedHeight;
+        return width > 0 && height > 0 ? width / height : null;
+    } catch {
+        return null;
+    } finally {
+        frame?.close();
+    }
+}

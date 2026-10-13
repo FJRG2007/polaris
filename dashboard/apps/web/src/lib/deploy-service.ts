@@ -31,7 +31,8 @@ import { projectEntryWhere } from "./deploy-project-access";
 import { releaseEnvFor, releaseImageFor } from "./app-extensions/registry";
 import { findApp } from "@/lib/apps/catalog";
 import { speaksHttp } from "@/lib/deploy/portless";
-import { noteAppDeleted } from "@/lib/deploy/host-resources";
+import { removeHostVolume } from "@/lib/deploy/host-volumes";
+import { appDataVolumeNames, noteAppDeleted } from "@/lib/deploy/host-resources";
 import { LocalRouter, type AppRoute } from "./deploy/router";
 import { memberOrgIds, orgIdsWhere } from "./orgs/org-service";
 import { resolveServiceReferences } from "./deploy/references";
@@ -2385,18 +2386,30 @@ export async function removeApplicationDeployment(
  * and everything scoped to it. Domains and volumes cascade on the row delete;
  * deployments and env vars are polymorphic (no FK), so they are removed by hand.
  */
-export async function deleteApplication(applicationId: string, ownerId: string): Promise<void> {
+export async function deleteApplication(
+    applicationId: string,
+    ownerId: string,
+    options?: { deleteData?: boolean }
+): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true, environmentId: true, volumes: { select: { id: true } } }
+        select: {
+            id: true,
+            environmentId: true,
+            volumes: { select: { id: true } },
+            target: { select: { id: true, kind: true } }
+        }
     });
     if (!app) throw new Error("Application not found");
+    const deleteData = options?.deleteData === true;
 
-    // Destroying the data is opt-in per project. It has to happen while the
-    // container is still up - that is the only way in to the volume - so it runs
-    // before the deployment comes down, not after.
+    // Destroying the data is opt-in per project, or confirmed by whoever is
+    // deleting it. It has to happen while the container is still up - that is the
+    // only way in to the volume - so it runs before the deployment comes down.
     const flags = await getFlagsForEnvironment(app.environmentId);
-    if (flags.wipeVolumesOnDelete) {
+    // The Docker volumes it used, named before the rows that name them go.
+    const dataVolumes = deleteData ? await appDataVolumeNames(applicationId) : [];
+    if (flags.wipeVolumesOnDelete || deleteData) {
         for (const volume of app.volumes) {
             await wipeVolume(volume.id, ownerId).catch(() => undefined);
         }
@@ -2410,6 +2423,16 @@ export async function deleteApplication(applicationId: string, ownerId: string):
         where: { deployableType: "application", deployableId: applicationId }
     });
     await prisma.envVar.deleteMany({ where: { scopeType: "application", scopeId: applicationId } });
+    // Polymorphic like the env vars: a firewall rule for a service that no longer
+    // exists guards nothing, and would be read back onto a new service given the id.
+    await prisma.wafRule.deleteMany({
+        where: { scopeType: "application", scopeId: applicationId }
+    });
+    if (deleteData) {
+        await prisma.analyticsSite.deleteMany({
+            where: { scopeType: "application", scopeId: applicationId }
+        });
+    }
     await prisma.application.delete({ where: { id: applicationId } });
     // The folder it was built from, when it was uploaded rather than cloned.
     await sourceUpload.forgetUploadedSources(applicationId).catch(() => undefined);
@@ -2419,6 +2442,47 @@ export async function deleteApplication(applicationId: string, ownerId: string):
     // longer exists answers for the hostname as an app that is merely down. Resynced
     // here so a deleted app's name goes back to being an unclaimed one.
     await syncAppRoutes().catch(() => undefined);
+    // The emptied volumes themselves, now nothing is attached to them. Each goes
+    // through `removeHostVolume`'s own checks; one it refuses is left for the
+    // leftover-volume sweep rather than failing a delete that already happened.
+    if (dataVolumes.length === 0) return;
+    if (app.target?.kind === "local") {
+        for (const name of dataVolumes) {
+            const result = await removeHostVolume(name).catch(() => null);
+            if (!result?.ok)
+                console.error(`polaris: volume ${name} was left for the leftover sweep`);
+        }
+    } else if (app.target) {
+        await removeServerVolumes(app.target.id, ownerId, dataVolumes);
+    }
+}
+
+/**
+ * A deleted app's emptied volumes on another server, removed over its own
+ * connection. Best effort like the local removal: the app is already gone, and a
+ * volume the server refuses is named in the log rather than failing that.
+ */
+async function removeServerVolumes(
+    targetId: string,
+    ownerId: string,
+    names: readonly string[]
+): Promise<void> {
+    const target = await prisma.deployTarget.findFirst({ where: { id: targetId, ownerId } });
+    if (!target) return;
+    const ports = await getPorts(target as TargetRow, ownerId).catch(() => null);
+    if (!ports?.removeVolume) {
+        await ports?.dispose();
+        return;
+    }
+    try {
+        for (const name of names) {
+            await ports.removeVolume(name).catch((error: unknown) => {
+                console.error(`polaris: volume ${name} was left on its server:`, error);
+            });
+        }
+    } finally {
+        await ports.dispose();
+    }
 }
 
 /**

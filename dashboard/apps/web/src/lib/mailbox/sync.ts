@@ -37,7 +37,7 @@ import { applyRulesToMessage, filterHeaderNames } from "./rules";
 import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
-import { recordAccountState } from "./accounts";
+import { recordAccountAttempt, recordAccountState } from "./accounts";
 import { confirmedGone, missingFromWindow, nextCursor } from "./folder-window";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
@@ -47,7 +47,7 @@ import { MailUnreachableError, withImap } from "./imap";
 import { readShape, type MessageShape } from "./structure";
 import { reconcileAttachments } from "./attachment-rows";
 import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
-import { mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
+import { failureIsNews, mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
 
 /** How many messages of a folder are held. Four hundred is roughly two years of
@@ -151,6 +151,11 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
     // and that is worse than any amount of mail arriving late.
     if (!mayTryMailbox(account, { force })) return;
 
+    // Where the pass was when it failed, for the log line: "Socket timeout" on
+    // its own does not say whether it was the login, the folder list or one
+    // folder's fetch that the server sat on.
+    const started = Date.now();
+    let step = "connecting";
     try {
         // Read before the pass rather than during it, so every folder decides
         // against the same line. Mail arriving in the meantime is newer than the
@@ -159,6 +164,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         // reads the edge again, settles it.
         const edge = await bodyWindowEdge(account.id);
         await withImap(account, async (client) => {
+            step = "listing folders";
             await syncFolders(client, account.id);
             const folders = await prisma.mailFolder.findMany({
                 where: { accountId: account.id }
@@ -166,6 +172,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             folders.sort((left, right) => syncRank(left.role) - syncRank(right.role));
             for (const folder of folders) {
                 if (!worthSyncing(folder)) continue;
+                step = `folder ${folder.role}`;
                 await syncFolder(client, account, folder, edge);
             }
         });
@@ -183,7 +190,8 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         // same refusal a second time.
         else if (account.state === "auth") {
             await recordCredentialRefusal(accountId, account.stateDetail);
-        } else await recordAccountState(accountId, "unreachable");
+        } else if (failureIsNews(account)) await recordAccountState(accountId, "unreachable");
+        else await recordAccountAttempt(accountId);
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
             // and internal paths, so they never reach the screen.
@@ -197,6 +205,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             console.warn(
                 "mail sync failed",
                 accountId,
+                `${step} after ${Math.round((Date.now() - started) / 1000)}s:`,
                 caught instanceof MailUnreachableError
                     ? caught.detail || caught.message
                     : caught instanceof Error
