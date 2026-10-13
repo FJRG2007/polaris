@@ -269,6 +269,15 @@ describe("the port-80 forwarder", () => {
         expect(script.indexOf("TCP4-LISTEN:80")).toBeGreaterThan(own80);
     });
 
+    it("keeps the listener's pid in the shell, so its watch loop has something to watch", () => {
+        // Without a separator, `pid=$!` is an environment prefix on the next
+        // command: the shell's $pid stays empty, `kill -0` fails on the first
+        // check, and the forwarder restarts every fifteen seconds forever.
+        const script = forwarderScript(3000);
+        expect(script).toMatch(/& pid=\$!; /);
+        expect(script).toContain("kill -0 $pid");
+    });
+
     it("renders as a shared namespace for a server reached over SSH", () => {
         const yaml = renderComposeYaml(withPortForwarders(named(), 3000), "/v", "/m");
         expect(yaml).toContain('    network_mode: "service:shop-api-abcd"\n');

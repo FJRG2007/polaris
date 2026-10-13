@@ -91,7 +91,7 @@ export function forwarderScript(port: number): string {
     return [
         `until ${listening(port)}; do sleep 1; ${alive}; done;`,
         `if ${listening(PORTLESS_PORT)}; then while sleep 15; do ${alive}; done; fi;`,
-        `socat TCP4-LISTEN:${PORTLESS_PORT},fork,reuseaddr ${target} & pid=$!`,
+        `socat TCP4-LISTEN:${PORTLESS_PORT},fork,reuseaddr ${target} & pid=$!;`,
         `socat TCP6-LISTEN:${PORTLESS_PORT},fork,reuseaddr,ipv6only=1 ${target} 2>/dev/null &`,
         `while sleep 15; do kill -0 $pid 2>/dev/null || exit 1; ${alive}; done`
     ].join(" ");
