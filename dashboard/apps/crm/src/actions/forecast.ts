@@ -9,6 +9,7 @@ import * as forecast from "../lib/forecast";
 import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { forecastInputSchema, oddsSchema, type Forecast, type Odds } from "../model/forecast";
+import { stageFlowInputSchema, type StageFlow } from "../model/stage-flow";
 
 export interface ForecastReading {
     readonly forecast: Forecast;
@@ -33,5 +34,13 @@ export async function saveOddsAction(input: unknown): Promise<Outcome<{ odds: Od
     if (!parsed.success) return invalid();
     return outcome(async () => ({
         odds: await forecast.saveOdds(await requireCrmActor(), parsed.data)
+    }));
+}
+
+export async function stageFlowAction(input: unknown): Promise<Outcome<{ flow: StageFlow }>> {
+    const parsed = stageFlowInputSchema.safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        flow: await forecast.stageFlow(await requireCrmActor(), parsed.data)
     }));
 }

@@ -12886,8 +12886,10 @@ model CrmOpportunity {
     amountCurrency   String    @default("")
     // A calendar day, stored at midnight UTC.
     closeDate        DateTime?
-    // new | screening | meeting | proposal | customer (apps/crm model/objects).
+    // new | screening | meeting | proposal | customer | lost (apps/crm model/objects).
     stage            String    @default("new")
+    // Why it was won or lost, as somebody wrote it.
+    closeReason      String    @default("")
     companyId        String?   @db.Uuid
     pointOfContactId String?   @db.Uuid
     ownerId          String?   @db.Uuid

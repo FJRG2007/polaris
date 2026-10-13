@@ -56,7 +56,7 @@ describe("readFilter", () => {
             rules: [
                 rule("stage", "isAnyOf", [
                     { id: "proposal", name: "" },
-                    { id: "lost", name: "" }
+                    { id: "closed", name: "" }
                 ])
             ]
         });

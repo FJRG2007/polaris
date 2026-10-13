@@ -7,7 +7,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-    crmOpportunity: { groupBy: vi.fn(async (): Promise<unknown[]> => []) },
+    crmOpportunity: {
+        groupBy: vi.fn(async (): Promise<unknown[]> => []),
+        findMany: vi.fn(async (): Promise<unknown[]> => [])
+    },
+    crmEvent: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     crmForecast: {
         findUnique: vi.fn(async (): Promise<unknown> => null),
         upsert: vi.fn(async () => ({}))
@@ -62,6 +66,7 @@ describe("forecast", () => {
         expect(call.where).toMatchObject({ orgId: "o1", deletedAt: null });
         expect(call.where).not.toHaveProperty("ownerId");
         expect(call.where.AND).toEqual([
+            { stage: { not: "lost" } },
             { OR: [{ closeDate: null }, { closeDate: { lt: new Date("2027-01-01T00:00:00Z") } }] },
             {
                 OR: [
@@ -117,5 +122,51 @@ describe("saveOdds", () => {
             forecast.saveOdds(actor(can(true, false)), DEFAULT_ODDS)
         ).rejects.toBeInstanceOf(CrmRefusal);
         expect(db.crmForecast.upsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("stage flow", () => {
+    it("reads the newest deals, their stage moves and won or lost reasons, on this shelf", async () => {
+        db.crmOpportunity.findMany.mockResolvedValueOnce([
+            { id: "d1", stage: "customer", createdAt: new Date("2026-09-01T00:00:00Z") }
+        ]);
+        db.crmOpportunity.groupBy.mockResolvedValueOnce([
+            { stage: "customer", closeReason: "Price", _count: { _all: 1 } }
+        ]);
+        db.crmEvent.findMany.mockResolvedValueOnce([
+            {
+                recordId: "d1",
+                createdAt: new Date("2026-09-11T00:00:00Z"),
+                changes: JSON.stringify([{ key: "stage", before: "new", after: "customer" }])
+            }
+        ]);
+        const flow = await forecast.stageFlow(actor(), { mine: true });
+        const deals = (db.crmOpportunity.findMany.mock.calls[0] as unknown as [
+            { where: Record<string, unknown> }
+        ])[0];
+        expect(deals.where).toMatchObject({ orgId: "o1", deletedAt: null, ownerId: "u1" });
+        const events = (db.crmEvent.findMany.mock.calls[0] as unknown as [
+            { where: Record<string, unknown> }
+        ])[0];
+        expect(events.where).toMatchObject({
+            orgId: "o1",
+            object: "opportunities",
+            recordId: { in: ["d1"] }
+        });
+        expect(flow.won).toBe(1);
+        expect(flow.winRate).toBe(100);
+        expect(flow.steps.find((step) => step.stage === "new")).toMatchObject({
+            reached: 1,
+            won: 1,
+            averageDays: 10
+        });
+        expect(flow.wonReasons).toEqual([{ reason: "Price", deals: 1 }]);
+    });
+
+    it("is refused to a role that may not read opportunities", async () => {
+        await expect(forecast.stageFlow(actor(can(false)), { mine: false })).rejects.toBeInstanceOf(
+            CrmRefusal
+        );
+        expect(db.crmOpportunity.findMany).not.toHaveBeenCalled();
     });
 });

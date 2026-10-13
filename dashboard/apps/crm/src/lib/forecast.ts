@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import * as model from "../model/forecast";
+import * as flow from "../model/stage-flow";
 import { ownClause, requireCan, requireShown, shelfData, shelfWhere, type CrmActor } from "./access";
 
 /** Groups a forecast reads at most; past this it says it is incomplete. */
@@ -71,6 +72,7 @@ export async function forecast(
                 deletedAt: null,
                 ...(input.mine ? { ownerId: actor.user.id } : {}),
                 AND: [
+                    { stage: { not: "lost" } },
                     { OR: [{ closeDate: null }, { closeDate: { lt: end } }] },
                     { OR: [{ stage: { not: model.WON_STAGE } }, { closeDate: { gte: start } }] },
                     ...(own ? [own] : [])
@@ -95,5 +97,72 @@ export async function forecast(
         range,
         input.granularity,
         capped
+    );
+}
+
+/** The most deals, and stage moves, one reading of the stage flow counts. */
+export const FLOW_DEALS = 2_000;
+export const FLOW_EVENTS = 20_000;
+
+/** How deals moved through the stages, and why they were won or lost. Reads
+ *  the newest deals only, flagged when there are more. */
+export async function stageFlow(
+    actor: CrmActor,
+    input: { mine: boolean }
+): Promise<flow.StageFlow> {
+    await requireCan(actor, "opportunities", "read");
+    await requireShown(actor, "opportunities", ["stage"]);
+    const own = ownClause(actor, "opportunities");
+    const where = {
+        ...shelfWhere(actor.shelf),
+        deletedAt: null,
+        ...(input.mine ? { ownerId: actor.user.id } : {}),
+        ...(own ? { AND: [own] } : {})
+    };
+    const reasonShown = !(actor.rules?.opportunities.hidden ?? []).includes("closeReason");
+    const [deals, reasons] = await Promise.all([
+        prisma.crmOpportunity.findMany({
+            where,
+            orderBy: { id: "desc" },
+            take: FLOW_DEALS + 1,
+            select: { id: true, stage: true, createdAt: true }
+        }),
+        reasonShown
+            ? (prisma.crmOpportunity.groupBy({
+                  by: ["stage", "closeReason"],
+                  where: { ...where, stage: { in: [model.WON_STAGE, flow.LOST_STAGE] } },
+                  _count: { _all: true },
+                  orderBy: [{ stage: "asc" }, { closeReason: "asc" }],
+                  take: ROW_CAP
+              }) as unknown as Promise<
+                  { stage: string; closeReason: string; _count: { _all: number } }[]
+              >)
+            : Promise.resolve([])
+    ]);
+    const kept = deals.slice(0, FLOW_DEALS);
+    const events = kept.length
+        ? await prisma.crmEvent.findMany({
+              where: {
+                  ...shelfWhere(actor.shelf),
+                  object: "opportunities",
+                  recordId: { in: kept.map((deal) => deal.id) },
+                  changes: { contains: '"key":"stage"' }
+              },
+              orderBy: { id: "asc" },
+              take: FLOW_EVENTS + 1,
+              select: { recordId: true, createdAt: true, changes: true }
+          })
+        : [];
+    return flow.buildStageFlow(
+        kept,
+        events
+            .slice(0, FLOW_EVENTS)
+            .map((event) => ({ recordId: event.recordId, at: event.createdAt, changes: event.changes })),
+        reasons.map((row) => ({
+            stage: row.stage,
+            reason: row.closeReason,
+            deals: row._count._all
+        })),
+        deals.length > FLOW_DEALS || events.length > FLOW_EVENTS
     );
 }

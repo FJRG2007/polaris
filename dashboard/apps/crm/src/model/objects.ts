@@ -101,8 +101,16 @@ export function fieldsOf(object: CrmObject, custom: readonly FieldDef[] = []): r
     return custom.length === 0 ? FIELDS[object] : [...FIELDS[object], ...custom];
 }
 
-/** An opportunity's stages, first to last. A board draws one column each. */
-export const OPPORTUNITY_STAGES = ["new", "screening", "meeting", "proposal", "customer"] as const;
+/** An opportunity's stages, first to last. A board draws one column each.
+ *  "customer" is won and "lost" is lost (model/forecast, model/stage-flow). */
+export const OPPORTUNITY_STAGES = [
+    "new",
+    "screening",
+    "meeting",
+    "proposal",
+    "customer",
+    "lost"
+] as const;
 
 export type OpportunityStage = (typeof OPPORTUNITY_STAGES)[number];
 
@@ -169,6 +177,7 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "company", kind: "relation", target: "companies", width: 190 },
         { key: "pointOfContact", kind: "relation", target: "people", width: 190 },
         { key: "owner", kind: "member", width: 170 },
+        { key: "closeReason", kind: "text", width: 200, hiddenByDefault: true },
         CREATED,
         UPDATED,
         CREATED_BY,

@@ -60,7 +60,8 @@
             "createdAt": "Created",
             "updatedAt": "Updated",
             "createdBy": "Created by",
-            "updatedBy": "Last updated by"
+            "updatedBy": "Last updated by",
+            "closeReason": "Won or lost because"
         }
     },
     "options": {
@@ -70,7 +71,8 @@
                 "screening": "Screening",
                 "meeting": "Meeting",
                 "proposal": "Proposal",
-                "customer": "Customer"
+                "customer": "Customer",
+                "lost": "Lost"
             }
         }
     },
@@ -735,7 +737,23 @@
         "oddsSaved": "Stage odds saved",
         "wonAlways": "{stage} counts as won, in full.",
         "save": "Save",
-        "close": "Close"
+        "close": "Close",
+        "flow": {
+            "title": "How deals move",
+            "winRate": "{rate}% won: {won} won, {lost} lost",
+            "noneDecided": "No deal won or lost yet",
+            "stage": "Stage",
+            "reached": "Reached",
+            "now": "There now",
+            "stay": "Average stay",
+            "converted": "Won from here",
+            "days": "{count, plural, one {# day} other {# days}}",
+            "wonReasons": "Why deals were won",
+            "lostReasons": "Why deals were lost",
+            "none": "None yet",
+            "noReason": "No reason given",
+            "capped": "Only the newest 2,000 deals are counted here."
+        }
     },
     "roles": {
         "title": "Roles",

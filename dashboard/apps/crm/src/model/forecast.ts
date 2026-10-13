@@ -17,10 +17,15 @@ import { OPPORTUNITY_STAGES, type OpportunityStage } from "./objects";
 /** The stage a deal is won at. */
 export const WON_STAGE: OpportunityStage = "customer";
 
-/** The stages still in play, first to last. */
-export const OPEN_STAGES = OPPORTUNITY_STAGES.filter((stage) => stage !== WON_STAGE);
+/** The stage a deal is lost at: out of every forecast. */
+const LOST: OpportunityStage = "lost";
 
-export type OpenStage = Exclude<OpportunityStage, typeof WON_STAGE>;
+/** The stages still in play, first to last. */
+export const OPEN_STAGES = OPPORTUNITY_STAGES.filter(
+    (stage): stage is OpenStage => stage !== WON_STAGE && stage !== LOST
+);
+
+export type OpenStage = Exclude<OpportunityStage, typeof WON_STAGE | "lost">;
 
 export type Odds = Readonly<Record<OpenStage, number>>;
 
@@ -161,6 +166,7 @@ export function buildForecast(
     const used = new Map<string, number>();
     const first = range.starts[0]!;
     for (const row of rows) {
+        if (row.stage === LOST) continue;
         const open = row.stage !== WON_STAGE;
         let period: ForecastPeriod | undefined;
         if (row.closeDate === null) {

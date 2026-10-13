@@ -161,7 +161,8 @@ describe("a split", () => {
                 { key: "screening", label: null, value: 0 },
                 { key: "meeting", label: null, value: 4 },
                 { key: "proposal", label: null, value: 0 },
-                { key: "customer", label: null, value: 0 }
+                { key: "customer", label: null, value: 0 },
+                { key: "lost", label: null, value: 0 }
             ],
             other: null,
             capped: false

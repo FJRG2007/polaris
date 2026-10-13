@@ -17,6 +17,7 @@ import * as model from "../model/forecast";
 import { fieldOf } from "../model/objects";
 import { ChartColors } from "./widget-charts";
 import { optionLabel } from "./custom-fields";
+import { StageFlowPanel } from "./stage-flow-panel";
 import * as actions from "../actions/forecast";
 import { hostUi } from "@polaris/app-host/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -362,6 +363,7 @@ export function ForecastScreen() {
                 </Button>
             </div>
             {body}
+            {mounted ? <StageFlowPanel mine={choice.mine} /> : null}
             {editingOdds && data ? (
                 <OddsDialog
                     odds={data.odds}

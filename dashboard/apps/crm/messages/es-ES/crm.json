@@ -60,7 +60,8 @@
             "createdAt": "Creado",
             "updatedAt": "Editado",
             "createdBy": "Creado por",
-            "updatedBy": "Actualizado por"
+            "updatedBy": "Actualizado por",
+            "closeReason": "Motivo de ganar o perder"
         }
     },
     "options": {
@@ -70,7 +71,8 @@
                 "screening": "Filtrado",
                 "meeting": "Reunión",
                 "proposal": "Propuesta",
-                "customer": "Cliente"
+                "customer": "Cliente",
+                "lost": "Perdida"
             }
         }
     },
@@ -735,7 +737,23 @@
         "oddsSaved": "Cambios guardados",
         "wonAlways": "{stage} cuenta como ganado, entero.",
         "save": "Guardar",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "flow": {
+            "title": "Cómo avanzan los tratos",
+            "winRate": "{rate}% ganados: {won} ganados, {lost} perdidos",
+            "noneDecided": "Aún no se ha ganado ni perdido ningún trato",
+            "stage": "Etapa",
+            "reached": "Llegaron",
+            "now": "Ahora",
+            "stay": "Estancia media",
+            "converted": "Ganados desde aquí",
+            "days": "{count, plural, one {# día} other {# días}}",
+            "wonReasons": "Por qué se ganaron",
+            "lostReasons": "Por qué se perdieron",
+            "none": "Ninguno aún",
+            "noReason": "Sin motivo",
+            "capped": "Aquí solo cuentan los 2.000 tratos más recientes."
+        }
     },
     "roles": {
         "title": "Roles",

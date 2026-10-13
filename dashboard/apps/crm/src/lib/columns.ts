@@ -95,6 +95,7 @@ export const COLUMNS: Readonly<Record<CrmObject, Readonly<Record<string, ColumnS
             target: "people"
         },
         owner: user("ownerId", "owner"),
+        closeReason: scalar("closeReason"),
         ...COMMON
     }
 };
