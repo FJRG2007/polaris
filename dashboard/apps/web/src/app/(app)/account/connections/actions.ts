@@ -14,7 +14,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
-import { minecraftNameSchema } from "@polaris/core";
+import { lastfmNameSchema, minecraftNameSchema } from "@polaris/core";
+import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
+import { LastfmKeyRefused, LastfmUnknownUser, readLastfmPlaying } from "@/lib/connections/lastfm";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { readGithubAccount } from "@/lib/github-service";
 import { awsIdentity } from "@/lib/integrations/aws-api";
@@ -217,6 +219,44 @@ export async function saveMinecraftNameAction(rawName: unknown): Promise<{ error
         }
         console.error("typed Minecraft name not saved:", caught);
         return { error: (await getTranslations("account"))("connections.errors.usernameNotSaved") };
+    }
+}
+
+/**
+ * Say what one's Last.fm username is, so the song they scrobble shows beside
+ * their name.
+ *
+ * Asked of Last.fm before it is stored: a name with a typo would otherwise sit
+ * on the card showing nothing, with nothing saying why. Without a deployment
+ * key there is nothing to read it with, so nothing is stored.
+ */
+export async function saveLastfmNameAction(rawName: unknown): Promise<{ error?: string; name?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+
+    const parsed = lastfmNameSchema.safeParse(rawName);
+    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.errors.lastfmNameShape");
+
+    const t = await getTranslations("account");
+    const apiKey = await lastfmApiKey();
+    if (!apiKey) return { error: t("connections.errors.lastfmUnavailable") };
+    try {
+        await readLastfmPlaying(apiKey, parsed.data);
+    } catch (caught) {
+        if (caught instanceof LastfmUnknownUser) return { error: t("connections.errors.lastfmUnknown") };
+        if (caught instanceof LastfmKeyRefused) return { error: t("connections.errors.lastfmUnavailable") };
+        return { error: t("connections.errors.lastfmUnreachable") };
+    }
+
+    try {
+        const saved = await saveTypedConnection(user.id, "lastfm", parsed.data);
+        revalidatePath(CONNECTIONS_PATH);
+        return { name: saved.label };
+    } catch (caught) {
+        if (caught instanceof ConnectionLimitError) return { error: caught.message };
+        console.error("typed Last.fm name not saved:", caught);
+        return { error: t("connections.errors.usernameNotSaved") };
     }
 }
 

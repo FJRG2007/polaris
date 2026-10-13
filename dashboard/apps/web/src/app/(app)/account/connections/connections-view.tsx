@@ -13,7 +13,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
-import { connectionSections, minecraftNameSchema, type ConnectionCategory } from "@polaris/core";
+import { connectionSections, lastfmNameSchema, minecraftNameSchema, type ConnectionCategory } from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -23,6 +23,7 @@ import {
     connectAwsAction,
     connectTokenAction,
     disconnectAccountAction,
+    saveLastfmNameAction,
     saveMinecraftNameAction
 } from "./actions";
 import {
@@ -74,6 +75,8 @@ export interface ConnectionProviderCard {
     /** Whether a name may be typed instead of proved. Such a link is shown as not
      *  verified, and a proved account replaces it. */
     acceptsTypedName?: boolean;
+    /** A typed name is the only way this one is linked, so it is never "not verified". */
+    typedOnly?: boolean;
     /** What the operator has to connect first, for the card that cannot offer one. */
     requires: string;
     /** How many accounts of this service the person may link. */
@@ -270,7 +273,7 @@ function ProviderCard({
                                         {t("connections.badges.token")}
                                     </Badge>
                                 ) : null}
-                                {provider.acceptsTypedName ? (
+                                {provider.acceptsTypedName && !provider.typedOnly ? (
                                     account.method === "manual" ? (
                                         <Badge
                                             variant="warning"
@@ -416,7 +419,7 @@ function ProviderCard({
                                 onClick={() => setTyping(true)}
                             >
                                 <Pencil className="size-4" />
-                                {t("connections.typeUsername")}
+                                {provider.typedOnly ? t("connections.enterUsername") : t("connections.typeUsername")}
                             </Button>
                         ) : null}
                         {!canAdd && (provider.canAuthorize || provider.acceptsToken) ? (
@@ -469,8 +472,9 @@ function ProviderCard({
                 />
             ) : null}
 
-            {typing && provider.slug === "minecraft" ? (
-                <MinecraftNameDialog
+            {typing && (provider.slug === "minecraft" || provider.slug === "lastfm") ? (
+                <TypedNameDialog
+                    kind={provider.slug}
                     current={typed?.label ?? null}
                     onClose={() => setTyping(false)}
                     onDone={() => {
@@ -649,11 +653,19 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
  * wrong, so it says nothing until there is something to judge, and saving the
  * name that is already there is not offered.
  */
-function MinecraftNameDialog({
+/** What each service that takes a typed name checks it with and saves it through. */
+const TYPED_NAMES = {
+    minecraft: { schema: minecraftNameSchema, save: (name: string) => saveMinecraftNameAction(name), maxLength: 32, example: "Steve" },
+    lastfm: { schema: lastfmNameSchema, save: (name: string) => saveLastfmNameAction(name), maxLength: 64, example: "listener_01" }
+} as const;
+
+function TypedNameDialog({
+    kind,
     current,
     onClose,
     onDone
 }: {
+    kind: keyof typeof TYPED_NAMES;
     /** The name typed before, when this is a change. */
     current: string | null;
     onClose: () => void;
@@ -665,10 +677,14 @@ function MinecraftNameDialog({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const checked = minecraftNameSchema.safeParse(name);
+    // A schema names its complaint by catalog key or, the older ones, in English.
+    const said = (message: string | undefined) =>
+        message && t.has(message) ? t(message as Parameters<typeof t>[0]) : message;
+    const typed = TYPED_NAMES[kind];
+    const checked = typed.schema.safeParse(name);
     const problem =
         name.trim().length > 0 && !checked.success
-            ? (checked.error.issues[0]?.message ?? null)
+            ? (said(checked.error.issues[0]?.message) ?? null)
             : null;
     const unchanged = checked.success && checked.data === current;
 
@@ -677,7 +693,7 @@ function MinecraftNameDialog({
         setError(null);
         startTransition(async () => {
             const result = await runAction(
-                () => saveMinecraftNameAction(checked.data),
+                () => typed.save(checked.data),
                 (message) => setError(message)
             );
             if (!result) return;
@@ -694,9 +710,9 @@ function MinecraftNameDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {current ? t("connections.minecraft.changeTitle") : t("connections.minecraft.typeTitle")}
+                        {current ? t(`connections.${kind}.changeTitle`) : t(`connections.${kind}.typeTitle`)}
                     </DialogTitle>
-                    <DialogDescription>{t("connections.minecraft.description")}</DialogDescription>
+                    <DialogDescription>{t(`connections.${kind}.description`)}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-2"
@@ -705,27 +721,26 @@ function MinecraftNameDialog({
                         submit();
                     }}
                 >
-                    <label className="text-sm font-medium" htmlFor="minecraft-name">
-                        {t("connections.minecraft.username")}
+                    <label className="text-sm font-medium" htmlFor={`${kind}-name`}>
+                        {t(`connections.${kind}.username`)}
                     </label>
                     <Input
-                        id="minecraft-name"
+                        id={`${kind}-name`}
                         autoFocus
                         autoComplete="off"
                         spellCheck={false}
-                        maxLength={32}
+                        maxLength={typed.maxLength}
                         value={name}
-                        // i18n-ignore: an example player name
-                        placeholder="Steve"
+                        placeholder={typed.example}
                         aria-invalid={problem ? true : undefined}
-                        aria-describedby="minecraft-name-hint"
+                        aria-describedby={`${kind}-name-hint`}
                         onChange={(event) => setName(event.target.value)}
                     />
                     <p
-                        id="minecraft-name-hint"
+                        id={`${kind}-name-hint`}
                         className={`text-xs ${problem ? "text-danger" : "text-muted-foreground"}`}
                     >
-                        {problem ?? t("connections.minecraft.hint")}
+                        {problem ?? t(`connections.${kind}.hint`)}
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </form>

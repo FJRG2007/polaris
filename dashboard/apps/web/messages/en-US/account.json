@@ -403,6 +403,13 @@
             "username": "Username",
             "hint": "Java Edition: 3 to 16 letters, numbers or underscores."
         },
+        "lastfm": {
+            "changeTitle": "Change your Last.fm username",
+            "typeTitle": "Enter your Last.fm username",
+            "description": "The name in your Last.fm profile address. To scrobble from Spotify, open Last.fm -> Settings -> Applications and press Connect next to Spotify Scrobbling.",
+            "username": "Username",
+            "hint": "Letters, numbers, hyphens or underscores."
+        },
         "token": {
             "accessToken": "Access token",
             "title": "Connect {provider} with a token",
@@ -421,8 +428,14 @@
             "checkUsername": "Check the username and try again",
             "usernameNotSaved": "Could not save the username. Try again.",
             "unknownAccount": "Unknown account",
-            "notLinked": "That account is not linked to your profile"
-        }
+            "notLinked": "That account is not linked to your profile",
+            "typeLastfmName": "Type your Last.fm username",
+            "lastfmNameShape": "Letters, numbers, hyphens or underscores, 2 to 64 of them.",
+            "lastfmUnknown": "Last.fm has no account with that username. Check it against your profile address.",
+            "lastfmUnavailable": "Last.fm is not set up on this Polaris yet. Ask an administrator to add a Last.fm API key under Integrations.",
+            "lastfmUnreachable": "Last.fm could not be reached. Try again in a moment."
+        },
+        "enterUsername": "Enter your username"
     },
     "details": {
         "page": {

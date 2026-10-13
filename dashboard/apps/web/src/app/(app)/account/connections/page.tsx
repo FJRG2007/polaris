@@ -13,6 +13,7 @@ import { requireUser } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
+import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
 import { connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,10 @@ export const dynamic = "force-dynamic";
 export default async function ConnectionsPage() {
     const user = await requireUser();
     const t = await getTranslations("account");
-    const linked = await listConnections(user.id);
+    const [linked, lastfmReady] = await Promise.all([
+        listConnections(user.id),
+        lastfmApiKey().then((key) => key !== null)
+    ]);
 
     const providers = await Promise.all(
         CONNECTION_PROVIDERS.map(async (provider) => ({
@@ -35,7 +39,11 @@ export default async function ConnectionsPage() {
             tokenUrl: provider.tokenUrl,
             // Offered whether or not the operator has connected the application
             // behind the verified link: typing a name needs nothing from them.
-            acceptsTypedName: provider.acceptsTypedName ?? false,
+            // Except Last.fm, whose name is only worth typing once the operator
+            // has added the key it is read with; until then the card says so.
+            acceptsTypedName:
+                (provider.acceptsTypedName ?? false) && (provider.slug !== "lastfm" || lastfmReady),
+            typedOnly: provider.typedOnly ?? false,
             requires: provider.requires,
             limit: await connectionLimit(provider.slug),
             // Whether the operator has connected the application this authorizes
