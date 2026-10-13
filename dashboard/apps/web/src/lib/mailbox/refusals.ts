@@ -90,7 +90,9 @@ export function isCredentialRefusal(caught: unknown): boolean {
     const failure = caught as MailFailureShape;
 
     const imapCode =
-        typeof failure.serverResponseCode === "string" ? failure.serverResponseCode.toUpperCase() : "";
+        typeof failure.serverResponseCode === "string"
+            ? failure.serverResponseCode.toUpperCase()
+            : "";
     if (TEMPORARY_CODES.has(imapCode)) return false;
     if (REFUSAL_CODES.has(imapCode)) return true;
 

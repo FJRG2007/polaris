@@ -25,7 +25,7 @@ stream from it waits forever for a keyframe that is never coming. Replacing
 or deleting the relay's record of that stream does not close the underlying
 connection - the relay only forgets the name - and most cameras cap how many
 sessions they will hold open at once, so the still-open stalled one is what
-then made the camera refuse the *next* connection too.
+then made the camera refuse the _next_ connection too.
 
 On top of that, nothing paced how often a frame was asked for. Every tile
 and wall refresh fired its own request at `/api/frame.jpeg`, and the relay

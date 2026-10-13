@@ -16,7 +16,9 @@ describe("fading past days", () => {
     });
 
     it("stays off for a document saved while the old default was on", () => {
-        expect(readPreferences(JSON.stringify({ dimPast: true, showTasks: true })).fadePast).toBe(false);
+        expect(readPreferences(JSON.stringify({ dimPast: true, showTasks: true })).fadePast).toBe(
+            false
+        );
     });
 
     it("is on for somebody who turned it on", () => {

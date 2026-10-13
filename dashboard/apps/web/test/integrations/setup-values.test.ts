@@ -11,7 +11,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/connections/oauth", () => ({
-    connectionCallbackUrl: (provider: string, baseUrl: string) => `${baseUrl}/api/connections/${provider}/callback`
+    connectionCallbackUrl: (provider: string, baseUrl: string) =>
+        `${baseUrl}/api/connections/${provider}/callback`
 }));
 
 import { INTEGRATIONS } from "@/lib/integrations/registry";
@@ -27,7 +28,10 @@ describe("setup values", () => {
             const values = setupValuesFor(entry.slug, common, { oauthApp: true, baseUrl: BASE });
             for (const step of entry.setupLinks ?? []) {
                 for (const kind of step.values ?? []) {
-                    expect(values[kind], `${entry.slug}: ${step.label} asks for ${kind}`).toBeTruthy();
+                    expect(
+                        values[kind],
+                        `${entry.slug}: ${step.label} asks for ${kind}`
+                    ).toBeTruthy();
                 }
             }
         }
@@ -38,7 +42,9 @@ describe("setup values", () => {
         expect(setupValuesFor("epic", common, { oauthApp: true, baseUrl: BASE }).redirectUri).toBe(
             `${BASE}/api/connections/epic/callback`
         );
-        expect(setupValuesFor("virustotal", common, { oauthApp: false, baseUrl: BASE }).redirectUri).toBeUndefined();
+        expect(
+            setupValuesFor("virustotal", common, { oauthApp: false, baseUrl: BASE }).redirectUri
+        ).toBeUndefined();
     });
 
     it("builds the public pages and the logo on this deployment's address", () => {
@@ -56,8 +62,16 @@ describe("setup values", () => {
         // a step that left any of them to be typed sends the operator to invent
         // one.
         const spotify = INTEGRATIONS.find((entry) => entry.slug === "spotify");
-        const values = setupValuesFor("spotify", commonSetupValues(BASE), { oauthApp: true, baseUrl: BASE });
-        expect(spotify?.setupLinks?.[0]?.values).toEqual(["appName", "appDescription", "homeUrl", "redirectUri"]);
+        const values = setupValuesFor("spotify", commonSetupValues(BASE), {
+            oauthApp: true,
+            baseUrl: BASE
+        });
+        expect(spotify?.setupLinks?.[0]?.values).toEqual([
+            "appName",
+            "appDescription",
+            "homeUrl",
+            "redirectUri"
+        ]);
         expect(values.appName).toBe("Polaris");
         expect(values.appDescription).toBe("Community platform");
     });
