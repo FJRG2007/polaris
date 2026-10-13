@@ -784,11 +784,23 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 body: t("errors.forbidden", { verb: "edit", object })
             });
         } else if (kind === "kanban") {
-            setBoardDraft(grouped.groups?.[0]?.value ?? null);
+            // A new card is made in a column, so with the board's field (and
+            // the name) it needs both to be changeable.
+            const lockedKey = [boardBy?.key, primary.key].find(
+                (key) => key && rule?.readOnly.includes(key)
+            );
+            if (lockedKey) {
+                toast.show({
+                    title: t("errors.notCreated"),
+                    body: t("errors.fieldLocked", { field: fieldName(lockedKey) })
+                });
+            } else {
+                setBoardDraft(grouped.groups?.[0]?.value ?? null);
+            }
         } else {
             setDrafting(true);
         }
-    }, [wantsNew, can, config, rows, canEdit, kind, grouped.groups, toast, t, object]);
+    }, [wantsNew, can, config, rows, canEdit, kind, grouped.groups, toast, t, object, boardBy, rule, primary, fieldName]);
     const boardable = views.groupFields(object, custom).length > 0;
     const narrowed = Boolean(search) || activeFilters > 0;
     const failure = (!opening.data && opening.error) || (readable && !rows && store.error) || null;
@@ -836,6 +848,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 groups={grouped.groups}
                 columns={columns}
                 canEdit={canEdit}
+                locked={rule?.readOnly}
                 people={people}
                 defaultCurrency={format.preferences.currency}
                 sorted={config.sorts.length > 0}

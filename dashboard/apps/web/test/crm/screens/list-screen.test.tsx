@@ -48,7 +48,8 @@ const state = vi.hoisted(() => ({
     trashed: [] as CrmRecord[],
     restores: [] as unknown[],
     favoriteViews: [] as string[],
-    pins: [] as unknown[]
+    pins: [] as unknown[],
+    rule: null as { rows: "all" | "own"; hidden: string[]; readOnly: string[] } | null
 }));
 
 vi.mock("next/navigation", () => ({
@@ -87,6 +88,7 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
                 can: abilities(),
                 people: [],
                 shelfName: state.shelfName,
+                rule: state.rule,
                 favoriteViews: state.favoriteViews
             };
         },
@@ -194,6 +196,7 @@ beforeEach(() => {
     state.madeViews = [];
     state.views = null;
     state.groups = [];
+    state.rule = null;
     state.shelfName = null;
     state.trashed = [];
     state.restores = [];
@@ -412,6 +415,44 @@ describe("a CRM list", () => {
         expect(state.moves[0]).toMatchObject({ id: ACME, key: "stage", value: "proposal" });
         const column = screen.getByRole("region", { name: "Proposal" });
         expect(column.textContent).toContain("Acme deal");
+    });
+
+    it("locks a board's cards where the reader's role may not change the stage", async () => {
+        window.history.replaceState(null, "", "/crm/opportunities?new=1");
+        state.rule = { rows: "all", hidden: [], readOnly: ["stage", "amount"] };
+        state.views = [
+            { id: VIEW_ID, name: "", kind: "kanban", config: defaultConfig("opportunities") }
+        ];
+        state.groups = [
+            {
+                value: "new",
+                records: [
+                    {
+                        id: ACME,
+                        position: 0,
+                        deletedAt: null,
+                        values: {
+                            name: "Acme deal",
+                            stage: "new",
+                            amount: { amount: 5, currency: "EUR" }
+                        }
+                    }
+                ],
+                total: 1
+            }
+        ];
+        render(<ListScreen object="opportunities" />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Acme deal")).toBeTruthy();
+        const card = screen.getByRole("article", { name: "Acme deal" });
+        expect(card.getAttribute("draggable")).toBe("false");
+        expect(screen.queryByRole("button", { name: "Move Acme deal" })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Add/ })).toBeNull();
+        // The name stays changeable; the locked amount does not open.
+        expect(within(card).getByLabelText("Name").getAttribute("tabindex")).toBe("0");
+        expect(within(card).getByLabelText("Amount").getAttribute("tabindex")).toBeNull();
+        // Asked for a new card, none opens (a toast says why).
+        await waitFor(() => expect(window.location.search).toBe(""));
+        expect(screen.getByRole("region", { name: "New" }).querySelector("input")).toBeNull();
     });
 
     it("saves the list as it is drawn now as a new named view", async () => {

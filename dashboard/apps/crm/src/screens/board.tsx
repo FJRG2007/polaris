@@ -60,6 +60,8 @@ export interface BoardProps {
     /** The view's visible columns: the fields a card shows, in order. */
     readonly columns: readonly ViewColumn[];
     readonly canEdit: boolean;
+    /** Fields the reader's role may see but not change. */
+    readonly locked?: readonly string[];
     readonly people: readonly Ref[];
     readonly defaultCurrency: string;
     /** Cards keep the sorted order, so a drop only changes the column. */
@@ -101,10 +103,16 @@ export function Board(props: BoardProps) {
         .filter((one): one is FieldDef => Boolean(one) && !one!.primary && one!.key !== field.key)
         .slice(0, CARD_FIELDS);
     const label = (value: string) => optionLabel(t, object, field, value);
+    const changeable = (one: FieldDef) =>
+        props.canEdit && !one.readOnly && !props.locked?.includes(one.key);
+    // A card changes column by changing the board's field, and a new card in a
+    // column is made with it (and named), so a locked one stops both.
+    const canMove = changeable(field);
+    const canAdd = canMove && changeable(primary);
     const byId = new Map(groups.flatMap((group) => group.rows).map((row) => [row.id, row]));
 
     const open = (record: CrmRecord, one: FieldDef) => {
-        if (!props.canEdit || one.readOnly) return;
+        if (!changeable(one)) return;
         if (one.kind === "boolean") {
             const next = !record.values[one.key];
             props.onEdit(record, one, next, next);
@@ -119,7 +127,7 @@ export function Board(props: BoardProps) {
         const active = editing?.id === record.id && editing.key === one.key;
         const close = () => setEditing(null);
         const Editor = active ? editorFor(one) : null;
-        const can = props.canEdit && !one.readOnly;
+        const can = changeable(one);
         return (
             <div
                 tabIndex={can ? 0 : undefined}
@@ -174,7 +182,7 @@ export function Board(props: BoardProps) {
     };
 
     const accepts = (event: DragEvent) =>
-        props.canEdit && event.dataTransfer.types.includes(CARD_DRAG);
+        canMove && event.dataTransfer.types.includes(CARD_DRAG);
 
     /** Where in a column a card would land: before the first card whose middle
      *  is below the pointer. */
@@ -236,7 +244,7 @@ export function Board(props: BoardProps) {
                             <span className="text-[0.75rem] tabular-nums text-muted-foreground">
                                 {group.total}
                             </span>
-                            {props.canEdit ? (
+                            {canAdd ? (
                                 <button
                                     type="button"
                                     className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
@@ -293,7 +301,7 @@ export function Board(props: BoardProps) {
                                         key={record.id}
                                         data-card={record.id}
                                         draggable={
-                                            props.canEdit && !pending && editing?.id !== record.id
+                                            canMove && !pending && editing?.id !== record.id
                                         }
                                         aria-label={name}
                                         onDragStart={(event) => {
@@ -307,7 +315,7 @@ export function Board(props: BoardProps) {
                                         }}
                                         className={cn(
                                             "group/card relative flex shrink-0 flex-col gap-1.5 rounded-md border border-border bg-card p-2.5 shadow-sm",
-                                            props.canEdit &&
+                                            canMove &&
                                                 !pending &&
                                                 "cursor-grab active:cursor-grabbing",
                                             dragging === record.id && "opacity-50",
@@ -342,7 +350,7 @@ export function Board(props: BoardProps) {
                                                     <ArrowUpRight className="size-3.5" />
                                                 </Link>
                                             )}
-                                            {props.canEdit && !pending ? (
+                                            {canMove && !pending ? (
                                                 <MoveMenu
                                                     label={label}
                                                     field={field}
