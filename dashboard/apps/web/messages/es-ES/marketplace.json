@@ -63,5 +63,25 @@
         "chooseNas": "Elige un NAS",
         "noNas": "Aún no hay conexiones NAS. Añade una antes en Drive.",
         "configuration": "Configuración"
+    },
+    "detail": {
+        "back": "Todas las apps",
+        "screenshots": "Capturas",
+        "screenshotAlt": "{name}, captura {index}",
+        "about": "Acerca de",
+        "features": "Qué hace",
+        "information": "Información",
+        "developer": "Desarrollador",
+        "category": "Categoría",
+        "version": "Versión",
+        "image": "Imagen",
+        "docs": "Documentación",
+        "installs": "Instaladas",
+        "readOnly": "Instalar apps requiere permiso para gestionar apps. Pídeselo a un administrador.",
+        "ownerOnly": "Solo quien instaló una app, o un administrador, puede desinstalarla.",
+        "deleteData": "Eliminar también sus datos",
+        "deleteDataWarning": "{name} se elimina con todo lo que contiene: sus volúmenes, ajustes y lo que se creó en ella. No se puede deshacer.",
+        "confirmDelete": "Desinstalar y eliminar datos",
+        "uninstallFailed": "No se pudo desinstalar la app. Inténtalo de nuevo."
     }
 }
