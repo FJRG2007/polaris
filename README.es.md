@@ -11,23 +11,28 @@
   <hr />
 </div>
 
-Polaris es un espacio de trabajo autoalojado para todo lo que gestionas tú mismo:
-tus archivos, tus servidores, las apps que despliegas en ellos, el trabajo que
-planificas a su alrededor y las personas con las que lo haces. Una instalación, un
-inicio de sesión y una interfaz.
+Polaris es una plataforma autoalojada para gestionar tus servidores y tu equipo
+desde un solo sitio: despliega apps y bases de datos en tus propias máquinas,
+gestiona archivos en todos tus NAS y nubes, aloja servidores de juegos y trabaja
+en equipo con chat, llamadas, tareas, calendario, correo y documentos.
 
-Después de instalarlo no hace falta una terminal: las actualizaciones, las funciones
-nuevas y las reparaciones se hacen desde la interfaz.
+Sustituye las herramientas sueltas que acaba teniendo un home lab o un equipo
+pequeño - despliegues, compartir archivos, gestor de contraseñas, monitorización,
+analítica, chat, gestor de tareas - por una sola instalación y unas mismas
+cuentas. Las apps comparten datos: una tarea enlaza el despliegue del que trata y
+un archivo de Drive se adjunta a un mensaje sin volver a subirlo.
+
+Después de instalarlo, las actualizaciones y los ajustes se hacen desde la
+interfaz web.
 
 La guía completa (qué incluye cada app, requisitos, uso y desarrollo) está en el
 [README en inglés](README.md).
 
 ## Un vistazo
 
-Cada imagen es la interfaz real, dibujada con sus propios componentes y datos
-inventados, y sigue tu ajuste claro u oscuro. Casi todas abren una página
-sobre su área con más imágenes y todo lo que hace. Las versiones para móvil
-están en [docs/assets/media](docs/assets/media).
+Capturas de la interfaz real con datos de ejemplo. Casi todas enlazan a una
+página con todas sus funciones. Las versiones para móvil están en
+[docs/assets/media](docs/assets/media).
 
 ### Hablar
 
