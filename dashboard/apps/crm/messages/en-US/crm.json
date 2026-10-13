@@ -384,5 +384,16 @@
                 "pointOfContact": "Opportunities as contact"
             }
         }
+    },
+    "timeline": {
+        "title": "Activity",
+        "created": "{actor} created this record",
+        "updated": "{actor} changed it",
+        "trashed": "{actor} moved it to the trash",
+        "restored": "{actor} restored it from the trash",
+        "someone": "Someone",
+        "empty": "Nothing has happened yet",
+        "more": "Show older",
+        "to": "to"
     }
 }
