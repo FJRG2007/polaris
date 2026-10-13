@@ -128,6 +128,14 @@ export interface AppExtension {
     /** The reader's next events, for the Overview card, soonest first. */
     readonly upcomingEvents?: (userId: string, limit: number) => Promise<readonly UpcomingEvent[]>;
 
+    /** Its records whose name matches, for search's `/records`; with no query,
+     *  the ones changed most recently. Only what this account may open. */
+    readonly searchRecords?: (
+        userId: string,
+        query: string,
+        limit: number
+    ) => Promise<readonly AppRecordHit[]>;
+
     /** Its servers, for the overview card. */
     readonly gameServerSummaries?: (userId: string) => Promise<readonly GameServerSummary[]>;
 
@@ -259,6 +267,15 @@ export type AppMcpTool = McpTool<never>;
 
 /** A search provider an app offers `polaris_search`. */
 export type AppMcpSearchProvider = McpSearchProvider;
+
+/** One record an app found for search. */
+export interface AppRecordHit {
+    readonly id: string;
+    readonly label: string;
+    /** What kind of record it is, and where it lives. */
+    readonly detail: string;
+    readonly href: string;
+}
 
 /** A sanction a game server put on a player linked to an account. */
 export interface GameSanction {

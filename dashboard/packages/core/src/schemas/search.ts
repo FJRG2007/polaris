@@ -37,6 +37,9 @@ export const REMOTE_SEARCH_SCOPES = [
     "docs",
     "notes",
     "users",
+    // Records an installed app keeps (the CRM's companies, people and
+    // opportunities), answered by that app.
+    "records",
     ...CHAT_SEARCH_SCOPES
 ] as const;
 

@@ -11,14 +11,15 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
-import { relatedLists } from "../model/related";
+import { recordHref, relatedLists } from "../model/related";
 import { prisma } from "@polaris/db";
 import { dropEvents, logEvents, type NewEvent } from "./timeline";
 import { changesBetween, initialValues } from "../model/timeline";
 import { host } from "@polaris/app-host";
+import { CRM_OBJECTS } from "@polaris/core";
 import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
-import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
+import { crmActor, requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import { recordSelect, table, toRecord, writable, writeData } from "./columns";
 import {
     fieldOf,
@@ -329,7 +330,11 @@ export async function createRecord(
     });
     const record = toRecord(object, row as Record<string, unknown>);
     await logEvents(actor, object, [
-        { recordId: record.id, kind: "created", changes: initialValues(record, Object.keys(values)) }
+        {
+            recordId: record.id,
+            kind: "created",
+            changes: initialValues(record, Object.keys(values))
+        }
     ]);
     return record;
 }
@@ -383,7 +388,13 @@ export async function updateRecords(
         saved.flatMap((record) => {
             const old = was.get(record.id);
             return old
-                ? [{ recordId: record.id, kind: "updated" as const, changes: changesBetween(old, record, keys) }]
+                ? [
+                      {
+                          recordId: record.id,
+                          kind: "updated" as const,
+                          changes: changesBetween(old, record, keys)
+                      }
+                  ]
                 : [];
         })
     );
@@ -512,4 +523,38 @@ export async function destroyRecords(
     });
     for (const one of cleared) await logEvents(actor, one.object, one.events);
     return count;
+}
+
+/**
+ * Records of every kind the account may see, named, for search: each kind's
+ * matches, the most recently changed first, taken in turn so one kind cannot
+ * crowd out the others. Nothing for an account that may not use the CRM.
+ */
+export async function searchAllRecords(
+    userId: string,
+    search: string,
+    limit: number
+): Promise<{ id: string; label: string; detail: string; href: string }[]> {
+    const user = await host.crmHost.crmRunner(userId);
+    if (!user) return [];
+    const actor = await crmActor(user);
+    const t = await crmT();
+    const kinds = CRM_OBJECTS.filter((object) => actor.can[object].read);
+    const found = await Promise.all(
+        kinds.map(async (object) =>
+            (await searchRefs(actor, object, search, limit)).map((ref) => ({
+                id: ref.id,
+                label: ref.name,
+                detail: actor.shelf.orgName
+                    ? `${t(`objects.${object}.plural`)} - ${actor.shelf.orgName}`
+                    : t(`objects.${object}.plural`),
+                href: recordHref(object, ref.id)
+            }))
+        )
+    );
+    const hits = [];
+    for (let at = 0; hits.length < limit && found.some((list) => at < list.length); at++) {
+        for (const list of found) if (at < list.length) hits.push(list[at]!);
+    }
+    return hits.slice(0, limit);
 }

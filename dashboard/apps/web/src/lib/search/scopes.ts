@@ -16,6 +16,7 @@ import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { SEARCH_SCOPES, type SearchScope } from "@polaris/core";
 import {
     AtSign,
+    Contact,
     Boxes,
     Hash,
     MessageCircle,
@@ -43,6 +44,9 @@ export interface SearchScopeDefinition {
     readonly resourceKind?: SearchResourceKind;
     /** Typed instead of a command word, the way @ opens people. */
     readonly sigil?: string;
+    /** Offered only to somebody who can open one of these apps, the ones that
+     *  answer it. */
+    readonly apps?: readonly string[];
 }
 
 export const SEARCH_SCOPE_LIST: readonly SearchScopeDefinition[] = [
@@ -104,6 +108,12 @@ export const SEARCH_SCOPE_LIST: readonly SearchScopeDefinition[] = [
         sigil: "@"
     },
     {
+        id: "records",
+        keywords: ["records", "record", "crm"],
+        icon: Contact,
+        apps: ["crm"]
+    },
+    {
         id: "chat",
         keywords: ["chat"],
         icon: MessagesSquare
@@ -146,6 +156,11 @@ for (const id of SEARCH_SCOPES) {
     if (!BY_ID.has(id)) throw new Error(`Search scope "${id}" has no definition`);
 }
 
+/** Whether somebody who can open these apps is offered this command. */
+export function scopeOffered(scope: SearchScopeDefinition, appIds: readonly string[]): boolean {
+    return !scope.apps || scope.apps.some((app) => appIds.includes(app));
+}
+
 export function searchScope(id: SearchScope): SearchScopeDefinition {
     // Every id in the type is in the map, which the loop above guarantees.
     return BY_ID.get(id)!;
@@ -159,5 +174,8 @@ export function scopeWords(
     t: NamespaceTranslator<"components">,
     id: SearchScope
 ): { label: string; placeholder: string } {
-    return { label: t(`search.scopes.${id}.label`), placeholder: t(`search.scopes.${id}.placeholder`) };
+    return {
+        label: t(`search.scopes.${id}.label`),
+        placeholder: t(`search.scopes.${id}.placeholder`)
+    };
 }

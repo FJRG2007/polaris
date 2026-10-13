@@ -22,5 +22,7 @@ export const crmExtension: AppExtension = {
             leaseMs: 5 * MINUTE,
             run: async () => (await import("./workflows")).runDueSchedules()
         }
-    ]
+    ],
+    searchRecords: async (userId, query, limit) =>
+        (await import("./records")).searchAllRecords(userId, query, limit)
 };

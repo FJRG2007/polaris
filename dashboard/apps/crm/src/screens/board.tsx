@@ -24,7 +24,7 @@ import Link from "next/link";
 import { openInPanel } from "./record-table";
 import { recordHref } from "../model/related";
 import { ArrowRightLeft, ArrowUpRight, Check, Plus } from "lucide-react";
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useState, type DragEvent, type ReactNode } from "react";
 import {
     Button,
     DropdownMenu,
@@ -79,6 +79,8 @@ export interface BoardProps {
     ) => void;
     /** Open a card's record in the side panel. */
     readonly onOpen?: (id: string) => void;
+    /** A column to open a new card in as soon as it is drawn. */
+    readonly draftIn?: string | null;
 }
 
 export function Board(props: BoardProps) {
@@ -88,6 +90,9 @@ export function Board(props: BoardProps) {
     const [dragging, setDragging] = useState<string | null>(null);
     const [target, setTarget] = useState<{ value: string; beforeId: string | null } | null>(null);
     const [drafting, setDrafting] = useState<string | null>(null);
+    useEffect(() => {
+        if (props.draftIn) setDrafting(props.draftIn);
+    }, [props.draftIn]);
     const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
     const primary = primaryField(object);
     const DraftEditor = editorFor(primary);

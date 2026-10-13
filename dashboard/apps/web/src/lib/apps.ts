@@ -1212,6 +1212,27 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/crm/opportunities",
             icon: Target,
             keywords: ["deals", "pipeline", "stages", "sales", "amount", "close date"]
+        },
+        {
+            label: "New company", // i18n-ignore
+            href: "/crm/companies?new=1",
+            icon: Building2,
+            keywords: ["create", "add", "account", "customer", "client"],
+            hidden: true
+        },
+        {
+            label: "New person", // i18n-ignore
+            href: "/crm/people?new=1",
+            icon: Contact,
+            keywords: ["create", "add", "contact", "lead"],
+            hidden: true
+        },
+        {
+            label: "New opportunity", // i18n-ignore
+            href: "/crm/opportunities?new=1",
+            icon: Target,
+            keywords: ["create", "add", "deal"],
+            hidden: true
         }
     ],
     notes: [

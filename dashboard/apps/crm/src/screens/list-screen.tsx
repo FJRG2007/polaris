@@ -734,6 +734,33 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const canEdit = Boolean(can?.edit);
     const canDelete = Boolean(can?.delete);
     const rows = store.rows;
+
+    // Arrived to add one (search's "New company"): the address says so once,
+    // and the new row opens as soon as the list can take it.
+    const [wantsNew, setWantsNew] = useState(false);
+    const [boardDraft, setBoardDraft] = useState<string | null>(null);
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("new") !== "1") return;
+        url.searchParams.delete("new");
+        window.history.replaceState(window.history.state, "", url);
+        setWantsNew(true);
+    }, []);
+    useEffect(() => {
+        if (!wantsNew || !can || !config || !rows) return;
+        if (kind === "kanban" && !grouped.groups) return;
+        setWantsNew(false);
+        if (!canEdit) {
+            toast.show({
+                title: t("errors.notCreated"),
+                body: t("errors.forbidden", { verb: "edit", object })
+            });
+        } else if (kind === "kanban") {
+            setBoardDraft(grouped.groups?.[0]?.value ?? null);
+        } else {
+            setDrafting(true);
+        }
+    }, [wantsNew, can, config, rows, canEdit, kind, grouped.groups, toast, t, object]);
     const boardable = views.groupFields(object, custom).length > 0;
     const narrowed = Boolean(search) || activeFilters > 0;
     const failure = (!opening.data && opening.error) || (readable && !rows && store.error) || null;
@@ -790,6 +817,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 onCreate={(value, name) => create(name, { key: boardBy.key, value })}
                 onEdit={edit}
                 onOpen={setPeek}
+                draftIn={boardDraft}
             />
         );
     } else if (rows.length === 0 && !drafting && narrowed) {

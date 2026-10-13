@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { SEARCH_SCOPES, isRemoteSearchScope } from "@polaris/core";
-import { SEARCH_SCOPE_LIST, searchScope } from "@/lib/search/scopes";
+import { SEARCH_SCOPE_LIST, scopeOffered, searchScope } from "@/lib/search/scopes";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 
 describe("detectCommand", () => {
@@ -138,5 +138,13 @@ describe("the scope registry", () => {
     it("answers to each keyword exactly once", () => {
         const keywords = SEARCH_SCOPE_LIST.flatMap((scope) => scope.keywords);
         expect(keywords.length).toBe(new Set(keywords).size);
+    });
+});
+
+describe("commands an app answers", () => {
+    it("offers records only to somebody who can open the CRM", () => {
+        expect(scopeOffered(searchScope("records"), ["tasks"])).toBe(false);
+        expect(scopeOffered(searchScope("records"), ["tasks", "crm"])).toBe(true);
+        expect(scopeOffered(searchScope("tasks"), [])).toBe(true);
     });
 });

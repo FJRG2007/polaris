@@ -279,6 +279,38 @@ describe("a CRM list", () => {
         expect(await screen.findByText("Initech")).toBeTruthy();
     });
 
+    it("opens the new row when the address asks for one, and forgets the ask", async () => {
+        window.history.replaceState(null, "", "/crm/companies?new=1");
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        expect(await screen.findByRole("textbox", { name: "Name" })).toBeTruthy();
+        expect(window.location.search).toBe("");
+    });
+
+    it("opens the new card in the first column of a board", async () => {
+        window.history.replaceState(null, "", "/crm/opportunities?new=1");
+        state.views = [
+            { id: VIEW_ID, name: "", kind: "kanban", config: defaultConfig("opportunities") }
+        ];
+        state.groups = ["new", "screening", "meeting", "proposal", "customer"].map((value) => ({
+            value,
+            records: [],
+            total: 0
+        }));
+        render(<ListScreen object="opportunities" />, { wrapper: MessagesWrapper });
+        const column = await screen.findByRole("region", { name: "New" });
+        await waitFor(() => expect(column.querySelector("input")).toBeTruthy());
+    });
+
+    it("says why no new row opens for a reader who may not add one", async () => {
+        window.history.replaceState(null, "", "/crm/companies?new=1");
+        state.can = { read: true, edit: false, delete: false };
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+        expect(window.location.search).toBe("");
+    });
+
     it("offers a reader who may not change records nothing that would", async () => {
         state.can = { read: true, edit: false, delete: false };
         render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });

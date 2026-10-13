@@ -319,7 +319,10 @@
         "CRM": "CRM",
         "Companies": "Companies",
         "Opportunities": "Opportunities",
-        "Storage locations": "Storage locations"
+        "Storage locations": "Storage locations",
+        "New company": "New company",
+        "New person": "New person",
+        "New opportunity": "New opportunity"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",
