@@ -26,6 +26,11 @@ vi.mock("@/app/(app)/search-actions", () => ({
     recordSearchAction: vi.fn(async () => ({}))
 }));
 
+vi.mock("@/app/(app)/tour-actions", () => ({
+    markOverviewAction: vi.fn(async () => undefined),
+    shouldOfferOverviewAction: vi.fn(async () => false)
+}));
+
 const requested: string[] = [];
 
 // jsdom draws nothing, so it has no scrolling to do.
