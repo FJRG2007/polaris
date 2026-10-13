@@ -154,6 +154,12 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             if (raw === null || raw === "") return ok(null);
             const value = typeof raw === "string" ? Number(raw.trim()) : raw;
             if (typeof value !== "number" || !Number.isFinite(value)) return no("number");
+            // A number somebody added may be any amount, kept to four places.
+            if (field.custom) {
+                return Math.abs(value) < MAX_AMOUNT
+                    ? ok(Math.round(value * 10_000) / 10_000)
+                    : no("number");
+            }
             if (!Number.isInteger(value) || value < 0 || value > 2_000_000_000) {
                 return no("wholeNumber");
             }
@@ -177,6 +183,8 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
         }
         case "select": {
             const value = text(raw);
+            // A choice somebody added may be left unset; a stage never is.
+            if (value === "" && field.custom) return ok("");
             return value !== null && field.options?.includes(value) ? ok(value) : no("option");
         }
         case "boolean":

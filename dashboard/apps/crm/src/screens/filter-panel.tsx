@@ -7,6 +7,7 @@
  */
 
 import { unwrap } from "./call";
+import { useCustomFields, fieldLabel, optionLabel as choiceLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
 import * as actions from "../actions/records";
 import { parseAmount } from "../model/values";
@@ -31,7 +32,7 @@ import {
     menuSearchMatches,
     Select
 } from "@polaris/ui";
-import { FIELDS, fieldOf, type CrmObject, type FieldDef, type Ref } from "../model/objects";
+import { fieldsOf, fieldOf, type CrmObject, type FieldDef, type Ref } from "../model/objects";
 import * as filters from "../model/filters";
 
 let made = 0;
@@ -43,7 +44,7 @@ function localId(): string {
 }
 
 function newRule(object: CrmObject): filters.FilterRule {
-    const field = FIELDS[object][0]!;
+    const field = fieldsOf(object)[0]!;
     return {
         id: localId(),
         key: field.key,
@@ -73,8 +74,9 @@ export function FilterButton({
     disabled?: boolean;
 }) {
     const t = useCrmT();
+    const custom = useCustomFields();
     const [open, setOpen] = useState(false);
-    const active = filters.activeRules(object, filter);
+    const active = filters.activeRules(object, filter, custom);
     return (
         <>
             <Button
@@ -310,9 +312,9 @@ function RuleEditor({
     onChange: (rule: filters.FilterRule | null) => void;
 }) {
     const t = useCrmT();
-    const field = fieldOf(object, rule.key)!;
-    const fieldName = (one: FieldDef) =>
-        t(`fields.${object}.${one.key}` as Parameters<typeof t>[0]);
+    const custom = useCustomFields();
+    const field = fieldOf(object, rule.key, custom)!;
+    const fieldName = (one: FieldDef) => fieldLabel(t, object, one);
     const operand = filters.operandOf(field.kind, rule.operator);
     return (
         <div className="flex flex-wrap items-center gap-2">
@@ -320,9 +322,12 @@ function RuleEditor({
                 value={rule.key}
                 aria-label={t("filters.field")}
                 className="h-8 w-40 min-w-0"
-                options={FIELDS[object].map((one) => ({ value: one.key, label: fieldName(one) }))}
+                options={fieldsOf(object, custom).map((one) => ({
+                    value: one.key,
+                    label: fieldName(one)
+                }))}
                 onValueChange={(key) => {
-                    const next = fieldOf(object, key);
+                    const next = fieldOf(object, key, custom);
                     if (!next || key === rule.key) return;
                     onChange({
                         ...rule,
@@ -521,9 +526,8 @@ function ChoicePicker({
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
     const optionLabel = useCallback(
-        (option: string) =>
-            t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0]),
-        [t, object, field.key]
+        (option: string) => choiceLabel(t, object, field, option),
+        [t, object, field]
     );
     const choices = useChoices(field, people, search, open, optionLabel);
     const named = (choice: Ref) => (field.kind === "select" ? optionLabel(choice.id) : choice.name);

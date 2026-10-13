@@ -8,6 +8,7 @@
  */
 
 import { cn } from "@polaris/ui";
+import { optionLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
 import { plainText } from "./format";
 import { hostUi } from "@polaris/app-host/client";
@@ -161,11 +162,7 @@ export function CellDisplay({
                 <OptionChip
                     field={field}
                     option={value as string}
-                    label={t(
-                        `options.${object}.${field.key}.${value as string}` as Parameters<
-                            typeof t
-                        >[0]
-                    )}
+                    label={optionLabel(t, object, field, value as string)}
                 />
             );
         case "member":

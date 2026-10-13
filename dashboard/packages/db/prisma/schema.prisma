@@ -377,6 +377,7 @@ model User {
     crmOpportunitiesOwned   CrmOpportunity[] @relation("CrmOpportunityOwner")
     crmOpportunitiesCreated CrmOpportunity[] @relation("CrmOpportunityCreatedBy")
     crmViews                CrmView[]        @relation("CrmViewShelf")
+    crmFields               CrmField[]       @relation("CrmFieldShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5861,6 +5862,7 @@ model Organization {
     crmPeople        CrmPerson[]
     crmOpportunities CrmOpportunity[]
     crmViews         CrmView[]
+    crmFields        CrmField[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -12737,6 +12739,33 @@ model CrmCompany {
     country               String    @default("")
     idealCustomer         Boolean   @default(false)
     accountOwnerId        String?   @db.Uuid
+    // Custom field slots: a CrmField row names one for a shelf (apps/crm
+    // lib/fields). Empty until a field claims it.
+    cText1                String    @default("")
+    cText2                String    @default("")
+    cText3                String    @default("")
+    cText4                String    @default("")
+    cText5                String    @default("")
+    cText6                String    @default("")
+    cText7                String    @default("")
+    cText8                String    @default("")
+    cText9                String    @default("")
+    cText10               String    @default("")
+    cNum1                 Float?
+    cNum2                 Float?
+    cNum3                 Float?
+    cNum4                 Float?
+    cNum5                 Float?
+    cDate1                DateTime?
+    cDate2                DateTime?
+    cDate3                DateTime?
+    cDate4                DateTime?
+    cDate5                DateTime?
+    cBool1                Boolean   @default(false)
+    cBool2                Boolean   @default(false)
+    cBool3                Boolean   @default(false)
+    cBool4                Boolean   @default(false)
+    cBool5                Boolean   @default(false)
     createdById           String?   @db.Uuid
     position              Float     @default(0)
     deletedAt             DateTime?
@@ -12770,6 +12799,33 @@ model CrmPerson {
     linkedinUrl String    @default("")
     xUrl        String    @default("")
     companyId   String?   @db.Uuid
+    // Custom field slots: a CrmField row names one for a shelf (apps/crm
+    // lib/fields). Empty until a field claims it.
+    cText1      String    @default("")
+    cText2      String    @default("")
+    cText3      String    @default("")
+    cText4      String    @default("")
+    cText5      String    @default("")
+    cText6      String    @default("")
+    cText7      String    @default("")
+    cText8      String    @default("")
+    cText9      String    @default("")
+    cText10     String    @default("")
+    cNum1       Float?
+    cNum2       Float?
+    cNum3       Float?
+    cNum4       Float?
+    cNum5       Float?
+    cDate1      DateTime?
+    cDate2      DateTime?
+    cDate3      DateTime?
+    cDate4      DateTime?
+    cDate5      DateTime?
+    cBool1      Boolean   @default(false)
+    cBool2      Boolean   @default(false)
+    cBool3      Boolean   @default(false)
+    cBool4      Boolean   @default(false)
+    cBool5      Boolean   @default(false)
     createdById String?   @db.Uuid
     position    Float     @default(0)
     deletedAt   DateTime?
@@ -12804,6 +12860,33 @@ model CrmOpportunity {
     companyId        String?   @db.Uuid
     pointOfContactId String?   @db.Uuid
     ownerId          String?   @db.Uuid
+    // Custom field slots: a CrmField row names one for a shelf (apps/crm
+    // lib/fields). Empty until a field claims it.
+    cText1           String    @default("")
+    cText2           String    @default("")
+    cText3           String    @default("")
+    cText4           String    @default("")
+    cText5           String    @default("")
+    cText6           String    @default("")
+    cText7           String    @default("")
+    cText8           String    @default("")
+    cText9           String    @default("")
+    cText10          String    @default("")
+    cNum1            Float?
+    cNum2            Float?
+    cNum3            Float?
+    cNum4            Float?
+    cNum5            Float?
+    cDate1           DateTime?
+    cDate2           DateTime?
+    cDate3           DateTime?
+    cDate4           DateTime?
+    cDate5           DateTime?
+    cBool1           Boolean   @default(false)
+    cBool2           Boolean   @default(false)
+    cBool3           Boolean   @default(false)
+    cBool4           Boolean   @default(false)
+    cBool5           Boolean   @default(false)
     createdById      String?   @db.Uuid
     position         Float     @default(0)
     deletedAt        DateTime?
@@ -12849,6 +12932,34 @@ model CrmView {
     user User?         @relation("CrmViewShelf", fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([shelf, object, name])
+}
+
+// A field somebody added to one kind of record on one shelf. Its value lives in
+// a slot column of the record's table (`slot`, e.g. "cText3"), so it filters,
+// sorts and groups in the database like a built-in field. `options` is the JSON
+// list of a select's choices.
+model CrmField {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String?  @db.Uuid
+    userId      String?  @db.Uuid
+    // "org:<id>" or "user:<id>".
+    shelf       String
+    // companies | people | opportunities
+    object      String
+    slot        String
+    label       String
+    // text | number | date | boolean | select | url | email | phone
+    kind        String
+    options     String   @default("[]")
+    position    Float    @default(0)
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmFieldShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([shelf, object, slot])
 }
 
 // A service volume being moved from one storage location to another (this

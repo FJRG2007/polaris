@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import { isCalendarDay } from "./values";
-import { fieldOf, type CrmObject, type FieldKind, type Ref } from "./objects";
+import { fieldOf, type CrmObject, type FieldDef, type FieldKind, type Ref } from "./objects";
 
 export const FILTER_OPERATORS = [
     "contains",
@@ -162,8 +162,12 @@ function operand(kind: FieldKind, operator: FilterOperator, value: FilterValue):
 }
 
 /** Whether a rule narrows anything yet: its value is there when it needs one. */
-export function ruleComplete(object: CrmObject, rule: FilterRule): boolean {
-    const field = fieldOf(object, rule.key);
+export function ruleComplete(
+    object: CrmObject,
+    rule: FilterRule,
+    custom: readonly FieldDef[] = []
+): boolean {
+    const field = fieldOf(object, rule.key, custom);
     if (!field || !operatorsFor(field.kind).includes(rule.operator)) return false;
     switch (operandOf(field.kind, rule.operator)) {
         case "none":
@@ -180,13 +184,17 @@ export function ruleComplete(object: CrmObject, rule: FilterRule): boolean {
 }
 
 /** How many whole rules a filter holds, inside groups too. */
-export function activeRules(object: CrmObject, filter: ViewFilter): number {
+export function activeRules(
+    object: CrmObject,
+    filter: ViewFilter,
+    custom: readonly FieldDef[] = []
+): number {
     return filter.rules.reduce(
         (sum, item) =>
             sum +
             (isGroup(item)
-                ? item.rules.filter((rule) => ruleComplete(object, rule)).length
-                : ruleComplete(object, item)
+                ? item.rules.filter((rule) => ruleComplete(object, rule, custom)).length
+                : ruleComplete(object, item, custom)
                   ? 1
                   : 0),
         0
@@ -198,10 +206,14 @@ export function optionChoice(option: string): Ref {
     return { id: option, name: "" };
 }
 
-function readRule(object: CrmObject, raw: unknown): FilterRule | null {
+function readRule(
+    object: CrmObject,
+    raw: unknown,
+    custom: readonly FieldDef[] = []
+): FilterRule | null {
     const rule = ruleSchema.safeParse(raw);
     if (!rule.success) return null;
-    const field = fieldOf(object, rule.data.key);
+    const field = fieldOf(object, rule.data.key, custom);
     if (!field || !operatorsFor(field.kind).includes(rule.data.operator)) return null;
     let value = operand(field.kind, rule.data.operator, rule.data.value);
     // A choice of a select is one of its options, whatever was stored.
@@ -221,7 +233,11 @@ function readRule(object: CrmObject, raw: unknown): FilterRule | null {
  * operator cannot use is emptied, so the rule waits for one; a group left with
  * no rules is dropped. Anything unreadable is no filter.
  */
-export function readFilter(object: CrmObject, raw: unknown): ViewFilter {
+export function readFilter(
+    object: CrmObject,
+    raw: unknown,
+    custom: readonly FieldDef[] = []
+): ViewFilter {
     const parsed = z
         .object({ conjunction: z.enum(CONJUNCTIONS), rules: z.array(z.unknown()) })
         .safeParse(raw);
@@ -237,7 +253,7 @@ export function readFilter(object: CrmObject, raw: unknown): ViewFilter {
         if (group.success) {
             const inner: FilterRule[] = [];
             for (const one of group.data.rules) {
-                const rule = readRule(object, one);
+                const rule = readRule(object, one, custom);
                 if (rule && count < MAX_RULES) {
                     inner.push(rule);
                     count += 1;
@@ -246,7 +262,7 @@ export function readFilter(object: CrmObject, raw: unknown): ViewFilter {
             if (inner.length > 0) rules.push({ ...group.data, rules: inner });
             continue;
         }
-        const rule = readRule(object, entry);
+        const rule = readRule(object, entry, custom);
         if (rule) {
             rules.push(rule);
             count += 1;
@@ -257,13 +273,17 @@ export function readFilter(object: CrmObject, raw: unknown): ViewFilter {
 
 /** The filter with its unfinished rules and emptied groups taken out: what a
  *  read is keyed by, so typing half a rule does not read the list again. */
-export function completeFilter(object: CrmObject, filter: ViewFilter): ViewFilter {
+export function completeFilter(
+    object: CrmObject,
+    filter: ViewFilter,
+    custom: readonly FieldDef[] = []
+): ViewFilter {
     const rules: FilterItem[] = [];
     for (const item of filter.rules) {
         if (isGroup(item)) {
-            const inner = item.rules.filter((rule) => ruleComplete(object, rule));
+            const inner = item.rules.filter((rule) => ruleComplete(object, rule, custom));
             if (inner.length > 0) rules.push({ ...item, rules: inner });
-        } else if (ruleComplete(object, item)) {
+        } else if (ruleComplete(object, item, custom)) {
             rules.push(item);
         }
     }

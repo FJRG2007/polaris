@@ -13,9 +13,10 @@
  */
 
 import { crmT } from "./i18n";
+import { loadFields } from "./fields";
 import { prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
-import type { CrmObject } from "../model/objects";
+import type { CrmObject, FieldDef } from "../model/objects";
 import { requireCan, type CrmActor } from "./access";
 import {
     defaultConfig,
@@ -35,11 +36,11 @@ type ViewRow = { id: string; name: string; kind: string; config: string };
 
 /** A kind of view this kind of record can be drawn as: a board needs a field
  *  with choices, so a kind of record without one is a table. */
-function kindFor(object: CrmObject, kind: string): ViewKind {
-    return kind === "kanban" && groupFields(object).length > 0 ? "kanban" : "table";
+function kindFor(object: CrmObject, kind: string, custom: readonly FieldDef[]): ViewKind {
+    return kind === "kanban" && groupFields(object, custom).length > 0 ? "kanban" : "table";
 }
 
-function summary(object: CrmObject, row: ViewRow): ViewSummary {
+function summary(object: CrmObject, row: ViewRow, custom: readonly FieldDef[]): ViewSummary {
     let stored: unknown = null;
     try {
         stored = JSON.parse(row.config);
@@ -49,8 +50,8 @@ function summary(object: CrmObject, row: ViewRow): ViewSummary {
     return {
         id: row.id,
         name: row.name,
-        kind: kindFor(object, row.kind),
-        config: readConfig(object, stored)
+        kind: kindFor(object, row.kind, custom),
+        config: readConfig(object, stored, custom)
     };
 }
 
@@ -64,9 +65,10 @@ async function refuse(
 /** The view a kind of record opens with on this shelf, made if it is missing. */
 export async function defaultView(actor: CrmActor, object: CrmObject): Promise<ViewSummary> {
     await requireCan(actor, object, "read");
+    const custom = await loadFields(actor.shelf, object);
     const key = { shelf_object_name: { shelf: actor.shelf.key, object, name: "" } };
     const found = await prisma.crmView.findUnique({ where: key, select: VIEW_SELECT });
-    if (found) return summary(object, found);
+    if (found) return summary(object, found, custom);
     try {
         const made = await prisma.crmView.create({
             data: {
@@ -75,16 +77,16 @@ export async function defaultView(actor: CrmActor, object: CrmObject): Promise<V
                 userId: actor.shelf.orgId ? null : actor.shelf.userId,
                 object,
                 name: "",
-                config: JSON.stringify(defaultConfig(object)),
+                config: JSON.stringify(defaultConfig(object, custom)),
                 createdById: actor.user.id
             },
             select: VIEW_SELECT
         });
-        return summary(object, made);
+        return summary(object, made, custom);
     } catch {
         // Two first visits at once: the other one made it.
         const raced = await prisma.crmView.findUnique({ where: key, select: VIEW_SELECT });
-        if (raced) return summary(object, raced);
+        if (raced) return summary(object, raced, custom);
         throw new Error("crm: the default view could not be made");
     }
 }
@@ -92,14 +94,17 @@ export async function defaultView(actor: CrmActor, object: CrmObject): Promise<V
 /** Every view of a kind of record on this shelf: the default first, then the
  *  named ones in the order they were made. */
 export async function listViews(actor: CrmActor, object: CrmObject): Promise<ViewSummary[]> {
-    const first = await defaultView(actor, object);
+    const [first, custom] = await Promise.all([
+        defaultView(actor, object),
+        loadFields(actor.shelf, object)
+    ]);
     const named = await prisma.crmView.findMany({
         where: { shelf: actor.shelf.key, object, NOT: { name: "" } },
         orderBy: [{ position: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         take: MAX_VIEWS,
         select: VIEW_SELECT
     });
-    return [first, ...named.map((row) => summary(object, row))];
+    return [first, ...named.map((row) => summary(object, row, custom))];
 }
 
 /** A name typed for a view, checked: there, not too long. */
@@ -145,6 +150,7 @@ export async function createView(
     input: { readonly name: string; readonly kind: ViewKind; readonly config: ViewConfig }
 ): Promise<ViewSummary> {
     await requireCan(actor, object, "edit");
+    const custom = await loadFields(actor.shelf, object);
     const name = await cleanName(input.name);
     const where = { shelf: actor.shelf.key, object, NOT: { name: "" } };
     const [count, last] = await Promise.all([
@@ -165,14 +171,14 @@ export async function createView(
                 userId: actor.shelf.orgId ? null : actor.shelf.userId,
                 object,
                 name,
-                kind: kindFor(object, input.kind),
-                config: JSON.stringify(readConfig(object, input.config)),
+                kind: kindFor(object, input.kind, custom),
+                config: JSON.stringify(readConfig(object, input.config, custom)),
                 position: (last?.position ?? 0) + 1,
                 createdById: actor.user.id
             },
             select: VIEW_SELECT
         });
-        return summary(object, made);
+        return summary(object, made, custom);
     } catch (caught) {
         if (nameTaken(caught)) await refuse("viewNameTaken");
         throw caught;
@@ -187,6 +193,7 @@ export async function renameView(
     name: string
 ): Promise<ViewSummary> {
     await requireCan(actor, object, "edit");
+    const custom = await loadFields(actor.shelf, object);
     const clean = await cleanName(name);
     const where = { id: viewId, shelf: actor.shelf.key, object };
     const found = await prisma.crmView.findFirst({ where, select: { name: true } });
@@ -199,7 +206,7 @@ export async function renameView(
             data: { name: clean },
             select: VIEW_SELECT
         });
-        return summary(object, row);
+        return summary(object, row, custom);
     } catch (caught) {
         if (nameTaken(caught)) await refuse("viewNameTaken");
         throw caught;
@@ -230,14 +237,18 @@ export async function saveViewConfig(
     kind?: ViewKind
 ): Promise<ViewSummary> {
     await requireCan(actor, object, "edit");
-    const clean = readConfig(object, config);
+    const custom = await loadFields(actor.shelf, object);
+    const clean = readConfig(object, config, custom);
     const where = { id: viewId, shelf: actor.shelf.key, object };
     const result = await prisma.crmView.updateMany({
         where,
-        data: { config: JSON.stringify(clean), ...(kind ? { kind: kindFor(object, kind) } : {}) }
+        data: {
+            config: JSON.stringify(clean),
+            ...(kind ? { kind: kindFor(object, kind, custom) } : {})
+        }
     });
     const row =
         result.count > 0 ? await prisma.crmView.findFirst({ where, select: VIEW_SELECT }) : null;
     if (!row) await refuse("viewMissing");
-    return summary(object, row!);
+    return summary(object, row!, custom);
 }

@@ -7,6 +7,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { useCustomFields, fieldLabel as labelOf, optionLabel } from "./custom-fields";
 import { currencyName } from "./format";
 import { RefChip } from "./cell-display";
 import { CellPicker } from "./cell-picker";
@@ -14,7 +15,13 @@ import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import { useMemo, useState, type FormEvent } from "react";
 import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
-import { FIELDS, type CrmObject, type FieldDef, type FieldValue, type Ref } from "../model/objects";
+import {
+    fieldsOf,
+    type CrmObject,
+    type FieldDef,
+    type FieldValue,
+    type Ref
+} from "../model/objects";
 import {
     Button,
     Dialog,
@@ -92,9 +99,10 @@ export function BulkEditDialog({
     onClose: () => void;
 }) {
     const t = useCrmT();
+    const custom = useCustomFields();
     const locale = hostUi.i18nProvider.useLocale();
     const editable = useMemo(
-        () => FIELDS[object].filter((field) => !field.primary && !field.readOnly),
+        () => fieldsOf(object, custom).filter((field) => !field.primary && !field.readOnly),
         [object]
     );
     const [key, setKey] = useState(editable[0]!.key);
@@ -109,8 +117,7 @@ export function BulkEditDialog({
     const result = settle(field, draft);
     const error =
         "error" in result ? t(`invalid.${result.error}` as Parameters<typeof t>[0]) : null;
-    const fieldLabel = (one: FieldDef) =>
-        t(`fields.${object}.${one.key}` as Parameters<typeof t>[0]);
+    const fieldLabel = (one: FieldDef) => labelOf(t, object, one);
 
     const choose = (next: string) => {
         setKey(next);
@@ -158,11 +165,7 @@ export function BulkEditDialog({
                         onValueChange={(text) => setDraft({ ...draft, text })}
                         options={(field.options ?? []).map((option) => ({
                             value: option,
-                            label: t(
-                                `options.${object}.${field.key}.${option}` as Parameters<
-                                    typeof t
-                                >[0]
-                            )
+                            label: optionLabel(t, object, field, option)
                         }))}
                     />
                 );

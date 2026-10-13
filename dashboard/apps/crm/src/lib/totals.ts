@@ -9,7 +9,8 @@ import { listWhere, type ListScope } from "./query";
 import { requireCan, type CrmActor } from "./access";
 import { aggregatesFor, type Aggregate } from "../model/views";
 import { columnOf, dayText, table, type ColumnSpec } from "./columns";
-import { fieldOf, type CrmObject, type Money } from "../model/objects";
+import { loadFields } from "./fields";
+import { fieldOf, slotOf, type CrmObject, type Money } from "../model/objects";
 
 /** One total, ready to draw. */
 export interface Total {
@@ -36,11 +37,11 @@ function emptyWhere(
     key: string,
     spec: ColumnSpec
 ): Record<string, unknown> | null {
-    const kind = fieldOf(object, key)?.kind;
+    const kind = slotOf(key) === "cBool" ? "boolean" : fieldOf(object, key)?.kind;
     if (kind === "dateTime" || kind === "boolean") return null;
     switch (spec.type) {
         case "scalar":
-            return NULLABLE_SCALARS.has(spec.column)
+            return NULLABLE_SCALARS.has(spec.column) || slotOf(spec.column) === "cNum"
                 ? { [spec.column]: null }
                 : { [spec.column]: "" };
         case "day":
@@ -182,12 +183,13 @@ export async function computeTotals(
     options: Omit<ListScope, "group">
 ): Promise<Total[]> {
     await requireCan(actor, object, "read");
-    const where = listWhere(object, actor.shelf, options);
+    const custom = await loadFields(actor.shelf, object);
+    const where = listWhere(object, actor.shelf, { ...options, custom });
     let counted: Promise<number> | null = null;
     const all = () => (counted ??= table(object).count({ where }) as Promise<number>);
     const totals: Total[] = [];
     for (const { key, aggregate } of asked.slice(0, 64)) {
-        const field = fieldOf(object, key);
+        const field = fieldOf(object, key, custom);
         if (!field || !aggregatesFor(field.kind).includes(aggregate)) continue;
         totals.push(await one(object, where, all, key, aggregate));
     }

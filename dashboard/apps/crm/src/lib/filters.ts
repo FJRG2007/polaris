@@ -92,9 +92,13 @@ function compareRule(column: string, field: FieldDef, rule: FilterRule): Where {
 }
 
 /** One whole rule as a `where`. */
-export function ruleWhere(object: CrmObject, rule: FilterRule): Where | null {
-    const field = fieldOf(object, rule.key);
-    if (!field || !ruleComplete(object, rule)) return null;
+export function ruleWhere(
+    object: CrmObject,
+    rule: FilterRule,
+    custom: readonly FieldDef[] = []
+): Where | null {
+    const field = fieldOf(object, rule.key, custom);
+    if (!field || !ruleComplete(object, rule, custom)) return null;
     const spec = columnOf(object, field.key);
     const ids = Array.isArray(rule.value) ? rule.value.map((choice) => choice.id) : [];
     switch (spec.type) {
@@ -128,7 +132,9 @@ export function ruleWhere(object: CrmObject, rule: FilterRule): Where | null {
                     // A count is a whole number: "over 2.5" is "over 2", and
                     // nothing is exactly 2.5.
                     const value = rule.value as number;
-                    if (Number.isInteger(value)) return compareRule(spec.column, field, rule);
+                    // A custom number is a decimal, compared as it is.
+                    if (field.custom || Number.isInteger(value))
+                        return compareRule(spec.column, field, rule);
                     if (rule.operator === "is") return { id: { in: [] } };
                     const whole =
                         rule.operator === "greaterThan" ? Math.floor(value) : Math.ceil(value);
@@ -149,17 +155,21 @@ function joined(conjunction: Conjunction, parts: Where[]): Where | null {
 }
 
 /** A whole filter as a `where`; an empty object when it narrows nothing. */
-export function filterWhere(object: CrmObject, filter: ViewFilter): Where {
+export function filterWhere(
+    object: CrmObject,
+    filter: ViewFilter,
+    custom: readonly FieldDef[] = []
+): Where {
     const parts: Where[] = [];
     for (const item of filter.rules) {
         if (isGroup(item)) {
             const inner = item.rules
-                .map((rule) => ruleWhere(object, rule))
+                .map((rule) => ruleWhere(object, rule, custom))
                 .filter((where): where is Where => where !== null);
             const group = joined(item.conjunction, inner);
             if (group) parts.push(group);
         } else {
-            const where = ruleWhere(object, item);
+            const where = ruleWhere(object, item, custom);
             if (where) parts.push(where);
         }
     }

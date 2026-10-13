@@ -35,6 +35,7 @@ const pick = (row: Row) => ({ id: row.id, name: row.name, kind: row.kind, config
 vi.mock("@polaris/db", () => ({
     Prisma: { Decimal: class {} },
     prisma: {
+        crmField: { findMany: async () => [] },
         crmView: {
             findUnique: async ({
                 where

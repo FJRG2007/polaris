@@ -13,6 +13,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { useCustomFields, fieldLabel, optionLabel } from "./custom-fields";
 import { TotalCell } from "./totals-row";
 import { CellPicker } from "./cell-picker";
 import type { Total } from "../lib/totals";
@@ -95,6 +96,7 @@ function fromField(event: KeyboardEvent): boolean {
 export function RecordTable(props: TableProps) {
     const { object, columns, rows, canEdit, selected, onSelect } = props;
     const t = useCrmT();
+    const custom = useCustomFields();
     const [editing, setEditing] = useState<Editing | null>(null);
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
     const grouping = props.grouping ?? null;
@@ -108,7 +110,7 @@ export function RecordTable(props: TableProps) {
     const fields = useMemo(
         () =>
             columns
-                .map((column) => ({ column, field: fieldOf(object, column.key)! }))
+                .map((column) => ({ column, field: fieldOf(object, column.key, custom)! }))
                 .filter((one) => one.field),
         [columns, object]
     );
@@ -170,7 +172,7 @@ export function RecordTable(props: TableProps) {
                 key={field.key}
                 style={{ left: pinned(field) }}
                 tabIndex={canEdit && !field.readOnly ? 0 : -1}
-                aria-label={t(`fields.${object}.${field.key}` as Parameters<typeof t>[0])}
+                aria-label={fieldLabel(t, object, field)}
                 className={cn(
                     "relative h-9 border-b border-r border-border p-0 text-[0.8125rem]",
                     field.primary &&
@@ -259,8 +261,7 @@ export function RecordTable(props: TableProps) {
         );
     };
 
-    const groupLabel = (field: FieldDef, value: string) =>
-        t(`options.${object}.${field.key}.${value}` as Parameters<typeof t>[0]);
+    const groupLabel = (field: FieldDef, value: string) => optionLabel(t, object, field, value);
 
     const DraftEditor = props.draft ? editorFor(primary) : null;
     const totalWidth = BOX_WIDTH + fields.reduce((sum, { column }) => sum + column.width, 0);

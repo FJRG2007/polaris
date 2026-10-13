@@ -7,6 +7,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { fieldLabel } from "./custom-fields";
 import { Check } from "lucide-react";
 import type { Total } from "../lib/totals";
 import { hostUi } from "@polaris/app-host/client";
@@ -68,7 +69,7 @@ export function TotalCell({
     const t = useCrmT();
     const format = hostUi.displayFormat.useDisplayFormat();
     const locale = hostUi.i18nProvider.useLocale();
-    const label = t(`fields.${object}.${field.key}` as Parameters<typeof t>[0]);
+    const label = fieldLabel(t, object, field);
     const text = column.aggregate && total ? totalText(field, total, format, locale) : "";
 
     const face = (

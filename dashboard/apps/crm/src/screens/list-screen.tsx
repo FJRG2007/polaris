@@ -15,6 +15,9 @@
  */
 
 import { Board } from "./board";
+import { customDef } from "../model/fields";
+import { FieldsDialog } from "./fields-dialog";
+import { CustomFieldsProvider, fieldLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
 import * as views from "../model/views";
 import { useGroups } from "./use-groups";
@@ -37,6 +40,7 @@ import {
     Pencil,
     Plus,
     Search,
+    SlidersHorizontal,
     SearchX,
     ShieldOff,
     Table2,
@@ -94,9 +98,12 @@ function useDebounced<T>(value: T, delay: number): T {
 function useAppliedFilter(
     object: CrmObject,
     viewId: string | null,
-    filter: filters.ViewFilter | null
+    filter: filters.ViewFilter | null,
+    custom: readonly FieldDef[]
 ): filters.ViewFilter {
-    const key = JSON.stringify(filters.completeFilter(object, filter ?? filters.EMPTY_FILTER));
+    const key = JSON.stringify(
+        filters.completeFilter(object, filter ?? filters.EMPTY_FILTER, custom)
+    );
     const [settled, setSettled] = useState({ key, viewId });
     useEffect(() => {
         if (settled.viewId !== viewId) {
@@ -195,6 +202,14 @@ export function ListScreen({ object }: { object: CrmObject }) {
     openingRef.current = opening;
     const can = opening.data?.can[object] ?? null;
     const people = opening.data?.people ?? [];
+    // An answer kept from before fields could be added carries none.
+    const addedFields = opening.data?.fields;
+    const custom = useMemo(() => (addedFields ?? []).map(customDef), [addedFields]);
+    const [fieldsOpen, setFieldsOpen] = useState(false);
+    const fieldName = (key: string) => {
+        const field = fieldOf(object, key, custom);
+        return field ? fieldLabel(t, object, field) : "";
+    };
     const allViews = useMemo(() => {
         const data = opening.data;
         if (!data) return [];
@@ -217,8 +232,12 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const layout = useMemo<Layout | null>(() => {
         if (!view) return null;
         if (local && local.viewId === view.id) return local;
-        return { viewId: view.id, kind: view.kind, config: views.readConfig(object, view.config) };
-    }, [view, local, object]);
+        return {
+            viewId: view.id,
+            kind: view.kind,
+            config: views.readConfig(object, view.config, custom)
+        };
+    }, [view, local, object, custom]);
     const layoutRef = useRef(layout);
     layoutRef.current = layout;
     const config = layout?.config ?? null;
@@ -297,14 +316,14 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const search = useDebounced(typed.trim(), SEARCH_DELAY_MS);
     const sorts = useMemo(() => config?.sorts ?? [], [config]);
     const readable = Boolean(can?.read);
-    const filter = useAppliedFilter(object, view?.id ?? null, config?.filter ?? null);
-    const activeFilters = config ? filters.activeRules(object, config.filter) : 0;
-    const boardBy = config && kind === "kanban" ? views.boardField(object, config) : null;
+    const filter = useAppliedFilter(object, view?.id ?? null, config?.filter ?? null, custom);
+    const activeFilters = config ? filters.activeRules(object, config.filter, custom) : 0;
+    const boardBy = config && kind === "kanban" ? views.boardField(object, config, custom) : null;
     const groupField: FieldDef | null =
         kind === "kanban"
             ? boardBy
             : config?.groupBy
-              ? (fieldOf(object, config.groupBy) ?? null)
+              ? (fieldOf(object, config.groupBy, custom) ?? null)
               : null;
     const ready = config !== null && readable;
     const flat = useRecords(object, {
@@ -665,7 +684,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const canEdit = Boolean(can?.edit);
     const canDelete = Boolean(can?.delete);
     const rows = store.rows;
-    const boardable = views.groupFields(object).length > 0;
+    const boardable = views.groupFields(object, custom).length > 0;
     const narrowed = Boolean(search) || activeFilters > 0;
     const failure = (!opening.data && opening.error) || (readable && !rows && store.error) || null;
 
@@ -795,219 +814,253 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const shaping = !config || !readable;
 
     return (
-        <div data-crm-ready className="flex h-full min-h-0 flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="mr-auto flex min-w-0 items-baseline gap-2">
-                    <h1
-                        className="truncate text-[1.0625rem] font-semibold leading-tight tracking-tight"
-                        title={title}
-                    >
-                        {title}
-                    </h1>
-                    {rows ? (
-                        <span className="shrink-0 text-[0.8125rem] tabular-nums text-muted-foreground">
-                            {format.number(store.total)}
-                        </span>
-                    ) : null}
-                    {opening.data?.shelfName ? (
-                        <span
-                            className="truncate text-[0.8125rem] text-muted-foreground"
-                            title={opening.data.shelfName}
+        <CustomFieldsProvider value={custom}>
+            <div data-crm-ready className="flex h-full min-h-0 flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="mr-auto flex min-w-0 items-baseline gap-2">
+                        <h1
+                            className="truncate text-[1.0625rem] font-semibold leading-tight tracking-tight"
+                            title={title}
                         >
-                            {opening.data.shelfName}
-                        </span>
+                            {title}
+                        </h1>
+                        {rows ? (
+                            <span className="shrink-0 text-[0.8125rem] tabular-nums text-muted-foreground">
+                                {format.number(store.total)}
+                            </span>
+                        ) : null}
+                        {opening.data?.shelfName ? (
+                            <span
+                                className="truncate text-[0.8125rem] text-muted-foreground"
+                                title={opening.data.shelfName}
+                            >
+                                {opening.data.shelfName}
+                            </span>
+                        ) : null}
+                    </div>
+                    <div className="relative w-full min-w-0 sm:w-56">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            value={typed}
+                            maxLength={200}
+                            onChange={(event) => setTyped(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === "Escape") setTyped("");
+                            }}
+                            placeholder={t("list.search", { object: title })}
+                            aria-label={t("list.search", { object: title })}
+                            className="h-8 pl-8"
+                            disabled={!readable}
+                        />
+                    </div>
+                    {canEdit && kind === "table" ? (
+                        <Button
+                            size="sm"
+                            onClick={() => setDrafting(true)}
+                            disabled={!config || drafting}
+                        >
+                            <Plus className="size-4" />
+                            {t(`objects.${object}.new`)}
+                        </Button>
                     ) : null}
                 </div>
-                <div className="relative w-full min-w-0 sm:w-56">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        value={typed}
-                        maxLength={200}
-                        onChange={(event) => setTyped(event.target.value)}
-                        onKeyDown={(event) => {
-                            if (event.key === "Escape") setTyped("");
-                        }}
-                        placeholder={t("list.search", { object: title })}
-                        aria-label={t("list.search", { object: title })}
-                        className="h-8 pl-8"
-                        disabled={!readable}
-                    />
-                </div>
-                {canEdit && kind === "table" ? (
-                    <Button
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="mr-auto flex min-w-0 max-w-full items-center">
+                        <ViewPicker
+                            object={object}
+                            views={allViews}
+                            current={view}
+                            canEdit={canEdit}
+                            disabled={!readable}
+                            onPick={pick}
+                            onCreate={createView}
+                            onRename={renameView}
+                            onDelete={(target) => void deleteView(target)}
+                        />
+                    </div>
+                    <SegmentedControl
                         size="sm"
-                        onClick={() => setDrafting(true)}
-                        disabled={!config || drafting}
-                    >
-                        <Plus className="size-4" />
-                        {t(`objects.${object}.new`)}
-                    </Button>
-                ) : null}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-                <div className="mr-auto flex min-w-0 max-w-full items-center">
-                    <ViewPicker
-                        object={object}
-                        views={allViews}
-                        current={view}
-                        canEdit={canEdit}
-                        disabled={!readable}
-                        onPick={pick}
-                        onCreate={createView}
-                        onRename={renameView}
-                        onDelete={(target) => void deleteView(target)}
+                        value={kind}
+                        onValueChange={setKind}
+                        aria-label={t("views.layout")}
+                        options={[
+                            {
+                                value: "table",
+                                label: (
+                                    <span className="flex items-center gap-1.5">
+                                        <Table2 className="size-3.5 shrink-0" />
+                                        {t("views.kinds.table")}
+                                    </span>
+                                ),
+                                disabled: shaping
+                            },
+                            {
+                                value: "kanban",
+                                label: (
+                                    <span className="flex items-center gap-1.5">
+                                        <Kanban className="size-3.5 shrink-0" />
+                                        {t("views.kinds.kanban")}
+                                    </span>
+                                ),
+                                title: boardable ? undefined : t("views.noBoard"),
+                                disabled: shaping || !boardable
+                            }
+                        ]}
                     />
-                </div>
-                <SegmentedControl
-                    size="sm"
-                    value={kind}
-                    onValueChange={setKind}
-                    aria-label={t("views.layout")}
-                    options={[
-                        {
-                            value: "table",
-                            label: (
-                                <span className="flex items-center gap-1.5">
-                                    <Table2 className="size-3.5 shrink-0" />
-                                    {t("views.kinds.table")}
-                                </span>
-                            ),
-                            disabled: shaping
-                        },
-                        {
-                            value: "kanban",
-                            label: (
-                                <span className="flex items-center gap-1.5">
-                                    <Kanban className="size-3.5 shrink-0" />
-                                    {t("views.kinds.kanban")}
-                                </span>
-                            ),
-                            title: boardable ? undefined : t("views.noBoard"),
-                            disabled: shaping || !boardable
-                        }
-                    ]}
-                />
-                <FilterButton
-                    object={object}
-                    filter={config?.filter ?? filters.EMPTY_FILTER}
-                    people={people}
-                    disabled={shaping}
-                    onChange={(next) => setConfig({ filter: next })}
-                />
-                <SortMenu
-                    object={object}
-                    sorts={sorts}
-                    disabled={shaping}
-                    onChange={(next) => setConfig({ sorts: next })}
-                />
-                {kind === "table" || views.groupFields(object).length > 1 ? (
-                    <GroupMenu
+                    <FilterButton
                         object={object}
-                        board={kind === "kanban"}
-                        value={groupField}
+                        filter={config?.filter ?? filters.EMPTY_FILTER}
+                        people={people}
                         disabled={shaping}
-                        onChange={(key) =>
-                            setConfig(kind === "kanban" ? { boardBy: key } : { groupBy: key })
-                        }
+                        onChange={(next) => setConfig({ filter: next })}
                     />
-                ) : null}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={shaping}>
-                            <Columns3 className="size-4" />
-                            {t("columns.fields")}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                        {(config?.columns ?? [])
-                            .filter((column) => column.key !== primary.key)
-                            .map((column) => (
-                                <DropdownMenuItem
-                                    key={column.key}
-                                    onSelect={(event) => {
-                                        event.preventDefault();
-                                        toggleColumn(column.key);
-                                    }}
-                                    className="gap-2"
-                                >
-                                    <span
-                                        className={cn(
-                                            "grid size-4 shrink-0 place-items-center rounded border",
-                                            column.hidden
-                                                ? "border-border-strong bg-field"
-                                                : "border-primary bg-primary text-primary-foreground"
-                                        )}
-                                        aria-hidden
-                                    >
-                                        {column.hidden ? null : (
-                                            <span className="size-1.5 rounded-sm bg-current" />
-                                        )}
-                                    </span>
-                                    <span className="truncate">
-                                        {t(
-                                            `fields.${object}.${column.key}` as Parameters<
-                                                typeof t
-                                            >[0]
-                                        )}
-                                    </span>
-                                </DropdownMenuItem>
-                            ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-
-            {body}
-
-            {selected.length > 0 && kind === "table" ? (
-                <div
-                    role="toolbar"
-                    aria-label={t("selection.toolbar")}
-                    className="flex flex-wrap items-center gap-2 self-center rounded-lg border border-border-strong bg-elevated px-3 py-2 shadow-popover"
-                >
-                    <span className="text-[0.8125rem] font-medium tabular-nums">
-                        {t("selection.count", { count: selected.length })}
-                    </span>
-                    {canEdit ? (
-                        <Button size="sm" variant="ghost" onClick={() => setBulkOpen(true)}>
-                            <Pencil className="size-4" />
-                            {t("selection.edit")}
+                    <SortMenu
+                        object={object}
+                        sorts={sorts}
+                        disabled={shaping}
+                        onChange={(next) => setConfig({ sorts: next })}
+                    />
+                    {can?.edit ? (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={shaping}
+                            onClick={() => setFieldsOpen(true)}
+                        >
+                            <SlidersHorizontal className="size-4" />
+                            {t("customFields.manage")}
                         </Button>
                     ) : null}
-                    {canDelete ? (
+                    {kind === "table" || views.groupFields(object, custom).length > 1 ? (
+                        <GroupMenu
+                            object={object}
+                            board={kind === "kanban"}
+                            value={groupField}
+                            disabled={shaping}
+                            onChange={(key) =>
+                                setConfig(kind === "kanban" ? { boardBy: key } : { groupBy: key })
+                            }
+                        />
+                    ) : null}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={shaping}>
+                                <Columns3 className="size-4" />
+                                {t("columns.fields")}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            {(config?.columns ?? [])
+                                .filter((column) => column.key !== primary.key)
+                                .map((column) => (
+                                    <DropdownMenuItem
+                                        key={column.key}
+                                        onSelect={(event) => {
+                                            event.preventDefault();
+                                            toggleColumn(column.key);
+                                        }}
+                                        className="gap-2"
+                                    >
+                                        <span
+                                            className={cn(
+                                                "grid size-4 shrink-0 place-items-center rounded border",
+                                                column.hidden
+                                                    ? "border-border-strong bg-field"
+                                                    : "border-primary bg-primary text-primary-foreground"
+                                            )}
+                                            aria-hidden
+                                        >
+                                            {column.hidden ? null : (
+                                                <span className="size-1.5 rounded-sm bg-current" />
+                                            )}
+                                        </span>
+                                        <span className="truncate">{fieldName(column.key)}</span>
+                                    </DropdownMenuItem>
+                                ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+
+                {body}
+
+                {selected.length > 0 && kind === "table" ? (
+                    <div
+                        role="toolbar"
+                        aria-label={t("selection.toolbar")}
+                        className="flex flex-wrap items-center gap-2 self-center rounded-lg border border-border-strong bg-elevated px-3 py-2 shadow-popover"
+                    >
+                        <span className="text-[0.8125rem] font-medium tabular-nums">
+                            {t("selection.count", { count: selected.length })}
+                        </span>
+                        {canEdit ? (
+                            <Button size="sm" variant="ghost" onClick={() => setBulkOpen(true)}>
+                                <Pencil className="size-4" />
+                                {t("selection.edit")}
+                            </Button>
+                        ) : null}
+                        {canDelete ? (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-danger"
+                                onClick={() => void trash()}
+                            >
+                                <Trash2 className="size-4" />
+                                {t("selection.trash")}
+                            </Button>
+                        ) : null}
                         <Button
                             size="sm"
                             variant="ghost"
-                            className="text-danger"
-                            onClick={() => void trash()}
+                            onClick={() => setSelected([])}
+                            aria-label={t("selection.clear")}
+                            title={t("selection.clear")}
                         >
-                            <Trash2 className="size-4" />
-                            {t("selection.trash")}
+                            <X className="size-4" />
                         </Button>
-                    ) : null}
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setSelected([])}
-                        aria-label={t("selection.clear")}
-                        title={t("selection.clear")}
-                    >
-                        <X className="size-4" />
-                    </Button>
-                </div>
-            ) : null}
+                    </div>
+                ) : null}
 
-            {bulkOpen ? (
-                <BulkEditDialog
-                    object={object}
-                    count={selected.length}
-                    people={people}
-                    defaultCurrency={format.preferences.currency}
-                    onApply={bulkEdit}
-                    onClose={() => setBulkOpen(false)}
-                />
-            ) : null}
-            {confirmElement}
-        </div>
+                {bulkOpen ? (
+                    <BulkEditDialog
+                        object={object}
+                        count={selected.length}
+                        people={people}
+                        defaultCurrency={format.preferences.currency}
+                        onApply={bulkEdit}
+                        onClose={() => setBulkOpen(false)}
+                    />
+                ) : null}
+                {fieldsOpen ? (
+                    <FieldsDialog
+                        object={object}
+                        fields={addedFields ?? []}
+                        canDelete={Boolean(can?.delete)}
+                        onChanged={() => opening.refresh()}
+                        onCreated={(field) => {
+                            // A field just added shows in the view it was added from.
+                            if (config) {
+                                const def = customDef(field);
+                                setConfig({
+                                    columns: [
+                                        ...config.columns.filter((one) => one.key !== def.key),
+                                        {
+                                            key: def.key,
+                                            width: def.width,
+                                            hidden: false,
+                                            aggregate: null
+                                        }
+                                    ]
+                                });
+                            }
+                            opening.refresh();
+                        }}
+                        onClose={() => setFieldsOpen(false)}
+                    />
+                ) : null}
+                {confirmElement}
+            </div>
+        </CustomFieldsProvider>
     );
 }

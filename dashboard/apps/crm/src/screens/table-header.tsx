@@ -7,6 +7,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { fieldLabel } from "./custom-fields";
 import { useState, type DragEvent } from "react";
 import type { CrmObject, FieldDef } from "../model/objects";
 import { ArrowDown, ArrowUp, ArrowDownUp, EyeOff, X } from "lucide-react";
@@ -50,7 +51,7 @@ export function HeaderCell({
 }) {
     const t = useCrmT();
     const [over, setOver] = useState(false);
-    const label = t(`fields.${object}.${field.key}` as Parameters<typeof t>[0]);
+    const label = fieldLabel(t, object, field);
     const movable = !field.primary;
     const SortIcon = sort?.direction === "asc" ? ArrowUp : ArrowDown;
 
