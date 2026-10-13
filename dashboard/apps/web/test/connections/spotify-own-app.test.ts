@@ -4,7 +4,8 @@
  * What is pinned:
  * - a link is refreshed with the app that issued it, whichever that was; a link
  *   from before anybody had their own app is the deployment's;
- * - a new link uses the person's own app when they have one;
+ * - a new link always goes through the deployment's app, even for somebody who
+ *   stored their own before that was the administrator's to set up;
  * - the pasted pair is checked against the schema both sides share, and with
  *   Spotify itself before it is stored;
  * - the credential a code is exchanged for says which app it belongs to.
@@ -74,14 +75,14 @@ describe("which app a link speaks through", () => {
             own.pickOAuthClient({
                 own: MINE,
                 deployment: DEPLOYMENT,
-                issuedTo: undefined,
-                existing: true
+                issuedTo: undefined
             })
         ).toBe(DEPLOYMENT);
     });
 
-    it("is their own for a new link, and the deployment's when they have none", () => {
-        expect(own.pickOAuthClient({ own: MINE, deployment: DEPLOYMENT })).toBe(MINE);
+    it("is the deployment's for a new link, even with an app of their own", () => {
+        expect(own.pickOAuthClient({ own: MINE, deployment: DEPLOYMENT })).toBe(DEPLOYMENT);
+        expect(own.pickOAuthClient({ own: MINE, deployment: null })).toBeNull();
         expect(own.pickOAuthClient({ own: null, deployment: DEPLOYMENT })).toBe(DEPLOYMENT);
         expect(own.pickOAuthClient({ own: null, deployment: null })).toBeNull();
     });

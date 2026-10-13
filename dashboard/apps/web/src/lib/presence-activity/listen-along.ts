@@ -94,8 +94,7 @@ async function listenerToken(
     const client = pickOAuthClient({
         own,
         deployment,
-        issuedTo: credential.clientId,
-        existing: true
+        issuedTo: credential.clientId
     });
     if (!client) return null;
     const token = await spotifyAccessToken(client, credential).catch((caught: unknown) => {

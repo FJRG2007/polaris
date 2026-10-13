@@ -167,7 +167,7 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
         ownOAuthAppsFor(userIds, SPOTIFY_PROVIDER)
     ]);
     const clientFor = (userId: string, issuedTo: string | undefined): SpotifyOAuthClient | null =>
-        pickOAuthClient({ own: ownApps.get(userId) ?? null, deployment, issuedTo, existing: true });
+        pickOAuthClient({ own: ownApps.get(userId) ?? null, deployment, issuedTo });
     const present = new Set(here.map((row) => row.userId));
     const hosts = new Set(along.map((row) => row.hostId));
     const listeners = new Set(along.map((row) => row.listenerId));

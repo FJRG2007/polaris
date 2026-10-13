@@ -12,6 +12,10 @@
  * A link is always refreshed with the app that issued it: a refresh token is
  * bound to its client, so a person who adds or removes their own app later must
  * not have an existing link spoken for by the other one (`pickOAuthClient`).
+ *
+ * Setting up a provider app is the administrator's job, so a new link always
+ * goes through the deployment's. An app somebody stored before that only keeps
+ * the links it already issued alive.
  */
 
 import { prisma } from "@polaris/db";
@@ -27,15 +31,13 @@ import type { OwnOAuthAppInput } from "./own-oauth-app-schema";
  *
  * - `issuedTo` set: exactly that app, or nothing when it is gone - a token
  *   refreshed through another client is refused anyway.
- * - An `existing` link with no record of its app predates personal apps, so it
- *   is the deployment's.
- * - A new link: the person's own app first, then the deployment's.
+ * - Otherwise the deployment's: a link with no record of its app predates
+ *   personal apps, and a new link goes through what the administrator set up.
  */
 export function pickOAuthClient(options: {
     own: OAuthAppClient | null;
     deployment: OAuthAppClient | null;
     issuedTo?: string;
-    existing?: boolean;
 }): OAuthAppClient | null {
     const { own, deployment, issuedTo } = options;
     if (issuedTo) {
@@ -43,8 +45,7 @@ export function pickOAuthClient(options: {
         if (deployment?.clientId === issuedTo) return deployment;
         return null;
     }
-    if (options.existing) return deployment;
-    return own ?? deployment;
+    return deployment;
 }
 
 function decrypt(row: {

@@ -14,7 +14,6 @@
  * that already connected.
  */
 
-import { ownOAuthAppClientId } from "./own-oauth-app";
 import { STEAM_PROVIDER } from "./steam";
 import { connectionProven } from "./proven";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -262,7 +261,6 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
     },
     spotify: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/spotify/callback`,
-        // A person's own app first: the deployment's serves five people at most.
         client: (userId) => (userId ? spotifyClientFor(userId) : getSpotifyOAuthClient()),
         authorizeUrl: (client, redirectUri, state) =>
             spotifyAuthorizeUrl(client, redirectUri, state),
@@ -322,15 +320,6 @@ export async function connectionLinkAvailable(
 ): Promise<boolean> {
     if (provider === STEAM_PROVIDER)
         return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
-    // Somebody who registered their own application has proved nothing to
-    // anybody else, but needs nothing from the operator either.
-    if (
-        options?.userId &&
-        supportsOAuth(provider) &&
-        (await ownOAuthAppClientId(options.userId, provider))
-    ) {
-        return true;
-    }
     if (!supportsOAuth(provider) || (await connectionOAuthClient(provider)) === null) return false;
     return options?.admin === true || (await connectionProven(provider));
 }

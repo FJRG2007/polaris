@@ -290,7 +290,6 @@
         "web/src/app/(app)/account/companies-card.tsx",
         "web/src/app/(app)/account/connections/actions.ts",
         "web/src/app/(app)/account/connections/connections-view.tsx",
-        "web/src/app/(app)/account/connections/own-app-dialog.tsx",
         "web/src/app/(app)/account/connections/page.tsx",
         "web/src/app/(app)/account/details-card.tsx",
         "web/src/app/(app)/account/details/account-view.tsx",

@@ -40,6 +40,7 @@ import { publicAppUrl, requestOrigin } from "@/lib/domain-service";
 import type { CalendarLinkProvider } from "@/lib/calendar-host";
 import { connectionSignInChallenged } from "@/lib/instance-security";
 import { signInWithConnection, type ConnectionSignInResult } from "@polaris/auth";
+import { FAILURE_RECORDED } from "./outcome-params";
 import { clearConnectionFailure, describeFailure, recordConnectionFailure } from "./attention";
 import { readSteamPersona, steamAuthorizeUrl, STEAM_PROVIDER, verifySteamReturn } from "./steam";
 import {
@@ -597,9 +598,16 @@ async function finishLink(
             return endLink(origin, provider, "limit", screen, extra);
         // Those two are this person's to resolve. This one is the operator's, and
         // they are not the person standing at the redirect - so they are told.
-        if ((await connectionOAuthClient(provider))?.clientId === client.clientId)
-            await recordConnectionFailure(provider, describeFailure(caught));
-        return endLink(origin, provider, "error", screen, extra);
+        const recorded =
+            (await connectionOAuthClient(provider))?.clientId === client.clientId &&
+            (await recordConnectionFailure(provider, describeFailure(caught)));
+        return endLink(
+            origin,
+            provider,
+            "error",
+            screen,
+            recorded ? { ...extra, [FAILURE_RECORDED]: "1" } : extra
+        );
     }
 }
 

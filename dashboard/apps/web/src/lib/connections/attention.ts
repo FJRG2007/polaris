@@ -41,7 +41,9 @@ export interface ConnectionFailure {
 }
 
 /** The failure held on a stored config, or null when there is none to read. */
-export function readConnectionFailure(config: Record<string, unknown> | undefined): ConnectionFailure | null {
+export function readConnectionFailure(
+    config: Record<string, unknown> | undefined
+): ConnectionFailure | null {
     const held = config?.[FAILURE];
     if (!held || typeof held !== "object") return null;
     const { at, reason } = held as Record<string, unknown>;
@@ -70,20 +72,25 @@ export function describeFailure(caught: unknown): string {
 /**
  * Record a refusal and tell whoever can act on it. Never throws: it runs on the
  * path that is already handling a failure, and the person waiting on that
- * redirect must still land somewhere.
+ * redirect must still land somewhere. Answers whether the reason was recorded.
  */
-export async function recordConnectionFailure(provider: string, reason: string): Promise<void> {
+export async function recordConnectionFailure(provider: string, reason: string): Promise<boolean> {
+    let recorded = false;
     try {
         const state = await getIntegrationState(provider);
         // No row means no application: nothing reached the provider, so there is
         // nothing here for an operator to go and fix.
-        if (!state) return;
+        if (!state) return false;
         await upsertIntegration(provider, {
-            config: { ...state.config, [FAILURE]: { at: new Date().toISOString(), reason } satisfies ConnectionFailure }
+            config: {
+                ...state.config,
+                [FAILURE]: { at: new Date().toISOString(), reason } satisfies ConnectionFailure
+            }
         });
+        recorded = true;
 
         const throttle = await rateLimit(`integration-attention:${provider}`, 1, ALERT_WINDOW_MS);
-        if (!throttle.ok) return;
+        if (!throttle.ok) return recorded;
 
         const name = findConnectionProvider(provider)?.name ?? provider;
         await notifyOperators({
@@ -103,6 +110,7 @@ export async function recordConnectionFailure(provider: string, reason: string):
     } catch (error) {
         console.error("polaris: could not record the connection failure:", error);
     }
+    return recorded;
 }
 
 /** Forget the last failure, on an authorization that completed. What it answers

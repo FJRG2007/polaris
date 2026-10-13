@@ -11,7 +11,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { rows, alerts, throttle, broken } = vi.hoisted(() => ({
-    rows: new Map<string, { provider: string; enabled: boolean; config: Record<string, unknown>; hasSecret: boolean; updatedAt: string | null }>(),
+    rows: new Map<
+        string,
+        {
+            provider: string;
+            enabled: boolean;
+            config: Record<string, unknown>;
+            hasSecret: boolean;
+            updatedAt: string | null;
+        }
+    >(),
     alerts: [] as { event: string; title: string; body: string }[],
     throttle: { ok: true },
     /** Set when the test wants the write itself to fail. */
@@ -58,9 +67,9 @@ beforeEach(() => {
 
 describe("describeFailure", () => {
     it("repeats what the provider module threw", () => {
-        expect(describeFailure(new Error("Epic refused the token request (401): invalid_client"))).toBe(
-            "Epic refused the token request (401): invalid_client"
-        );
+        expect(
+            describeFailure(new Error("Epic refused the token request (401): invalid_client"))
+        ).toBe("Epic refused the token request (401): invalid_client");
     });
 
     it("still says something for whatever else was thrown", () => {
@@ -72,7 +81,12 @@ describe("describeFailure", () => {
 describe("recordConnectionFailure", () => {
     it("records the reason and tells whoever can act on it", async () => {
         install("epic");
-        await recordConnectionFailure("epic", "Epic refused the token request (401): invalid_client");
+        expect(
+            await recordConnectionFailure(
+                "epic",
+                "Epic refused the token request (401): invalid_client"
+            )
+        ).toBe(true);
 
         const held = await connectionFailure("epic");
         expect(held?.reason).toContain("invalid_client");
@@ -89,7 +103,9 @@ describe("recordConnectionFailure", () => {
     it("keeps recording while the alert is throttled", async () => {
         install("epic");
         throttle.ok = false;
-        await recordConnectionFailure("epic", "Epic refused the token request (500)");
+        expect(await recordConnectionFailure("epic", "Epic refused the token request (500)")).toBe(
+            true
+        );
 
         expect(alerts).toHaveLength(0);
         // The screen reads this, and it should say what happened last rather than
@@ -98,7 +114,9 @@ describe("recordConnectionFailure", () => {
     });
 
     it("says nothing about a service that was never configured", async () => {
-        await recordConnectionFailure("epic", "Epic refused the token request (401)");
+        expect(await recordConnectionFailure("epic", "Epic refused the token request (401)")).toBe(
+            false
+        );
         expect(alerts).toHaveLength(0);
         expect(await connectionFailure("epic")).toBeNull();
     });
@@ -108,14 +126,17 @@ describe("recordConnectionFailure", () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
         broken.write = true;
 
-        await expect(recordConnectionFailure("epic", "anything")).resolves.toBeUndefined();
+        await expect(recordConnectionFailure("epic", "anything")).resolves.toBe(false);
         vi.restoreAllMocks();
     });
 });
 
 describe("clearConnectionFailure", () => {
     it("forgets it once an authorization completes", async () => {
-        install("epic", { clientId: "abc", lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "invalid_client" } });
+        install("epic", {
+            clientId: "abc",
+            lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "invalid_client" }
+        });
         await clearConnectionFailure("epic");
 
         expect(await connectionFailure("epic")).toBeNull();
