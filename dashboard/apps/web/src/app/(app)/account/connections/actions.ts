@@ -16,6 +16,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
 import { lastfmNameSchema, minecraftNameSchema } from "@polaris/core";
 import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
+import { SPOTIFY_PROVIDER, verifySpotifyClient } from "@/lib/connections/spotify";
+import { ownOAuthAppSchema, removeOwnOAuthApp, saveOwnOAuthApp } from "@/lib/connections/own-oauth-app";
 import { LastfmKeyRefused, LastfmUnknownUser, readLastfmPlaying } from "@/lib/connections/lastfm";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { readGithubAccount } from "@/lib/github-service";
@@ -258,6 +260,43 @@ export async function saveLastfmNameAction(rawName: unknown): Promise<{ error?: 
         console.error("typed Last.fm name not saved:", caught);
         return { error: t("connections.errors.usernameNotSaved") };
     }
+}
+
+/**
+ * Keep a Spotify app of one's own, for linking past the deployment app's five.
+ *
+ * Validated, then asked of Spotify with the pair alone, before it is stored: a
+ * mistyped secret would otherwise surface as a consent screen that fails.
+ */
+export async function saveOwnSpotifyAppAction(raw: unknown): Promise<{ error?: string; clientId?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+
+    const parsed = ownOAuthAppSchema.safeParse(raw);
+    if (!parsed.success) return issue(parsed.error.issues[0]?.message, "connections.ownApp.errors.clientIdShape");
+
+    const t = await getTranslations("account");
+    let accepted: boolean;
+    try {
+        accepted = await verifySpotifyClient(parsed.data);
+    } catch {
+        return { error: t("connections.ownApp.errors.unreachable") };
+    }
+    if (!accepted) return { error: t("connections.ownApp.errors.refused") };
+    await saveOwnOAuthApp(user.id, SPOTIFY_PROVIDER, parsed.data);
+    revalidatePath(CONNECTIONS_PATH);
+    return { clientId: parsed.data.clientId };
+}
+
+/** Stop using one's own Spotify app. A link it issued has to be made again. */
+export async function removeOwnSpotifyAppAction(): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    await removeOwnOAuthApp(user.id, SPOTIFY_PROVIDER);
+    revalidatePath(CONNECTIONS_PATH);
+    return {};
 }
 
 /** Forget one linked account. */

@@ -14,30 +14,13 @@
  * not have an existing link spoken for by the other one (`pickOAuthClient`).
  */
 
-import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import type { OAuthAppClient } from "./oauth-app";
 import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
 
-/** A client id or secret as a provider's dashboard shows it: letters and digits.
- *  Bounded rather than pinned to one provider's exact length. */
-const CREDENTIAL_PATTERN = /^[A-Za-z0-9]{16,128}$/;
-
-export const ownOAuthAppSchema = z.object({
-    clientId: z
-        .string()
-        .trim()
-        .min(1, "connections.ownApp.errors.clientIdRequired")
-        .regex(CREDENTIAL_PATTERN, "connections.ownApp.errors.clientIdShape"),
-    clientSecret: z
-        .string()
-        .trim()
-        .min(1, "connections.ownApp.errors.secretRequired")
-        .regex(CREDENTIAL_PATTERN, "connections.ownApp.errors.secretShape")
-});
-
-export type OwnOAuthAppInput = z.infer<typeof ownOAuthAppSchema>;
+export { ownOAuthAppSchema, type OwnOAuthAppInput } from "./own-oauth-app-schema";
+import type { OwnOAuthAppInput } from "./own-oauth-app-schema";
 
 /**
  * Which application a link speaks through.

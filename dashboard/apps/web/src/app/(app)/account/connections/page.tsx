@@ -14,16 +14,20 @@ import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
 import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
-import { connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
+import { ownOAuthAppClientId } from "@/lib/connections/own-oauth-app";
+import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
+import type { OwnAppCard } from "./own-app-dialog";
+import { connectionFlowOrigin, connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConnectionsPage() {
     const user = await requireUser();
     const t = await getTranslations("account");
-    const [linked, lastfmReady] = await Promise.all([
+    const [linked, lastfmReady, spotifyApp] = await Promise.all([
         listConnections(user.id),
-        lastfmApiKey().then((key) => key !== null)
+        lastfmApiKey().then((key) => key !== null),
+        ownSpotifyApp(user.id)
     ]);
 
     const providers = await Promise.all(
@@ -56,6 +60,7 @@ export default async function ConnectionsPage() {
             // the card says nothing about signing in rather than pointing at a
             // switch that would do nothing.
             canSignIn: await connectionSignInAllowed(provider.slug),
+            ...(provider.slug === "spotify" ? { ownApp: spotifyApp } : {}),
             accounts: linked
                 .filter((account) => account.provider === provider.slug)
                 .map((account) => ({
@@ -80,4 +85,22 @@ export default async function ConnectionsPage() {
             <ConnectionsView providers={providers} />
         </div>
     );
+}
+
+/** What the Spotify card needs to offer an app of one's own: the client id in
+ *  use, never the secret, and the values Spotify's create-app form asks for on
+ *  this deployment's address. */
+async function ownSpotifyApp(userId: string): Promise<OwnAppCard> {
+    const [clientId, origin] = await Promise.all([ownOAuthAppClientId(userId, "spotify"), connectionFlowOrigin()]);
+    const values = setupValuesFor("spotify", commonSetupValues(origin), { oauthApp: true, baseUrl: origin });
+    return {
+        clientId,
+        values: [
+            // Pasted into Spotify's form, which is in English, so not translated.
+            { key: "appName", value: "Polaris" },
+            { key: "appDescription", value: "Shows what I am listening to on Polaris, and lets me listen along." },
+            { key: "homeUrl", value: values.homeUrl ?? origin },
+            { key: "redirectUri", value: values.redirectUri ?? "" }
+        ]
+    };
 }

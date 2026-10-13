@@ -435,7 +435,36 @@
             "lastfmUnavailable": "Last.fm is not set up on this Polaris yet. Ask an administrator to add a Last.fm API key under Integrations.",
             "lastfmUnreachable": "Last.fm could not be reached. Try again in a moment."
         },
-        "enterUsername": "Enter your username"
+        "enterUsername": "Enter your username",
+        "ownApp": {
+            "use": "Use your own Spotify app",
+            "change": "Change",
+            "inUse": "Your own Spotify app is in use ({clientId}).",
+            "why": "Spotify lets one app link five people. Your own app has no such limit for you.",
+            "title": "Your own Spotify app",
+            "description": "Create an app in Spotify's developer dashboard and Polaris links your Spotify through it. As its owner you need no invitation; Spotify asks for Premium on the owner's account.",
+            "create": "Create an app",
+            "createHelp": "Paste the values below, and tick Web API where it asks which APIs the app uses.",
+            "paste": "Then copy the client id and secret from the app's Settings -> Basic Information and paste them here.",
+            "values": {
+                "appName": "App name",
+                "appDescription": "App description",
+                "homeUrl": "Website",
+                "redirectUri": "Redirect URI"
+            },
+            "clientId": "Client id",
+            "clientSecret": "Client secret",
+            "premium": "The app's owner needs Spotify Premium. After saving, connect Spotify again so the link goes through your app.",
+            "remove": "Stop using it",
+            "errors": {
+                "clientIdRequired": "Paste the client id",
+                "clientIdShape": "The client id is letters and numbers, as Spotify shows it.",
+                "secretRequired": "Paste the client secret",
+                "secretShape": "The secret is letters and numbers, as Spotify shows it.",
+                "refused": "Spotify did not accept that client id and secret. Copy both again from the app's Basic Information.",
+                "unreachable": "Spotify could not be reached. Try again in a moment."
+            }
+        }
     },
     "details": {
         "page": {
