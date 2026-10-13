@@ -13,8 +13,8 @@ import * as actions from "../actions/workflows";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2, Workflow, X } from "lucide-react";
-import { ActionFields, TriggerFields, useWorkflowWords } from "./workflow-fields";
+import { Pencil, Plus, Trash2, Workflow } from "lucide-react";
+import { ActionList, TriggerFields, useWorkflowWords } from "./workflow-fields";
 import {
     Button,
     Checkbox,
@@ -25,10 +25,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     EmptyState,
     Input,
     Select,
@@ -158,9 +154,6 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
 
     let body: React.ReactNode;
     if (draft) {
-        const kinds = model.ACTION_KINDS.filter(
-            (kind) => words.actionFits(kind, draft.trigger) && words.actionOffered(kind, options)
-        );
         body = (
             <div className="flex min-w-0 flex-col gap-4">
                 <label className="flex flex-col gap-1.5 text-[0.8125rem] font-medium">
@@ -212,85 +205,14 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                 </div>
                 <div className="flex flex-col gap-2">
                     <span className="text-[0.8125rem] font-medium">{t("workflows.actions")}</span>
-                    {draft.actions.length === 0 ? (
-                        <p className="text-[0.8125rem] text-muted-foreground">
-                            {t("workflows.noActions")}
-                        </p>
-                    ) : (
-                        <ol className="flex flex-col gap-2">
-                            {draft.actions.map((action, index) => (
-                                <li
-                                    key={index}
-                                    className="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/50 p-3"
-                                >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="truncate text-[0.8125rem] font-medium">
-                                            {index + 1}. {t(`workflows.actionKinds.${action.kind}`)}
-                                        </span>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="size-7 shrink-0 p-0"
-                                            aria-label={t("workflows.removeAction")}
-                                            title={t("workflows.removeAction")}
-                                            onClick={() =>
-                                                setDraft({
-                                                    ...draft,
-                                                    actions: draft.actions.filter(
-                                                        (_, at) => at !== index
-                                                    )
-                                                })
-                                            }
-                                        >
-                                            <X className="size-3.5" />
-                                        </Button>
-                                    </div>
-                                    <ActionFields
-                                        object={object}
-                                        trigger={draft.trigger}
-                                        action={action}
-                                        options={options}
-                                        onChange={(next) =>
-                                            setDraft({
-                                                ...draft,
-                                                actions: draft.actions.map((one, at) =>
-                                                    at === index ? next : one
-                                                )
-                                            })
-                                        }
-                                    />
-                                </li>
-                            ))}
-                        </ol>
-                    )}
-                    {kinds.length > 0 && draft.actions.length < model.MAX_WORKFLOW_ACTIONS ? (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="self-start">
-                                    <Plus className="size-4" />
-                                    {t("workflows.addAction")}
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start">
-                                {kinds.map((kind) => (
-                                    <DropdownMenuItem
-                                        key={kind}
-                                        onSelect={() =>
-                                            setDraft({
-                                                ...draft,
-                                                actions: [
-                                                    ...draft.actions,
-                                                    words.newAction(kind, options)
-                                                ]
-                                            })
-                                        }
-                                    >
-                                        {t(`workflows.actionKinds.${kind}`)}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    ) : null}
+                    <ActionList
+                        object={object}
+                        trigger={draft.trigger}
+                        actions={draft.actions}
+                        kinds={model.ACTION_KINDS}
+                        options={options}
+                        onChange={(list) => setDraft({ ...draft, actions: list })}
+                    />
                 </div>
             </div>
         );

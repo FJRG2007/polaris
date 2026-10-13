@@ -520,7 +520,10 @@
             "createTask": "Create a task",
             "notify": "Send a notification",
             "sendEmail": "Send an email",
-            "httpRequest": "Send to an address"
+            "httpRequest": "Send to an address",
+            "filter": "Go on only if the record matches",
+            "ifElse": "If the record matches",
+            "forEach": "For each record found"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -570,7 +573,13 @@
         "emailNoMailbox": "Emails go from your own mailbox. Add one in Mail first.",
         "emailNoAddress": "The email had nobody to go to.",
         "emailBadAddress": "{address} is not an email address.",
-        "emailTooMany": "An email from a workflow goes to {count} addresses at most."
+        "emailTooMany": "An email from a workflow goes to {count} addresses at most.",
+        "filterHint": "When it does not match, the run ends here.",
+        "then": "Then",
+        "otherwise": "Otherwise",
+        "foundLimit": "How many records",
+        "foundUpTo": "Up to {count}",
+        "forEachFound": "On each record found"
     },
     "favorites": {
         "add": "Add to favorites",

@@ -15,7 +15,8 @@ import { prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
 import { host } from "@polaris/app-host";
 import type { NewEvent } from "./timeline";
-import { writable } from "./columns";
+import { listWhere } from "./query";
+import { table, writable } from "./columns";
 import { loadFields } from "./fields";
 import * as records from "./records";
 import { importRecords, readRows } from "./import";
@@ -123,6 +124,18 @@ async function checkActions(
     for (const action of actions) {
         if (!model.actionFits(action.kind, trigger.kind)) {
             throw new CrmRefusal(t("workflows.actionNeedsRecord"));
+        }
+        if (action.kind === "filter" || action.kind === "ifElse") {
+            await records.requireListShown(actor, object, { filter: action.when });
+        }
+        if (action.kind === "ifElse") {
+            await checkActions(actor, object, trigger, [...action.then, ...action.otherwise]);
+        }
+        if (action.kind === "forEach") {
+            await requireCan(actor, object, "read");
+            await records.requireListShown(actor, object, { filter: action.where });
+            // In the loop there is always a record: the one found.
+            await checkActions(actor, object, { kind: "manual" }, action.actions);
         }
         if (action.kind === "updateRecord" || action.kind === "createRecord") {
             const target = action.kind === "createRecord" ? action.object : object;
@@ -331,15 +344,69 @@ async function filled(
     return { keys, cells, record };
 }
 
-/** One action, done as the runner. */
+/** Whether the record a run is about matches a filter, read as the runner: a
+ *  record they may not see, or none at all, does not. */
+async function recordMatches(
+    runner: CrmActor,
+    context: RunContext,
+    filter: model.WorkflowFilter
+): Promise<boolean> {
+    if (!context.recordId) return false;
+    const custom = await loadFields(runner.shelf, context.object);
+    await records.requireListShown(runner, context.object, { filter });
+    const where = listWhere(context.object, runner, { filter, custom });
+    const count = await table(context.object).count({
+        where: { AND: [where, { id: context.recordId }] }
+    });
+    return count > 0;
+}
+
+/** Actions in turn, to the end or to a filter the record does not pass:
+ *  false when one stopped the run. */
+async function runActions(
+    runner: CrmActor,
+    workflow: StoredWorkflow,
+    list: readonly model.WorkflowAction[],
+    context: RunContext
+): Promise<boolean> {
+    for (const action of list) {
+        if ((await runAction(runner, workflow, action, context)) === "stop") return false;
+    }
+    return true;
+}
+
+/** One action, done as the runner; "stop" when a filter ends the run. */
 async function runAction(
     runner: CrmActor,
     workflow: StoredWorkflow,
     action: model.WorkflowAction,
     context: RunContext
-): Promise<void> {
+): Promise<void | "stop"> {
     const t = await crmT();
     switch (action.kind) {
+        case "filter":
+            return (await recordMatches(runner, context, action.when)) ? undefined : "stop";
+        case "ifElse": {
+            const branch = (await recordMatches(runner, context, action.when))
+                ? action.then
+                : action.otherwise;
+            await runActions(runner, workflow, branch, context);
+            return;
+        }
+        case "forEach": {
+            const found = await records.listRecords(runner, context.object, {
+                filter: action.where,
+                limit: action.limit
+            });
+            for (const record of found.records) {
+                await runActions(runner, workflow, action.actions, {
+                    ...context,
+                    recordId: record.id,
+                    event: null
+                });
+            }
+            return;
+        }
         case "updateRecord": {
             if (!context.recordId) throw new CrmRefusal(t("workflows.actionNeedsRecord"));
             const { keys, cells } = await filled(runner, context, action.values);
@@ -504,9 +571,7 @@ export async function runWorkflow(
         const runner = await runnerOf(workflow);
         if (!runner) throw new CrmRefusal((await crmT())("workflows.noRunner"));
         await withinWorkflow(async () => {
-            for (const action of model.readActions(workflow.actions)) {
-                await runAction(runner, workflow, action, context);
-            }
+            await runActions(runner, workflow, model.readActions(workflow.actions), context);
         });
     } catch (caught) {
         lastError = await failureText(caught);

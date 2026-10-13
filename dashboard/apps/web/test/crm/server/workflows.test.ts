@@ -339,6 +339,121 @@ describe("record actions", () => {
     });
 });
 
+describe("branches and loops", () => {
+    const when = {
+        conjunction: "and",
+        rules: [{ id: "r1", key: "city", operator: "contains", value: "Paris" }]
+    };
+    const runOn = async (actions: unknown[], trigger: unknown = { kind: "created" }) => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored(trigger, { actions: JSON.stringify(actions) })
+        ]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            { recordId: RECORD, kind: "created", changes: [] }
+        ]);
+        const [[done]] = db.crmWorkflow.update.mock.calls as unknown as [
+            [{ data: { lastError: string | null } }]
+        ];
+        return done.data.lastError;
+    };
+    const record = { id: RECORD, name: "Acme", city: "", position: 0, deletedAt: null, ...stamp };
+
+    it("ends the run quietly where the record does not pass a filter", async () => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.count.mockResolvedValueOnce(0);
+        expect(
+            await runOn([
+                { kind: "filter", when },
+                { kind: "updateRecord", values: { city: "never" } }
+            ])
+        ).toBeNull();
+        expect(db.records.count).toHaveBeenCalledWith({
+            where: {
+                AND: [expect.objectContaining({ orgId: "o1", deletedAt: null }), { id: RECORD }]
+            }
+        });
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("runs one branch or the other by whether the record matches", async () => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.findMany.mockResolvedValue([record]);
+        const branch = {
+            kind: "ifElse",
+            when,
+            then: [{ kind: "updateRecord", values: { city: "matched" } }],
+            otherwise: [{ kind: "updateRecord", values: { city: "missed" } }]
+        };
+        db.records.count.mockResolvedValueOnce(1);
+        expect(await runOn([branch])).toBeNull();
+        expect(db.records.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ city: "matched" }) })
+        );
+
+        vi.clearAllMocks();
+        db.records.count.mockResolvedValueOnce(0);
+        expect(await runOn([branch])).toBeNull();
+        expect(db.records.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ city: "missed" }) })
+        );
+    });
+
+    it("runs a loop's actions on each record found, filled from that record", async () => {
+        const other = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+        db.records.findMany.mockResolvedValue([
+            { ...record, name: "Acme" },
+            { ...record, id: other, name: "Globex" }
+        ]);
+        db.records.count.mockResolvedValue(2);
+        db.records.findFirst.mockImplementation(
+            async (query?: { where?: { id?: string } }) =>
+                (query?.where?.id === other
+                    ? { ...record, id: other, name: "Globex" }
+                    : record) as never
+        );
+        const loop = {
+            kind: "forEach",
+            where: when,
+            limit: 5,
+            actions: [{ kind: "updateRecord", values: { city: "{{name}} city" } }]
+        };
+        expect(
+            await workflows.runWorkflow(
+                stored(
+                    { kind: "schedule", cron: "0 9 * * 1", timeZone: "UTC" },
+                    { actions: JSON.stringify([loop]) }
+                ),
+                { object: "companies", recordId: null, event: null }
+            )
+        ).toBeNull();
+        expect(db.records.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 5 }));
+        const written = (
+            db.records.updateMany.mock.calls as unknown as [
+                { where: { id: { in: string[] } }; data: { city: string } }
+            ][]
+        ).map(([call]) => [call.where.id.in[0], call.data.city]);
+        expect(written).toEqual([
+            [RECORD, "Acme city"],
+            [other, "Globex city"]
+        ]);
+        db.records.findFirst.mockReset();
+        db.records.count.mockReset();
+        db.records.count.mockResolvedValue(1);
+    });
+
+    it("refuses to save a check on the record under a trigger about none", async () => {
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "schedule", cron: "0 9 * * 1", timeZone: "UTC" },
+                actions: [{ kind: "filter", when }],
+                enabled: true
+            })
+        ).rejects.toThrow();
+        expect(db.crmWorkflow.create).not.toHaveBeenCalled();
+    });
+});
+
 describe("a field changing", () => {
     it("runs on the change the timeline logged, and refuses a field that is not there", async () => {
         db.crmWorkflow.findMany.mockResolvedValueOnce([

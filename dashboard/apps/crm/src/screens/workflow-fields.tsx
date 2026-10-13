@@ -10,7 +10,19 @@ import { useCrmT } from "./i18n";
 import { hostUi } from "@polaris/app-host/client";
 import { Plus, X } from "lucide-react";
 import * as model from "../model/workflows";
-import { Button, Checkbox, Input, Select, Textarea } from "@polaris/ui";
+import { FilterButton } from "./filter-panel";
+import { EMPTY_FILTER } from "../model/filters";
+import {
+    Button,
+    Checkbox,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Input,
+    Select,
+    Textarea
+} from "@polaris/ui";
 import { fieldLabel, optionLabel, useCustomFields } from "./custom-fields";
 import {
     CRM_OBJECTS,
@@ -305,7 +317,183 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
                     />
                 </div>
             );
+        case "filter":
+            return (
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <FilterButton
+                        object={object}
+                        filter={action.when}
+                        people={options.people}
+                        onChange={(when) => onChange({ ...action, when })}
+                    />
+                    <span className="text-[0.75rem] text-muted-foreground">
+                        {t("workflows.filterHint")}
+                    </span>
+                </div>
+            );
+        case "ifElse":
+            return (
+                <div className="flex min-w-0 flex-col gap-2">
+                    <FilterButton
+                        object={object}
+                        filter={action.when}
+                        people={options.people}
+                        onChange={(when) => onChange({ ...action, when })}
+                    />
+                    <span className="text-[0.75rem] font-medium">{t("workflows.then")}</span>
+                    <ActionList
+                        object={object}
+                        trigger={trigger}
+                        actions={action.then}
+                        kinds={model.LEAF_KINDS}
+                        options={options}
+                        onChange={(then) =>
+                            onChange({ ...action, then: then as model.LeafAction[] })
+                        }
+                    />
+                    <span className="text-[0.75rem] font-medium">{t("workflows.otherwise")}</span>
+                    <ActionList
+                        object={object}
+                        trigger={trigger}
+                        actions={action.otherwise}
+                        kinds={model.LEAF_KINDS}
+                        options={options}
+                        onChange={(otherwise) =>
+                            onChange({ ...action, otherwise: otherwise as model.LeafAction[] })
+                        }
+                    />
+                </div>
+            );
+        case "forEach":
+            return (
+                <div className="flex min-w-0 flex-col gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <FilterButton
+                            object={object}
+                            filter={action.where}
+                            people={options.people}
+                            onChange={(where) => onChange({ ...action, where })}
+                        />
+                        <Select
+                            aria-label={t("workflows.foundLimit")}
+                            value={String(action.limit)}
+                            onValueChange={(limit) => onChange({ ...action, limit: Number(limit) })}
+                            options={FOUND_CHOICES.map((count) => ({
+                                value: String(count),
+                                label: t("workflows.foundUpTo", { count })
+                            }))}
+                        />
+                    </div>
+                    <span className="text-[0.75rem] font-medium">
+                        {t("workflows.forEachFound")}
+                    </span>
+                    <ActionList
+                        object={object}
+                        trigger={{ kind: "manual" }}
+                        actions={action.actions}
+                        kinds={model.LEAF_KINDS}
+                        options={options}
+                        onChange={(list) =>
+                            onChange({ ...action, actions: list as model.LeafAction[] })
+                        }
+                    />
+                </div>
+            );
     }
+}
+
+/** How many records a "for each record found" may go through, offered. */
+const FOUND_CHOICES = [1, 5, 10, 25, model.MAX_FOUND];
+
+export interface ActionListProps {
+    readonly object: CrmObject;
+    readonly trigger: model.WorkflowTrigger;
+    readonly actions: readonly model.WorkflowAction[];
+    /** The kinds the reader may add here. */
+    readonly kinds: readonly model.ActionKind[];
+    readonly options: model.WorkflowOptions;
+    readonly onChange: (actions: model.WorkflowAction[]) => void;
+}
+
+/** A list of actions, each with its settings, and the menu that adds one. */
+export function ActionList({
+    object,
+    trigger,
+    actions,
+    kinds,
+    options,
+    onChange
+}: ActionListProps) {
+    const t = useCrmT();
+    const words = useWorkflowWords(object);
+    const offered = kinds.filter(
+        (kind) => words.actionFits(kind, trigger) && words.actionOffered(kind, options)
+    );
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            {actions.length === 0 ? (
+                <p className="text-[0.8125rem] text-muted-foreground">{t("workflows.noActions")}</p>
+            ) : (
+                <ol className="flex min-w-0 flex-col gap-2">
+                    {actions.map((action, index) => (
+                        <li
+                            key={index}
+                            className="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/50 p-3"
+                        >
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-[0.8125rem] font-medium">
+                                    {index + 1}. {t(`workflows.actionKinds.${action.kind}`)}
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="size-7 shrink-0 p-0"
+                                    aria-label={t("workflows.removeAction")}
+                                    title={t("workflows.removeAction")}
+                                    onClick={() =>
+                                        onChange(actions.filter((_, at) => at !== index))
+                                    }
+                                >
+                                    <X className="size-3.5" />
+                                </Button>
+                            </div>
+                            <ActionFields
+                                object={object}
+                                trigger={trigger}
+                                action={action}
+                                options={options}
+                                onChange={(next) =>
+                                    onChange(actions.map((one, at) => (at === index ? next : one)))
+                                }
+                            />
+                        </li>
+                    ))}
+                </ol>
+            )}
+            {offered.length > 0 && actions.length < model.MAX_WORKFLOW_ACTIONS ? (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="self-start">
+                            <Plus className="size-4" />
+                            {t("workflows.addAction")}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                        {offered.map((kind) => (
+                            <DropdownMenuItem
+                                key={kind}
+                                onSelect={() =>
+                                    onChange([...actions, words.newAction(kind, options)])
+                                }
+                            >
+                                {t(`workflows.actionKinds.${kind}`)}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            ) : null}
+        </div>
+    );
 }
 
 /** Where `{{field}}` fills in a value of the record. */
@@ -548,6 +736,12 @@ export function useWorkflowWords(object: CrmObject) {
                         title: `{{${primaryField(object).key}}}`,
                         body: ""
                     };
+                case "filter":
+                    return { kind, when: EMPTY_FILTER };
+                case "ifElse":
+                    return { kind, when: EMPTY_FILTER, then: [], otherwise: [] };
+                case "forEach":
+                    return { kind, where: EMPTY_FILTER, limit: 10, actions: [] };
             }
         },
         /** Whether an action can run under a trigger. */

@@ -322,3 +322,43 @@ describe("emailRecipients", () => {
         expect(emailRecipients(" ,; ")).toEqual({ addresses: [], invalid: [] });
     });
 });
+
+describe("branches and loops", () => {
+    const when = { conjunction: "and", rules: [] };
+    const update = { kind: "updateRecord", values: { city: "x" } };
+    const parse = (actions: unknown[]) =>
+        workflowInputSchema.safeParse({ name: "x", trigger: { kind: "created" }, actions }).success;
+
+    it("takes a filter, an if/else and a loop holding single actions", () => {
+        expect(
+            parse([
+                { kind: "filter", when },
+                { kind: "ifElse", when, then: [update], otherwise: [] },
+                { kind: "forEach", where: when, limit: 10, actions: [update] }
+            ])
+        ).toBe(true);
+    });
+
+    it("refuses a branch inside a branch, a loop with nothing to do or too many records", () => {
+        expect(
+            parse([{ kind: "ifElse", when, then: [{ kind: "filter", when }], otherwise: [] }])
+        ).toBe(false);
+        expect(parse([{ kind: "forEach", where: when, limit: 10, actions: [] }])).toBe(false);
+        expect(parse([{ kind: "forEach", where: when, limit: 500, actions: [update] }])).toBe(
+            false
+        );
+    });
+
+    it("counts the actions inside branches against the whole workflow", () => {
+        const ten = Array.from({ length: 10 }, () => update);
+        const branch = { kind: "ifElse", when, then: ten, otherwise: ten };
+        expect(parse([branch])).toBe(true);
+        expect(parse([branch, branch])).toBe(false);
+    });
+
+    it("checks the record only under a trigger about one, and loops under any", () => {
+        expect(actionFits("filter", "schedule")).toBe(false);
+        expect(actionFits("ifElse", "webhook")).toBe(false);
+        expect(actionFits("forEach", "schedule")).toBe(true);
+    });
+});

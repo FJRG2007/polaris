@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { isTimeZone, nextCronRun, parseCron } from "@polaris/core";
 import { csvValue } from "./csv";
+import { filterSchema, type ViewFilter } from "./filters";
 import type { EventKind, FieldChange } from "./timeline";
 import { CRM_OBJECTS, type FieldDef, type FieldValue } from "./objects";
 
@@ -145,8 +146,17 @@ const valuesSchema = z
         return count > 0 && count <= MAX_ACTION_VALUES;
     });
 
-/** One thing a workflow does. */
-export const workflowActionSchema = z.discriminatedUnion("kind", [
+/** A filter a workflow checks a record against, as a view's filter reads. */
+export type WorkflowFilter = ViewFilter;
+
+/** The most records one "for each record found" goes through. */
+export const MAX_FOUND = 50;
+
+/** The most actions one workflow holds, counting the ones inside branches. */
+export const MAX_TOTAL_ACTIONS = 30;
+
+/** The actions that do one thing, each on its own. */
+const LEAF_ACTIONS = [
     z.object({ kind: z.literal("updateRecord"), values: valuesSchema }),
     z.object({
         kind: z.literal("createRecord"),
@@ -182,12 +192,41 @@ export const workflowActionSchema = z.discriminatedUnion("kind", [
         kind: z.literal("httpRequest"),
         url: z.string().trim().max(REQUEST_URL_MAX).refine(isHttpAddress)
     })
+] as const;
+
+/** An action that does one thing: the kind a branch or a loop holds. */
+export const leafActionSchema = z.discriminatedUnion("kind", [...LEAF_ACTIONS]);
+export type LeafAction = z.infer<typeof leafActionSchema>;
+
+const branchSchema = z.array(leafActionSchema).max(MAX_WORKFLOW_ACTIONS);
+
+/** One thing a workflow does. */
+export const workflowActionSchema = z.discriminatedUnion("kind", [
+    ...LEAF_ACTIONS,
+    /** Go on only when the record matches; otherwise end the run there, as a
+     *  run that went well. */
+    z.object({ kind: z.literal("filter"), when: filterSchema }),
+    /** One list of actions when the record matches, the other when it does not. */
+    z.object({
+        kind: z.literal("ifElse"),
+        when: filterSchema,
+        then: branchSchema,
+        otherwise: branchSchema
+    }),
+    /** Find the records of the same kind that match, and run the actions on
+     *  each one in turn: in them, "the record" is the one found. */
+    z.object({
+        kind: z.literal("forEach"),
+        where: filterSchema,
+        limit: z.number().int().min(1).max(MAX_FOUND),
+        actions: branchSchema.min(1)
+    })
 ]);
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
 export type ActionKind = WorkflowAction["kind"];
 
-/** The actions in the order the screen offers them. */
-export const ACTION_KINDS: readonly ActionKind[] = [
+/** The actions that do one thing, in the order the screen offers them. */
+export const LEAF_KINDS: readonly LeafAction["kind"][] = [
     "updateRecord",
     "createRecord",
     "createTask",
@@ -195,6 +234,18 @@ export const ACTION_KINDS: readonly ActionKind[] = [
     "sendEmail",
     "httpRequest"
 ];
+
+/** The actions in the order the screen offers them. */
+export const ACTION_KINDS: readonly ActionKind[] = [...LEAF_KINDS, "filter", "ifElse", "forEach"];
+
+/** The actions a workflow's list holds, with the ones inside branches. */
+export function allActions(actions: readonly WorkflowAction[]): WorkflowAction[] {
+    return actions.flatMap((action): WorkflowAction[] => {
+        if (action.kind === "ifElse") return [action, ...action.then, ...action.otherwise];
+        if (action.kind === "forEach") return [action, ...action.actions];
+        return [action];
+    });
+}
 
 /** A recipient that is whoever an owner field of the record names. */
 export const FIELD_RECIPIENT = "field:";
@@ -210,7 +261,9 @@ export const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = [
 /** Whether an action can run under a kind of trigger: one that changes "the
  *  record" needs a trigger that is about one still there. */
 export function actionFits(kind: ActionKind, trigger: TriggerKind): boolean {
-    if (kind === "updateRecord") return LIVE_RECORD_TRIGGERS.includes(trigger);
+    if (kind === "updateRecord" || kind === "filter" || kind === "ifElse") {
+        return LIVE_RECORD_TRIGGERS.includes(trigger);
+    }
     return true;
 }
 
@@ -250,7 +303,10 @@ export const workflowInputSchema = z.object({
     id: z.string().uuid().optional(),
     name: z.string().trim().min(1).max(WORKFLOW_NAME_MAX),
     trigger: workflowTriggerSchema,
-    actions: z.array(workflowActionSchema).max(MAX_WORKFLOW_ACTIONS),
+    actions: z
+        .array(workflowActionSchema)
+        .max(MAX_WORKFLOW_ACTIONS)
+        .refine((actions) => allActions(actions).length <= MAX_TOTAL_ACTIONS),
     enabled: z.boolean().default(true),
     /** Give a webhook trigger a new address, ending the old one. */
     newHookSecret: z.boolean().optional()
