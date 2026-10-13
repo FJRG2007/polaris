@@ -23,8 +23,8 @@ import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { CellDisplay, RefChip } from "./cell-display";
 import type { RecordOpening } from "../lib/record-page";
-import { ArrowLeft, Link2, ShieldOff } from "lucide-react";
-import { Button, cn, EmptyState, useToast } from "@polaris/ui";
+import { ArrowLeft, Link2, Maximize2, ShieldOff } from "lucide-react";
+import { Button, cn, DialogTitle, EmptyState, useToast } from "@polaris/ui";
 import {
     fieldsOf,
     recordName,
@@ -38,7 +38,16 @@ function Block({ className }: { className?: string }) {
     return <span aria-hidden className={cn("block animate-pulse rounded bg-muted", className)} />;
 }
 
-export function RecordScreen({ object, id }: { object: CrmObject; id: string }) {
+export interface RecordScreenProps {
+    readonly object: CrmObject;
+    readonly id: string;
+    /** Drawn in a side panel over a list rather than on a page of its own. */
+    readonly panel?: boolean;
+    /** A change kept by the server, so a list behind the panel can show it. */
+    readonly onSaved?: (record: CrmRecord) => void;
+}
+
+export function RecordScreen({ object, id, panel = false, onSaved }: RecordScreenProps) {
     const t = useCrmT();
     const toast = useToast();
     const format = hostUi.displayFormat.useDisplayFormat();
@@ -67,7 +76,10 @@ export function RecordScreen({ object, id }: { object: CrmObject; id: string }) 
                 actions.updateRecordAction({ object, id, values: { [field.key]: stored } }),
             t("errors.generic")
         )
-            .then(({ record: saved }) => put(saved))
+            .then(({ record: saved }) => {
+                put(saved);
+                onSaved?.(saved);
+            })
             .catch((caught) => {
                 opening.replace(kept);
                 toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
@@ -91,18 +103,41 @@ export function RecordScreen({ object, id }: { object: CrmObject; id: string }) 
             .catch(() => undefined);
     };
 
+    const name = record ? recordName(object, record) || t("record.untitled") : null;
+    const title = (
+        <>
+            {name}
+            {!record && opening.loading ? <Block className="h-5 w-48" /> : null}
+        </>
+    );
+    const titleClass =
+        "mr-auto min-w-0 truncate text-[1.0625rem] font-semibold leading-tight tracking-tight";
     const header = (
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Button variant="ghost" size="sm" asChild>
-                <Link href={`/crm/${object}`}>
-                    <ArrowLeft className="size-4" />
-                    <span className="truncate" title={plural}>{plural}</span>
-                </Link>
-            </Button>
-            <h1 className="mr-auto min-w-0 truncate text-[1.0625rem] font-semibold leading-tight tracking-tight">
-                {record ? recordName(object, record) || t("record.untitled") : null}
-                {!record && opening.loading ? <Block className="h-5 w-48" /> : null}
-            </h1>
+        <div className={cn("flex min-w-0 flex-wrap items-center gap-2", panel && "pr-10")}>
+            {panel ? null : (
+                <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/crm/${object}`}>
+                        <ArrowLeft className="size-4" />
+                        <span className="truncate" title={plural}>{plural}</span>
+                    </Link>
+                </Button>
+            )}
+            {panel ? (
+                <DialogTitle className={titleClass}>{title}</DialogTitle>
+            ) : (
+                <h1 className={titleClass}>{title}</h1>
+            )}
+            {panel ? (
+                <Button variant="ghost" size="sm" asChild>
+                    <Link
+                        href={recordHref(object, id)}
+                        aria-label={t("record.openPage")}
+                        title={t("record.openPage")}
+                    >
+                        <Maximize2 className="size-4" />
+                    </Link>
+                </Button>
+            ) : null}
             {record ? (
                 <Button
                     variant="ghost"
@@ -216,7 +251,12 @@ export function RecordScreen({ object, id }: { object: CrmObject; id: string }) 
                     {t("record.inTrash")}
                 </p>
             ) : null}
-            <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+            <div
+                className={cn(
+                    "grid min-h-0 flex-1 content-start gap-3 overflow-y-auto",
+                    !panel && "lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]"
+                )}
+            >
                 <section
                     aria-label={t("record.fields")}
                     className="h-fit min-w-0 rounded-lg border border-border bg-card"

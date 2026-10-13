@@ -367,6 +367,7 @@
     },
     "record": {
         "open": "Abrir registro",
+        "openPage": "Abrir en página",
         "untitled": "Sin nombre",
         "fields": "Campos",
         "copyLink": "Copiar URL",

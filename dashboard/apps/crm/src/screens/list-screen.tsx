@@ -25,6 +25,7 @@ import { useGroups } from "./use-groups";
 import { messageOf, unwrap } from "./call";
 import * as filters from "../model/filters";
 import { RecordTable } from "./record-table";
+import { RecordScreen } from "./record-screen";
 import * as actions from "../actions/records";
 import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
@@ -62,6 +63,7 @@ import {
 import {
     Button,
     cn,
+    Dialog,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -69,6 +71,7 @@ import {
     EmptyState,
     Input,
     SegmentedControl,
+    SheetContent,
     useToast
 } from "@polaris/ui";
 
@@ -375,6 +378,8 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const refreshTotals = totals.refresh;
 
     const [selected, setSelected] = useState<string[]>([]);
+    /** The record open in the side panel. */
+    const [peek, setPeek] = useState<string | null>(null);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
@@ -776,6 +781,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 onMove={moveCard}
                 onCreate={(value, name) => create(name, { key: boardBy.key, value })}
                 onEdit={edit}
+                onOpen={setPeek}
             />
         );
     } else if (rows.length === 0 && !drafting && narrowed) {
@@ -834,6 +840,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 hasMore={rows.length < flat.total}
                 loadingMore={flat.loadingMore}
                 onLoadMore={flat.loadMore}
+                onOpen={setPeek}
                 grouping={
                     groupField && grouped.groups
                         ? {
@@ -1107,6 +1114,19 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     />
                 ) : null}
                 {confirmElement}
+                <Dialog open={peek !== null} onOpenChange={(open) => !open && setPeek(null)}>
+                    <SheetContent aria-describedby={undefined} className="p-4 sm:w-[38rem]">
+                        {peek ? (
+                            <RecordScreen
+                                key={peek}
+                                object={object}
+                                id={peek}
+                                panel
+                                onSaved={(record) => store.put([record])}
+                            />
+                        ) : null}
+                    </SheetContent>
+                </Dialog>
             </div>
         </CustomFieldsProvider>
     );
