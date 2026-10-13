@@ -56,8 +56,9 @@ const GREETING_TIMEOUT_MS = 20_000;
  * imapflow's own five minutes rather than one. Gmail answers the odd FETCH or
  * STATUS a minute and more late on an ordinary day, and at sixty seconds every
  * one of those threw the whole pass away and put "cannot reach this mail server"
- * on the screen over a server that was answering. A pass is one per mailbox at a
- * time, so a server that really has stopped holds up only its own mailbox.
+ * on the screen over a server that was answering. The scheduled sweep runs a
+ * few mailboxes side by side, so a server that really has stopped holds up only
+ * its own mailbox and not everybody else's mail behind it.
  */
 const SOCKET_TIMEOUT_MS = 5 * 60_000;
 

@@ -31,9 +31,13 @@ import {
     warmStreams
 } from "./relay";
 
-/** What each relay was receiving at the last pass, and when it was last restarted. */
+/** What each relay was receiving at the last pass, and its last restart: when,
+ *  for which streams, and how many restarts in a row left those still stalled. */
 const lastTraffic = new Map<string, StreamTraffic>();
-const lastRestart = new Map<string, number>();
+const lastRestart = new Map<
+    string,
+    { readonly at: number; readonly streams: readonly string[]; readonly fruitless: number }
+>();
 
 /**
  * A relay whose camera connection stopped delivering without closing is
@@ -46,8 +50,11 @@ async function recoverStalled(server: string, endpoint: RelayEndpoint): Promise<
     const stalled = stalledStreams(lastTraffic.get(server), traffic);
     lastTraffic.set(server, traffic);
     const now = Date.now();
-    if (!restartDue(stalled, lastRestart.get(server), now)) return false;
-    lastRestart.set(server, now);
+    const previous = lastRestart.get(server);
+    const again = previous ? stalled.some((name) => previous.streams.includes(name)) : false;
+    const fruitless = again && previous ? previous.fruitless + 1 : 0;
+    if (!restartDue(stalled, previous?.at, now, fruitless)) return false;
+    lastRestart.set(server, { at: now, streams: stalled, fruitless });
     // Counted afresh after the restart: the byte counts start over.
     lastTraffic.delete(server);
     console.warn(`[places] relay stream stalled (${stalled.join(", ")}); restarting the relay`);

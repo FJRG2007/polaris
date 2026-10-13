@@ -556,6 +556,16 @@ export async function reorderAccounts(
     );
 }
 
+/** Write down that a pass was tried, without saying how it went. A failure
+ *  still inside the grace leaves the rail as it was, and this is what keeps the
+ *  next try on the mailbox's own interval instead of the next tick. */
+export async function recordAccountAttempt(accountId: string): Promise<void> {
+    await prisma.mailAccount.updateMany({
+        where: { id: accountId },
+        data: { lastSyncAt: new Date() }
+    });
+}
+
 /** Write down what the last conversation with the server came to, so the rail
  *  can say so without asking again. A mailbox that was not working and now is
  *  has its refusal notices answered, so the bell stops asking for a fix. */

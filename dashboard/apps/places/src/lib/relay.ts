@@ -322,6 +322,21 @@ export type StreamTraffic = Record<string, number>;
  */
 export const RELAY_RESTART_COOLDOWN_MS = 5 * 60_000;
 
+/** The longest a relay that keeps stalling waits between restarts. */
+export const RELAY_RESTART_COOLDOWN_MAX_MS = 60 * 60_000;
+
+/**
+ * How long after a restart the next one waits.
+ *
+ * Doubles for each restart in a row that did not free the streams it was for:
+ * a camera that stays stalled through a restart is not one a restart fixes, and
+ * every restart drops every other camera on the relay with it.
+ */
+export function relayRestartCooldownMs(fruitless: number): number {
+    const doublings = Math.max(0, Math.min(fruitless, 10));
+    return Math.min(RELAY_RESTART_COOLDOWN_MS * 2 ** doublings, RELAY_RESTART_COOLDOWN_MAX_MS);
+}
+
 /**
  * What each stream is receiving, from the relay's `GET /api/streams` answer.
  *
@@ -371,10 +386,11 @@ export function stalledStreams(before: StreamTraffic | undefined, now: StreamTra
 export function restartDue(
     stalled: readonly string[],
     lastRestartAt: number | undefined,
-    now: number
+    now: number,
+    fruitless = 0
 ): boolean {
     if (stalled.length === 0) return false;
-    return lastRestartAt === undefined || now - lastRestartAt >= RELAY_RESTART_COOLDOWN_MS;
+    return lastRestartAt === undefined || now - lastRestartAt >= relayRestartCooldownMs(fruitless);
 }
 
 /**

@@ -37,7 +37,7 @@ import { applyRulesToMessage, filterHeaderNames } from "./rules";
 import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
-import { recordAccountState } from "./accounts";
+import { recordAccountAttempt, recordAccountState } from "./accounts";
 import { confirmedGone, missingFromWindow, nextCursor } from "./folder-window";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
@@ -191,6 +191,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         else if (account.state === "auth") {
             await recordCredentialRefusal(accountId, account.stateDetail);
         } else if (failureIsNews(account)) await recordAccountState(accountId, "unreachable");
+        else await recordAccountAttempt(accountId);
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
             // and internal paths, so they never reach the screen.

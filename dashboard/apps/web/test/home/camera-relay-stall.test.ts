@@ -12,7 +12,9 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+    RELAY_RESTART_COOLDOWN_MAX_MS,
     RELAY_RESTART_COOLDOWN_MS,
+    relayRestartCooldownMs,
     relayTraffic,
     restartDue,
     restartRelay,
@@ -77,6 +79,15 @@ describe("a stalled stream", () => {
         expect(restartDue([], undefined, now)).toBe(false);
         expect(restartDue(["a"], now - 1000, now)).toBe(false);
         expect(restartDue(["a"], now - RELAY_RESTART_COOLDOWN_MS, now)).toBe(true);
+    });
+
+    it("waits twice as long after each restart that left the same stream stalled", () => {
+        const now = 1_000_000_000;
+        expect(relayRestartCooldownMs(0)).toBe(RELAY_RESTART_COOLDOWN_MS);
+        expect(relayRestartCooldownMs(1)).toBe(2 * RELAY_RESTART_COOLDOWN_MS);
+        expect(relayRestartCooldownMs(50)).toBe(RELAY_RESTART_COOLDOWN_MAX_MS);
+        expect(restartDue(["a"], now - RELAY_RESTART_COOLDOWN_MS, now, 1)).toBe(false);
+        expect(restartDue(["a"], now - 2 * RELAY_RESTART_COOLDOWN_MS, now, 1)).toBe(true);
     });
 });
 
