@@ -4,8 +4,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { fieldOf } from "@polaris-app/crm/src/model/objects";
 import {
+    actionFits,
     eventsOf,
+    renderTemplate,
     triggerMatches,
     workflowInputSchema
 } from "@polaris-app/crm/src/model/workflows";
@@ -71,5 +74,51 @@ describe("record triggers", () => {
         expect(triggerMatches({ kind: "updated" }, updated!)).toBe(true);
         expect(triggerMatches({ kind: "updated" }, deleted!)).toBe(false);
         expect(triggerMatches({ kind: "deleted" }, deleted!)).toBe(true);
+    });
+});
+
+describe("record actions", () => {
+    const base = { name: "x", trigger: { kind: "created" }, enabled: true };
+
+    it("takes an update and a create with values to write", () => {
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [
+                    { kind: "updateRecord", values: { city: "Madrid" } },
+                    { kind: "createRecord", object: "people", values: { name: "{{name}} contact" } }
+                ]
+            }).success
+        ).toBe(true);
+    });
+
+    it("refuses an action that writes nothing or names no kind of record", () => {
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [{ kind: "updateRecord", values: {} }]
+            }).success
+        ).toBe(false);
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [{ kind: "createRecord", object: "planets", values: { name: "x" } }]
+            }).success
+        ).toBe(false);
+    });
+
+    it("changes the record only under a trigger that is about one still there", () => {
+        expect(actionFits("updateRecord", "created")).toBe(true);
+        expect(actionFits("updateRecord", "updated")).toBe(true);
+        expect(actionFits("updateRecord", "deleted")).toBe(false);
+        expect(actionFits("createRecord", "deleted")).toBe(true);
+    });
+
+    it("fills a template from the record, as the text a CSV would hold", () => {
+        const fields = [fieldOf("companies", "name")!, fieldOf("companies", "annualRevenue")!];
+        const values = { name: "Acme", annualRevenue: { amount: 1200, currency: "EUR" } };
+        expect(renderTemplate("{{ name }} earns {{annualRevenue}}{{nope}}", fields, values)).toBe(
+            "Acme earns 1200 EUR"
+        );
     });
 });

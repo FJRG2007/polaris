@@ -7,7 +7,9 @@
  */
 
 import { z } from "zod";
+import { csvValue } from "./csv";
 import type { EventKind, FieldChange } from "./timeline";
+import { CRM_OBJECTS, type FieldDef, type FieldValue } from "./objects";
 
 /** The longest name a workflow may have. */
 export const WORKFLOW_NAME_MAX = 120;
@@ -30,18 +32,59 @@ export type TriggerKind = WorkflowTrigger["kind"];
 /** The triggers in the order the screen offers them. */
 export const TRIGGER_KINDS: readonly TriggerKind[] = ["created", "updated", "deleted"];
 
+/** The longest text an action holds in one place: a value, a title. */
+export const ACTION_TEXT_MAX = 2000;
+
+/** The most fields one action writes. */
+export const MAX_ACTION_VALUES = 40;
+
+/** Field values to write, each the text a cell would hold. `{{field}}` in one
+ *  is the value of that field on the record the workflow is about. */
+const valuesSchema = z
+    .record(z.string().min(1).max(64), z.string().max(ACTION_TEXT_MAX))
+    .refine((values) => {
+        const count = Object.keys(values).length;
+        return count > 0 && count <= MAX_ACTION_VALUES;
+    });
+
 /** One thing a workflow does. */
-export const workflowActionSchema = z.never();
+export const workflowActionSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("updateRecord"), values: valuesSchema }),
+    z.object({
+        kind: z.literal("createRecord"),
+        object: z.enum(CRM_OBJECTS),
+        values: valuesSchema
+    })
+]);
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
-export type ActionKind = WorkflowAction extends { kind: infer K } ? K : never;
+export type ActionKind = WorkflowAction["kind"];
 
 /** The actions in the order the screen offers them. */
-export const ACTION_KINDS: readonly ActionKind[] = [];
+export const ACTION_KINDS: readonly ActionKind[] = ["updateRecord", "createRecord"];
+
+/** The triggers that are about one record still out of the trash. */
+const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = ["created", "updated"];
 
 /** Whether an action can run under a kind of trigger: one that changes "the
- *  record" needs a trigger that is about one. */
-export function actionFits(_kind: ActionKind, _trigger: TriggerKind): boolean {
+ *  record" needs a trigger that is about one still there. */
+export function actionFits(kind: ActionKind, trigger: TriggerKind): boolean {
+    if (kind === "updateRecord") return LIVE_RECORD_TRIGGERS.includes(trigger);
     return true;
+}
+
+/**
+ * A template filled in: `{{key}}` is the value of that field on the record, as
+ * the text its CSV cell would hold, and nothing for a field that is not there.
+ */
+export function renderTemplate(
+    text: string,
+    fields: readonly FieldDef[],
+    values: Readonly<Record<string, FieldValue | undefined>>
+): string {
+    return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => {
+        const field = fields.find((one) => one.key === key);
+        return field ? csvValue(field, values[key]) : "";
+    });
 }
 
 /** A workflow as the screen sends it. */

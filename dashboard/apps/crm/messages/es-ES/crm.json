@@ -495,6 +495,16 @@
             "updated": "Se cambia un registro",
             "deleted": "Se elimina un registro"
         },
-        "actionKinds": {}
+        "actionKinds": {
+            "updateRecord": "Actualizar el registro",
+            "createRecord": "Crear un registro"
+        },
+        "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
+        "createNeedsName": "Pon nombre al nuevo registro.",
+        "recordKind": "Tipo de registro",
+        "addValue": "Añadir campo",
+        "removeValue": "Quitar campo",
+        "value": "Valor",
+        "valueHint": "Escribe {example} para usar un campo del registro."
     }
 }

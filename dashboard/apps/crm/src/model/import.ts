@@ -197,7 +197,9 @@ export interface CheckedRow {
 export function checkRow(
     columns: readonly (FieldDef | null)[],
     cells: readonly string[],
-    primary: FieldDef
+    primary: FieldDef,
+    /** False for values that change a record rather than make one. */
+    needsName = true
 ): CheckedRow {
     const values: Record<string, unknown> = {};
     const refs: Record<string, string> = {};
@@ -218,7 +220,7 @@ export function checkRow(
         if (normalized.ok) values[field.key] = normalized.value;
         else problems.push({ key: field.key, reason: normalized.reason });
     });
-    if (!columns.some((field) => field?.key === primary.key)) {
+    if (needsName && !columns.some((field) => field?.key === primary.key)) {
         problems.push({ key: primary.key, reason: "required" });
     }
     return { values, refs, problems };

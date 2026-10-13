@@ -495,6 +495,16 @@
             "updated": "A record is changed",
             "deleted": "A record is deleted"
         },
-        "actionKinds": {}
+        "actionKinds": {
+            "updateRecord": "Update the record",
+            "createRecord": "Create a record"
+        },
+        "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
+        "createNeedsName": "Give the new record a name.",
+        "recordKind": "Kind of record",
+        "addValue": "Add field",
+        "removeValue": "Remove field",
+        "value": "Value",
+        "valueHint": "Type {example} to use a field of the record."
     }
 }

@@ -26,6 +26,15 @@ const db = vi.hoisted(() => ({
         deleteMany: vi.fn(async () => ({ count: 1 }))
     },
     records: {
+        count: vi.fn(async () => 1),
+        findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+            id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            position: 0,
+            deletedAt: null,
+            ...data
+        })),
         findFirst: vi.fn(
             async (): Promise<Record<string, unknown> | null> => ({
                 id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -50,21 +59,28 @@ const crmHost = vi.hoisted(() => ({
     crmOrgPermissions: vi.fn(async (): Promise<string[] | null> => ["*"])
 }));
 
-vi.mock("@polaris/db", () => ({
-    prisma: {
+vi.mock("@polaris/db", () => {
+    const client: Record<string, unknown> = {
         crmWorkflow: db.crmWorkflow,
         crmCompany: db.records,
         crmPerson: db.records,
-        crmOpportunity: db.records
-    },
-    Prisma: { Decimal: class {} }
-}));
+        crmOpportunity: db.records,
+        crmEvent: { createMany: vi.fn(async () => ({ count: 1 })) }
+    };
+    client.$transaction = async (run: (tx: unknown) => unknown) => run(client);
+    return { prisma: client, Prisma: { Decimal: class {} } };
+});
 vi.mock("@polaris/app-host", () => ({
     host: { crmHost, i18nRequest: { getLocale: async () => "en-US" } }
 }));
 vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }));
 
 import * as workflows from "@polaris-app/crm/src/lib/workflows";
+
+const stamp = {
+    updatedAt: new Date("2026-10-01T10:00:00Z"),
+    createdAt: new Date("2026-10-01T10:00:00Z")
+};
 
 const allowed = { read: true, edit: true, delete: true };
 const reader = { read: true, edit: false, delete: false };
@@ -190,5 +206,102 @@ describe("running on record changes", () => {
             ])
         );
         expect(db.crmWorkflow.findMany).not.toHaveBeenCalled();
+    });
+});
+
+describe("record actions", () => {
+    const runOn = async (actions: unknown[], trigger: unknown = { kind: "created" }) => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored(trigger, { actions: JSON.stringify(actions) })
+        ]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            { recordId: RECORD, kind: "created", changes: [] }
+        ]);
+        const [[done]] = db.crmWorkflow.update.mock.calls as unknown as [
+            [{ data: { lastError: string | null } }]
+        ];
+        return done.data.lastError;
+    };
+
+    it("changes the record that set it off, filled from that record", async () => {
+        db.records.findFirst.mockResolvedValue({
+            id: RECORD,
+            name: "Acme",
+            city: "",
+            position: 0,
+            deletedAt: null,
+            ...stamp
+        });
+        db.records.findMany.mockResolvedValue([
+            { id: RECORD, name: "Acme", city: "Acme town", position: 0, deletedAt: null, ...stamp }
+        ]);
+        expect(
+            await runOn([{ kind: "updateRecord", values: { city: "{{name}} town" } }])
+        ).toBeNull();
+        expect(db.records.updateMany).toHaveBeenCalledWith({
+            where: { id: { in: [RECORD] }, orgId: "o1", deletedAt: null },
+            data: { city: "Acme town" }
+        });
+    });
+
+    it("makes a record, logged as created, and stops at a value that does not pass", async () => {
+        db.records.findFirst.mockResolvedValue({
+            id: RECORD,
+            name: "Acme",
+            position: 0,
+            deletedAt: null,
+            ...stamp
+        });
+        expect(
+            await runOn([
+                {
+                    kind: "createRecord",
+                    object: "opportunities",
+                    values: { name: "Deal with {{name}}" }
+                }
+            ])
+        ).toBeNull();
+        expect(db.records.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    name: "Deal with Acme",
+                    orgId: "o1",
+                    createdById: "u2"
+                })
+            })
+        );
+
+        vi.clearAllMocks();
+        const error = await runOn([
+            {
+                kind: "createRecord",
+                object: "companies",
+                values: { name: "x", domain: "not a domain" }
+            },
+            { kind: "updateRecord", values: { city: "never" } }
+        ]);
+        expect(error).toMatch(/domain/i);
+        expect(db.records.create).not.toHaveBeenCalled();
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses to save an action on a field that is not there", async () => {
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "created" },
+                actions: [{ kind: "updateRecord", values: { nope: "1" } }],
+                enabled: true
+            })
+        ).rejects.toThrow();
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "deleted" },
+                actions: [{ kind: "updateRecord", values: { city: "1" } }],
+                enabled: true
+            })
+        ).rejects.toThrow();
+        expect(db.crmWorkflow.create).not.toHaveBeenCalled();
     });
 });

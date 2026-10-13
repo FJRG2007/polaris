@@ -15,7 +15,12 @@ import { prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
 import { host } from "@polaris/app-host";
 import type { NewEvent } from "./timeline";
-import type { CrmObject } from "../model/objects";
+import { writable } from "./columns";
+import { loadFields } from "./fields";
+import * as records from "./records";
+import { importRecords, readRows } from "./import";
+import type { RowProblem } from "../model/import";
+import { fieldsOf, primaryField, type CrmObject, type CrmRecord } from "../model/objects";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { actorOn, requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import * as model from "../model/workflows";
@@ -84,13 +89,34 @@ export async function listWorkflows(
     return rows.flatMap((row) => toView(row) ?? []);
 }
 
-/** Check what the actions name against the shelf, refusing what cannot run. */
+/** Check what the actions name against the shelf, refusing what cannot run:
+ *  an action its trigger cannot give it a record for, a field that is not
+ *  there, a record made without its name, a kind of record the reader may not
+ *  change. */
 async function checkActions(
-    _actor: CrmActor,
-    _object: CrmObject,
-    _trigger: model.WorkflowTrigger,
-    _actions: readonly model.WorkflowAction[]
-): Promise<void> {}
+    actor: CrmActor,
+    object: CrmObject,
+    trigger: model.WorkflowTrigger,
+    actions: readonly model.WorkflowAction[]
+): Promise<void> {
+    const t = await crmT();
+    for (const action of actions) {
+        if (!model.actionFits(action.kind, trigger.kind)) {
+            throw new CrmRefusal(t("workflows.actionNeedsRecord"));
+        }
+        if (action.kind === "updateRecord" || action.kind === "createRecord") {
+            const target = action.kind === "createRecord" ? action.object : object;
+            await requireCan(actor, target, "edit");
+            const custom = await loadFields(actor.shelf, target);
+            for (const key of Object.keys(action.values)) {
+                if (!writable(target, key, custom)) throw new CrmRefusal(t("errors.unknownField"));
+            }
+            if (action.kind === "createRecord" && !(primaryField(target).key in action.values)) {
+                throw new CrmRefusal(t("workflows.createNeedsName"));
+            }
+        }
+    }
+}
 
 /** Make a workflow, or change one on the reader's shelf. It runs as them from
  *  now on. */
@@ -171,13 +197,93 @@ async function runnerOf(workflow: StoredWorkflow): Promise<CrmActor | null> {
     return actorOn(user, workflow.orgId, null);
 }
 
+/** The record a run is about, read as the runner, or null. */
+async function recordOf(runner: CrmActor, context: RunContext): Promise<CrmRecord | null> {
+    if (!context.recordId) return null;
+    return records.getRecord(runner, context.object, context.recordId).catch(() => null);
+}
+
+/** Problems with a value an action wrote, as the sentence a refusal shows. */
+async function problemText(
+    runner: CrmActor,
+    object: CrmObject,
+    problems: readonly RowProblem[]
+): Promise<string> {
+    const t = await crmT();
+    const custom = await loadFields(runner.shelf, object).catch(() => []);
+    return problems
+        .map((problem) => {
+            const field = fieldsOf(object, custom).find((one) => one.key === problem.key);
+            return t("errors.invalidValue", {
+                field:
+                    field?.label ?? t(`fields.${object}.${problem.key}` as Parameters<typeof t>[0]),
+                reason: t(`invalid.${problem.reason}` as Parameters<typeof t>[0])
+            });
+        })
+        .join(" ");
+}
+
+/** An action's values, filled from the record the run is about. */
+async function filled(
+    runner: CrmActor,
+    context: RunContext,
+    values: Readonly<Record<string, string>>
+): Promise<{ keys: string[]; cells: string[] }> {
+    const record = await recordOf(runner, context);
+    const fields = record
+        ? fieldsOf(context.object, await loadFields(runner.shelf, context.object))
+        : [];
+    const keys = Object.keys(values);
+    const cells = keys.map((key) =>
+        model.renderTemplate(values[key]!, fields, record?.values ?? {})
+    );
+    return { keys, cells };
+}
+
 /** One action, done as the runner. */
 async function runAction(
-    _runner: CrmActor,
+    runner: CrmActor,
     _workflow: StoredWorkflow,
-    _action: model.WorkflowAction,
-    _context: RunContext
-): Promise<void> {}
+    action: model.WorkflowAction,
+    context: RunContext
+): Promise<void> {
+    const t = await crmT();
+    switch (action.kind) {
+        case "updateRecord": {
+            if (!context.recordId) throw new CrmRefusal(t("workflows.actionNeedsRecord"));
+            const { keys, cells } = await filled(runner, context, action.values);
+            const read = await readRows(
+                runner,
+                context.object,
+                { mapping: keys, rows: [cells] },
+                false
+            );
+            const [values] = read.values;
+            if (!values) {
+                throw new CrmRefusal(
+                    await problemText(runner, context.object, read.failed[0]?.problems ?? [])
+                );
+            }
+            await records.updateRecord(runner, context.object, context.recordId, values);
+            return;
+        }
+        case "createRecord": {
+            const { keys, cells } = await filled(runner, context, action.values);
+            const made = await importRecords(
+                runner,
+                action.object,
+                { mapping: keys, rows: [cells] },
+                "created"
+            );
+            if (made.created === 0) {
+                throw new CrmRefusal(
+                    await problemText(runner, action.object, made.failed[0]?.problems ?? [])
+                );
+            }
+            return;
+        }
+    }
+}
 
 /** What a failure says on the workflow: a refusal as it was worded, anything
  *  else as a sentence that names nothing internal. */

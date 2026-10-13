@@ -82,13 +82,26 @@ async function findByName(
     return found;
 }
 
-/** Import one batch of rows. */
-export async function importRecords(
+/** Rows of text read as values for a kind of record: each checked, each
+ *  reference found by name on the shelf. A row with a problem has no values. */
+export interface ReadRows {
+    readonly values: (Record<string, InputValue> | null)[];
+    readonly failed: ImportResult["failed"];
+    /** The fields the columns go to. */
+    readonly fields: readonly FieldDef[];
+}
+
+/**
+ * Rows of text, one cell per mapped field, as the values to store - checked
+ * with the rules a cell's editor uses and with every company, person and owner
+ * named in them found on the actor's shelf.
+ */
+export async function readRows(
     actor: CrmActor,
     object: CrmObject,
-    batch: ImportBatch
-): Promise<ImportResult> {
-    await requireCan(actor, object, "edit");
+    batch: ImportBatch,
+    needsName = true
+): Promise<ReadRows> {
     const custom = await loadFields(actor.shelf, object);
     const columns = batch.mapping.map((fieldKey) =>
         fieldKey === null ? null : writable(object, fieldKey, custom)
@@ -103,7 +116,7 @@ export async function importRecords(
         throw new CrmRefusal(t("import.duplicateMapping"));
     }
     const primary = primaryField(object);
-    const checked = batch.rows.map((cells) => checkRow(columns, cells, primary));
+    const checked = batch.rows.map((cells) => checkRow(columns, cells, primary, needsName));
 
     // Every name a reference column holds, found in one read per field.
     const relations = mapped.filter((field) => field.kind === "relation");
@@ -124,33 +137,48 @@ export async function importRecords(
     }
 
     const failed: ImportResult["failed"] = [];
-    const ready: Record<string, unknown>[] = [];
-    const readyKeys: string[][] = [];
-    checked.forEach((row, index) => {
+    const values = checked.map((row, index) => {
         const problems = [...row.problems];
-        const values: Record<string, unknown> = { ...row.values };
+        const out: Record<string, InputValue> = { ...(row.values as Record<string, InputValue>) };
         for (const [fieldKey, name] of Object.entries(row.refs)) {
             const ids = found.get(fieldKey)?.get(key(name)) ?? [];
             const member = columns.find((field) => field?.key === fieldKey)?.kind === "member";
-            if (ids.length === 1) values[fieldKey] = ids[0];
+            if (ids.length === 1) out[fieldKey] = ids[0]!;
             else
                 problems.push({
                     key: fieldKey,
                     reason: ids.length > 1 ? "ambiguous" : member ? "notOnShelf" : "missing"
                 });
         }
-        if (problems.length > 0) {
-            failed.push({ row: index, problems });
-            return;
-        }
+        if (problems.length === 0) return out;
+        failed.push({ row: index, problems });
+        return null;
+    });
+    return { values, failed, fields: mapped };
+}
+
+/** Import one batch of rows. */
+export async function importRecords(
+    actor: CrmActor,
+    object: CrmObject,
+    batch: ImportBatch,
+    /** How the new records' timelines name how they were made. */
+    logAs: "imported" | "created" = "imported"
+): Promise<ImportResult> {
+    await requireCan(actor, object, "edit");
+    const { values, failed, fields } = await readRows(actor, object, batch);
+    const ready: Record<string, unknown>[] = [];
+    const readyKeys: string[][] = [];
+    for (const row of values) {
+        if (!row) continue;
         const data: Record<string, unknown> = {};
-        for (const [fieldKey, value] of Object.entries(values)) {
-            const field = columns.find((one) => one?.key === fieldKey)!;
-            Object.assign(data, writeData(object, field, value as InputValue));
+        for (const [fieldKey, value] of Object.entries(row)) {
+            const field = fields.find((one) => one.key === fieldKey)!;
+            Object.assign(data, writeData(object, field, value));
         }
         ready.push(data);
-        readyKeys.push(Object.keys(values));
-    });
+        readyKeys.push(Object.keys(row));
+    }
     if (ready.length === 0) return { created: 0, failed };
 
     // Made above everything already there, in the file's order.
@@ -184,7 +212,7 @@ export async function importRecords(
         object,
         records.map((record, index) => ({
             recordId: record.id,
-            kind: "imported",
+            kind: logAs,
             changes: initialValues(record, readyKeys[index]!)
         }))
     );
