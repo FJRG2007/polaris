@@ -323,7 +323,8 @@
         "New company": "New company",
         "New person": "New person",
         "New opportunity": "New opportunity",
-        "Dashboards": "Dashboards"
+        "Dashboards": "Dashboards",
+        "Forecast": "Forecast"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

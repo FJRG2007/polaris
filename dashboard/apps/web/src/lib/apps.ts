@@ -103,6 +103,7 @@ import {
     PanelRight,
     Keyboard,
     Music,
+    TrendingUp,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -1221,7 +1222,13 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             label: "Dashboards", // i18n-ignore
             href: "/crm/dashboards",
             icon: ChartColumn,
-            keywords: ["charts", "reports", "analytics", "forecast", "pipeline value", "kpi"]
+            keywords: ["charts", "reports", "analytics", "pipeline value", "kpi"]
+        },
+        {
+            label: "Forecast", // i18n-ignore
+            href: "/crm/forecast",
+            icon: TrendingUp,
+            keywords: ["sales forecast", "pipeline", "weighted", "quota", "close date", "revenue"]
         },
         {
             label: "New company", // i18n-ignore

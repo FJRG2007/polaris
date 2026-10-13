@@ -383,6 +383,7 @@ model User {
     crmWorkflows            CrmWorkflow[]    @relation("CrmWorkflowShelf")
     crmFavorites            CrmFavorite[]    @relation("CrmFavoriteOwner")
     crmDashboards           CrmDashboard[]   @relation("CrmDashboardShelf")
+    crmForecasts            CrmForecast[]    @relation("CrmForecastShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5882,6 +5883,7 @@ model Organization {
     crmWorkflows     CrmWorkflow[]
     crmFavorites     CrmFavorite[]
     crmDashboards    CrmDashboard[]
+    crmForecasts     CrmForecast[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -13049,6 +13051,22 @@ model CrmDashboard {
     user User?         @relation("CrmDashboardShelf", fields: [userId], references: [id], onDelete: Cascade)
 
     @@unique([shelf, name])
+}
+
+// How likely a deal at each open stage is to be won, per shelf, for the CRM
+// forecast (apps/crm model/forecast). A JSON object of stage -> percent; a
+// stage left out takes the default.
+model CrmForecast {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    orgId     String?  @db.Uuid
+    userId    String?  @db.Uuid
+    // "org:<id>" or "user:<id>".
+    shelf     String   @unique
+    odds      String   @default("{}")
+    updatedAt DateTime @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmForecastShelf", fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // A CRM record or view somebody pinned to the CRM's rail. Their own: nobody

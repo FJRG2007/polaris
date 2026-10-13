@@ -323,7 +323,8 @@
         "New company": "Nueva empresa",
         "New person": "Nueva persona",
         "New opportunity": "Nueva oportunidad",
-        "Dashboards": "Paneles"
+        "Dashboards": "Paneles",
+        "Forecast": "Previsión"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",
