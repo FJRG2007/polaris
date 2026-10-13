@@ -3,7 +3,7 @@
  * notification looks and reads the same wherever it is shown.
  */
 
-import { AlertTriangle, CheckCheck, Info, ShieldAlert, ShieldCheck, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCheck, Info, Megaphone, ShieldAlert, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { NotificationAudience, NotificationLevel } from "@/lib/notification-service";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -12,6 +12,9 @@ export function levelStyle(level: NotificationLevel, type: string): { Icon: Luci
     if (level === "danger") return { Icon: ShieldAlert, color: "text-danger" };
     if (level === "warning") return { Icon: AlertTriangle, color: "text-warning" };
     if (level === "success") return { Icon: type.startsWith("scan") ? ShieldCheck : CheckCheck, color: "text-success" };
+    // `@everyone` and `@here`: said to a whole room, not to the reader, so it
+    // must not pass for one more message somebody sent them.
+    if (type === "chat.mention") return { Icon: Megaphone, color: "text-primary" };
     return { Icon: Info, color: "text-muted-foreground" };
 }
 

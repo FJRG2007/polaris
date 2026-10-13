@@ -32,10 +32,18 @@ let blocks: BlockRow[] = [];
 
 /** The conversation every test acts in. A one-to-one unless a test says
  *  otherwise, since that is where blocking does most of its work. */
-let room = { id: "dm-1", kind: "dm", spaceId: null as string | null, private: true };
+let room: { id: string; kind: string; spaceId: string | null; private: boolean; name?: string } = {
+    id: "dm-1",
+    kind: "dm",
+    spaceId: null,
+    private: true
+};
 
 /** Who was told about the `@everyone`, in the order the notifications went out. */
 let told: string[] = [];
+
+/** Who each of those notifications said it was for. */
+let addressed: { audience?: string; audienceLabel?: string | null }[] = [];
 
 /** What was written into the conversation, so a message that was NOT refused can
  *  be shown to have actually landed. */
@@ -98,8 +106,13 @@ vi.mock("@/lib/chat/link-preview", () => ({
 vi.mock("@/lib/contact-names", () => ({ nicknamesFor: async () => new Map(), MAX_NICKNAME: 40 }));
 vi.mock("@/lib/notifications/presence", () => ({ onlineUserIds: () => new Set(["ada", "grace"]) }));
 vi.mock("@/lib/notification-service", () => ({
-    createNotification: async ({ userId }: { userId: string }) => {
-        told.push(userId);
+    createNotification: async (input: {
+        userId: string;
+        audience?: string;
+        audienceLabel?: string | null;
+    }) => {
+        told.push(input.userId);
+        addressed.push({ audience: input.audience, audienceLabel: input.audienceLabel });
     }
 }));
 
@@ -238,6 +251,15 @@ describe("a mention of the whole room", () => {
     it("tells everybody in the room", async () => {
         await mentions.announceRoomMention("dm-1", "ada", "@everyone stand up", "m1");
         expect(told).toEqual(["grace"]);
+    });
+
+    it("says it was for the room, not for the reader", async () => {
+        addressed = [];
+        room = { ...room, name: "Fixture Room" };
+        await mentions.announceRoomMention("dm-1", "ada", "@everyone stand up", "m1");
+        expect(addressed).toHaveLength(1);
+        expect(addressed[0]?.audience).toBe("group");
+        expect(addressed[0]?.audienceLabel).toBe("Fixture Room");
     });
 
     it("does not tell somebody who blocked whoever wrote it", async () => {

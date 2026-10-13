@@ -164,6 +164,11 @@ export async function announceRoomMention(
                     body: plainExcerpt(body, 140),
                     href: `/chat/c/${channelId}/${messageId}`,
                     level: "info",
+                    // Addressed to the room, and drawn as that: the conversation
+                    // it went to rather than "you", so it reads as an
+                    // announcement and not as a message written to the reader.
+                    audience: "group",
+                    audienceLabel: where || null,
                     shelf: await recipientShelf(userId, about).catch(() => null)
                 });
             })
