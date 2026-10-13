@@ -121,3 +121,45 @@ describe("the inventory grid", () => {
         expect(container.querySelectorAll("li .item-glint")).toHaveLength(2);
     });
 });
+
+/** Potions say which potion they are, as their tooltip does in game. */
+describe("a potion", () => {
+    it("reads the potion alone, or with the effects written onto it", () => {
+        expect(
+            itemDetails({
+                era: "components",
+                snbt: `{"minecraft:potion_contents": "minecraft:strong_swiftness"}`
+            })
+        ).toMatchObject({ potion: "minecraft:strong_swiftness", effects: [] });
+        expect(
+            itemDetails({
+                era: "components",
+                snbt: `{"minecraft:potion_contents": {potion: "minecraft:long_night_vision", custom_effects: [{id: "minecraft:speed", amplifier: 1b, duration: 1800}]}}`
+            })
+        ).toMatchObject({
+            potion: "minecraft:long_night_vision",
+            effects: [{ id: "minecraft:speed", level: 2, duration: 1800 }]
+        });
+        expect(
+            itemDetails({
+                era: "tag",
+                snbt: `{Potion: "minecraft:healing", CustomPotionEffects: [{Id: 1b, Amplifier: 0b}]}`
+            })
+        ).toMatchObject({ potion: "minecraft:healing", effects: [] });
+        expect(itemDetails(null)).toMatchObject({ potion: null, effects: [] });
+    });
+
+    it("names it under the grid and on the slot", () => {
+        const reply = `PlayerOne has the following entity data: [{count: 1, Slot: 0b, components: {"minecraft:potion_contents": {potion: "minecraft:strong_swiftness", custom_effects: [{id: "minecraft:speed", amplifier: 1b, duration: 1800}]}}, id: "minecraft:splash_potion"}]`;
+        render(
+            <MessagesWrapper>
+                <InventoryGrid items={parseInventory(reply)} />
+            </MessagesWrapper>
+        );
+        const slot = screen.getByLabelText(/Splash Potion/);
+        expect(slot.getAttribute("title")).toContain("Potion: Strong Swiftness");
+        fireEvent.pointerEnter(slot);
+        expect(screen.getByText("Potion: Strong Swiftness")).toBeTruthy();
+        expect(screen.getByText("Effects: Speed II (1:30)")).toBeTruthy();
+    });
+});

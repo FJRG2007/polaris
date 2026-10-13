@@ -5,7 +5,8 @@
  * opening only for what is stored in it, and two diamond swords are not the
  * same sword. So the stack's own compound is walked for the things a player
  * would read on its tooltip in game - the name somebody typed, its enchantments
- * (or, on a book, the ones it carries to apply), and how worn it is.
+ * (or, on a book, the ones it carries to apply), how worn it is, and which
+ * potion a potion, splash potion, lingering potion or tipped arrow holds.
  *
  * Both shapes the game has used are read: the components of 1.20.5 and later,
  * and the `tag` before them. Walked rather than matched (see ./snbt): an
@@ -25,6 +26,16 @@ export interface Enchantment {
     readonly level: number;
 }
 
+/** One effect a potion gives beyond its base type. */
+export interface PotionEffect {
+    /** The namespaced id, e.g. "minecraft:speed". */
+    readonly id: string;
+    /** As the game prints it: amplifier 0 is level 1. */
+    readonly level: number;
+    /** How long it lasts in ticks, or null when the stack does not say. */
+    readonly duration: number | null;
+}
+
 export interface ItemDetails {
     /** The name somebody gave it at an anvil or with a command, or null. */
     readonly name: string | null;
@@ -37,6 +48,10 @@ export interface ItemDetails {
     /** Its whole durability when the stack states it, or null. */
     readonly maxDamage: number | null;
     readonly unbreakable: boolean;
+    /** The potion it holds, e.g. "minecraft:long_swiftness", or null. */
+    readonly potion: string | null;
+    /** Effects written onto it besides the potion's own. */
+    readonly effects: PotionEffect[];
 }
 
 /** A compound's top-level fields, keyed as written (quotes removed). */
@@ -93,6 +108,41 @@ function fromList(value: string | undefined): Enchantment[] {
 }
 
 /**
+ * The potion in `minecraft:potion_contents`, which is either the potion id alone
+ * (`"minecraft:swiftness"`) or a compound with `potion` and `custom_effects`; and
+ * in the older tag, `Potion` and `custom_potion_effects`/`CustomPotionEffects`.
+ * Effects the older tag numbered rather than named are left out, not guessed.
+ */
+function potionFrom(
+    contents: string | undefined,
+    effectsList: string | undefined
+): { potion: string | null; effects: PotionEffect[] } {
+    let potion: string | null = null;
+    let list = effectsList;
+    const body = contents?.trim();
+    if (body) {
+        if (body.startsWith("{")) {
+            const fields = fieldsOf(body);
+            potion = unquote(fields.get("potion") ?? "") || null;
+            list = fields.get("custom_effects") ?? list;
+        } else potion = unquote(body) || null;
+    }
+    const effects: PotionEffect[] = [];
+    for (const entry of entriesOf(list)) {
+        const fields = fieldsOf(entry);
+        const id = unquote(fields.get("id") ?? fields.get("Id") ?? "");
+        if (!id || /^-?\d+[bsil]?$/i.test(id)) continue;
+        const amplifier = readInt(fields.get("amplifier") ?? fields.get("Amplifier")) ?? 0;
+        effects.push({
+            id: namespaced(id),
+            level: amplifier + 1,
+            duration: readInt(fields.get("duration") ?? fields.get("Duration"))
+        });
+    }
+    return { potion: potion && namespaced(potion), effects };
+}
+
+/**
  * The words of a name, however it was stored: a JSON text component in a
  * string (up to 1.21.4), an SNBT text compound (1.21.5 on), or plain text.
  */
@@ -130,7 +180,9 @@ export function itemDetails(data: ItemData | null): ItemDetails {
         stored: [],
         damage: null,
         maxDamage: null,
-        unbreakable: false
+        unbreakable: false,
+        potion: null,
+        effects: []
     };
     if (!data) return empty;
     const fields = fieldsOf(data.snbt);
@@ -142,7 +194,8 @@ export function itemDetails(data: ItemData | null): ItemDetails {
             stored: fromComponent(fields.get("minecraft:stored_enchantments")),
             damage: damage && damage > 0 ? damage : null,
             maxDamage: readInt(fields.get("minecraft:max_damage")),
-            unbreakable: fields.has("minecraft:unbreakable")
+            unbreakable: fields.has("minecraft:unbreakable"),
+            ...potionFrom(fields.get("minecraft:potion_contents"), undefined)
         };
     }
     const display = fieldsOf(fields.get("display") ?? "");
@@ -153,7 +206,11 @@ export function itemDetails(data: ItemData | null): ItemDetails {
         stored: fromList(fields.get("StoredEnchantments")),
         damage: damage && damage > 0 ? damage : null,
         maxDamage: null,
-        unbreakable: readInt(fields.get("Unbreakable")) === 1
+        unbreakable: readInt(fields.get("Unbreakable")) === 1,
+        ...potionFrom(
+            fields.get("Potion"),
+            fields.get("custom_potion_effects") ?? fields.get("CustomPotionEffects")
+        )
     };
 }
 
@@ -190,6 +247,18 @@ export function levelText(level: number): string {
 
 /** "minecraft:fire_protection" as "Fire Protection", the way items are named. */
 export const enchantmentLabel = itemLabel;
+
+/** "minecraft:strong_swiftness" as "Strong Swiftness", the potion's own name. */
+export const potionLabel = itemLabel;
+
+/** One extra effect as the game writes it: "Speed II (1:30)". Infinite and
+ *  unstated durations are left off. */
+export function potionEffectText(effect: PotionEffect): string {
+    const name = `${itemLabel(effect.id)} ${levelText(effect.level)}`;
+    if (effect.duration === null || effect.duration < 0) return name;
+    const seconds = Math.floor(effect.duration / 20);
+    return `${name} (${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")})`;
+}
 
 /** One enchantment as the game writes it: "Sharpness V". */
 export function enchantmentText(enchantment: Enchantment): string {

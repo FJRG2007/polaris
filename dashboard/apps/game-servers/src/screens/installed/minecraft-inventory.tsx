@@ -30,7 +30,13 @@ import { cn } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
 import { itemLabel } from "../../lib/minecraft/items";
 import { isMovable, replaceSlot } from "../../lib/minecraft/item-argument";
-import { enchantmentText, itemDetails, type ItemDetails } from "../../lib/minecraft/item-details";
+import {
+    enchantmentText,
+    itemDetails,
+    potionEffectText,
+    potionLabel,
+    type ItemDetails
+} from "../../lib/minecraft/item-details";
 import {
     ARMOUR_SLOTS,
     HOTBAR_SLOTS,
@@ -426,6 +432,11 @@ function describe(t: GameText<"minecraft">, details: ItemDetails): string[] {
     if (details.stored.length > 0)
         lines.push(
             t("inventory.details.stored", { list: details.stored.map(enchantmentText).join(", ") })
+        );
+    if (details.potion) lines.push(t("inventory.details.potion", { name: potionLabel(details.potion) }));
+    if (details.effects.length > 0)
+        lines.push(
+            t("inventory.details.effects", { list: details.effects.map(potionEffectText).join(", ") })
         );
     if (details.unbreakable) lines.push(t("inventory.details.unbreakable"));
     else if (details.damage !== null)

@@ -967,6 +967,8 @@
         },
         "pointAtAStack": "Señala un objeto para ver qué es.",
         "details": {
+            "potion": "Poción: {name}",
+            "effects": "Efectos: {list}",
             "stored": "Guarda {list}",
             "unbreakable": "Irrompible",
             "durability": "Durabilidad {left} / {max}",
