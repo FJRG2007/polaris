@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { useCrmT } from "./i18n";
+import { Timeline } from "./timeline";
 import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
 import { messageOf, unwrap } from "./call";
@@ -79,6 +80,8 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             .then(({ record: saved }) => {
                 put(saved);
                 onSaved?.(saved);
+                // The change is on the timeline now.
+                opening.refresh();
             })
             .catch((caught) => {
                 opening.replace(kept);
@@ -305,6 +308,12 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                             ) : null}
                         </section>
                     ))}
+                    <Timeline
+                        object={object}
+                        id={id}
+                        page={data?.timeline ?? null}
+                        fields={fields}
+                    />
                 </div>
             </div>
         </div>

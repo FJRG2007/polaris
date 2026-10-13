@@ -6,6 +6,8 @@
  */
 
 import { loadFields } from "./fields";
+import { listTimeline } from "./timeline";
+import type { TimelinePage } from "../model/timeline";
 import { getRecord, shelfPeople } from "./records";
 import { recordSelect, table, toRecord } from "./columns";
 import { relatedLists, type RelatedList } from "../model/related";
@@ -27,6 +29,8 @@ export interface RecordOpening {
     readonly can: Abilities;
     readonly people: Ref[];
     readonly related: RelatedRecords[];
+    /** The newest page of what happened to the record. */
+    readonly timeline: TimelinePage;
 }
 
 export async function openRecord(
@@ -42,6 +46,9 @@ export async function openRecord(
     const lists = record
         ? relatedLists(object).filter((list) => actor.can[list.object].read)
         : [];
+    const timeline: Promise<TimelinePage> = record
+        ? listTimeline(actor, object, id, people)
+        : Promise.resolve({ events: [], next: null });
     const related = await Promise.all(
         lists.map(async (list): Promise<RelatedRecords> => {
             const where = { ...shelfWhere(actor.shelf), deletedAt: null, [list.column]: id };
@@ -64,5 +71,12 @@ export async function openRecord(
             };
         })
     );
-    return { record, fields: [...fields], can: actor.can, people, related };
+    return {
+        record,
+        fields: [...fields],
+        can: actor.can,
+        people,
+        related,
+        timeline: await timeline
+    };
 }

@@ -13,6 +13,8 @@ import * as totals from "../lib/totals";
 import * as records from "../lib/records";
 import * as exporter from "../lib/export";
 import * as page from "../lib/record-page";
+import * as timeline from "../lib/timeline";
+import type { TimelinePage } from "../model/timeline";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities } from "../lib/access";
 import { requireCrmActor } from "../lib/access";
@@ -131,6 +133,22 @@ export async function openRecordAction(input: unknown): Promise<Outcome<page.Rec
     return outcome(async () =>
         page.openRecord(await requireCrmActor(), parsed.data.object, parsed.data.id)
     );
+}
+
+/** An older page of what happened to a record. */
+export async function recordTimelineAction(input: unknown): Promise<Outcome<TimelinePage>> {
+    const parsed = z.object({ object, id, before: id }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => {
+        const actor = await requireCrmActor();
+        return timeline.listTimeline(
+            actor,
+            parsed.data.object,
+            parsed.data.id,
+            await records.shelfPeople(actor),
+            parsed.data.before
+        );
+    });
 }
 
 /** The rows a view shows, in its columns, as a CSV file. */
