@@ -29,7 +29,7 @@ import {
     resumeOwnedServices
 } from "@/lib/apps/app-lifecycle";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
-import { isPluginServer } from "@/lib/app-extensions/registry";
+import { isPluginServer, purgeInstallFiles } from "@/lib/app-extensions/registry";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import {
     createApplication,
@@ -644,7 +644,11 @@ export async function uninstallApp(
             : [];
     const ids = [...new Set([row.id, ...copies.map((copy) => copy.id)])];
     if (options.deleteData) {
-        for (const installId of ids) await purgeInstallData(installId);
+        for (const installId of ids) {
+            // Files first, while the rows that find them (clips, stills) still exist.
+            await purgeInstallFiles(installId);
+            await purgeInstallData(installId);
+        }
         await prisma.installedApp.deleteMany({ where: { id: { in: ids } } });
     } else {
         // Kept so a reinstall finds what was made in it, but not the credential:

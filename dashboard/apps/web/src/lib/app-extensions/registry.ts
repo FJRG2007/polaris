@@ -137,6 +137,16 @@ export async function beforeInstallStops(ownerId: string, installedAppId: string
     for (const extension of extensions()) await extension.beforeStop?.(ownerId, installedAppId);
 }
 
+/** Let every app remove the files an install wrote before its rows are purged.
+ *  One app failing does not keep the others from removing theirs. */
+export async function purgeInstallFiles(installedAppId: string): Promise<void> {
+    for (const extension of extensions()) {
+        await extension.purgeInstallFiles?.(installedAppId).catch((caught) => {
+            console.error(`polaris: ${extension.id} could not remove an install's files:`, caught);
+        });
+    }
+}
+
 /** Tell every app an install was started by hand. */
 export async function afterInstallStarts(installedAppId: string): Promise<void> {
     for (const extension of extensions()) await extension.afterStart?.(installedAppId);

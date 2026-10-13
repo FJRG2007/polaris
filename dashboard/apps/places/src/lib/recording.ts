@@ -24,7 +24,7 @@ import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { randomUUID } from "node:crypto";
 import { getCamera } from "./cameras";
-import { footageTarget } from "./stills";
+import { deleteStill, footageTarget } from "./stills";
 import { relayEndpoint, relayServerFor, relayStream, streamPath } from "./relay";
 import { LOCAL_TARGET } from "@polaris/core";
 import { host } from "@polaris/app-host";
@@ -358,6 +358,50 @@ export async function deleteClips(
         if (batch.length < CLIP_DELETE_BATCH) break;
     }
     return removed;
+}
+
+/** How many rows one page of an install's footage reads. */
+const FOOTAGE_PAGE = 500;
+
+/**
+ * Remove every file an install's cameras wrote - each clip, kept ones included,
+ * and each event's still - before its data is purged. The rows go with the purge
+ * (they cascade from the camera), so this only touches files, and it reads them
+ * a page at a time by id so a house with years of footage is never one query.
+ */
+export async function deleteInstallFootage(installedAppId: string): Promise<void> {
+    const cameras = await prisma.camera.findMany({
+        where: { installedAppId },
+        select: { id: true }
+    });
+    if (cameras.length === 0) return;
+    const cameraId = { in: cameras.map((camera) => camera.id) };
+
+    let after: string | undefined;
+    for (;;) {
+        const clips = await prisma.cameraClip.findMany({
+            where: { cameraId, ...(after ? { id: { gt: after } } : {}) },
+            orderBy: { id: "asc" },
+            take: FOOTAGE_PAGE,
+            select: { id: true, path: true }
+        });
+        for (const clip of clips) await deleteClipFile(clip.path);
+        if (clips.length < FOOTAGE_PAGE) break;
+        after = clips[clips.length - 1].id;
+    }
+
+    after = undefined;
+    for (;;) {
+        const events = await prisma.cameraEvent.findMany({
+            where: { cameraId, stillKey: { not: null }, ...(after ? { id: { gt: after } } : {}) },
+            orderBy: { id: "asc" },
+            take: FOOTAGE_PAGE,
+            select: { id: true, stillKey: true }
+        });
+        for (const event of events) if (event.stillKey) await deleteStill(event.stillKey);
+        if (events.length < FOOTAGE_PAGE) break;
+        after = events[events.length - 1].id;
+    }
 }
 
 /** Remove a clip and its file. */

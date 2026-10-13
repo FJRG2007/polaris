@@ -101,6 +101,11 @@ export const placesExtension: AppExtension = {
                 : {})
         })),
 
+    // Uninstalling with the data deletes the footage files too, not only the
+    // rows that point at them.
+    purgeInstallFiles: async (installedAppId) =>
+        (await import("./recording")).deleteInstallFootage(installedAppId),
+
     onBoot: () => {
         // Bring Places' own containers - the camera relay, the vision worker, the
         // recognizer - to the version of Polaris that is running. They are built

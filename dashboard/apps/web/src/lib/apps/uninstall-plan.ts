@@ -27,6 +27,9 @@ export type InstallResource =
     | "owned-services"
     /** Rows other features keep under the install id (game stats, places, cameras...). */
     | "install-data"
+    /** Files a builtin app writes for an install outside the database (camera
+     *  recordings and event stills), on the local disk or a storage connection. */
+    | "install-files"
     /** The Deploy Application row backing a container app. */
     | "application"
     /** Its deployment history rows. */
@@ -117,7 +120,7 @@ export function installFootprint(app: AppManifest): InstallResource[] {
         "audit"
     ];
     if (app.installMethod === "builtin") {
-        return [...shared, "app-bundle", "owned-services"];
+        return [...shared, "install-files", "app-bundle", "owned-services"];
     }
     const resources: InstallResource[] = [
         ...shared,
@@ -184,6 +187,13 @@ function stepFor(resource: InstallResource, { deleteData }: UninstallOptions): U
             return deleteData
                 ? { action: "remove", how: "INSTALL_SCOPED_MODELS purged in one transaction" }
                 : { action: "keep", why: "what people made in the app, kept for a reinstall" };
+        case "install-files":
+            return deleteData
+                ? {
+                      action: "remove",
+                      how: "each app's purgeInstallFiles, before the rows that find the files"
+                  }
+                : { action: "keep", why: "the footage the kept rows point at, for a reinstall" };
         case "application":
         case "deployments":
         case "env-vars":

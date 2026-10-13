@@ -45,6 +45,11 @@ vi.mock("@/lib/app-bundles/lifecycle", () => ({ appUninstalled, appInstalled: vi
 vi.mock("@/lib/access-live", () => ({ publishAccessChange: vi.fn() }));
 vi.mock("@/lib/messaging/bridge-endpoint", () => ({ invalidateBridgeCache: vi.fn() }));
 vi.mock("@/lib/apps/install-presence", () => ({ invalidateInstallPresence: vi.fn() }));
+const purgeInstallFiles = vi.fn(async () => undefined);
+vi.mock("@/lib/app-extensions/registry", async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    purgeInstallFiles
+}));
 
 const { uninstallApp } = await import("@/lib/apps/install-service");
 
@@ -74,6 +79,7 @@ describe("uninstallApp", () => {
         });
         expect(db.installedApp.deleteMany).not.toHaveBeenCalled();
         expect(db.$transaction).not.toHaveBeenCalled();
+        expect(purgeInstallFiles).not.toHaveBeenCalled();
         expect(pauseOwnedServices).toHaveBeenCalledWith("minecraft");
         expect(appUninstalled).toHaveBeenCalledWith("minecraft");
     });
@@ -84,6 +90,11 @@ describe("uninstallApp", () => {
             deleteData: true
         });
         expect(db.$transaction).toHaveBeenCalledTimes(1);
+        // The files go while the rows that find them still exist.
+        expect(purgeInstallFiles).toHaveBeenCalledWith(ROW.id);
+        expect(purgeInstallFiles.mock.invocationCallOrder[0]).toBeLessThan(
+            db.$transaction.mock.invocationCallOrder[0]!
+        );
         for (const model of INSTALL_SCOPED_MODELS) {
             expect(scoped[model]!.deleteMany, model).toHaveBeenCalledWith({
                 where: { installedAppId: ROW.id }

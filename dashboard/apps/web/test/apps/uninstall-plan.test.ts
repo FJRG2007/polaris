@@ -81,6 +81,17 @@ describe("uninstall plan", () => {
         );
     });
 
+    it("a builtin app's files go with the data and stay with it", () => {
+        const home = findApp("home")!;
+        expect(installFootprint(home)).toContain("install-files");
+        expect(uninstallPlan(home, { deleteData: true }).get("install-files")?.action).toBe(
+            "remove"
+        );
+        expect(uninstallPlan(home, { deleteData: false }).get("install-files")?.action).toBe(
+            "keep"
+        );
+    });
+
     it("the hub's shared secret never survives an uninstall", () => {
         const hub = findApp("messaging-bridge")!;
         expect(installFootprint(hub)).toContain("install-secret");
@@ -101,6 +112,44 @@ describe("install-scoped tables", () => {
             .map(([, name]) => name!.charAt(0).toLowerCase() + name!.slice(1));
         expect(models.length).toBeGreaterThan(0);
         expect([...INSTALL_SCOPED_MODELS].sort()).toEqual(models.sort());
+    });
+
+    it("knows every column under an install that points at a stored file", () => {
+        const schema = readFileSync(
+            resolve(__dirname, "../../../../packages/db/prisma/schema.prisma"),
+            "utf8"
+        );
+        const bodies = new Map(
+            [...schema.matchAll(/model (\w+) \{([\s\S]*?)\n\}/g)].map(([, name, body]) => [
+                name!,
+                body!
+            ])
+        );
+        const scoped = new Set(
+            INSTALL_SCOPED_MODELS.map((model) => model.charAt(0).toUpperCase() + model.slice(1))
+        );
+        // Models whose rows cascade from an install-scoped one, and so are purged
+        // with it without being named in INSTALL_SCOPED_MODELS.
+        const cascaded = [...bodies].filter(([name, body]) =>
+            [...body.matchAll(/^\s*\w+\s+(\w+)\??\s+@relation\([^)]*onDelete: Cascade/gm)].some(
+                ([, parent]) => scoped.has(parent!) && !scoped.has(name)
+            )
+        );
+        const fileColumns = [...cascaded, ...[...bodies].filter(([name]) => scoped.has(name))]
+            .flatMap(([name, body]) =>
+                [...body.matchAll(/^\s*(path|\w*(?:Key|Path|File))\s+String/gm)].map(
+                    ([, column]) => `${name}.${column}`
+                )
+            )
+            .sort();
+        // Named like a file but not one: a camera's stream paths and a dedupe key.
+        const notFiles = ["Camera.mainPath", "Camera.subPath", "PlaceAutomationRun.firingKey"];
+        // Each of these is deleted by an app's purgeInstallFiles before the purge;
+        // a new one has to be added there, then here.
+        expect(fileColumns.filter((column) => !notFiles.includes(column))).toEqual([
+            "CameraClip.path",
+            "CameraEvent.stillKey"
+        ]);
     });
 
     it("deletes a child before the place it belongs to", () => {
