@@ -407,5 +407,25 @@
         "destroyBody": "Su actividad se borra con él. Lo que apunte a él quedará vacío.",
         "deletedAt": "Movido aquí {when}",
         "more": "Ver más"
+    },
+    "activities": {
+        "notes": "Notas",
+        "tasks": "Tareas",
+        "noNotes": "Sin notas",
+        "noTasks": "Sin tareas",
+        "addNote": "Nueva nota",
+        "addTask": "Nueva tarea",
+        "add": "Añadir",
+        "noteTitle": "Título",
+        "noteBody": "Nota",
+        "noteShelf": "Dónde guardarla",
+        "myNotes": "Mis notas",
+        "taskName": "Tarea",
+        "taskList": "Lista",
+        "taskDue": "Vence",
+        "done": "Marcar {name} como hecha",
+        "unlink": "Quitar de este registro",
+        "notesOff": "Tu cuenta no puede escribir notas.",
+        "tasksOff": "Tu cuenta no puede crear tareas."
     }
 }

@@ -379,6 +379,7 @@ model User {
     crmViews                CrmView[]        @relation("CrmViewShelf")
     crmFields               CrmField[]       @relation("CrmFieldShelf")
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
+    crmLinks                CrmLink[]        @relation("CrmLinkShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5874,6 +5875,7 @@ model Organization {
     crmViews         CrmView[]
     crmFields        CrmField[]
     crmEvents        CrmEvent[]
+    crmLinks         CrmLink[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -12997,6 +12999,28 @@ model CrmEvent {
     user User?         @relation("CrmEventShelf", fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([recordId, id])
+}
+
+// A CRM record linked to something another app keeps: a note, a task, a Drive
+// file. Read through that app, so what the reader cannot open is not shown.
+model CrmLink {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String?  @db.Uuid
+    userId      String?  @db.Uuid
+    // companies | people | opportunities
+    object      String
+    recordId    String   @db.Uuid
+    // note | task | file
+    kind        String
+    targetId    String   @db.Uuid
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmLinkShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([recordId, kind, targetId])
+    @@index([recordId, kind, id])
 }
 
 // A service volume being moved from one storage location to another (this

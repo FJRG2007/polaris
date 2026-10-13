@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 /**
- * A record's page while it is in the trash: it says so, offers to bring the
+ * A record's page. While it is in the trash it says so, offers to bring the
  * record back to whoever may, shows it back at once and goes back to the
- * trash if the server refuses.
+ * trash if the server refuses. Its notes and tasks are listed, a note is
+ * written from it, and a task ticked off shows at once and goes back when the
+ * server refuses.
  */
 
 import "@/components/app-host/client";
@@ -18,7 +20,50 @@ const state = vi.hoisted(() => ({
     record: null as CrmRecord | null,
     can: { read: true, edit: true, delete: true },
     refuse: false,
-    restores: [] as unknown[]
+    restores: [] as unknown[],
+    notes: [] as unknown[],
+    tasks: [] as { id: string; name: string; done: boolean }[],
+    refuseTick: false,
+    madeNotes: [] as unknown[],
+    ticks: [] as unknown[]
+}));
+
+vi.mock("@polaris-app/crm/src/actions/activities", () => ({
+    recordActivitiesAction: async () => ({
+        ok: true,
+        activities: {
+            notes: state.notes,
+            noteShelves: [{ id: null, name: "" }],
+            tasks: state.tasks.map((task) => ({
+                ...task,
+                reference: "T-1",
+                due: null,
+                listName: "Sales"
+            })),
+            taskLists: [
+                { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Sales", spaceName: "Team" }
+            ]
+        }
+    }),
+    createRecordNoteAction: async (input: { note: { title: string } }) => {
+        state.madeNotes.push(input);
+        const note = {
+            id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+            title: input.note.title,
+            excerpt: "",
+            updatedAt: "2026-10-01T10:00:00.000Z"
+        };
+        state.notes = [note, ...state.notes];
+        return { ok: true, note };
+    },
+    createRecordTaskAction: vi.fn(),
+    setRecordTaskDoneAction: async (input: unknown) => {
+        state.ticks.push(input);
+        return state.refuseTick
+            ? { ok: false, error: "Not yours to change." }
+            : { ok: true, done: true };
+    },
+    unlinkAction: vi.fn()
 }));
 
 vi.mock("@polaris-app/crm/src/actions/records", () => ({
@@ -54,6 +99,11 @@ beforeEach(() => {
     state.can = { read: true, edit: true, delete: true };
     state.refuse = false;
     state.restores = [];
+    state.notes = [];
+    state.tasks = [];
+    state.refuseTick = false;
+    state.madeNotes = [];
+    state.ticks = [];
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
     if (typeof localStorage !== "undefined") localStorage.clear();
 });
@@ -90,5 +140,53 @@ describe("a record in the trash", () => {
         render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
         await screen.findByText(notice);
         expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+    });
+});
+
+describe("notes and tasks on a record", () => {
+    beforeEach(() => {
+        state.record = { ...state.record!, deletedAt: null };
+    });
+
+    it("writes a note from the record and lists it", async () => {
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("No notes yet")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Add note" }));
+        const add = screen.getByRole("button", { name: "Add" });
+        expect(add.getAttribute("aria-disabled")).toBe("true");
+        fireEvent.change(screen.getByRole("textbox", { name: "Title *" }), {
+            target: { value: "  Kickoff call " }
+        });
+        expect(add.getAttribute("aria-disabled")).toBe("false");
+        await act(async () => {
+            fireEvent.click(add);
+        });
+        expect(await screen.findByText("Kickoff call")).toBeTruthy();
+        expect(state.madeNotes).toEqual([
+            {
+                object: "companies",
+                id: ACME,
+                note: { title: "  Kickoff call ", body: "", spaceId: null }
+            }
+        ]);
+    });
+
+    it("puts a task back when ticking it off is refused", async () => {
+        state.tasks = [
+            { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Call back", done: false }
+        ];
+        state.refuseTick = true;
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const box = await screen.findByRole("checkbox", { name: "Mark Call back done" });
+        await act(async () => {
+            fireEvent.click(box);
+        });
+        const ticked = () => {
+            const now = screen.getByRole("checkbox", { name: "Mark Call back done" });
+            return now.getAttribute("aria-checked") ?? String((now as HTMLInputElement).checked);
+        };
+        await waitFor(() => expect(state.ticks).toHaveLength(1));
+        expect(state.ticks[0]).toMatchObject({ done: true });
+        await waitFor(() => expect(ticked()).toBe("false"));
     });
 });
