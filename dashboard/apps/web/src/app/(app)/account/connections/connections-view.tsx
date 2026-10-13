@@ -12,7 +12,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { OwnAppDialog, type OwnAppCard } from "./own-app-dialog";
 import { IntegrationLogo } from "@/components/logos";
 import {
     connectionSections,
@@ -92,8 +91,8 @@ export interface ConnectionProviderCard {
     /** Whether the operator allows this service as a way into Polaris at all. */
     canSignIn: boolean;
     accounts: LinkedAccount[];
-    /** A provider app of one's own (Spotify), with the values its form asks for. */
-    ownApp?: OwnAppCard;
+    /** Why the provider last refused an authorization, sent to administrators only. */
+    lastFailure?: string;
 }
 
 /** What the round trip to a provider came back with, as the callback flagged it. */
@@ -130,10 +129,18 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         const provider = params.get("provider");
         if (!outcome || !provider) return;
         const known = OUTCOMES[outcome];
+        // An administrator is the person the reason was recorded for, so they
+        // read it here instead of being told that they have been told.
+        const reason =
+            outcome === "error"
+                ? providers.find((entry) => entry.slug === provider)?.lastFailure
+                : undefined;
         if (known)
             setNotice({
                 provider,
-                text: t(`connections.outcomes.${known.key}` as const),
+                text: reason
+                    ? t("connections.outcomes.errorReason", { reason })
+                    : t(`connections.outcomes.${known.key}` as const),
                 bad: known.bad
             });
         const url = new URL(window.location.href);
@@ -187,7 +194,6 @@ function ProviderCard({
     const [confirming, setConfirming] = useState<LinkedAccount | null>(null);
     const [tokenOpen, setTokenOpen] = useState(false);
     const [typing, setTyping] = useState(false);
-    const [ownAppOpen, setOwnAppOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const accounts = useMemo(
@@ -487,30 +493,6 @@ function ProviderCard({
                     </p>
                 ) : null}
 
-                {provider.ownApp ? (
-                    <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {provider.ownApp.clientId ? (
-                            <span className="min-w-0 truncate" title={provider.ownApp.clientId}>
-                                {t("connections.ownApp.inUse", {
-                                    clientId: provider.ownApp.clientId
-                                })}
-                            </span>
-                        ) : (
-                            <span className="min-w-0">{t("connections.ownApp.why")}</span>
-                        )}
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={pending}
-                            onClick={() => setOwnAppOpen(true)}
-                        >
-                            {provider.ownApp.clientId
-                                ? t("connections.ownApp.change")
-                                : t("connections.ownApp.use")}
-                        </Button>
-                    </div>
-                ) : null}
-
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 {notice ? (
                     <p className={`text-sm ${notice.bad ? "text-danger" : "text-success"}`}>
@@ -518,10 +500,6 @@ function ProviderCard({
                     </p>
                 ) : null}
             </CardBody>
-
-            {ownAppOpen && provider.ownApp ? (
-                <OwnAppDialog ownApp={provider.ownApp} onClose={() => setOwnAppOpen(false)} />
-            ) : null}
 
             {confirming ? (
                 <DisconnectDialog

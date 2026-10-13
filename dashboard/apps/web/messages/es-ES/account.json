@@ -350,7 +350,8 @@
             "taken": "Esa cuenta ya está vinculada a otra cuenta de Polaris.",
             "limit": "Ya has vinculado tantas cuentas de ese servicio como se te permite.",
             "unavailable": "Este Polaris todavía no puede conectar ese servicio.",
-            "error": "El servicio no ha completado la autorización. No has hecho nada mal: este Polaris ya ha avisado a sus administradores."
+            "error": "El servicio no ha completado la autorización. No has hecho nada mal: este Polaris ya ha avisado a sus administradores.",
+            "errorReason": "El servicio rechazó la autorización: {reason}"
         },
         "ofLimit": "{count} de {limit}",
         "badges": {
@@ -437,25 +438,6 @@
         },
         "enterUsername": "Escribe tu usuario",
         "ownApp": {
-            "use": "Usar tu propia app de Spotify",
-            "change": "Cambiar",
-            "inUse": "Se usa tu propia app de Spotify ({clientId}).",
-            "why": "Spotify deja que una app enlace a cinco personas. Con tu propia app no tienes ese límite.",
-            "title": "Tu propia app de Spotify",
-            "description": "Crea una app en el panel de desarrolladores de Spotify y Polaris enlazará tu Spotify a través de ella. Como propietario no necesitas invitación; Spotify pide Premium en la cuenta del propietario.",
-            "create": "Crear una app",
-            "createHelp": "Pega los valores de abajo y marca Web API donde pregunta qué APIs usa la app.",
-            "paste": "Después copia el client id y el secreto desde Settings -> Basic Information de la app y pégalos aquí.",
-            "values": {
-                "appName": "Nombre",
-                "appDescription": "Descripción",
-                "homeUrl": "Sitio web",
-                "redirectUri": "Redirect URI"
-            },
-            "clientId": "Client id",
-            "clientSecret": "Secreto",
-            "premium": "El propietario de la app necesita Spotify Premium. Después de guardar, vuelve a conectar Spotify para que el enlace pase por tu app.",
-            "remove": "Dejar de usarla",
             "errors": {
                 "clientIdRequired": "Pega el client id",
                 "clientIdShape": "El client id son letras y números, tal como lo muestra Spotify.",
