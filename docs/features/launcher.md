@@ -17,8 +17,9 @@ follows your light or dark setting. Phone-sized versions are in
 </picture>
 
 Unread chats and mail, and anything that needs an administrator, are counted
-on the app they belong to and listed by name, so a click opens the one
-conversation. Apps can be searched, kept as favorites and arranged by
+on the app's own tile. A tile with something to dismiss carries a small "mark
+read" in its corner, and the foot of the menu has "mark everything read" for
+all of them at once. Apps can be searched, kept as favorites and arranged by
 dragging; the first ones also appear on the Overview. Apps are switched on per
 account and per role, and the menu only lists the ones you can open.
 

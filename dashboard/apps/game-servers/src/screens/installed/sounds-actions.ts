@@ -16,12 +16,21 @@ import { gameWords, messageText } from "../game-words";
 import { editionOf } from "../../lib/minecraft/service";
 import * as service from "../../lib/minecraft/sounds-service";
 import { MAX_PITCH, MIN_PITCH } from "../../lib/minecraft/sounds";
+import { MAX_LIVE_PAGE, type LiveSoundPlayer } from "../../lib/minecraft/sounds-live";
 
 const { recordAudit } = host.auditService;
 const { deployApplication } = host.deployService;
 const { requireGameServer } = host.appsInstallAccess;
 
 const serverId = z.string().uuid();
+
+const livePlayersSchema = z.object({
+    installedAppId: serverId,
+    query: z.string().trim().max(16),
+    filter: z.enum(["all", "have", "missing"]),
+    offset: z.number().int().min(0).max(100_000),
+    limit: z.number().int().min(1).max(MAX_LIVE_PAGE)
+});
 
 async function failure(caught: unknown): Promise<string> {
     const digest = (caught as { digest?: unknown } | null)?.digest;
@@ -71,6 +80,21 @@ export async function liveSoundsAction(
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         return { live: await service.liveSounds(access.ownerId, parsed.data) };
+    } catch (caught) {
+        return { error: await failure(caught) };
+    }
+}
+
+/** One page of who has the pack, for the list opened under the counts. */
+export async function liveSoundPlayersAction(
+    input: z.input<typeof livePlayersSchema>
+): Promise<{ players?: LiveSoundPlayer[]; total?: number; error?: string }> {
+    const parsed = livePlayersSchema.safeParse(input);
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
+    try {
+        const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
+        const { installedAppId, ...options } = parsed.data;
+        return await service.liveSoundPlayers(access.ownerId, installedAppId, options);
     } catch (caught) {
         return { error: await failure(caught) };
     }

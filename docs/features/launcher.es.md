@@ -17,10 +17,11 @@ sigue tu ajuste claro u oscuro. Las versiones para móvil están en
 </picture>
 
 Los chats y correos sin leer, y lo que necesita a un administrador, se cuentan
-en su app y se listan por nombre, así que un clic abre esa conversación. Las
-apps se buscan, se marcan como favoritas y se ordenan arrastrando; las primeras
-también aparecen en el Resumen. Las apps se activan por cuenta y por rol, y el
-menú solo muestra las que puedes abrir.
+en la propia ficha de la app. Una ficha con algo que descartar lleva un
+pequeño "marcar leído" en su esquina, y el pie del menú tiene "marcar todo
+leído" para todas a la vez. Las apps se buscan, se marcan como favoritas y se
+ordenan arrastrando; las primeras también aparecen en el Resumen. Las apps se
+activan por cuenta y por rol, y el menú solo muestra las que puedes abrir.
 
 ## Personal u organización
 

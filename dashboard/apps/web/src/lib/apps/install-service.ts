@@ -21,6 +21,7 @@ import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { localizeSetting } from "@/lib/apps/app-words";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
+import { INSTALL_SCOPED_MODELS, type UninstallOptions } from "@/lib/apps/uninstall-plan";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import {
     appUninstallRefusal,
@@ -28,7 +29,7 @@ import {
     resumeOwnedServices
 } from "@/lib/apps/app-lifecycle";
 import { invalidateBridgeCache } from "@/lib/messaging/bridge-endpoint";
-import { isPluginServer } from "@/lib/app-extensions/registry";
+import { isPluginServer, purgeInstallFiles } from "@/lib/app-extensions/registry";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import {
     createApplication,
@@ -575,10 +576,51 @@ async function isStillInstalled(catalogId: string): Promise<boolean> {
     return left !== null;
 }
 
+/**
+ * Delete every row other features keep under this install, in one transaction:
+ * either all of it goes or none of it does, so a purge that fails halfway never
+ * leaves a place without its cameras or a server's stats half gone.
+ */
+async function purgeInstallData(installedAppId: string): Promise<void> {
+    const where = { where: { installedAppId } };
+    await prisma.$transaction(
+        INSTALL_SCOPED_MODELS.map(
+            (model) =>
+                (
+                    prisma[model] as unknown as {
+                        deleteMany: (args: typeof where) => Promise<unknown>;
+                    }
+                ).deleteMany(where) as never
+        )
+    );
+}
+
+/** The helper installs a builtin app runs (`ownedBy`), whoever's they are. */
+async function ownedInstalls(catalogId: string): Promise<{ id: string; ownerId: string }[]> {
+    const services = POLARIS_APP_CATALOG.filter((app) => app.ownedBy === catalogId).map(
+        (app) => app.id
+    );
+    if (services.length === 0) return [];
+    return prisma.installedApp.findMany({
+        where: { catalogId: { in: services }, status: { not: "removed" } },
+        select: { id: true, ownerId: true }
+    });
+}
+
 /** Remove an installed app: tear down its Deploy application (best effort, it may
  *  already be gone) and mark the install removed so it drops out of the lists.
- *  An instance-wide app is one install for everybody, so every copy of it goes. */
-export async function uninstallApp(ownerId: string, id: string): Promise<void> {
+ *  An instance-wide app is one install for everybody, so every copy of it goes.
+ *
+ *  `deleteData` is the reader having confirmed that what is in it goes too: its
+ *  volumes are wiped and removed, the rows other features keep under it are
+ *  purged, its helper apps are uninstalled the same way, and the install row is
+ *  deleted rather than kept for a reinstall. `uninstall-plan` is the inventory
+ *  this is checked against. */
+export async function uninstallApp(
+    ownerId: string,
+    id: string,
+    options: UninstallOptions = { deleteData: false }
+): Promise<void> {
     const row = await prisma.installedApp.findFirst({ where: { id, ownerId } });
     if (!row) throw new Error("Installed app not found");
     // The mail server's rule holds whichever door the uninstall came through.
@@ -587,25 +629,57 @@ export async function uninstallApp(ownerId: string, id: string): Promise<void> {
             ? await mailServerUninstallRefusal()
             : await appUninstallRefusal(row);
     if (refusal) throw new Error(refusal);
+    const app = findApp(row.catalogId);
+    const copies =
+        app?.singleton && app.instanceWide
+            ? await prisma.installedApp.findMany({
+                  where: { catalogId: row.catalogId, status: { not: "removed" } },
+                  select: { id: true }
+              })
+            : [];
+    const ids = [...new Set([row.id, ...copies.map((copy) => copy.id)])];
+    // Files first, while the rows that find them (clips, stills) still exist, and
+    // before anything else goes: a file that stays stops the uninstall here, so
+    // trying again still finds it.
+    if (options.deleteData) for (const installId of ids) await purgeInstallFiles(installId);
     if (row.applicationId) {
         try {
-            await deleteApplication(row.applicationId, ownerId);
+            await deleteApplication(row.applicationId, ownerId, {
+                deleteData: options.deleteData
+            });
         } catch {
             // The application may already have been removed in Deploy; proceed.
         }
     }
-    await prisma.installedApp.update({ where: { id: row.id }, data: { status: "removed" } });
-    const app = findApp(row.catalogId);
-    if (app?.singleton && app.instanceWide) {
+    if (options.deleteData) {
+        for (const installId of ids) await purgeInstallData(installId);
+        await prisma.installedApp.deleteMany({ where: { id: { in: ids } } });
+    } else {
+        // Kept so a reinstall finds what was made in it, but not the credential:
+        // a removed install has no bridge to dial.
         await prisma.installedApp.updateMany({
-            where: { catalogId: row.catalogId, status: { not: "removed" } },
-            data: { status: "removed" }
+            where: { id: { in: ids } },
+            data: {
+                status: "removed",
+                encryptedSecret: null,
+                secretNonce: null,
+                secretKeyId: null
+            }
         });
     }
     invalidateInstallPresence(row.catalogId);
-    // The helper containers it ran come down with it; their data stays.
+    // The helper containers it ran come down with it; their data stays unless the
+    // reader asked for the data to go, and then the helpers go entirely.
     if (!(await isStillInstalled(row.catalogId))) {
-        await pauseOwnedServices(row.catalogId).catch(() => undefined);
+        if (options.deleteData) {
+            for (const helper of await ownedInstalls(row.catalogId)) {
+                await uninstallApp(helper.ownerId, helper.id, options).catch((error) => {
+                    console.error(`polaris: could not remove a helper of ${row.catalogId}:`, error);
+                });
+            }
+        } else {
+            await pauseOwnedServices(row.catalogId).catch(() => undefined);
+        }
         await (await import("@/lib/app-bundles/lifecycle")).appUninstalled(row.catalogId);
     }
     // And gone: a switcher still offering it opens a screen for something that

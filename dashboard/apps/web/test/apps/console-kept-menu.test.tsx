@@ -20,7 +20,7 @@ vi.mock("@polaris/app-host/client", () => ({
     hostUi: { i18nProvider: { useLocale: () => "en-US" } }
 }));
 
-const { KeptCommandsMenu, filterKeptCommands } = await import(
+const { KeptCommandsMenu, duplicateDraft, filterKeptCommands } = await import(
     "@polaris-app/game-servers/src/screens/installed/console-kept-menu"
 );
 
@@ -43,6 +43,7 @@ function renderMenu(canRun = true) {
         onEdit: vi.fn(),
         onSchedule: vi.fn(),
         onLoad: vi.fn(),
+        onDuplicate: vi.fn(),
         onForget: vi.fn()
     };
     render(<KeptCommandsMenu saved={SAVED} canRun={canRun} canManage {...handlers} />);
@@ -126,5 +127,47 @@ describe("the menu", () => {
         await waitFor(() => expect(document.activeElement?.textContent).toBe("Edit"));
         await user.keyboard("{ArrowDown}{Enter}");
         expect(handlers.onSchedule).toHaveBeenCalledWith(SAVED[41]);
+    });
+});
+
+describe("duplicating a kept command", () => {
+    const copyName = (name: string) => `${name} (copy)`;
+
+    it("keeps the command and its blanks under a new name, as a new one", () => {
+        const entry: SavedCommand = {
+            id: "tp",
+            label: "Bring",
+            command: "tp {player} ~ ~ ~",
+            variables: [{ name: "player", kind: "player" } as never]
+        };
+        const draft = duplicateDraft(entry, copyName);
+        expect(draft).toEqual({
+            label: "Bring (copy)",
+            command: entry.command,
+            variables: entry.variables
+        });
+        expect("id" in draft).toBe(false);
+    });
+
+    it("cuts a long name so the copy still fits", () => {
+        const draft = duplicateDraft(
+            { id: "x", label: "y".repeat(40), command: "say hi" },
+            copyName
+        );
+        expect(draft.label.length).toBeLessThanOrEqual(40);
+        expect(draft.label.endsWith(" (copy)")).toBe(true);
+    });
+
+    it("is offered beside the rest, named for the command it copies", async () => {
+        const user = userEvent.setup();
+        const handlers = renderMenu();
+        await user.click(screen.getByRole("button", { name: /Kept commands/ }));
+        await user.type(await screen.findByPlaceholderText("Search kept commands"), "night");
+        screen.getByRole("menuitem", { name: "More for Night" }).focus();
+        await user.keyboard("{ArrowRight}");
+        const item = await screen.findByRole("menuitem", { name: "Duplicate Night" });
+        expect(item.getAttribute("title")).toBe("Duplicate Night");
+        await user.click(item);
+        expect(handlers.onDuplicate).toHaveBeenCalledWith(SAVED[40]);
     });
 });

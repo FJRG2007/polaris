@@ -138,6 +138,13 @@ export interface RuntimePorts {
      * older host daemon has no route for it - the image then simply stays.
      */
     removeImage?(image: string): Promise<void>;
+    /**
+     * Remove a deleted app's emptied Docker volume (`polaris-<hash>_<source>`).
+     * Never forced, so a volume a container still uses is refused by the engine.
+     * Optional: the local machine removes its volumes through the daemon's own
+     * checked route (`removeHostVolume`), not through these ports.
+     */
+    removeVolume?(name: string): Promise<void>;
     /** Whether an image is present on the machine, asked before a rollback runs a
      *  kept image so a missing one is refused in words rather than by a failed
      *  pull of a name no registry has. Optional for the same reason as above. */

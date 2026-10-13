@@ -137,6 +137,29 @@ export async function beforeInstallStops(ownerId: string, installedAppId: string
     for (const extension of extensions()) await extension.beforeStop?.(ownerId, installedAppId);
 }
 
+/** Some of an install's files are still where they were, so the rows that find
+ *  them must not be purged yet. */
+export class InstallFilesLeftError extends Error {
+    public constructor(public readonly extensionIds: readonly string[]) {
+        super(`Files of this install are still left by ${extensionIds.join(", ")}`);
+        this.name = "InstallFilesLeftError";
+    }
+}
+
+/** Let every app remove the files an install wrote before its rows are purged.
+ *  One app failing does not keep the others from removing theirs, but it is
+ *  reported once they all ran, with `InstallFilesLeftError`. */
+export async function purgeInstallFiles(installedAppId: string): Promise<void> {
+    const failed: string[] = [];
+    for (const extension of extensions()) {
+        await extension.purgeInstallFiles?.(installedAppId).catch((caught) => {
+            console.error(`polaris: ${extension.id} could not remove an install's files:`, caught);
+            failed.push(extension.id);
+        });
+    }
+    if (failed.length > 0) throw new InstallFilesLeftError(failed);
+}
+
 /** Tell every app an install was started by hand. */
 export async function afterInstallStarts(installedAppId: string): Promise<void> {
     for (const extension of extensions()) await extension.afterStart?.(installedAppId);

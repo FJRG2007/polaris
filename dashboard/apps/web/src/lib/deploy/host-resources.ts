@@ -248,6 +248,22 @@ export function appVolumeDescription(app: {
     return where ? `Data of ${app.name} (${where})` : `Data of ${app.name}`;
 }
 
+/** The Docker volume compose creates for one of an app's volumes: `<project>_<name>`. */
+export function appVolumeName(applicationId: string, source: string): string {
+    return `polaris-${shortHash(applicationId, 8)}_${source}`;
+}
+
+/** The Docker volumes an app's own volume rows name on this machine. */
+export async function appDataVolumeNames(applicationId: string): Promise<string[]> {
+    const volumes = await prisma.volume.findMany({
+        where: { applicationId, kind: "volume", source: { not: null } },
+        select: { source: true }
+    });
+    return volumes.flatMap((volume) =>
+        volume.source ? [appVolumeName(applicationId, volume.source)] : []
+    );
+}
+
 /**
  * Before an app is deleted: note its volumes as belonging to something that no
  * longer exists, rather than letting them become nameless.
@@ -265,11 +281,10 @@ export async function noteAppDeleted(applicationId: string, now = new Date()): P
         }
     });
     if (!app) return;
-    const project = `polaris-${shortHash(applicationId, 8)}`;
     const description = appVolumeDescription(app);
     for (const volume of app.volumes) {
         if (!volume.source) continue;
-        const name = `${project}_${volume.source}`;
+        const name = appVolumeName(applicationId, volume.source);
         await prisma.hostResourceRecord.upsert({
             where: { serverId_kind_name: { serverId: LOCAL_SERVER, kind: "volume", name } },
             create: {

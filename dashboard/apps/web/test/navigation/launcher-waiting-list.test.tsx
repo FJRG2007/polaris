@@ -1,20 +1,19 @@
 // @vitest-environment jsdom
 
 /**
- * What each app has waiting, under the app menu's grid: the entries come from
- * the route when the menu opens; marking one read takes it away and moves the
- * badge at once; a refusal puts both back and says so; an answer read while a
- * mark is on its way does not undo it; "mark all" leaves only what cannot be
- * dismissed; and a search puts the list away.
+ * Marking read from the app menu: the menu lists only apps, a tile with
+ * something dismissable carries "mark read" for that app, and the foot has
+ * "mark everything read". A mark moves the badges at once; a refusal puts them
+ * back and says so; a fault alone (a Google API off) offers no mark.
  */
 
-import { AppSwitcher } from "@polaris/ui";
+import { AppSwitcher, DropdownMenuItem } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { Mail, MessageCircle, Shield } from "lucide-react";
 import type { LauncherWaiting } from "@/lib/launcher-waiting";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 const marked: unknown[] = [];
 let refuse = false;
@@ -47,7 +46,7 @@ vi.mock("@polaris/ui", async (original) => ({
     })
 }));
 
-const { LauncherWaitingList } = await import("@/components/launcher-waiting");
+const { useLauncherMarks } = await import("@/components/launcher-waiting");
 
 const APPS = [
     { id: "chat", label: "Chat", icon: MessageCircle, href: "/chat" },
@@ -61,34 +60,83 @@ const ANSWER: LauncherWaiting = {
             app: "chat",
             total: 7,
             items: [
-                { id: "c1", title: "Ada", detail: "", href: "/chat/c/c1", count: 5, dismissable: true },
-                { id: "c2", title: "Ops", detail: "", href: "/chat/c/c2", count: 2, dismissable: true }
+                {
+                    id: "c1",
+                    title: "Ada",
+                    detail: "",
+                    href: "/chat/c/c1",
+                    count: 5,
+                    dismissable: true
+                },
+                {
+                    id: "c2",
+                    title: "Ops",
+                    detail: "",
+                    href: "/chat/c/c2",
+                    count: 2,
+                    dismissable: true
+                }
             ]
         },
         {
             app: "mail",
             total: 2,
             items: [
-                { id: "t1", title: "Grace", detail: "Invoice", href: "/mail/t/t1", count: 2, dismissable: true }
+                {
+                    id: "t1",
+                    title: "Grace",
+                    detail: "Invoice",
+                    href: "/mail/t/t1",
+                    count: 2,
+                    dismissable: true
+                }
             ]
         },
         {
             app: "admin",
             total: 4,
             items: [
-                { id: "reports", title: "", detail: "", href: "/admin/safety", count: 3, dismissable: true },
-                { id: "apis", title: "", detail: "", href: "/admin/integrations", count: 1, dismissable: false }
+                {
+                    id: "reports",
+                    title: "",
+                    detail: "",
+                    href: "/admin/safety",
+                    count: 3,
+                    dismissable: true
+                },
+                {
+                    id: "apis",
+                    title: "",
+                    detail: "",
+                    href: "/admin/integrations",
+                    count: 1,
+                    dismissable: false
+                }
             ]
         }
     ]
 };
 
 function Menu() {
+    const marks = useLauncherMarks(true);
     return (
         <AppSwitcher
             apps={APPS}
             currentAppId="chat"
-            below={<LauncherWaitingList open apps={APPS} />}
+            tileAction={marks.tileAction}
+            footer={
+                marks.anything ? (
+                    <DropdownMenuItem
+                        aria-label="Mark everything read"
+                        onSelect={(event) => {
+                            event.preventDefault();
+                            marks.markAll();
+                        }}
+                    >
+                        all
+                    </DropdownMenuItem>
+                ) : null
+            }
         />
     );
 }
@@ -112,85 +160,52 @@ afterEach(() => {
 
 async function open() {
     const user = userEvent.setup();
-    const view = render(<Menu />, { wrapper: MessagesWrapper });
+    render(<Menu />, { wrapper: MessagesWrapper });
     await user.click(screen.getByRole("button", { name: /chat/i }));
-    const list = await screen.findByRole("region", { name: "Waiting in your apps" });
-    await within(list).findByText("Ada");
-    return { user, list, view };
+    await screen.findByRole("menuitem", { name: "Mark all read in Chat" });
+    return { user };
 }
 
-describe("the waiting list in the app menu", () => {
-    it("lists each app's entries, in the app's own words", async () => {
-        const { list } = await open();
-        expect(within(list).getByText("Grace")).toBeTruthy();
-        expect(within(list).getByText("Invoice")).toBeTruthy();
-        expect(within(list).getByText("3 reported messages")).toBeTruthy();
-        expect(within(list).getByText("1 Google API is off")).toBeTruthy();
-        // A fault is never dismissed: the APIs entry has no mark of its own.
-        expect(within(list).queryByRole("menuitem", { name: /Mark 1 Google API/ })).toBeNull();
-        expect(within(list).getByRole("menuitem", { name: "Mark 3 reported messages seen" })).toBeTruthy();
+describe("marking read from the app menu", () => {
+    it("lists apps only, with a mark on each tile that has something to dismiss", async () => {
+        await open();
+        expect(screen.queryByText("Ada")).toBeNull();
+        expect(screen.queryByText("Invoice")).toBeNull();
+        expect(screen.getByRole("menuitem", { name: "Mark all read in Mail" })).toBeTruthy();
+        expect(screen.getByRole("menuitem", { name: "Mark all seen in Management" })).toBeTruthy();
     });
 
-    it("marks one entry read at once, badge included, and keeps the menu open", async () => {
-        const { user, list } = await open();
-        await user.click(within(list).getByRole("menuitem", { name: "Mark Ada read" }));
-        expect(within(list).queryByText("Ada")).toBeNull();
-        expect(nudges).toEqual([["chat", -5]]);
-        expect(marked).toEqual([{ scope: "item", app: "chat", id: "c1" }]);
+    it("marks one app at once, badge included, and keeps the menu open", async () => {
+        const { user } = await open();
+        await user.click(screen.getByRole("menuitem", { name: "Mark all read in Chat" }));
+        expect(nudges).toEqual([["chat", -7]]);
+        expect(marked).toEqual([{ scope: "app", app: "chat" }]);
         expect(screen.getByRole("menu")).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "Mark all read in Chat" })).toBeNull();
     });
 
-    it("puts the entry and the badge back when the server refuses", async () => {
+    it("puts the badge and the mark back when the server refuses", async () => {
         refuse = true;
-        const { user, list } = await open();
-        await user.click(within(list).getByRole("menuitem", { name: "Mark Ada read" }));
+        const { user } = await open();
+        await user.click(screen.getByRole("menuitem", { name: "Mark all read in Chat" }));
         await waitFor(() => expect(shown).toEqual(["That could not be marked."]));
         expect(nudges).toEqual([
-            ["chat", -5],
-            ["chat", 5]
+            ["chat", -7],
+            ["chat", 7]
         ]);
-        expect(within(list).getByText("Ada")).toBeTruthy();
+        expect(screen.getByRole("menuitem", { name: "Mark all read in Chat" })).toBeTruthy();
     });
 
-    it("sets aside an answer read while a mark is on its way, and asks again after", async () => {
-        let release = () => undefined as void;
-        hold = new Promise<void>((resolve) => {
-            release = resolve;
-        });
-        const { user, list, view } = await open();
-        const fetched = vi.mocked(fetch);
-        await user.click(within(list).getByRole("menuitem", { name: "Mark Ada read" }));
-        expect(fetched).toHaveBeenCalledTimes(1);
-        // Something arrived somewhere else while the mark was on its way: the
-        // answer still has Ada, read before the mark landed.
-        server = { chat: 8, mail: 2, admin: 4 };
-        view.rerender(<Menu />);
-        await waitFor(() => expect(fetched).toHaveBeenCalledTimes(2));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        expect(within(list).queryByText("Ada")).toBeNull();
-        fetched.mockImplementation(
-            async () =>
-                new Response(JSON.stringify({ groups: ANSWER.groups.slice(1) }), { status: 200 })
-        );
-        release();
-        await waitFor(() => expect(fetched).toHaveBeenCalledTimes(3));
-        await waitFor(() => expect(within(list).queryByText("Ops")).toBeNull());
-    });
-
-    it("marks a whole app, leaving what cannot be dismissed", async () => {
-        const { user, list } = await open();
-        await user.click(
-            within(list).getByRole("menuitem", { name: "Mark all seen in Management" })
-        );
-        expect(within(list).queryByText("3 reported messages")).toBeNull();
-        expect(within(list).getByText("1 Google API is off")).toBeTruthy();
-        expect(marked).toEqual([{ scope: "app", app: "admin" }]);
-        expect(nudges).toEqual([["admin", -3]]);
-    });
-
-    it("is put away while a search narrows the grid", async () => {
+    it("marks everything, leaving the fault, and the tile marks go", async () => {
         const { user } = await open();
-        await user.type(screen.getByPlaceholderText("Search apps"), "ma");
-        expect(screen.queryByRole("region", { name: "Waiting in your apps" })).toBeNull();
+        await user.click(screen.getByRole("menuitem", { name: "Mark everything read" }));
+        expect(marked).toEqual([{ scope: "all" }]);
+        expect(nudges).toEqual([
+            ["chat", -7],
+            ["mail", -2],
+            ["admin", -3]
+        ]);
+        expect(screen.queryByRole("menuitem", { name: "Mark all seen in Management" })).toBeNull();
+        expect(screen.queryByRole("menuitem", { name: "Mark everything read" })).toBeNull();
     });
 });

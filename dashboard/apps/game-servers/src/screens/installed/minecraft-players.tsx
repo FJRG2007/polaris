@@ -53,7 +53,6 @@ import {
     InventoryDialog,
     LocationDialog,
     PlayerAccessDialog,
-    TeleportDialog,
     type PlayerDialog
 } from "./minecraft-player-dialogs";
 import { Badge, Button, Card, CardBody, Skeleton, Switch, cn } from "@polaris/ui";
@@ -67,7 +66,6 @@ import {
     History,
     KeyRound,
     LocateFixed,
-    MapPin,
     Pencil,
     RotateCcw,
     ShieldBan,
@@ -82,11 +80,14 @@ import {
     X
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
+import * as view from "../../lib/minecraft/players-view";
 
 const { relativeTime } = hostUi.relativeTime;
 const { useConfirm } = hostUi.confirmDialog;
 const { ToolbarSwitch } = hostUi.toolbarSwitch;
 const { useDisplayFormat } = hostUi.displayFormat;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
 
 /** Nobody known to be idle: the screen before the first answer about it. */
 const NOBODY_IDLE: Readonly<Record<string, number>> = {};
@@ -170,6 +171,8 @@ export function MinecraftPlayers({
     const [note, setNote] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
+    /** Rows drawn so far: a server of thousands draws a screenful, then more. */
+    const [rowLimit, setRowLimit] = useState(view.PLAYER_ROWS_STEP);
     // Refusals cleared here, hidden at once and put back if the save fails.
     const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
     const refusalKey = (refusal: { player: string; at: string }) =>
@@ -220,13 +223,23 @@ export function MinecraftPlayers({
         () => foldPlayers(status, roster, access, sessions, now, seen, passwords ?? []),
         [status, roster, access, sessions, now, seen, passwords]
     );
+    // The last whole list, drawn on a reload until every read is back in, so
+    // the rows do not reshuffle as each read lands (see players-view).
+    const keptKey = `minecraft-players:${installedAppId}`;
+    const [kept, setKept] = useState<readonly PlayerEntry[] | null>(null);
+    useKeptSnapshot<PlayerEntry[]>(keptKey, view.KEPT_PLAYERS_MS, (value) => setKept(value.value));
+    const complete = view.playersComplete({ status, roster, access });
+    useEffect(() => {
+        if (complete) writeSnapshot(keptKey, view.keptPlayers(known));
+    }, [complete, known, keptKey]);
+    const onScreen = view.playersOnScreen(known, kept, complete);
     const players = useMemo(
         () =>
-            known.map((player) => ({
+            onScreen.map((player) => ({
                 ...player,
                 ...(applied.get(player.name.toLowerCase()) ?? {})
             })),
-        [known, applied]
+        [onScreen, applied]
     );
     const registered = access?.rules.length ?? 0;
     // Folded to lower case, because the server reports a name the way it stored
@@ -748,7 +761,7 @@ export function MinecraftPlayers({
                           ? t("playersTab.nobodyAtAll")
                           : t("playersTab.nobodyMatches")
                 }
-                rows={shown.map((player) => (
+                rows={shown.slice(0, rowLimit).map((player) => (
                     <PlayerRow
                         key={player.name.toLowerCase()}
                         player={player}
@@ -795,6 +808,16 @@ export function MinecraftPlayers({
                     />
                 ))}
             />
+            {shown.length > rowLimit && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="self-center"
+                    onClick={() => setRowLimit((limit) => limit + view.PLAYER_ROWS_STEP)}
+                >
+                    {t("playersTab.showMore", { count: shown.length - rowLimit })}
+                </Button>
+            )}
 
             {acting?.dialog === "access" && (
                 <PlayerAccessDialog
@@ -844,24 +867,6 @@ export function MinecraftPlayers({
                         const name = target.name;
                         setActing(null);
                         run(() => actions.revokePlayerAddressAction(installedAppId, name, address));
-                    }}
-                />
-            )}
-            {acting?.dialog === "teleport" && target && (
-                <TeleportDialog
-                    player={target.name}
-                    others={onlineNames.filter((name) => name !== target.name)}
-                    pending={pending}
-                    onClose={() => setActing(null)}
-                    onTeleport={(destination) => {
-                        setActing(null);
-                        run(() =>
-                            actions.teleportPlayerAction({
-                                installedAppId,
-                                player: target.name,
-                                destination
-                            })
-                        );
                     }}
                 />
             )}
@@ -919,6 +924,11 @@ export function MinecraftPlayers({
                     others={onlineNames.filter(
                         (name) => name.toLowerCase() !== target.name.toLowerCase()
                     )}
+                    // From the list's own presence, so a bag opened while they
+                    // were away turns live when they join.
+                    online={onlineNames.some(
+                        (name) => name.toLowerCase() === target.name.toLowerCase()
+                    )}
                     onClose={() => setActing(null)}
                     onChanged={onChanged}
                 />
@@ -927,6 +937,20 @@ export function MinecraftPlayers({
                 <LocationDialog
                     installedAppId={installedAppId}
                     player={target.name}
+                    teleport={{
+                        others: onlineNames.filter((name) => name !== target.name),
+                        pending,
+                        onTeleport: (destination) => {
+                            setActing(null);
+                            run(() =>
+                                actions.teleportPlayerAction({
+                                    installedAppId,
+                                    player: target.name,
+                                    destination
+                                })
+                            );
+                        }
+                    }}
                     onClose={() => setActing(null)}
                 />
             )}
@@ -1509,13 +1533,6 @@ function moreEntries({
             icon: <LocateFixed className="size-4" />,
             disabled: !live || bedrock || !player.online,
             onSelect: () => onOpen("location")
-        },
-        {
-            kind: "item",
-            text: t("playersTab.menu.teleport"),
-            icon: <MapPin className="size-4" />,
-            disabled: !live || bedrock || !player.online,
-            onSelect: () => onOpen("teleport")
         },
         // Only while they are on: the game changes a bar on a player who is
         // standing there, and there is nothing to write down for somebody who is

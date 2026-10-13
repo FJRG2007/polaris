@@ -92,7 +92,12 @@ export * from "./components/dropdown-menu";
 export * from "./components/context-menu";
 export * from "./components/dialog";
 export * from "./shell/capabilities";
-export { AppSwitcher, type AppSwitcherStrings, type PolarisApp } from "./shell/app-switcher";
+export {
+    AppSwitcher,
+    type AppSwitcherStrings,
+    type AppTileAction,
+    type PolarisApp
+} from "./shell/app-switcher";
 export { MobileNav } from "./shell/mobile-nav";
 export { AppShell, PolarisMark, PageHeader, PAGE_FILL, PAGE_BLEED } from "./shell/app-shell";
 export {

@@ -8,9 +8,11 @@
  * "New" button and the filters are on screen before anything has been asked
  * for, and a shelf that has been looked at once paints from what this tab kept.
  *
- * Rows rather than a grid of thumbnails. A thumbnail of a document is a picture
- * of a page of text, which tells nobody anything; what people actually pick a
- * document out of a list by is its name, when it was touched and who touched it.
+ * A grid of previews by default, the way Google's home opens: the first page,
+ * sheet or slide of each, so a document is found by what is on it as well as by
+ * its name (`DocumentPreview`). The rows are one press away for somebody who
+ * picks by name, date and who touched it, and the choice is this browser's to
+ * keep (`office-layout`).
  */
 
 import Link from "next/link";
@@ -28,10 +30,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { GoogleImportDialog } from "./google-import-dialog";
+import { DocumentPreview } from "./document-preview";
+import { readOfficeLayout, writeOfficeLayout, type OfficeLayout } from "@/lib/office/layout";
 import {
     Cloud,
     Columns3,
     FileText,
+    LayoutGrid,
+    List,
     Loader2,
     Plus,
     Upload,
@@ -124,6 +130,14 @@ export function OfficeView({
     const [documents, setDocuments] = useState<OfficeDocumentView[] | null>(null);
     const [sort, setSort] = useState<core.OfficeSort>(core.DEFAULT_OFFICE_SORT);
     const [query, setQuery] = useState("");
+    // The grid until this browser said otherwise. Read after mount: the server
+    // cannot know what one browser kept, and a guess would fail hydration.
+    const [layout, setLayout] = useState<OfficeLayout>("grid");
+    useEffect(() => setLayout(readOfficeLayout()), []);
+    const chooseLayout = (next: OfficeLayout) => {
+        setLayout(next);
+        writeOfficeLayout(next);
+    };
     const [confirm, confirmDialog] = useConfirm();
     /**
      * Making one is pressing the button, and nothing else.
@@ -388,9 +402,45 @@ export function OfficeView({
                         label: t(SORT_KEYS[one])
                     }))}
                 />
+                <div
+                    role="group"
+                    aria-label={t("view.layoutLabel")}
+                    className="flex shrink-0 items-center gap-0.5"
+                >
+                    {(["grid", "list"] as const).map((one) => {
+                        const Mark = one === "grid" ? LayoutGrid : List;
+                        const name = t(one === "grid" ? "view.layoutGrid" : "view.layoutList");
+                        return (
+                            <Button
+                                key={one}
+                                variant="ghost"
+                                size="icon"
+                                aria-pressed={layout === one}
+                                aria-label={name}
+                                title={name}
+                                className={cn(layout === one && "bg-muted text-foreground")}
+                                onClick={() => chooseLayout(one)}
+                            >
+                                <Mark className="size-4 shrink-0" aria-hidden />
+                            </Button>
+                        );
+                    })}
+                </div>
             </div>
 
-            {documents === null ? (
+            {documents === null && layout === "grid" ? (
+                <ul className={GRID} aria-hidden>
+                    {[0, 1, 2, 3, 4, 5].map((tile) => (
+                        <li key={tile} className="overflow-hidden rounded-lg border border-border">
+                            <Skeleton className="aspect-[4/3] w-full rounded-none" />
+                            <div className="space-y-1.5 p-2.5">
+                                <Skeleton className="h-3.5 w-2/3" />
+                                <Skeleton className="h-3 w-1/3" />
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            ) : documents === null ? (
                 <ul className="flex flex-col gap-1" aria-hidden>
                     {[0, 1, 2, 3, 4, 5].map((row) => (
                         <li
@@ -423,10 +473,11 @@ export function OfficeView({
                     }
                 />
             ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className={layout === "grid" ? GRID : "flex flex-col gap-1"}>
                     {shown.map((row) => (
-                        <Row
+                        <Entry
                             key={row.id}
+                            layout={layout}
                             row={row}
                             onStar={() =>
                                 void act(
@@ -508,20 +559,97 @@ export function OfficeView({
     );
 }
 
-/** One row: what it is, what it is called, and what has happened to it. */
-function Row({
-    row,
-    onStar,
-    onArchive,
-    onTrash,
-    onDelete
-}: {
+/** Two columns on a phone, more as the screen allows. */
+const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
+
+interface EntryProps {
     row: OfficeDocumentView;
     onStar: () => void;
     onArchive: () => void;
     onTrash: () => void;
     onDelete: () => void;
-}) {
+}
+
+function Entry({ layout, ...props }: EntryProps & { layout: OfficeLayout }) {
+    return layout === "grid" ? <Tile {...props} /> : <Row {...props} />;
+}
+
+/**
+ * One tile: the first page, sheet or slide, the name under it, and when it
+ * changed. The preview and the name both open it; the actions sit over the
+ * preview's corner, shown on hover or focus, and always on a touch screen where
+ * there is no hover to show them.
+ */
+function Tile({ row, ...actions }: EntryProps) {
+    const t = useTranslations("office");
+    const Icon = KIND_ICONS[row.kind];
+    const href = core.officeDocumentPath(row.kind, row.id);
+    return (
+        <li className="group relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-border transition-colors hover:border-border-strong">
+            <Link
+                href={href}
+                tabIndex={-1}
+                aria-hidden
+                className="block aspect-[4/3] w-full overflow-hidden border-b border-border bg-muted"
+            >
+                <DocumentPreview
+                    id={row.id}
+                    kind={row.kind}
+                    version={row.editedAt ?? row.createdAt}
+                    fallback={
+                        <span
+                            className={cn(
+                                "grid size-full place-items-center",
+                                KIND_TONES[row.kind]
+                            )}
+                        >
+                            <Icon className="size-8 shrink-0" aria-hidden />
+                        </span>
+                    }
+                />
+            </Link>
+            <div className="flex min-w-0 items-center gap-2 px-2.5 py-2">
+                <Icon className={cn("size-4 shrink-0", KIND_TONES[row.kind])} aria-hidden />
+                <div className="min-w-0 flex-1">
+                    <Link
+                        href={href}
+                        className="block truncate text-[13px] font-medium text-foreground"
+                        title={row.title}
+                    >
+                        {row.title}
+                    </Link>
+                    <p className="flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">
+                        {row.shared ? (
+                            <Users
+                                className="size-3 shrink-0"
+                                aria-label={t("view.sharedWithYou")}
+                            />
+                        ) : null}
+                        <span className="truncate">
+                            {row.editedAt ? (
+                                <RelativeTime iso={row.editedAt} />
+                            ) : (
+                                t(OFFICE_KIND_KEYS[row.kind])
+                            )}
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-md bg-elevated/90 opacity-0 shadow-sm ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+                <Actions row={row} {...actions} />
+            </div>
+            {row.starred && !row.trashed ? (
+                <Star
+                    className="pointer-events-none absolute left-2 top-2 size-4 shrink-0 fill-current text-warning"
+                    aria-hidden
+                />
+            ) : null}
+        </li>
+    );
+}
+
+/** One row: what it is, what it is called, and what has happened to it. */
+function Row({ row, ...actions }: EntryProps) {
     const t = useTranslations("office");
     const Icon = KIND_ICONS[row.kind];
     return (
@@ -577,82 +705,92 @@ function Row({
                 </span>
             ) : null}
             <div className="flex shrink-0 items-center gap-0.5">
-                {row.trashed ? (
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t("view.restoreNamed", { name: row.title })}
-                            title={t("view.restore")}
-                            onClick={onTrash}
-                        >
-                            <Undo2 className="size-4 shrink-0" aria-hidden />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t("view.burnNamed", { name: row.title })}
-                            title={t("view.burn")}
-                            onClick={onDelete}
-                        >
-                            <Trash2 className="size-4 shrink-0" aria-hidden />
-                        </Button>
-                    </>
-                ) : (
-                    <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-pressed={row.starred}
-                            aria-label={
-                                row.starred
-                                    ? t("view.unstarNamed", { name: row.title })
-                                    : t("view.starNamed", { name: row.title })
-                            }
-                            title={row.starred ? t("view.unstar") : t("view.star")}
-                            onClick={onStar}
-                        >
-                            <Star
-                                className={cn(
-                                    "size-4 shrink-0",
-                                    row.starred && "fill-current text-warning"
-                                )}
-                                aria-hidden
-                            />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={
-                                row.archived
-                                    ? t("view.restoreNamed", { name: row.title })
-                                    : t("view.archiveNamed", { name: row.title })
-                            }
-                            title={row.archived ? t("view.restore") : t("view.archive")}
-                            onClick={onArchive}
-                        >
-                            <Undo2
-                                className={cn("size-4 shrink-0", !row.archived && "hidden")}
-                                aria-hidden
-                            />
-                            <Columns3
-                                className={cn("size-4 shrink-0", row.archived && "hidden")}
-                                aria-hidden
-                            />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={t("view.binNamed", { name: row.title })}
-                            title={t("view.bin")}
-                            onClick={onTrash}
-                        >
-                            <Trash2 className="size-4 shrink-0" aria-hidden />
-                        </Button>
-                    </>
-                )}
+                <Actions row={row} {...actions} />
             </div>
         </li>
+    );
+}
+
+/** Star, archive and bin - or, in the bin, restore and delete for good. */
+function Actions({ row, onStar, onArchive, onTrash, onDelete }: EntryProps) {
+    const t = useTranslations("office");
+    return (
+        <>
+            {row.trashed ? (
+                <>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("view.restoreNamed", { name: row.title })}
+                        title={t("view.restore")}
+                        onClick={onTrash}
+                    >
+                        <Undo2 className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("view.burnNamed", { name: row.title })}
+                        title={t("view.burn")}
+                        onClick={onDelete}
+                    >
+                        <Trash2 className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                </>
+            ) : (
+                <>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-pressed={row.starred}
+                        aria-label={
+                            row.starred
+                                ? t("view.unstarNamed", { name: row.title })
+                                : t("view.starNamed", { name: row.title })
+                        }
+                        title={row.starred ? t("view.unstar") : t("view.star")}
+                        onClick={onStar}
+                    >
+                        <Star
+                            className={cn(
+                                "size-4 shrink-0",
+                                row.starred && "fill-current text-warning"
+                            )}
+                            aria-hidden
+                        />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={
+                            row.archived
+                                ? t("view.restoreNamed", { name: row.title })
+                                : t("view.archiveNamed", { name: row.title })
+                        }
+                        title={row.archived ? t("view.restore") : t("view.archive")}
+                        onClick={onArchive}
+                    >
+                        <Undo2
+                            className={cn("size-4 shrink-0", !row.archived && "hidden")}
+                            aria-hidden
+                        />
+                        <Columns3
+                            className={cn("size-4 shrink-0", row.archived && "hidden")}
+                            aria-hidden
+                        />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t("view.binNamed", { name: row.title })}
+                        title={t("view.bin")}
+                        onClick={onTrash}
+                    >
+                        <Trash2 className="size-4 shrink-0" aria-hidden />
+                    </Button>
+                </>
+            )}
+        </>
     );
 }
 

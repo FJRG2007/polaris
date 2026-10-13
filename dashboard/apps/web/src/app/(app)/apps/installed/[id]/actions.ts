@@ -15,8 +15,13 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
-import { installRef } from "@/lib/apps/install-access";
-import { afterInstallStarts, beforeInstallStops } from "@/lib/app-extensions/registry";
+import { z } from "zod";
+import { installRef, uninstallAccess } from "@/lib/apps/install-access";
+import {
+    afterInstallStarts,
+    beforeInstallStops,
+    InstallFilesLeftError
+} from "@/lib/app-extensions/registry";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import type { DeployStrategy } from "@/lib/deploy/releases";
@@ -89,24 +94,40 @@ export async function setInstalledAppRunningAction(
     }
 }
 
-export async function uninstallInstalledAppAction(id: string): Promise<{ error?: string }> {
+/** What the uninstall dialog sends beside the id. */
+const uninstallOptionsSchema = z.object({ deleteData: z.boolean() }).strict();
+
+export async function uninstallInstalledAppAction(
+    id: string,
+    options: { deleteData: boolean } = { deleteData: false }
+): Promise<{ error?: string }> {
     try {
-        const { user, access } = await requirePermissionOn("deploy.manage", installRef(id));
-        if (!access.isOwner && !user.isAdmin) {
+        const parsedId = z.string().uuid().safeParse(id);
+        const parsed = uninstallOptionsSchema.safeParse(options);
+        if (!parsedId.success || !parsed.success) {
+            return { error: (await getTranslations("installed"))("errors.uninstall") };
+        }
+        const user = await requireUser();
+        const access = await uninstallAccess(user, id);
+        if (!access) {
             return { error: (await getTranslations("installed"))("errors.ownerOnly") };
         }
-        await uninstallApp(access.ownerId, id);
+        await uninstallApp(access.ownerId, id, parsed.data);
         // The app is gone, so the access people were given to it is too.
         await clearResourceGrants(installRef(id));
         await recordAudit({
             actorId: user.id,
             action: "apps.uninstall",
             targetType: "installedApp",
-            targetId: id
+            targetId: id,
+            metadata: { deleteData: parsed.data.deleteData }
         });
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {
+        if (caught instanceof InstallFilesLeftError) {
+            return { error: (await getTranslations("installed"))("errors.filesLeft") };
+        }
         return {
             error:
                 caught instanceof Error

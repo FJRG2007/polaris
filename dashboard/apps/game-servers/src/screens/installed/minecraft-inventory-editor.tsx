@@ -85,10 +85,14 @@ export function InventoryEditor({
     player,
     editable,
     others = [],
+    online,
     onChanged
 }: {
     installedAppId: string;
     player: string;
+    /** Whether the screen behind sees them on the server now, from its own
+     *  presence. Undefined where it does not know. */
+    online?: boolean;
     /** Everybody else who is on the server right now: who a stack can be sent to. */
     others?: readonly string[];
     /** False on Bedrock, which answers no `data get`: nothing to read back and no
@@ -249,6 +253,21 @@ export function InventoryEditor({
         );
         return () => clearInterval(timer);
     }, [live, pending, reload, slowRead]);
+
+    /*
+     * Somebody looking at the last copy of an absent player's bag is switched to
+     * the live one when the screen behind sees them join, without reopening it.
+     * Their first moments on the server may not answer yet, so it asks again
+     * until the bag is live or they leave; no read happens while they are away.
+     */
+    useEffect(() => {
+        if (!online || live || loading) return;
+        void reload();
+        const timer = setInterval(() => {
+            if (!dragging.current && !pending) void reload();
+        }, SLOW_POLL_MS);
+        return () => clearInterval(timer);
+    }, [online, live, loading, pending, reload]);
 
     /** The stacks waiting on a slot, which the grid draws in it, and everything
      *  else that is waiting, which is a line under it. */

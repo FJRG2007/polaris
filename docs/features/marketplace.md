@@ -32,3 +32,15 @@ arrives the first time a server of that game is created.
 An app that runs a container of its own can be installed as it comes, or
 configured first: its name, the machine it runs on, and whether each of its
 volumes lives on that machine or on a NAS from Drive.
+
+## Each app's own page
+
+Every app in the catalog has a page of its own, like a store listing: its
+name, mark and description, what it does, its own screenshots for your theme
+and language, and the details its manifest knows - developer, category,
+version, image. Install, Configure, Open and Uninstall sit on the page and are
+offered only when you are allowed to use them.
+
+Uninstalling can also delete the app's data - its volumes, settings and
+everything made in it, including files such as camera footage - and leaves
+nothing behind; by default the data is kept for a reinstall.

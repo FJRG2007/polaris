@@ -30,6 +30,7 @@
 import * as Y from "yjs";
 import * as XLSX from "xlsx";
 import * as deck from "./deck";
+import * as preview from "./preview";
 import * as core from "@polaris/core";
 import { writeDocx, writePptx } from "./ooxml";
 import { OFFICE_FIELDS, openDocument } from "./content";
@@ -413,4 +414,52 @@ export async function exportDocument(
     // A drawing leaves through the canvas that is already showing it - see the
     // note at the top of this file.
     return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The home's preview                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The start of a document, for its tile on the Office home - see `preview`.
+ *
+ * Read with the same walkers as the exports, so a tile shows what an export
+ * would. A sheet is read only as far as the corner a tile draws: building the
+ * whole grid of a large workbook to keep twelve rows of it is the work this
+ * avoids.
+ */
+export function previewDocument(
+    kind: core.OfficeKind,
+    stored: Uint8Array | null
+): preview.OfficePreview {
+    if (!stored || stored.length === 0) return { kind: "none" };
+    const doc = openDocument(stored);
+    if (kind === "doc") return { kind, blocks: preview.clipBlocks(docBlocks(doc)) };
+    if (kind === "sheet") return { kind, rows: preview.clipGrid(sheetCorner(doc)) };
+    if (kind === "comparison") return { kind, rows: preview.clipGrid(comparisonRows(doc)) };
+    if (kind === "slides") return { kind, ...preview.clipSlides(deckSlides(doc)) };
+    // A drawing is shapes rather than words; its tile keeps the kind's icon.
+    return { kind: "none" };
+}
+
+/** The top-left corner of a workbook's first sheet - the one a CSV export
+ *  takes - and nothing past it. */
+function sheetCorner(doc: Y.Doc): string[][] {
+    const cells = doc.getMap<{ v?: unknown }>(OFFICE_FIELDS.sheet.cells);
+    const rows: string[][] = [];
+    let sheet: string | null = null;
+    for (const [key, cell] of cells) {
+        const at = readCellKey(key);
+        if (!at) continue;
+        sheet ??= at.sheetId;
+        if (at.sheetId !== sheet) continue;
+        if (at.row >= preview.PREVIEW_ROWS || at.column >= preview.PREVIEW_COLUMNS) continue;
+        const value = cell?.v;
+        if (value === undefined || value === null) continue;
+        const row = (rows[at.row] ??= []);
+        row[at.column] = String(value);
+    }
+    return Array.from({ length: rows.length }, (_, at) =>
+        Array.from({ length: preview.PREVIEW_COLUMNS }, (_, column) => rows[at]?.[column] ?? "")
+    );
 }

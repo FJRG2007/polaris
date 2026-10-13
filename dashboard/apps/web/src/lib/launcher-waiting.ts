@@ -1,11 +1,12 @@
 /**
- * What the app menu lists under its grid: the things each app has waiting, and
- * how somebody says they have dealt with one.
+ * What each app has waiting, as the app menu knows it, and how somebody says
+ * they have dealt with it from there.
  *
- * Drawn the way a notification centre groups by app (macOS, Windows, Android):
- * one group per app with its icon, name and count, the newest few entries in
- * it, each one opening what it is about and each one with its own "mark read",
- * and one "mark all read" for the group.
+ * The menu lists apps and nothing else: the count is on each tile, and a tile
+ * with something it may dismiss offers "mark read" for the whole app, with one
+ * "mark everything read" at the foot. The entries below are what the route
+ * answers with, so the menu knows which tiles may be marked and by how much a
+ * mark moves each badge.
  *
  * "Read" here means what the app itself means by it, never a second flag only
  * the menu knows about. A conversation marked read in the menu is read in Chat,
@@ -81,14 +82,16 @@ export const launcherWaitingSchema = z.object({ groups: z.array(groupSchema) });
 
 export type LauncherWaiting = z.infer<typeof launcherWaitingSchema>;
 
-/** One entry marked read, or every entry of one app. */
+/** One entry marked read, every entry of one app, or everything in every app
+ *  this reader can reach. */
 export const markLauncherReadSchema = z.discriminatedUnion("scope", [
     z.object({
         scope: z.literal("item"),
         app: z.enum(LAUNCHER_WAITING_APPS),
         id: z.string().trim().min(1).max(64)
     }),
-    z.object({ scope: z.literal("app"), app: z.enum(LAUNCHER_WAITING_APPS) })
+    z.object({ scope: z.literal("app"), app: z.enum(LAUNCHER_WAITING_APPS) }),
+    z.object({ scope: z.literal("all") })
 ]);
 
 export type MarkLauncherRead = z.infer<typeof markLauncherReadSchema>;
@@ -136,4 +139,19 @@ export function badgeDelta(
     const total = (waiting: LauncherWaiting) =>
         waiting.groups.find((group) => group.app === app)?.total ?? 0;
     return total(after) - total(before);
+}
+
+/** The menu after everything is marked read: only what cannot be dismissed. */
+export function withoutAll(waiting: LauncherWaiting): LauncherWaiting {
+    return LAUNCHER_WAITING_APPS.reduce((left, app) => withoutApp(left, app), waiting);
+}
+
+/** The apps whose tile offers "mark read": those with something the menu may
+ *  dismiss. A fault alone - a Google API switched off - is not one. */
+export function markableApps(waiting: LauncherWaiting | null): Set<LauncherWaitingApp> {
+    const found = new Set<LauncherWaitingApp>();
+    for (const group of waiting?.groups ?? []) {
+        if (group.items.some((item) => item.dismissable)) found.add(group.app);
+    }
+    return found;
 }
