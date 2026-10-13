@@ -17,10 +17,8 @@ CREATE TABLE IF NOT EXISTS "CrmWorkflowVersion" (
 
 CREATE INDEX IF NOT EXISTS "CrmWorkflowVersion_workflowId_createdAt_idx" ON "CrmWorkflowVersion"("workflowId", "createdAt");
 
-DO $$ BEGIN
-    ALTER TABLE "CrmWorkflowVersion" ADD CONSTRAINT "CrmWorkflowVersion_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "CrmWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "CrmWorkflowVersion" DROP CONSTRAINT IF EXISTS "CrmWorkflowVersion_workflowId_fkey";
+ALTER TABLE "CrmWorkflowVersion" ADD CONSTRAINT "CrmWorkflowVersion_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "CrmWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 INSERT INTO "CrmWorkflowVersion" ("id", "workflowId", "name", "trigger", "actions", "savedById", "createdAt")
 SELECT gen_random_uuid(), w."id", w."name", w."trigger", w."actions", w."runAsId", w."updatedAt"

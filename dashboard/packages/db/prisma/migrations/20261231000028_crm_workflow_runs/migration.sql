@@ -20,7 +20,5 @@ CREATE TABLE IF NOT EXISTS "CrmWorkflowRun" (
 CREATE INDEX IF NOT EXISTS "CrmWorkflowRun_workflowId_startedAt_idx" ON "CrmWorkflowRun"("workflowId", "startedAt");
 CREATE INDEX IF NOT EXISTS "CrmWorkflowRun_status_resumeAt_idx" ON "CrmWorkflowRun"("status", "resumeAt");
 
-DO $$ BEGIN
-    ALTER TABLE "CrmWorkflowRun" ADD CONSTRAINT "CrmWorkflowRun_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "CrmWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "CrmWorkflowRun" DROP CONSTRAINT IF EXISTS "CrmWorkflowRun_workflowId_fkey";
+ALTER TABLE "CrmWorkflowRun" ADD CONSTRAINT "CrmWorkflowRun_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "CrmWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
