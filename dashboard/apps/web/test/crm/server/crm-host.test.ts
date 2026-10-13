@@ -37,7 +37,10 @@ const mocks = vi.hoisted(() => ({
                 })
             )
         },
-        mailAccount: { findMany: vi.fn(async (): Promise<unknown[]> => [{ id: "acc-1" }]) },
+        mailAccount: {
+            findMany: vi.fn(async (): Promise<unknown[]> => [{ id: "acc-1" }]),
+            findFirst: vi.fn(async (): Promise<unknown> => ({ id: "acc-1" }))
+        },
         mailThread: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
         $queryRaw: vi.fn(async (): Promise<unknown[]> => []),
         driveItemMeta: {
@@ -48,6 +51,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@polaris/db", () => ({ prisma: mocks.prisma }));
+const queueSend = vi.hoisted(() => vi.fn(async () => ({ draftId: "d1", sendAt: new Date() })));
+vi.mock("@/lib/mailbox/compose", () => ({ queueSend }));
 vi.mock("@/lib/drive-authz", () => ({
     requireDriveDriver: mocks.requireDriveDriver,
     mayReadDrive: mocks.mayReadDrive
@@ -63,12 +68,14 @@ vi.mock("@/lib/orgs/org-service", () => ({
 }));
 
 import {
+    crmCanSendMail,
     crmDriveFileRef,
     crmDriveFiles,
     crmEventsWith,
     crmMailWith,
     crmPostJson,
-    crmRunner
+    crmRunner,
+    crmSendMail
 } from "@/lib/crm-host";
 
 const actor = { id: "u1", isAdmin: false };
@@ -245,5 +252,39 @@ describe("mail and events with a record's people", () => {
                 href: "/calendar/e/e1"
             })
         ]);
+    });
+});
+
+describe("a workflow's email", () => {
+    const actor = { id: "u1", isAdmin: false } as never;
+
+    it("goes from the account's first mailbox through the send queue, at once", async () => {
+        expect(await crmCanSendMail(actor)).toBe(true);
+        expect(
+            await crmSendMail(actor, { to: ["sales@example.test"], subject: "Hi", body: "Body" })
+        ).toEqual({ sent: true });
+        expect(mocks.prisma.mailAccount.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { userId: "u1" }, orderBy: { id: "asc" } })
+        );
+        expect(queueSend).toHaveBeenCalledWith(
+            "u1",
+            expect.objectContaining({
+                accountId: "acc-1",
+                to: [{ name: "", address: "sales@example.test" }],
+                subject: "Hi",
+                body: "Body",
+                sendAt: expect.any(Date)
+            })
+        );
+    });
+
+    it("is refused without Mail or a mailbox", async () => {
+        mocks.userHasPermission.mockResolvedValueOnce(false);
+        expect(await crmCanSendMail(actor)).toBe(false);
+        mocks.prisma.mailAccount.findFirst.mockResolvedValueOnce(null);
+        expect(await crmSendMail(actor, { to: ["a@example.test"], subject: "x", body: "" })).toEqual({
+            refused: "mail"
+        });
+        expect(queueSend).not.toHaveBeenCalled();
     });
 });

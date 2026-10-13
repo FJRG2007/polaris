@@ -304,11 +304,13 @@ export const serverHost = {
     // from, what their organization's role lets them do there, and who on it
     // may own a record.
     crmHost: {
+        crmCanSendMail: later(load.crmHost, "crmCanSendMail"),
         crmCreateNote: later(load.crmHost, "crmCreateNote"),
         crmDriveFileRef: later(load.crmHost, "crmDriveFileRef"),
         crmDriveFiles: later(load.crmHost, "crmDriveFiles"),
         crmEventsWith: later(load.crmHost, "crmEventsWith"),
         crmMailWith: later(load.crmHost, "crmMailWith"),
+        crmSendMail: later(load.crmHost, "crmSendMail"),
         crmNoteShelves: later(load.crmHost, "crmNoteShelves"),
         crmNotesByIds: later(load.crmHost, "crmNotesByIds"),
         crmOrgPeople: later(load.crmHost, "crmOrgPeople"),

@@ -358,6 +358,55 @@ async function mayUse(actor: OrgActor, permission: "mail.use" | "calendar.use"):
     return userHasPermission(actor.id, permission);
 }
 
+/** The mailbox a workflow's email goes from: the first one this account
+ *  added. Null when it may not use Mail or has no mailbox. */
+async function sendingAccount(actor: OrgActor): Promise<string | null> {
+    if (!(await mayUse(actor, "mail.use"))) return null;
+    const account = await prisma.mailAccount.findFirst({
+        where: { userId: actor.id },
+        orderBy: { id: "asc" },
+        select: { id: true }
+    });
+    return account?.id ?? null;
+}
+
+/** Whether this account has a mailbox a workflow's email can go from. */
+export async function crmCanSendMail(actor: OrgActor): Promise<boolean> {
+    return (await sendingAccount(actor)) !== null;
+}
+
+/**
+ * Queue an email from this account's own mailbox, through the same queue its
+ * Send button uses, so it is in its Sent folder like any other. Sent at once:
+ * nobody is there to undo it. Answers `refused` when there is no mailbox to
+ * send from.
+ */
+export async function crmSendMail(
+    actor: OrgActor,
+    message: { to: readonly string[]; subject: string; body: string }
+): Promise<{ sent: true } | { refused: "mail" }> {
+    const accountId = await sendingAccount(actor);
+    if (!accountId) return { refused: "mail" };
+    const { queueSend } = await import("@/lib/mailbox/compose");
+    await queueSend(actor.id, {
+        accountId,
+        identityId: null,
+        to: message.to.map((address) => ({ name: "", address })),
+        cc: [],
+        bcc: [],
+        replyTo: "",
+        subject: message.subject,
+        body: message.body,
+        attachmentIds: [],
+        inReplyToId: null,
+        forward: false,
+        sendAt: new Date(),
+        requestReceipt: false,
+        draftId: null
+    });
+    return { sent: true };
+}
+
 /** The most addresses one question asks about: a company with a long staff
  *  list reads its most recent people, not a query the size of the table. */
 const MAX_ADDRESSES = 50;

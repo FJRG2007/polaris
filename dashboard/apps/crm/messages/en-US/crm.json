@@ -519,6 +519,7 @@
             "createRecord": "Create a record",
             "createTask": "Create a task",
             "notify": "Send a notification",
+            "sendEmail": "Send an email",
             "httpRequest": "Send to an address"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
@@ -562,7 +563,14 @@
         "requestBadUrl": "Use an http or https address.",
         "requestRefused": "That address cannot be reached from here.",
         "requestUnreachable": "The address did not answer.",
-        "requestFailed": "The address answered {status}."
+        "requestFailed": "The address answered {status}.",
+        "emailTo": "To",
+        "emailToHint": "Addresses, or {example}",
+        "emailSubject": "Subject",
+        "emailNoMailbox": "Emails go from your own mailbox. Add one in Mail first.",
+        "emailNoAddress": "The email had nobody to go to.",
+        "emailBadAddress": "{address} is not an email address.",
+        "emailTooMany": "An email from a workflow goes to {count} addresses at most."
     },
     "favorites": {
         "add": "Add to favorites",

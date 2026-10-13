@@ -232,6 +232,34 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
                 </div>
             );
         }
+        case "sendEmail":
+            return (
+                <div className="flex min-w-0 flex-col gap-2">
+                    <Input
+                        aria-label={t("workflows.emailTo")}
+                        placeholder={t("workflows.emailToHint", { example: "{{email}}" })}
+                        value={action.to}
+                        maxLength={model.EMAIL_TO_MAX}
+                        onChange={(event) => onChange({ ...action, to: event.target.value })}
+                    />
+                    <Input
+                        aria-label={t("workflows.emailSubject")}
+                        placeholder={t("workflows.emailSubject")}
+                        value={action.subject}
+                        maxLength={model.EMAIL_SUBJECT_MAX}
+                        onChange={(event) => onChange({ ...action, subject: event.target.value })}
+                    />
+                    <Textarea
+                        aria-label={t("workflows.notifyBody")}
+                        placeholder={t("workflows.notifyBody")}
+                        rows={4}
+                        value={action.body}
+                        maxLength={model.ACTION_TEXT_MAX}
+                        onChange={(event) => onChange({ ...action, body: event.target.value })}
+                    />
+                    <TemplateHint object={object} />
+                </div>
+            );
         case "notify":
             return (
                 <NotifyFields
@@ -484,6 +512,7 @@ export function useWorkflowWords(object: CrmObject) {
         actionOffered(kind: model.ActionKind, options: model.WorkflowOptions): boolean {
             if (kind === "createTask") return options.taskLists.length > 0;
             if (kind === "notify") return options.people.length > 0;
+            if (kind === "sendEmail") return options.mail === true;
             return true;
         },
         newAction(kind: model.ActionKind, options: model.WorkflowOptions): model.WorkflowAction {
@@ -505,6 +534,13 @@ export function useWorkflowWords(object: CrmObject) {
                     };
                 case "httpRequest":
                     return { kind, url: "" };
+                case "sendEmail":
+                    return {
+                        kind,
+                        to: object === "people" ? "{{email}}" : "",
+                        subject: `{{${primaryField(object).key}}}`,
+                        body: ""
+                    };
                 case "notify":
                     return {
                         kind,

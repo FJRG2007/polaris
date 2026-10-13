@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { fieldOf } from "@polaris-app/crm/src/model/objects";
 import {
     actionFits,
+    emailRecipients,
     eventsOf,
     nextScheduledRun,
     renderTemplate,
@@ -309,5 +310,15 @@ describe("a call out", () => {
         expect(parse("javascript:alert(1)")).toBe(false);
         expect(parse("not an address")).toBe(false);
         expect(parse(`https://hooks.example.invalid/${"a".repeat(2100)}`)).toBe(false);
+    });
+});
+
+describe("emailRecipients", () => {
+    it("splits, lowercases and dedupes addresses, keeping the bad ones apart", () => {
+        expect(emailRecipients(" A@Example.test, a@example.test;b@example.test  nope ")).toEqual({
+            addresses: ["a@example.test", "b@example.test"],
+            invalid: ["nope"]
+        });
+        expect(emailRecipients(" ,; ")).toEqual({ addresses: [], invalid: [] });
     });
 });

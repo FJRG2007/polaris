@@ -79,6 +79,8 @@ export const MAX_ACTION_VALUES = 40;
 export interface WorkflowOptions {
     readonly taskLists: { id: string; name: string; spaceName: string }[];
     readonly people: { id: string; name: string }[];
+    /** Whether the reader has a mailbox a workflow's email can go from. */
+    readonly mail?: boolean;
 }
 
 /** The longest address a workflow may call. */
@@ -107,6 +109,32 @@ export const MAX_RECIPIENTS = 50;
 
 /** The longest title a notification may have. */
 export const NOTIFY_TITLE_MAX = 200;
+
+/** The most addresses one workflow email goes to. */
+export const MAX_EMAIL_RECIPIENTS = 20;
+
+/** The longest subject a workflow email may have. */
+export const EMAIL_SUBJECT_MAX = 300;
+
+/** The longest recipient list a workflow email may have, as typed. */
+export const EMAIL_TO_MAX = 2000;
+
+const anEmail = z.string().email().max(254);
+
+/** The addresses in a filled-in recipient list: split on commas, semicolons
+ *  and spaces, lowercased, each once. Anything that is not an address is
+ *  returned apart, so a run can say which. */
+export function emailRecipients(text: string): { addresses: string[]; invalid: string[] } {
+    const addresses: string[] = [];
+    const invalid: string[] = [];
+    for (const part of text.split(/[,;\s]+/)) {
+        const one = part.trim().toLowerCase();
+        if (!one) continue;
+        if (!anEmail.safeParse(one).success) invalid.push(one);
+        else if (!addresses.includes(one)) addresses.push(one);
+    }
+    return { addresses, invalid };
+}
 
 /** Field values to write, each the text a cell would hold. `{{field}}` in one
  *  is the value of that field on the record the workflow is about. */
@@ -141,6 +169,14 @@ export const workflowActionSchema = z.discriminatedUnion("kind", [
         title: z.string().trim().min(1).max(NOTIFY_TITLE_MAX),
         body: z.string().max(ACTION_TEXT_MAX)
     }),
+    /** An email from the mailbox of whoever owns the workflow. Every part is a
+     *  template, so `{{email}}` writes to the person the record is about. */
+    z.object({
+        kind: z.literal("sendEmail"),
+        to: z.string().trim().min(1).max(EMAIL_TO_MAX),
+        subject: z.string().trim().min(1).max(EMAIL_SUBJECT_MAX),
+        body: z.string().max(ACTION_TEXT_MAX)
+    }),
     /** A POST of the record, as JSON, to an address outside. */
     z.object({
         kind: z.literal("httpRequest"),
@@ -156,6 +192,7 @@ export const ACTION_KINDS: readonly ActionKind[] = [
     "createRecord",
     "createTask",
     "notify",
+    "sendEmail",
     "httpRequest"
 ];
 

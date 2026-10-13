@@ -519,6 +519,7 @@
             "createRecord": "Crear un registro",
             "createTask": "Crear una tarea",
             "notify": "Enviar un aviso",
+            "sendEmail": "Enviar un correo",
             "httpRequest": "Enviar a una dirección"
         },
         "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
@@ -562,7 +563,14 @@
         "requestBadUrl": "Usa una dirección http o https.",
         "requestRefused": "No se puede llegar a esa dirección desde aquí.",
         "requestUnreachable": "La dirección no respondió.",
-        "requestFailed": "La dirección respondió {status}."
+        "requestFailed": "La dirección respondió {status}.",
+        "emailTo": "Para",
+        "emailToHint": "Direcciones, o {example}",
+        "emailSubject": "Asunto",
+        "emailNoMailbox": "Los correos salen de tu propio buzón. Añade uno en Correo primero.",
+        "emailNoAddress": "El correo no tenía a quién ir.",
+        "emailBadAddress": "{address} no es una dirección de correo.",
+        "emailTooMany": "Un correo de un flujo va a {count} direcciones como mucho."
     },
     "favorites": {
         "add": "Añadir a favoritos",

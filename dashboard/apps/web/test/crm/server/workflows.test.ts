@@ -66,6 +66,8 @@ const crmHost = vi.hoisted(() => ({
         { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Sales", spaceName: "Team" }
     ]),
     crmPostJson: vi.fn(async (): Promise<unknown> => ({ status: 200 })),
+    crmCanSendMail: vi.fn(async () => true),
+    crmSendMail: vi.fn(async (): Promise<unknown> => ({ sent: true })),
     createTask: vi.fn(
         async (): Promise<unknown> => ({
             id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -676,8 +678,49 @@ describe("a task or a notification", () => {
             people: [
                 { id: "u1", name: "Test User" },
                 { id: "u3", name: "Other User" }
-            ]
+            ],
+            mail: true
         });
+    });
+
+    it("emails from the runner's mailbox, filled from the record, each address once", async () => {
+        expect(
+            await runOn([
+                {
+                    kind: "sendEmail",
+                    to: "Sales@Example.test; sales@example.test, {{city}}",
+                    subject: "About {{name}}",
+                    body: "Hello {{name}}"
+                }
+            ])
+        ).toBeNull();
+        expect(crmHost.crmSendMail).toHaveBeenCalledWith(
+            { id: "u2", isAdmin: false },
+            { to: ["sales@example.test"], subject: "About Acme", body: "Hello Acme" }
+        );
+    });
+
+    it("says why an email could not go", async () => {
+        const email = (to: string) => [{ kind: "sendEmail", to, subject: "x", body: "" }];
+        expect(await runOn(email("not-an-address"))).toContain("not-an-address");
+        db.crmWorkflow.update.mockClear();
+        expect(await runOn(email("{{city}}"))).toBeTruthy();
+        db.crmWorkflow.update.mockClear();
+        crmHost.crmSendMail.mockResolvedValueOnce({ refused: "mail" });
+        expect(await runOn(email("sales@example.test"))).toMatch(/mailbox/);
+    });
+
+    it("refuses to save an email for somebody with no mailbox", async () => {
+        crmHost.crmCanSendMail.mockResolvedValueOnce(false);
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "created" },
+                actions: [{ kind: "sendEmail", to: "sales@example.test", subject: "x", body: "" }],
+                enabled: true
+            })
+        ).rejects.toThrow(/mailbox/);
+        expect(db.crmWorkflow.create).not.toHaveBeenCalled();
     });
 });
 
