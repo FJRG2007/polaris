@@ -160,6 +160,17 @@ const THREADS: readonly ThreadDraft[] = [
         starred: true
     },
     {
+        from: ["Mateo Silva", "mateo@example.com"],
+        subject: ["Q2 roadmap review moved to 3pm", "La revisión del roadmap del T2 pasa a las 15:00"],
+        snippet: [
+            "Room 4 was taken, so we are in the big room instead. Same agenda, same link.",
+            "La sala 4 estaba ocupada, así que vamos a la grande. Mismo orden del día, mismo enlace."
+        ],
+        minutes: 22,
+        unread: 1,
+        count: 2
+    },
+    {
         from: ["Kenji Mori", "kenji@example.com"],
         subject: ["Invoice 2026-031 from Northwind Studio", "Factura 2026-031 de Northwind Studio"],
         snippet: [
@@ -170,6 +181,15 @@ const THREADS: readonly ThreadDraft[] = [
         unread: 1,
         attachments: true,
         label: 1
+    },
+    {
+        from: ["Builds", "ci@builds.example"],
+        subject: ["main: deploy succeeded in 2m 14s", "main: despliegue correcto en 2 min 14 s"],
+        snippet: [
+            "Commit 4f2a9c1 by Sam Okafor is live on production. 128 tests passed.",
+            "El commit 4f2a9c1 de Sam Okafor ya está en producción. 128 pruebas superadas."
+        ],
+        minutes: 55
     },
     {
         from: ["Priya Nair", "priya@example.org"],
@@ -194,6 +214,18 @@ const THREADS: readonly ThreadDraft[] = [
         attachments: true
     },
     {
+        from: ["Grace Lin", "grace@example.com"],
+        subject: ["Brand colors, round two", "Colores de marca, segunda ronda"],
+        snippet: [
+            "Took your notes on contrast. The teal is darker now and passes on white.",
+            "He aplicado tus notas de contraste. El verde azulado es más oscuro y ya pasa sobre blanco."
+        ],
+        minutes: 160,
+        count: 4,
+        attachments: true,
+        label: 1
+    },
+    {
         from: ["Sam Okafor", "sam@example.com"],
         subject: ["Staging is green", "Staging en verde"],
         snippet: [
@@ -202,6 +234,16 @@ const THREADS: readonly ThreadDraft[] = [
         ],
         minutes: 190,
         unread: 1
+    },
+    {
+        from: ["Parcel Tracking", "updates@parcels.example"],
+        subject: ["Your order has shipped", "Tu pedido está en camino"],
+        snippet: [
+            "Order 50-2291 left the warehouse this morning. Expected Friday between 9 and 13.",
+            "El pedido 50-2291 salió del almacén esta mañana. Llegada prevista el viernes entre las 9 y las 13."
+        ],
+        minutes: 60 * 5,
+        home: true
     },
     {
         from: ["Example Bank", "statements@bank.example"],
@@ -216,6 +258,26 @@ const THREADS: readonly ThreadDraft[] = [
         label: 2
     },
     {
+        from: ["Yuki Tanaka", "yuki@example.org"],
+        subject: ["Contract for the translation work", "Contrato para el trabajo de traducción"],
+        snippet: [
+            "Signed copy attached. I can start on the Japanese strings next Monday.",
+            "Te adjunto la copia firmada. Puedo empezar con los textos en japonés el lunes."
+        ],
+        minutes: 60 * 12,
+        attachments: true,
+        label: 1
+    },
+    {
+        from: ["The Weekly Build", "digest@news.example"],
+        subject: ["Issue 112: shipping smaller releases", "Número 112: publicar versiones más pequeñas"],
+        snippet: [
+            "Three teams on how they cut release size in half, and what it cost them.",
+            "Tres equipos cuentan cómo redujeron sus versiones a la mitad y lo que les costó."
+        ],
+        minutes: 60 * 16
+    },
+    {
         from: ["Ana Torres", "ana@example.com"],
         subject: ["Customer interviews: notes", "Entrevistas con clientes: notas"],
         snippet: [
@@ -225,6 +287,16 @@ const THREADS: readonly ThreadDraft[] = [
         minutes: 60 * 22,
         count: 2,
         starred: true
+    },
+    {
+        from: ["Omar Haddad", "omar@example.com"],
+        subject: ["Access to the staging database", "Acceso a la base de datos de staging"],
+        snippet: [
+            "Could you add me to the read-only group? I need it for the migration dry run.",
+            "¿Me puedes añadir al grupo de solo lectura? Lo necesito para el ensayo de la migración."
+        ],
+        minutes: 60 * 25,
+        count: 2
     },
     {
         from: ["Kenji Mori", "kenji@example.com"],
@@ -246,6 +318,27 @@ const THREADS: readonly ThreadDraft[] = [
         minutes: 60 * 30,
         home: true,
         label: 2
+    },
+    {
+        from: ["Support", "help@support.example"],
+        subject: ["Ticket 8841 has been resolved", "La incidencia 8841 se ha resuelto"],
+        snippet: [
+            "The SSO redirect issue is fixed in the latest release. Reply if it happens again.",
+            "El problema de redirección del SSO está corregido en la última versión. Responde si vuelve a pasar."
+        ],
+        minutes: 60 * 34
+    },
+    {
+        from: ["Lena Fischer", "lena@example.com"],
+        subject: ["Photos from the offsite", "Fotos de la jornada fuera de la oficina"],
+        snippet: [
+            "Uploaded everything to the shared album. The group shot by the lake came out well.",
+            "Lo he subido todo al álbum compartido. La foto de grupo junto al lago ha salido bien."
+        ],
+        minutes: 60 * 40,
+        home: true,
+        attachments: true,
+        starred: true
     }
 ];
 
