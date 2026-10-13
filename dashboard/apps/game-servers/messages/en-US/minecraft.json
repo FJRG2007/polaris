@@ -1049,7 +1049,7 @@
         }
     },
     "panel": {
-        "polarisLoginHasAnUpdate": "Polaris login has an update",
+        "polarisLoginHasAnUpdate": "The Polaris mod has an update",
         "antiCheatReadsWhatThe": "Anti-cheat reads what the game counts for each player, which only Java keeps.",
         "usageIsMeasuredOnceThe": "Usage is measured once the server has deployed.",
         "serverAddress": "Server address",
@@ -1079,7 +1079,7 @@
         "memory": "Memory",
         "world": "World",
         "readFailed": "Could not read the server",
-        "loginUpdateReason": "Polaris login update",
+        "loginUpdateReason": "Polaris mod update",
         "loginUpdateDetail": "This server runs an older build. It installs the new one when it restarts; passwords are kept.",
         "modsWaitForARestart": "Mod changes wait for a restart",
         "modsChangedReason": "Mod changes",
@@ -1381,7 +1381,7 @@
         "readFailed": "Could not read the login state",
         "lastReached": "Last reached <time></time>.",
         "neverReached": "It has never reached it.",
-        "checkedIn": "Polaris login checked in <time></time>.",
+        "checkedIn": "The Polaris mod checked in <time></time>.",
         "outdated": "The server runs an older build; the new one installs when it restarts.",
         "commandsHelp": "Players register with <register></register>, come back with <login></login> and change it with <change></change>. Letters, digits and symbols all work; a password with spaces goes in double quotes.",
         "words": {
