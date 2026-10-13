@@ -48,6 +48,7 @@ import { drawsFromBattery } from "../lib/camera-models";
 import { quietSince } from "../lib/availability";
 import {
     captureFrame,
+    codedShape,
     nextTransport,
     preferredTransport,
     rememberFrame,
@@ -56,6 +57,7 @@ import {
     type Transport
 } from "../lib/player";
 import { playLive } from "../lib/live-player";
+import { coverBox, streamShape } from "../lib/viewer-shape";
 import { useReconnect } from "./use-reconnect";
 import { hostUi } from "@polaris/app-host/client";
 
@@ -161,6 +163,8 @@ export function CameraTile({
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. Null until one has arrived. */
     const [shape, setShape] = useState<number | null>(null);
+    /** The last still's shape on its own, which a stream's report never overrides. */
+    const stillShape = useRef<number | null>(null);
     const format = useDisplayFormat();
     const t = usePlacesT();
     /** When this camera stopped answering, in the reader's own format, or null
@@ -385,7 +389,8 @@ export function CameraTile({
                                 if (shownSrc) rememberFrame(camera.id, shownSrc);
                                 const { naturalWidth, naturalHeight } = loaded.currentTarget;
                                 if (naturalWidth > 0 && naturalHeight > 0) {
-                                    setShape(naturalWidth / naturalHeight);
+                                    stillShape.current = naturalWidth / naturalHeight;
+                                    setShape(stillShape.current);
                                 }
                                 if (wantFrames) after(attempt ? FRAME_GAP_MS : COLD_GAP_MS);
                             }}
@@ -409,10 +414,16 @@ export function CameraTile({
                                         ? undefined
                                         : streamSrc(camera.id, attempt, transport)
                                 }
+                                // Covering the tile at its own measured shape and
+                                // filled exactly, not `object-cover`: that crops
+                                // at the shape the browser reports, which a
+                                // camera declaring the wrong pixel shape
+                                // stretches (see `streamShape`).
                                 className={cn(
-                                    "absolute inset-0 size-full object-cover",
+                                    "absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2 object-fill",
                                     playing ? "opacity-100" : "opacity-0"
                                 )}
+                                style={coverBox(shape, TILE_SHAPE)}
                                 autoPlay
                                 muted
                                 playsInline
@@ -420,12 +431,20 @@ export function CameraTile({
                                 // still coming. Without them the clock below runs
                                 // against a camera that is merely loading.
                                 onLoadStart={stirred}
-                                onLoadedMetadata={(loaded) => {
-                                    stirred();
-                                    const { videoWidth, videoHeight } = loaded.currentTarget;
-                                    if (videoWidth > 0 && videoHeight > 0) {
-                                        setShape(videoWidth / videoHeight);
-                                    }
+                                onLoadedMetadata={stirred}
+                                // Measured off the first decoded frame rather
+                                // than the element's own report.
+                                onLoadedData={(loaded) => {
+                                    const element = loaded.currentTarget;
+                                    const { videoWidth, videoHeight } = element;
+                                    if (videoWidth <= 0 || videoHeight <= 0) return;
+                                    const coded = codedShape(element);
+                                    setShape(
+                                        streamShape(stillShape.current, coded, {
+                                            width: videoWidth,
+                                            height: videoHeight
+                                        })
+                                    );
                                 }}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
