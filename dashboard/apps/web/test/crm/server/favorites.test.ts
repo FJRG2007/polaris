@@ -102,11 +102,11 @@ describe("pinning", () => {
             user: { id: "u1", name: "Test User" },
             shelf: { orgId: "o1", userId: null, key: "org:o1", orgName: "Example Org" },
             can: { companies: can(true), people: can(true), opportunities: can(true) },
-        rules: {
-            companies: { rows: "own", hidden: [], readOnly: [] },
-            people: { rows: "own", hidden: [], readOnly: [] },
-            opportunities: { rows: "own", hidden: [], readOnly: [] }
-        }
+            rules: {
+                companies: { rows: "own", hidden: [], readOnly: [] },
+                people: { rows: "own", hidden: [], readOnly: [] },
+                opportunities: { rows: "own", hidden: [], readOnly: [] }
+            }
         } as never;
         db.companies.findFirst.mockResolvedValueOnce(null);
         await expect(

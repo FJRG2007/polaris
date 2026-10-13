@@ -14,7 +14,14 @@
 import { prisma } from "@polaris/db";
 import * as model from "../model/forecast";
 import * as flow from "../model/stage-flow";
-import { ownClause, requireCan, requireShown, shelfData, shelfWhere, type CrmActor } from "./access";
+import {
+    ownClause,
+    requireCan,
+    requireShown,
+    shelfData,
+    shelfWhere,
+    type CrmActor
+} from "./access";
 
 /** Groups a forecast reads at most; past this it says it is incomplete. */
 export const ROW_CAP = 20_000;
@@ -155,9 +162,11 @@ export async function stageFlow(
         : [];
     return flow.buildStageFlow(
         kept,
-        events
-            .slice(0, FLOW_EVENTS)
-            .map((event) => ({ recordId: event.recordId, at: event.createdAt, changes: event.changes })),
+        events.slice(0, FLOW_EVENTS).map((event) => ({
+            recordId: event.recordId,
+            at: event.createdAt,
+            changes: event.changes
+        })),
         reasons.map((row) => ({
             stage: row.stage,
             reason: row.closeReason,

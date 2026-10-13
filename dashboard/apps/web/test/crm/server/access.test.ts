@@ -39,7 +39,10 @@ describe("crmActor", () => {
 
     it("lets every member of an organization see it, and change only what the role grants", async () => {
         crmHost.crmShelf.mockResolvedValue({ orgId: "o1", orgName: "Acme" });
-        crmHost.crmOrgAccess.mockResolvedValue({ role: null, permissions: ["org.read", "crm.people.edit"] });
+        crmHost.crmOrgAccess.mockResolvedValue({
+            role: null,
+            permissions: ["org.read", "crm.people.edit"]
+        });
         const actor = await crmActor(user);
         expect(actor.shelf).toMatchObject({
             orgId: "o1",
@@ -53,7 +56,10 @@ describe("crmActor", () => {
 
     it("shows a restricted role only the kinds it may change", async () => {
         crmHost.crmShelf.mockResolvedValue({ orgId: "o1", orgName: "Acme" });
-        crmHost.crmOrgAccess.mockResolvedValue({ role: null, permissions: ["crm.opportunities.delete"] });
+        crmHost.crmOrgAccess.mockResolvedValue({
+            role: null,
+            permissions: ["crm.opportunities.delete"]
+        });
         const actor = await crmActor(user);
         expect(actor.can.opportunities).toEqual({ read: true, edit: false, delete: true });
         expect(actor.can.companies).toEqual({ read: false, edit: false, delete: false });

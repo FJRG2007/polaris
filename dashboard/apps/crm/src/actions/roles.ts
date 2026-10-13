@@ -22,7 +22,8 @@ export async function rolesAction(): Promise<Outcome<RolesOpening>> {
         const actor = await requireCrmActor();
         return {
             orgName: actor.shelf.orgName,
-            reading: actor.shelf.orgId && actor.manageRoles ? await roles.listRoleRules(actor) : null
+            reading:
+                actor.shelf.orgId && actor.manageRoles ? await roles.listRoleRules(actor) : null
         };
     });
 }

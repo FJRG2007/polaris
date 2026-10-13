@@ -20,8 +20,10 @@ const db = vi.hoisted(() => ({
         count: vi.fn(async () => 1),
         findMany: vi.fn(async (): Promise<{ email: string }[]> => []),
         findFirst: vi.fn(
-            async (): Promise<{ companyId: string | null; pointOfContactId: string | null } | null> =>
-                null
+            async (): Promise<{
+                companyId: string | null;
+                pointOfContactId: string | null;
+            } | null> => null
         )
     },
     crmLink: {
@@ -219,11 +221,11 @@ describe("notes and tasks on a record", () => {
             user: { id: "u1", name: "Test User", isAdmin: false },
             shelf: { orgId: "o1", userId: null, key: "org:o1" },
             can: { companies: allowed, people: allowed, opportunities: allowed },
-        rules: {
-            companies: { rows: "own", hidden: [], readOnly: [] },
-            people: { rows: "own", hidden: [], readOnly: [] },
-            opportunities: { rows: "own", hidden: [], readOnly: [] }
-        }
+            rules: {
+                companies: { rows: "own", hidden: [], readOnly: [] },
+                people: { rows: "own", hidden: [], readOnly: [] },
+                opportunities: { rows: "own", hidden: [], readOnly: [] }
+            }
         } as never;
         db.records.count.mockResolvedValueOnce(0);
         await expect(
@@ -331,11 +333,7 @@ describe("mail and meetings on a record", () => {
         expect(db.records.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
-                    AND: [
-                        { orgId: "o1" },
-                        { id: RECORD },
-                        { deletedAt: null, NOT: { email: "" } }
-                    ]
+                    AND: [{ orgId: "o1" }, { id: RECORD }, { deletedAt: null, NOT: { email: "" } }]
                 }
             })
         );

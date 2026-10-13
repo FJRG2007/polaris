@@ -181,8 +181,7 @@ export function Board(props: BoardProps) {
         );
     };
 
-    const accepts = (event: DragEvent) =>
-        canMove && event.dataTransfer.types.includes(CARD_DRAG);
+    const accepts = (event: DragEvent) => canMove && event.dataTransfer.types.includes(CARD_DRAG);
 
     /** Where in a column a card would land: before the first card whose middle
      *  is below the pointer. */
@@ -300,9 +299,7 @@ export function Board(props: BoardProps) {
                                     <article
                                         key={record.id}
                                         data-card={record.id}
-                                        draggable={
-                                            canMove && !pending && editing?.id !== record.id
-                                        }
+                                        draggable={canMove && !pending && editing?.id !== record.id}
                                         aria-label={name}
                                         onDragStart={(event) => {
                                             event.dataTransfer.setData(CARD_DRAG, record.id);

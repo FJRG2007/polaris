@@ -46,7 +46,10 @@ function sameRule(a: model.ObjectRule, b: model.ObjectRule): boolean {
 export function RolesScreen() {
     const t = useCrmT();
     const toast = useToast();
-    const load = useCallback(() => unwrap(() => actions.rolesAction(), t("errors.loadFailed")), [t]);
+    const load = useCallback(
+        () => unwrap(() => actions.rolesAction(), t("errors.loadFailed")),
+        [t]
+    );
     const reading = hostUi.liveRead.useLiveRead<actions.RolesOpening>({
         cacheKey: "crm:roles",
         load
@@ -59,7 +62,8 @@ export function RolesScreen() {
     const [saved, setSaved] = useState<Record<string, model.ObjectRule>>({});
     const [busy, setBusy] = useState(false);
 
-    const role = roles.find((one) => one.slug === roleSlug) ?? roles.find((one) => !one.full) ?? null;
+    const role =
+        roles.find((one) => one.slug === roleSlug) ?? roles.find((one) => !one.full) ?? null;
     const draftKey = role ? `${role.slug}:${object}` : "";
     const stored = role ? (saved[draftKey] ?? role.rules[object]) : model.OPEN_RULE;
     const rule = drafts[draftKey] ?? stored;
@@ -94,7 +98,13 @@ export function RolesScreen() {
 
     let body: React.ReactNode;
     if (!data && reading.error) {
-        body = <EmptyState icon={<ShieldCheck />} title={t("errors.loadFailed")} description={reading.error} />;
+        body = (
+            <EmptyState
+                icon={<ShieldCheck />}
+                title={t("errors.loadFailed")}
+                description={reading.error}
+            />
+        );
     } else if (!data) {
         body = (
             <div aria-busy="true" aria-label={t("roles.loading")} className="flex flex-col gap-2">
@@ -139,31 +149,45 @@ export function RolesScreen() {
                                 size="sm"
                                 aria-label={t("roles.rows")}
                                 value={rule.rows}
-                                onValueChange={(rows) => change({ ...rule, rows: rows as model.RowScope })}
+                                onValueChange={(rows) =>
+                                    change({ ...rule, rows: rows as model.RowScope })
+                                }
                                 options={[
                                     { value: "all", label: t("roles.rowsAll") },
                                     { value: "own", label: t("roles.rowsOwn") }
                                 ]}
                             />
                             {rule.rows === "own" ? (
-                                <span className="text-xs text-muted-foreground">{t("roles.rowsOwnHint")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("roles.rowsOwnHint")}
+                                </span>
                             ) : null}
                         </div>
                         <ul className="flex min-w-0 flex-col divide-y rounded-md border">
                             {fields.map((field) => (
-                                <li key={field.key} className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2">
-                                    <span className="min-w-0 flex-1 truncate text-sm" title={fieldLabel(t, object, field)}>
+                                <li
+                                    key={field.key}
+                                    className="flex min-w-0 flex-wrap items-center gap-2 px-3 py-2"
+                                >
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-sm"
+                                        title={fieldLabel(t, object, field)}
+                                    >
                                         {fieldLabel(t, object, field)}
                                     </span>
                                     {field.primary ? (
-                                        <span className="text-xs text-muted-foreground">{t("roles.nameHint")}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {t("roles.nameHint")}
+                                        </span>
                                     ) : (
                                         <SegmentedControl
                                             size="sm"
                                             aria-label={`${t("roles.access")}: ${fieldLabel(t, object, field)}`}
                                             value={accessOf(rule, field.key)}
                                             onValueChange={(access) =>
-                                                change(withAccess(rule, field.key, access as Access))
+                                                change(
+                                                    withAccess(rule, field.key, access as Access)
+                                                )
                                             }
                                             options={[
                                                 { value: "change", label: t("roles.see") },
@@ -190,11 +214,18 @@ export function RolesScreen() {
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto overscroll-contain" data-crm-ready>
+        <div
+            className="flex h-full min-h-0 flex-col gap-3 overflow-auto overscroll-contain"
+            data-crm-ready
+        >
             <div className="flex min-w-0 flex-col gap-1">
-                <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">{t("roles.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">
+                    {t("roles.title")}
+                </h1>
                 {data?.orgName ? (
-                    <p className="text-sm text-muted-foreground">{t("roles.intro", { org: data.orgName })}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {t("roles.intro", { org: data.orgName })}
+                    </p>
                 ) : null}
             </div>
             {body}

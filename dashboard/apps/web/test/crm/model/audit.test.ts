@@ -5,7 +5,12 @@
 
 import { describe, expect, it } from "vitest";
 import { FIELDS } from "@polaris-app/crm/src/model/objects";
-import { auditCsv, auditQuerySchema, auditRange, EMPTY_AUDIT_QUERY } from "@polaris-app/crm/src/model/audit";
+import {
+    auditCsv,
+    auditQuerySchema,
+    auditRange,
+    EMPTY_AUDIT_QUERY
+} from "@polaris-app/crm/src/model/audit";
 
 const labels = {
     header: ["When", "Who", "Object", "Record", "What", "Field", "Before", "After"] as const,
@@ -18,9 +23,15 @@ const labels = {
 describe("auditQuerySchema", () => {
     it("takes the empty query and refuses an unknown kind or a bad id", () => {
         expect(auditQuerySchema.parse(EMPTY_AUDIT_QUERY)).toEqual(EMPTY_AUDIT_QUERY);
-        expect(auditQuerySchema.safeParse({ ...EMPTY_AUDIT_QUERY, kind: "deleted" }).success).toBe(false);
-        expect(auditQuerySchema.safeParse({ ...EMPTY_AUDIT_QUERY, cursor: "1 OR 1" }).success).toBe(false);
-        expect(auditQuerySchema.safeParse({ ...EMPTY_AUDIT_QUERY, object: "users" }).success).toBe(false);
+        expect(auditQuerySchema.safeParse({ ...EMPTY_AUDIT_QUERY, kind: "deleted" }).success).toBe(
+            false
+        );
+        expect(auditQuerySchema.safeParse({ ...EMPTY_AUDIT_QUERY, cursor: "1 OR 1" }).success).toBe(
+            false
+        );
+        expect(auditQuerySchema.safeParse({ ...EMPTY_AUDIT_QUERY, object: "users" }).success).toBe(
+            false
+        );
     });
 });
 

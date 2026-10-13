@@ -106,7 +106,9 @@ export async function actorOn(
         ),
         // The owner and a full-access role are held to nothing.
         rules:
-            access?.role && !granted.includes("*") ? await loadRules(orgId, access.role) : OPEN_RULES,
+            access?.role && !granted.includes("*")
+                ? await loadRules(orgId, access.role)
+                : OPEN_RULES,
         manageRoles: hasOrgPermission(granted, "roles.manage")
     };
 }

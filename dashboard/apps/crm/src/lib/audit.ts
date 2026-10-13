@@ -46,7 +46,9 @@ export function auditObjects(actor: CrmActor): CrmObject[] {
 }
 
 function eventsWhere(actor: CrmActor, query: AuditQuery): Record<string, unknown> | null {
-    const objects = auditObjects(actor).filter((object) => !query.object || object === query.object);
+    const objects = auditObjects(actor).filter(
+        (object) => !query.object || object === query.object
+    );
     if (objects.length === 0) return null;
     return {
         ...shelfWhere(actor.shelf),
@@ -91,7 +93,9 @@ async function recordNames(
     const names = new Map<string, string>();
     await Promise.all(
         CRM_OBJECTS.map(async (object) => {
-            const ids = [...new Set(rows.filter((row) => row.object === object).map((row) => row.recordId))];
+            const ids = [
+                ...new Set(rows.filter((row) => row.object === object).map((row) => row.recordId))
+            ];
             if (ids.length === 0) return;
             const found = (await table(object).findMany({
                 where: { ...recordWhere(actor, object), id: { in: ids } },
@@ -172,12 +176,14 @@ export async function exportAudit(
         if (batch.length < BATCH) break;
     }
     const kept = rows.slice(0, AUDIT_EXPORT_LIMIT);
-    const objects = [...new Set(kept.map((row) => row.object))].filter((object): object is CrmObject =>
-        CRM_OBJECTS.includes(object as CrmObject)
+    const objects = [...new Set(kept.map((row) => row.object))].filter(
+        (object): object is CrmObject => CRM_OBJECTS.includes(object as CrmObject)
     );
     const [names, custom, t] = await Promise.all([
         recordNames(actor, kept),
-        Promise.all(objects.map(async (object) => [object, await loadFields(actor.shelf, object)] as const)),
+        Promise.all(
+            objects.map(async (object) => [object, await loadFields(actor.shelf, object)] as const)
+        ),
         crmT()
     ]);
     const customOf = new Map<CrmObject, readonly FieldDef[]>(custom);

@@ -36,11 +36,15 @@ describe("checkRule", () => {
     });
 
     it("refuses a field the record does not have, and the name field", () => {
-        expect(roles.checkRule("companies", { rows: "all", hidden: ["nope"], readOnly: [] })).toEqual({
+        expect(
+            roles.checkRule("companies", { rows: "all", hidden: ["nope"], readOnly: [] })
+        ).toEqual({
             ok: false,
             reason: "unknownField"
         });
-        expect(roles.checkRule("companies", { rows: "all", hidden: [], readOnly: ["name"] })).toEqual({
+        expect(
+            roles.checkRule("companies", { rows: "all", hidden: [], readOnly: ["name"] })
+        ).toEqual({
             ok: false,
             reason: "nameLocked"
         });
@@ -82,7 +86,10 @@ describe("filterKeys", () => {
                     conjunction: "and",
                     rules: [
                         { key: "city", operator: "is", value: "x" },
-                        { conjunction: "or", rules: [{ key: "employees", operator: "gt", value: 1 }] }
+                        {
+                            conjunction: "or",
+                            rules: [{ key: "employees", operator: "gt", value: 1 }]
+                        }
                     ]
                 })
             ].sort()

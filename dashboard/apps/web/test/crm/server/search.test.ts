@@ -104,7 +104,10 @@ describe("searching every kind of record", () => {
     it("leaves out what an organization's role cannot see, and names the organization", async () => {
         mocks.crmShelf.mockResolvedValueOnce({ orgId: "o1", orgName: "Example Org" });
         // A restricted role holding only "edit" on companies: companies, nothing else.
-        mocks.crmOrgAccess.mockResolvedValueOnce({ role: null, permissions: ["crm.companies.edit"] });
+        mocks.crmOrgAccess.mockResolvedValueOnce({
+            role: null,
+            permissions: ["crm.companies.edit"]
+        });
         mocks.companies.mockResolvedValueOnce([{ id: "c1", name: "Example Co" }]);
         const hits = await searchAllRecords("u1", "", 12);
         expect(hits).toEqual([

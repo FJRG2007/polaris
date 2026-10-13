@@ -56,7 +56,11 @@ describe("actor rules", () => {
         expect(db.crmRoleRule.findMany.mock.calls[0]).toMatchObject([
             { where: { orgId: "o1", role: "sales" } }
         ]);
-        expect(actor.rules?.companies).toEqual({ rows: "own", hidden: ["employees"], readOnly: [] });
+        expect(actor.rules?.companies).toEqual({
+            rows: "own",
+            hidden: ["employees"],
+            readOnly: []
+        });
         expect(actor.manageRoles).toBe(false);
     });
 
@@ -134,7 +138,12 @@ describe("enforcement", () => {
 });
 
 describe("saving rules", () => {
-    const rule = { object: "companies" as const, rows: "own" as const, hidden: [] as string[], readOnly: [] as string[] };
+    const rule = {
+        object: "companies" as const,
+        rows: "own" as const,
+        hidden: [] as string[],
+        readOnly: [] as string[]
+    };
 
     it("refuses somebody who does not manage roles", async () => {
         await expect(

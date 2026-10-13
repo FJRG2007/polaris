@@ -30,7 +30,10 @@ vi.mock("@polaris-app/crm/src/actions/roles", () => ({
     }),
     saveRoleRuleAction: async (input: { rows: string; hidden: string[]; readOnly: string[] }) => {
         state.saved.push(input);
-        return { ok: true, rule: { rows: input.rows, hidden: input.hidden, readOnly: input.readOnly } };
+        return {
+            ok: true,
+            rule: { rows: input.rows, hidden: input.hidden, readOnly: input.readOnly }
+        };
     }
 }));
 
@@ -50,7 +53,9 @@ describe("roles screen", () => {
         state.manage = false;
         render(<RolesScreen />, { wrapper: MessagesWrapper });
         expect(
-            await screen.findByText("Only people who manage the organization's roles can change these.")
+            await screen.findByText(
+                "Only people who manage the organization's roles can change these."
+            )
         ).toBeTruthy();
     });
 

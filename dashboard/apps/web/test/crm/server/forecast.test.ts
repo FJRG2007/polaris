@@ -141,13 +141,15 @@ describe("stage flow", () => {
             }
         ]);
         const flow = await forecast.stageFlow(actor(), { mine: true });
-        const deals = (db.crmOpportunity.findMany.mock.calls[0] as unknown as [
-            { where: Record<string, unknown> }
-        ])[0];
+        const deals = (
+            db.crmOpportunity.findMany.mock.calls[0] as unknown as [
+                { where: Record<string, unknown> }
+            ]
+        )[0];
         expect(deals.where).toMatchObject({ orgId: "o1", deletedAt: null, ownerId: "u1" });
-        const events = (db.crmEvent.findMany.mock.calls[0] as unknown as [
-            { where: Record<string, unknown> }
-        ])[0];
+        const events = (
+            db.crmEvent.findMany.mock.calls[0] as unknown as [{ where: Record<string, unknown> }]
+        )[0];
         expect(events.where).toMatchObject({
             orgId: "o1",
             object: "opportunities",

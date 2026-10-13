@@ -105,7 +105,13 @@ export function auditCsv(
         const changes = event.changes.flatMap((change) => {
             const field = byKey.get(change.key);
             return field
-                ? [[labels.field(event.object, field), csvValue(field, change.before), csvValue(field, change.after)]]
+                ? [
+                      [
+                          labels.field(event.object, field),
+                          csvValue(field, change.before),
+                          csvValue(field, change.after)
+                      ]
+                  ]
                 : [];
         });
         for (const tail of changes.length > 0 ? changes : [["", "", ""]]) {

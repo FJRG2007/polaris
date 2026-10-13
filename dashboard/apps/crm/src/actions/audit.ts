@@ -30,7 +30,9 @@ export async function auditAction(input: unknown): Promise<Outcome<AuditReading>
         const objects = audit.auditObjects(actor);
         const [people, fields] = await Promise.all([
             shelfPeople(actor),
-            Promise.all(objects.map(async (object) => [object, await loadFields(actor.shelf, object)]))
+            Promise.all(
+                objects.map(async (object) => [object, await loadFields(actor.shelf, object)])
+            )
         ]);
         return {
             ...(await audit.listAudit(actor, parsed.data, people)),

@@ -157,11 +157,17 @@ export function StageFlowPanel({ mine }: { mine: boolean }) {
                 </div>
             )}
             {flow?.capped ? (
-                <p className="text-[0.8125rem] text-muted-foreground">{t("forecast.flow.capped")}</p>
+                <p className="text-[0.8125rem] text-muted-foreground">
+                    {t("forecast.flow.capped")}
+                </p>
             ) : null}
             {flow ? (
                 <div className="flex flex-col gap-2 sm:flex-row">
-                    <Reasons title={t("forecast.flow.wonReasons")} reasons={flow.wonReasons} t={t} />
+                    <Reasons
+                        title={t("forecast.flow.wonReasons")}
+                        reasons={flow.wonReasons}
+                        t={t}
+                    />
                     <Reasons
                         title={t("forecast.flow.lostReasons")}
                         reasons={flow.lostReasons}

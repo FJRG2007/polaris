@@ -106,7 +106,10 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
             state.merges.push(input);
             const kept = state.rows.find((one) => one.id === input.keepId)!;
             state.rows = state.rows.filter((one) => !input.ids.includes(one.id));
-            return { ok: true, record: { ...kept, values: { ...kept.values, domain: "merged.test" } } };
+            return {
+                ok: true,
+                record: { ...kept, values: { ...kept.values, domain: "merged.test" } }
+            };
         },
         listRecordsAction: async (input: unknown) => {
             if ((input as { deleted?: boolean }).deleted) {

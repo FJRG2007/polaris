@@ -326,7 +326,11 @@ async function prepare(
         if (value !== null && field.kind === "relation") {
             await requireCan(actor, field.target!, "read");
             const found = await table(field.target!).count({
-                where: { id: value as string, ...recordWhere(actor, field.target!), deletedAt: null }
+                where: {
+                    id: value as string,
+                    ...recordWhere(actor, field.target!),
+                    deletedAt: null
+                }
             });
             if (found === 0) await refuseValue(object, field, "missing");
         }

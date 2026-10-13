@@ -114,9 +114,7 @@ const OWNER_COLUMN: Readonly<Record<CrmObject, string | null>> = {
 /** The records somebody owns or made, as a Prisma `where`. */
 export function ownWhere(object: CrmObject, userId: string): Record<string, unknown> {
     const owner = OWNER_COLUMN[object];
-    return owner
-        ? { OR: [{ [owner]: userId }, { createdById: userId }] }
-        : { createdById: userId };
+    return owner ? { OR: [{ [owner]: userId }, { createdById: userId }] } : { createdById: userId };
 }
 
 /** A record without the values its reader may not see. */

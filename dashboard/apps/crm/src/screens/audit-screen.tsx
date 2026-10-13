@@ -63,11 +63,18 @@ export function AuditScreen() {
         () => unwrap(() => actions.auditAction(JSON.parse(key)), t("errors.loadFailed")),
         [key, t]
     );
-    const reading = hostUi.liveRead.useLiveRead<AuditReading>({ cacheKey: `crm:audit:${key}`, load });
+    const reading = hostUi.liveRead.useLiveRead<AuditReading>({
+        cacheKey: `crm:audit:${key}`,
+        load
+    });
     const data = reading.data ?? null;
 
     // Older pages belong to the newest page they were read after.
-    const [older, setOlder] = useState<{ from: AuditReading; events: AuditEvent[]; next: string | null } | null>(null);
+    const [older, setOlder] = useState<{
+        from: AuditReading;
+        events: AuditEvent[];
+        next: string | null;
+    } | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
     const [moreError, setMoreError] = useState<string | null>(null);
     const extra = older && older.from === data ? older : null;
@@ -80,7 +87,11 @@ export function AuditScreen() {
         setMoreError(null);
         unwrap(() => actions.auditAction({ ...query, cursor: next }), t("errors.loadFailed"))
             .then((more) =>
-                setOlder({ from: data, events: [...(extra?.events ?? []), ...more.events], next: more.next })
+                setOlder({
+                    from: data,
+                    events: [...(extra?.events ?? []), ...more.events],
+                    next: more.next
+                })
             )
             .catch((caught) => setMoreError(messageOf(caught)))
             .finally(() => setLoadingMore(false));
@@ -90,7 +101,10 @@ export function AuditScreen() {
     const exportCsv = async () => {
         setExporting(true);
         try {
-            const file = await unwrap(() => actions.exportAuditAction(query), t("audit.exportFailed"));
+            const file = await unwrap(
+                () => actions.exportAuditAction(query),
+                t("audit.exportFailed")
+            );
             const url = URL.createObjectURL(new Blob([file.csv], { type: "text/csv" }));
             const link = document.createElement("a");
             link.href = url;
@@ -115,7 +129,10 @@ export function AuditScreen() {
 
     const line = (event: AuditEvent) => {
         const fields = new Map(
-            fieldsOf(event.object, data?.fields[event.object] ?? []).map((field) => [field.key, field])
+            fieldsOf(event.object, data?.fields[event.object] ?? []).map((field) => [
+                field.key,
+                field
+            ])
         );
         const changes = event.changes.filter((change) => fields.has(change.key));
         return (
@@ -141,7 +158,10 @@ export function AuditScreen() {
                         {t(`objects.${event.object}.plural`)}
                     </span>
                     <span className="ml-auto flex min-w-0 items-baseline gap-2 text-[0.75rem] text-muted-foreground">
-                        <span className="min-w-0 truncate" title={event.actor?.name || t("audit.someone")}>
+                        <span
+                            className="min-w-0 truncate"
+                            title={event.actor?.name || t("audit.someone")}
+                        >
                             {event.actor?.name || t("audit.someone")}
                         </span>
                         <time dateTime={event.at} className="shrink-0 tabular-nums">
@@ -166,7 +186,11 @@ export function AuditScreen() {
                                         {event.kind === "updated" ? (
                                             <>
                                                 <span className="flex min-w-0 items-center overflow-hidden text-muted-foreground line-through">
-                                                    <CellDisplay object={event.object} field={field} value={change.before} />
+                                                    <CellDisplay
+                                                        object={event.object}
+                                                        field={field}
+                                                        value={change.before}
+                                                    />
                                                 </span>
                                                 <ArrowRight
                                                     aria-label={t("timeline.to")}
@@ -175,7 +199,11 @@ export function AuditScreen() {
                                             </>
                                         ) : null}
                                         <span className="flex min-w-0 items-center overflow-hidden">
-                                            <CellDisplay object={event.object} field={field} value={change.after} />
+                                            <CellDisplay
+                                                object={event.object}
+                                                field={field}
+                                                value={change.after}
+                                            />
                                         </span>
                                     </span>
                                 </li>
@@ -189,10 +217,19 @@ export function AuditScreen() {
 
     let body;
     if (reading.error && !data) {
-        body = <EmptyState icon={<History />} title={t("errors.loadFailed")} description={reading.error} />;
+        body = (
+            <EmptyState
+                icon={<History />}
+                title={t("errors.loadFailed")}
+                description={reading.error}
+            />
+        );
     } else if (!data) {
         body = (
-            <div className="flex flex-col divide-y divide-border rounded-lg border border-border" aria-busy>
+            <div
+                className="flex flex-col divide-y divide-border rounded-lg border border-border"
+                aria-busy
+            >
                 {[0, 1, 2, 3, 4, 5].map((row) => (
                     <div key={row} className="flex flex-col gap-2 px-3 py-3">
                         <Block className="h-3 w-1/2" />
@@ -202,12 +239,26 @@ export function AuditScreen() {
             </div>
         );
     } else if (data.objects.length === 0) {
-        body = <EmptyState icon={<History />} title={t("audit.title")} description={t("audit.noAccess")} />;
+        body = (
+            <EmptyState
+                icon={<History />}
+                title={t("audit.title")}
+                description={t("audit.noAccess")}
+            />
+        );
     } else if (events.length === 0) {
-        body = <EmptyState icon={<History />} title={filtered ? t("audit.emptyFiltered") : t("audit.empty")} />;
+        body = (
+            <EmptyState
+                icon={<History />}
+                title={filtered ? t("audit.emptyFiltered") : t("audit.empty")}
+            />
+        );
     } else {
         body = (
-            <section aria-label={t("audit.title")} className="min-w-0 rounded-lg border border-border bg-card">
+            <section
+                aria-label={t("audit.title")}
+                className="min-w-0 rounded-lg border border-border bg-card"
+            >
                 <ol className="flex flex-col divide-y divide-border">{events.map(line)}</ol>
                 {moreError ? (
                     <p role="alert" className="px-3 pb-2 text-[0.75rem] text-destructive">
@@ -226,7 +277,10 @@ export function AuditScreen() {
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto overscroll-contain" data-crm-ready>
+        <div
+            className="flex h-full min-h-0 flex-col gap-3 overflow-auto overscroll-contain"
+            data-crm-ready
+        >
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h1 className="mr-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
                     {t("audit.title")}
@@ -245,19 +299,29 @@ export function AuditScreen() {
                 <Select
                     aria-label={t("audit.object")}
                     value={filters.object ?? ALL}
-                    onValueChange={(value) => set({ object: value === ALL ? null : (value as CrmObject) })}
+                    onValueChange={(value) =>
+                        set({ object: value === ALL ? null : (value as CrmObject) })
+                    }
                     options={[
                         { value: ALL, label: t("audit.allObjects") },
-                        ...objects.map((object) => ({ value: object, label: t(`objects.${object}.plural`) }))
+                        ...objects.map((object) => ({
+                            value: object,
+                            label: t(`objects.${object}.plural`)
+                        }))
                     ]}
                 />
                 <Select
                     aria-label={t("audit.what")}
                     value={filters.kind ?? ALL}
-                    onValueChange={(value) => set({ kind: value === ALL ? null : (value as EventKind) })}
+                    onValueChange={(value) =>
+                        set({ kind: value === ALL ? null : (value as EventKind) })
+                    }
                     options={[
                         { value: ALL, label: t("audit.allKinds") },
-                        ...EVENT_KINDS.map((kind) => ({ value: kind, label: t(`audit.kinds.${kind}`) }))
+                        ...EVENT_KINDS.map((kind) => ({
+                            value: kind,
+                            label: t(`audit.kinds.${kind}`)
+                        }))
                     ]}
                 />
                 <Select
@@ -266,7 +330,10 @@ export function AuditScreen() {
                     onValueChange={(value) => set({ actorId: value === ALL ? null : value })}
                     options={[
                         { value: ALL, label: t("audit.everyone") },
-                        ...(data?.people ?? []).map((person) => ({ value: person.id, label: person.name }))
+                        ...(data?.people ?? []).map((person) => ({
+                            value: person.id,
+                            label: person.name
+                        }))
                     ]}
                 />
                 <label className="flex items-center gap-1.5 text-[0.75rem] text-muted-foreground">

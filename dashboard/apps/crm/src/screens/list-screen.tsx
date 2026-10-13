@@ -1188,7 +1188,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
                                 {t("selection.edit")}
                             </Button>
                         ) : null}
-                        {canEdit && canDelete && selected.length >= 2 && selected.length <= MAX_MERGE ? (
+                        {canEdit &&
+                        canDelete &&
+                        selected.length >= 2 &&
+                        selected.length <= MAX_MERGE ? (
                             <Button size="sm" variant="ghost" onClick={() => setMergeOpen(true)}>
                                 <Merge className="size-4" />
                                 {t("merge.button")}

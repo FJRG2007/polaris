@@ -471,7 +471,9 @@ const MAX_ADDRESSES = 50;
 
 function addressList(addresses: readonly string[]): string[] {
     return [
-        ...new Set(addresses.map((one) => one.trim().toLowerCase()).filter((one) => one.includes("@")))
+        ...new Set(
+            addresses.map((one) => one.trim().toLowerCase()).filter((one) => one.includes("@"))
+        )
     ].slice(0, MAX_ADDRESSES);
 }
 

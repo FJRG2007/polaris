@@ -14,7 +14,10 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 const ID = (n: number) => `00000000-0000-7000-8000-${String(n).padStart(12, "0")}`;
 
-const state = vi.hoisted(() => ({ calls: [] as Record<string, unknown>[], objects: ["companies"] as string[] }));
+const state = vi.hoisted(() => ({
+    calls: [] as Record<string, unknown>[],
+    objects: ["companies"] as string[]
+}));
 
 vi.mock("@polaris-app/crm/src/actions/audit", () => ({
     auditAction: async (input: Record<string, unknown>) => {
@@ -26,33 +29,34 @@ vi.mock("@polaris-app/crm/src/actions/audit", () => ({
             people: [{ id: "u1", name: "Test User" }],
             fields: { companies: [] },
             next: older ? null : ID(1),
-            events: state.objects.length === 0
-                ? []
-                : older
-                  ? [
-                        {
-                            id: ID(1),
-                            object: "companies",
-                            recordId: ID(10),
-                            recordName: null,
-                            kind: "trashed",
-                            actor: null,
-                            at: "2026-10-12T10:00:00.000Z",
-                            changes: []
-                        }
-                    ]
-                  : [
-                        {
-                            id: ID(2),
-                            object: "companies",
-                            recordId: ID(11),
-                            recordName: "Example Co",
-                            kind: "updated",
-                            actor: { id: "u1", name: "Test User" },
-                            at: "2026-10-13T10:00:00.000Z",
-                            changes: [{ key: "city", before: "Old Town", after: "New Town" }]
-                        }
-                    ]
+            events:
+                state.objects.length === 0
+                    ? []
+                    : older
+                      ? [
+                            {
+                                id: ID(1),
+                                object: "companies",
+                                recordId: ID(10),
+                                recordName: null,
+                                kind: "trashed",
+                                actor: null,
+                                at: "2026-10-12T10:00:00.000Z",
+                                changes: []
+                            }
+                        ]
+                      : [
+                            {
+                                id: ID(2),
+                                object: "companies",
+                                recordId: ID(11),
+                                recordName: "Example Co",
+                                kind: "updated",
+                                actor: { id: "u1", name: "Test User" },
+                                at: "2026-10-13T10:00:00.000Z",
+                                changes: [{ key: "city", before: "Old Town", after: "New Town" }]
+                            }
+                        ]
         };
     },
     exportAuditAction: async () => ({ ok: true, csv: "", rows: 0, truncated: false })
@@ -89,6 +93,8 @@ describe("audit log", () => {
         state.objects = [];
         render(<AuditScreen />, { wrapper: MessagesWrapper });
         expect(await screen.findByText(/Each record's own activity is on its page/)).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Export" }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Export" }) as HTMLButtonElement).disabled).toBe(
+            true
+        );
     });
 });

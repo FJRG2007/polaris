@@ -27,7 +27,11 @@ vi.mock("@polaris/app-host", () => ({
 }));
 
 import { auditObjects, exportAudit, listAudit } from "@polaris-app/crm/src/lib/audit";
-import { AUDIT_EXPORT_LIMIT, AUDIT_PAGE, EMPTY_AUDIT_QUERY } from "@polaris-app/crm/src/model/audit";
+import {
+    AUDIT_EXPORT_LIMIT,
+    AUDIT_PAGE,
+    EMPTY_AUDIT_QUERY
+} from "@polaris-app/crm/src/model/audit";
 
 const can = (read: boolean) => ({ read, edit: read, delete: false });
 const rule = (rows: "all" | "own", hidden: string[] = []) => ({ rows, hidden, readOnly: [] });
@@ -56,7 +60,9 @@ const event = (id: number, over: Record<string, unknown> = {}) => ({
 const people = [{ id: "u1", name: "Test User" }];
 
 function lastWhere(): Record<string, unknown> {
-    const calls = db.crmEvent.findMany.mock.calls as unknown as [{ where: Record<string, unknown> }][];
+    const calls = db.crmEvent.findMany.mock.calls as unknown as [
+        { where: Record<string, unknown> }
+    ][];
     return calls[calls.length - 1]![0].where;
 }
 
@@ -69,7 +75,10 @@ describe("auditObjects", () => {
         expect(auditObjects(actor())).toEqual(["companies", "people", "opportunities"]);
         expect(
             auditObjects(
-                actor({ companies: rule("all"), people: rule("all"), opportunities: rule("own") }, can(false))
+                actor(
+                    { companies: rule("all"), people: rule("all"), opportunities: rule("own") },
+                    can(false)
+                )
             )
         ).toEqual(["companies"]);
     });
@@ -80,7 +89,9 @@ describe("listAudit", () => {
         db.crmEvent.findMany.mockResolvedValueOnce([event(2), event(1)]);
         db.records.findMany.mockResolvedValueOnce([{ id: RECORD, name: "New Co" }]);
         const page = await listAudit(actor(), EMPTY_AUDIT_QUERY, people);
-        const call = (db.crmEvent.findMany.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+        const call = (
+            db.crmEvent.findMany.mock.calls[0] as unknown as [Record<string, unknown>]
+        )[0];
         expect(call).toMatchObject({ orderBy: { id: "desc" }, take: AUDIT_PAGE + 1 });
         expect(lastWhere()).toEqual({
             orgId: "o1",
@@ -134,10 +145,16 @@ describe("listAudit", () => {
 
     it("hides the fields the role hides, marks a record gone for good, and pages on", async () => {
         db.crmEvent.findMany.mockResolvedValueOnce(
-            Array.from({ length: AUDIT_PAGE + 1 }, (_, index) => event(AUDIT_PAGE + 1 - index, { actorId: null }))
+            Array.from({ length: AUDIT_PAGE + 1 }, (_, index) =>
+                event(AUDIT_PAGE + 1 - index, { actorId: null })
+            )
         );
         const page = await listAudit(
-            actor({ companies: rule("all", ["domain"]), people: rule("all"), opportunities: rule("all") }),
+            actor({
+                companies: rule("all", ["domain"]),
+                people: rule("all"),
+                opportunities: rule("all")
+            }),
             EMPTY_AUDIT_QUERY,
             people
         );

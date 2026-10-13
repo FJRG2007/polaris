@@ -193,7 +193,8 @@ export async function computeTotals(
     const totals: Total[] = [];
     for (const { key, aggregate } of asked.slice(0, 64)) {
         const field = fieldOf(object, key, custom);
-        if (!field || hidden.includes(key) || !aggregatesFor(field.kind).includes(aggregate)) continue;
+        if (!field || hidden.includes(key) || !aggregatesFor(field.kind).includes(aggregate))
+            continue;
         totals.push(await one(object, where, all, key, aggregate));
     }
     return totals;

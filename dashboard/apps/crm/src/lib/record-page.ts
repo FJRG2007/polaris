@@ -64,7 +64,11 @@ export async function openRecord(
     // (two lists at most), never from data, so one read per list stays fixed.
     const related = await Promise.all(
         lists.map(async (list): Promise<RelatedRecords> => {
-            const where = { ...recordWhere(actor, list.object), deletedAt: null, [list.column]: id };
+            const where = {
+                ...recordWhere(actor, list.object),
+                deletedAt: null,
+                [list.column]: id
+            };
             const [rows, total] = await Promise.all([
                 table(list.object).findMany({
                     where,

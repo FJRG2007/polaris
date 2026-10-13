@@ -67,7 +67,10 @@ function zoomedIn(): boolean {
 }
 
 /** Listen for swipes on `ref` and step the calendar with them, on a phone only. */
-export function useSwipeStep(ref: RefObject<HTMLElement | null>, step: (direction: 1 | -1) => void) {
+export function useSwipeStep(
+    ref: RefObject<HTMLElement | null>,
+    step: (direction: 1 | -1) => void
+) {
     // Read at the moment of the swipe, so a new `step` each render does not
     // tear the listeners down and put them back.
     const latest = useRef(step);

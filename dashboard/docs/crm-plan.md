@@ -218,7 +218,7 @@ alone.
 
 - **Mail and meetings on a record.** Not CRM data: `apps/web/src/lib/crm-host.ts`'s
   `crmMailWith`/`crmEventsWith` ask the Mail and Calendar apps for the reader's
-  *own* threads and events with the addresses on the record (a company's
+  _own_ threads and events with the addresses on the record (a company's
   people's emails, an opportunity's contact and company) - never another
   teammate's mailbox. Answered as `null`, and so not drawn, when the reader
   lacks the app's permission or the role hides the email field. Shown on the

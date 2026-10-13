@@ -115,9 +115,7 @@ export async function openActivities(
         reach.tasks ? host.crmHost.tasksByIds(who(actor), taskIds) : Promise.resolve(null),
         host.crmHost.crmDriveFiles(who(actor), fileIds),
         host.crmHost.crmMailWith(who(actor), found, ACTIVITY_LIMIT) as Promise<MailWith[] | null>,
-        host.crmHost.crmEventsWith(who(actor), found, ACTIVITY_LIMIT) as Promise<
-            EventWith[] | null
-        >
+        host.crmHost.crmEventsWith(who(actor), found, ACTIVITY_LIMIT) as Promise<EventWith[] | null>
     ]);
     return {
         notes: notes ? notes.map((note: LinkedNote) => ({ ...note })) : null,

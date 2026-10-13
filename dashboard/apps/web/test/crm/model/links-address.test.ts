@@ -53,10 +53,7 @@ describe("links", () => {
 
     it("keeps each address once, as a full URL, typed with spaces or commas", () => {
         const value = stored(sites, "example.com, https://blog.example.com/a,b  example.com");
-        expect(readLinks(value)).toEqual([
-            "https://example.com/",
-            "https://blog.example.com/a,b"
-        ]);
+        expect(readLinks(value)).toEqual(["https://example.com/", "https://blog.example.com/a,b"]);
         expect(stored(sites, readLinks(value))).toBe(value);
         expect(stored(sites, value)).toBe(value);
         expect(stored(sites, "")).toBe("");
@@ -161,9 +158,7 @@ describe("address", () => {
         const value = stored(office, { street: "Main Street 1", country: "Example Land" });
         const cell = csvValue(office, value);
         expect(stored(office, cellInput(office, cell))).toBe(value);
-        expect(plainText(office, value, {} as never, "en-US")).toBe(
-            "Main Street 1, Example Land"
-        );
+        expect(plainText(office, value, {} as never, "en-US")).toBe("Main Street 1, Example Land");
         expect(operatorsFor("address")[0]).toBe("contains");
     });
 });

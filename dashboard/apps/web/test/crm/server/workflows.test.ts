@@ -124,6 +124,7 @@ vi.mock("@polaris/app-host", () => ({
 vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }));
 
 import * as workflows from "@polaris-app/crm/src/lib/workflows";
+import type { ViewFilter } from "@polaris-app/crm/src/model/filters";
 import { createHash } from "node:crypto";
 import { POST as hook } from "@polaris-app/crm/src/routes/api/crm/hooks/[secret]/route";
 
@@ -451,7 +452,7 @@ describe("record actions", () => {
 });
 
 describe("branches and loops", () => {
-    const when = {
+    const when: ViewFilter = {
         conjunction: "and",
         rules: [{ id: "r1", key: "city", operator: "contains", value: "Paris" }]
     };

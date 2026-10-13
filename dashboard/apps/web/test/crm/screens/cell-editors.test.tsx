@@ -17,7 +17,13 @@ import {
     RatingEditor
 } from "@polaris-app/crm/src/screens/cell-editors";
 
-const office = customDef({ id: "f1", slot: "cText1", label: "Office", kind: "address", options: [] });
+const office = customDef({
+    id: "f1",
+    slot: "cText1",
+    label: "Office",
+    kind: "address",
+    options: []
+});
 const tags = customDef({
     id: "f2",
     slot: "cText2",

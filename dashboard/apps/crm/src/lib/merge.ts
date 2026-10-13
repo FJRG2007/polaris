@@ -18,13 +18,7 @@ import { changesBetween } from "../model/timeline";
 import { columnOf, recordSelect, table, toRecord } from "./columns";
 import { fieldOf, fieldsOf, type CrmObject, type CrmRecord } from "../model/objects";
 import { MAX_MERGE } from "../model/duplicates";
-import {
-    recordWhere,
-    requireCan,
-    requireChangeable,
-    shelfWhere,
-    type CrmActor
-} from "./access";
+import { recordWhere, requireCan, requireChangeable, shelfWhere, type CrmActor } from "./access";
 
 export { MAX_MERGE };
 

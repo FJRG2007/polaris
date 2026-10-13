@@ -282,7 +282,9 @@ describe("a workflow's email", () => {
         mocks.userHasPermission.mockResolvedValueOnce(false);
         expect(await crmCanSendMail(actor)).toBe(false);
         mocks.prisma.mailAccount.findFirst.mockResolvedValueOnce(null);
-        expect(await crmSendMail(actor, { to: ["a@example.test"], subject: "x", body: "" })).toEqual({
+        expect(
+            await crmSendMail(actor, { to: ["a@example.test"], subject: "x", body: "" })
+        ).toEqual({
             refused: "mail"
         });
         expect(queueSend).not.toHaveBeenCalled();
