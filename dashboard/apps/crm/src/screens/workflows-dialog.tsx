@@ -297,7 +297,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     } else if (rows === null) {
         body = <p className="text-[0.8125rem] text-muted-foreground">{t("list.loading")}</p>;
     } else if (rows.length === 0) {
-        body = <EmptyState icon={Workflow} title={t("workflows.empty")} />;
+        body = <EmptyState icon={<Workflow />} title={t("workflows.empty")} />;
     } else {
         body = (
             <ul className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">

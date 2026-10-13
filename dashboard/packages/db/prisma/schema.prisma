@@ -382,6 +382,7 @@ model User {
     crmLinks                CrmLink[]        @relation("CrmLinkShelf")
     crmWorkflows            CrmWorkflow[]    @relation("CrmWorkflowShelf")
     crmFavorites            CrmFavorite[]    @relation("CrmFavoriteOwner")
+    crmDashboards           CrmDashboard[]   @relation("CrmDashboardShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5880,6 +5881,7 @@ model Organization {
     crmLinks         CrmLink[]
     crmWorkflows     CrmWorkflow[]
     crmFavorites     CrmFavorite[]
+    crmDashboards    CrmDashboard[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -13025,6 +13027,28 @@ model CrmLink {
 
     @@unique([recordId, kind, targetId])
     @@index([recordId, kind, id])
+}
+
+// A page of charts over one shelf's CRM records, shared like its views.
+// `widgets` is a JSON array checked against `widgetsSchema` (apps/crm
+// model/dashboards.ts) on the way in and on the way out.
+model CrmDashboard {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String?  @db.Uuid
+    userId      String?  @db.Uuid
+    // "org:<id>" or "user:<id>".
+    shelf       String
+    name        String
+    widgets     String   @default("[]")
+    position    Float    @default(0)
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmDashboardShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([shelf, name])
 }
 
 // A CRM record or view somebody pinned to the CRM's rail. Their own: nobody

@@ -322,7 +322,8 @@
         "Storage locations": "Ubicaciones de datos",
         "New company": "Nueva empresa",
         "New person": "Nueva persona",
-        "New opportunity": "Nueva oportunidad"
+        "New opportunity": "Nueva oportunidad",
+        "Dashboards": "Paneles"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

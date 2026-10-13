@@ -322,7 +322,8 @@
         "Storage locations": "Storage locations",
         "New company": "New company",
         "New person": "New person",
-        "New opportunity": "New opportunity"
+        "New opportunity": "New opportunity",
+        "Dashboards": "Dashboards"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

@@ -1218,6 +1218,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["deals", "pipeline", "stages", "sales", "amount", "close date"]
         },
         {
+            label: "Dashboards", // i18n-ignore
+            href: "/crm/dashboards",
+            icon: ChartColumn,
+            keywords: ["charts", "reports", "analytics", "forecast", "pipeline value", "kpi"]
+        },
+        {
             label: "New company", // i18n-ignore
             href: "/crm/companies?new=1",
             icon: Building2,

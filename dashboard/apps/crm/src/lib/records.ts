@@ -500,7 +500,7 @@ export async function destroyRecords(
             cleared.push({
                 object: list.object,
                 events: rows.map((row, at) => ({
-                    recordId: row.id,
+                    recordId: row.id!,
                     kind: "updated" as const,
                     changes: [
                         {
