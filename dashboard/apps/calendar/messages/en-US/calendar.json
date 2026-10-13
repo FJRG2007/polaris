@@ -478,7 +478,7 @@
         "defaultView": "Open on",
         "defaultViewHint": "Changes when you switch views.",
         "description": "How your calendar looks and what new events start with.",
-        "dimPast": "Dim past days and events",
+        "fadePast": "Dim past days and events",
         "display": "Display",
         "endAfterStart": "The end must be after the start.",
         "eventLimit": "Events per day in a month",

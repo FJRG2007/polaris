@@ -329,7 +329,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 showDeclined: preferences.showDeclined,
                 showTasks: preferences.showTasks,
                 showDoneTasks: preferences.showDoneTasks,
-                dimPast: preferences.dimPast,
+                fadePast: preferences.fadePast,
                 surface,
                 calendars: calendarsById,
                 t
@@ -342,7 +342,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
             preferences.showDeclined,
             preferences.showTasks,
             preferences.showDoneTasks,
-            preferences.dimPast,
+            preferences.fadePast,
             surface,
             calendarsById,
             t
@@ -1811,7 +1811,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                         showWeekends={preferences.showWeekends}
                                         showWeekNumbers={preferences.showWeekNumbers}
                                         now={now}
-                                        dimPast={preferences.dimPast}
+                                        fadePast={preferences.fadePast}
                                         scrollToNowSignal={nowSignal}
                                         slotMinutes={preferences.slotMinutes}
                                         dayStart={preferences.dayStart}

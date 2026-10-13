@@ -200,7 +200,7 @@ export function SettingsView() {
         key:
             | "showWeekends"
             | "showWeekNumbers"
-            | "dimPast"
+            | "fadePast"
             | "showDeclined"
             | "showTasks"
             | "showDoneTasks"
@@ -298,7 +298,7 @@ export function SettingsView() {
                         ]}
                     />
                 </Row>
-                <Row label={t("settingsPage.dimPast")}>{toggle("dimPast")}</Row>
+                <Row label={t("settingsPage.fadePast")}>{toggle("fadePast")}</Row>
                 <Row label={t("settingsPage.showDeclined")}>{toggle("showDeclined")}</Row>
                 <Row label={t("settingsPage.showTasks")} hint={t("settingsPage.showTasksHint")}>
                     {toggle("showTasks")}
