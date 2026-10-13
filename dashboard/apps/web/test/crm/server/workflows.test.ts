@@ -76,6 +76,8 @@ const crmHost = vi.hoisted(() => ({
     crmPostJson: vi.fn(async (): Promise<unknown> => ({ status: 200 })),
     crmCanSendMail: vi.fn(async () => true),
     crmSendMail: vi.fn(async (): Promise<unknown> => ({ sent: true })),
+    crmChatChannels: vi.fn(async () => [{ id: "33333333-3333-4333-8333-333333333333", name: "sales" }]),
+    crmSendChat: vi.fn(async (): Promise<unknown> => ({ sent: true })),
     createTask: vi.fn(
         async (): Promise<unknown> => ({
             id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -1001,8 +1003,39 @@ describe("a task or a notification", () => {
                 { id: "u1", name: "Test User" },
                 { id: "u3", name: "Other User" }
             ],
+            chatChannels: [{ id: "33333333-3333-4333-8333-333333333333", name: "sales" }],
             mail: true
         });
+    });
+
+    it("posts a chat message as the runner, filled from the record", async () => {
+        const channelId = "33333333-3333-4333-8333-333333333333";
+        expect(await runOn([{ kind: "sendChat", channelId, body: "Won {{name}}" }])).toBeNull();
+        expect(crmHost.crmSendChat).toHaveBeenCalledWith(
+            { id: "u2", isAdmin: false },
+            { channelId, body: "Won Acme" }
+        );
+        db.crmWorkflow.update.mockClear();
+        crmHost.crmSendChat.mockResolvedValueOnce({ refused: "archived" });
+        expect(await runOn([{ kind: "sendChat", channelId, body: "x" }])).toMatch(/archived/);
+    });
+
+    it("refuses to save a chat message to a channel the owner cannot post in", async () => {
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "created" },
+                actions: [
+                    {
+                        kind: "sendChat",
+                        channelId: "44444444-4444-4444-8444-444444444444",
+                        body: "x"
+                    }
+                ],
+                enabled: true
+            })
+        ).rejects.toThrow(/channel/);
+        expect(db.crmWorkflow.create).not.toHaveBeenCalled();
     });
 
     it("emails from the runner's mailbox, filled from the record, each address once", async () => {

@@ -530,7 +530,8 @@
             "filter": "Seguir solo si el registro coincide",
             "ifElse": "Si el registro coincide",
             "forEach": "Para cada registro encontrado",
-            "delay": "Esperar"
+            "delay": "Esperar",
+            "sendChat": "Enviar un mensaje de chat"
         },
         "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
         "createNeedsName": "Pon nombre al nuevo registro.",
@@ -604,7 +605,12 @@
             "stopped": "Detenida por un filtro",
             "failed": "Fallida",
             "cancelled": "Cancelada"
-        }
+        },
+        "chatChannel": "Canal",
+        "chatBody": "Mensaje",
+        "chatNoChannel": "Elige un canal de chat en el que puedas escribir.",
+        "chatEmpty": "El mensaje de chat quedó vacío.",
+        "chatRefused": "El chat no aceptó el mensaje: puede que el canal esté archivado o que ya no estés en él."
     },
     "favorites": {
         "add": "Añadir a favoritos",

@@ -157,6 +157,12 @@ async function checkActions(
         if (action.kind === "sendEmail" && !(await host.crmHost.crmCanSendMail(who(actor)))) {
             throw new CrmRefusal(t("workflows.emailNoMailbox"));
         }
+        if (action.kind === "sendChat") {
+            const channels = (await host.crmHost.crmChatChannels(who(actor))) as { id: string }[];
+            if (!channels.some((channel) => channel.id === action.channelId)) {
+                throw new CrmRefusal(t("workflows.chatNoChannel"));
+            }
+        }
         if (action.kind === "notify") {
             const people = new Set((await records.shelfPeople(actor)).map((person) => person.id));
             const custom = await loadFields(actor.shelf, object);
@@ -285,10 +291,11 @@ const who = (actor: CrmActor) => ({ id: actor.user.id, isAdmin: actor.user.isAdm
 
 /** The task lists and people a workflow's actions may name. */
 export async function workflowOptions(actor: CrmActor): Promise<model.WorkflowOptions> {
-    const [lists, people, mail] = await Promise.all([
+    const [lists, people, mail, chatChannels] = await Promise.all([
         host.crmHost.taskListsFor(who(actor)),
         records.shelfPeople(actor),
-        host.crmHost.crmCanSendMail(who(actor)) as Promise<boolean>
+        host.crmHost.crmCanSendMail(who(actor)) as Promise<boolean>,
+        host.crmHost.crmChatChannels(who(actor)) as Promise<{ id: string; name: string }[]>
     ]);
     return {
         taskLists: (lists ?? []).map((list: { id: string; name: string; spaceName: string }) => ({
@@ -297,6 +304,7 @@ export async function workflowOptions(actor: CrmActor): Promise<model.WorkflowOp
             spaceName: list.spaceName
         })),
         people: people.map((person) => ({ id: person.id, name: person.name })),
+        chatChannels,
         mail
     };
 }
@@ -537,6 +545,17 @@ async function runAction(
                 body: cells[2]!
             })) as { sent: true } | { refused: "mail" };
             if ("refused" in sent) throw new CrmRefusal(t("workflows.emailNoMailbox"));
+            return;
+        }
+        case "sendChat": {
+            const { cells } = await filled(runner, context, { body: action.body });
+            const body = cells[0]!.trim();
+            if (!body) throw new CrmRefusal(t("workflows.chatEmpty"));
+            const sent = (await host.crmHost.crmSendChat(who(runner), {
+                channelId: action.channelId,
+                body
+            })) as { sent: true } | { refused: string };
+            if ("refused" in sent) throw new CrmRefusal(t("workflows.chatRefused"));
             return;
         }
         case "notify": {

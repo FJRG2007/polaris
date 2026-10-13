@@ -82,6 +82,8 @@ export interface WorkflowOptions {
     readonly people: { id: string; name: string }[];
     /** Whether the reader has a mailbox a workflow's email can go from. */
     readonly mail?: boolean;
+    /** The chat channels the reader can post in. */
+    readonly chatChannels?: { id: string; name: string }[];
 }
 
 /** The longest address a workflow may call. */
@@ -190,6 +192,13 @@ const LEAF_ACTIONS = [
         subject: z.string().trim().min(1).max(EMAIL_SUBJECT_MAX),
         body: z.string().max(ACTION_TEXT_MAX)
     }),
+    /** A message in a chat channel, posted as whoever owns the workflow. The
+     *  body is a template. */
+    z.object({
+        kind: z.literal("sendChat"),
+        channelId: z.string().uuid(),
+        body: z.string().trim().min(1).max(ACTION_TEXT_MAX)
+    }),
     /** A POST of the record, as JSON, to an address outside. */
     z.object({
         kind: z.literal("httpRequest"),
@@ -240,6 +249,7 @@ export const LEAF_KINDS: readonly LeafAction["kind"][] = [
     "createTask",
     "notify",
     "sendEmail",
+    "sendChat",
     "httpRequest"
 ];
 

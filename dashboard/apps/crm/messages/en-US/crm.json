@@ -530,7 +530,8 @@
             "filter": "Go on only if the record matches",
             "ifElse": "If the record matches",
             "forEach": "For each record found",
-            "delay": "Wait"
+            "delay": "Wait",
+            "sendChat": "Send a chat message"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -604,7 +605,12 @@
             "stopped": "Stopped by a filter",
             "failed": "Failed",
             "cancelled": "Cancelled"
-        }
+        },
+        "chatChannel": "Channel",
+        "chatBody": "Message",
+        "chatNoChannel": "Pick a chat channel you can post in.",
+        "chatEmpty": "The chat message came out empty.",
+        "chatRefused": "Chat would not take the message: the channel may be archived, or you may no longer be in it."
     },
     "favorites": {
         "add": "Add to favorites",

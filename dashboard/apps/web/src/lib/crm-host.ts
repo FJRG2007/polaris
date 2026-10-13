@@ -13,7 +13,7 @@
 import { prisma } from "@polaris/db";
 import { resolveScope } from "@/lib/workspace-scope";
 import { isUuid } from "@/lib/uuid";
-import { normalizeRelPath } from "@polaris/core";
+import { chatSendSchema, normalizeRelPath } from "@polaris/core";
 import { mayReadDrive, requireDriveDriver } from "@/lib/drive-authz";
 import { follow, safeUrl } from "@/lib/safe-fetch";
 import { sessionCan, type SessionUser } from "@/lib/session";
@@ -405,6 +405,53 @@ export async function crmSendMail(
         draftId: null
     });
     return { sent: true };
+}
+
+/** A chat channel a workflow may post in. */
+export interface CrmChatChannel {
+    readonly id: string;
+    readonly name: string;
+}
+
+/** The text channels this account can post in, by name: what a workflow's
+ *  chat message may be sent to. Empty when Chat is not theirs to use. */
+export async function crmChatChannels(actor: OrgActor): Promise<CrmChatChannel[]> {
+    const { listChannels } = await import("@/lib/chat/chat-service");
+    try {
+        return (await listChannels({ id: actor.id }))
+            .filter((channel) => channel.kind === "text" && !channel.archived)
+            .map((channel) => ({ id: channel.id, name: channel.name }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    } catch (caught) {
+        console.error("crm: could not list chat channels", caught);
+        return [];
+    }
+}
+
+/**
+ * Post a message in a chat channel as this account, through the same path its
+ * composer uses, so the channel's own rules - membership, archive, a time-out -
+ * decide. Answers `refused` with Chat's own reason when it will not take it.
+ */
+export async function crmSendChat(
+    actor: OrgActor,
+    message: { channelId: string; body: string }
+): Promise<{ sent: true } | { refused: string }> {
+    const [{ send }, { ChatAccessError }] = await Promise.all([
+        import("@/lib/chat/messages"),
+        import("@/lib/chat/access")
+    ]);
+    // A filled-in template can outgrow a message: checked as the composer's
+    // input is, before anything is posted.
+    const input = chatSendSchema.safeParse(message);
+    if (!input.success) return { refused: input.error.issues[0]?.message ?? "invalid" };
+    try {
+        await send({ id: actor.id }, input.data);
+        return { sent: true };
+    } catch (caught) {
+        if (caught instanceof ChatAccessError) return { refused: caught.message };
+        throw caught;
+    }
 }
 
 /** The most addresses one question asks about: a company with a long staff

@@ -272,6 +272,29 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
                     <TemplateHint object={object} />
                 </div>
             );
+        case "sendChat":
+            return (
+                <div className="flex min-w-0 flex-col gap-2">
+                    <Select
+                        aria-label={t("workflows.chatChannel")}
+                        value={action.channelId}
+                        onValueChange={(channelId) => onChange({ ...action, channelId })}
+                        options={(options.chatChannels ?? []).map((channel) => ({
+                            value: channel.id,
+                            label: `#${channel.name}`
+                        }))}
+                    />
+                    <Textarea
+                        aria-label={t("workflows.chatBody")}
+                        placeholder={t("workflows.chatBody")}
+                        rows={3}
+                        value={action.body}
+                        maxLength={model.ACTION_TEXT_MAX}
+                        onChange={(event) => onChange({ ...action, body: event.target.value })}
+                    />
+                    <TemplateHint object={object} />
+                </div>
+            );
         case "notify":
             return (
                 <NotifyFields
@@ -727,6 +750,7 @@ export function useWorkflowWords(object: CrmObject) {
             if (kind === "createTask") return options.taskLists.length > 0;
             if (kind === "notify") return options.people.length > 0;
             if (kind === "sendEmail") return options.mail === true;
+            if (kind === "sendChat") return (options.chatChannels?.length ?? 0) > 0;
             return true;
         },
         newAction(kind: model.ActionKind, options: model.WorkflowOptions): model.WorkflowAction {
@@ -754,6 +778,12 @@ export function useWorkflowWords(object: CrmObject) {
                         to: object === "people" ? "{{email}}" : "",
                         subject: `{{${primaryField(object).key}}}`,
                         body: ""
+                    };
+                case "sendChat":
+                    return {
+                        kind,
+                        channelId: options.chatChannels?.[0]?.id ?? "",
+                        body: `{{${primaryField(object).key}}}`
                     };
                 case "notify":
                     return {
