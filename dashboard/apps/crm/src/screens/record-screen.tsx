@@ -18,6 +18,7 @@ import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
 import { messageOf, unwrap } from "./call";
 import { fieldLabel } from "./custom-fields";
+import { RunWorkflowMenu } from "./run-workflow-menu";
 import * as actions from "../actions/records";
 import { recordHref } from "../model/related";
 import { useCallback, useState } from "react";
@@ -75,8 +76,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         const put = (next: CrmRecord) => opening.replace({ ...kept, record: next });
         put({ ...record, values: { ...record.values, [field.key]: shown } });
         unwrap(
-            () =>
-                actions.updateRecordAction({ object, id, values: { [field.key]: stored } }),
+            () => actions.updateRecordAction({ object, id, values: { [field.key]: stored } }),
             t("errors.generic")
         )
             .then(({ record: saved }) => {
@@ -141,7 +141,9 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                 <Button variant="ghost" size="sm" asChild>
                     <Link href={`/crm/${object}`}>
                         <ArrowLeft className="size-4" />
-                        <span className="truncate" title={plural}>{plural}</span>
+                        <span className="truncate" title={plural}>
+                            {plural}
+                        </span>
                     </Link>
                 </Button>
             )}
@@ -160,6 +162,9 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                         <Maximize2 className="size-4" />
                     </Link>
                 </Button>
+            ) : null}
+            {record && canEdit ? (
+                <RunWorkflowMenu object={object} id={id} onRan={opening.refresh} />
             ) : null}
             {record ? (
                 <Button
@@ -301,7 +306,11 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                         >
                             <h2 className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-[0.8125rem] font-medium">
                                 <span className="truncate">
-                                    {t(`record.related.${list.object}.${list.field}` as Parameters<typeof t>[0])}
+                                    {t(
+                                        `record.related.${list.object}.${list.field}` as Parameters<
+                                            typeof t
+                                        >[0]
+                                    )}
                                 </span>
                                 <span className="tabular-nums text-muted-foreground">
                                     {list.total}

@@ -300,7 +300,10 @@ async function failureText(caught: unknown): Promise<string> {
 }
 
 /** Run one workflow to the end or its first failure, and note how it went. */
-export async function runWorkflow(workflow: StoredWorkflow, context: RunContext): Promise<void> {
+export async function runWorkflow(
+    workflow: StoredWorkflow,
+    context: RunContext
+): Promise<string | null> {
     let lastError: string | null = null;
     try {
         const runner = await runnerOf(workflow);
@@ -317,6 +320,47 @@ export async function runWorkflow(workflow: StoredWorkflow, context: RunContext)
         where: { id: workflow.id },
         data: { runCount: { increment: 1 }, lastRunAt: new Date(), lastError }
     });
+    return lastError;
+}
+
+/** The workflows a kind of record can be run through by hand, for its page. */
+export async function listManualWorkflows(
+    actor: CrmActor,
+    object: CrmObject
+): Promise<{ id: string; name: string }[]> {
+    await requireCan(actor, object, "edit");
+    const rows = (await prisma.crmWorkflow.findMany({
+        where: { ...shelfWhere(actor.shelf), object, enabled: true },
+        orderBy: { name: "asc" },
+        take: model.MAX_WORKFLOWS
+    })) as StoredWorkflow[];
+    return rows
+        .filter((row) => model.readTrigger(row.trigger)?.kind === "manual")
+        .map((row) => ({ id: row.id, name: row.name }));
+}
+
+/**
+ * Run a manual workflow on a record, for somebody who may change that record.
+ * It runs as whoever saved it, like any other run; the answer says whether it
+ * failed and why.
+ */
+export async function runManualWorkflow(
+    actor: CrmActor,
+    object: CrmObject,
+    recordId: string,
+    workflowId: string
+): Promise<{ error: string | null }> {
+    await requireCan(actor, object, "edit");
+    const t = await crmT();
+    const row = (await prisma.crmWorkflow.findFirst({
+        where: { id: workflowId, ...shelfWhere(actor.shelf), object, enabled: true }
+    })) as StoredWorkflow | null;
+    if (!row || model.readTrigger(row.trigger)?.kind !== "manual") {
+        throw new CrmRefusal(t("workflows.gone"));
+    }
+    const record = await records.getRecord(actor, object, recordId);
+    if (!record || record.deletedAt) throw new CrmRefusal(t("errors.notFound"));
+    return { error: await runWorkflow(row, { object, recordId, event: null }) };
 }
 
 /**

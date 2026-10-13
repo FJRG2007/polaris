@@ -58,3 +58,26 @@ export async function deleteWorkflowAction(input: unknown): Promise<Outcome<{ de
         return { deleted: true as const };
     });
 }
+
+/** The workflows a record's page can run by hand. */
+export async function listManualWorkflowsAction(
+    input: unknown
+): Promise<Outcome<{ workflows: { id: string; name: string }[] }>> {
+    const parsed = z.object({ object }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        workflows: await workflows.listManualWorkflows(await requireCrmActor(), parsed.data.object)
+    }));
+}
+
+/** Run a manual workflow on a record. */
+export async function runManualWorkflowAction(
+    input: unknown
+): Promise<Outcome<{ error: string | null }>> {
+    const parsed = one.extend({ workflowId: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, id, workflowId } = parsed.data;
+    return outcome(async () =>
+        workflows.runManualWorkflow(await requireCrmActor(), kind, id, workflowId)
+    );
+}

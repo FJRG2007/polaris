@@ -34,7 +34,9 @@ export const workflowTriggerSchema = z.discriminatedUnion("kind", [
         kind: z.literal("fieldChanged"),
         field: z.string().min(1).max(64),
         to: z.string().trim().max(ACTION_TEXT_MAX).nullable()
-    })
+    }),
+    /** Somebody runs it on a record from the record's page. */
+    z.object({ kind: z.literal("manual") })
 ]);
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;
 export type TriggerKind = WorkflowTrigger["kind"];
@@ -44,7 +46,8 @@ export const TRIGGER_KINDS: readonly TriggerKind[] = [
     "created",
     "updated",
     "fieldChanged",
-    "deleted"
+    "deleted",
+    "manual"
 ];
 
 /** The most fields one action writes. */
@@ -75,7 +78,12 @@ export type ActionKind = WorkflowAction["kind"];
 export const ACTION_KINDS: readonly ActionKind[] = ["updateRecord", "createRecord"];
 
 /** The triggers that are about one record still out of the trash. */
-const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = ["created", "updated", "fieldChanged"];
+const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = [
+    "created",
+    "updated",
+    "fieldChanged",
+    "manual"
+];
 
 /** Whether an action can run under a kind of trigger: one that changes "the
  *  record" needs a trigger that is about one still there. */

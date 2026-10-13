@@ -494,7 +494,8 @@
             "created": "A record is created",
             "updated": "A record is changed",
             "fieldChanged": "A field changes",
-            "deleted": "A record is deleted"
+            "deleted": "A record is deleted",
+            "manual": "Run by hand on a record"
         },
         "actionKinds": {
             "updateRecord": "Update the record",
@@ -511,6 +512,11 @@
         "changeTo": "Changes to",
         "anyValue": "Any value",
         "summaryField": "{field} changes",
-        "summaryFieldTo": "{field} changes to {value}"
+        "summaryFieldTo": "{field} changes to {value}",
+        "gone": "That workflow is gone or switched off.",
+        "run": "Run workflow",
+        "noManual": "No workflows to run. Add one that runs by hand.",
+        "ran": "{name} ran",
+        "runFailed": "{name} failed"
     }
 }

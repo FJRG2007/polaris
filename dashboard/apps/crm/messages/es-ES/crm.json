@@ -494,7 +494,8 @@
             "created": "Se crea un registro",
             "updated": "Se cambia un registro",
             "fieldChanged": "Cambia un campo",
-            "deleted": "Se elimina un registro"
+            "deleted": "Se elimina un registro",
+            "manual": "Se ejecuta a mano"
         },
         "actionKinds": {
             "updateRecord": "Actualizar el registro",
@@ -511,6 +512,11 @@
         "changeTo": "Cambia a",
         "anyValue": "Cualquiera",
         "summaryField": "Cambia {field}",
-        "summaryFieldTo": "{field} cambia a {value}"
+        "summaryFieldTo": "{field} cambia a {value}",
+        "gone": "Ese flujo ya no existe o está desactivado.",
+        "run": "Ejecutar flujo",
+        "noManual": "No hay flujos que ejecutar. Añade uno manual.",
+        "ran": "{name} se ejecutó",
+        "runFailed": "{name} falló"
     }
 }

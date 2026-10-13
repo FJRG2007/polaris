@@ -1845,6 +1845,7 @@
         "crm/src/screens/list-shell.tsx",
         "crm/src/screens/record-activities.tsx",
         "crm/src/screens/record-screen.tsx",
+        "crm/src/screens/run-workflow-menu.tsx",
         "crm/src/screens/record-table.tsx",
         "crm/src/screens/table-header.tsx",
         "crm/src/screens/timeline.tsx",

@@ -334,3 +334,57 @@ describe("a field changing", () => {
         ).rejects.toThrow();
     });
 });
+
+describe("run by hand", () => {
+    it("lists the enabled manual workflows to somebody who may edit", async () => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored({ kind: "manual" }, { name: "Qualify" }),
+            stored({ kind: "created" }, { id: "other" })
+        ]);
+        expect(await workflows.listManualWorkflows(actorWith(allowed), "companies")).toEqual([
+            { id: FLOW, name: "Qualify" }
+        ]);
+        await expect(
+            workflows.listManualWorkflows(actorWith(reader), "companies")
+        ).rejects.toThrow();
+    });
+
+    it("runs one on a record and says how it went", async () => {
+        db.crmWorkflow.findFirst.mockResolvedValueOnce(stored({ kind: "manual" }));
+        db.records.findFirst.mockResolvedValue({
+            id: RECORD,
+            name: "Acme",
+            position: 0,
+            deletedAt: null,
+            ...stamp
+        });
+        expect(
+            await workflows.runManualWorkflow(actorWith(allowed), "companies", RECORD, FLOW)
+        ).toEqual({
+            error: null
+        });
+        expect(db.crmWorkflow.findFirst).toHaveBeenCalledWith({
+            where: { id: FLOW, orgId: "o1", object: "companies", enabled: true }
+        });
+        expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses a workflow that is not manual, and a record in the trash", async () => {
+        db.crmWorkflow.findFirst.mockResolvedValueOnce(stored({ kind: "created" }));
+        await expect(
+            workflows.runManualWorkflow(actorWith(allowed), "companies", RECORD, FLOW)
+        ).rejects.toThrow();
+        db.crmWorkflow.findFirst.mockResolvedValueOnce(stored({ kind: "manual" }));
+        db.records.findFirst.mockResolvedValueOnce({
+            id: RECORD,
+            name: "Acme",
+            position: 0,
+            deletedAt: new Date(),
+            ...stamp
+        });
+        await expect(
+            workflows.runManualWorkflow(actorWith(allowed), "companies", RECORD, FLOW)
+        ).rejects.toThrow();
+        expect(db.crmWorkflow.update).not.toHaveBeenCalled();
+    });
+});

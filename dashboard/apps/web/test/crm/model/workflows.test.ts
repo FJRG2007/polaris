@@ -178,3 +178,11 @@ describe("a field changing", () => {
         expect(actionFits("updateRecord", "fieldChanged")).toBe(true);
     });
 });
+
+describe("run by hand", () => {
+    it("is a trigger no record change sets off, about the record it is run on", () => {
+        const [created] = eventsOf([{ recordId: RECORD, kind: "created", changes: [] }]);
+        expect(triggerMatches({ kind: "manual" }, created!)).toBe(false);
+        expect(actionFits("updateRecord", "manual")).toBe(true);
+    });
+});
