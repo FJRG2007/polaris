@@ -1,0 +1,45 @@
+{
+    "about": "The soundboard's built-in sounds. Every one is a recording released into the public domain under CC0 1.0, so it needs no attribution and may be redistributed. Each was cut to the second or two that carries the idea, faded in and out, mixed to mono, resampled to 22.05 kHz and brought to the same gated RMS level (-20 dBFS, peaks under -1 dBFS), then written as 16-bit PCM WAV.",
+    "sounds": {
+        "applause": {
+            "source": "https://freesound.org/s/277021/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "rimshot": {
+            "source": "https://freesound.org/s/383898/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "crickets": {
+            "source": "https://freesound.org/s/129678/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "letdown": {
+            "source": "https://freesound.org/s/175409/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "fanfare": {
+            "source": "https://freesound.org/s/397355/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "boing": {
+            "source": "https://freesound.org/s/119518/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "whoosh": {
+            "source": "https://freesound.org/s/369698/",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        },
+        "horn": {
+            "source": "https://commons.wikimedia.org/wiki/File:Cruise_ship_Albatros_ship_horn.ogg",
+            "license": "CC0-1.0",
+            "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+        }
+    }
+}
