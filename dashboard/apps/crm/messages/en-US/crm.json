@@ -764,5 +764,14 @@
     "duplicates": {
         "title": "{count, plural, one {A record like this is already here} other {# records like this are already here}}",
         "body": "Same {field}: {names}"
+    },
+    "merge": {
+        "count": "Choose from 2 to {count} records to merge.",
+        "missing": "One of these records is gone or in the trash. Refresh the list and try again.",
+        "button": "Merge",
+        "title": "Merge {count} records",
+        "keep": "Keep this record. Its empty fields are filled from the others, which go to the trash.",
+        "confirm": "Merge",
+        "done": "Records merged"
     }
 }

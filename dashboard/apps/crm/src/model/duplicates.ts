@@ -29,6 +29,9 @@ export const DUPLICATE_FIELDS: Readonly<Record<CrmObject, readonly string[]>> = 
     opportunities: ["name"]
 };
 
+/** The most records merged into one at a time. */
+export const MAX_MERGE = 5;
+
 /** The most records a duplicate warning names. */
 export const MAX_DUPLICATES = 5;
 

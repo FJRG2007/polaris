@@ -37,6 +37,8 @@ import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { BulkEditDialog } from "./bulk-edit-dialog";
+import { MergeDialog } from "./merge-dialog";
+import { MAX_MERGE } from "../model/duplicates";
 import { GroupMenu, SortMenu } from "./arrange-menus";
 import { useViewName, ViewPicker } from "./view-picker";
 import { useRecords, type RowStore } from "./use-records";
@@ -56,6 +58,7 @@ import {
     ShieldOff,
     Table2,
     Target,
+    Merge,
     Trash2,
     User,
     X
@@ -415,6 +418,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const [workflowsOpen, setWorkflowsOpen] = useState(false);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
+    const [mergeOpen, setMergeOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
     // no longer chosen.
     const rowIds = useMemo(() => new Set((store.rows ?? []).map((row) => row.id)), [store.rows]);
@@ -1184,6 +1188,12 @@ export function ListScreen({ object }: { object: CrmObject }) {
                                 {t("selection.edit")}
                             </Button>
                         ) : null}
+                        {canEdit && canDelete && selected.length >= 2 && selected.length <= MAX_MERGE ? (
+                            <Button size="sm" variant="ghost" onClick={() => setMergeOpen(true)}>
+                                <Merge className="size-4" />
+                                {t("merge.button")}
+                            </Button>
+                        ) : null}
                         {canDelete ? (
                             <Button
                                 size="sm"
@@ -1207,6 +1217,20 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     </div>
                 ) : null}
 
+                {mergeOpen ? (
+                    <MergeDialog
+                        object={object}
+                        records={(store.rows ?? []).filter((row) => selected.includes(row.id))}
+                        onMerged={(record, trashed) => {
+                            setMergeOpen(false);
+                            setSelected([]);
+                            store.drop(trashed);
+                            store.patch([{ id: record.id, values: record.values }]);
+                            refreshTotals();
+                        }}
+                        onClose={() => setMergeOpen(false)}
+                    />
+                ) : null}
                 {bulkOpen ? (
                     <BulkEditDialog
                         object={object}

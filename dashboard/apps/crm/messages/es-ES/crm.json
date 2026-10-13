@@ -764,5 +764,14 @@
     "duplicates": {
         "title": "{count, plural, one {Ya hay un registro como este} other {Ya hay # registros como este}}",
         "body": "Mismo {field}: {names}"
+    },
+    "merge": {
+        "count": "Elige de 2 a {count} registros para fusionar.",
+        "missing": "Uno de estos registros ya no existe o está en la papelera. Actualiza la lista y vuelve a intentarlo.",
+        "button": "Fusionar",
+        "title": "Fusionar {count} registros",
+        "keep": "Conservar este registro. Sus campos vacíos se rellenan con los demás, que van a la papelera.",
+        "confirm": "Fusionar",
+        "done": "Registros fusionados"
     }
 }

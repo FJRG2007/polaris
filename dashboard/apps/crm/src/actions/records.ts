@@ -17,6 +17,7 @@ import * as page from "../lib/record-page";
 import * as timeline from "../lib/timeline";
 import * as favorites from "../lib/favorites";
 import * as duplicates from "../lib/duplicates";
+import * as merging from "../lib/merge";
 import type { TimelinePage } from "../model/timeline";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities, CrmActor } from "../lib/access";
@@ -468,4 +469,16 @@ export async function deleteFieldAction(input: unknown): Promise<Outcome<{ delet
         await fields.deleteField(await requireCrmActor(), parsed.data.object, parsed.data.fieldId);
         return { deleted: true as const };
     });
+}
+
+/** Merge duplicates into the record kept; the others go to the trash. */
+export async function mergeRecordsAction(input: unknown): Promise<Outcome<{ record: CrmRecord }>> {
+    const parsed = z
+        .object({ object, keepId: id, ids: z.array(id).min(1).max(merging.MAX_MERGE) })
+        .safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, keepId, ids: merged } = parsed.data;
+    return outcome(async () => ({
+        record: await merging.mergeRecords(await requireCrmActor(), kind, keepId, merged)
+    }));
 }

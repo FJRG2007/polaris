@@ -49,6 +49,7 @@ const state = vi.hoisted(() => ({
     restores: [] as unknown[],
     favoriteViews: [] as string[],
     pins: [] as unknown[],
+    merges: [] as unknown[],
     rule: null as { rows: "all" | "own"; hidden: string[]; readOnly: string[] } | null
 }));
 
@@ -101,6 +102,12 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
             return { ok: true, count: back.length };
         },
         destroyRecordsAction: async () => ({ ok: true, count: 1 }),
+        mergeRecordsAction: async (input: { keepId: string; ids: string[] }) => {
+            state.merges.push(input);
+            const kept = state.rows.find((one) => one.id === input.keepId)!;
+            state.rows = state.rows.filter((one) => !input.ids.includes(one.id));
+            return { ok: true, record: { ...kept, values: { ...kept.values, domain: "merged.test" } } };
+        },
         listRecordsAction: async (input: unknown) => {
             if ((input as { deleted?: boolean }).deleted) {
                 return { ok: true, records: state.trashed, total: state.trashed.length };
@@ -203,6 +210,7 @@ beforeEach(() => {
     state.restores = [];
     state.favoriteViews = [];
     state.pins = [];
+    state.merges = [];
     window.history.replaceState(null, "", "/crm/companies");
     if (typeof localStorage !== "undefined") localStorage.clear();
     // What the tab kept from the last test would paint before the read.
@@ -551,6 +559,26 @@ describe("a CRM list", () => {
         expect(await screen.findByText("The trash is empty")).toBeTruthy();
         fireEvent.keyDown(dialog, { key: "Escape" });
         expect(await screen.findByText("Initech")).toBeTruthy();
+    });
+
+    it("merges the selected rows into the one chosen to keep", async () => {
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        const boxes = screen.getAllByRole("checkbox", { name: "Select row" });
+        fireEvent.click(boxes[0]!);
+        fireEvent.click(boxes[1]!);
+        fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.click(within(dialog).getByRole("radio", { name: "Globex" }));
+        await act(async () => {
+            fireEvent.click(within(dialog).getByRole("button", { name: "Merge" }));
+        });
+        await waitFor(() =>
+            expect(state.merges).toEqual([{ object: "companies", keepId: GLOBEX, ids: [ACME] }])
+        );
+        await waitFor(() => expect(screen.queryByText("Acme")).toBeNull());
+        expect(screen.getByText("Globex")).toBeTruthy();
+        expect(screen.getByText("merged.test")).toBeTruthy();
     });
 
     it("says so to somebody who may not see this kind of record", async () => {
