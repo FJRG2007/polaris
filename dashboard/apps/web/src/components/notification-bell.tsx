@@ -143,7 +143,9 @@ export function NotificationBell() {
                                     </DropdownMenuItem>
                                     {!item.read ? (
                                         <DropdownMenuItem
-                                            aria-label={t("bell.markReadNamed", { title: item.title })}
+                                            aria-label={t("bell.markReadNamed", {
+                                                title: item.title
+                                            })}
                                             title={t("bell.markRead")}
                                             // The menu stays open: this is a
                                             // control over the list itself, and

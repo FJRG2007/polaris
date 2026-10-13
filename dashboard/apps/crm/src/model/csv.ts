@@ -39,9 +39,8 @@ export function csvValue(field: FieldDef, value: FieldValue | undefined): string
  *  line break, and kept from being read as a formula. A number stays a number:
  *  "-3" is not a formula. */
 export function csvCell(text: string): string {
-    const safe = FORMULA_START.test(text) && !/^-?\d+(\.\d+)?( [A-Z]{3})?$/.test(text)
-        ? `'${text}`
-        : text;
+    const safe =
+        FORMULA_START.test(text) && !/^-?\d+(\.\d+)?( [A-Z]{3})?$/.test(text) ? `'${text}` : text;
     return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 

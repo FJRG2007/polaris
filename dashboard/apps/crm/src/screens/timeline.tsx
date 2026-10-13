@@ -30,7 +30,11 @@ export interface TimelineProps {
 export function Timeline({ object, id, page, fields }: TimelineProps) {
     const t = useCrmT();
     const format = hostUi.displayFormat.useDisplayFormat();
-    const [older, setOlder] = useState<{ from: TimelinePage; events: TimelineEvent[]; next: string | null } | null>(null);
+    const [older, setOlder] = useState<{
+        from: TimelinePage;
+        events: TimelineEvent[];
+        next: string | null;
+    } | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     // Older pages belong to the newest page they were read after.
@@ -93,13 +97,24 @@ export function Timeline({ object, id, page, fields }: TimelineProps) {
                                         {event.kind === "updated" ? (
                                             <>
                                                 <span className="flex min-w-0 items-center overflow-hidden text-muted-foreground line-through">
-                                                    <CellDisplay object={object} field={field} value={change.before} />
+                                                    <CellDisplay
+                                                        object={object}
+                                                        field={field}
+                                                        value={change.before}
+                                                    />
                                                 </span>
-                                                <ArrowRight aria-label={t("timeline.to")} className="size-3 shrink-0 text-muted-foreground" />
+                                                <ArrowRight
+                                                    aria-label={t("timeline.to")}
+                                                    className="size-3 shrink-0 text-muted-foreground"
+                                                />
                                             </>
                                         ) : null}
                                         <span className="flex min-w-0 items-center overflow-hidden">
-                                            <CellDisplay object={object} field={field} value={change.after} />
+                                            <CellDisplay
+                                                object={object}
+                                                field={field}
+                                                value={change.after}
+                                            />
                                         </span>
                                     </span>
                                 </li>

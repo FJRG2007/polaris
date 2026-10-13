@@ -293,11 +293,17 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                             <VisitRecorder />
                                                                             <GuidedTours
                                                                                 userId={user.id}
-                                                                                isAdmin={user.isAdmin}
+                                                                                isAdmin={
+                                                                                    user.isAdmin
+                                                                                }
                                                                                 appIds={apps.ids}
                                                                                 held={held}
-                                                                                installed={installed}
-                                                                                canOffer={!user.viewingAs}
+                                                                                installed={
+                                                                                    installed
+                                                                                }
+                                                                                canOffer={
+                                                                                    !user.viewingAs
+                                                                                }
                                                                             />
                                                                             {/* The bottom corner, laid out once. Each of these
                                     used to pin itself there, so an update landing

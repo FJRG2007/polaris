@@ -92,7 +92,11 @@ const valueShape: z.ZodType<FieldValue> = z.union([
     z.object({ amount: z.number().nullable(), currency: z.string().max(8) }),
     z.object({ first: z.string().max(512), last: z.string().max(512) })
 ]) as z.ZodType<FieldValue>;
-const changeShape = z.object({ key: z.string().min(1).max(64), before: valueShape, after: valueShape });
+const changeShape = z.object({
+    key: z.string().min(1).max(64),
+    before: valueShape,
+    after: valueShape
+});
 
 /** A stored event's changes, keeping only the entries shaped like one. */
 export function readChanges(raw: string): FieldChange[] {

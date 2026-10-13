@@ -9,11 +9,11 @@ screen's own address, or offered once to a new account.
 
 Four pieces:
 
-| Piece                            | Where                                     |
-| --------------------------------- | ------------------------------------------ |
-| Which tours exist, and their steps | `apps/web/src/lib/tours/registry.ts`     |
-| Whether a step's target can be pointed at right now | `apps/web/src/lib/tours/target.ts` |
-| Draws a tour with driver.js, loaded on demand | `apps/web/src/lib/tours/runtime.ts` |
+| Piece                                                  | Where                                            |
+| ------------------------------------------------------ | ------------------------------------------------ |
+| Which tours exist, and their steps                     | `apps/web/src/lib/tours/registry.ts`             |
+| Whether a step's target can be pointed at right now    | `apps/web/src/lib/tours/target.ts`               |
+| Draws a tour with driver.js, loaded on demand          | `apps/web/src/lib/tours/runtime.ts`              |
 | The list, the `?tour=` starter and the first-run offer | `apps/web/src/components/tours/guided-tours.tsx` |
 
 ## Adding a step

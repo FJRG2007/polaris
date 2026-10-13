@@ -406,10 +406,7 @@ export function CommandPalette({
     );
 
     // "Take the tour of Chat": found by typing, never listed in the empty map.
-    const reachable = useMemo(
-        () => new Set(navigation.map((entry) => entry.href)),
-        [navigation]
-    );
+    const reachable = useMemo(() => new Set(navigation.map((entry) => entry.href)), [navigation]);
     const tTours = useTranslations("tours");
     const tourRows = useTourEntries(reachable);
     const tours = useMemo<CommandEntry[]>(

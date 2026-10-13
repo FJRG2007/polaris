@@ -19,10 +19,12 @@ describe("csvValue", () => {
         expect(csvValue(field("people", "name"), { first: "Ada", last: "Example" })).toBe(
             "Ada Example"
         );
-        expect(csvValue(field("opportunities", "amount"), { amount: 1200.5, currency: "EUR" })).toBe(
-            "1200.5 EUR"
+        expect(
+            csvValue(field("opportunities", "amount"), { amount: 1200.5, currency: "EUR" })
+        ).toBe("1200.5 EUR");
+        expect(csvValue(field("opportunities", "amount"), { amount: null, currency: "EUR" })).toBe(
+            ""
         );
-        expect(csvValue(field("opportunities", "amount"), { amount: null, currency: "EUR" })).toBe("");
         expect(csvValue(field("companies", "idealCustomer"), true)).toBe("true");
         expect(csvValue(field("companies", "idealCustomer"), false)).toBe("false");
         expect(csvValue(field("people", "company"), { id: "x", name: "Example Co" })).toBe(
@@ -48,7 +50,7 @@ describe("csvCell", () => {
         expect(csvCell("+1+1")).toBe("'+1+1");
         expect(csvCell("@SUM(A1)")).toBe("'@SUM(A1)");
         expect(csvCell("-2+3")).toBe("'-2+3");
-        expect(csvCell("=1,2")).toBe("\"'=1,2\"");
+        expect(csvCell("=1,2")).toBe('"\'=1,2"');
     });
 
     it("leaves negative numbers and amounts as numbers", () => {

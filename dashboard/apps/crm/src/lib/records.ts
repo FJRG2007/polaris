@@ -329,7 +329,11 @@ export async function createRecord(
     });
     const record = toRecord(object, row as Record<string, unknown>);
     await logEvents(actor, object, [
-        { recordId: record.id, kind: "created", changes: initialValues(record, Object.keys(values)) }
+        {
+            recordId: record.id,
+            kind: "created",
+            changes: initialValues(record, Object.keys(values))
+        }
     ]);
     return record;
 }
@@ -383,7 +387,13 @@ export async function updateRecords(
         saved.flatMap((record) => {
             const old = was.get(record.id);
             return old
-                ? [{ recordId: record.id, kind: "updated" as const, changes: changesBetween(old, record, keys) }]
+                ? [
+                      {
+                          recordId: record.id,
+                          kind: "updated" as const,
+                          changes: changesBetween(old, record, keys)
+                      }
+                  ]
                 : [];
         })
     );
