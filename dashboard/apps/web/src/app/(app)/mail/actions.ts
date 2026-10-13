@@ -1055,6 +1055,12 @@ export async function retrySendAction(draftId: string) {
     }
 }
 
+/** The drafts screen's list again, for when a message on it has gone. One
+ *  query, rather than the router re-rendering the whole signed-in frame. */
+export async function listDraftsAction() {
+    return await compose.listDrafts(await actorId());
+}
+
 /** Put messages in a folder, for the drag onto the rail and the Move to menu. */
 export async function moveToFolderAction(input: unknown) {
     const userId = await actorId();
