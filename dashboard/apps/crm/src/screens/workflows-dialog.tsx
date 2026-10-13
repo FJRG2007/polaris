@@ -100,7 +100,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
         if (!open) return;
         let live = true;
         unwrap(() => actions.workflowOptionsAction({ object }), "")
-            .then(({ taskLists, people }) => live && setOptions({ taskLists, people }))
+            .then((answer) => live && setOptions(answer))
             .catch(() => undefined);
         return () => {
             live = false;

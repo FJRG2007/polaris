@@ -33,8 +33,34 @@ vi.mock("@polaris-app/crm/src/actions/workflows", () => ({
             : { ok: true, enabled: input.enabled };
     },
     deleteWorkflowAction: vi.fn(),
+    listWorkflowRunsAction: async () => ({
+        ok: true,
+        runs: [
+            {
+                id: "r1",
+                status: "failed",
+                cause: "created",
+                recordId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                error: "City: Enter a number.",
+                startedAt: "2026-10-01T10:00:00.000Z",
+                finishedAt: "2026-10-01T10:00:01.000Z",
+                resumeAt: null
+            },
+            {
+                id: "r2",
+                status: "waiting",
+                cause: "manual",
+                recordId: null,
+                error: null,
+                startedAt: "2026-10-01T09:00:00.000Z",
+                finishedAt: null,
+                resumeAt: "2026-10-02T09:00:00.000Z"
+            }
+        ]
+    }),
     workflowOptionsAction: async () => ({
         ok: true,
+        mail: true,
         taskLists: [],
         people: [
             { id: "u1", name: "Test User" },
@@ -156,5 +182,42 @@ describe("the workflows dialog", () => {
                 }
             ])
         );
+    });
+
+    it("offers an email once the reader has a mailbox, and branches, loops and waits", async () => {
+        open();
+        await screen.findByText("Welcome");
+        fireEvent.click(screen.getByRole("button", { name: "New workflow" }));
+        await act(async () => undefined);
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Add action" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        for (const name of [
+            "Send an email",
+            "Go on only if the record matches",
+            "If the record matches",
+            "For each record found",
+            "Wait"
+        ]) {
+            expect(await screen.findByRole("menuitem", { name })).toBeTruthy();
+        }
+        fireEvent.click(screen.getByRole("menuitem", { name: "If the record matches" }));
+        expect(await screen.findByText("When it does not")).toBeTruthy();
+        expect(screen.getAllByRole("button", { name: "Add action" })).toHaveLength(3);
+    });
+
+    it("shows a workflow's runs: how each ended, why, and the record", async () => {
+        open();
+        await screen.findByText("Welcome");
+        fireEvent.click(screen.getByRole("button", { name: "Runs" }));
+        expect(await screen.findByText("Runs of Welcome")).toBeTruthy();
+        expect(await screen.findByText("Failed")).toBeTruthy();
+        expect(screen.getByText("Waiting")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Open record" }).getAttribute("href")).toContain(
+            "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Back" }));
+        expect(await screen.findByText("Welcome")).toBeTruthy();
     });
 });
