@@ -15,7 +15,7 @@ about _any_ object answers it about exactly one kind:
 | Labelling                                  | `TaskTag`, `TaskTagLink`                              | Tasks                          |
 | A saved way of looking                     | `TaskView`                                            | Tasks                          |
 | Starting from a shape                      | `TaskTemplate`, `ServerTemplate`, `DropPointTemplate` | Tasks, Servers, Drop points    |
-| Marking a favourite                        | `VaultFavorite`                                       | Vault                          |
+| Marking a favourite                        | `VaultFavorite`, `CrmFavorite`                        | Vault, CRM                     |
 | Handing a thing to somebody off its roster | `AccessGrant`                                         | Chat, Tasks, Notes, Places     |
 
 Meanwhile `Notification`, `NotificationDestination` and `NotificationDelivery`
