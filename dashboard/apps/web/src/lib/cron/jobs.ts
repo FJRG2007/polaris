@@ -41,6 +41,7 @@ import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
+import { pollLastfm } from "@/lib/presence-activity/lastfm-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepStorageMoves } from "@/lib/storage-moves/service";
 import { sweepAppStorage } from "@/lib/storage-moves/app-storage";
@@ -411,6 +412,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // listen-along song on twice.
         leaseMs: 2 * MINUTE,
         run: () => pollSpotify()
+    },
+    {
+        key: "activity-lastfm",
+        // Every fifteen seconds, and each person is asked at most once in thirty
+        // (longer while nothing plays). Only people here, sharing music, with no
+        // Spotify link of their own. With no Last.fm key connected it reads one row.
+        everyMs: 15_000,
+        // Leased: two runners would ask Last.fm about everybody twice.
+        leaseMs: 2 * MINUTE,
+        run: () => pollLastfm()
     },
     {
         key: "service-desired-state",

@@ -76,6 +76,8 @@ describe("the work Polaris runs on a schedule", () => {
         // had not seen before.
         const leased = SCHEDULED_JOBS.filter((job) => job.leaseMs !== null).map((job) => job.key);
         expect(leased.sort()).toEqual([
+            // Two runners would ask Last.fm about everybody twice.
+            "activity-lastfm",
             // Two runners would ask Spotify about everybody twice, and put every
             // listen-along song on twice.
             "activity-spotify",

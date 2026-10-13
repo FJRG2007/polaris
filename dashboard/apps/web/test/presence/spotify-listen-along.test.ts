@@ -334,6 +334,12 @@ describe("listening along", () => {
         await expect(along.startListenAlong(listener, BOB)).rejects.toThrow(/your own/);
     });
 
+    it("does not try to follow a song that came from Last.fm", async () => {
+        fake.visible.set(ANA, { key: "lastfm:artist|song", startedAt: new Date().toISOString() });
+        await expect(along.startListenAlong(listener, ANA)).rejects.toThrow(/Last\.fm/);
+        expect(fake.plays).toEqual([]);
+    });
+
     it("says to link Spotify, and says Premium, where those are what is missing", async () => {
         fake.visible.set(ANA, { key: "s1", startedAt: new Date().toISOString() });
         fake.links = [{ id: "ana-link", userId: ANA }];

@@ -24,6 +24,7 @@
 import { prisma } from "@polaris/db";
 import type * as core from "@polaris/core";
 import { sourceSharedWith } from "./service";
+import { isLastfmKey } from "@/lib/connections/spotify-search";
 import { presenceFor } from "@/lib/presence-service";
 import { readCredential, updateCredential } from "@/lib/connections/store";
 import {
@@ -129,6 +130,11 @@ export async function startListenAlong(
     if (hostId === listener.id) throw new ListenAlongError("That is your own music.");
     const track = await visibleTrack(listener, hostId);
     if (!track) throw new ListenAlongError("They are not playing anything you can see right now.");
+    // Last.fm names a song but not the Spotify track, so there is nothing to
+    // follow in step: the card opens it in Spotify instead.
+    if (isLastfmKey(track.key)) {
+        throw new ListenAlongError("This song comes from their Last.fm. Open it in Spotify to play it from the start.");
+    }
     let token: Awaited<ReturnType<typeof listenerToken>>;
     try {
         token = await listenerToken(listener.id);
