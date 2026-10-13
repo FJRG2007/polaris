@@ -68,7 +68,11 @@ export function takeRememberedVoice(meetingId: string): ResumedVoice | null {
             typeof note.micBeforeDeafen !== "boolean"
         )
             return null;
-        return { micOn: note.micOn, deafened: note.deafened, micBeforeDeafen: note.micBeforeDeafen };
+        return {
+            micOn: note.micOn,
+            deafened: note.deafened,
+            micBeforeDeafen: note.micBeforeDeafen
+        };
     } catch {
         return null;
     }
