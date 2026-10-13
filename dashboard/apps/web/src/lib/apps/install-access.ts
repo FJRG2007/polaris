@@ -135,3 +135,19 @@ export async function sharingRightsFor(
     );
     return { mayPassOn: true, until: furthest };
 }
+
+/**
+ * Whether this user may uninstall this install, and on whose behalf.
+ *
+ * `deploy.manage` on the install and being its owner (or an admin): taking an app
+ * away is not something "manage this app" ever handed out. The action and the
+ * detail page both ask here, so the button is shown exactly when it would work.
+ */
+export async function uninstallAccess(
+    user: SessionUser,
+    installedAppId: string
+): Promise<ResourceAccess | null> {
+    const access = await resourceAccess(user, installRef(installedAppId), "deploy.manage");
+    if (!access) return null;
+    return access.isOwner || user.isAdmin ? access : null;
+}
