@@ -668,20 +668,20 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
     );
 }
 
-/**
- * A Minecraft username, typed rather than proved.
- *
- * Checked as it is typed against the same schema the action checks, so what the
- * form accepts is what gets saved. An empty field is unfinished rather than
- * wrong, so it says nothing until there is something to judge, and saving the
- * name that is already there is not offered.
- */
 /** What each service that takes a typed name checks it with and saves it through. */
 const TYPED_NAMES = {
     minecraft: { schema: minecraftNameSchema, save: (name: string) => saveMinecraftNameAction(name), maxLength: 32, example: "Steve" },
     lastfm: { schema: lastfmNameSchema, save: (name: string) => saveLastfmNameAction(name), maxLength: 64, example: "listener_01" }
 } as const;
 
+/**
+ * A Minecraft or Last.fm username, typed rather than proved.
+ *
+ * Checked as it is typed against the same schema the action checks, so what the
+ * form accepts is what gets saved. An empty field is unfinished rather than
+ * wrong, so it says nothing until there is something to judge, and saving the
+ * name that is already there is not offered.
+ */
 function TypedNameDialog({
     kind,
     current,

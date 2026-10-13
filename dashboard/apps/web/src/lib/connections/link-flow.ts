@@ -597,7 +597,8 @@ async function finishLink(
             return endLink(origin, provider, "limit", screen, extra);
         // Those two are this person's to resolve. This one is the operator's, and
         // they are not the person standing at the redirect - so they are told.
-        await recordConnectionFailure(provider, describeFailure(caught));
+        if ((await connectionOAuthClient(provider))?.clientId === client.clientId)
+            await recordConnectionFailure(provider, describeFailure(caught));
         return endLink(origin, provider, "error", screen, extra);
     }
 }

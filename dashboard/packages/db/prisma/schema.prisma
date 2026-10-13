@@ -9641,13 +9641,6 @@ model UserActivity {
     @@index([expiresAt])
 }
 
-// One account's Spotify following another's: "Listen along".
-//
-// One row per listener, because somebody can follow one person at a time. The
-// track last put on the listener's device is kept so the next read of the host
-// can tell a new song from the same one still playing, and the moment it was
-// put there so the listener's own next read does not mistake the gap between
-// two songs for them taking their Spotify back. Empty while the host is paused.
 // An application somebody registered with a provider themselves, used for their
 // own links instead of the deployment's. Spotify keeps an app in development
 // mode to five allowlisted people, and the app's owner is never one of the
@@ -9669,6 +9662,13 @@ model UserOAuthApp {
     @@id([userId, provider])
 }
 
+// One account's Spotify following another's: "Listen along".
+//
+// One row per listener, because somebody can follow one person at a time. The
+// track last put on the listener's device is kept so the next read of the host
+// can tell a new song from the same one still playing, and the moment it was
+// put there so the listener's own next read does not mistake the gap between
+// two songs for them taking their Spotify back. Empty while the host is paused.
 model SpotifyListenAlong {
     listenerId String   @id @db.Uuid
     hostId     String   @db.Uuid
