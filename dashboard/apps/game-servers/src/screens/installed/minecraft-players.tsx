@@ -899,6 +899,11 @@ export function MinecraftPlayers({
                     others={onlineNames.filter(
                         (name) => name.toLowerCase() !== target.name.toLowerCase()
                     )}
+                    // From the list's own presence, so a bag opened while they
+                    // were away turns live when they join.
+                    online={onlineNames.some(
+                        (name) => name.toLowerCase() === target.name.toLowerCase()
+                    )}
                     onClose={() => setActing(null)}
                     onChanged={onChanged}
                 />

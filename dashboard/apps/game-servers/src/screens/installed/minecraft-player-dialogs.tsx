@@ -264,6 +264,7 @@ export function InventoryDialog({
     player,
     canEdit,
     others,
+    online,
     onClose,
     onChanged
 }: {
@@ -274,6 +275,8 @@ export function InventoryDialog({
     canEdit: boolean;
     /** Everybody else who is on right now, for sending stacks to. */
     others: readonly string[];
+    /** Whether they are on the server now, as the screen behind sees it. */
+    online?: boolean;
     onClose: () => void;
     /** The screen behind lists what is waiting to reach this player too, so a
      *  write that lands in that queue has to ask it to read the list again. */
@@ -296,6 +299,7 @@ export function InventoryDialog({
                     player={player}
                     editable={canEdit}
                     others={others}
+                    online={online}
                     onChanged={onChanged}
                 />
                 <DialogFooter>
