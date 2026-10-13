@@ -83,7 +83,9 @@ function drawnShape(video: HTMLVideoElement): number {
 
 describe("the camera viewer, following a stream that resizes in-band", () => {
     it("follows a resize report rather than freezing on the shape first measured", async () => {
-        render(withMessages(<CameraViewer camera={camera()} canControl={false} onClose={() => {}} />));
+        render(
+            withMessages(<CameraViewer camera={camera()} canControl={false} onClose={() => {}} />)
+        );
         await act(async () => {
             await Promise.resolve();
         });
