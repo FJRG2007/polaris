@@ -12,7 +12,13 @@ import { host } from "@polaris/app-host";
 import type { CrmObject } from "../model/objects";
 import { requireCan, type CrmActor } from "./access";
 import { addLink, isLinked, linkedIds, requireLiveRecord } from "./links";
-import { dueAt, type LinkedNote, type LinkedTask, type RecordActivities } from "../model/links";
+import {
+    dueAt,
+    type LinkedFile,
+    type LinkedNote,
+    type LinkedTask,
+    type RecordActivities
+} from "../model/links";
 
 const who = (actor: CrmActor) => ({ id: actor.user.id, isAdmin: actor.user.isAdmin });
 
@@ -42,15 +48,17 @@ export async function openActivities(
 ): Promise<RecordActivities> {
     await requireCan(actor, object, "read");
     const editing = actor.can[object].edit;
-    const [noteIds, taskIds, shelves, lists] = await Promise.all([
+    const [noteIds, taskIds, fileIds, shelves, lists] = await Promise.all([
         linkedIds(actor, object, recordId, "note"),
         linkedIds(actor, object, recordId, "task"),
+        linkedIds(actor, object, recordId, "file"),
         host.crmHost.crmNoteShelves(who(actor)),
         editing ? host.crmHost.taskListsFor(who(actor)) : Promise.resolve(null)
     ]);
-    const [notes, tasks] = await Promise.all([
+    const [notes, tasks, files] = await Promise.all([
         shelves ? host.crmHost.crmNotesByIds(who(actor), noteIds) : Promise.resolve(null),
-        host.crmHost.tasksByIds(who(actor), taskIds)
+        host.crmHost.tasksByIds(who(actor), taskIds),
+        host.crmHost.crmDriveFiles(who(actor), fileIds)
     ]);
     return {
         notes: notes ? notes.map((note: LinkedNote) => ({ ...note })) : null,
@@ -60,8 +68,28 @@ export async function openActivities(
             id: list.id,
             name: list.name,
             spaceName: list.spaceName
-        }))
+        })),
+        files: files.map((file: LinkedFile) => ({ id: file.id, name: file.name, href: file.href }))
     };
+}
+
+/** Link a file already in Drive to a record. Nothing is copied: the record
+ *  points at the file where it is, for whoever may open it there. */
+export async function attachRecordFile(
+    actor: CrmActor,
+    object: CrmObject,
+    recordId: string,
+    input: { connectionId: string; path: string }
+): Promise<LinkedFile> {
+    await requireCan(actor, object, "edit");
+    await requireLiveRecord(actor, object, recordId);
+    const t = await crmT();
+    const ref = await host.crmHost.crmDriveFileRef(who(actor), input.connectionId, input.path);
+    if ("refused" in ref) throw new CrmRefusal(t("activities.fileRefused"));
+    await addLink(actor, object, recordId, "file", ref.id);
+    const [file] = await host.crmHost.crmDriveFiles(who(actor), [ref.id]);
+    if (!file) throw new CrmRefusal(t("errors.generic"));
+    return { id: file.id, name: file.name, href: file.href };
 }
 
 /** Write a note in Notes and link it to the record. */

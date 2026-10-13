@@ -10,7 +10,11 @@
  * Server-only.
  */
 
+import { prisma } from "@polaris/db";
 import { resolveScope } from "@/lib/workspace-scope";
+import { isUuid } from "@/lib/uuid";
+import { normalizeRelPath } from "@polaris/core";
+import { mayReadDrive, requireDriveDriver } from "@/lib/drive-authz";
 import { listOrgMembers, orgCan, resolveOrgAccess, type OrgActor } from "@/lib/orgs/org-service";
 
 /** The shelf somebody is working from: an organization, or their own (null). */
@@ -169,4 +173,90 @@ export async function crmCreateNote(
         if (caught instanceof access.NoteAccessError) return { refused: caught.message };
         throw caught;
     }
+}
+
+/** A Drive file a record points at, as the record page lists it. */
+export interface CrmDriveFile {
+    readonly id: string;
+    readonly name: string;
+    /** Where the file opens in Drive. */
+    readonly href: string;
+}
+
+const driveFileName = (path: string): string => path.split("/").at(-1) || path;
+
+/**
+ * A file picked out of Drive, as the id a record can point at: the file's own
+ * Drive entry, made if it has none yet, so it follows the file when it is moved
+ * or renamed there. Nothing is copied. Refused when the reader may not read the
+ * file, or the path is a folder or is gone.
+ */
+export async function crmDriveFileRef(
+    actor: OrgActor,
+    connectionId: string,
+    rawPath: string
+): Promise<{ id: string; name: string } | { refused: true }> {
+    let path: string;
+    try {
+        path = normalizeRelPath(rawPath);
+    } catch {
+        return { refused: true };
+    }
+    if (!isUuid(connectionId) || !path) return { refused: true };
+    const driver = await requireDriveDriver(actor.id, connectionId, path, "read", {
+        skipLock: true
+    }).catch(() => null);
+    if (!driver) return { refused: true };
+    try {
+        const stat = await driver.stat(path).catch(() => null);
+        if (!stat || stat.kind !== "file") return { refused: true };
+    } finally {
+        await driver.dispose().catch(() => undefined);
+    }
+    const connection = await prisma.storageConnection.findUnique({
+        where: { id: connectionId },
+        select: { ownerId: true, orgId: true }
+    });
+    const owner = connection?.ownerId ?? connection?.orgId;
+    if (!owner) return { refused: true };
+    const entry = await prisma.driveItemMeta.upsert({
+        where: { connectionId_path: { connectionId, path } },
+        create: { ownerId: owner, connectionId, path },
+        update: {},
+        select: { id: true }
+    });
+    return { id: entry.id, name: driveFileName(path) };
+}
+
+/**
+ * The Drive files behind these ids that the reader may still read, in the
+ * order asked. A file they lost access to is left out, not named.
+ */
+export async function crmDriveFiles(
+    actor: OrgActor,
+    ids: readonly string[]
+): Promise<CrmDriveFile[]> {
+    if (ids.length === 0) return [];
+    const rows: { id: string; connectionId: string; path: string }[] =
+        await prisma.driveItemMeta.findMany({
+            where: { id: { in: [...ids] } },
+            select: { id: true, connectionId: true, path: true }
+        });
+    const readable = await Promise.all(
+        rows.map(async (row) =>
+            (await mayReadDrive(actor.id, row.connectionId, row.path)) ? row : null
+        )
+    );
+    const byId = new Map(readable.flatMap((row) => (row ? [[row.id, row] as const] : [])));
+    return ids.flatMap((id) => {
+        const row = byId.get(id);
+        if (!row) return [];
+        return [
+            {
+                id,
+                name: driveFileName(row.path),
+                href: `/drive/open?c=${encodeURIComponent(row.connectionId)}&p=${encodeURIComponent(row.path)}`
+            }
+        ];
+    });
 }

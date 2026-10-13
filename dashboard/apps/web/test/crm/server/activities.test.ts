@@ -12,6 +12,8 @@ const NOTE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TASK = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const LIST = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const RECORD = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+const FILE = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+const CONNECTION = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 
 const db = vi.hoisted(() => ({
     records: { count: vi.fn(async () => 1) },
@@ -50,7 +52,11 @@ const crmHost = vi.hoisted(() => ({
         }))
     ),
     createTask: vi.fn(async (): Promise<unknown> => ({ id: TASK, reference: "T-1" })),
-    setTaskDone: vi.fn(async () => ({}))
+    setTaskDone: vi.fn(async () => ({})),
+    crmDriveFileRef: vi.fn(async (): Promise<unknown> => ({ id: FILE, name: "deck.pdf" })),
+    crmDriveFiles: vi.fn(async (_actor: unknown, ids: string[]) =>
+        ids.map((id) => ({ id, name: "deck.pdf", href: `/drive/open?c=x&p=deck.pdf` }))
+    )
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -205,5 +211,52 @@ describe("a new task's input", () => {
         expect(newTaskSchema.safeParse({ ...base, due: "tomorrow" }).success).toBe(false);
         expect(newTaskSchema.safeParse({ ...base, name: "   " }).success).toBe(false);
         expect(dueAt(null)).toBeNull();
+    });
+});
+
+describe("Drive files on a record", () => {
+    it("lists the linked files the reader may still open", async () => {
+        db.crmLink.findMany
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([{ targetId: FILE }]);
+        const opened = await activities.openActivities(actorWith(allowed), "companies", RECORD);
+        expect(crmHost.crmDriveFiles).toHaveBeenCalledWith(caller, [FILE]);
+        expect(opened.files).toEqual([
+            { id: FILE, name: "deck.pdf", href: "/drive/open?c=x&p=deck.pdf" }
+        ]);
+    });
+
+    it("links a picked file where it is, and refuses one the reader cannot open", async () => {
+        const file = await activities.attachRecordFile(actorWith(allowed), "companies", RECORD, {
+            connectionId: CONNECTION,
+            path: "decks/deck.pdf"
+        });
+        expect(file.id).toBe(FILE);
+        expect(crmHost.crmDriveFileRef).toHaveBeenCalledWith(caller, CONNECTION, "decks/deck.pdf");
+        expect(db.crmLink.createMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ kind: "file", targetId: FILE, recordId: RECORD })],
+            skipDuplicates: true
+        });
+
+        vi.clearAllMocks();
+        crmHost.crmDriveFileRef.mockResolvedValueOnce({ refused: true });
+        await expect(
+            activities.attachRecordFile(actorWith(allowed), "companies", RECORD, {
+                connectionId: CONNECTION,
+                path: "secret.pdf"
+            })
+        ).rejects.toThrow();
+        expect(db.crmLink.createMany).not.toHaveBeenCalled();
+    });
+
+    it("lets nobody who may not edit attach a file", async () => {
+        await expect(
+            activities.attachRecordFile(actorWith(reader), "companies", RECORD, {
+                connectionId: CONNECTION,
+                path: "deck.pdf"
+            })
+        ).rejects.toThrow();
+        expect(crmHost.crmDriveFileRef).not.toHaveBeenCalled();
     });
 });

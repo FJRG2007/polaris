@@ -305,6 +305,8 @@ export const serverHost = {
     // may own a record.
     crmHost: {
         crmCreateNote: later(load.crmHost, "crmCreateNote"),
+        crmDriveFileRef: later(load.crmHost, "crmDriveFileRef"),
+        crmDriveFiles: later(load.crmHost, "crmDriveFiles"),
         crmNoteShelves: later(load.crmHost, "crmNoteShelves"),
         crmNotesByIds: later(load.crmHost, "crmNotesByIds"),
         crmOrgPeople: later(load.crmHost, "crmOrgPeople"),

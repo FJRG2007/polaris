@@ -14,8 +14,10 @@ import { CRM_OBJECTS } from "../model/objects";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import {
     LINK_KINDS,
+    driveFileSchema,
     newNoteSchema,
     newTaskSchema,
+    type LinkedFile,
     type LinkedNote,
     type LinkedTask,
     type RecordActivities
@@ -66,6 +68,22 @@ export async function createRecordTaskAction(
             parsed.data.object,
             parsed.data.id,
             parsed.data.task
+        )
+    }));
+}
+
+/** Link a file already in Drive to a record. */
+export async function attachRecordFileAction(
+    input: unknown
+): Promise<Outcome<{ file: LinkedFile }>> {
+    const parsed = record.extend({ file: driveFileSchema }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        file: await activities.attachRecordFile(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.id,
+            parsed.data.file
         )
     }));
 }

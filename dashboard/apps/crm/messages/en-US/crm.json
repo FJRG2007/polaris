@@ -428,7 +428,11 @@
         "done": "Mark {name} done",
         "unlink": "Remove from this record",
         "notesOff": "Your account cannot write notes.",
-        "tasksOff": "Your account cannot create tasks."
+        "tasksOff": "Your account cannot create tasks.",
+        "files": "Files",
+        "noFiles": "No files yet",
+        "attachFile": "Attach from Drive",
+        "fileRefused": "That file cannot be attached. Pick a file you can open in Drive."
     },
     "import": {
         "button": "Import",

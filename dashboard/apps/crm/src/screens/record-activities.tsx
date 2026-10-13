@@ -1,16 +1,16 @@
 "use client";
 
 /**
- * A record's notes and tasks, kept in Polaris's Notes and Tasks and linked
- * here. Each opens in its own app; a note or task written here is an ordinary
- * one there. The lists paint from the last answer kept for this record and
+ * A record's notes, tasks and files, kept in Polaris's Notes, Tasks and Drive
+ * and linked here. Each opens in its own app; a note or task written here is an
+ * ordinary one there, and a file stays where it is in Drive. The lists paint from the last answer kept for this record and
  * refresh behind it; a change shows at once and goes back if it is refused.
  */
 
 import Link from "next/link";
 import { useCrmT } from "./i18n";
 import { messageOf, unwrap } from "./call";
-import { Plus, Unlink } from "lucide-react";
+import { File as FileIcon, Plus, Unlink } from "lucide-react";
 import * as actions from "../actions/activities";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
@@ -23,6 +23,7 @@ import {
     NOTE_TITLE_MAX,
     TASK_NAME_MAX,
     type LinkKind,
+    type LinkedFile,
     type LinkedNote,
     type LinkedTask,
     type RecordActivities as Activities
@@ -75,7 +76,8 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
             {
                 ...data,
                 notes: data.notes?.filter((note) => note.id !== targetId) ?? null,
-                tasks: data.tasks?.filter((task) => task.id !== targetId) ?? null
+                tasks: data.tasks?.filter((task) => task.id !== targetId) ?? null,
+                files: (data.files ?? []).filter((file) => file.id !== targetId)
             },
             () =>
                 unwrap(
@@ -110,6 +112,32 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
 
     const added = (patch: Partial<Activities>) => {
         if (data) live.replace({ ...data, ...patch });
+    };
+
+    const [picking, setPicking] = useState(false);
+    const attach = async (
+        picked: readonly { kind: string; connectionId?: string; path?: string }[]
+    ) => {
+        setPicking(false);
+        const made: LinkedFile[] = [];
+        for (const one of picked) {
+            if (one.kind !== "drive" || !one.connectionId || !one.path) continue;
+            try {
+                const answer = await unwrap(
+                    () =>
+                        actions.attachRecordFileAction({
+                            object,
+                            id,
+                            file: { connectionId: one.connectionId, path: one.path }
+                        }),
+                    t("errors.generic")
+                );
+                made.push(answer.file);
+            } catch (caught) {
+                toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
+            }
+        }
+        if (made.length > 0) live.refresh();
     };
 
     return (
@@ -179,7 +207,61 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
                     )}
                 </Section>
             )}
+            <Section
+                title={t("activities.files")}
+                count={data ? (data.files ?? []).length : null}
+                adding={
+                    canEdit && data ? (
+                        <AddToggle
+                            label={t("activities.attachFile")}
+                            onClick={() => setPicking(true)}
+                        />
+                    ) : null
+                }
+            >
+                {!data ? (
+                    <Block className="mx-3 my-3 h-3 w-40" />
+                ) : (data.files ?? []).length === 0 ? (
+                    <Empty text={t("activities.noFiles")} />
+                ) : (
+                    <ul className="flex flex-col gap-1 p-2">
+                        {(data.files ?? []).map((file) => (
+                            <FileRow
+                                key={file.id}
+                                file={file}
+                                onUnlink={canEdit ? () => unlink("file", file.id) : null}
+                            />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+            {picking ? (
+                <hostUi.filePicker.FilePickerDialog
+                    storageOnly
+                    title={t("activities.attachFile")}
+                    onPick={(
+                        picked: readonly { kind: string; connectionId?: string; path?: string }[]
+                    ) => void attach(picked)}
+                    onClose={() => setPicking(false)}
+                />
+            ) : null}
         </>
+    );
+}
+
+function FileRow({ file, onUnlink }: { file: LinkedFile; onUnlink: (() => void) | null }) {
+    return (
+        <li className="flex min-w-0 items-center gap-2 px-1">
+            <FileIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+            <a
+                href={file.href}
+                className="min-w-0 flex-1 truncate rounded py-0.5 text-[0.8125rem] hover:underline"
+                title={file.name}
+            >
+                {file.name}
+            </a>
+            {onUnlink ? <UnlinkButton onClick={onUnlink} /> : null}
+        </li>
     );
 }
 

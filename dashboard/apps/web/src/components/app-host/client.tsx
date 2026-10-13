@@ -48,6 +48,14 @@ import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache
 import { mergeUnchanged } from "@/lib/structural-merge";
 import { useKeptSnapshot, useLiveRead } from "@/components/use-live-resource";
 
+const FilePickerDialog = dynamic(
+    () =>
+        import("@/components/file-picker/file-picker-dialog").then(
+            (module) => module.FilePickerDialog
+        ),
+    { ssr: false }
+);
+
 const ShareDialog = dynamic(
     () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
     { ssr: false }
@@ -138,6 +146,7 @@ export const clientHost = {
     confirmDialog: { useConfirm },
     copyButton: { CopyButton },
     displayFormat: { useDisplayFormat },
+    filePicker: { FilePickerDialog },
     gameLogo: { GameLogo },
     i18nProvider: { useLocale },
     logViewer: { LogViewer },

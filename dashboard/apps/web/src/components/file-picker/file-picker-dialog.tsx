@@ -77,7 +77,8 @@ export function FilePickerDialog({
     onClose,
     accept,
     multiple = true,
-    title
+    title,
+    storageOnly = false
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
@@ -87,6 +88,9 @@ export function FilePickerDialog({
     accept?: string;
     multiple?: boolean;
     title?: string;
+    /** Offer only files already on a storage, for a screen that points at a
+     *  file where it is and so has nowhere to put an upload. */
+    storageOnly?: boolean;
 }) {
     const t = useTranslations("components");
     const heading = title ?? t("files.title");
@@ -238,7 +242,9 @@ export function FilePickerDialog({
 
                     <div className="flex min-h-0 flex-1 gap-3">
                         <nav className="w-40 shrink-0 space-y-0.5" aria-label={t("files.where")}>
-                            {TABS.map((entry) => (
+                            {TABS.filter(
+                                (entry) => !storageOnly || (entry.id !== "upload" && entry.id !== "url")
+                            ).map((entry) => (
                                 <button
                                     key={entry.id}
                                     type="button"

@@ -428,7 +428,11 @@
         "done": "Marcar {name} como hecha",
         "unlink": "Quitar de este registro",
         "notesOff": "Tu cuenta no puede escribir notas.",
-        "tasksOff": "Tu cuenta no puede crear tareas."
+        "tasksOff": "Tu cuenta no puede crear tareas.",
+        "files": "Archivos",
+        "noFiles": "Sin archivos",
+        "attachFile": "Adjuntar de Drive",
+        "fileRefused": "Ese archivo no se puede adjuntar. Elige uno que puedas abrir en Drive."
     },
     "import": {
         "button": "Importar",
