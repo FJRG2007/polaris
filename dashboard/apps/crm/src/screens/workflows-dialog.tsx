@@ -71,6 +71,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     const [draft, setDraft] = useState<Draft | null>(null);
     const [saving, setSaving] = useState(false);
     const [notice, setNotice] = useState<{ text: string; copy: string } | null>(null);
+    const [options, setOptions] = useState<model.WorkflowOptions>({ taskLists: [], people: [] });
 
     const load = useCallback(() => {
         unwrap(() => actions.listWorkflowsAction({ object }), t("errors.loadFailed"))
@@ -80,6 +81,19 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                 toast.show({ title: t("errors.loadFailed"), body: messageOf(caught) });
             });
     }, [object, t, toast]);
+
+    // Without these the editor offers no task or notification action; nothing
+    // else waits on them, so a failure only leaves those two out.
+    useEffect(() => {
+        if (!open) return;
+        let live = true;
+        unwrap(() => actions.workflowOptionsAction({ object }), "")
+            .then(({ taskLists, people }) => live && setOptions({ taskLists, people }))
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [open, object]);
 
     useEffect(() => {
         if (open) load();
@@ -144,7 +158,9 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
 
     let body: React.ReactNode;
     if (draft) {
-        const kinds = model.ACTION_KINDS.filter((kind) => words.actionFits(kind, draft.trigger));
+        const kinds = model.ACTION_KINDS.filter(
+            (kind) => words.actionFits(kind, draft.trigger) && words.actionOffered(kind, options)
+        );
         body = (
             <div className="flex min-w-0 flex-col gap-4">
                 <label className="flex flex-col gap-1.5 text-[0.8125rem] font-medium">
@@ -233,6 +249,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                                         object={object}
                                         trigger={draft.trigger}
                                         action={action}
+                                        options={options}
                                         onChange={(next) =>
                                             setDraft({
                                                 ...draft,
@@ -261,7 +278,10 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                                         onSelect={() =>
                                             setDraft({
                                                 ...draft,
-                                                actions: [...draft.actions, words.newAction(kind)]
+                                                actions: [
+                                                    ...draft.actions,
+                                                    words.newAction(kind, options)
+                                                ]
                                             })
                                         }
                                     >

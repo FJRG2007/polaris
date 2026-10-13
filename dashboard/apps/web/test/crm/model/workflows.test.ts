@@ -248,3 +248,51 @@ describe("an outside call", () => {
         expect(actionFits("updateRecord", "webhook")).toBe(false);
     });
 });
+
+describe("a task or a notification", () => {
+    const base = { name: "x", trigger: { kind: "created" }, enabled: true };
+    const LIST = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+    it("takes a task in a list with a name, due in some days or never", () => {
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [{ kind: "createTask", listId: LIST, name: "Call {{name}}", dueInDays: 2 }]
+            }).success
+        ).toBe(true);
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [{ kind: "createTask", listId: LIST, name: " ", dueInDays: null }]
+            }).success
+        ).toBe(false);
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [{ kind: "createTask", listId: LIST, name: "x", dueInDays: -1 }]
+            }).success
+        ).toBe(false);
+    });
+
+    it("takes a notification to somebody, or to whoever a field names", () => {
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [
+                    {
+                        kind: "notify",
+                        to: ["u1", "field:accountOwner"],
+                        title: "New: {{name}}",
+                        body: ""
+                    }
+                ]
+            }).success
+        ).toBe(true);
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                actions: [{ kind: "notify", to: [], title: "x", body: "" }]
+            }).success
+        ).toBe(false);
+    });
+});

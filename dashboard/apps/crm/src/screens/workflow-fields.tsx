@@ -10,7 +10,7 @@ import { useCrmT } from "./i18n";
 import { hostUi } from "@polaris/app-host/client";
 import { Plus, X } from "lucide-react";
 import * as model from "../model/workflows";
-import { Button, Input, Select } from "@polaris/ui";
+import { Button, Checkbox, Input, Select, Textarea } from "@polaris/ui";
 import { fieldLabel, optionLabel, useCustomFields } from "./custom-fields";
 import {
     CRM_OBJECTS,
@@ -143,13 +143,79 @@ export interface ActionFieldsProps {
     readonly object: CrmObject;
     readonly trigger: model.WorkflowTrigger;
     readonly action: model.WorkflowAction;
+    readonly options: model.WorkflowOptions;
     readonly onChange: (action: model.WorkflowAction) => void;
 }
 
+/** The days ahead a task may be set to fall due, offered in the editor. */
+const DUE_CHOICES = [0, 1, 2, 3, 5, 7, 14, 30, 60, 90];
+const NO_DUE = "none";
+
 /** The settings of one action. */
-export function ActionFields({ object, action, onChange }: ActionFieldsProps) {
+export function ActionFields({ object, trigger, action, options, onChange }: ActionFieldsProps) {
     const t = useCrmT();
     switch (action.kind) {
+        case "createTask": {
+            const days = DUE_CHOICES.includes(action.dueInDays ?? -1)
+                ? DUE_CHOICES
+                : [...DUE_CHOICES, action.dueInDays ?? 0].sort((a, b) => a - b);
+            return (
+                <div className="flex min-w-0 flex-col gap-2">
+                    <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row">
+                        <div className="min-w-0 sm:flex-1">
+                            <Select
+                                aria-label={t("workflows.taskList")}
+                                value={action.listId}
+                                onValueChange={(listId) => onChange({ ...action, listId })}
+                                options={options.taskLists.map((list) => ({
+                                    value: list.id,
+                                    label: `${list.name} - ${list.spaceName}`
+                                }))}
+                            />
+                        </div>
+                        <div className="min-w-0 sm:w-44">
+                            <Select
+                                aria-label={t("workflows.dueIn")}
+                                value={
+                                    action.dueInDays === null ? NO_DUE : String(action.dueInDays)
+                                }
+                                onValueChange={(next) =>
+                                    onChange({
+                                        ...action,
+                                        dueInDays: next === NO_DUE ? null : Number(next)
+                                    })
+                                }
+                                options={[
+                                    { value: NO_DUE, label: t("workflows.noDue") },
+                                    ...days.map((count) => ({
+                                        value: String(count),
+                                        label: t("workflows.dueDays", { count })
+                                    }))
+                                ]}
+                            />
+                        </div>
+                    </div>
+                    <Input
+                        aria-label={t("workflows.taskName")}
+                        placeholder={t("workflows.taskName")}
+                        value={action.name}
+                        maxLength={model.ACTION_TEXT_MAX}
+                        onChange={(event) => onChange({ ...action, name: event.target.value })}
+                    />
+                    <TemplateHint object={object} />
+                </div>
+            );
+        }
+        case "notify":
+            return (
+                <NotifyFields
+                    object={object}
+                    trigger={trigger}
+                    action={action}
+                    options={options}
+                    onChange={onChange}
+                />
+            );
         case "updateRecord":
             return (
                 <ValuesEditor
@@ -186,6 +252,94 @@ export function ActionFields({ object, action, onChange }: ActionFieldsProps) {
                 </div>
             );
     }
+}
+
+/** Where `{{field}}` fills in a value of the record. */
+function TemplateHint({ object }: { object: CrmObject }) {
+    const t = useCrmT();
+    return (
+        <p className="text-[0.75rem] text-muted-foreground">
+            {t("workflows.valueHint", { example: `{{${primaryField(object).key}}}` })}
+        </p>
+    );
+}
+
+/** Who a notification goes to, and what it says. */
+function NotifyFields({
+    object,
+    trigger,
+    action,
+    options,
+    onChange
+}: {
+    object: CrmObject;
+    trigger: model.WorkflowTrigger;
+    action: Extract<model.WorkflowAction, { kind: "notify" }>;
+    options: model.WorkflowOptions;
+    onChange: (action: model.WorkflowAction) => void;
+}) {
+    const t = useCrmT();
+    const custom = useCustomFields();
+    const members = model.LIVE_RECORD_TRIGGERS.includes(trigger.kind)
+        ? fieldsOf(object, custom).filter((field) => field.kind === "member")
+        : [];
+    const choices = [
+        ...members.map((field) => ({
+            value: `${model.FIELD_RECIPIENT}${field.key}`,
+            label: t("workflows.fieldRecipient", { field: fieldLabel(t, object, field) })
+        })),
+        ...options.people.map((person) => ({ value: person.id, label: person.name }))
+    ];
+    const toggle = (value: string, on: boolean) =>
+        onChange({
+            ...action,
+            to: on ? [...action.to, value] : action.to.filter((one) => one !== value)
+        });
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            <fieldset className="flex min-w-0 flex-col gap-1">
+                <legend className="mb-1 text-[0.75rem] font-medium text-muted-foreground">
+                    {t("workflows.recipients")}
+                </legend>
+                <div className="flex max-h-40 min-w-0 flex-col gap-1 overflow-y-auto">
+                    {choices.map((choice) => (
+                        <label
+                            key={choice.value}
+                            className="flex min-w-0 items-center gap-2 text-[0.8125rem]"
+                        >
+                            <Checkbox
+                                checked={action.to.includes(choice.value)}
+                                disabled={
+                                    !action.to.includes(choice.value) &&
+                                    action.to.length >= model.MAX_RECIPIENTS
+                                }
+                                onChange={(event) => toggle(choice.value, event.target.checked)}
+                            />
+                            <span className="min-w-0 truncate" title={choice.label}>
+                                {choice.label}
+                            </span>
+                        </label>
+                    ))}
+                </div>
+            </fieldset>
+            <Input
+                aria-label={t("workflows.notifyTitle")}
+                placeholder={t("workflows.notifyTitle")}
+                value={action.title}
+                maxLength={model.NOTIFY_TITLE_MAX}
+                onChange={(event) => onChange({ ...action, title: event.target.value })}
+            />
+            <Textarea
+                aria-label={t("workflows.notifyBody")}
+                placeholder={t("workflows.notifyBody")}
+                rows={2}
+                value={action.body}
+                maxLength={model.ACTION_TEXT_MAX}
+                onChange={(event) => onChange({ ...action, body: event.target.value })}
+            />
+            <TemplateHint object={object} />
+        </div>
+    );
 }
 
 /** Field values to write: a field and the text to put in it, per line. */
@@ -265,9 +419,7 @@ function ValuesEditor({
                     </div>
                 </div>
             ))}
-            <p className="text-[0.75rem] text-muted-foreground">
-                {t("workflows.valueHint", { example: `{{${primaryField(object).key}}}` })}
-            </p>
+            <TemplateHint object={target === object ? object : target} />
             {free.length > 0 && keys.length < model.MAX_ACTION_VALUES ? (
                 <Button
                     variant="ghost"
@@ -301,7 +453,14 @@ export function useWorkflowWords(object: CrmObject) {
             }
             return { kind } as model.WorkflowTrigger;
         },
-        newAction(kind: model.ActionKind): model.WorkflowAction {
+        /** Whether the editor can offer an action at all, given what the
+         *  reader may use. */
+        actionOffered(kind: model.ActionKind, options: model.WorkflowOptions): boolean {
+            if (kind === "createTask") return options.taskLists.length > 0;
+            if (kind === "notify") return options.people.length > 0;
+            return true;
+        },
+        newAction(kind: model.ActionKind, options: model.WorkflowOptions): model.WorkflowAction {
             switch (kind) {
                 case "updateRecord": {
                     const first = fieldsOf(object).find(
@@ -311,6 +470,20 @@ export function useWorkflowWords(object: CrmObject) {
                 }
                 case "createRecord":
                     return { kind, object, values: { [primaryField(object).key]: "" } };
+                case "createTask":
+                    return {
+                        kind,
+                        listId: options.taskLists[0]?.id ?? "",
+                        name: `{{${primaryField(object).key}}}`,
+                        dueInDays: 1
+                    };
+                case "notify":
+                    return {
+                        kind,
+                        to: [],
+                        title: `{{${primaryField(object).key}}}`,
+                        body: ""
+                    };
             }
         },
         /** Whether an action can run under a trigger. */

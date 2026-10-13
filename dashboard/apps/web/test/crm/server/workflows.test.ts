@@ -25,6 +25,7 @@ const db = vi.hoisted(() => ({
         updateMany: vi.fn(async () => ({ count: 1 })),
         deleteMany: vi.fn(async () => ({ count: 1 }))
     },
+    crmLink: { createMany: vi.fn(async () => ({ count: 1 })) },
     records: {
         count: vi.fn(async () => 1),
         findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
@@ -56,8 +57,23 @@ const crmHost = vi.hoisted(() => ({
             sessionId: ""
         })
     ),
-    crmOrgPermissions: vi.fn(async (): Promise<string[] | null> => ["*"])
+    crmOrgPermissions: vi.fn(async (): Promise<string[] | null> => ["*"]),
+    crmOrgPeople: vi.fn(async () => [
+        { id: "u1", name: "Test User", contact: "" },
+        { id: "u3", name: "Other User", contact: "" }
+    ]),
+    taskListsFor: vi.fn(async () => [
+        { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Sales", spaceName: "Team" }
+    ]),
+    createTask: vi.fn(
+        async (): Promise<unknown> => ({
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            reference: "T-1"
+        })
+    )
 }));
+
+const notifications = vi.hoisted(() => ({ createNotification: vi.fn(async () => undefined) }));
 
 const limits = vi.hoisted(() => ({ ok: true }));
 
@@ -67,7 +83,8 @@ vi.mock("@polaris/db", () => {
         crmCompany: db.records,
         crmPerson: db.records,
         crmOpportunity: db.records,
-        crmEvent: { createMany: vi.fn(async () => ({ count: 1 })) }
+        crmEvent: { createMany: vi.fn(async () => ({ count: 1 })) },
+        crmLink: db.crmLink
     };
     client.$transaction = async (run: (tx: unknown) => unknown) => run(client);
     return { prisma: client, Prisma: { Decimal: class {} } };
@@ -77,7 +94,8 @@ vi.mock("@polaris/app-host", () => ({
         crmHost,
         i18nRequest: { getLocale: async () => "en-US" },
         rateLimitService: { rateLimit: async () => ({ ok: limits.ok }) },
-        requestContext: { clientIp: async () => "203.0.113.9" }
+        requestContext: { clientIp: async () => "203.0.113.9" },
+        notificationService: notifications
     }
 }));
 vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }));
@@ -540,5 +558,124 @@ describe("an outside call", () => {
         limits.ok = false;
         expect((await call(secret, "{}")).status).toBe(429);
         expect(db.crmWorkflow.update).not.toHaveBeenCalled();
+    });
+});
+
+describe("a task or a notification", () => {
+    const LIST = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const TASK = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const runOn = async (actions: unknown[]) => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored({ kind: "created" }, { actions: JSON.stringify(actions) })
+        ]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            { recordId: RECORD, kind: "created", changes: [] }
+        ]);
+        const [[done]] = db.crmWorkflow.update.mock.calls as unknown as [
+            [{ data: { lastError: string | null } }]
+        ];
+        return done.data.lastError;
+    };
+
+    beforeEach(() => {
+        db.records.findFirst.mockResolvedValue({
+            id: RECORD,
+            name: "Acme",
+            accountOwnerId: "u3",
+            accountOwner: { id: "u3", name: "Other User" },
+            position: 0,
+            deletedAt: null,
+            ...stamp
+        });
+    });
+
+    it("makes a task in Tasks as the runner, due in the days set, linked to the record", async () => {
+        vi.useFakeTimers({ now: new Date("2026-10-13T10:00:00Z"), toFake: ["Date"] });
+        expect(
+            await runOn([{ kind: "createTask", listId: LIST, name: "Call {{name}}", dueInDays: 2 }])
+        ).toBeNull();
+        vi.useRealTimers();
+        expect(crmHost.createTask).toHaveBeenCalledWith(
+            { id: "u2", isAdmin: false },
+            {
+                listId: LIST,
+                name: "Call Acme",
+                due: { at: "2026-10-15T00:00:00.000Z", timed: false }
+            }
+        );
+        expect(db.crmLink.createMany).toHaveBeenCalledWith({
+            data: [expect.objectContaining({ kind: "task", targetId: TASK, recordId: RECORD })],
+            skipDuplicates: true
+        });
+    });
+
+    it("says why when Tasks refuses", async () => {
+        crmHost.createTask.mockResolvedValueOnce({ refused: "That list is gone." });
+        expect(
+            await runOn([{ kind: "createTask", listId: LIST, name: "x", dueInDays: null }])
+        ).toBe("That list is gone.");
+    });
+
+    it("notifies the people named and whoever the field names, once each, only on the shelf", async () => {
+        expect(
+            await runOn([
+                {
+                    kind: "notify",
+                    to: ["u1", "field:accountOwner", "u3", "gone"],
+                    title: "New company {{name}}",
+                    body: "Owner {{accountOwner}}"
+                }
+            ])
+        ).toBeNull();
+        const sent = notifications.createNotification.mock.calls.map(
+            (call) =>
+                (
+                    call as unknown as [
+                        { userId: string; title: string; body: string; href: string }
+                    ]
+                )[0]
+        );
+        expect(sent.map((one) => one.userId).sort()).toEqual(["u1", "u3"]);
+        expect(sent[0]).toMatchObject({
+            title: "New company Acme",
+            body: "Owner Other User",
+            href: `/crm/companies/${RECORD}`,
+            shelf: "o1"
+        });
+    });
+
+    it("refuses to save a list the runner cannot use, or somebody not on the shelf", async () => {
+        const save = (action: unknown) =>
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "created" },
+                actions: [action as never],
+                enabled: true
+            });
+        await expect(
+            save({
+                kind: "createTask",
+                listId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                name: "x",
+                dueInDays: null
+            })
+        ).rejects.toThrow();
+        await expect(
+            save({ kind: "notify", to: ["stranger"], title: "x", body: "" })
+        ).rejects.toThrow();
+        await expect(
+            save({ kind: "notify", to: ["field:city"], title: "x", body: "" })
+        ).rejects.toThrow();
+        expect(db.crmWorkflow.create).not.toHaveBeenCalled();
+    });
+
+    it("offers the editor the lists it may add tasks to and the people on the shelf", async () => {
+        expect(await workflows.workflowOptions(actorWith(allowed))).toEqual({
+            taskLists: [{ id: LIST, name: "Sales", spaceName: "Team" }],
+            people: [
+                { id: "u1", name: "Test User" },
+                { id: "u3", name: "Other User" }
+            ]
+        });
     });
 });

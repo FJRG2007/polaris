@@ -32,7 +32,15 @@ vi.mock("@polaris-app/crm/src/actions/workflows", () => ({
             ? { ok: false, error: "Your role cannot change companies here." }
             : { ok: true, enabled: input.enabled };
     },
-    deleteWorkflowAction: vi.fn()
+    deleteWorkflowAction: vi.fn(),
+    workflowOptionsAction: async () => ({
+        ok: true,
+        taskLists: [],
+        people: [
+            { id: "u1", name: "Test User" },
+            { id: "u3", name: "Other User" }
+        ]
+    })
 }));
 
 import { WorkflowsDialog } from "@polaris-app/crm/src/screens/workflows-dialog";
@@ -112,6 +120,37 @@ describe("the workflows dialog", () => {
                         name: "Greet",
                         trigger: { kind: "created" },
                         actions: [],
+                        enabled: true
+                    }
+                }
+            ])
+        );
+    });
+
+    it("sends a notification to the people ticked, and offers no task without a list", async () => {
+        open();
+        await screen.findByText("Welcome");
+        fireEvent.click(screen.getByRole("button", { name: "New workflow" }));
+        fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Tell" } });
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Add action" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        expect(await screen.findByRole("menuitem", { name: "Send a notification" })).toBeTruthy();
+        expect(screen.queryByRole("menuitem", { name: "Create a task" })).toBeNull();
+        fireEvent.click(screen.getByRole("menuitem", { name: "Send a notification" }));
+        fireEvent.click(await screen.findByLabelText("Other User"));
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        });
+        await waitFor(() =>
+            expect(state.saved).toEqual([
+                {
+                    object: "companies",
+                    workflow: {
+                        name: "Tell",
+                        trigger: { kind: "created" },
+                        actions: [{ kind: "notify", to: ["u3"], title: "{{name}}", body: "" }],
                         enabled: true
                     }
                 }

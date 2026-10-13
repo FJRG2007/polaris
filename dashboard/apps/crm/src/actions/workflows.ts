@@ -11,7 +11,12 @@ import * as workflows from "../lib/workflows";
 import { CRM_OBJECTS } from "../model/objects";
 import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
-import { workflowInputSchema, type SavedWorkflow, type WorkflowView } from "../model/workflows";
+import {
+    workflowInputSchema,
+    type SavedWorkflow,
+    type WorkflowOptions,
+    type WorkflowView
+} from "../model/workflows";
 
 const object = z.enum(CRM_OBJECTS);
 const one = z.object({ object, id: z.string().uuid() });
@@ -25,6 +30,13 @@ export async function listWorkflowsAction(
     return outcome(async () => ({
         workflows: await workflows.listWorkflows(await requireCrmActor(), parsed.data.object)
     }));
+}
+
+/** The task lists and people the editor offers. */
+export async function workflowOptionsAction(input: unknown): Promise<Outcome<WorkflowOptions>> {
+    const parsed = z.object({ object }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => workflows.workflowOptions(await requireCrmActor()));
 }
 
 /** Make a workflow, or change one. */

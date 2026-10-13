@@ -74,6 +74,22 @@ export const TRIGGER_KINDS: readonly TriggerKind[] = [
 /** The most fields one action writes. */
 export const MAX_ACTION_VALUES = 40;
 
+/** What the editor offers a task or notification action: the lists the
+ *  editor may add tasks to and the people on the shelf. */
+export interface WorkflowOptions {
+    readonly taskLists: { id: string; name: string; spaceName: string }[];
+    readonly people: { id: string; name: string }[];
+}
+
+/** How far ahead a workflow's task may fall due, in days. */
+export const MAX_DUE_DAYS = 365;
+
+/** The most people one notification goes to. */
+export const MAX_RECIPIENTS = 50;
+
+/** The longest title a notification may have. */
+export const NOTIFY_TITLE_MAX = 200;
+
 /** Field values to write, each the text a cell would hold. `{{field}}` in one
  *  is the value of that field on the record the workflow is about. */
 const valuesSchema = z
@@ -90,16 +106,40 @@ export const workflowActionSchema = z.discriminatedUnion("kind", [
         kind: z.literal("createRecord"),
         object: z.enum(CRM_OBJECTS),
         values: valuesSchema
+    }),
+    /** A task in a list of Polaris's Tasks, linked to the record when there is
+     *  one; due that many days after the run, or never. */
+    z.object({
+        kind: z.literal("createTask"),
+        listId: z.string().uuid(),
+        name: z.string().trim().min(1).max(ACTION_TEXT_MAX),
+        dueInDays: z.number().int().min(0).max(MAX_DUE_DAYS).nullable()
+    }),
+    /** A notification to people on the shelf: by id, or `field:<key>` for
+     *  whoever an owner field of the record names. */
+    z.object({
+        kind: z.literal("notify"),
+        to: z.array(z.string().min(1).max(80)).min(1).max(MAX_RECIPIENTS),
+        title: z.string().trim().min(1).max(NOTIFY_TITLE_MAX),
+        body: z.string().max(ACTION_TEXT_MAX)
     })
 ]);
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
 export type ActionKind = WorkflowAction["kind"];
 
 /** The actions in the order the screen offers them. */
-export const ACTION_KINDS: readonly ActionKind[] = ["updateRecord", "createRecord"];
+export const ACTION_KINDS: readonly ActionKind[] = [
+    "updateRecord",
+    "createRecord",
+    "createTask",
+    "notify"
+];
+
+/** A recipient that is whoever an owner field of the record names. */
+export const FIELD_RECIPIENT = "field:";
 
 /** The triggers that are about one record still out of the trash. */
-const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = [
+export const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = [
     "created",
     "updated",
     "fieldChanged",

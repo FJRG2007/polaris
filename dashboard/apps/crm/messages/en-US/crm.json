@@ -501,7 +501,9 @@
         },
         "actionKinds": {
             "updateRecord": "Update the record",
-            "createRecord": "Create a record"
+            "createRecord": "Create a record",
+            "createTask": "Create a task",
+            "notify": "Send a notification"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -527,6 +529,17 @@
         "timeZone": "Time zone: {zone}",
         "webhookHint": "Saving gives it a secret address. POST JSON to it, and use {example} in the actions for a value from the call.",
         "hookAddress": "Send {name} a POST with a JSON body at this address. Copy it now: it is not shown again.",
-        "newAddress": "Give it a new address (the old one stops working)"
+        "newAddress": "Give it a new address (the old one stops working)",
+        "noList": "Pick a task list you can add tasks to.",
+        "notOnShelf": "Pick people who are on this shelf, or an owner field.",
+        "taskList": "List",
+        "taskName": "Task",
+        "dueIn": "Due",
+        "noDue": "No due date",
+        "dueDays": "{count, plural, =0 {The same day} one {# day later} other {# days later}}",
+        "recipients": "To",
+        "fieldRecipient": "The {field}",
+        "notifyTitle": "Title",
+        "notifyBody": "Message"
     }
 }

@@ -19,6 +19,9 @@ import { writable } from "./columns";
 import { loadFields } from "./fields";
 import * as records from "./records";
 import { importRecords, readRows } from "./import";
+import { addLink } from "./links";
+import { dueAt } from "../model/links";
+import { recordHref } from "../model/related";
 import type { RowProblem } from "../model/import";
 import { fieldsOf, primaryField, type CrmObject, type CrmRecord } from "../model/objects";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -131,6 +134,26 @@ async function checkActions(
                 throw new CrmRefusal(t("workflows.createNeedsName"));
             }
         }
+        if (action.kind === "createTask") {
+            const lists = (await host.crmHost.taskListsFor(who(actor))) ?? [];
+            if (!lists.some((list: { id: string }) => list.id === action.listId)) {
+                throw new CrmRefusal(t("workflows.noList"));
+            }
+        }
+        if (action.kind === "notify") {
+            const people = new Set((await records.shelfPeople(actor)).map((person) => person.id));
+            const custom = await loadFields(actor.shelf, object);
+            for (const to of action.to) {
+                const ok = to.startsWith(model.FIELD_RECIPIENT)
+                    ? fieldsOf(object, custom).some(
+                          (field) =>
+                              field.kind === "member" &&
+                              field.key === to.slice(model.FIELD_RECIPIENT.length)
+                      )
+                    : people.has(to);
+                if (!ok) throw new CrmRefusal(t("workflows.notOnShelf"));
+            }
+        }
     }
 }
 
@@ -240,6 +263,25 @@ async function runnerOf(workflow: StoredWorkflow): Promise<CrmActor | null> {
     return actorOn(user, workflow.orgId, null);
 }
 
+/** Somebody, as the hosts that do not need their whole session take them. */
+const who = (actor: CrmActor) => ({ id: actor.user.id, isAdmin: actor.user.isAdmin });
+
+/** The task lists and people a workflow's actions may name. */
+export async function workflowOptions(actor: CrmActor): Promise<model.WorkflowOptions> {
+    const [lists, people] = await Promise.all([
+        host.crmHost.taskListsFor(who(actor)),
+        records.shelfPeople(actor)
+    ]);
+    return {
+        taskLists: (lists ?? []).map((list: { id: string; name: string; spaceName: string }) => ({
+            id: list.id,
+            name: list.name,
+            spaceName: list.spaceName
+        })),
+        people: people.map((person) => ({ id: person.id, name: person.name }))
+    };
+}
+
 /** The record a run is about, read as the runner, or null. */
 async function recordOf(runner: CrmActor, context: RunContext): Promise<CrmRecord | null> {
     if (!context.recordId) return null;
@@ -271,7 +313,7 @@ async function filled(
     runner: CrmActor,
     context: RunContext,
     values: Readonly<Record<string, string>>
-): Promise<{ keys: string[]; cells: string[] }> {
+): Promise<{ keys: string[]; cells: string[]; record: CrmRecord | null }> {
     const record = await recordOf(runner, context);
     const fields = record
         ? fieldsOf(context.object, await loadFields(runner.shelf, context.object))
@@ -280,7 +322,7 @@ async function filled(
     const cells = keys.map((key) =>
         model.renderTemplate(values[key]!, fields, record?.values ?? {}, context.body)
     );
-    return { keys, cells };
+    return { keys, cells, record };
 }
 
 /** One action, done as the runner. */
@@ -322,6 +364,53 @@ async function runAction(
                 throw new CrmRefusal(
                     await problemText(runner, action.object, made.failed[0]?.problems ?? [])
                 );
+            }
+            return;
+        }
+        case "createTask": {
+            const { cells, record } = await filled(runner, context, { name: action.name });
+            const day =
+                action.dueInDays === null
+                    ? null
+                    : new Date(Date.now() + action.dueInDays * 86_400_000)
+                          .toISOString()
+                          .slice(0, 10);
+            const made = await host.crmHost.createTask(who(runner), {
+                listId: action.listId,
+                name: cells[0]!.trim() || action.name,
+                due: dueAt(day)
+            });
+            if ("refused" in made) throw new CrmRefusal(made.refused || t("activities.tasksOff"));
+            if (record && !record.deletedAt) {
+                await addLink(runner, context.object, record.id, "task", made.id);
+            }
+            return;
+        }
+        case "notify": {
+            const { cells, record } = await filled(runner, context, {
+                title: action.title,
+                body: action.body
+            });
+            const people = new Set((await records.shelfPeople(runner)).map((person) => person.id));
+            const to = new Set<string>();
+            for (const one of action.to) {
+                if (!one.startsWith(model.FIELD_RECIPIENT)) {
+                    to.add(one);
+                    continue;
+                }
+                const named = record?.values[one.slice(model.FIELD_RECIPIENT.length)];
+                if (named && typeof named === "object" && "id" in named) to.add(named.id);
+            }
+            for (const userId of to) {
+                if (!people.has(userId)) continue;
+                await host.notificationService.createNotification({
+                    userId,
+                    type: "crm.workflow",
+                    title: cells[0]!.trim() || action.title,
+                    body: cells[1]!.trim() || null,
+                    href: record ? recordHref(context.object, record.id) : null,
+                    shelf: runner.shelf.orgId ?? "personal"
+                });
             }
             return;
         }
