@@ -93,7 +93,8 @@
         "date": "Enter a date.",
         "option": "Choose one of the options.",
         "missing": "That record is gone or in the trash.",
-        "notOnShelf": "That person is not a member here."
+        "notOnShelf": "That person is not a member here.",
+        "ambiguous": "More than one record has that name."
     },
     "list": {
         "loading": "Loading",
@@ -394,7 +395,8 @@
         "someone": "Someone",
         "empty": "Nothing has happened yet",
         "more": "Show older",
-        "to": "to"
+        "to": "to",
+        "imported": "{actor} imported this record"
     },
     "trashView": {
         "title": "Trash",
@@ -427,5 +429,37 @@
         "unlink": "Remove from this record",
         "notesOff": "Your account cannot write notes.",
         "tasksOff": "Your account cannot create tasks."
+    },
+    "import": {
+        "button": "Import",
+        "hint": "Add records from a CSV file",
+        "title": "Import {objects}",
+        "choose": "Choose a CSV file",
+        "drop": "or drop it here. Up to {rows} rows and {size} MB.",
+        "reading": "Reading the file",
+        "tooBig": "That file is larger than {size} MB. Split it and import each part.",
+        "notCsv": "Choose a .csv file.",
+        "empty": "The file has no rows under its header.",
+        "tooManyRows": "The file has more than {rows} rows. Split it and import each part.",
+        "tooManyColumns": "The file has more than {columns} columns.",
+        "unclosedQuote": "A quoted cell never ends. Check the file in a spreadsheet and save it again.",
+        "column": "Column",
+        "field": "Field",
+        "skip": "Do not import",
+        "sample": "First value",
+        "needsName": "Choose which column holds the {field}.",
+        "duplicateMapping": "Two columns go to the same field. Choose a different field for one.",
+        "ready": "{count, plural, one {# row ready} other {# rows ready}}",
+        "problems": "{count, plural, one {# row has a problem and will be skipped} other {# rows have a problem and will be skipped}}",
+        "row": "Row {row}",
+        "moreProblems": "And {count, plural, one {# more row} other {# more rows}}",
+        "refsChecked": "Companies, people and owners are matched by name when the rows are imported.",
+        "back": "Choose another file",
+        "start": "Import {count, plural, one {# row} other {# rows}}",
+        "progress": "Imported {done} of {total}",
+        "done": "{count, plural, one {# record imported} other {# records imported}}",
+        "skipped": "{count, plural, one {# row was skipped} other {# rows were skipped}}",
+        "failed": "The import stopped. {count, plural, =0 {Nothing was imported.} one {# record was imported before it stopped.} other {# records were imported before it stopped.}}",
+        "close": "Close"
     }
 }

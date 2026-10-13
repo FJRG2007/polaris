@@ -12,6 +12,7 @@ import * as fields from "../lib/fields";
 import * as totals from "../lib/totals";
 import * as records from "../lib/records";
 import * as exporter from "../lib/export";
+import * as importer from "../lib/import";
 import * as page from "../lib/record-page";
 import * as timeline from "../lib/timeline";
 import type { TimelinePage } from "../model/timeline";
@@ -21,6 +22,7 @@ import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { CRM_OBJECTS, type CrmRecord, type Ref } from "../model/objects";
 import { filterSchema } from "../model/filters";
+import { IMPORT_BATCH, MAX_IMPORT_CELL, MAX_IMPORT_COLUMNS } from "../model/import";
 import { choiceRenamesSchema, fieldInputSchema, type CustomField } from "../model/fields";
 import {
     AGGREGATES,
@@ -166,6 +168,23 @@ export async function exportRecordsAction(input: unknown): Promise<Outcome<expor
     if (!parsed.success) return invalid();
     const { object: kind, ...options } = parsed.data;
     return outcome(async () => exporter.exportRecords(await requireCrmActor(), kind, options));
+}
+
+/** One batch of a CSV import: the field each column goes to, and the rows. */
+export async function importRecordsAction(input: unknown): Promise<Outcome<importer.ImportResult>> {
+    const parsed = z
+        .object({
+            object,
+            mapping: z.array(fieldKey.nullable()).min(1).max(MAX_IMPORT_COLUMNS),
+            rows: z
+                .array(z.array(z.string().max(MAX_IMPORT_CELL * 2)).max(MAX_IMPORT_COLUMNS))
+                .min(1)
+                .max(IMPORT_BATCH)
+        })
+        .safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, ...batch } = parsed.data;
+    return outcome(async () => importer.importRecords(await requireCrmActor(), kind, batch));
 }
 
 /** The first page of every group of a grouped list or a board. */

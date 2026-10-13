@@ -93,7 +93,8 @@
         "date": "Escribe una fecha.",
         "option": "Elige una de las opciones.",
         "missing": "Ese registro ya no existe o está en la papelera.",
-        "notOnShelf": "Esa persona no es miembro aquí."
+        "notOnShelf": "Esa persona no es miembro aquí.",
+        "ambiguous": "Hay más de un registro con ese nombre."
     },
     "list": {
         "loading": "Cargando",
@@ -394,7 +395,8 @@
         "someone": "Alguien",
         "empty": "Aún no ha pasado nada",
         "more": "Ver más",
-        "to": "a"
+        "to": "a",
+        "imported": "{actor} importó este registro"
     },
     "trashView": {
         "title": "Papelera",
@@ -427,5 +429,37 @@
         "unlink": "Quitar de este registro",
         "notesOff": "Tu cuenta no puede escribir notas.",
         "tasksOff": "Tu cuenta no puede crear tareas."
+    },
+    "import": {
+        "button": "Importar",
+        "hint": "Añadir registros de un CSV",
+        "title": "Importar {objects}",
+        "choose": "Elegir un archivo CSV",
+        "drop": "o suéltalo aquí. Hasta {rows} filas y {size} MB.",
+        "reading": "Leyendo el archivo",
+        "tooBig": "El archivo pesa más de {size} MB. Divídelo e importa cada parte.",
+        "notCsv": "Elige un archivo .csv.",
+        "empty": "El archivo no tiene filas bajo la cabecera.",
+        "tooManyRows": "El archivo tiene más de {rows} filas. Divídelo e importa cada parte.",
+        "tooManyColumns": "El archivo tiene más de {columns} columnas.",
+        "unclosedQuote": "Una celda entre comillas no se cierra. Revisa el archivo en una hoja de cálculo y guárdalo de nuevo.",
+        "column": "Columna",
+        "field": "Campo",
+        "skip": "No importar",
+        "sample": "Primer valor",
+        "needsName": "Elige qué columna contiene el campo {field}.",
+        "duplicateMapping": "Dos columnas van al mismo campo. Elige otro campo para una de ellas.",
+        "ready": "{count, plural, one {# fila lista} other {# filas listas}}",
+        "problems": "{count, plural, one {# fila tiene un problema y se omitirá} other {# filas tienen un problema y se omitirán}}",
+        "row": "Fila {row}",
+        "moreProblems": "Y {count, plural, one {# fila más} other {# filas más}}",
+        "refsChecked": "Las empresas, personas y responsables se buscan por nombre al importar las filas.",
+        "back": "Elegir otro archivo",
+        "start": "Importar {count, plural, one {# fila} other {# filas}}",
+        "progress": "Importadas {done} de {total}",
+        "done": "{count, plural, one {# registro importado} other {# registros importados}}",
+        "skipped": "{count, plural, one {Se omitió # fila} other {Se omitieron # filas}}",
+        "failed": "La importación se detuvo. {count, plural, =0 {No se importó nada.} one {Se importó # registro antes.} other {Se importaron # registros antes.}}",
+        "close": "Cerrar"
     }
 }
