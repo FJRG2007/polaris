@@ -206,6 +206,32 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
                 </div>
             );
         }
+        case "httpRequest": {
+            const bad = action.url.trim() !== "" && !model.isHttpAddress(action.url.trim());
+            return (
+                <div className="flex min-w-0 flex-col gap-1">
+                    <Input
+                        aria-label={t("workflows.requestUrl")}
+                        placeholder="https://"
+                        type="url"
+                        inputMode="url"
+                        value={action.url}
+                        maxLength={model.REQUEST_URL_MAX}
+                        aria-invalid={bad || undefined}
+                        onChange={(event) => onChange({ ...action, url: event.target.value })}
+                    />
+                    <p
+                        className={
+                            bad
+                                ? "text-[0.75rem] text-destructive"
+                                : "text-[0.75rem] text-muted-foreground"
+                        }
+                    >
+                        {bad ? t("workflows.requestBadUrl") : t("workflows.requestHint")}
+                    </p>
+                </div>
+            );
+        }
         case "notify":
             return (
                 <NotifyFields
@@ -477,6 +503,8 @@ export function useWorkflowWords(object: CrmObject) {
                         name: `{{${primaryField(object).key}}}`,
                         dueInDays: 1
                     };
+                case "httpRequest":
+                    return { kind, url: "" };
                 case "notify":
                     return {
                         kind,

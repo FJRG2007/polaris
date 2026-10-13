@@ -65,6 +65,7 @@ const crmHost = vi.hoisted(() => ({
     taskListsFor: vi.fn(async () => [
         { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Sales", spaceName: "Team" }
     ]),
+    crmPostJson: vi.fn(async (): Promise<unknown> => ({ status: 200 })),
     createTask: vi.fn(
         async (): Promise<unknown> => ({
             id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -677,5 +678,61 @@ describe("a task or a notification", () => {
                 { id: "u3", name: "Other User" }
             ]
         });
+    });
+});
+
+describe("a call out", () => {
+    const URL = "https://hooks.example.invalid/crm";
+    const runOn = async () => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored(
+                { kind: "created" },
+                { actions: JSON.stringify([{ kind: "httpRequest", url: URL }]) }
+            )
+        ]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            { recordId: RECORD, kind: "created", changes: [] }
+        ]);
+        const [[done]] = db.crmWorkflow.update.mock.calls as unknown as [
+            [{ data: { lastError: string | null } }]
+        ];
+        return done.data.lastError;
+    };
+
+    beforeEach(() => {
+        db.records.findFirst.mockResolvedValue({
+            id: RECORD,
+            name: "Acme",
+            position: 0,
+            deletedAt: null,
+            ...stamp
+        });
+    });
+
+    it("posts the record that set it off as JSON, through the checked fetch", async () => {
+        expect(await runOn()).toBeNull();
+        expect(crmHost.crmPostJson).toHaveBeenCalledTimes(1);
+        const [[url, body]] = crmHost.crmPostJson.mock.calls as unknown as [[string, string]];
+        expect(url).toBe(URL);
+        expect(JSON.parse(body)).toEqual({
+            workflow: expect.objectContaining({ id: expect.any(String) }),
+            object: "companies",
+            event: "created",
+            record: expect.objectContaining({
+                id: RECORD,
+                fields: expect.objectContaining({ name: "Acme" })
+            })
+        });
+    });
+
+    it("says what went wrong when the other end refuses or cannot be reached", async () => {
+        crmHost.crmPostJson.mockResolvedValueOnce({ status: 500 });
+        expect(await runOn()).toContain("500");
+        db.crmWorkflow.update.mockClear();
+        crmHost.crmPostJson.mockResolvedValueOnce({ failed: "address" });
+        expect(await runOn()).toBeTruthy();
+        db.crmWorkflow.update.mockClear();
+        crmHost.crmPostJson.mockResolvedValueOnce({ failed: "unreachable" });
+        expect(await runOn()).toBeTruthy();
     });
 });

@@ -503,7 +503,8 @@
             "updateRecord": "Update the record",
             "createRecord": "Create a record",
             "createTask": "Create a task",
-            "notify": "Send a notification"
+            "notify": "Send a notification",
+            "httpRequest": "Send to an address"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -540,6 +541,12 @@
         "recipients": "To",
         "fieldRecipient": "The {field}",
         "notifyTitle": "Title",
-        "notifyBody": "Message"
+        "notifyBody": "Message",
+        "requestUrl": "Address",
+        "requestHint": "Sends the record here as JSON in a POST.",
+        "requestBadUrl": "Use an http or https address.",
+        "requestRefused": "That address cannot be reached from here.",
+        "requestUnreachable": "The address did not answer.",
+        "requestFailed": "The address answered {status}."
     }
 }

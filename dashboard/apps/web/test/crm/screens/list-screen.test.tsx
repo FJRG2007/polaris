@@ -18,15 +18,7 @@ import { MessagesWrapper } from "../../setup/i18n";
 import { defaultConfig, type ViewSummary } from "@polaris-app/crm/src/model/views";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CrmRecord, FieldValue } from "@polaris-app/crm/src/model/objects";
-import {
-    act,
-    cleanup,
-    fireEvent,
-    render,
-    screen,
-    waitFor,
-    within
-} from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const VIEW_ID = "11111111-1111-4111-8111-111111111111";
 const ACME = "22222222-2222-4222-8222-222222222222";
@@ -412,7 +404,9 @@ describe("a CRM list", () => {
     });
 
     it("restores a record from the trash back into the list", async () => {
-        state.trashed = [{ ...company(INITECH, "Initech", "Oslo"), deletedAt: "2026-10-02T10:00:00.000Z" }];
+        state.trashed = [
+            { ...company(INITECH, "Initech", "Oslo"), deletedAt: "2026-10-02T10:00:00.000Z" }
+        ];
         render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
         await screen.findByText("Acme");
         fireEvent.click(screen.getByRole("button", { name: "Trash" }));
@@ -421,7 +415,9 @@ describe("a CRM list", () => {
         await act(async () => {
             fireEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
         });
-        await waitFor(() => expect(state.restores).toEqual([{ object: "companies", ids: [INITECH] }]));
+        await waitFor(() =>
+            expect(state.restores).toEqual([{ object: "companies", ids: [INITECH] }])
+        );
         expect(within(dialog).queryByText("Initech")).toBeNull();
         expect(await screen.findByText("The trash is empty")).toBeTruthy();
         fireEvent.keyDown(dialog, { key: "Escape" });

@@ -55,7 +55,8 @@ const row = (id: string, city: string) => ({
 });
 
 type Logged = { data: { recordId: string; kind: string; changes: string; userId: string }[] };
-const logged = () => (db.crmEvent.createMany.mock.calls as unknown as [Logged][]).map(([call]) => call.data);
+const logged = () =>
+    (db.crmEvent.createMany.mock.calls as unknown as [Logged][]).map(([call]) => call.data);
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -115,7 +116,13 @@ describe("the record timeline", () => {
             createdAt: new Date("2026-10-01T10:00:00Z")
         }));
         db.crmEvent.findMany.mockResolvedValueOnce(rows);
-        const page = await listTimeline(actor, "companies", "c1", [{ id: "u1", name: "Test User" }], "e200");
+        const page = await listTimeline(
+            actor,
+            "companies",
+            "c1",
+            [{ id: "u1", name: "Test User" }],
+            "e200"
+        );
         const [query] = db.crmEvent.findMany.mock.calls[0] as unknown as [
             { where: Record<string, unknown>; take: number; orderBy: unknown }
         ];

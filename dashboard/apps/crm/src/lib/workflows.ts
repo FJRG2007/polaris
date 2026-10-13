@@ -22,6 +22,7 @@ import { importRecords, readRows } from "./import";
 import { addLink } from "./links";
 import { dueAt } from "../model/links";
 import { recordHref } from "../model/related";
+import { csvValue } from "../model/csv";
 import type { RowProblem } from "../model/import";
 import { fieldsOf, primaryField, type CrmObject, type CrmRecord } from "../model/objects";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -328,7 +329,7 @@ async function filled(
 /** One action, done as the runner. */
 async function runAction(
     runner: CrmActor,
-    _workflow: StoredWorkflow,
+    workflow: StoredWorkflow,
     action: model.WorkflowAction,
     context: RunContext
 ): Promise<void> {
@@ -364,6 +365,45 @@ async function runAction(
                 throw new CrmRefusal(
                     await problemText(runner, action.object, made.failed[0]?.problems ?? [])
                 );
+            }
+            return;
+        }
+        case "httpRequest": {
+            const record = await recordOf(runner, context);
+            const fields = record
+                ? fieldsOf(context.object, await loadFields(runner.shelf, context.object))
+                : [];
+            const sent = await host.crmHost.crmPostJson(
+                action.url,
+                JSON.stringify({
+                    workflow: { id: workflow.id, name: workflow.name },
+                    object: context.object,
+                    event: context.event?.kind ?? model.readTrigger(workflow.trigger)?.kind ?? null,
+                    record: record
+                        ? {
+                              id: record.id,
+                              fields: Object.fromEntries(
+                                  fields.map((field) => [
+                                      field.key,
+                                      csvValue(field, record.values[field.key])
+                                  ])
+                              )
+                          }
+                        : null,
+                    body: context.body
+                })
+            );
+            if ("failed" in sent) {
+                throw new CrmRefusal(
+                    t(
+                        sent.failed === "address"
+                            ? "workflows.requestRefused"
+                            : "workflows.requestUnreachable"
+                    )
+                );
+            }
+            if (sent.status < 200 || sent.status >= 300) {
+                throw new CrmRefusal(t("workflows.requestFailed", { status: sent.status }));
             }
             return;
         }

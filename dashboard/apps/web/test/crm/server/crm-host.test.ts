@@ -2,7 +2,7 @@
  * The dashboard's half of the CRM: a Drive file is pointed at only after the
  * reader's Drive access is checked, never a folder, and a file the reader lost
  * access to drops out of the list; a workflow runs only as an account that may
- * still use the CRM.
+ * still use the CRM; a workflow's call out goes only through the checked fetch.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
     requireDriveDriver: vi.fn(),
     mayReadDrive: vi.fn(async () => true),
     sessionCan: vi.fn(async () => true),
+    follow: vi.fn(
+        async (): Promise<unknown> => ({
+            status: 202,
+            body: { cancel: vi.fn(async () => undefined) }
+        })
+    ),
+    safeUrl: vi.fn((address: string) => (address.startsWith("https://") ? new URL(address) : null)),
     prisma: {
         storageConnection: { findUnique: vi.fn(async () => ({ ownerId: "u1", orgId: null })) },
         user: {
@@ -43,13 +50,14 @@ vi.mock("@/lib/drive-authz", () => ({
 }));
 vi.mock("@/lib/workspace-scope", () => ({ resolveScope: vi.fn() }));
 vi.mock("@/lib/session", () => ({ sessionCan: mocks.sessionCan }));
+vi.mock("@/lib/safe-fetch", () => ({ follow: mocks.follow, safeUrl: mocks.safeUrl }));
 vi.mock("@/lib/orgs/org-service", () => ({
     listOrgMembers: vi.fn(),
     orgCan: vi.fn(),
     resolveOrgAccess: vi.fn()
 }));
 
-import { crmDriveFileRef, crmDriveFiles, crmRunner } from "@/lib/crm-host";
+import { crmDriveFileRef, crmDriveFiles, crmPostJson, crmRunner } from "@/lib/crm-host";
 
 const actor = { id: "u1", isAdmin: false };
 
@@ -128,5 +136,23 @@ describe("crmRunner", () => {
         mocks.sessionCan.mockResolvedValueOnce(false);
         expect(await crmRunner(RUNNER)).toBeNull();
         expect(await crmRunner("not-an-id")).toBeNull();
+    });
+});
+
+describe("crmPostJson", () => {
+    const URL = "https://hooks.example.invalid/crm";
+
+    it("posts JSON through the checked fetch and answers the status, leaving the body unread", async () => {
+        expect(await crmPostJson(URL, '{"a":1}')).toEqual({ status: 202 });
+        expect(mocks.follow).toHaveBeenCalledWith(new globalThis.URL(URL), "application/json", {
+            contentType: "application/json",
+            body: '{"a":1}'
+        });
+    });
+
+    it("refuses an address it may not reach, and says when nothing answered", async () => {
+        expect(await crmPostJson("http://169.254.169.254/", "{}")).toEqual({ failed: "address" });
+        mocks.follow.mockResolvedValueOnce(null);
+        expect(await crmPostJson(URL, "{}")).toEqual({ failed: "unreachable" });
     });
 });

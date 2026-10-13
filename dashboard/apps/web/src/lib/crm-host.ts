@@ -15,6 +15,7 @@ import { resolveScope } from "@/lib/workspace-scope";
 import { isUuid } from "@/lib/uuid";
 import { normalizeRelPath } from "@polaris/core";
 import { mayReadDrive, requireDriveDriver } from "@/lib/drive-authz";
+import { follow, safeUrl } from "@/lib/safe-fetch";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { listOrgMembers, orgCan, resolveOrgAccess, type OrgActor } from "@/lib/orgs/org-service";
 
@@ -276,4 +277,24 @@ export async function crmRunner(userId: string): Promise<SessionUser | null> {
     if (!found) return null;
     const user: SessionUser = { ...found, sessionId: "" };
     return (await sessionCan(user, "crm.use")) ? user : null;
+}
+
+/**
+ * A CRM workflow's call out: a POST of JSON to the address it was given, only
+ * through the checked fetch, so it cannot reach the network Polaris sits on.
+ * Answers the status, leaving what came back unread, or why nothing was sent.
+ */
+export async function crmPostJson(
+    address: string,
+    body: string
+): Promise<{ status: number } | { failed: "address" | "unreachable" }> {
+    const url = safeUrl(address);
+    if (!url) return { failed: "address" };
+    const response = await follow(url, "application/json", {
+        contentType: "application/json",
+        body
+    });
+    if (!response) return { failed: "unreachable" };
+    await response.body?.cancel().catch(() => undefined);
+    return { status: response.status };
 }

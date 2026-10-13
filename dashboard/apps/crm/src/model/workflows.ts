@@ -81,6 +81,24 @@ export interface WorkflowOptions {
     readonly people: { id: string; name: string }[];
 }
 
+/** The longest address a workflow may call. */
+export const REQUEST_URL_MAX = 2048;
+
+/** Whether a text is an http or https address with no credentials in it. Where
+ *  it resolves to is checked when it is called, every time. */
+export function isHttpAddress(text: string): boolean {
+    try {
+        const url = new URL(text);
+        return (
+            (url.protocol === "https:" || url.protocol === "http:") &&
+            !url.username &&
+            !url.password
+        );
+    } catch {
+        return false;
+    }
+}
+
 /** How far ahead a workflow's task may fall due, in days. */
 export const MAX_DUE_DAYS = 365;
 
@@ -122,6 +140,11 @@ export const workflowActionSchema = z.discriminatedUnion("kind", [
         to: z.array(z.string().min(1).max(80)).min(1).max(MAX_RECIPIENTS),
         title: z.string().trim().min(1).max(NOTIFY_TITLE_MAX),
         body: z.string().max(ACTION_TEXT_MAX)
+    }),
+    /** A POST of the record, as JSON, to an address outside. */
+    z.object({
+        kind: z.literal("httpRequest"),
+        url: z.string().trim().max(REQUEST_URL_MAX).refine(isHttpAddress)
     })
 ]);
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
@@ -132,7 +155,8 @@ export const ACTION_KINDS: readonly ActionKind[] = [
     "updateRecord",
     "createRecord",
     "createTask",
-    "notify"
+    "notify",
+    "httpRequest"
 ];
 
 /** A recipient that is whoever an owner field of the record names. */

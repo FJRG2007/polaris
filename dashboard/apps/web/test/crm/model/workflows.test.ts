@@ -296,3 +296,18 @@ describe("a task or a notification", () => {
         ).toBe(false);
     });
 });
+
+describe("a call out", () => {
+    const base = { name: "x", trigger: { kind: "created" }, enabled: true };
+    const parse = (url: string) =>
+        workflowInputSchema.safeParse({ ...base, actions: [{ kind: "httpRequest", url }] }).success;
+
+    it("takes an http or https address and nothing else", () => {
+        expect(parse("https://hooks.example.invalid/crm")).toBe(true);
+        expect(parse("http://hooks.example.invalid/crm?x=1")).toBe(true);
+        expect(parse("ftp://hooks.example.invalid/crm")).toBe(false);
+        expect(parse("javascript:alert(1)")).toBe(false);
+        expect(parse("not an address")).toBe(false);
+        expect(parse(`https://hooks.example.invalid/${"a".repeat(2100)}`)).toBe(false);
+    });
+});

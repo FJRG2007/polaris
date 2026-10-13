@@ -503,7 +503,8 @@
             "updateRecord": "Actualizar el registro",
             "createRecord": "Crear un registro",
             "createTask": "Crear una tarea",
-            "notify": "Enviar un aviso"
+            "notify": "Enviar un aviso",
+            "httpRequest": "Enviar a una dirección"
         },
         "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
         "createNeedsName": "Pon nombre al nuevo registro.",
@@ -540,6 +541,12 @@
         "recipients": "Para",
         "fieldRecipient": "El campo {field}",
         "notifyTitle": "Título",
-        "notifyBody": "Mensaje"
+        "notifyBody": "Mensaje",
+        "requestUrl": "Dirección",
+        "requestHint": "Envía aquí el registro como JSON en un POST.",
+        "requestBadUrl": "Usa una dirección http o https.",
+        "requestRefused": "No se puede llegar a esa dirección desde aquí.",
+        "requestUnreachable": "La dirección no respondió.",
+        "requestFailed": "La dirección respondió {status}."
     }
 }
