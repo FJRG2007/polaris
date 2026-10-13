@@ -69,6 +69,15 @@ export interface PolarisApp {
     readonly keywords?: readonly string[];
 }
 
+/** One thing a tile offers besides opening its app - marking what is waiting
+ *  in it read, for one. Drawn as a small icon button on the tile's corner. */
+export interface AppTileAction {
+    /** The accessible name and the tooltip. */
+    readonly label: string;
+    readonly icon: ReactNode;
+    readonly onSelect: () => void;
+}
+
 /** The switcher's own words. Everything else it draws is the caller's data. */
 export interface AppSwitcherStrings {
     /** The search field's placeholder and name. */
@@ -110,6 +119,7 @@ function quoted(value: string): string {
 
 const TILE = "data-launcher-tile";
 const MORE = "data-launcher-more";
+const ACTION = "data-launcher-tile-action";
 
 export function AppSwitcher({
     apps,
@@ -124,6 +134,7 @@ export function AppSwitcher({
     onOpenChange,
     footer,
     below,
+    tileAction,
     strings = ENGLISH
 }: {
     apps: readonly PolarisApp[];
@@ -169,6 +180,9 @@ export function AppSwitcher({
      *  has waiting, for one. Menu items, walked by the arrow keys like the rest;
      *  put away while a search narrows the grid, which is a question about apps. */
     below?: ReactNode;
+    /** What a tile offers besides opening its app, if anything. Shown on hover
+     *  and focus, always on a touch screen, and reached by Tab after its tile. */
+    tileAction?: (app: PolarisApp) => AppTileAction | null;
     /** The switcher's own words, in the reader's language. English by default. */
     strings?: AppSwitcherStrings;
 }) {
@@ -304,7 +318,9 @@ export function AppSwitcher({
     function onKeyDownCapture(event: KeyboardEvent<HTMLDivElement>) {
         const target = event.target as HTMLElement;
         const root = event.currentTarget;
-        const isTile = target.hasAttribute(TILE);
+        // A tile's own action moves through the grid as its tile does.
+        const actionOf = target.getAttribute(ACTION);
+        const isTile = target.hasAttribute(TILE) || actionOf !== null;
 
         // More sits between the grid and the options under it: up goes back to
         // the last row, down on to the options.
@@ -326,7 +342,9 @@ export function AppSwitcher({
         // Tab walks every tile in reading order - a menu refuses tab otherwise.
         if (event.key === "Tab") {
             const stops = [
-                ...root.querySelectorAll<HTMLElement>(`[${TILE}]:not([data-disabled])`)
+                ...root.querySelectorAll<HTMLElement>(
+                    `[${TILE}]:not([data-disabled]), [${ACTION}]:not([data-disabled])`
+                )
             ].filter((stop) => stop === target || getComputedStyle(stop).display !== "none");
             const at = stops.indexOf(target);
             const next = stops[at + (event.shiftKey ? -1 : 1)];
@@ -338,7 +356,7 @@ export function AppSwitcher({
             return;
         }
 
-        const id = target.getAttribute(TILE) ?? "";
+        const id = actionOf ?? target.getAttribute(TILE) ?? "";
         if (event.altKey && arrangeable) {
             const by =
                 event.key === "ArrowLeft"
@@ -414,6 +432,7 @@ export function AppSwitcher({
                             app={app}
                             active={app.id === currentAppId}
                             Anchor={Anchor}
+                            action={tileAction?.(app) ?? null}
                             drag={
                                 arrangeable
                                     ? {
@@ -469,8 +488,9 @@ function firstFooterItem(root: HTMLElement) {
  *  option. */
 function firstBelowItem(root: HTMLElement) {
     return (
-        root.querySelector<HTMLElement>("[data-launcher-below] [role=menuitem]:not([data-disabled])") ??
-        firstFooterItem(root)
+        root.querySelector<HTMLElement>(
+            "[data-launcher-below] [role=menuitem]:not([data-disabled])"
+        ) ?? firstFooterItem(root)
     );
 }
 
@@ -532,11 +552,13 @@ function AppTile({
     app,
     active,
     Anchor,
+    action,
     drag
 }: {
     app: PolarisApp;
     active: boolean;
     Anchor: ElementType;
+    action: AppTileAction | null;
     drag?: {
         start: (event: DragEvent<HTMLElement>) => void;
         over: (event: DragEvent<HTMLElement>) => void;
@@ -590,6 +612,21 @@ function AppTile({
                     </span>
                 </Anchor>
             </DropdownMenuItem>
+            {action ? (
+                <DropdownMenuItem
+                    {...{ [ACTION]: app.id }}
+                    aria-label={action.label}
+                    title={action.label}
+                    onSelect={(event) => {
+                        // The menu stays open: marking read is not leaving.
+                        event.preventDefault();
+                        action.onSelect();
+                    }}
+                    className="absolute left-0.5 top-0.5 size-6 justify-center rounded-full bg-elevated p-0 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:text-foreground focus:text-foreground focus:opacity-100 group-hover/tile:opacity-100 [@media(hover:none)]:opacity-100 [&_svg]:!size-3.5"
+                >
+                    {action.icon}
+                </DropdownMenuItem>
+            ) : null}
         </div>
     );
 }
