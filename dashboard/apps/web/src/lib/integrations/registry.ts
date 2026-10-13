@@ -586,7 +586,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Add the people who will link",
                 url: "https://developer.spotify.com/dashboard",
-                help: "The app -> Settings -> User Management: each person's name and the address of their Spotify account. In development mode nobody else can link, and they are told so by Spotify rather than by Polaris."
+                help: "The app -> Settings -> User Management: each person's name and the address of their Spotify account. There is no way around this list for most deployments: Spotify only lifts it (extended quota) for registered businesses with at least 250,000 monthly users, applied for from the app's Quota extension Request tab. Anybody not on it is refused by Spotify rather than by Polaris."
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts

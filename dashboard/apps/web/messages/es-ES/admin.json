@@ -1821,7 +1821,7 @@
                     },
                     "1": {
                         "label": "Añadir a quienes vayan a vincular",
-                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En modo de desarrollo nadie más puede vincular, y quien lo intente lo sabrá por Spotify, no por Polaris."
+                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En casi todas las instalaciones no hay forma de evitar esta lista: Spotify solo la quita (extended quota) a empresas registradas con al menos 250.000 usuarios al mes, y se pide desde la pestaña Quota extension Request de la app. A quien no esté en ella lo rechaza Spotify, no Polaris."
                     },
                     "2": {
                         "label": "Copiar el id y el secreto del cliente",
