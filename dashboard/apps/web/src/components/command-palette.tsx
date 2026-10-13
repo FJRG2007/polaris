@@ -27,6 +27,7 @@ import { PlainNames } from "@/components/person-name";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
+import { calculate, calculationText } from "@/lib/search/calculate";
 import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
 import {
     Dialog,
@@ -48,6 +49,7 @@ import {
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
+    CalculationRow,
     ClockRow,
     clockCommandText,
     CommandRow,
@@ -115,6 +117,7 @@ function rememberLookup(key: string, hits: SearchHit[]): void {
 
 /** One line of the panel. Everything the arrow keys move through is one of these. */
 type Row =
+    | { kind: "calculation"; id: string; group: string; value: number }
     | { kind: "command"; id: string; group: string; scope: SearchScopeDefinition }
     | { kind: "clock"; id: string; group: string; command: core.ClockCommand }
     | { kind: "entry"; id: string; group: string; entry: CommandEntry }
@@ -420,6 +423,10 @@ export function CommandPalette({
         [scope, query, appKey]
     );
 
+    // "2 * (3 + 4)": answered as it is typed, and Enter copies the answer.
+    // Never inside a command, where what is typed is a search of that one thing.
+    const calculation = useMemo(() => (scope ? null : calculate(query)), [scope, query]);
+
     /** Earlier searches, narrowed to the command in hand and to what is typed. */
     const recentRows = useMemo(() => {
         const matching = recent.filter((entry) => {
@@ -501,8 +508,21 @@ export function CommandPalette({
               ]
             : [];
 
-        return [...clock, ...remembered, ...commands, ...found];
+        const sum: Row[] =
+            calculation === null
+                ? []
+                : [
+                      {
+                          kind: "calculation",
+                          id: "calculation",
+                          group: t("search.calculator"),
+                          value: calculation
+                      }
+                  ];
+
+        return [...sum, ...clock, ...remembered, ...commands, ...found];
     }, [
+        calculation,
         recentRows,
         suggestions,
         scope,
@@ -579,8 +599,30 @@ export function CommandPalette({
             );
     }
 
+    /** Put the answer on the clipboard, and say so - or that it could not be. */
+    function copyCalculation(value: number): void {
+        const text = calculationText(value);
+        openedRef.current = true;
+        setOpen(false);
+        void navigator.clipboard
+            .writeText(text)
+            .then(() =>
+                toast.show({
+                    key: "search-calculation",
+                    title: t("search.calculationCopied", { value: text })
+                })
+            )
+            .catch(() =>
+                toast.show({ key: "search-calculation", title: t("search.calculationCopyFailed") })
+            );
+    }
+
     function go(row: Row | undefined): void {
         if (!row) return;
+        if (row.kind === "calculation") {
+            copyCalculation(row.value);
+            return;
+        }
         if (row.kind === "clock") {
             runClock(row.command);
             return;
@@ -845,6 +887,25 @@ export function CommandPalette({
                                             const selected = position === active;
                                             const select = () => go(row);
                                             const hover = () => setActive(position);
+                                            if (row.kind === "calculation") {
+                                                const answer = new Intl.NumberFormat(locale, {
+                                                    maximumFractionDigits: 10
+                                                }).format(row.value);
+                                                return (
+                                                    <CalculationRow
+                                                        key={row.id}
+                                                        id={rowElementId(row)}
+                                                        expression={trimmed}
+                                                        answer={answer}
+                                                        label={t("search.calculationLabel", {
+                                                            value: answer
+                                                        })}
+                                                        selected={selected}
+                                                        onSelect={select}
+                                                        onHover={hover}
+                                                    />
+                                                );
+                                            }
                                             if (row.kind === "clock") {
                                                 return (
                                                     <ClockRow

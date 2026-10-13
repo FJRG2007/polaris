@@ -17,7 +17,7 @@ import { Badge, cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
-import { AlarmClock, Clock, CornerDownLeft, Timer, Watch, X } from "lucide-react";
+import { AlarmClock, Calculator, Clock, CornerDownLeft, Timer, Watch, X } from "lucide-react";
 import type { CommandEntry } from "@/lib/search/entries";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -147,6 +147,32 @@ export function clockCommandText(
     return command.label
         ? t("search.clock.labelled", { action: said, label: command.label })
         : said;
+}
+
+/** The answer to a sum typed into the field; choosing it copies the answer. */
+export function CalculationRow({
+    expression,
+    answer,
+    label,
+    ...row
+}: RowProps & { expression: string; answer: string; label: string }) {
+    return (
+        <Row {...row} label={label}>
+            <Calculator className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold tabular-nums" title={answer}>
+                    = {answer}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground" title={expression}>
+                    {expression}
+                </span>
+            </span>
+            <CornerDownLeft
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+            />
+        </Row>
+    );
 }
 
 /** A typed "timer 10m", "alarm 7:30" or "stopwatch", ready to run. */
