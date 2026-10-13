@@ -10,7 +10,8 @@
 import Link from "next/link";
 import { useCrmT } from "./i18n";
 import { messageOf, unwrap } from "./call";
-import { File as FileIcon, Plus, Unlink } from "lucide-react";
+import { formatDay } from "./format";
+import { CalendarDays, File as FileIcon, Mail, Plus, Unlink } from "lucide-react";
 import * as actions from "../actions/activities";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
@@ -224,6 +225,44 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
                     </ul>
                 )}
             </Section>
+            {data?.mail === null ? null : (
+                <Section
+                    title={t("activities.mail")}
+                    count={data?.mail ? data.mail.length : null}
+                    adding={null}
+                >
+                    {!data?.mail ? (
+                        <Block className="mx-3 my-3 h-3 w-40" />
+                    ) : data.mail.length === 0 ? (
+                        <Empty text={t("activities.noMail")} />
+                    ) : (
+                        <ul className="flex flex-col gap-1 p-2">
+                            {data.mail.map((thread) => (
+                                <MailRow key={thread.id} thread={thread} />
+                            ))}
+                        </ul>
+                    )}
+                </Section>
+            )}
+            {data?.events === null ? null : (
+                <Section
+                    title={t("activities.events")}
+                    count={data?.events ? data.events.length : null}
+                    adding={null}
+                >
+                    {!data?.events ? (
+                        <Block className="mx-3 my-3 h-3 w-40" />
+                    ) : data.events.length === 0 ? (
+                        <Empty text={t("activities.noEvents")} />
+                    ) : (
+                        <ul className="flex flex-col gap-1 p-2">
+                            {data.events.map((event) => (
+                                <EventRow key={event.id} event={event} />
+                            ))}
+                        </ul>
+                    )}
+                </Section>
+            )}
             {picking ? (
                 <hostUi.filePicker.FilePickerDialog
                     storageOnly
@@ -250,6 +289,61 @@ function FileRow({ file, onUnlink }: { file: links.LinkedFile; onUnlink: (() => 
                 {file.name}
             </a>
             {onUnlink ? <UnlinkButton onClick={onUnlink} /> : null}
+        </li>
+    );
+}
+
+function MailRow({ thread }: { thread: links.MailWith }) {
+    const t = useCrmT();
+    const format = hostUi.displayFormat.useDisplayFormat();
+    const subject = thread.subject.trim() || t("activities.noSubject");
+    const people = thread.participants.map((one) => one.name.trim() || one.address).join(", ");
+    return (
+        <li className="flex min-w-0 items-start gap-2 px-1">
+            <Mail aria-hidden className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+            <a
+                href={thread.href}
+                className="flex min-w-0 flex-1 flex-col rounded py-0.5 hover:underline"
+                title={subject}
+            >
+                <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{subject}</span>
+                    <span className="shrink-0 text-[0.75rem] tabular-nums text-muted-foreground">
+                        {format.date(thread.lastMessageAt)}
+                    </span>
+                </span>
+                <span className="truncate text-[0.75rem] text-muted-foreground" title={people}>
+                    {thread.messageCount > 1
+                        ? t("activities.mailCount", { count: thread.messageCount, people })
+                        : people}
+                </span>
+            </a>
+        </li>
+    );
+}
+
+function EventRow({ event }: { event: links.EventWith }) {
+    const t = useCrmT();
+    const format = hostUi.displayFormat.useDisplayFormat();
+    const summary = event.summary.trim() || t("activities.noSummary");
+    const when = !event.startsAt
+        ? ""
+        : event.allDay
+          ? formatDay(event.startsAt.slice(0, 10), format)
+          : format.dateTime(event.startsAt);
+    return (
+        <li className="flex min-w-0 items-start gap-2 px-1">
+            <CalendarDays aria-hidden className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+            <a
+                href={event.href}
+                className="flex min-w-0 flex-1 flex-col rounded py-0.5 hover:underline"
+                title={summary}
+            >
+                <span className="truncate text-[0.8125rem]">{summary}</span>
+                <span className="truncate text-[0.75rem] text-muted-foreground">
+                    {[when, event.location.trim()].filter(Boolean).join(" - ")}
+                </span>
+            </a>
         </li>
     );
 }

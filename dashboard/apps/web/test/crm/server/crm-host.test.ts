@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     requireDriveDriver: vi.fn(),
     mayReadDrive: vi.fn(async () => true),
     sessionCan: vi.fn(async () => true),
+    userHasPermission: vi.fn(async () => true),
     follow: vi.fn(
         async (): Promise<unknown> => ({
             status: 202,
@@ -36,6 +37,9 @@ const mocks = vi.hoisted(() => ({
                 })
             )
         },
+        mailAccount: { findMany: vi.fn(async (): Promise<unknown[]> => [{ id: "acc-1" }]) },
+        mailThread: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+        $queryRaw: vi.fn(async (): Promise<unknown[]> => []),
         driveItemMeta: {
             upsert: vi.fn(async () => ({ id: "meta-1" })),
             findMany: vi.fn(async (): Promise<unknown[]> => [])
@@ -48,6 +52,7 @@ vi.mock("@/lib/drive-authz", () => ({
     requireDriveDriver: mocks.requireDriveDriver,
     mayReadDrive: mocks.mayReadDrive
 }));
+vi.mock("@polaris/auth", () => ({ userHasPermission: mocks.userHasPermission }));
 vi.mock("@/lib/workspace-scope", () => ({ resolveScope: vi.fn() }));
 vi.mock("@/lib/session", () => ({ sessionCan: mocks.sessionCan }));
 vi.mock("@/lib/safe-fetch", () => ({ follow: mocks.follow, safeUrl: mocks.safeUrl }));
@@ -57,7 +62,14 @@ vi.mock("@/lib/orgs/org-service", () => ({
     resolveOrgAccess: vi.fn()
 }));
 
-import { crmDriveFileRef, crmDriveFiles, crmPostJson, crmRunner } from "@/lib/crm-host";
+import {
+    crmDriveFileRef,
+    crmDriveFiles,
+    crmEventsWith,
+    crmMailWith,
+    crmPostJson,
+    crmRunner
+} from "@/lib/crm-host";
 
 const actor = { id: "u1", isAdmin: false };
 
@@ -154,5 +166,84 @@ describe("crmPostJson", () => {
         expect(await crmPostJson("http://169.254.169.254/", "{}")).toEqual({ failed: "address" });
         mocks.follow.mockResolvedValueOnce(null);
         expect(await crmPostJson(URL, "{}")).toEqual({ failed: "unreachable" });
+    });
+});
+
+describe("mail and events with a record's people", () => {
+    it("reads only the reader's own mailboxes, matched by lowercased address", async () => {
+        mocks.prisma.mailThread.findMany.mockResolvedValueOnce([
+            {
+                id: "t1",
+                subject: "Renewal",
+                snippet: "See you then",
+                participants: [{ name: "Fixture Contact", address: "contact@example.test" }],
+                messageCount: 3,
+                lastMessageAt: new Date("2026-10-01T10:00:00.000Z")
+            }
+        ]);
+        const found = await crmMailWith(actor, [" Contact@Example.test ", "not-an-address"], 20);
+        expect(mocks.prisma.mailAccount.findMany).toHaveBeenCalledWith({
+            where: { userId: "u1" },
+            select: { id: true }
+        });
+        expect(mocks.prisma.mailThread.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({
+                    accountId: { in: ["acc-1"] },
+                    OR: [
+                        {
+                            participants: {
+                                array_contains: [{ address: "contact@example.test" }]
+                            }
+                        }
+                    ]
+                }),
+                orderBy: { lastMessageAt: "desc" },
+                take: 20
+            })
+        );
+        expect(found).toEqual([
+            expect.objectContaining({
+                id: "t1",
+                messageCount: 3,
+                lastMessageAt: "2026-10-01T10:00:00.000Z",
+                href: "/mail/t/t1"
+            })
+        ]);
+    });
+
+    it("answers null without Mail or Calendar, and asks nothing without addresses", async () => {
+        mocks.userHasPermission.mockResolvedValueOnce(false);
+        expect(await crmMailWith(actor, ["contact@example.test"], 20)).toBeNull();
+        mocks.userHasPermission.mockResolvedValueOnce(false);
+        expect(await crmEventsWith(actor, ["contact@example.test"], 20)).toBeNull();
+        expect(await crmMailWith(actor, [], 20)).toEqual([]);
+        expect(await crmEventsWith(actor, [""], 20)).toEqual([]);
+        expect(mocks.prisma.mailThread.findMany).not.toHaveBeenCalled();
+        expect(mocks.prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it("finds events by an escaped mailto pattern on the reader's own calendars", async () => {
+        mocks.prisma.$queryRaw.mockResolvedValueOnce([
+            {
+                id: "e1",
+                summary: "Demo",
+                location: "",
+                startsAt: new Date("2026-10-02T09:00:00.000Z"),
+                endsAt: null,
+                allDay: false
+            }
+        ]);
+        const found = await crmEventsWith(actor, ["first_last@example.test"], 20);
+        const [, ...values] = mocks.prisma.$queryRaw.mock.calls[0] as unknown as unknown[];
+        expect(values).toContain("u1");
+        expect(values).toContainEqual(["%mailto:first\_last@example.test%"]);
+        expect(found).toEqual([
+            expect.objectContaining({
+                id: "e1",
+                startsAt: "2026-10-02T09:00:00.000Z",
+                href: "/calendar/e/e1"
+            })
+        ]);
     });
 });

@@ -329,3 +329,150 @@ export async function crmPostJson(
     await response.body?.cancel().catch(() => undefined);
     return { status: response.status };
 }
+
+/** A conversation in the reader's own mail, as a record's activity shows it. */
+export interface CrmMailThread {
+    readonly id: string;
+    readonly subject: string;
+    readonly snippet: string;
+    readonly participants: readonly { readonly name: string; readonly address: string }[];
+    readonly messageCount: number;
+    readonly lastMessageAt: string;
+    readonly href: string;
+}
+
+/** An event in the reader's own calendars, as a record's activity shows it. */
+export interface CrmCalendarEvent {
+    readonly id: string;
+    readonly summary: string;
+    readonly location: string;
+    readonly startsAt: string | null;
+    readonly endsAt: string | null;
+    readonly allDay: boolean;
+    readonly href: string;
+}
+
+async function mayUse(actor: OrgActor, permission: "mail.use" | "calendar.use"): Promise<boolean> {
+    if (actor.isAdmin) return true;
+    const { userHasPermission } = await import("@polaris/auth");
+    return userHasPermission(actor.id, permission);
+}
+
+/** The most addresses one question asks about: a company with a long staff
+ *  list reads its most recent people, not a query the size of the table. */
+const MAX_ADDRESSES = 50;
+
+function addressList(addresses: readonly string[]): string[] {
+    return [
+        ...new Set(addresses.map((one) => one.trim().toLowerCase()).filter((one) => one.includes("@")))
+    ].slice(0, MAX_ADDRESSES);
+}
+
+/**
+ * The newest conversations in this account's own mailboxes that any of these
+ * addresses took part in, or null when the account may not use Mail. Only the
+ * reader's own mail: nobody else's mailbox is read for a record they share.
+ * Conversations left only in the trash or junk are not counted.
+ */
+export async function crmMailWith(
+    actor: OrgActor,
+    addresses: readonly string[],
+    limit: number
+): Promise<CrmMailThread[] | null> {
+    if (!(await mayUse(actor, "mail.use"))) return null;
+    const wanted = addressList(addresses);
+    if (wanted.length === 0) return [];
+    const accounts = await prisma.mailAccount.findMany({
+        where: { userId: actor.id },
+        select: { id: true }
+    });
+    if (accounts.length === 0) return [];
+    const { addressesFrom } = await import("@/lib/mailbox/json");
+    const { snippetFrom } = await import("@polaris/core");
+    const rows = await prisma.mailThread.findMany({
+        where: {
+            accountId: { in: accounts.map((one) => one.id) },
+            // Participants are held lowercased, so containment on the address
+            // alone matches whatever name came with it.
+            OR: wanted.map((address) => ({ participants: { array_contains: [{ address }] } })),
+            messages: {
+                some: {
+                    deleted: false,
+                    folder: { role: { notIn: ["trash", "junk"] } }
+                }
+            }
+        },
+        select: {
+            id: true,
+            subject: true,
+            snippet: true,
+            participants: true,
+            messageCount: true,
+            lastMessageAt: true
+        },
+        orderBy: { lastMessageAt: "desc" },
+        take: Math.min(Math.max(limit, 1), 50)
+    });
+    return rows.map((row) => ({
+        id: row.id,
+        subject: row.subject,
+        snippet: snippetFrom(row.snippet),
+        participants: addressesFrom(row.participants).map((one) => ({
+            name: one.name,
+            address: one.address
+        })),
+        messageCount: row.messageCount,
+        lastMessageAt: row.lastMessageAt.toISOString(),
+        href: `/mail/t/${row.id}`
+    }));
+}
+
+/** Escape what ILIKE reads as a wildcard, so `a_b@x` matches only itself. */
+const likeLiteral = (value: string) => value.replace(/[\%_]/g, "\$&");
+
+/**
+ * The events in this account's own calendars that any of these addresses is
+ * invited to or organizes, the latest first, or null when the account may not
+ * use Calendar. Read from the stored iCalendar text with its folded lines
+ * joined first, since a long address can be split across one.
+ */
+export async function crmEventsWith(
+    actor: OrgActor,
+    addresses: readonly string[],
+    limit: number
+): Promise<CrmCalendarEvent[] | null> {
+    if (!(await mayUse(actor, "calendar.use"))) return null;
+    const wanted = addressList(addresses);
+    if (wanted.length === 0) return [];
+    const patterns = wanted.map((address) => `%mailto:${likeLiteral(address)}%`);
+    const take = Math.min(Math.max(limit, 1), 50);
+    const rows = await prisma.$queryRaw<
+        {
+            id: string;
+            summary: string;
+            location: string;
+            startsAt: Date | null;
+            endsAt: Date | null;
+            allDay: boolean;
+        }[]
+    >`
+        SELECT o."id", o."summary", o."location", o."startsAt", o."endsAt", o."allDay"
+        FROM "CalendarObject" o
+        JOIN "Calendar" c ON c."id" = o."calendarId"
+        WHERE c."ownerId" = ${actor.id}::uuid
+          AND o."deletedAt" IS NULL
+          AND o."component" = 'VEVENT'
+          AND regexp_replace(o."ics", E'\r?\n[ \t]', '', 'g') ILIKE ANY (${patterns}::text[])
+        ORDER BY o."startsAt" DESC NULLS LAST
+        LIMIT ${take}
+    `;
+    return rows.map((row) => ({
+        id: row.id,
+        summary: row.summary,
+        location: row.location,
+        startsAt: row.startsAt?.toISOString() ?? null,
+        endsAt: row.endsAt?.toISOString() ?? null,
+        allDay: row.allDay,
+        href: `/calendar/e/${row.id}`
+    }));
+}

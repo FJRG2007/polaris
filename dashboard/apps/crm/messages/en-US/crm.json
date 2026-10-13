@@ -437,7 +437,14 @@
         "files": "Files",
         "noFiles": "No files yet",
         "attachFile": "Attach from Drive",
-        "fileRefused": "That file cannot be attached. Pick a file you can open in Drive."
+        "fileRefused": "That file cannot be attached. Pick a file you can open in Drive.",
+        "mail": "Emails",
+        "noMail": "No emails with them in your mailboxes",
+        "noSubject": "(no subject)",
+        "mailCount": "{count} messages - {people}",
+        "events": "Meetings",
+        "noEvents": "No meetings with them in your calendars",
+        "noSummary": "(untitled event)"
     },
     "import": {
         "button": "Import",

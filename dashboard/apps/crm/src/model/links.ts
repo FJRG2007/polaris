@@ -69,6 +69,34 @@ export interface RecordActivities {
     /** The Drive files linked here that the reader may still open. Missing
      *  from an answer kept by an older build. */
     readonly files?: LinkedFile[];
+    /** The reader's own mail with the record's people, newest first; null when
+     *  they may not use Mail. Missing from an answer kept by an older build. */
+    readonly mail?: MailWith[] | null;
+    /** The reader's own events those people are in; null when they may not
+     *  use Calendar. Missing from an answer kept by an older build. */
+    readonly events?: EventWith[] | null;
+}
+
+/** A conversation in the reader's mail that someone on a record took part in. */
+export interface MailWith {
+    readonly id: string;
+    readonly subject: string;
+    readonly snippet: string;
+    readonly participants: readonly { readonly name: string; readonly address: string }[];
+    readonly messageCount: number;
+    readonly lastMessageAt: string;
+    readonly href: string;
+}
+
+/** An event in the reader's calendars that someone on a record is in. */
+export interface EventWith {
+    readonly id: string;
+    readonly summary: string;
+    readonly location: string;
+    readonly startsAt: string | null;
+    readonly endsAt: string | null;
+    readonly allDay: boolean;
+    readonly href: string;
 }
 
 const text = (max: number) => z.string().trim().max(max);

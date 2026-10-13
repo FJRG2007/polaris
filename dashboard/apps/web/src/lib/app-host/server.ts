@@ -307,6 +307,8 @@ export const serverHost = {
         crmCreateNote: later(load.crmHost, "crmCreateNote"),
         crmDriveFileRef: later(load.crmHost, "crmDriveFileRef"),
         crmDriveFiles: later(load.crmHost, "crmDriveFiles"),
+        crmEventsWith: later(load.crmHost, "crmEventsWith"),
+        crmMailWith: later(load.crmHost, "crmMailWith"),
         crmNoteShelves: later(load.crmHost, "crmNoteShelves"),
         crmNotesByIds: later(load.crmHost, "crmNotesByIds"),
         crmOrgPeople: later(load.crmHost, "crmOrgPeople"),

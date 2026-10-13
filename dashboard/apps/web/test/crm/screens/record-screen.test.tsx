@@ -28,7 +28,9 @@ const state = vi.hoisted(() => ({
     ticks: [] as unknown[],
     favorite: false,
     pins: [] as unknown[],
-    refusePin: false
+    refusePin: false,
+    mail: null as unknown[] | null,
+    events: null as unknown[] | null
 }));
 
 vi.mock("@polaris-app/crm/src/actions/favorites", () => ({
@@ -53,7 +55,9 @@ vi.mock("@polaris-app/crm/src/actions/activities", () => ({
             })),
             taskLists: [
                 { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Sales", spaceName: "Team" }
-            ]
+            ],
+            mail: state.mail,
+            events: state.events
         }
     }),
     createRecordNoteAction: async (input: { note: { title: string } }) => {
@@ -119,6 +123,8 @@ beforeEach(() => {
     state.favorite = false;
     state.pins = [];
     state.refusePin = false;
+    state.mail = null;
+    state.events = null;
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
     if (typeof localStorage !== "undefined") localStorage.clear();
 });
@@ -195,6 +201,33 @@ describe("pinning a record", () => {
 describe("notes and tasks on a record", () => {
     beforeEach(() => {
         state.record = { ...state.record!, deletedAt: null };
+    });
+
+    it("lists the reader's mail and meetings with the record's people, linked to them", async () => {
+        state.mail = [
+            {
+                id: "t1",
+                subject: "Renewal terms",
+                snippet: "",
+                participants: [{ name: "Fixture Contact", address: "contact@example.test" }],
+                messageCount: 3,
+                lastMessageAt: "2026-10-01T10:00:00.000Z",
+                href: "/mail/t/t1"
+            }
+        ];
+        state.events = [];
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const link = await screen.findByRole("link", { name: /Renewal terms/ });
+        expect(link.getAttribute("href")).toBe("/mail/t/t1");
+        expect(link.textContent).toContain("3 messages - Fixture Contact");
+        expect(screen.getByText("No meetings with them in your calendars")).toBeTruthy();
+    });
+
+    it("leaves mail and meetings out for a reader without them", async () => {
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("No notes yet")).toBeTruthy();
+        expect(screen.queryByRole("region", { name: "Emails" })).toBeNull();
+        expect(screen.queryByRole("region", { name: "Meetings" })).toBeNull();
     });
 
     it("writes a note from the record and lists it", async () => {

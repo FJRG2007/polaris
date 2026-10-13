@@ -437,7 +437,14 @@
         "files": "Archivos",
         "noFiles": "Sin archivos",
         "attachFile": "Adjuntar de Drive",
-        "fileRefused": "Ese archivo no se puede adjuntar. Elige uno que puedas abrir en Drive."
+        "fileRefused": "Ese archivo no se puede adjuntar. Elige uno que puedas abrir en Drive.",
+        "mail": "Correos",
+        "noMail": "No hay correos con ellos en tus buzones",
+        "noSubject": "(sin asunto)",
+        "mailCount": "{count} mensajes - {people}",
+        "events": "Reuniones",
+        "noEvents": "No hay reuniones con ellos en tus calendarios",
+        "noSummary": "(evento sin título)"
     },
     "import": {
         "button": "Importar",
