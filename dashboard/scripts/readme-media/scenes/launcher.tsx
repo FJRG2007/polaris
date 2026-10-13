@@ -47,9 +47,9 @@ export const launcher = defineScene({
     id: "launcher",
     path: `/tasks/l/${TASK_LIST_ID}`,
     actions: () => ({
-        markLauncherReadAction: (input: { scope: string; app?: string }) => {
-            if (input.scope === "all") for (const group of ["chat", "mail"]) marked.add(group);
-            else if (input.app) marked.add(input.app);
+        markLauncherReadAction: (input?: { scope: string; app?: string }) => {
+            if (input?.scope === "all") for (const group of ["chat", "mail"]) marked.add(group);
+            else if (input?.app) marked.add(input.app);
             return {};
         }
     }),
