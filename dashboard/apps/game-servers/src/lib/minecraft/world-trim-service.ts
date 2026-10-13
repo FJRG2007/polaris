@@ -69,7 +69,8 @@ async function worldPathOf(ownerId: string, installedAppId: string): Promise<str
     // The image defaults to a level called `world`, and a level name with a slash
     // or a parent step in it is not a level name - it is somebody pointing this at
     // a folder outside the world.
-    const name = level && /^[A-Za-z0-9 _.-]{1,64}$/.test(level) && !level.includes("..") ? level : "world";
+    const name =
+        level && /^[A-Za-z0-9 _.-]{1,64}$/.test(level) && !level.includes("..") ? level : "world";
     return `${levelParent("java")}/${name}`;
 }
 
@@ -81,7 +82,10 @@ async function worldPathOf(ownerId: string, installedAppId: string): Promise<str
  * needs the server stopped: reading a region file a live server is writing would
  * give a number that was true for a moment.
  */
-export async function previewWorldTrim(ownerId: string, installedAppId: string): Promise<WorldTrimOutcome> {
+export async function previewWorldTrim(
+    ownerId: string,
+    installedAppId: string
+): Promise<WorldTrimOutcome> {
     return runTrim(ownerId, installedAppId, { dryRun: true, backup: false, restart: false });
 }
 
@@ -110,7 +114,11 @@ export async function optimizeWorldNow(
  * own reasons is a free moment, and this is the only kind of moment an automatic
  * optimization is allowed to use.
  */
-export async function sweepWorldTrim(ownerId: string, installedAppId: string, now = new Date()): Promise<boolean> {
+export async function sweepWorldTrim(
+    ownerId: string,
+    installedAppId: string,
+    now = new Date()
+): Promise<boolean> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
         select: { config: true, catalogId: true, applicationId: true }
@@ -132,7 +140,11 @@ export async function sweepWorldTrim(ownerId: string, installedAppId: string, no
     // server up, and starting it to back it up would be the sweep stopping and
     // starting a server nobody asked it to touch. A stopped server's world is
     // already covered by whatever backup plan it has.
-    const outcome = await runTrim(ownerId, installedAppId, { dryRun: false, backup: false, restart: false });
+    const outcome = await runTrim(ownerId, installedAppId, {
+        dryRun: false,
+        backup: false,
+        restart: false
+    });
     return outcome.failure === null;
 }
 
@@ -156,8 +168,7 @@ async function runTrim(
         .catch(() => null);
     const wasRunning = app?.desiredState === "running";
 
-    if (wasRunning && !how.restart)
-        return fail(gameMessage("games", "lib.trim.stopFirst"), false);
+    if (wasRunning && !how.restart) return fail(gameMessage("games", "lib.trim.stopFirst"), false);
 
     let restarted = false;
     const held = [install.applicationId];
@@ -175,14 +186,18 @@ async function runTrim(
         if (!how.dryRun) await record(installedAppId, outcome);
         return { ...outcome, restarted };
     } catch (caught) {
-        const why = caught instanceof Error ? caught.message : gameMessage("games", "lib.trim.failed");
+        const why =
+            caught instanceof Error ? caught.message : gameMessage("games", "lib.trim.failed");
         if (!how.dryRun) await record(installedAppId, { report: null, failure: why, restarted });
         return { report: null, failure: why, restarted };
     } finally {
         // Always, including after a failure: a server that was up when somebody
         // pressed this has to be up when they look again.
         await releaseStorage(held).catch(() => undefined);
-        if (restarted) await setApplicationRunning(install.applicationId, ownerId, true).catch(() => undefined);
+        if (restarted)
+            await setApplicationRunning(install.applicationId, ownerId, true).catch(
+                () => undefined
+            );
     }
 }
 
@@ -194,8 +209,7 @@ async function execute(
     dryRun: boolean
 ): Promise<WorldTrimOutcome> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!server.trimWorld)
-            return fail(gameMessage("games", "lib.trim.needsNewer"), false);
+        if (!server.trimWorld) return fail(gameMessage("games", "lib.trim.needsNewer"), false);
         const result = await server.trimWorld(WORLD_TRIM_SCRIPT, {
             world,
             keepTicks: settings.keepTicks,
@@ -208,7 +222,12 @@ async function execute(
             // "python3: not found" is the whole answer for an image that has none,
             // and inventing a friendlier sentence would hide it.
             const said = result.output.trim().split(/\r?\n/).filter(Boolean).slice(-1)[0] ?? "";
-            return fail(said.length > 0 && said.length < 300 ? said : gameMessage("games", "lib.trim.failed"), false);
+            return fail(
+                said.length > 0 && said.length < 300
+                    ? said
+                    : gameMessage("games", "lib.trim.failed"),
+                false
+            );
         }
         return { report, failure: null, restarted: false };
     });

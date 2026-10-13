@@ -70,22 +70,24 @@ async function factsOf(where: { id: { in: string[] } } | { storageMode: { not: n
             .filter((install) => gameForCatalogId(install.catalogId))
             .map((install) => install.applicationId)
     );
-    return apps.map((app): AppFacts => ({
-        id: app.id,
-        ownerId: app.environment.project.ownerId,
-        desiredState: app.desiredState,
-        asleep: app.asleepSince !== null,
-        deployed: app.currentDeploymentId !== null,
-        swarm: app.target.runtime === "swarm",
-        game: games.has(app.id),
-        own: placement.choiceOf(app.storageMode, app.storageConnectionId),
-        pendingSince: app.parkPendingSince,
-        createdAt: app.createdAt,
-        volumes: app.volumes.flatMap((volume) => {
-            const where = plan.placementOf(volume);
-            return where ? [{ id: volume.id, location: plan.locationOf(where) }] : [];
+    return apps.map(
+        (app): AppFacts => ({
+            id: app.id,
+            ownerId: app.environment.project.ownerId,
+            desiredState: app.desiredState,
+            asleep: app.asleepSince !== null,
+            deployed: app.currentDeploymentId !== null,
+            swarm: app.target.runtime === "swarm",
+            game: games.has(app.id),
+            own: placement.choiceOf(app.storageMode, app.storageConnectionId),
+            pendingSince: app.parkPendingSince,
+            createdAt: app.createdAt,
+            volumes: app.volumes.flatMap((volume) => {
+                const where = plan.placementOf(volume);
+                return where ? [{ id: volume.id, location: plan.locationOf(where) }] : [];
+            })
         })
-    }));
+    );
 }
 
 /** Every game server's install, for a policy that applies to all of them. */

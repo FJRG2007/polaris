@@ -29,7 +29,8 @@ export type Placement =
 
 /** A storage location a volume can be moved to. */
 export type Location =
-    { readonly kind: "server" } | { readonly kind: "nas"; readonly connectionId: string };
+    | { readonly kind: "server" }
+    | { readonly kind: "nas"; readonly connectionId: string };
 
 export const MOVE_STATES = [
     "queued",

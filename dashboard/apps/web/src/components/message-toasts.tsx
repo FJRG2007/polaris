@@ -210,7 +210,10 @@ export function MessageToasts() {
 
             const t = words.current;
             const who = message.inChannel
-                ? t("messageToasts.inChannel", { author: message.authorName, channel: message.conversation })
+                ? t("messageToasts.inChannel", {
+                      author: message.authorName,
+                      channel: message.conversation
+                  })
                 : message.authorName;
             const replyTo = message.inChannel
                 ? t("messageToasts.messageChannel", { channel: message.conversation })

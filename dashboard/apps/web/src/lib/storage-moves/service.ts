@@ -475,7 +475,12 @@ export async function volumeApplication(volumeId: string): Promise<string | null
 }
 
 export type StartRefusal =
-    "missing" | "notDeployed" | "busy" | "sameLocation" | "notOffered" | "swarm";
+    | "missing"
+    | "notDeployed"
+    | "busy"
+    | "sameLocation"
+    | "notOffered"
+    | "swarm";
 
 /**
  * Queue a move of one volume to `destination` (`server` or a connection id) and
