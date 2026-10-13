@@ -499,8 +499,7 @@
         "whitelist": "Poner a {name} en la lista blanca",
         "menu": {
             "inventory": "Inventario y objetos",
-            "location": "Dónde está",
-            "teleport": "Teleportar",
+            "location": "Coordenadas",
             "experience": "Experiencia",
             "resetPassword": "Nueva contraseña",
             "gameMode": "Modo",

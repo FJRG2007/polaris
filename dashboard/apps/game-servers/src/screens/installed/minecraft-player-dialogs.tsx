@@ -63,7 +63,6 @@ const { AccountInput } = hostUi.accountInput;
 
 /** Which of the forms is open, or none. */
 export type PlayerDialog =
-    | "teleport"
     | "timeout"
     | "inventory"
     | "location"
@@ -177,18 +176,21 @@ const COORDINATES =
 /** A Java account name, which a teleport destination may also be. */
 const PLAYER_NAME = /^[A-Za-z0-9_]{1,16}$/;
 
-export function TeleportDialog({
+/**
+ * Sending a player somewhere: to whoever else is on, or to three coordinates.
+ * Part of the coordinates screen rather than a door of its own, so looking where
+ * somebody is never moves them - only the button here does.
+ */
+function TeleportForm({
     player,
     others,
     pending,
-    onClose,
     onTeleport
 }: {
     player: string;
     /** Everyone else on right now, since "to whoever" is the common case. */
     others: readonly string[];
     pending: boolean;
-    onClose: () => void;
     onTeleport: (destination: string) => void;
 }) {
     const t = useGameText("minecraft");
@@ -198,20 +200,23 @@ export function TeleportDialog({
     const error = value.length > 0 && !valid ? t("players.teleportTargetRule") : null;
 
     return (
-        <PlayerFormDialog
-            title={t("players.teleportNamed", { name: player })}
-            description={t("players.toAnotherPlayerWhoIs")}
-            onClose={onClose}
-            pending={pending}
-            ready={valid && !pending}
-            confirmLabel={t("players.teleport")}
-            onConfirm={() => onTeleport(value)}
+        <form
+            className="flex flex-col gap-2 border-t border-border pt-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (valid && !pending) onTeleport(value);
+            }}
         >
+            <div>
+                <p className="text-sm font-medium">{t("players.teleportNamed", { name: player })}</p>
+                <p className="text-xs text-muted-foreground">{t("players.toAnotherPlayerWhoIs")}</p>
+            </div>
             {others.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                     {others.map((name) => (
                         <Button
                             key={name}
+                            type="button"
                             size="sm"
                             variant="secondary"
                             onClick={() => setDestination(name)}
@@ -222,15 +227,21 @@ export function TeleportDialog({
                 </div>
             )}
             <PlayerFormField label={t("players.playerOrCoordinates")} error={error}>
-                <Input
-                    autoFocus
-                    value={destination}
-                    spellCheck={false}
-                    placeholder={t("players.aliceOr10064220")}
-                    onChange={(event) => setDestination(event.target.value)}
-                />
+                <div className="flex min-w-0 gap-2">
+                    <Input
+                        value={destination}
+                        spellCheck={false}
+                        placeholder={t("players.aliceOr10064220")}
+                        className="min-w-0 flex-1"
+                        onChange={(event) => setDestination(event.target.value)}
+                    />
+                    <Button type="submit" disabled={!valid || pending}>
+                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Locate className="size-4" />}
+                        {t("players.teleport")}
+                    </Button>
+                </div>
             </PlayerFormField>
-        </PlayerFormDialog>
+        </form>
     );
 }
 
@@ -298,7 +309,8 @@ export function InventoryDialog({
 }
 
 /**
- * Where a player is, and the coordinates in a form worth pasting.
+ * Where a player is, and the coordinates in a form worth pasting - and, below
+ * them, where to send them, for whoever may teleport.
  *
  * Read on demand rather than shown in the table: every reading is a command sent
  * to the running server, and one per player per poll would be a moderation screen
@@ -307,10 +319,17 @@ export function InventoryDialog({
 export function LocationDialog({
     installedAppId,
     player,
+    teleport,
     onClose
 }: {
     installedAppId: string;
     player: string;
+    /** The way to move them, or undefined where that is not offered. */
+    teleport?: {
+        readonly others: readonly string[];
+        readonly pending: boolean;
+        readonly onTeleport: (destination: string) => void;
+    };
     onClose: () => void;
 }) {
     const t = useGameText("minecraft");
@@ -332,6 +351,16 @@ export function LocationDialog({
             error={error}
             onRefresh={refresh}
             onClose={onClose}
+            after={
+                teleport && (
+                    <TeleportForm
+                        player={player}
+                        others={teleport.others}
+                        pending={teleport.pending}
+                        onTeleport={teleport.onTeleport}
+                    />
+                )
+            }
         >
             {position && <Coordinates player={player} position={position} />}
         </Reading>
@@ -433,6 +462,7 @@ function Reading({
     loading,
     error,
     children,
+    after,
     onRefresh,
     onClose
 }: {
@@ -446,6 +476,8 @@ function Reading({
     error: string | null;
     /** The reading itself, or nothing when there was none. */
     children: React.ReactNode;
+    /** Shown under the reading whatever state it is in. */
+    after?: React.ReactNode;
     onRefresh: () => void;
     onClose: () => void;
 }) {
@@ -474,6 +506,7 @@ function Reading({
                         {empty}
                     </p>
                 )}
+                {after}
                 <DialogFooter>
                     <Button variant="secondary" onClick={onRefresh} disabled={loading}>
                         <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} />

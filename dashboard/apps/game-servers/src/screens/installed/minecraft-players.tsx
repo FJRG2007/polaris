@@ -53,7 +53,6 @@ import {
     InventoryDialog,
     LocationDialog,
     PlayerAccessDialog,
-    TeleportDialog,
     type PlayerDialog
 } from "./minecraft-player-dialogs";
 import { Badge, Button, Card, CardBody, Skeleton, Switch, cn } from "@polaris/ui";
@@ -67,7 +66,6 @@ import {
     History,
     KeyRound,
     LocateFixed,
-    MapPin,
     Pencil,
     RotateCcw,
     ShieldBan,
@@ -847,24 +845,6 @@ export function MinecraftPlayers({
                     }}
                 />
             )}
-            {acting?.dialog === "teleport" && target && (
-                <TeleportDialog
-                    player={target.name}
-                    others={onlineNames.filter((name) => name !== target.name)}
-                    pending={pending}
-                    onClose={() => setActing(null)}
-                    onTeleport={(destination) => {
-                        setActing(null);
-                        run(() =>
-                            actions.teleportPlayerAction({
-                                installedAppId,
-                                player: target.name,
-                                destination
-                            })
-                        );
-                    }}
-                />
-            )}
             {acting?.dialog === "experience" && target && (
                 <ExperienceDialog
                     player={target.name}
@@ -927,6 +907,20 @@ export function MinecraftPlayers({
                 <LocationDialog
                     installedAppId={installedAppId}
                     player={target.name}
+                    teleport={{
+                        others: onlineNames.filter((name) => name !== target.name),
+                        pending,
+                        onTeleport: (destination) => {
+                            setActing(null);
+                            run(() =>
+                                actions.teleportPlayerAction({
+                                    installedAppId,
+                                    player: target.name,
+                                    destination
+                                })
+                            );
+                        }
+                    }}
                     onClose={() => setActing(null)}
                 />
             )}
@@ -1509,13 +1503,6 @@ function moreEntries({
             icon: <LocateFixed className="size-4" />,
             disabled: !live || bedrock || !player.online,
             onSelect: () => onOpen("location")
-        },
-        {
-            kind: "item",
-            text: t("playersTab.menu.teleport"),
-            icon: <MapPin className="size-4" />,
-            disabled: !live || bedrock || !player.online,
-            onSelect: () => onOpen("teleport")
         },
         // Only while they are on: the game changes a bar on a player who is
         // standing there, and there is nothing to write down for somebody who is
