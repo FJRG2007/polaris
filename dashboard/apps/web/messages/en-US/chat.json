@@ -359,6 +359,7 @@
         "yourScreen": "Your screen",
         "theirScreen": "{name} - screen",
         "backToTheGrid": "Back to the grid",
+        "streamFormat": "{height}P {fps}FPS",
         "backToThePeople": "Back to the people",
         "you": "You",
         "guest": "guest",
