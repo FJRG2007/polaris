@@ -1,6 +1,8 @@
 /**
- * The client id and secret somebody pastes for an app of their own. Shared by
- * the form, which checks it as it is typed, and the action that stores it.
+ * The client id and secret of an app somebody registered for their own links,
+ * shaped the way `saveOwnOAuthApp` stores it. No screen collects this anymore
+ * (setting up a provider app is the administrator's job), so this only
+ * validates an app stored before that.
  */
 
 import { z } from "zod";
