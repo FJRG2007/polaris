@@ -112,6 +112,11 @@ export async function ownOAuthAppsFor(
     return found;
 }
 
+/** How many people brought their own app for a provider. One indexed count. */
+export async function countOwnOAuthApps(provider: string): Promise<number> {
+    return prisma.userOAuthApp.count({ where: { provider } });
+}
+
 /** The client id alone, for the screen: never the secret. */
 export async function ownOAuthAppClientId(userId: string, provider: string): Promise<string | null> {
     const row = await prisma.userOAuthApp.findUnique({

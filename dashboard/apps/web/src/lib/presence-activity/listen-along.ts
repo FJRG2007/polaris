@@ -24,6 +24,7 @@
 import { prisma } from "@polaris/db";
 import type * as core from "@polaris/core";
 import { sourceSharedWith } from "./service";
+import { ownOAuthApp, pickOAuthClient } from "@/lib/connections/own-oauth-app";
 import { isLastfmKey } from "@/lib/connections/spotify-search";
 import { presenceFor } from "@/lib/presence-service";
 import { readCredential, updateCredential } from "@/lib/connections/store";
@@ -77,8 +78,6 @@ function strays(): Map<string, number> {
 async function listenerToken(
     userId: string
 ): Promise<{ connectionId: string; accessToken: string } | null> {
-    const client = await getSpotifyOAuthClient();
-    if (!client) return null;
     const link = await prisma.userConnection.findFirst({
         where: { userId, provider: SPOTIFY_PROVIDER, encryptedToken: { not: null } },
         orderBy: { linkedAt: "asc" },
@@ -87,6 +86,13 @@ async function listenerToken(
     if (!link) return null;
     const credential = await readCredential(link.id);
     if (!credential) return null;
+    // The app that issued their link: their own, or the deployment's.
+    const [own, deployment] = await Promise.all([
+        ownOAuthApp(userId, SPOTIFY_PROVIDER),
+        getSpotifyOAuthClient()
+    ]);
+    const client = pickOAuthClient({ own, deployment, issuedTo: credential.clientId, existing: true });
+    if (!client) return null;
     const token = await spotifyAccessToken(client, credential).catch((caught: unknown) => {
         if (caught instanceof SpotifyUnauthorized) return null;
         throw caught;

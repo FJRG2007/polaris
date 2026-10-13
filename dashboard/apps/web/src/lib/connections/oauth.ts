@@ -14,6 +14,7 @@
  * that already connected.
  */
 
+import { ownOAuthAppClientId } from "./own-oauth-app";
 import { STEAM_PROVIDER } from "./steam";
 import { connectionProven } from "./proven";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -43,6 +44,7 @@ import {
     exchangeSpotifyCode,
     getSpotifyOAuthClient,
     identifySpotifyAccount,
+    spotifyClientFor,
     SPOTIFY_REQUIRED_SCOPES,
     spotifyAuthorizeUrl
 } from "./spotify";
@@ -116,8 +118,10 @@ interface ProviderOAuth {
     /** Where the provider returns somebody after they authorize. Registered on
      *  the operator's application, so it is built in one place. */
     callbackUrl(baseUrl: string): string;
-    /** The operator's application, or null when this deployment has none. */
-    client(): Promise<OAuthClient | null>;
+    /** The operator's application, or null when this deployment has none.
+     *  Given who is linking, a provider that lets a person bring their own
+     *  application answers with theirs first. */
+    client(userId?: string): Promise<OAuthClient | null>;
     authorizeUrl(
         client: OAuthClient,
         redirectUri: string,
@@ -258,7 +262,8 @@ const ADAPTERS: Record<string, ProviderOAuth> = {
     },
     spotify: {
         callbackUrl: (baseUrl) => `${baseUrl}/api/connections/spotify/callback`,
-        client: getSpotifyOAuthClient,
+        // A person's own app first: the deployment's serves five people at most.
+        client: (userId) => (userId ? spotifyClientFor(userId) : getSpotifyOAuthClient()),
         authorizeUrl: (client, redirectUri, state) =>
             spotifyAuthorizeUrl(client, redirectUri, state),
         // Nothing about an address: Spotify no longer hands one over.
@@ -313,10 +318,15 @@ export function supportsOAuth(provider: string): boolean {
  */
 export async function connectionLinkAvailable(
     provider: string,
-    options?: { admin?: boolean }
+    options?: { admin?: boolean; userId?: string }
 ): Promise<boolean> {
     if (provider === STEAM_PROVIDER)
         return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
+    // Somebody who registered their own application has proved nothing to
+    // anybody else, but needs nothing from the operator either.
+    if (options?.userId && supportsOAuth(provider) && (await ownOAuthAppClientId(options.userId, provider))) {
+        return true;
+    }
     if (!supportsOAuth(provider) || (await connectionOAuthClient(provider)) === null) return false;
     return options?.admin === true || (await connectionProven(provider));
 }
@@ -392,9 +402,11 @@ export async function verifyConnectionOAuthApp(
     return verify ? verify(client, redirectUri) : null;
 }
 
-/** The operator's application for this provider, or null when there is none. */
-export function connectionOAuthClient(provider: string): Promise<OAuthClient | null> {
-    return adapter(provider).client();
+/** The operator's application for this provider, or null when there is none.
+ *  With a user, the application that person's link goes through, which may be
+ *  their own. */
+export function connectionOAuthClient(provider: string, userId?: string): Promise<OAuthClient | null> {
+    return adapter(provider).client(userId);
 }
 
 export function connectionAuthorizeUrl(

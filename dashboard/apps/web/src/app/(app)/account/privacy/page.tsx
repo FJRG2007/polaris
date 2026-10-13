@@ -28,7 +28,7 @@ export default async function PrivacyPage() {
         listBlocked(session.id),
         activitySettingsOf(session.id),
         listConnections(session.id, "spotify"),
-        connectionLinkAvailable("spotify", { admin: session.isAdmin }).catch(() => false)
+        connectionLinkAvailable("spotify", { admin: session.isAdmin, userId: session.id }).catch(() => false)
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.

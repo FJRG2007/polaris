@@ -51,7 +51,7 @@ export default async function ConnectionsPage() {
             // is no screen worth sending anybody to, so the card says what to ask
             // for instead of offering a button that fails. An administrator is
             // offered it anyway: theirs is the authorization that proves it.
-            canAuthorize: await connectionLinkAvailable(provider.slug, { admin: user.isAdmin }),
+            canAuthorize: await connectionLinkAvailable(provider.slug, { admin: user.isAdmin, userId: user.id }),
             // Whether the operator allows this service as a way in. Without it,
             // the card says nothing about signing in rather than pointing at a
             // switch that would do nothing.

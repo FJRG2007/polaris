@@ -45,7 +45,11 @@ const fake = vi.hoisted(() => ({
     refreshRefused: new Set<string>(),
     slow: 0,
     rateLimited: false,
-    asked: [] as string[]
+    asked: [] as string[],
+    deployment: true,
+    ownApps: new Map<string, { clientId: string; clientSecret: string }>(),
+    issued: new Map<string, string>(),
+    clients: [] as string[]
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -122,15 +126,29 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/connections/store", () => ({
-    readCredential: async (id: string) => ({ accessToken: `token-${id}` }),
+    readCredential: async (id: string) => ({
+        accessToken: `token-${id}`,
+        ...(fake.issued.has(id) ? { clientId: fake.issued.get(id) } : {})
+    }),
     updateCredential: async () => undefined
 }));
+vi.mock("@/lib/connections/own-oauth-app", async (original) => {
+    const real = await original<typeof import("@/lib/connections/own-oauth-app")>();
+    return {
+        ...real,
+        ownOAuthApp: async (userId: string) => fake.ownApps.get(userId) ?? null,
+        ownOAuthAppsFor: async (userIds: string[]) =>
+            new Map([...fake.ownApps].filter(([userId]) => userIds.includes(userId))),
+        countOwnOAuthApps: async () => fake.ownApps.size
+    };
+});
 vi.mock("@/lib/connections/spotify", async (original) => {
     const real = await original<typeof import("@/lib/connections/spotify")>();
     return {
         ...real,
-        getSpotifyOAuthClient: async () => ({ clientId: "c", clientSecret: "s" }),
-        spotifyAccessToken: async (_client: unknown, credential: { accessToken: string }) => {
+        getSpotifyOAuthClient: async () => (fake.deployment ? { clientId: "c", clientSecret: "s" } : null),
+        spotifyAccessToken: async (client: { clientId: string }, credential: { accessToken: string }) => {
+            fake.clients.push(client.clientId);
             if (fake.refreshRefused.has(credential.accessToken))
                 throw new real.SpotifyUnauthorized();
             if (fake.blip.has(credential.accessToken)) throw new Error("Spotify timed out");
@@ -218,6 +236,10 @@ beforeEach(() => {
     fake.slow = 0;
     fake.rateLimited = false;
     fake.asked = [];
+    fake.deployment = true;
+    fake.ownApps.clear();
+    fake.issued.clear();
+    fake.clients = [];
 });
 
 describe("when an account is asked about again", () => {
@@ -232,6 +254,37 @@ describe("when an account is asked about again", () => {
         expect([1, 2, 3, 4, 9].map(poll.nextIdleCheck)).toEqual([
             60_000, 120_000, 240_000, 300_000, 300_000
         ]);
+    });
+});
+
+describe("somebody's own Spotify app", () => {
+    const OWN_A = { clientId: "own-app-a", clientSecret: "secret-a" };
+    const OWN_B = { clientId: "own-app-b", clientSecret: "secret-b" };
+
+    it("reads a link through the app that issued it, with no deployment app at all", async () => {
+        fake.deployment = false;
+        fake.ownApps.set(ANA, OWN_A);
+        fake.issued.set("ana-link", OWN_A.clientId);
+        fake.playing.set("token-ana-link", song("s1"));
+        await poll.pollSpotify(1_000_000);
+        expect(fake.asked).toEqual(["token-ana-link"]);
+        expect(fake.clients).toEqual([OWN_A.clientId]);
+    });
+
+    it("keeps a link made before their own app on the deployment's", async () => {
+        fake.ownApps.set(ANA, OWN_A);
+        fake.playing.set("token-ana-link", song("s1"));
+        await poll.pollSpotify(1_000_000);
+        expect(fake.clients).toEqual(["c"]);
+    });
+
+    it("starts listening along through the listener's own app", async () => {
+        fake.ownApps.set(BOB, OWN_B);
+        fake.issued.set("bob-link", OWN_B.clientId);
+        fake.visible.set(ANA, { key: "s1", startedAt: new Date(1_000_000 - 1_000).toISOString() });
+        await along.startListenAlong({ id: BOB, isAdmin: false }, ANA, 1_000_000);
+        expect(fake.clients).toEqual([OWN_B.clientId]);
+        expect(fake.plays).toHaveLength(1);
     });
 });
 

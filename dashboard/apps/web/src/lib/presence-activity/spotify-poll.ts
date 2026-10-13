@@ -38,6 +38,7 @@ import {
     type SpotifyTrack
 } from "@/lib/connections/spotify";
 import { followHost, noticeListener, stopListenAlong } from "./listen-along";
+import { countOwnOAuthApps, ownOAuthAppsFor, pickOAuthClient } from "@/lib/connections/own-oauth-app";
 
 /** How recently a session has to have been seen for its owner to count as here.
  *  The same window the presence dot uses. */
@@ -122,8 +123,12 @@ export interface SpotifyPass {
 export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass> {
     const held = schedule();
     if (now < held.pausedUntil) return { asked: 0, skipped: "Spotify asked for fewer requests" };
-    const client = await getSpotifyOAuthClient();
-    if (!client) return { asked: 0, skipped: "no Spotify application is connected" };
+    // The deployment's app, and people's own: either can be what a link was
+    // issued to, so the pass runs when there is any of them.
+    const deployment = await getSpotifyOAuthClient();
+    if (!deployment && (await countOwnOAuthApps(SPOTIFY_PROVIDER)) === 0) {
+        return { asked: 0, skipped: "no Spotify application is connected" };
+    }
 
     const [links, along] = await Promise.all([
         prisma.userConnection.findMany({
@@ -148,14 +153,17 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
     if (byUser.size === 0) return { asked: 0 };
     const userIds = [...byUser.keys()];
 
-    const [here, settings] = await Promise.all([
+    const [here, settings, ownApps] = await Promise.all([
         // One row per account that is here, not one per session they have open.
         prisma.sessionState.groupBy({
             by: ["userId"],
             where: { userId: { in: userIds }, lastSeenAt: { gt: new Date(now - HERE_MS) } }
         }),
-        activitySettingsFor(userIds)
+        activitySettingsFor(userIds),
+        ownOAuthAppsFor(userIds, SPOTIFY_PROVIDER)
     ]);
+    const clientFor = (userId: string, issuedTo: string | undefined): SpotifyOAuthClient | null =>
+        pickOAuthClient({ own: ownApps.get(userId) ?? null, deployment, issuedTo, existing: true });
     const present = new Set(here.map((row) => row.userId));
     const hosts = new Set(along.map((row) => row.hostId));
     const listeners = new Set(along.map((row) => row.listenerId));
@@ -197,7 +205,7 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
                 "spotify"
             );
         try {
-            await askOne(client, entry, {
+            await askOne(clientFor, entry, {
                 shares,
                 hosting: hosts.has(entry.userId),
                 listening: listeners.has(entry.userId),
@@ -219,13 +227,16 @@ export async function pollSpotify(now: number = Date.now()): Promise<SpotifyPass
 }
 
 async function askOne(
-    client: SpotifyOAuthClient,
+    clientFor: (userId: string, issuedTo: string | undefined) => SpotifyOAuthClient | null,
     entry: { userId: string; connectionId: string },
     role: { shares: boolean; hosting: boolean; listening: boolean; clock: () => number }
 ): Promise<void> {
     const held = schedule();
     const credential = await readCredential(entry.connectionId);
     if (!credential) throw new SpotifyUnauthorized();
+    // The app that issued this link, or none when it was removed since.
+    const client = clientFor(entry.userId, credential.clientId);
+    if (!client) throw new SpotifyUnauthorized();
     const token = await spotifyAccessToken(client, credential);
     if (!token) throw new SpotifyUnauthorized();
     if (token.refreshed) await updateCredential(entry.connectionId, token.refreshed);
