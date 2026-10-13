@@ -157,6 +157,25 @@ export function refusedRetryDelayMs(account: MailPassState): number {
     return Math.min(REFUSED_RETRY_MAX_MS, Math.max(REFUSED_RETRY_MIN_MS, refusedFor / 2));
 }
 
+/** How long a working mailbox may keep failing before the screen says so. Three
+ *  passes or so: one timeout from a provider that answered a minute ago is
+ *  weather, not an outage. */
+export const UNREACHABLE_GRACE_MS = 15 * 60 * 1000;
+
+/**
+ * Whether a failed pass is worth putting on the screen as "cannot reach".
+ *
+ * Not on the first stumble of a mailbox that was working: Gmail drops the odd
+ * connection half way through a sync, and saying "Polaris cannot reach this mail
+ * server" over it reads as Gmail being down when the next pass, a minute later,
+ * goes through. Once it has failed for longer than the grace, or for a mailbox
+ * that never worked, it is news.
+ */
+export function failureIsNews(account: MailPassState, now = Date.now()): boolean {
+    if (account.state !== "ok" || !account.lastOkAt) return true;
+    return now - account.lastOkAt.getTime() >= UNREACHABLE_GRACE_MS;
+}
+
 /**
  * Whether a pass over this mailbox may open a connection now.
  *

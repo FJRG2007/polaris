@@ -47,7 +47,7 @@ import { MailUnreachableError, withImap } from "./imap";
 import { readShape, type MessageShape } from "./structure";
 import { reconcileAttachments } from "./attachment-rows";
 import { WATCHED_POLL_SECONDS, watchedReaders } from "./watch";
-import { mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
+import { failureIsNews, mayTryMailbox, REFUSED_RETRY_MIN_MS } from "./refusals";
 import type { ImapFlow, MessageAddressObject, MessageEnvelopeObject } from "imapflow";
 
 /** How many messages of a folder are held. Four hundred is roughly two years of
@@ -183,7 +183,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         // same refusal a second time.
         else if (account.state === "auth") {
             await recordCredentialRefusal(accountId, account.stateDetail);
-        } else await recordAccountState(accountId, "unreachable");
+        } else if (failureIsNews(account)) await recordAccountState(accountId, "unreachable");
         if (!auth) {
             // The server's own words are useful once, in the log. They name hosts
             // and internal paths, so they never reach the screen.
