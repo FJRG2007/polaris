@@ -22,6 +22,19 @@ shows where Polaris is reachable, its public pages for OAuth providers, the
 seasonal themes, and a way to move everything to another machine in one
 passphrase-sealed file.
 
+## Roles and permissions
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="../assets/media/settings-roles-light-en-desktop.webp">
+  <img src="../assets/media/settings-roles-dark-en-desktop.webp" alt="The member role's permissions, ticked app by app">
+</picture>
+
+Everyone holds a role, and a role is a list of permissions, app by app: who
+may delete files, run a mail server, op players on a game server or change
+instance settings. The built-in roles (admin, member, viewer, guest) can be
+rewritten, new ones added, and "View as" shows Polaris as somebody with that
+role sees it. An app a role cannot use is not shown to them at all.
+
 ## Your account
 
 <picture>

@@ -17,7 +17,7 @@ import { launcher } from "./launcher";
 import { mail, mailThread } from "./mail";
 import { marketplace, marketplaceInstall } from "./marketplace";
 import { office, officeDoc } from "./office";
-import { accountSecurity, settings } from "./settings";
+import { accountSecurity, settings, settingsRoles } from "./settings";
 import { soundboard } from "./soundboard";
 import { vault, vaultSends } from "./vault";
 import { deploy, deployLogs, deployProject } from "./deploy";
@@ -54,6 +54,7 @@ export const SCENES: readonly SceneDefinition[] = [
     marketplaceInstall,
     launcher,
     settings,
+    settingsRoles,
     accountSecurity,
     call,
     inCall,
