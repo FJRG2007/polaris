@@ -47,7 +47,7 @@ import type { ConsoleSchedule } from "../../lib/console-schedule";
 import { KeepCommandDialog, type KeepDraft } from "./console-keep-dialog";
 import { RunCommandDialog, type RunChoice, type ScheduleChoice } from "./console-run-dialog";
 import { ConsoleSchedules } from "./console-schedules";
-import { KeptCommandsMenu } from "./console-kept-menu";
+import { KeptCommandsMenu, duplicateDraft } from "./console-kept-menu";
 import {
     useCallback,
     useEffect,
@@ -695,6 +695,12 @@ export function GameConsole({
                                 setAsking({ entry, mode: "schedule" });
                             }}
                             onLoad={(entry) => load(entry.command)}
+                            onDuplicate={(entry) => {
+                                setKeepError("");
+                                setKeeping(
+                                    duplicateDraft(entry, (name) => t("console.copyName", { name }))
+                                );
+                            }}
                             onForget={(entry) => forget(entry.id)}
                         />
                     )}

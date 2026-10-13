@@ -8,13 +8,13 @@
  * Opening it puts the caret in the search; Enter runs the first command left, the
  * arrows walk the list, and the arrow to the right of a command (or a press on
  * its "..." ) opens what else can be done with it - edit, schedule, put it in the
- * box, forget it. The menu is portalled and kept on screen, so neither the card
+ * box, duplicate it, forget it. The menu is portalled and kept on screen, so neither the card
  * nor a narrow phone can cut it off, and it floats over the console instead of
  * pushing it down.
  */
 
 import { useMemo, useState } from "react";
-import { BookmarkCheck, CalendarClock, ChevronDown, MoreHorizontal, Trash2 } from "lucide-react";
+import { BookmarkCheck, CalendarClock, ChevronDown, Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -30,12 +30,30 @@ import {
     menuSearchMatches
 } from "@polaris/ui";
 import { useGameText } from "../game-text";
-import type { SavedCommand } from "../../lib/console-commands";
+import { MAX_SAVED_LABEL, type SavedCommand } from "../../lib/console-commands";
+import type { KeepDraft } from "./console-keep-dialog";
 
 /** The kept commands left after typing, in the order they were kept. Matched on
  *  the name and on the command itself. */
 export function filterKeptCommands(saved: readonly SavedCommand[], query: string): SavedCommand[] {
     return saved.filter((entry) => menuSearchMatches(`${entry.label} ${entry.command}`, query));
+}
+
+/** A new command to keep, written from an existing one: the same command and
+ *  blanks under a name that says it is a copy, cut so the whole name still fits.
+ *  It has no id, so keeping it adds one instead of rewriting the original. */
+export function duplicateDraft(entry: SavedCommand, copyName: (name: string) => string): KeepDraft {
+    let name = entry.label;
+    let label = copyName(name);
+    while (label.length > MAX_SAVED_LABEL && name.length > 0) {
+        name = name.slice(0, -1).trimEnd();
+        label = copyName(name);
+    }
+    return {
+        label: label.slice(0, MAX_SAVED_LABEL),
+        command: entry.command,
+        variables: entry.variables ?? []
+    };
 }
 
 export function KeptCommandsMenu({
@@ -46,6 +64,7 @@ export function KeptCommandsMenu({
     onEdit,
     onSchedule,
     onLoad,
+    onDuplicate,
     onForget
 }: {
     saved: readonly SavedCommand[];
@@ -57,6 +76,7 @@ export function KeptCommandsMenu({
     onEdit: (entry: SavedCommand) => void;
     onSchedule: (entry: SavedCommand) => void;
     onLoad: (entry: SavedCommand) => void;
+    onDuplicate: (entry: SavedCommand) => void;
     onForget: (entry: SavedCommand) => void;
 }) {
     const t = useGameText("games");
@@ -135,6 +155,13 @@ export function KeptCommandsMenu({
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onSelect={() => onLoad(entry)}>
                                         {t("console.putItInTheBox")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        aria-label={t("console.duplicateName", { name: entry.label })}
+                                        title={t("console.duplicateName", { name: entry.label })}
+                                        onSelect={() => onDuplicate(entry)}
+                                    >
+                                        <Copy /> {t("console.duplicateIt")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                         variant="danger"
