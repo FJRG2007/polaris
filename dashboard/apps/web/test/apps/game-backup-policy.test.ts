@@ -32,7 +32,13 @@ describe("reading a stored policy", () => {
     });
 
     it("takes a whole policy back unchanged", () => {
-        const stored = { every: "daily", keepLast: 3, maxBytes: 1024, notifyOnFailure: false, onShutdown: false };
+        const stored = {
+            every: "daily",
+            keepLast: 3,
+            maxBytes: 1024,
+            notifyOnFailure: false,
+            onShutdown: false
+        };
         expect(policy.readBackupPolicy({ backupPolicy: stored })).toEqual(stored);
     });
 
@@ -50,9 +56,13 @@ describe("reading a stored policy", () => {
     });
 
     it("keeps a shutdown copy turned off when that is what was stored", () => {
-        expect(policy.readBackupPolicy({ backupPolicy: { onShutdown: false } }).onShutdown).toBe(false);
+        expect(policy.readBackupPolicy({ backupPolicy: { onShutdown: false } }).onShutdown).toBe(
+            false
+        );
         // Not a boolean is not an answer, so the default stands.
-        expect(policy.readBackupPolicy({ backupPolicy: { onShutdown: "yes" } }).onShutdown).toBe(true);
+        expect(policy.readBackupPolicy({ backupPolicy: { onShutdown: "yes" } }).onShutdown).toBe(
+            true
+        );
     });
 });
 
@@ -93,15 +103,21 @@ describe("which copies are pruned", () => {
     });
 
     it("never proposes anything when there is only one copy", () => {
-        expect(policy.backupsToPrune([archive(0, 10 ** 9)], { ...policy.DEFAULT_BACKUP_POLICY, maxBytes: 1 })).toEqual(
-            []
-        );
+        expect(
+            policy.backupsToPrune([archive(0, 10 ** 9)], {
+                ...policy.DEFAULT_BACKUP_POLICY,
+                maxBytes: 1
+            })
+        ).toEqual([]);
         expect(policy.backupsToPrune([], policy.DEFAULT_BACKUP_POLICY)).toEqual([]);
     });
 
     it("keeps the last N and drops the rest, oldest first", () => {
         const backups = [archive(0), archive(24), archive(48), archive(72)];
-        const doomed = policy.backupsToPrune(backups, { ...policy.DEFAULT_BACKUP_POLICY, keepLast: 2 });
+        const doomed = policy.backupsToPrune(backups, {
+            ...policy.DEFAULT_BACKUP_POLICY,
+            keepLast: 2
+        });
 
         expect(doomed).toEqual([backups[3]?.name, backups[2]?.name]);
     });
@@ -133,24 +149,59 @@ describe("which copies are pruned", () => {
     it("proposes nothing when neither limit is set", () => {
         const backups = [archive(0, 10 ** 9), archive(24, 10 ** 9)];
         expect(
-            policy.backupsToPrune(backups, { ...policy.DEFAULT_BACKUP_POLICY, keepLast: 0, maxBytes: 0 })
+            policy.backupsToPrune(backups, {
+                ...policy.DEFAULT_BACKUP_POLICY,
+                keepLast: 0,
+                maxBytes: 0
+            })
         ).toEqual([]);
     });
 });
 
 describe("what the screen says", () => {
     it("has no next time while the schedule is off", () => {
-        expect(policy.nextBackupAt({ ...policy.DEFAULT_BACKUP_POLICY, every: "off" }, null)).toBeNull();
+        expect(
+            policy.nextBackupAt({ ...policy.DEFAULT_BACKUP_POLICY, every: "off" }, null)
+        ).toBeNull();
     });
 
     it("counts the next one from the newest archive", () => {
         const newest = new Date(NOW.getTime() - HOUR);
-        const next = policy.nextBackupAt({ ...policy.DEFAULT_BACKUP_POLICY, every: "six-hourly" }, newest);
+        const next = policy.nextBackupAt(
+            { ...policy.DEFAULT_BACKUP_POLICY, every: "six-hourly" },
+            newest
+        );
 
         expect(next?.toISOString()).toBe(new Date(newest.getTime() + 6 * HOUR).toISOString());
     });
 
     it("adds up what the archives take", () => {
         expect(policy.totalBackupBytes([archive(0, 10), archive(1, 32)])).toBe(42);
+    });
+});
+
+describe("waiting for an empty server", () => {
+    const daily = { ...policy.DEFAULT_BACKUP_POLICY, every: "daily" as const };
+    const hourly = { ...policy.DEFAULT_BACKUP_POLICY, every: "hourly" as const };
+    const ago = (hours: number) => new Date(NOW.getTime() - hours * HOUR);
+
+    it("waits while somebody is playing and the copy has only just come due", () => {
+        expect(policy.waitsForQuiet(daily, ago(25), NOW, 2)).toBe(true);
+    });
+
+    it("takes it at once on an empty server", () => {
+        expect(policy.waitsForQuiet(daily, ago(25), NOW, 0)).toBe(false);
+    });
+
+    it("stops waiting once it is late by six hours, or half an hourly interval", () => {
+        expect(policy.waitsForQuiet(daily, ago(30), NOW, 3)).toBe(false);
+        expect(policy.waitsForQuiet(hourly, ago(1.4), NOW, 3)).toBe(true);
+        expect(policy.waitsForQuiet(hourly, ago(1.5), NOW, 3)).toBe(false);
+    });
+
+    it("never holds back a first copy, a copy not yet due, or one whose count is unknown", () => {
+        expect(policy.waitsForQuiet(daily, null, NOW, 5)).toBe(false);
+        expect(policy.waitsForQuiet(daily, ago(2), NOW, 5)).toBe(false);
+        expect(policy.waitsForQuiet(daily, ago(25), NOW, null)).toBe(false);
     });
 });

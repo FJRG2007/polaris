@@ -22,6 +22,7 @@ import { gameCatalogs } from "../../../messages";
 import { ownerLocale } from "../owner-words";
 import { gameMessage, gameMessageIn, readGameMessage } from "../game-message";
 import * as world from "./world";
+import * as parse from "./parse";
 import {
     readWorldTrim,
     readWorldTrimRun,
@@ -33,7 +34,12 @@ import * as policy from "./backup-policy";
 import { EVENT_STATE_KEY } from "./events/catalog";
 import { formatBytes, gameOfServer } from "@polaris/core";
 import { OWNED_PROJECTS } from "../games-create";
-import { withServerContainer, type MinecraftEdition, type ServerContainer } from "./service";
+import {
+    onlinePlayers,
+    withServerContainer,
+    type MinecraftEdition,
+    type ServerContainer
+} from "./service";
 import { host } from "@polaris/app-host";
 
 const { listEnvVars, setEnvVars } = host.envVarService;
@@ -1159,6 +1165,18 @@ async function forgetBackupFailure(install: { id: string; config: string | null 
     await patchInstallConfig(install.id, { [BACKUP_FAILURE_KEY]: null }).catch(() => undefined);
 }
 
+/** How many are playing, on the container already open; null when unknown.
+ *  Bedrock answers `list` into its console, which only the log read reaches. */
+async function playersOn(ownerId: string, server: ServerContainer): Promise<number | null> {
+    if (!server.running) return null;
+    if (server.edition === "bedrock")
+        return (await onlinePlayers(ownerId, server.installedAppId))?.online ?? null;
+    return server.say(["list"]).then(
+        (answer) => parse.parsePlayerList(answer)?.online ?? null,
+        () => null
+    );
+}
+
 /** One server's turn, which never throws: a sweep walks every server the owner
  *  has, and one that cannot be reached must not end the walk. */
 async function sweepOne(
@@ -1171,9 +1189,14 @@ async function sweepOne(
         return await withServerContainer(ownerId, install.id, async (server) => {
             const existing = await listBackups(server);
             const newest = existing[0] ? new Date(existing[0].createdAt) : null;
-            if (!policy.backupDue(rules, newest, now)) {
-                // Not due, but retention still applies: the operator may have just
-                // lowered the limit, and it should bite without waiting a week.
+            // Due, but with somebody playing: wait for the server to empty,
+            // up to a limit (`waitsForQuiet`), since the copy freezes it.
+            const due = policy.backupDue(rules, newest, now);
+            const holding =
+                due && policy.waitsForQuiet(rules, newest, now, await playersOn(ownerId, server));
+            if (!due || holding) {
+                // Not taken, but retention still applies: the operator may have
+                // just lowered the limit, and it should bite without waiting a week.
                 return {
                     installedAppId: install.id,
                     name: null,

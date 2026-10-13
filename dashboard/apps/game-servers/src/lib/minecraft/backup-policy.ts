@@ -69,7 +69,10 @@ const INTERVALS: Record<Exclude<BackupEvery, "off">, number> = {
     weekly: 7 * 24 * 60 * 60 * 1000
 };
 
-export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; readonly label: GameKey<"minecraft"> }[] = [
+export const BACKUP_EVERY_OPTIONS: readonly {
+    readonly value: BackupEvery;
+    readonly label: GameKey<"minecraft">;
+}[] = [
     { value: "off", label: "world.every.never" },
     { value: "hourly", label: "world.every.hourly" },
     { value: "six-hourly", label: "world.every.sixHourly" },
@@ -78,7 +81,13 @@ export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; reado
 ];
 
 function isEvery(value: unknown): value is BackupEvery {
-    return value === "off" || value === "hourly" || value === "six-hourly" || value === "daily" || value === "weekly";
+    return (
+        value === "off" ||
+        value === "hourly" ||
+        value === "six-hourly" ||
+        value === "daily" ||
+        value === "weekly"
+    );
 }
 
 /** A whole number inside a range, from whatever was in the config column. */
@@ -107,7 +116,10 @@ export function readBackupPolicy(config: Record<string, unknown>): BackupPolicy 
             typeof held.notifyOnFailure === "boolean"
                 ? held.notifyOnFailure
                 : DEFAULT_BACKUP_POLICY.notifyOnFailure,
-        onShutdown: typeof held.onShutdown === "boolean" ? held.onShutdown : DEFAULT_BACKUP_POLICY.onShutdown
+        onShutdown:
+            typeof held.onShutdown === "boolean"
+                ? held.onShutdown
+                : DEFAULT_BACKUP_POLICY.onShutdown
     };
 }
 
@@ -124,6 +136,33 @@ export function backupDue(policy: BackupPolicy, newest: Date | null, now: Date):
     if (policy.every === "off") return false;
     if (newest === null) return true;
     return now.getTime() - newest.getTime() >= INTERVALS[policy.every];
+}
+
+/** The longest a due copy waits for the server to empty: half its interval,
+ *  and never more than six hours. */
+const MOST_QUIET_WAIT = 6 * 60 * 60 * 1000;
+
+/**
+ * Whether a due copy should wait for nobody to be on.
+ *
+ * Taking it writes the whole world out first, which holds the server's tick
+ * for a few seconds - nothing to an empty server, a freeze mid-fight to
+ * anybody playing. So a copy that has just come due waits for the server to
+ * empty, and stops waiting once it is late by half its interval (six hours at
+ * most): a server that is never empty still gets its copies, only later.
+ * `online` null means the count could not be read, which never holds a copy
+ * back.
+ */
+export function waitsForQuiet(
+    policy: BackupPolicy,
+    newest: Date | null,
+    now: Date,
+    online: number | null
+): boolean {
+    if (policy.every === "off" || newest === null || !online) return false;
+    const interval = INTERVALS[policy.every];
+    const late = now.getTime() - newest.getTime() - interval;
+    return late >= 0 && late < Math.min(interval / 2, MOST_QUIET_WAIT);
 }
 
 /** When the next one would be taken, for a screen to say it. Null when the
