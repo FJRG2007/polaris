@@ -12,6 +12,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { FAILURE_RECORDED } from "@/lib/connections/outcome-params";
 import { IntegrationLogo } from "@/components/logos";
 import {
     connectionSections,
@@ -132,7 +133,7 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         // An administrator is the person the reason was recorded for, so they
         // read it here instead of being told that they have been told.
         const reason =
-            outcome === "error"
+            outcome === "error" && params.get(FAILURE_RECORDED) === "1"
                 ? providers.find((entry) => entry.slug === provider)?.lastFailure
                 : undefined;
         if (known)
@@ -146,6 +147,7 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         const url = new URL(window.location.href);
         url.searchParams.delete("connection");
         url.searchParams.delete("provider");
+        url.searchParams.delete(FAILURE_RECORDED);
         window.history.replaceState(null, "", url.toString());
     }, []);
 

@@ -9,7 +9,7 @@
  */
 
 import { getTranslations } from "@/lib/i18n/request";
-import { requireUser } from "@/lib/session";
+import { requireUser, sessionCan } from "@/lib/session";
 import { ConnectionsView } from "./connections-view";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { connectionLimit, connectionSignInAllowed, listConnections } from "@/lib/connections/store";
@@ -26,9 +26,10 @@ export const dynamic = "force-dynamic";
 export default async function ConnectionsPage() {
     const user = await requireUser();
     const t = await getTranslations("account");
-    const [linked, lastfmReady] = await Promise.all([
+    const [linked, lastfmReady, canConfigure] = await Promise.all([
         listConnections(user.id),
-        lastfmApiKey().then((key) => key !== null)
+        lastfmApiKey().then((key) => key !== null),
+        sessionCan(user, "settings.manage")
     ]);
 
     const providers = await Promise.all(
@@ -64,9 +65,10 @@ export default async function ConnectionsPage() {
             // the card says nothing about signing in rather than pointing at a
             // switch that would do nothing.
             canSignIn: await connectionSignInAllowed(provider.slug),
-            // Only an administrator can act on why the provider refused, and only
-            // they are shown it; everybody else is told the administrators know.
-            ...(user.isAdmin
+            // Only whoever configures integrations can act on why the provider
+            // refused, and only they are shown it; everybody else is told the
+            // administrators know.
+            ...(canConfigure
                 ? { lastFailure: (await connectionFailure(provider.slug))?.reason }
                 : {}),
             accounts: linked

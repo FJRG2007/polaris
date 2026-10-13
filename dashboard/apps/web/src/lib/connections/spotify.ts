@@ -65,8 +65,8 @@ export function getSpotifyOAuthClient(): Promise<SpotifyOAuthClient | null> {
 
 /**
  * The application one person's Spotify speaks through: the one that issued
- * their link when there is a link, otherwise their own app before the
- * deployment's. Null when there is none.
+ * their link when there is a link, otherwise the deployment's. Null when there
+ * is none.
  */
 export async function spotifyClientFor(
     userId: string,
@@ -79,8 +79,7 @@ export async function spotifyClientFor(
     return pickOAuthClient({
         own,
         deployment,
-        issuedTo: credential?.clientId,
-        existing: Boolean(credential)
+        issuedTo: credential?.clientId
     });
 }
 
