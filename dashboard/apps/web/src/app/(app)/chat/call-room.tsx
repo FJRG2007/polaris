@@ -2561,7 +2561,9 @@ function Tile({
                     {handPlace !== null && <span>{handPlace}</span>}
                 </span>
             )}
-            <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
+            {/* One line, whatever the tile's width: a long name truncates
+                rather than wrapping into a plate that covers the picture. */}
+            <span className="absolute bottom-1 left-1 flex min-w-0 max-w-[calc(100%-0.5rem)] items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {/* Drawn because this person cannot be heard, yours included,
                     and ahead of the name the way a voice channel's tile carries
                     it - camera on or off. It used to sit on the face when the
@@ -2581,24 +2583,28 @@ function Tile({
                     />
                 ) : null}
                 {screen && <Monitor className="size-3 shrink-0" aria-hidden />}
-                {label ?? name}
-                {guest && <span className="text-muted-foreground">{t("callRoom.guest")}</span>}
+                <span className="min-w-0 truncate" title={label ?? name}>
+                    {label ?? name}
+                </span>
+                {guest && (
+                    <span className="shrink-0 text-muted-foreground">{t("callRoom.guest")}</span>
+                )}
                 {sharing && <LiveBadge />}
                 {volumeKey && volume === 0 && (
                     <VolumeX
-                        className="size-3 text-danger"
+                        className="size-3 shrink-0 text-danger"
                         aria-label={t("callRoom.silencedForYou")}
                     />
                 )}
                 {sameRoom && (
                     <Users
-                        className="size-3 text-primary"
+                        className="size-3 shrink-0 text-primary"
                         aria-label={t("callRoom.sharingARoomSMicrophone")}
                     />
                 )}
                 {recording && (
                     <Circle
-                        className="size-3 fill-current text-danger"
+                        className="size-3 shrink-0 fill-current text-danger"
                         aria-label={t("callRoom.recordingThisCall")}
                     />
                 )}
@@ -2616,9 +2622,12 @@ function Tile({
                 // What the share is arriving at and that it is live, top right
                 // where every voice client puts it. Out of the way of the three
                 // size buttons, which take the same corner on hover.
-                <span className="pointer-events-none absolute right-1 top-1 flex items-center gap-1 transition-opacity group-focus-within/tile:opacity-0 group-hover/tile:opacity-0">
+                // Each mark stays on one line; on a tile too narrow for both,
+                // the LIVE mark moves under the format instead of either
+                // breaking or running off the edge.
+                <span className="pointer-events-none absolute right-1 top-1 flex max-w-[calc(100%-0.5rem)] flex-wrap items-center justify-end gap-1 transition-opacity group-focus-within/tile:opacity-0 group-hover/tile:opacity-0">
                     {format && (
-                        <span className="rounded bg-background/80 px-1 text-[0.625rem] font-bold leading-4 tabular-nums">
+                        <span className="whitespace-nowrap rounded bg-background/80 px-1 text-[0.625rem] font-bold leading-4 tabular-nums">
                             {t("callRoom.streamFormat", { height: format.height, fps: format.fps })}
                         </span>
                     )}
