@@ -115,6 +115,19 @@ describe("linking an account", () => {
         expect(provider?.acceptsToken).toBe(false);
     });
 
+    it("says what a refused account has to do, rather than a bare 403", async () => {
+        // Spotify answers 403 on /me for an account that is not on a
+        // development-mode app's User Management list, and for every account
+        // while the app's owner has no Premium.
+        state.responses.push(
+            { status: 200, body: { access_token: "a1", refresh_token: "r1", expires_in: 3600 } },
+            { status: 403 }
+        );
+        await expect(
+            spotify.exchangeSpotifyCode(CLIENT, "code1", "https://polaris.example/cb")
+        ).rejects.toThrow(/User Management.*Premium/);
+    });
+
     it("spends the code with the application's own credentials and reads the name", async () => {
         state.responses.push(
             {

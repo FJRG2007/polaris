@@ -167,6 +167,15 @@ export async function exchangeSpotifyCode(
         headers: { authorization: `Bearer ${token.access_token}` },
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
+    // A development-mode app gets a 403 here for every account that is not on
+    // its User Management list, and for all of them while its owner has no
+    // Premium. Said as that, because "403" is all Spotify gives and the fix is
+    // on Spotify's dashboard, not here.
+    if (response.status === 403) {
+        throw new Error(
+            "Spotify refused this account (403). It only lets an app in development mode link the accounts added under the app's Settings -> User Management, and only while the app's owner has Spotify Premium."
+        );
+    }
     if (!response.ok) {
         throw new Error(await refusalMessage(response, "Spotify would not say which account authorized"));
     }
