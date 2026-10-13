@@ -37,10 +37,10 @@ export const fieldInputSchema = z
     })
     .transform((input) => ({
         ...input,
-        options: input.kind === "select" ? input.options : []
+        options: hasOptions(input.kind) ? input.options : []
     }))
     .superRefine((input, context) => {
-        if (input.kind !== "select") return;
+        if (!hasOptions(input.kind)) return;
         if (input.options.length === 0) {
             // i18n-ignore a code the form reads as customFields.invalid.noOptions
             context.addIssue({ code: "custom", path: ["options"], message: "noOptions" });
@@ -98,6 +98,11 @@ export function choiceChanges(
     return { renamed, removed };
 }
 
+/** Whether a kind of field is picked from choices somebody names. */
+export function hasOptions(kind: CustomKind): boolean {
+    return kind === "select" || kind === "multiSelect";
+}
+
 /** One added field as the screens receive it, and as it is stored. */
 export interface CustomField {
     readonly id: string;
@@ -115,7 +120,7 @@ export function customDef(field: CustomField): FieldDef {
         label: field.label,
         custom: true,
         width: CUSTOM_WIDTH,
-        ...(field.kind === "select" ? { options: field.options } : {})
+        ...(hasOptions(field.kind) ? { options: field.options } : {})
     };
 }
 

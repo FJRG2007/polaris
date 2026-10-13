@@ -28,13 +28,29 @@ export type InvalidReason =
     | "wholeNumber"
     | "currency"
     | "date"
-    | "option";
+    | "option"
+    | "rating";
 
 export type Normalized =
     | { readonly ok: true; readonly value: InputValue }
     | { readonly ok: false; readonly reason: InvalidReason };
 
 const CURRENCY_CODES: readonly string[] = CURRENCIES.map((entry) => entry.code);
+
+/** The most stars a rating has. */
+export const MAX_RATING = 5;
+
+/** The choices of a multi-select as stored: a JSON list in option order, or
+ *  "" for none. Anything unreadable is none. */
+export function readChoices(value: unknown): string[] {
+    if (typeof value !== "string" || value === "") return [];
+    try {
+        const list: unknown = JSON.parse(value);
+        return Array.isArray(list) ? list.filter((one) => typeof one === "string") : [];
+    } catch {
+        return [];
+    }
+}
 
 /** The longest text any field keeps. */
 export const MAX_TEXT = 500;
@@ -186,6 +202,38 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             // A choice somebody added may be left unset; a stage never is.
             if (value === "" && field.custom) return ok("");
             return value !== null && field.options?.includes(value) ? ok(value) : no("option");
+        }
+        case "multiSelect": {
+            if (raw === null || raw === "") return ok("");
+            // A list, as it is stored, or typed as "Red, Blue".
+            const list =
+                typeof raw !== "string"
+                    ? raw
+                    : raw.trim().startsWith("[")
+                      ? readChoices(raw)
+                      : raw.split(",");
+            if (!Array.isArray(list)) return no("option");
+            const chosen = new Set<string>();
+            for (const one of list) {
+                const value = text(one)?.toLowerCase();
+                if (value === undefined) return no("option");
+                if (value === "") continue;
+                const option = field.options?.find((each) => each.toLowerCase() === value);
+                if (option === undefined) return no("option");
+                chosen.add(option);
+            }
+            const ordered = (field.options ?? []).filter((option) => chosen.has(option));
+            return ok(ordered.length === 0 ? "" : JSON.stringify(ordered));
+        }
+        case "rating": {
+            if (raw === null || raw === "" || raw === 0) return ok(null);
+            const value = typeof raw === "string" ? Number(raw.trim()) : raw;
+            return typeof value === "number" &&
+                Number.isInteger(value) &&
+                value >= 1 &&
+                value <= MAX_RATING
+                ? ok(value)
+                : no("rating");
         }
         case "boolean":
             return typeof raw === "boolean" ? ok(raw) : no("option");

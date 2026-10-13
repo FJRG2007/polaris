@@ -11,13 +11,21 @@
  */
 
 import { useCrmT } from "./i18n";
-import { X } from "lucide-react";
+import { Star, X } from "lucide-react";
+import { OptionChip } from "./cell-display";
 import { currencyName } from "./format";
 import { cn, Select } from "@polaris/ui";
 import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import type { FieldDef, FieldValue, FullName, Money } from "../model/objects";
-import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
+import {
+    MAX_RATING,
+    normalizeInput,
+    parseAmount,
+    readChoices,
+    typedCount,
+    type InputValue
+} from "../model/values";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export interface EditorProps {
@@ -262,6 +270,100 @@ export function DateEditor({ field, value, onCommit, onCancel }: EditorProps) {
     );
 }
 
+/** A rating: a star clicked, or a digit typed (0 clears it). Clicking the
+ *  stars it already has clears it too. */
+export function RatingEditor({ value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const current = typeof value === "number" ? value : 0;
+    const [hover, setHover] = useState(0);
+    const shown = hover || current;
+    return (
+        <Overlay onOutside={onCancel} error={null}>
+            <div
+                role="radiogroup"
+                aria-label={t("fields.valueOf")}
+                className="flex items-center gap-0.5 p-1"
+                onKeyDown={(event) => {
+                    const digit = Number(event.key);
+                    if (/^[0-9]$/.test(event.key) && digit <= MAX_RATING) {
+                        event.preventDefault();
+                        onCommit(digit === 0 ? null : digit);
+                    } else {
+                        keys(event, onCancel, onCancel);
+                    }
+                }}
+            >
+                {Array.from({ length: MAX_RATING }, (_, index) => index + 1).map((stars) => (
+                    <button
+                        key={stars}
+                        type="button"
+                        role="radio"
+                        aria-checked={stars === current}
+                        autoFocus={stars === Math.max(current, 1)}
+                        aria-label={t("values.stars", { count: stars })}
+                        title={t("values.stars", { count: stars })}
+                        className="grid size-7 place-items-center rounded hover:bg-card-hover"
+                        onMouseEnter={() => setHover(stars)}
+                        onMouseLeave={() => setHover(0)}
+                        onClick={() => onCommit(stars === current ? null : stars)}
+                    >
+                        <Star
+                            className={cn(
+                                "size-4",
+                                stars <= shown
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-muted-foreground"
+                            )}
+                        />
+                    </button>
+                ))}
+            </div>
+        </Overlay>
+    );
+}
+
+/** Several choices, ticked; kept when the editor is left or Enter is pressed. */
+export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const [chosen, setChosen] = useState(() => readChoices(value));
+    const keep = () => {
+        const result = normalizeInput(field, chosen);
+        if (result.ok) onCommit(result.value);
+        else onCancel();
+    };
+    return (
+        <Overlay onOutside={keep} error={null}>
+            <div
+                role="group"
+                aria-label={t("fields.valueOf")}
+                className="flex max-h-64 min-w-48 flex-col overflow-y-auto p-1"
+                onKeyDown={(event) => keys(event, keep, onCancel)}
+            >
+                {(field.options ?? []).map((option, index) => (
+                    <label
+                        key={option}
+                        className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-card-hover"
+                    >
+                        <input
+                            type="checkbox"
+                            autoFocus={index === 0}
+                            checked={chosen.includes(option)}
+                            onChange={(event) =>
+                                setChosen(
+                                    event.target.checked
+                                        ? [...chosen, option]
+                                        : chosen.filter((one) => one !== option)
+                                )
+                            }
+                        />
+                        <OptionChip field={field} option={option} label={option} />
+                    </label>
+                ))}
+            </div>
+        </Overlay>
+    );
+}
+
 /** The editor a kind of field is typed into, or null for one that is picked
  *  from a menu or toggled. */
 export function editorFor(field: FieldDef): ((props: EditorProps) => ReactNode) | null {
@@ -279,6 +381,10 @@ export function editorFor(field: FieldDef): ((props: EditorProps) => ReactNode) 
             return MoneyEditor;
         case "date":
             return DateEditor;
+        case "rating":
+            return RatingEditor;
+        case "multiSelect":
+            return ChoicesEditor;
         default:
             return null;
     }

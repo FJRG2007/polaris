@@ -58,6 +58,25 @@ function textRule(columns: readonly string[], rule: FilterRule): Where {
     }
 }
 
+/**
+ * A multi-select's rule. Its column holds a JSON list, so a choice is in it
+ * when its quoted name is: quotes inside a choice are escaped, so one choice
+ * never matches inside another.
+ */
+function choicesRule(column: string, rule: FilterRule, ids: readonly string[]): Where {
+    const holds = ids.map((id) => ({ [column]: { contains: JSON.stringify(id) } }));
+    switch (rule.operator) {
+        case "isAnyOf":
+            return { OR: holds };
+        case "isNoneOf":
+            return { NOT: { OR: holds } };
+        case "isEmpty":
+            return { [column]: "" };
+        default:
+            return { NOT: { [column]: "" } };
+    }
+}
+
 /** A number, an amount or a day compared, on a column that may be null. */
 function compareRule(column: string, field: FieldDef, rule: FilterRule): Where {
     const day = field.kind === "date" || field.kind === "dateTime";
@@ -141,7 +160,10 @@ export function ruleWhere(
                     return compareRule(spec.column, field, { ...rule, value: whole });
                 }
                 case "dateTime":
+                case "rating":
                     return compareRule(spec.column, field, rule);
+                case "multiSelect":
+                    return choicesRule(spec.column, rule, ids);
                 default:
                     return textRule([spec.column], rule);
             }

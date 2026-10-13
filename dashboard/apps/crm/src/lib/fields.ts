@@ -16,6 +16,7 @@ import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { table } from "./columns";
 import { readConfig } from "../model/views";
+import { readChoices } from "../model/values";
 import { isGroup, type FilterRule } from "../model/filters";
 import { prisma, type Prisma } from "@polaris/db";
 import { requireCan, shelfData, shelfWhere, type CrmActor, type Shelf } from "./access";
@@ -224,13 +225,24 @@ export async function updateField(
         customDef(one.id === id ? { ...one, label: input.label, options: input.options } : one)
     );
     const row = await prisma.$transaction(async (tx) => {
-        for (const rename of renamed) {
+        if (field.kind === "multiSelect") {
+            await rewriteChoices(
+                tx,
+                actor.shelf,
+                object,
+                field.slot,
+                renamed,
+                removed,
+                input.options
+            );
+        }
+        for (const rename of field.kind === "multiSelect" ? [] : renamed) {
             await table(object, tx).updateMany({
                 where: { ...shelfWhere(actor.shelf), [field.slot]: rename.from },
                 data: { [field.slot]: rename.to }
             });
         }
-        if (removed.length > 0) {
+        if (removed.length > 0 && field.kind !== "multiSelect") {
             await table(object, tx).updateMany({
                 where: { ...shelfWhere(actor.shelf), [field.slot]: { in: removed } },
                 data: { [field.slot]: "" }
@@ -249,6 +261,51 @@ export async function updateField(
         });
     });
     return toField(row)!;
+}
+
+/** The most records read at once while a multi-select's lists are rewritten. */
+const REWRITE_BATCH = 500;
+
+/**
+ * A multi-select's records after its choices change: each list that holds a
+ * changed choice is read and written back with the new wording, without the
+ * choices that are gone, in the new order.
+ */
+async function rewriteChoices(
+    tx: Prisma.TransactionClient,
+    shelf: Shelf,
+    object: CrmObject,
+    slot: string,
+    renamed: readonly ChoiceRename[],
+    removed: readonly string[],
+    options: readonly string[]
+): Promise<void> {
+    const touched = [...renamed.map((rename) => rename.from), ...removed];
+    if (touched.length === 0) return;
+    const wording = new Map(renamed.map((rename) => [rename.from, rename.to]));
+    let after: string | undefined;
+    for (;;) {
+        const rows: { id: string; [slot: string]: unknown }[] = await table(object, tx).findMany({
+            where: {
+                ...shelfWhere(shelf),
+                OR: touched.map((choice) => ({ [slot]: { contains: JSON.stringify(choice) } })),
+                ...(after ? { id: { gt: after } } : {})
+            },
+            select: { id: true, [slot]: true },
+            orderBy: { id: "asc" },
+            take: REWRITE_BATCH
+        });
+        for (const row of rows) {
+            const chosen = new Set(readChoices(row[slot]).map((one) => wording.get(one) ?? one));
+            const kept = options.filter((option) => chosen.has(option));
+            await table(object, tx).update({
+                where: { id: row.id },
+                data: { [slot]: kept.length === 0 ? "" : JSON.stringify(kept) }
+            });
+        }
+        if (rows.length < REWRITE_BATCH) return;
+        after = rows[rows.length - 1]!.id;
+    }
 }
 
 /** Remove a field, everything the records held in it, and every view's use of it. */

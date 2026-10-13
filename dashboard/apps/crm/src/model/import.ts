@@ -149,6 +149,19 @@ export function cellInput(field: FieldDef, cell: string): unknown {
             return splitName(text);
         case "number":
             return text === "" ? null : (parseAmount(text) ?? text);
+        case "rating":
+            return text === "" ? null : (parseAmount(text) ?? text);
+        case "multiSelect":
+            // "Red, Blue" or "Red; Blue", each matched like a single choice.
+            return text
+                .split(/[,;]/)
+                .map((one) => one.trim())
+                .filter(Boolean)
+                .map(
+                    (one) =>
+                        field.options?.find((value) => value.toLowerCase() === one.toLowerCase()) ??
+                        one
+                );
         case "currency": {
             if (text === "") return { amount: null, currency: "" };
             const match = /^([A-Za-z]{3})?\s*([^A-Za-z]*?)\s*([A-Za-z]{3})?$/.exec(text);

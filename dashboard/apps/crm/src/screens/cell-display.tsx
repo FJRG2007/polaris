@@ -12,7 +12,8 @@ import { optionLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
 import { plainText } from "./format";
 import { hostUi } from "@polaris/app-host/client";
-import { Building2, Check, Target, User } from "lucide-react";
+import { MAX_RATING, readChoices } from "../model/values";
+import { Building2, Check, Star, Target, User } from "lucide-react";
 import type { CrmObject, FieldDef, FieldValue, Ref } from "../model/objects";
 
 const { Avatar } = hostUi.avatar;
@@ -164,6 +165,40 @@ export function CellDisplay({
                     option={value as string}
                     label={optionLabel(t, object, field, value as string)}
                 />
+            );
+        case "multiSelect": {
+            const chosen = readChoices(value);
+            return (
+                <span
+                    className="flex min-w-0 items-center gap-1 overflow-hidden"
+                    title={chosen.join(", ")}
+                >
+                    {chosen.map((option) => (
+                        <OptionChip key={option} field={field} option={option} label={option} />
+                    ))}
+                </span>
+            );
+        }
+        case "rating":
+            return (
+                <span
+                    className="flex shrink-0 items-center gap-0.5"
+                    role="img"
+                    aria-label={t("values.stars", { count: value as number })}
+                    title={t("values.stars", { count: value as number })}
+                >
+                    {Array.from({ length: MAX_RATING }, (_, index) => (
+                        <Star
+                            key={index}
+                            className={cn(
+                                "size-3.5",
+                                index < (value as number)
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-border"
+                            )}
+                        />
+                    ))}
+                </span>
             );
         case "member":
             return <MemberLine value={value as Ref} />;

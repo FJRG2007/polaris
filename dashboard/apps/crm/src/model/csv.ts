@@ -6,6 +6,7 @@
  * Pure and client-safe, so the file a reader downloads is the one a test reads.
  */
 
+import { readChoices } from "./values";
 import type { FieldDef, FieldValue, FullName, Money } from "./objects";
 
 /** Where a cell begins a formula in a spreadsheet: such a cell is written as
@@ -30,6 +31,8 @@ export function csvValue(field: FieldDef, value: FieldValue | undefined): string
             return (value as { name: string }).name;
         case "boolean":
             return value ? "true" : "false";
+        case "multiSelect":
+            return readChoices(value).join(", ");
         default:
             return String(value);
     }
@@ -39,9 +42,8 @@ export function csvValue(field: FieldDef, value: FieldValue | undefined): string
  *  line break, and kept from being read as a formula. A number stays a number:
  *  "-3" is not a formula. */
 export function csvCell(text: string): string {
-    const safe = FORMULA_START.test(text) && !/^-?\d+(\.\d+)?( [A-Z]{3})?$/.test(text)
-        ? `'${text}`
-        : text;
+    const safe =
+        FORMULA_START.test(text) && !/^-?\d+(\.\d+)?( [A-Z]{3})?$/.test(text) ? `'${text}` : text;
     return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 

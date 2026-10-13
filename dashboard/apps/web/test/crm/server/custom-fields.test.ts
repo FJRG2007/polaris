@@ -46,7 +46,7 @@ describe("field input", () => {
 
     it("refuses an empty name and an unknown kind", () => {
         expect(fieldInputSchema.safeParse({ label: "   ", kind: "text" }).success).toBe(false);
-        expect(fieldInputSchema.safeParse({ label: "S", kind: "rating" }).success).toBe(false);
+        expect(fieldInputSchema.safeParse({ label: "S", kind: "address" }).success).toBe(false);
     });
 });
 

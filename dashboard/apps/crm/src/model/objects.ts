@@ -26,6 +26,8 @@ export type FieldKind =
     | "date"
     | "dateTime"
     | "select"
+    | "multiSelect"
+    | "rating"
     | "boolean"
     | "member"
     | "relation";
@@ -37,7 +39,8 @@ export interface FieldDef {
     readonly primary?: boolean;
     /** Written by Polaris, never by a person (created, updated). */
     readonly readOnly?: boolean;
-    /** The choices of a `select`, in the order a board draws its columns. */
+    /** The choices of a `select` or `multiSelect`, in the order a board draws
+     *  its columns. */
     readonly options?: readonly string[];
     /** The record kind a `relation` points at. */
     readonly target?: CrmObject;
@@ -58,6 +61,8 @@ export const CUSTOM_KINDS = [
     "date",
     "boolean",
     "select",
+    "multiSelect",
+    "rating",
     "url",
     "email",
     "phone"
@@ -72,7 +77,7 @@ export type SlotFamily = keyof typeof SLOT_FAMILIES;
 
 /** The family of slot columns a kind of custom field is stored in. */
 export function slotFamily(kind: CustomKind): SlotFamily {
-    if (kind === "number") return "cNum";
+    if (kind === "number" || kind === "rating") return "cNum";
     if (kind === "date") return "cDate";
     if (kind === "boolean") return "cBool";
     return "cText";

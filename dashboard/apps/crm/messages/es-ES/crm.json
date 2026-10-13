@@ -76,7 +76,8 @@
     },
     "values": {
         "yes": "Sí",
-        "no": "No"
+        "no": "No",
+        "stars": "{count, plural, one {# estrella} other {# estrellas}}"
     },
     "placeholders": {
         "email": "nombre@empresa.com",
@@ -98,7 +99,8 @@
         "missing": "Ese registro ya no existe o está en la papelera.",
         "notOnShelf": "Esa persona no es miembro aquí.",
         "ambiguous": "Hay más de un registro con ese nombre.",
-        "duplicate": "Ya hay un registro como este."
+        "duplicate": "Ya hay un registro como este.",
+        "rating": "Elige de 1 a 5 estrellas."
     },
     "list": {
         "loading": "Cargando",
@@ -338,6 +340,8 @@
             "date": "Fecha",
             "boolean": "Sí / no",
             "select": "Opción",
+            "multiSelect": "Varias opciones",
+            "rating": "Valoración",
             "url": "Enlace",
             "email": "Correo",
             "phone": "Teléfono"

@@ -45,6 +45,7 @@ const COUNTS: readonly Aggregate[] = [
 /** The totals that mean something for a kind of field. */
 export function aggregatesFor(kind: FieldKind): readonly Aggregate[] {
     if (kind === "number" || kind === "currency") return [...COUNTS, "sum", "avg", "min", "max"];
+    if (kind === "rating") return [...COUNTS, "avg", "min", "max"];
     if (kind === "date") return [...COUNTS, "earliest", "latest"];
     // Never empty: a moment Polaris wrote, a box that is ticked or not.
     if (kind === "dateTime") return ["countAll", "countUnique", "earliest", "latest"];

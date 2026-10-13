@@ -65,9 +65,9 @@ export type Widget = z.infer<typeof widgetSchema>;
 
 export const widgetsSchema = z.array(widgetSchema).max(MAX_WIDGETS);
 
-/** Whether a field can be measured: a number or an amount. */
+/** Whether a field can be measured: a number, an amount or a rating. */
 export function measurable(field: FieldDef): boolean {
-    return field.kind === "number" || field.kind === "currency";
+    return field.kind === "number" || field.kind === "currency" || field.kind === "rating";
 }
 
 /** Whether a field splits records into a few named groups. */

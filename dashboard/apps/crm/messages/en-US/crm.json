@@ -76,7 +76,8 @@
     },
     "values": {
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "stars": "{count, plural, one {# star} other {# stars}}"
     },
     "placeholders": {
         "email": "name@company.com",
@@ -98,7 +99,8 @@
         "missing": "That record is gone or in the trash.",
         "notOnShelf": "That person is not a member here.",
         "ambiguous": "More than one record has that name.",
-        "duplicate": "A record like this is already here."
+        "duplicate": "A record like this is already here.",
+        "rating": "Choose from 1 to 5 stars."
     },
     "list": {
         "loading": "Loading",
@@ -338,6 +340,8 @@
             "date": "Date",
             "boolean": "Yes / no",
             "select": "Choice",
+            "multiSelect": "Several choices",
+            "rating": "Rating",
             "url": "Link",
             "email": "Email",
             "phone": "Phone"
