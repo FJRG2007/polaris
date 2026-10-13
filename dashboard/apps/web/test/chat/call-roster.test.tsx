@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { CallRoster, VoiceStateIcons, callBadgeOf } from "@/app/(app)/chat/call-roster";
 
+vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
 vi.mock("@/components/presence-store", () => ({ usePresence: () => null }));
 vi.mock("@/components/photo-access", () => ({ usePhotoOpenable: () => false }));
 vi.mock("@/components/person-name", async (importOriginal) => ({

@@ -4,8 +4,9 @@
  * What a moderator's right-click on somebody in a call adds: mute, deafen and
  * disconnect, each with its undo.
  *
- * One component for the two places a person in a call is drawn - their face in
- * the call and their row under a voice channel in the rail - so the rule for who
+ * One component for every place a person in a call is drawn - their face in the
+ * call, their row under a voice channel in the rail, and the faces a
+ * conversation shows of a call the reader has not joined - so the rule for who
  * sees it and the sentences it says are written once. Whether the reader may
  * moderate is the caller's to pass in; the server asks again either way.
  */
@@ -17,7 +18,15 @@ import { runAction } from "@/lib/run-action";
 import { moderateCallAction } from "./meeting-actions";
 import { HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from "lucide-react";
 import type { CallModeration, SeatRestriction } from "@/lib/chat/voice-moderation";
-import { ContextMenuItem, ContextMenuLabel, ContextMenuSeparator } from "@polaris/ui";
+import type { VoicePresence } from "@/lib/chat/meetings";
+import {
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuLabel,
+    ContextMenuSeparator,
+    ContextMenuTrigger
+} from "@polaris/ui";
 
 /** What a menu needs to offer moderation over one seat. */
 export interface SeatModeration {
@@ -102,5 +111,53 @@ export function ModerationItems({ seat, name }: { seat: SeatModeration; name: st
                 {t("callModeration.disconnect")}
             </ContextMenuItem>
         </>
+    );
+}
+
+/** Who may moderate the people a roster lists, for a roster drawn outside the
+ *  call. Left out where nobody can moderate from it. */
+export interface RosterModeration {
+    /** Whether the reader moderates the conversation the call belongs to. */
+    readonly moderates: boolean;
+    /** The reader, who is never offered the menu over themselves. */
+    readonly viewerId: string;
+    /** Called once the server has taken a press, so the roster can redraw. */
+    readonly onDone?: () => void;
+}
+
+/**
+ * One person in a call, wrapped in the moderator's right-click - or left as it
+ * is for a reader who does not moderate, and over the reader's own face, which
+ * has its own buttons for this.
+ */
+export function SeatMenu({
+    person,
+    moderation,
+    children
+}: {
+    person: Pick<VoicePresence, "id" | "userId" | "name" | "serverMuted" | "serverDeafened">;
+    moderation?: RosterModeration;
+    /** The row or face itself; it becomes the menu's trigger. */
+    children: React.ReactElement;
+}) {
+    if (!moderation?.moderates || person.userId === moderation.viewerId) return children;
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+            <ContextMenuContent className="w-52">
+                <ContextMenuLabel className="truncate">{person.name}</ContextMenuLabel>
+                <ModerationItems
+                    name={person.name}
+                    seat={{
+                        participantId: person.id,
+                        restriction: {
+                            serverMuted: person.serverMuted,
+                            serverDeafened: person.serverDeafened
+                        },
+                        onDone: moderation.onDone
+                    }}
+                />
+            </ContextMenuContent>
+        </ContextMenu>
     );
 }

@@ -65,6 +65,7 @@ import { sendFile, type Sent } from "@/components/transfers/move-file";
 import type { SendOutcome, SendProgress } from "./outgoing";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
+import type { RosterModeration } from "./call-moderation-menu";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
@@ -508,6 +509,14 @@ export function ChannelView({
             .then(setLive)
             .catch(() => setLive(null));
     }, [channelId]);
+
+    // A moderator acts on a call from outside it as from inside: right-click a
+    // face to mute, deafen or disconnect it. The server asks again either way.
+    const rosterModeration: RosterModeration = {
+        moderates: canModerate,
+        viewerId,
+        onDone: checkCall
+    };
 
     /** Drop everything the server has now confirmed, so a message is never on
      *  screen twice. */
@@ -2324,6 +2333,7 @@ export function ChannelView({
                             busy={joining}
                             onJoin={(video) => void startCall(video)}
                             onHide={() => setHidden(true)}
+                            moderation={rosterModeration}
                         />
                     ))}
 
@@ -2332,6 +2342,7 @@ export function ChannelView({
                         name={channel.name}
                         count={live?.count ?? 0}
                         people={live?.people ?? []}
+                        moderation={rosterModeration}
                         off={callsOff}
                         busy={joining}
                         onJoin={async (video) => {
@@ -2646,7 +2657,8 @@ function VoiceStrip({
     people,
     onJoin,
     off,
-    busy = false
+    busy = false,
+    moderation
 }: {
     name: string;
     count: number;
@@ -2660,6 +2672,7 @@ function VoiceStrip({
      *  second to open, with a Join button still sitting there, is a room people
      *  press twice. */
     busy?: boolean;
+    moderation?: RosterModeration;
 }) {
     const t = useTranslations("chat");
     return (
@@ -2695,7 +2708,11 @@ function VoiceStrip({
                 // so it is the row the rest of Polaris uses - see
                 // `CallRosterList`.
                 <div className="basis-full max-h-40 overflow-y-auto overscroll-contain">
-                    <CallRosterList people={people} label={t("channelView.inRoom", { name })} />
+                    <CallRosterList
+                        people={people}
+                        label={t("channelView.inRoom", { name })}
+                        moderation={moderation}
+                    />
                 </div>
             )}
         </div>

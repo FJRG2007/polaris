@@ -27,6 +27,7 @@ import { Avatar } from "@/components/avatar";
 import { Mic, Video, X } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { SeatMenu, type RosterModeration } from "./call-moderation-menu";
 
 /** How big a face is here. The same as a call drawn as faces, so joining does
  *  not resize everybody. */
@@ -44,7 +45,8 @@ export function CallPreview({
     canJoin,
     busy = false,
     onJoin,
-    onHide
+    onHide,
+    moderation
 }: {
     /** Who is sitting in it, with their microphone and headphones as they last
      *  reported them. */
@@ -56,6 +58,9 @@ export function CallPreview({
     onJoin: (withVideo: boolean) => void;
     /** Put it away. The line it leaves behind is what brings it back. */
     onHide: () => void;
+    /** A moderator's right-click on a face: mute, deafen or disconnect them
+     *  without joining. */
+    moderation?: RosterModeration;
 }) {
     const t = useTranslations("chat");
     return (
@@ -87,26 +92,27 @@ export function CallPreview({
                 takes the conversation this sits above. */}
             <ul className="flex max-h-44 flex-wrap items-start justify-center gap-x-4 gap-y-3 overflow-y-auto overscroll-contain">
                 {people.map((person) => (
-                    <PersonRow
-                        as="li"
-                        key={person.id}
-                        personId={person.userId}
-                        plate="never"
-                        className="flex w-20 shrink-0 flex-col items-center gap-1"
-                        title={person.name}
-                    >
-                        <Avatar
-                            size={AVATAR_SIZE}
-                            person={{ id: person.userId, name: person.name }}
-                            callBadge={callBadgeOf(person)}
-                        />
-                        <span className="flex w-full items-center justify-center gap-1 text-xs">
-                            <span className="min-w-0 truncate">
-                                <PersonName id={person.userId} name={person.name} />
+                    <SeatMenu key={person.id} person={person} moderation={moderation}>
+                        <PersonRow
+                            as="li"
+                            personId={person.userId}
+                            plate="never"
+                            className="flex w-20 shrink-0 flex-col items-center gap-1"
+                            title={person.name}
+                        >
+                            <Avatar
+                                size={AVATAR_SIZE}
+                                person={{ id: person.userId, name: person.name }}
+                                callBadge={callBadgeOf(person)}
+                            />
+                            <span className="flex w-full items-center justify-center gap-1 text-xs">
+                                <span className="min-w-0 truncate">
+                                    <PersonName id={person.userId} name={person.name} />
+                                </span>
+                                {person.streaming && <LiveBadge />}
                             </span>
-                            {person.streaming && <LiveBadge />}
-                        </span>
-                    </PersonRow>
+                        </PersonRow>
+                    </SeatMenu>
                 ))}
             </ul>
 

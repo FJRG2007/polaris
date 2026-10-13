@@ -5,7 +5,7 @@
  */
 
 import { chatText } from "@/lib/chat/text";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { withMessages } from "../../setup/i18n";
 import { webCatalogs } from "../../../messages";
 import { spokenWait } from "@/lib/chat/durations";
@@ -13,6 +13,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LiveBadge } from "@/app/(app)/chat/call-roster";
 import { SendButton } from "@/app/(app)/chat/send-button";
 import { gameLinkLabel } from "@/app/(app)/chat/game-link-badge";
+
+vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
 
 describe("Chat in Spanish", () => {
     it("labels the controls a reader presses", () => {

@@ -37,7 +37,7 @@ import { ChatAvatar } from "@/components/chat-avatar";
 import { NewDirectDialog } from "./new-direct-dialog";
 import * as core from "@polaris/core";
 import { LiveBadge, VoiceStateIcons } from "./call-roster";
-import { ModerationItems } from "./call-moderation-menu";
+import { SeatMenu } from "./call-moderation-menu";
 import { useChatStream } from "./use-chat-stream";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -98,7 +98,6 @@ import {
     ContextMenu,
     ContextMenuContent,
     ContextMenuItem,
-    ContextMenuLabel,
     ContextMenuSeparator,
     ContextMenuSub,
     ContextMenuSubContent,
@@ -1094,26 +1093,10 @@ function VoicePerson({
             <VoiceStateIcons person={person} />
         </PersonRow>
     );
-    if (!moderates || person.userId === viewerId) return row;
-
     return (
-        <ContextMenu>
-            <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
-            <ContextMenuContent className="w-52">
-                <ContextMenuLabel className="truncate">{person.name}</ContextMenuLabel>
-                <ModerationItems
-                    name={person.name}
-                    seat={{
-                        participantId: person.id,
-                        restriction: {
-                            serverMuted: person.serverMuted,
-                            serverDeafened: person.serverDeafened
-                        },
-                        onDone: onModerated
-                    }}
-                />
-            </ContextMenuContent>
-        </ContextMenu>
+        <SeatMenu person={person} moderation={{ moderates, viewerId, onDone: onModerated }}>
+            {row}
+        </SeatMenu>
     );
 }
 
