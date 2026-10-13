@@ -67,6 +67,7 @@ import {
 } from "../lib/player";
 import { playLive } from "../lib/live-player";
 import { useReconnect } from "./use-reconnect";
+import { pictureShape, viewerFrame } from "../lib/viewer-shape";
 
 /**
  * Paced by arrival rather than by a clock, so a slow link stretches the gap
@@ -210,6 +211,7 @@ export function CameraViewer({
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. */
     const [shape, setShape] = useState<number | null>(null);
+    const sizeLogged = useRef(false);
     /** The shape of the surface they are drawn in, measured rather than assumed:
      *  it is `aspect-video` in the dialog and the whole screen in fullscreen, and
      *  a box placed against the wrong one of those is a box in the wrong place. */
@@ -467,11 +469,34 @@ export function CameraViewer({
         else void frame.current?.requestFullscreen().catch(() => setFull(false));
     };
 
-    const surface = full ? "h-dvh object-contain" : "aspect-video object-contain";
+    // The box is the picture's own shape, measured, so neither the still nor
+    // the stream is ever drawn with bands down its sides; 16:9 until measured.
+    const framed = viewerFrame(shape);
+    const surface = full ? "h-dvh object-contain" : "object-contain";
+    const surfaceStyle = full ? undefined : { aspectRatio: framed.aspectRatio };
+
+    /** The stream's own size, read off the element as it arrives and whenever it
+     *  changes in-band. Logged once beside the still's so a live check can tell
+     *  what the camera really sends. */
+    const measureVideo = (element: HTMLVideoElement) => {
+        const { videoWidth, videoHeight } = element;
+        if (videoWidth <= 0 || videoHeight <= 0) return;
+        setShape((known) => pictureShape(known, { width: videoWidth, height: videoHeight }));
+        if (sizeLogged.current) return;
+        sizeLogged.current = true;
+        const picture = still.current;
+        console.debug(
+            `[camera-viewer] video ${videoWidth}x${videoHeight}, still ${picture?.naturalWidth ?? 0}x${picture?.naturalHeight ?? 0}`
+        );
+    };
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-5xl p-0" showClose={!full}>
+            <DialogContent
+                className="max-w-5xl p-0"
+                style={full ? undefined : { maxWidth: framed.maxWidth }}
+                showClose={!full}
+            >
                 <DialogTitle className="sr-only">{camera.name}</DialogTitle>
                 <div
                     ref={holdFrame}
@@ -538,6 +563,7 @@ export function CameraViewer({
                                 surface,
                                 playing && !held && "invisible"
                             )}
+                            style={surfaceStyle}
                             onLoad={(loaded) => {
                                 setDrawn(true);
                                 const shownSrc = loaded.currentTarget.getAttribute("src");
@@ -581,6 +607,7 @@ export function CameraViewer({
                                     surface,
                                     (!playing || held) && "invisible"
                                 )}
+                                style={surfaceStyle}
                                 autoPlay={!paused}
                                 muted={muted}
                                 playsInline
@@ -590,11 +617,10 @@ export function CameraViewer({
                                 onLoadStart={stirred}
                                 onLoadedMetadata={(loaded) => {
                                     stirred();
-                                    const { videoWidth, videoHeight } = loaded.currentTarget;
-                                    if (videoWidth > 0 && videoHeight > 0) {
-                                        setShape(videoWidth / videoHeight);
-                                    }
+                                    measureVideo(loaded.currentTarget);
                                 }}
+                                // A stream can change size in-band; the box follows.
+                                onResize={(resized) => measureVideo(resized.currentTarget)}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
                                 onPlaying={() => {
