@@ -357,5 +357,12 @@
             "duplicate": "Esta opción ya está.",
             "tooMany": "Usa hasta {max} opciones."
         }
+    },
+    "export": {
+        "button": "Exportar",
+        "hint": "Descarga las filas de esta vista como archivo CSV",
+        "done": "{count, plural, one {# fila exportada} other {# filas exportadas}}",
+        "truncated": "Se exportaron las primeras {count, plural, one {# fila} other {# filas}}. Acota la vista para exportar el resto.",
+        "failed": "No se pudo exportar"
     }
 }

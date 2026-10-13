@@ -15,6 +15,7 @@
  */
 
 import { Board } from "./board";
+import { csvFileName } from "../model/csv";
 import { customDef } from "../model/fields";
 import { FieldsDialog } from "./fields-dialog";
 import { CustomFieldsProvider, fieldLabel } from "./custom-fields";
@@ -36,6 +37,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Building2,
     Columns3,
+    Download,
     Kanban,
     Pencil,
     Plus,
@@ -389,6 +391,41 @@ export function ListScreen({ object }: { object: CrmObject }) {
         (title: string, caught: unknown) => toast.show({ title, body: messageOf(caught) }),
         [toast]
     );
+
+    const [exporting, setExporting] = useState(false);
+    const exportCsv = useCallback(async () => {
+        if (!config) return;
+        setExporting(true);
+        try {
+            const columns = config.columns.filter((column) => !column.hidden);
+            const file = await unwrap(
+                () =>
+                    actions.exportRecordsAction({
+                        object,
+                        search,
+                        sorts,
+                        filter,
+                        columns: columns.map((column) => column.key)
+                    }),
+                t("errors.generic")
+            );
+            const url = URL.createObjectURL(new Blob([file.csv], { type: "text/csv" }));
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = csvFileName(t(`objects.${object}.plural`), new Date());
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.show({
+                title: file.truncated
+                    ? t("export.truncated", { count: file.rows })
+                    : t("export.done", { count: file.rows })
+            });
+        } catch (caught) {
+            failed(t("export.failed"), caught);
+        } finally {
+            setExporting(false);
+        }
+    }, [config, object, search, sorts, filter, t, toast, failed]);
 
     // The newest edit of each cell: an older answer arriving late is not
     // allowed to overwrite a newer value.
@@ -980,6 +1017,16 @@ export function ListScreen({ object }: { object: CrmObject }) {
                                 ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={shaping || exporting}
+                        onClick={() => void exportCsv()}
+                        title={t("export.hint")}
+                    >
+                        <Download className="size-4" />
+                        {t("export.button")}
+                    </Button>
                 </div>
 
                 {body}
