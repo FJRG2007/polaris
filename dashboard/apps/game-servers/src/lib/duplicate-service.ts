@@ -15,6 +15,9 @@
  * The source's storage is only ever read. If the copy fails, the source is
  * exactly what it was, running if it was running; the copy stays in the list
  * saying what went wrong, with a retry and a delete beside it.
+ *
+ * Both volumes are held for the copying window (`lib/storage-moves/hold`), so a
+ * storage move cannot start on either one while this is reading or writing it.
  */
 
 import { prisma } from "@polaris/db";

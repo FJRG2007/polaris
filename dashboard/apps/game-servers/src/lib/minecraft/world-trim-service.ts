@@ -19,6 +19,9 @@
  * running again at the end, including when the optimizer failed; a server that
  * was already stopped is left stopped, because starting somebody's server for
  * them is not part of tidying up a world.
+ *
+ * The volume is held for the run (`lib/storage-moves/hold`), so a storage move
+ * cannot copy it mid-rewrite or empty the original out from under this job.
  */
 
 import { gameMessage } from "../game-message";
