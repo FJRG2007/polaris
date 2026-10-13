@@ -213,8 +213,9 @@ export function CameraViewer({
     const [shape, setShape] = useState<number | null>(null);
     const sizeLogged = useRef(false);
     /** The shape of the surface they are drawn in, measured rather than assumed:
-     *  it is `aspect-video` in the dialog and the whole screen in fullscreen, and
-     *  a box placed against the wrong one of those is a box in the wrong place. */
+     *  in the dialog it follows the picture's own shape (see `viewerFrame`), and
+     *  in fullscreen it is the whole screen - a box placed against the wrong one
+     *  of those is a box in the wrong place. */
     const [surfaceShape, setSurfaceShape] = useState<number | null>(null);
 
     // Only this one: the wall behind the dialog has stopped asking for its own.
