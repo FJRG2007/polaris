@@ -283,6 +283,15 @@ export interface MailActionOptions {
      * row that stays bold after somebody read it, which is the mark not working.
      */
     readonly scope?: "message" | "conversation";
+    /**
+     * Throw when the server refused to move or delete any of them, instead of
+     * answering with what was done. For somebody pressing the button, whose
+     * screen has already taken the rows away: told nothing, they saw the
+     * message come back on the next list and deleted it again. A rule or the
+     * junk filter running inside a sync leaves it off, so one refused move does
+     * not throw a whole pass away.
+     */
+    readonly strict?: boolean;
 }
 
 /**
@@ -345,6 +354,11 @@ export async function actOnMessages(
     }
 
     let done = 0;
+    /** Folders whose server refused the move, said once everything else is done.
+     *  Answering "done" over them is what made a deleted message come back: the
+     *  row left the screen, the server still had it, and the next list put it
+     *  back. */
+    const refused: string[] = [];
     for (const [accountId, mine] of groupByAccount(messages)) {
         const account = await ownedAccount(userId, accountId);
         /** Where the messages went, so it can be read again before anybody looks
@@ -375,6 +389,7 @@ export async function actOnMessages(
                     );
                     done += outcome.done;
                     target = outcome.movedTo;
+                    if (outcome.refused) refused.push(folder.path);
                     // Unread mail leaving is unread mail the folder no longer
                     // has, whether it went to Trash or was destroyed outright.
                     addDelta(deltas, folderId, -outcome.unseen);
@@ -404,6 +419,9 @@ export async function actOnMessages(
     }
     if (options.settle !== false) {
         await refreshThreadsFor(messages.map((message) => message.accountId));
+    }
+    if (options.strict && refused.length > 0) {
+        throw new Error(`the mail server refused to ${action} messages in ${refused.join(", ")}`);
     }
     return done;
 }
@@ -582,6 +600,8 @@ interface Applied {
     /** How many of them were unread, so the folder they left and the folder they
      *  arrived in can both say so before the next sync. */
     readonly unseen: number;
+    /** The server answered the move or delete with a refusal. */
+    readonly refused?: true;
 }
 
 async function applyOne(
@@ -613,7 +633,7 @@ async function applyOne(
         // Deleting outright, not into Trash. Only ever reached from the Trash
         // folder's own Delete button and from Empty trash, both of which say so.
         const removed = await client.messageDelete(uids, { uid: true });
-        if (!removed) return { done: 0, movedTo: "", unseen: 0 };
+        if (!removed) return { done: 0, movedTo: "", unseen: 0, refused: true };
         await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
         if (leaving === "trash") {
             await forgetTrashOrigins(
@@ -629,7 +649,7 @@ async function applyOne(
     const target = await folderForRole(accountId, role);
     if (target.id === folderId) return { done: 0, movedTo: "", unseen: 0 };
     const moved = await client.messageMove(uids, target.path, { uid: true });
-    if (!moved) return { done: 0, movedTo: "", unseen: 0 };
+    if (!moved) return { done: 0, movedTo: "", unseen: 0, refused: true };
     // Where these were, written down now that they have actually left - so that
     // taking them out of the trash later puts them back in this folder rather
     // than in the inbox. And the other way for a message leaving the trash by

@@ -429,7 +429,7 @@ export async function actOnAction(input: unknown) {
             userId,
             parsed.data.messageIds,
             parsed.data.action,
-            { scope: parsed.data.scope }
+            { scope: parsed.data.scope, strict: true }
         );
         return { done };
     } catch (caught) {

@@ -65,6 +65,30 @@ const SOCKET_TIMEOUT_MS = 5 * 60_000;
 /** The account form's check waits on a person, so it keeps the short one. */
 const CHECK_SOCKET_TIMEOUT_MS = 60_000;
 
+/**
+ * imapflow's warnings, and only those, into the server log.
+ *
+ * A refused MOVE or STORE comes back from imapflow as `false` with the server's
+ * reason written to its logger and nowhere else, so with the logger off a
+ * mailbox that would not move a message left no trace of why. The reason and the
+ * command are kept; the rest of the entry (connection ids, raw objects) is not.
+ */
+const IMAP_LOGGER = {
+    debug: () => undefined,
+    info: () => undefined,
+    warn: (entry: unknown) => console.warn("imap:", describeImapEntry(entry)),
+    error: (entry: unknown) => console.warn("imap:", describeImapEntry(entry))
+};
+
+export function describeImapEntry(entry: unknown): string {
+    if (!entry || typeof entry !== "object") return String(entry);
+    const { msg, err } = entry as { msg?: unknown; err?: unknown };
+    const failure = (err ?? {}) as { message?: unknown; responseText?: unknown; command?: unknown };
+    return [msg, failure.command, failure.message, failure.responseText]
+        .filter((part) => typeof part === "string" && part.length > 0)
+        .join(" - ");
+}
+
 /** What Polaris tells the server it is. Servers log this, and a client that
  *  refuses to name itself is the one that gets rate limited first. */
 const CLIENT_INFO = { name: "Polaris", vendor: "Polaris" };
@@ -112,7 +136,7 @@ export async function withImap<T>(
         // Nothing in this app waits on a connection between commands, so an
         // automatic IDLE would only be something the next command has to break.
         disableAutoIdle: true,
-        logger: false,
+        logger: IMAP_LOGGER,
         connectionTimeout: CONNECT_TIMEOUT_MS,
         greetingTimeout: GREETING_TIMEOUT_MS,
         socketTimeout: SOCKET_TIMEOUT_MS,
