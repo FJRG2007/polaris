@@ -89,6 +89,20 @@ export function describeImapEntry(entry: unknown): string {
         .join(" - ");
 }
 
+/**
+ * The listener every client gets before it connects.
+ *
+ * imapflow reports a failure that lands after `connect()` has settled - a socket
+ * timeout during the session's own setup, a dropped connection between commands -
+ * as an `error` event, and an `error` event nobody listens to is thrown. Thrown
+ * inside imapflow's own promise chain, that became an unhandled rejection in the
+ * server log. Whatever command was waiting on the connection still fails on its
+ * own and is answered there; this only keeps the event from being thrown.
+ */
+function reportImapError(caught: unknown): void {
+    console.warn("imap:", describeImapEntry({ err: caught }));
+}
+
 /** What Polaris tells the server it is. Servers log this, and a client that
  *  refuses to name itself is the one that gets rate limited first. */
 const CLIENT_INFO = { name: "Polaris", vendor: "Polaris" };
@@ -145,6 +159,7 @@ export async function withImap<T>(
         // never widened to a host that is not a loopback address.
         ...(isLoopback(account.imapHost) ? { tls: { rejectUnauthorized: false } } : {})
     });
+    client.on("error", reportImapError);
 
     try {
         await client.connect();
@@ -198,6 +213,7 @@ export async function checkImap(account: MailConnectionSource): Promise<void> {
         socketTimeout: CHECK_SOCKET_TIMEOUT_MS,
         ...(isLoopback(account.imapHost) ? { tls: { rejectUnauthorized: false } } : {})
     });
+    client.on("error", reportImapError);
     try {
         await client.connect();
     } catch (caught) {
