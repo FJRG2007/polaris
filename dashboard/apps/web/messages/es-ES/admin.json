@@ -3169,7 +3169,7 @@
             },
             "keepLabel": "Cuánto tiempo se queda allí",
             "keepAlways": "Siempre",
-            "keepStopped": "Solo mientras está parado",
+            "keepStopped": "Solo si está parado",
             "keepAlwaysHint": "Funciona desde allí. Más lento que el disco de este servidor.",
             "keepStoppedHint": "Funciona desde el disco de este servidor. Tras 30 minutos parado se mueve allí y libera el disco; al arrancarlo, primero vuelve."
         },
@@ -3224,9 +3224,9 @@
             "originShared": "Otro volumen sigue usando el original, así que solo se puede conservar."
         },
         "policy": {
-            "title": "Servidores de juego",
+            "title": "Juegos",
             "description": "Dónde guardan sus mundos los servidores de juego.",
-            "default": "Servidores de juego nuevos",
+            "default": "Servidores nuevos",
             "defaultHint": "Se aplica a los servidores que se creen a partir de ahora. Los que ya existen se quedan donde están hasta que alguien elija.",
             "server": "Este servidor",
             "park": "{nas} mientras está apagado (funciona aquí)",
@@ -3234,7 +3234,7 @@
             "ownersChoose": "Los dueños eligen dónde se guardan sus servidores",
             "ownersChooseOn": "Cada dueño elige en los Ajustes de su servidor, entre las ubicaciones permitidas abajo.",
             "ownersChooseOff": "Todos los servidores de juego siguen el valor por defecto. Cada uno se mueve allí la próxima vez que se apague, nunca mientras funciona.",
-            "allowed": "Ubicaciones que pueden elegir los dueños",
+            "allowed": "Ubicaciones permitidas",
             "noNas": "Añade arriba una ubicación NAS para ofrecérsela a los servidores de juego.",
             "save": "Guardar",
             "saved": "Guardado",

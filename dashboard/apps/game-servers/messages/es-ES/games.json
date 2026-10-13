@@ -1271,7 +1271,7 @@
         }
     },
     "storage": {
-        "title": "Almacenamiento",
+        "title": "Ubicación",
         "now": "Ahora: {place}",
         "here": "Este servidor",
         "nas": "NAS",

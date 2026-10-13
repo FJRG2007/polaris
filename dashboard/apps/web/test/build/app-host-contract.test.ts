@@ -372,9 +372,11 @@ describe("an app's browser code", () => {
 
 /** Synchronous in the dashboard, so asynchronous for an app: every call awaits it. */
 const AWAITED = [
+    "holdStorage",
     "installRef",
     "peekServerMetrics",
     "publishChatChange",
+    "releaseStorage",
     "requestOrigin",
     "safeName",
     "serviceRef",
