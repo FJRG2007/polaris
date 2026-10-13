@@ -364,5 +364,24 @@
         "done": "{count, plural, one {# fila exportada} other {# filas exportadas}}",
         "truncated": "Se exportaron las primeras {count, plural, one {# fila} other {# filas}}. Acota la vista para exportar el resto.",
         "failed": "No se pudo exportar"
+    },
+    "record": {
+        "open": "Abrir registro",
+        "untitled": "Sin nombre",
+        "fields": "Campos",
+        "copyLink": "Copiar URL",
+        "linkCopied": "Enlace copiado",
+        "inTrash": "Este registro está en la papelera y no se puede cambiar.",
+        "noRelated": "Ninguno aún",
+        "moreRelated": "{count, plural, one {# más} other {# más}}",
+        "related": {
+            "people": {
+                "company": "Personas"
+            },
+            "opportunities": {
+                "company": "Oportunidades",
+                "pointOfContact": "Oportunidades como contacto"
+            }
+        }
     }
 }

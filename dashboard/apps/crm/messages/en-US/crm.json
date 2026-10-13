@@ -364,5 +364,24 @@
         "done": "{count, plural, one {# row} other {# rows}} exported",
         "truncated": "Exported the first {count, plural, one {# row} other {# rows}}. Narrow the view to export the rest.",
         "failed": "The export failed"
+    },
+    "record": {
+        "open": "Open record",
+        "untitled": "Untitled",
+        "fields": "Fields",
+        "copyLink": "Copy link",
+        "linkCopied": "Link copied",
+        "inTrash": "This record is in the trash and cannot be changed.",
+        "noRelated": "None yet",
+        "moreRelated": "{count, plural, one {# more} other {# more}}",
+        "related": {
+            "people": {
+                "company": "People"
+            },
+            "opportunities": {
+                "company": "Opportunities",
+                "pointOfContact": "Opportunities as contact"
+            }
+        }
     }
 }
