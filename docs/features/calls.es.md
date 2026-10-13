@@ -52,10 +52,14 @@ la llamada, y la reunión tiene su propio chat.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/call-group-light-es-desktop.webp">
-  <img src="../assets/media/call-group-dark-es-desktop.webp" alt="Un chat de grupo en una videollamada que se está grabando">
+  <img src="../assets/media/call-group-dark-es-desktop.webp" alt="Una llamada de grupo con una pantalla compartida vista entre las personas, grabándose">
 </picture>
 
 Cualquier mensaje directo o chat de grupo puede empezar una llamada de voz o de
-vídeo. La llamada se graba en el navegador de quien empieza la grabación, todos
-los que están dentro lo ven, y después la grabación se envía a la conversación
-o se descarta.
+vídeo. Una pantalla compartida que se está viendo aparece como una ficha del
+tamaño de una cara junto a quien la comparte, con lo que está llegando (720P
+30FPS) y la marca LIVE encima - igual que un cliente de voz dibuja una llamada
+entre unas pocas personas - hasta que alguien pide verla más grande, con lo que
+recupera toda la banda. La llamada se graba en el navegador de quien empieza la
+grabación, todos los que están dentro lo ven, y después la grabación se envía a
+la conversación o se descarta.
