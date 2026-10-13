@@ -11,6 +11,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
+    modToken: () => "key",
+    modTokenMatches: (token: string) => token === "key"
+}));
+
 const fake = vi.hoisted(() => ({
     installs: [] as { id: string; ownerId: string; applicationId: string }[],
     env: new Map<string, Map<string, string>>(),
@@ -40,7 +45,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files", () => ({
-    anticheatBundled: async () => fake.bundled
+    anticheatBundled: async () => fake.bundled,
+    PUBLIC_MOD_FILES: [
+        "polaris-neoforge-1.21.4.jar",
+        "polaris-paper.jar",
+        "polaris-anticheat-bukkit.jar"
+    ]
 }));
 vi.mock("@polaris/app-host", () => ({
     host: {
@@ -104,7 +114,7 @@ describe("switching it on for the servers made before", () => {
         const written = new Map(fake.written.get("app-1")!.map((one) => [one.key, one]));
         expect(written.get("POLARIS_ANTICHEAT")?.value).toBe("on");
         expect(written.get("MODS")?.value).toBe(
-            "https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar"
+            "https://polaris.example/api/minecraft/mod/key/polaris-anticheat-bukkit.jar"
         );
         expect(written.get("MODRINTH_PROJECTS")?.value).toBe("coreprotect?");
         expect(written.get("POLARIS_SERVER_TOKEN")).toEqual({
@@ -154,7 +164,7 @@ describe("switching it on for the servers made before", () => {
 });
 
 describe("the Polaris mod on every server it has a build for", () => {
-    const JAR = "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar";
+    const JAR = "https://polaris.example/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar";
 
     it("adds it whatever the switches say, keeping the rest of the list", async () => {
         server("1", {
@@ -181,6 +191,37 @@ describe("the Polaris mod on every server it has a build for", () => {
         server("4", { TYPE: "VANILLA", VERSION: "1.21.4" });
         expect(await adoptPolarisComponent()).toEqual({ adopted: 0 });
         expect(fake.written.size).toBe(0);
+    });
+
+    it("moves every jar it serves to the keyed address, keeping each one's base", async () => {
+        const old = "http://10.0.0.2:3000/api/minecraft/mod/polaris-neoforge-1.21.4.jar";
+        server("1", {
+            TYPE: "NEOFORGE",
+            VERSION: "1.21.4",
+            MODS: `https://example.org/other.jar,${old}`
+        });
+        server("2", {
+            TYPE: "PAPER",
+            VERSION: "1.21.4",
+            MODS: "https://polaris.example/api/minecraft/mod/stale/polaris-paper.jar"
+        });
+        // Without a public address nothing is added, but the move still happens.
+        fake.publicUrl = null;
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 2 });
+        expect(fake.written.get("app-1")).toEqual([
+            {
+                key: "MODS",
+                value: "https://example.org/other.jar,http://10.0.0.2:3000/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar",
+                isSecret: false
+            }
+        ]);
+        expect(fake.written.get("app-2")).toEqual([
+            {
+                key: "MODS",
+                value: "https://polaris.example/api/minecraft/mod/key/polaris-paper.jar",
+                isSecret: false
+            }
+        ]);
     });
 
     it("writes nothing without a public address or a jar to serve", async () => {

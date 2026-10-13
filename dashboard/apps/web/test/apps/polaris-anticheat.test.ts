@@ -19,9 +19,14 @@ import {
 } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 import * as anticheat from "@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat";
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
+    modToken: () => "key",
+    modTokenMatches: (token: string) => token === "key"
+}));
+
 const BASE = "https://polaris.example";
-const JAR = `${BASE}/api/minecraft/mod/polaris-anticheat-bukkit.jar`;
-const LOGIN = `${BASE}/api/minecraft/mod/polaris-paper.jar`;
+const JAR = `${BASE}/api/minecraft/mod/key/polaris-anticheat-bukkit.jar`;
+const LOGIN = `${BASE}/api/minecraft/mod/key/polaris-paper.jar`;
 const SERVER = "01a0a00b-35c5-7932-861e-1b2161a9b298";
 
 describe("where the engine runs", () => {
@@ -199,7 +204,7 @@ describe("on by default", () => {
 });
 
 describe("on a NeoForge server, through the Polaris mod", () => {
-    const MOD = `${BASE}/api/minecraft/mod/polaris-neoforge-1.21.4.jar`;
+    const MOD = `${BASE}/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar`;
     const neo = (extra: [string, string][] = []) =>
         new Map<string, string>([["TYPE", "NEOFORGE"], ["VERSION", "1.21.4"], ...extra]);
 

@@ -33,7 +33,7 @@
 import { findSoftware } from "@polaris/core";
 import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "./modrinth";
 import {
-    MOD_PATH,
+    modUrl,
     MODS_KEY,
     SERVER_ID_KEY,
     TOKEN_KEY,
@@ -179,7 +179,7 @@ export function anticheatEnableEnv(
     );
     const projects = current.get(PROJECTS_KEY);
     return new Map([
-        [MODS_KEY, [...kept, `${base}${MOD_PATH}/${file}`].join(",")],
+        [MODS_KEY, [...kept, modUrl(base, file)].join(",")],
         ...(build?.kind === "mod" ? [[ANTIXRAY_KEY, ""] as [string, string]] : []),
         ...(projects !== undefined && withoutReplacedAnticheats(projects) !== projects
             ? [[PROJECTS_KEY, withoutReplacedAnticheats(projects)] as [string, string]]

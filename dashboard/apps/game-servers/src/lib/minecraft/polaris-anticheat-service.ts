@@ -16,12 +16,13 @@ import {
     TOKEN_KEY,
     carriesFile,
     componentFileFor,
+    keyedMods,
     loginOn,
     modUrl,
     withMod
 } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
-import { anticheatBundled } from "./polaris-mod-files";
+import { PUBLIC_MOD_FILES, anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
 import { engineScore, reasonLine } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
@@ -190,10 +191,14 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
  * the anti-cheat off, and a server that just moved to a release with a build.
  * Written for the next start, never forced into a running one. Only `MODS`
  * changes: an anti-xray switched off stays off, and the login stays as it was.
+ *
+ * The same pass moves every jar this dashboard serves to its keyed address
+ * (`keyedMods`), on every server and whatever its software: a server written
+ * before the address carried a key would otherwise boot from the old one, which
+ * only lets a handful of downloads through.
  */
 export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null) return { adopted: 0 };
     const installs = await prisma.installedApp.findMany({
         where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
         select: { id: true, ownerId: true, applicationId: true }
@@ -218,12 +223,17 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
         const env = envs.get(install.applicationId!) ?? new Map<string, string>();
         const file = componentFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
         const mods = env.get(MODS_KEY) ?? "";
-        if (file === null || carriesFile(mods, file)) continue;
-        if (!bundled.has(file)) bundled.set(file, await anticheatBundled(file).catch(() => false));
-        if (!bundled.get(file)) continue;
+        const keyed = keyedMods(mods, PUBLIC_MOD_FILES);
+        let wanted = keyed;
+        if (baseUrl !== null && file !== null && !carriesFile(keyed, file)) {
+            if (!bundled.has(file))
+                bundled.set(file, await anticheatBundled(file).catch(() => false));
+            if (bundled.get(file)) wanted = withMod(keyed, modUrl(baseUrl, file));
+        }
+        if (wanted === mods) continue;
         try {
             await setEnvVars("application", install.applicationId!, install.ownerId, [
-                { key: MODS_KEY, value: withMod(mods, modUrl(baseUrl, file)), isSecret: false }
+                { key: MODS_KEY, value: wanted, isSecret: false }
             ]);
             adopted += 1;
         } catch (caught) {

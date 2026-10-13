@@ -6,14 +6,19 @@
  * after a move, and a server pack written over one the operator set.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as env from "@polaris-app/game-servers/src/lib/minecraft/sounds-env";
 import { guardAsTemplate } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
+    modToken: () => "key",
+    modTokenMatches: (token: string) => token === "key"
+}));
+
 const ID = "6b7a3c2e-0d59-4f43-9a8b-0c2f3e1d4a5b";
 const BASE = "https://polaris.example";
-const PAPER_JAR = `${BASE}/api/minecraft/mod/polaris-paper.jar`;
-const NEO_JAR = `${BASE}/api/minecraft/mod/polaris-neoforge-1.21.4.jar`;
+const PAPER_JAR = `${BASE}/api/minecraft/mod/key/polaris-paper.jar`;
+const NEO_JAR = `${BASE}/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar`;
 
 function vars(entries: Record<string, string>): Map<string, string> {
     return new Map(Object.entries(entries));

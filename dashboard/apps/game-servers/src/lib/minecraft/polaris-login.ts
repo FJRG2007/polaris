@@ -22,10 +22,12 @@
  * is that a download that fails ends the boot: while this is on, a server only
  * starts when it can reach Polaris.
  *
- * Pure: nothing here reads or writes a server.
+ * Pure: nothing here reads or writes a server. The one thing it reads is the
+ * instance's secret, for the key the download address carries (`mod-token`).
  */
 
 import { loaderForType } from "./modrinth";
+import { modToken } from "./mod-token";
 
 /** The image's list of jars to download, by URL. */
 export const MODS_KEY = "MODS";
@@ -140,9 +142,31 @@ export function hasBuildFor(software: string): boolean {
     return loader !== null && MOD_BUILDS.some((build) => build.loaders.includes(loader));
 }
 
-/** Where a server downloads the build from. */
+/** Where a server downloads the build from: behind this instance's key, so the
+ *  address is not one anybody can fetch. */
 export function modUrl(baseUrl: string, file: string): string {
-    return `${baseUrl.replace(/\/+$/, "")}${MOD_PATH}/${file}`;
+    return `${baseUrl.replace(/\/+$/, "")}${MOD_PATH}/${modToken()}/${file}`;
+}
+
+/**
+ * The list with every jar this dashboard serves pointed at its keyed address.
+ *
+ * For the servers written before the address carried a key, and for any written
+ * under a key the instance has since rotated: each keeps the base it was written
+ * with, so a server reaching Polaris by another name keeps reaching it. Entries
+ * for anybody else's jars are left exactly as they were.
+ */
+export function keyedMods(mods: string, served: readonly string[]): string {
+    const token = modToken();
+    return modEntries(mods)
+        .map((entry) => {
+            const at = entry.lastIndexOf(`${MOD_PATH}/`);
+            if (at < 0) return entry;
+            const file = entry.slice(entry.lastIndexOf("/") + 1);
+            if (!served.includes(file)) return entry;
+            return `${entry.slice(0, at)}${MOD_PATH}/${token}/${file}`;
+        })
+        .join(",");
 }
 
 /** The image splits `MODS` on commas and newlines. */

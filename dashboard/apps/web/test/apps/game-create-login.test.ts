@@ -10,6 +10,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createGameServerSchema } from "@polaris-app/game-servers/src/lib/games-schema";
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
+    modToken: () => "key",
+    modTokenMatches: (token: string) => token === "key"
+}));
+
 const installApp = vi.fn(async (..._args: unknown[]) => ({
     installedAppId: "created",
     applicationId: "app"
@@ -84,7 +89,7 @@ describe("a new server's login", () => {
         expect(written.get("POLARIS_SERVER_ID")?.value).toBe(seed!.installedAppId);
         expect(written.get("POLARIS_URL")?.value).toBe("https://polaris.example");
         expect(written.get("MODS")?.value).toBe(
-            "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar"
+            "https://polaris.example/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar"
         );
         expect(written.get("POLARIS_SERVER_TOKEN")?.isSecret).toBe(true);
         expect(written.get("POLARIS_SERVER_TOKEN")?.value).toMatch(/^[0-9a-f]{64}$/);
@@ -115,7 +120,7 @@ describe("a new server's login", () => {
         expect(seed).toBeDefined();
         const written = new Map(seed!.env.map((entry) => [entry.key, entry.value]));
         expect(written.get("MODS")).toBe(
-            "https://polaris.example/api/minecraft/mod/polaris-paper.jar,https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar"
+            "https://polaris.example/api/minecraft/mod/key/polaris-paper.jar,https://polaris.example/api/minecraft/mod/key/polaris-anticheat-bukkit.jar"
         );
         expect(written.get("POLARIS_LOGIN")).toBe("on");
         expect(written.get("POLARIS_ANTICHEAT")).toBe("on");
@@ -131,7 +136,7 @@ describe("a new server's login", () => {
         expect(written.has("POLARIS_LOGIN")).toBe(false);
         expect(written.get("POLARIS_ANTICHEAT")).toBe("on");
         expect(written.get("MODS")).toBe(
-            "https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar"
+            "https://polaris.example/api/minecraft/mod/key/polaris-anticheat-bukkit.jar"
         );
         expect(env.get("MODRINTH_PROJECTS")).toMatch(/simple-login\?/);
     });

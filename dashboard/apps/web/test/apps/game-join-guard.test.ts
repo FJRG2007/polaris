@@ -34,6 +34,11 @@ import {
     SOFTWARE_KEY
 } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
+    modToken: () => "key",
+    modTokenMatches: (token: string) => token === "key"
+}));
+
 /** The slugs on a list, lowercased, suffixes and pins dropped. */
 function slugs(list: string): string[] {
     return parseProjectList(list)
@@ -303,7 +308,7 @@ describe("reconciling the guard on a settings save", () => {
         TYPE: "NEOFORGE",
         VERSION: "1.21.4",
         MODRINTH_PROJECTS: "open-parties-and-claims?",
-        MODS: "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar",
+        MODS: "https://polaris.example/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar",
         POLARIS_LOGIN: "on"
     };
 
@@ -330,7 +335,7 @@ describe("reconciling the guard on a settings save", () => {
             await guardForSave([{ key: "TYPE", value: "PAPER" }], reader(modded))
         );
         expect(writes.get("MODS")).toBe(
-            "https://polaris.example/api/minecraft/mod/polaris-paper.jar"
+            "https://polaris.example/api/minecraft/mod/key/polaris-paper.jar"
         );
         expect(writes.has("POLARIS_LOGIN")).toBe(false);
         expect(writes.has(PROJECTS_KEY)).toBe(false);
@@ -384,7 +389,7 @@ describe("a template made from a server running Polaris login", () => {
         ["MODRINTH_PROJECTS", "create?"],
         [
             "MODS",
-            "https://example.org/extra.jar,https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar"
+            "https://example.org/extra.jar,https://polaris.example/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar"
         ],
         ["POLARIS_LOGIN", "on"]
     ]);
@@ -402,7 +407,7 @@ describe("a template made from a server running Polaris login", () => {
     });
 
     it("does not carry Polaris anti-cheat's jar, with the login on or off", () => {
-        const jar = "https://polaris.example/api/minecraft/mod/polaris-anticheat-bukkit.jar";
+        const jar = "https://polaris.example/api/minecraft/mod/key/polaris-anticheat-bukkit.jar";
         const paper = new Map([
             ["TYPE", "PAPER"],
             ["MODS", `https://example.org/extra.jar,${jar}`]
@@ -410,7 +415,7 @@ describe("a template made from a server running Polaris login", () => {
         expect(guardAsTemplate(paper).get("MODS")).toBe("https://example.org/extra.jar");
         const both = new Map([
             ["TYPE", "PAPER"],
-            ["MODS", `https://polaris.example/api/minecraft/mod/polaris-paper.jar,${jar}`],
+            ["MODS", `https://polaris.example/api/minecraft/mod/key/polaris-paper.jar,${jar}`],
             ["POLARIS_LOGIN", "on"]
         ]);
         expect(guardAsTemplate(both).get("MODS")).toBe("");

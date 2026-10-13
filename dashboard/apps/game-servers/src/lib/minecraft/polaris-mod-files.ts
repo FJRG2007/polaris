@@ -35,15 +35,16 @@ export function modPath(file: string): string | null {
     return SERVED.includes(file) ? path.join(modDir(), file) : null;
 }
 
-/** The jars anybody may download without a credential: the login's builds and
- *  the anti-cheat's, which a server fetches before it can present one. A mod
- *  Polaris carries for the operator is not one of them - it is handed out through
- *  the server's own pack link (`client-pack`). */
-const PUBLIC: readonly string[] = [...MOD_FILES, ...ANTICHEAT_FILES];
+/** The jars a server downloads from `/api/minecraft/mod` with the instance's key
+ *  (`mod-token`): the login's builds and the anti-cheat's, which a server
+ *  fetches before it can present a credential of its own. A mod Polaris carries
+ *  for the operator is not one of them - it is handed out through the server's
+ *  own pack link (`client-pack`). */
+export const PUBLIC_MOD_FILES: readonly string[] = [...MOD_FILES, ...ANTICHEAT_FILES];
 
 /** Where a publicly served build lives, or null when it is not public. */
 export function publicModPath(file: string): string | null {
-    return PUBLIC.includes(file) ? path.join(modDir(), file) : null;
+    return PUBLIC_MOD_FILES.includes(file) ? path.join(modDir(), file) : null;
 }
 
 /** The version a build reports, or null when the image has no record of it. The

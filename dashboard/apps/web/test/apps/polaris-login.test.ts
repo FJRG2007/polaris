@@ -9,12 +9,17 @@
 
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as login from "@polaris-app/game-servers/src/lib/minecraft/polaris-login";
+
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
+    modToken: () => "key",
+    modTokenMatches: (token: string) => token === "key"
+}));
 
 const BASE = "https://polaris.example";
 const JAR = "polaris-neoforge-1.21.4.jar";
-const URL = `${BASE}/api/minecraft/mod/${JAR}`;
+const URL = `${BASE}/api/minecraft/mod/key/${JAR}`;
 
 describe("which servers have a build", () => {
     it("is NeoForge on the release the jar was built for", () => {
@@ -122,9 +127,9 @@ describe("the MODS list", () => {
 
     it("recognises a build written with another address", () => {
         expect(
-            login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/polaris-neoforge-1.21.4.jar")
+            login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar")
         ).toBe(true);
-        expect(login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/polaris-paper.jar")).toBe(true);
+        expect(login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/key/polaris-paper.jar")).toBe(true);
         expect(login.hasMod("https://example.org/polaris-helper.jar")).toBe(false);
         expect(login.hasMod("https://example.org/polaris-paperweight.jar")).toBe(false);
         expect(login.hasMod("")).toBe(false);
@@ -227,7 +232,7 @@ describe("moving a server that runs it", () => {
 
     it("moves it to the plugin when the server moves to Paper", () => {
         const env = login.modMovedTo(on, "PAPER", "1.21.4");
-        expect(env?.get("MODS")).toBe(`${BASE}/api/minecraft/mod/polaris-paper.jar`);
+        expect(env?.get("MODS")).toBe(`${BASE}/api/minecraft/mod/key/polaris-paper.jar`);
         expect(env?.has("POLARIS_LOGIN")).toBe(false);
         expect(login.modMovedTo(on, "NEOFORGE", "1.21.4")).toBeNull();
     });
@@ -235,7 +240,7 @@ describe("moving a server that runs it", () => {
     it("points it at the right build when it names another one", () => {
         const stale = new Map([
             ...on,
-            ["MODS", `${BASE}/api/minecraft/mod/polaris-neoforge-1.21.1.jar`]
+            ["MODS", `${BASE}/api/minecraft/mod/key/polaris-neoforge-1.21.1.jar`]
         ]);
         expect(login.modMovedTo(stale, "NEOFORGE", "1.21.4")?.get("MODS")).toBe(URL);
     });
