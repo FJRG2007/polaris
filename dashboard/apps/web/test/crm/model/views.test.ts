@@ -61,6 +61,40 @@ describe("readConfig", () => {
         });
         expect(config).toEqual(defaultConfig("people"));
     });
+
+    it("reads a deals view stored before deals could be lost", () => {
+        const stored = {
+            columns: FIELDS.opportunities
+                .filter((field) => field.key !== "closeReason")
+                .map((field) => ({ key: field.key, width: 150, hidden: false, aggregate: null })),
+            sorts: [{ key: "stage", direction: "asc" }],
+            filter: {
+                conjunction: "and",
+                rules: [
+                    {
+                        id: "r1",
+                        key: "stage",
+                        operator: "isAnyOf",
+                        value: [{ id: "proposal", name: "" }, { id: "customer", name: "" }]
+                    }
+                ]
+            },
+            boardBy: "stage"
+        };
+        const config = readConfig("opportunities", stored);
+        expect(config.columns.at(-1)).toEqual({
+            key: "closeReason",
+            width: 200,
+            hidden: true,
+            aggregate: null
+        });
+        expect(config.columns.slice(0, -1).every((column) => !column.hidden)).toBe(true);
+        expect(config.filter.rules[0]).toMatchObject({
+            value: [{ id: "proposal", name: "" }, { id: "customer", name: "" }]
+        });
+        expect(config.sorts).toEqual([{ key: "stage", direction: "asc" }]);
+        expect(config.boardBy).toBe("stage");
+    });
 });
 
 describe("aggregatesFor", () => {

@@ -54,6 +54,13 @@ describe("readOdds", () => {
         expect(model.oddsSchema.safeParse(model.DEFAULT_ODDS).success).toBe(true);
         expect(model.oddsSchema.safeParse({ ...model.DEFAULT_ODDS, new: 1.5 }).success).toBe(false);
     });
+
+    it("keeps odds saved before deals could be lost, and takes none for the lost stage", () => {
+        const saved = { new: 15, screening: 25, meeting: 45, proposal: 70 };
+        expect(model.readOdds(saved)).toEqual(saved);
+        expect(model.oddsSchema.safeParse(saved).success).toBe(true);
+        expect(model.oddsSchema.safeParse({ ...saved, lost: 0 }).success).toBe(false);
+    });
 });
 
 describe("buildForecast", () => {
