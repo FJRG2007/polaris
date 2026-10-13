@@ -3240,6 +3240,7 @@
             "saved": "Saved",
             "invalid": "That couldn't be saved. Reload and try again.",
             "needsNas": "Choose which NAS the default uses.",
+            "outOfReach": "{count, plural, one {This game server's owner doesn't have that NAS, so it stays where it is: {servers}} other {These game servers' owners don't have that NAS, so they stay where they are: {servers}}}",
             "refused": {
                 "missing": "This service no longer exists.",
                 "notDeployed": "Deploy this service first; there is nothing to keep yet.",

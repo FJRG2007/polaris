@@ -1294,6 +1294,7 @@
         "noNas": "Aún no hay ningún NAS añadido. Quien administra Polaris puede añadirlo en Admin > Almacenamiento.",
         "notParkable": "Solo para servidores que guardan sus datos en un único sitio.",
         "noPermission": "Para cambiar esto hace falta permiso para gestionar este servidor.",
+        "outOfReach": "Quien administra Polaris eligió para los servidores de juego un NAS que no tienes, así que este se queda donde está.",
         "locked": "Quien administra Polaris decide dónde se guardan los servidores de juego.",
         "busy": "Su mundo se está moviendo. Podrás cambiarlo cuando termine.",
         "loadFailed": "No se pudo leer dónde se guarda este servidor. Recarga para volver a intentarlo.",

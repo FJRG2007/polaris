@@ -39,6 +39,8 @@ describe("calculate", () => {
         ["2pi", Number((2 * Math.PI).toPrecision(12))],
         ["3(4 + 1)", 15],
         ["3 x 4", 12],
+        ["7/2", 3.5],
+        ["2*3", 6],
         ["6 ÷ 3 × 2", 4],
         ["SQRT(9) + PI - pi", 3]
     ])("%s = %d", (input, expected) => {
@@ -66,7 +68,13 @@ describe("calculate", () => {
         "foo(2) + 1",
         "1 + 2; alert(1)",
         "process.exit(1)",
-        "1 + 2 = 3"
+        "1 + 2 = 3",
+        "2024-10-13",
+        "555-1234",
+        "1.2.3-4",
+        "3x4",
+        "1920x1080",
+        "10/13/2024"
     ])("leaves %j alone", (input) => {
         expect(calculate(input)).toBeNull();
     });

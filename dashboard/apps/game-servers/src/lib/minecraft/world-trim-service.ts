@@ -40,6 +40,7 @@ import {
 import { host } from "@polaris/app-host";
 
 const { setApplicationRunning } = host.deployService;
+const { holdStorage, releaseStorage } = host.storageHold;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 
 /** What an attempt did, for the screen that asked and for the record. */
@@ -156,6 +157,8 @@ async function runTrim(
         return fail(gameMessage("games", "lib.trim.stopFirst"), false);
 
     let restarted = false;
+    const held = [install.applicationId];
+    await holdStorage(held);
     try {
         if (how.backup) {
             // Before the stop, because the archive is the container's own tar.
@@ -175,6 +178,7 @@ async function runTrim(
     } finally {
         // Always, including after a failure: a server that was up when somebody
         // pressed this has to be up when they look again.
+        await releaseStorage(held).catch(() => undefined);
         if (restarted) await setApplicationRunning(install.applicationId, ownerId, true).catch(() => undefined);
     }
 }

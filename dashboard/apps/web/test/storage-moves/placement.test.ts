@@ -11,6 +11,7 @@ import * as placement from "@/lib/storage-moves/placement";
 
 const NAS = "0190f3a2-2222-7000-8000-000000000002";
 const OTHER_NAS = "0190f3a2-3333-7000-8000-000000000003";
+const OWNED = [NAS, OTHER_NAS];
 const NOW = new Date("2026-10-13T12:00:00.000Z");
 const HERE: plan.Location = { kind: "server" };
 const ON_NAS: plan.Location = { kind: "nas", connectionId: NAS };
@@ -171,8 +172,12 @@ describe("the instance's rule for game servers", () => {
     });
 
     it("keeps an owner's own choice while owners may choose", () => {
-        const policy = { ...placement.DEFAULT_POLICY, defaultMode: "park" as const, defaultConnectionId: NAS };
-        expect(placement.effectiveChoice(own, policy, true, created)).toEqual(own);
+        const policy = {
+            ...placement.DEFAULT_POLICY,
+            defaultMode: "park" as const,
+            defaultConnectionId: NAS
+        };
+        expect(placement.effectiveChoice(own, policy, true, created, OWNED)).toEqual(own);
     });
 
     it("puts every game server on the default when owners may not choose, and nothing else", () => {
@@ -182,12 +187,12 @@ describe("the instance's rule for game servers", () => {
             defaultConnectionId: NAS,
             ownersChoose: false
         };
-        expect(placement.effectiveChoice(own, policy, true, created)).toEqual({
+        expect(placement.effectiveChoice(own, policy, true, created, OWNED)).toEqual({
             mode: "nas",
             connectionId: NAS
         });
-        expect(placement.effectiveChoice(own, policy, false, created)).toEqual(own);
-        expect(placement.effectiveChoice(null, policy, false, created)).toBeNull();
+        expect(placement.effectiveChoice(own, policy, false, created, OWNED)).toEqual(own);
+        expect(placement.effectiveChoice(null, policy, false, created, OWNED)).toBeNull();
     });
 
     it("gives the default to game servers created after it was set, not to older ones", () => {
@@ -197,10 +202,49 @@ describe("the instance's rule for game servers", () => {
             defaultConnectionId: NAS,
             since: "2026-10-05T00:00:00.000Z"
         };
-        expect(placement.effectiveChoice(null, policy, true, created)).toBeNull();
+        expect(placement.effectiveChoice(null, policy, true, created, OWNED)).toBeNull();
         expect(
-            placement.effectiveChoice(null, policy, true, new Date("2026-10-06T00:00:00.000Z"))
+            placement.effectiveChoice(
+                null,
+                policy,
+                true,
+                new Date("2026-10-06T00:00:00.000Z"),
+                OWNED
+            )
         ).toEqual({ mode: "park", connectionId: NAS });
+    });
+
+    it("does not follow a default on a NAS the server's owner does not have", () => {
+        const locked = {
+            ...placement.DEFAULT_POLICY,
+            defaultMode: "nas" as const,
+            defaultConnectionId: NAS,
+            ownersChoose: false
+        };
+        expect(placement.effectiveChoice(own, locked, true, created, [OTHER_NAS])).toBeNull();
+        expect(placement.defaultOutOfReach(own, locked, true, created, [OTHER_NAS])).toBe(true);
+        expect(placement.defaultOutOfReach(own, locked, true, created, OWNED)).toBe(false);
+        expect(placement.defaultOutOfReach(own, locked, false, created, [])).toBe(false);
+
+        const since = {
+            ...placement.DEFAULT_POLICY,
+            defaultMode: "park" as const,
+            defaultConnectionId: NAS,
+            since: "2026-10-05T00:00:00.000Z"
+        };
+        const later = new Date("2026-10-06T00:00:00.000Z");
+        expect(placement.effectiveChoice(null, since, true, later, [])).toBeNull();
+        expect(placement.defaultOutOfReach(null, since, true, later, [])).toBe(true);
+        // Their own choice is theirs, and older servers never followed the default.
+        expect(placement.defaultOutOfReach(own, since, true, later, [])).toBe(false);
+        expect(placement.defaultOutOfReach(null, since, true, created, [])).toBe(false);
+
+        const here = { ...locked, defaultMode: "server" as const, defaultConnectionId: null };
+        expect(placement.effectiveChoice(own, here, true, created, [])).toEqual({
+            mode: "server",
+            connectionId: null
+        });
+        expect(placement.defaultOutOfReach(own, here, true, created, [])).toBe(false);
     });
 
     it("offers owners only the allowed NAS locations they have", () => {

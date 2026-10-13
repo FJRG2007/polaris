@@ -153,6 +153,7 @@ const load = {
     session: once(() => import("@/lib/session")),
     sessionDirectory: once(() => import("@/lib/session-directory")),
     settingStore: once(() => import("@/lib/setting-store")),
+    storageHold: once(() => import("@/lib/storage-moves/hold")),
     storageTarget: once(() => import("@/lib/storage-target")),
     wafService: once(() => import("@/lib/waf-service"))
 };
@@ -475,6 +476,12 @@ export const serverHost = {
     settingStore: {
         getSetting: later(load.settingStore, "getSetting"),
         setSetting: later(load.settingStore, "setSetting")
+    },
+    // A job that stopped a server to work on its files, so no storage move takes
+    // them away meanwhile.
+    storageHold: {
+        holdStorage: later(load.storageHold, "holdStorage"),
+        releaseStorage: later(load.storageHold, "releaseStorage")
     },
     storageTarget: {
         driverForTarget: later(load.storageTarget, "driverForTarget"),

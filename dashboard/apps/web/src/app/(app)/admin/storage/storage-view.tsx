@@ -687,6 +687,11 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
         cacheKey: "admin-storage-game-policy",
         intervalMs: 120_000
     });
+    const outOfReach = useLiveRead<string[]>({
+        load: useCallback(() => actions.gamePolicyOutOfReachAction(), []),
+        cacheKey: "admin-storage-game-policy-out-of-reach",
+        intervalMs: 120_000
+    });
     const [draft, setDraft] = useState<StoragePolicy | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -723,6 +728,7 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
         if (result.error) return setError(result.error);
         setSaved(true);
         policy.refresh();
+        outOfReach.refresh();
     };
 
     const allowed = (id: string) =>
@@ -768,6 +774,14 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
                                 {t("storage.policy.defaultHint")}
                             </span>
                         </label>
+                        {outOfReach.data && outOfReach.data.length > 0 ? (
+                            <p className="break-words text-xs text-warning-ink">
+                                {t("storage.policy.outOfReach", {
+                                    count: outOfReach.data.length,
+                                    servers: outOfReach.data.join(", ")
+                                })}
+                            </p>
+                        ) : null}
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="font-medium">{t("storage.policy.ownersChoose")}</p>
@@ -826,9 +840,7 @@ function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] 
                             ) : null}
                             <Button
                                 size="sm"
-                                disabled={
-                                    pending || !policy.data || samePolicy(draft, policy.data)
-                                }
+                                disabled={pending || !policy.data || samePolicy(draft, policy.data)}
                                 onClick={() => void save()}
                             >
                                 {pending ? (

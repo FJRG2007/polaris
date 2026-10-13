@@ -159,6 +159,12 @@ export async function gamePolicyAction(): Promise<placement.StoragePolicy> {
     return appStorage.readPolicy();
 }
 
+/** The game servers the default applies to whose owner does not have its NAS. */
+export async function gamePolicyOutOfReachAction(): Promise<string[]> {
+    await requireAdmin();
+    return appStorage.gameServersOutOfReach();
+}
+
 const policyInputSchema = z.object({
     defaultMode: z.enum(placement.STORAGE_MODES),
     defaultConnectionId: z.string().uuid().nullable(),

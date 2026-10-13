@@ -16,7 +16,7 @@ import type { AppHostTypes } from "@polaris/app-host";
 type AppStorageView = AppHostTypes["AppStorageView"];
 
 const { recordAudit } = host.auditService;
-const { requireGameServer } = host.appsInstallAccess;
+const { gamePermissionsFor, requireGameServer } = host.appsInstallAccess;
 const { appStorageView, chooseAppStorage } = host.appStorage;
 
 const chooseSchema = z.discriminatedUnion("mode", [
@@ -36,9 +36,16 @@ export async function readGameStorageAction(
     installedAppId: string
 ): Promise<AppStorageView | null> {
     try {
-        const { access } = await requireGameServer("games.read", installedAppId);
+        const { user, access } = await requireGameServer("games.read", installedAppId);
         const applicationId = access.install.applicationId;
-        return applicationId ? await appStorageView(applicationId) : null;
+        if (!applicationId) return null;
+        const [view, held] = await Promise.all([
+            appStorageView(applicationId),
+            gamePermissionsFor(user, installedAppId)
+        ]);
+        // The owner's NAS locations are theirs to pick from, not for everybody
+        // who may only look at the server.
+        return view && !held.includes("games.manage") ? { ...view, connections: [] } : view;
     } catch {
         return null;
     }

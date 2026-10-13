@@ -3240,6 +3240,7 @@
             "saved": "Guardado",
             "invalid": "No se pudo guardar. Recarga y vuelve a intentarlo.",
             "needsNas": "Elige qué NAS usa el valor por defecto.",
+            "outOfReach": "{count, plural, one {El dueño de este servidor de juego no tiene ese NAS, así que se queda donde está: {servers}} other {Los dueños de estos servidores de juego no tienen ese NAS, así que se quedan donde están: {servers}}}",
             "refused": {
                 "missing": "Este servicio ya no existe.",
                 "notDeployed": "Despliega primero este servicio; todavía no hay nada que guardar.",

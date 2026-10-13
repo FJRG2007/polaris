@@ -35,6 +35,11 @@ const CONSTANTS: ReadonlyMap<string, number> = new Map([
     ["e", Math.E]
 ]);
 
+/** Digits joined by dashes, dots or an "x" with no space or bracket - a date, a
+ *  phone or invoice number, a version, a screen size - and a date in slashes:
+ *  things somebody is looking up, not sums. "10 - 4" and "3 x 4" still are. */
+const LOOKS_LIKE_AN_ID = /^(?:\d[\d.]*(?:[-x][\d.]+)+|\d+(?:\/\d+){2,})$/i;
+
 /** Long enough for any sum somebody types, short enough to bound the work. */
 const MAX_LENGTH = 200;
 /** Brackets and signs nested deeper than this are not arithmetic anybody typed. */
@@ -215,6 +220,7 @@ export function calculate(input: string): number | null {
     if (!text || text.length > MAX_LENGTH) return null;
     // Something to work with, so a word that happens to spell "e" stays a search.
     if (!/\d|\bpi\b|\be\b/i.test(text)) return null;
+    if (LOOKS_LIKE_AN_ID.test(text)) return null;
     try {
         const { value, worked } = evaluate(tokenize(text));
         if (!worked || !Number.isFinite(value)) return null;

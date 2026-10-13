@@ -180,23 +180,55 @@ export function policyChoice(policy: StoragePolicy): StorageChoice | null {
     return choiceOf(policy.defaultMode, policy.defaultConnectionId);
 }
 
+/** Whether the instance's default is what applies to this service rather than
+ *  its own choice: a game server while owners may not choose, or one nobody
+ *  chose for that was created after the default was set. */
+function followsDefault(
+    own: StorageChoice | null,
+    policy: StoragePolicy,
+    game: boolean,
+    createdAt: Date
+): boolean {
+    if (!game) return false;
+    if (!policy.ownersChoose) return true;
+    return own === null && policy.since !== null && createdAt.getTime() >= Date.parse(policy.since);
+}
+
+/** Whether a choice can be followed by a service whose owner has these NAS
+ *  locations: a NAS is one owner's, and a move only goes to its owner's own. */
+function reachable(choice: StorageChoice | null, owned: readonly string[]): boolean {
+    return !choice?.connectionId || owned.includes(choice.connectionId);
+}
+
 /**
  * The choice that applies to a service: its own, unless it is a game server and
  * owners may not choose, when the instance's default applies to it as well. A
  * game server nobody chose for follows the default when it was created after the
- * default was set; one from before keeps its data where it already is.
+ * default was set; one from before keeps its data where it already is. A default
+ * on a NAS its owner does not have is no choice for it: it stays where it is.
  */
 export function effectiveChoice(
     own: StorageChoice | null,
     policy: StoragePolicy,
     game: boolean,
-    createdAt: Date
+    createdAt: Date,
+    owned: readonly string[]
 ): StorageChoice | null {
-    if (game && !policy.ownersChoose) return policyChoice(policy);
-    if (own) return own;
-    if (game && policy.since !== null && createdAt.getTime() >= Date.parse(policy.since))
-        return policyChoice(policy);
-    return null;
+    if (!followsDefault(own, policy, game, createdAt)) return own;
+    const choice = policyChoice(policy);
+    return reachable(choice, owned) ? choice : null;
+}
+
+/** Whether the instance's default applies to a service that cannot follow it,
+ *  because its owner does not have the default's NAS. */
+export function defaultOutOfReach(
+    own: StorageChoice | null,
+    policy: StoragePolicy,
+    game: boolean,
+    createdAt: Date,
+    owned: readonly string[]
+): boolean {
+    return followsDefault(own, policy, game, createdAt) && !reachable(policyChoice(policy), owned);
 }
 
 /** The NAS locations a game server's owner may pick among those they have. */

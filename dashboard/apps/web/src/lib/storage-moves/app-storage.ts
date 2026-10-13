@@ -13,6 +13,7 @@
 
 import * as plan from "./plan";
 import { prisma } from "@polaris/db";
+import { storageHeld } from "./hold";
 import * as placement from "./placement";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { gameForCatalogId, HOST_MOUNTABLE_KINDS } from "@polaris/core";
@@ -87,16 +88,20 @@ async function factsOf(where: { id: { in: string[] } } | { storageMode: { not: n
     }));
 }
 
-/** Every game server, for a policy that applies to all of them. */
-async function gameAppIds(): Promise<string[]> {
+/** Every game server's install, for a policy that applies to all of them. */
+async function gameInstalls(): Promise<{ applicationId: string; name: string }[]> {
     const installs = await prisma.installedApp.findMany({
         where: { status: { not: "removed" }, applicationId: { not: null } },
-        select: { applicationId: true, catalogId: true },
+        select: { applicationId: true, catalogId: true, name: true },
         take: 1000
     });
     return installs
         .filter((install) => gameForCatalogId(install.catalogId))
-        .map((install) => install.applicationId!);
+        .map((install) => ({ applicationId: install.applicationId!, name: install.name }));
+}
+
+async function gameAppIds(): Promise<string[]> {
+    return (await gameInstalls()).map((install) => install.applicationId);
 }
 
 /** The NAS locations an owner has that a service of theirs can be kept on. */
@@ -107,6 +112,20 @@ async function ownedConnections(ownerId: string): Promise<{ id: string; name: st
         orderBy: { name: "asc" },
         take: 100
     });
+}
+
+/** The ids of the NAS locations each of these owners has. */
+async function connectionsByOwner(ownerIds: readonly string[]): Promise<Map<string, string[]>> {
+    const rows = await prisma.storageConnection.findMany({
+        where: { ownerId: { in: [...new Set(ownerIds)] }, kind: { in: [...HOST_MOUNTABLE_KINDS] } },
+        select: { id: true, ownerId: true },
+        take: 5000
+    });
+    const owned = new Map<string, string[]>();
+    for (const row of rows) {
+        if (row.ownerId) owned.set(row.ownerId, [...(owned.get(row.ownerId) ?? []), row.id]);
+    }
+    return owned;
 }
 
 function destinationOf(location: plan.Location): string {
@@ -139,7 +158,7 @@ export async function sweepAppStorage(): Promise<{ started: number }> {
     const apps = [...chosen, ...forced];
     if (apps.length === 0) return { started: 0 };
     const ids = apps.map((app) => app.id);
-    const [busy, failures] = await Promise.all([
+    const [busy, failures, owned] = await Promise.all([
         prisma.storageMove.findMany({
             where: { applicationId: { in: ids }, state: { in: [...plan.BLOCKING_STATES] } },
             select: { applicationId: true }
@@ -152,7 +171,8 @@ export async function sweepAppStorage(): Promise<{ started: number }> {
                 finishedAt: { gt: new Date(Date.now() - placement.RETRY_AFTER_MS) }
             },
             select: { applicationId: true, finishedAt: true }
-        })
+        }),
+        connectionsByOwner(apps.map((app) => app.ownerId))
     ]);
     const moving = new Set(busy.map((move) => move.applicationId));
     const failedAt = new Map(failures.map((move) => [move.applicationId, move.finishedAt]));
@@ -160,10 +180,16 @@ export async function sweepAppStorage(): Promise<{ started: number }> {
     let started = 0;
     for (const app of apps) {
         const action = placement.sweepAction({
-            choice: placement.effectiveChoice(app.own, policy, app.game, app.createdAt),
+            choice: placement.effectiveChoice(
+                app.own,
+                policy,
+                app.game,
+                app.createdAt,
+                owned.get(app.ownerId) ?? []
+            ),
             stopped: app.desiredState === "stopped" && !app.asleep,
             deployed: app.deployed && !app.swarm,
-            busy: moving.has(app.id),
+            busy: moving.has(app.id) || storageHeld(app.id),
             volumes: app.volumes,
             pendingSince: app.pendingSince,
             failedAt: failedAt.get(app.id) ?? null,
@@ -196,6 +222,35 @@ export async function sweepAppStorage(): Promise<{ started: number }> {
     return { started };
 }
 
+/**
+ * The names of the game servers the instance's default applies to that cannot
+ * follow it, because their owner does not have the default's NAS: they stay
+ * where they are, and the admin screen says which.
+ */
+export async function gameServersOutOfReach(): Promise<string[]> {
+    const policy = await readPolicy();
+    if (!placement.policyChoice(policy)?.connectionId) return [];
+    const installs = await gameInstalls();
+    const apps = await factsOf({ id: { in: installs.map((install) => install.applicationId) } });
+    const owned = await connectionsByOwner(apps.map((app) => app.ownerId));
+    const off = new Set(
+        apps
+            .filter((app) =>
+                placement.defaultOutOfReach(
+                    app.own,
+                    policy,
+                    app.game,
+                    app.createdAt,
+                    owned.get(app.ownerId) ?? []
+                )
+            )
+            .map((app) => app.id)
+    );
+    return installs
+        .filter((install) => off.has(install.applicationId))
+        .map((install) => install.name);
+}
+
 // ---------------------------------------------------------------------------
 // Starting a parked service
 // ---------------------------------------------------------------------------
@@ -212,8 +267,14 @@ export async function bringHomeBeforeStart(
 ): Promise<boolean> {
     const [app] = await factsOf({ id: { in: [applicationId] } });
     if (!app) return false;
-    const policy = await readPolicy();
-    const choice = placement.effectiveChoice(app.own, policy, app.game, app.createdAt);
+    const [policy, owned] = await Promise.all([readPolicy(), ownedConnections(app.ownerId)]);
+    const choice = placement.effectiveChoice(
+        app.own,
+        policy,
+        app.game,
+        app.createdAt,
+        owned.map((connection) => connection.id)
+    );
     const volumeId = placement.homecoming(choice, app.volumes);
     if (!volumeId) return false;
     const running = await prisma.storageMove.findFirst({
@@ -271,6 +332,9 @@ export interface AppStorageView {
     readonly choice: placement.StorageChoice | null;
     /** The instance decides for game servers; the owner sees, not chooses. */
     readonly locked: boolean;
+    /** The instance's default applies to it, on a NAS its owner does not have,
+     *  so it stays where it is. */
+    readonly outOfReach: boolean;
     /** The NAS locations this service may be kept on. */
     readonly connections: { id: string; name: string }[];
     readonly parkable: boolean;
@@ -320,7 +384,9 @@ export async function appStorageView(applicationId: string): Promise<AppStorageV
     ]);
     const names = new Map(owned.map((connection) => [connection.id, connection.name]));
     const offered = new Set(placement.offeredConnections([...names.keys()], policy, app.game));
-    const choice = placement.effectiveChoice(app.own, policy, app.game, app.createdAt);
+    const choice = placement.effectiveChoice(app.own, policy, app.game, app.createdAt, [
+        ...names.keys()
+    ]);
     let move: AppStorageMove | null = null;
     if (latest) {
         const state = plan.isMoveState(latest.state) ? latest.state : "failed";
@@ -346,6 +412,9 @@ export async function appStorageView(applicationId: string): Promise<AppStorageV
         ),
         choice,
         locked: app.game && !policy.ownersChoose,
+        outOfReach: placement.defaultOutOfReach(app.own, policy, app.game, app.createdAt, [
+            ...names.keys()
+        ]),
         connections: owned.filter((connection) => offered.has(connection.id)),
         parkable: placement.parkable(app.volumes.length),
         blocked: !app.deployed

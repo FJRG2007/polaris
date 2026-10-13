@@ -520,7 +520,11 @@ export function CommandPalette({
                       }
                   ];
 
-        return [...sum, ...clock, ...remembered, ...commands, ...found];
+        // What the search found for what is typed is what Enter opened before the
+        // calculator existed, so the answer then follows it.
+        return found.length > 0
+            ? [...clock, ...remembered, ...commands, ...found, ...sum]
+            : [...sum, ...clock, ...remembered, ...commands];
     }, [
         calculation,
         recentRows,

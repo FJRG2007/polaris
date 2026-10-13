@@ -187,7 +187,7 @@ export function ServerStorage({
             title: t("storage.modes.park.title"),
             hint: t("storage.modes.park.hint"),
             off:
-                view.connections.length === 0
+                canManage && view.connections.length === 0
                     ? t("storage.noNas")
                     : !view.parkable
                       ? t("storage.notParkable")
@@ -197,7 +197,7 @@ export function ServerStorage({
             value: "nas",
             title: t("storage.modes.nas.title"),
             hint: t("storage.modes.nas.hint"),
-            off: view.connections.length === 0 ? t("storage.noNas") : null
+            off: canManage && view.connections.length === 0 ? t("storage.noNas") : null
         }
     ];
     const recent =
@@ -278,6 +278,9 @@ export function ServerStorage({
                 ) : null}
                 {disabledReason ? (
                     <p className="text-xs text-muted-foreground">{disabledReason}</p>
+                ) : null}
+                {view.outOfReach ? (
+                    <p className="text-xs text-warning-ink">{t("storage.outOfReach")}</p>
                 ) : null}
                 {recent && view.move ? (
                     <div className="flex flex-col gap-1 text-xs">

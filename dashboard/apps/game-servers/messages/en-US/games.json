@@ -1294,6 +1294,7 @@
         "noNas": "No NAS has been added yet. Whoever runs Polaris can add one in Admin > Storage.",
         "notParkable": "Only for servers that keep their data in one place.",
         "noPermission": "Changing this needs permission to manage this server.",
+        "outOfReach": "Whoever runs Polaris chose a NAS for game servers that you don't have, so this one stays where it is.",
         "locked": "Whoever runs Polaris decides where game servers are kept.",
         "busy": "Its world is being moved. You can change this when that finishes.",
         "loadFailed": "Couldn't read where this server is kept. Reload to try again.",

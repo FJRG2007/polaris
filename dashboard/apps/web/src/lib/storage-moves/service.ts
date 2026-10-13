@@ -20,6 +20,7 @@
 
 import * as plan from "./plan";
 import { prisma } from "@polaris/db";
+import { storageHeld } from "./hold";
 import { parseContainerState } from "@polaris/deploy";
 import { currentReleaseRef, serviceRef } from "@/lib/deploy/releases";
 import { restartFromKeptImage } from "@/lib/deploy-service";
@@ -517,6 +518,7 @@ export async function startMove(input: {
     if (!volume || !app) return { refused: "missing" };
     if (!app.currentDeploymentId) return { refused: "notDeployed" };
     if (app.target.runtime === "swarm") return { refused: "swarm" };
+    if (storageHeld(app.id)) return { refused: "busy" };
     const origin = plan.placementOf(volume);
     if (!origin) return { refused: "missing" };
     const ownerId = app.environment.project.ownerId;
