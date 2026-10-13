@@ -28,6 +28,7 @@
 import { z } from "zod";
 import { refusalMessage } from "./refusal";
 import { oauthClientFor } from "./oauth-app";
+import { ownOAuthApp, pickOAuthClient } from "./own-oauth-app";
 import type { ConnectionCredential } from "./store";
 
 export const SPOTIFY_PROVIDER = "spotify";
@@ -60,6 +61,41 @@ export interface SpotifyOAuthClient {
 /** The application an operator registered, or null when this deployment has none. */
 export function getSpotifyOAuthClient(): Promise<SpotifyOAuthClient | null> {
     return oauthClientFor(SPOTIFY_PROVIDER);
+}
+
+/**
+ * The application one person's Spotify speaks through: the one that issued
+ * their link when there is a link, otherwise their own app before the
+ * deployment's. Null when there is none.
+ */
+export async function spotifyClientFor(
+    userId: string,
+    credential?: ConnectionCredential | null
+): Promise<SpotifyOAuthClient | null> {
+    const [own, deployment] = await Promise.all([ownOAuthApp(userId, SPOTIFY_PROVIDER), getSpotifyOAuthClient()]);
+    return pickOAuthClient({ own, deployment, issuedTo: credential?.clientId, existing: Boolean(credential) });
+}
+
+/**
+ * Whether Spotify accepts this client id and secret, asked with the client
+ * credentials grant, which needs nothing but the pair:
+ * https://developer.spotify.com/documentation/web-api/tutorials/client-credentials-flow
+ * A refusal is false; anything else (a timeout, a 5xx) throws, so a blip is not
+ * mistaken for a wrong secret.
+ */
+export async function verifySpotifyClient(client: SpotifyOAuthClient): Promise<boolean> {
+    const response = await fetch(TOKEN, {
+        method: "POST",
+        headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            authorization: `Basic ${Buffer.from(`${client.clientId}:${client.clientSecret}`).toString("base64")}`
+        },
+        body: new URLSearchParams({ grant_type: "client_credentials" }),
+        signal: AbortSignal.timeout(TIMEOUT_MS)
+    });
+    if (response.ok) return true;
+    if (response.status === 400 || response.status === 401) return false;
+    throw new Error(await refusalMessage(response, "Spotify could not check the app"));
 }
 
 /**
@@ -146,11 +182,13 @@ async function postToken(
 
 function credentialFrom(
     token: z.infer<typeof tokenSchema>,
+    clientId: string,
     previous?: ConnectionCredential
 ): ConnectionCredential {
     const refreshToken = token.refresh_token ?? previous?.refreshToken;
     return {
         accessToken: token.access_token,
+        clientId,
         ...(refreshToken ? { refreshToken } : {}),
         ...(token.expires_in ? { expiresAt: Date.now() + token.expires_in * 1000 } : {})
     };
@@ -194,7 +232,7 @@ export async function exchangeSpotifyCode(
         // proof of one anyway.
         email: null,
         scope: token.scope ?? SCOPES.join(" "),
-        credential: credentialFrom(token)
+        credential: credentialFrom(token, client.clientId)
     };
 }
 
@@ -229,7 +267,7 @@ export async function spotifyAccessToken(
         grant_type: "refresh_token",
         refresh_token: credential.refreshToken
     });
-    return { accessToken: token.access_token, refreshed: credentialFrom(token, credential) };
+    return { accessToken: token.access_token, refreshed: credentialFrom(token, client.clientId, credential) };
 }
 
 /** Spotify asked to be left alone, for this long. */

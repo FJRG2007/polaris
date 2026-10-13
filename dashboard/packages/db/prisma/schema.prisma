@@ -354,6 +354,7 @@ model User {
     activitySettings    UserActivitySettings?
     badgesSeen          UserBadgeSeen[]
     listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
+    ownOAuthApps        UserOAuthApp[]
     listenedAlongWith   SpotifyListenAlong[] @relation("ListenAlongHost")
     mailAccounts        MailAccount[]
     mailLabels          MailLabel[]
@@ -9647,6 +9648,27 @@ model UserActivity {
 // can tell a new song from the same one still playing, and the moment it was
 // put there so the listener's own next read does not mistake the gap between
 // two songs for them taking their Spotify back. Empty while the host is paused.
+// An application somebody registered with a provider themselves, used for their
+// own links instead of the deployment's. Spotify keeps an app in development
+// mode to five allowlisted people, and the app's owner is never one of the
+// five's problem: with their own app, they are the owner. The secret is
+// envelope-encrypted like a link's credential.
+model UserOAuthApp {
+    userId          String   @db.Uuid
+    // Which service: "spotify".
+    provider        String
+    clientId        String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, provider])
+}
+
 model SpotifyListenAlong {
     listenerId String   @id @db.Uuid
     hostId     String   @db.Uuid
