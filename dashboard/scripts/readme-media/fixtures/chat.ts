@@ -9,6 +9,7 @@
  */
 
 import type { SceneContext } from "../runtime/scene";
+import { barsFrom } from "@/app/(app)/chat/voice-recorder";
 import { CREW, TEAM, VIEWER, ago, id } from "./people";
 import type { ChatProfile } from "@/lib/chat/profiles";
 import type { VoicePresence } from "@/lib/chat/meetings";
@@ -288,13 +289,52 @@ function file(
     };
 }
 
-/** A voice note's shape, one digit a bar, the way the recorder writes it. */
-const WAVE = "135797531246897642135798643124687975312468975421357986421357986531";
+/**
+ * The loudness a recorder would have sampled while somebody talked: words of a
+ * few syllables, each with its own stress, short gaps between words and longer
+ * breaths between phrases, over a quiet room. Seeded, so a picture is the same
+ * on every run, and different for every note.
+ */
+function speechLevels(seed: number, seconds: number): number[] {
+    let state = seed >>> 0 || 1;
+    const random = () => {
+        state = (state * 1664525 + 1013904223) >>> 0;
+        return state / 2 ** 32;
+    };
+    const frames = Math.round(seconds * 20); // 50 ms a frame
+    const levels: number[] = [];
+    const quiet = () => 0.02 + random() * 0.03;
+    // A short breath before the first word, the way a recording starts.
+    for (let at = 0; at < 4; at += 1) levels.push(quiet());
+    while (levels.length < frames) {
+        const words = 2 + Math.floor(random() * 6);
+        const phrase = 0.55 + random() * 0.45;
+        for (let word = 0; word < words && levels.length < frames; word += 1) {
+            const syllables = 1 + Math.floor(random() * 3);
+            for (let syllable = 0; syllable < syllables; syllable += 1) {
+                const length = 2 + Math.floor(random() * 4);
+                const stress = phrase * (0.35 + random() * 0.65);
+                for (let at = 0; at < length; at += 1) {
+                    const shape = Math.sin(((at + 0.5) / length) * Math.PI);
+                    levels.push(Math.max(quiet(), stress * shape));
+                }
+            }
+            const gap = random() < 0.7 ? 1 : 2 + Math.floor(random() * 2);
+            for (let at = 0; at < gap; at += 1) levels.push(quiet());
+        }
+        // Between phrases: a breath, now and then a longer pause to think.
+        const pause =
+            random() < 0.25 ? 14 + Math.floor(random() * 10) : 5 + Math.floor(random() * 6);
+        for (let at = 0; at < pause; at += 1) levels.push(quiet());
+    }
+    for (let at = 0; at < 3; at += 1) levels.push(quiet());
+    return levels.slice(0, frames);
+}
 
 function voiceNote(fileId: string, seconds: number): ChatAttachmentView {
     return file(fileId, "voice-message.webm", "audio/webm", seconds * 4_000, {
         durationMs: seconds * 1000,
-        waveform: WAVE.slice(0, 48)
+        waveform: barsFrom(speechLevels(Number.parseInt(fileId.slice(-6), 16), seconds))
     });
 }
 
