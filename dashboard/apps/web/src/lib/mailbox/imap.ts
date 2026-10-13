@@ -65,6 +65,44 @@ const SOCKET_TIMEOUT_MS = 5 * 60_000;
 /** The account form's check waits on a person, so it keeps the short one. */
 const CHECK_SOCKET_TIMEOUT_MS = 60_000;
 
+/**
+ * imapflow's warnings, and only those, into the server log.
+ *
+ * A refused MOVE or STORE comes back from imapflow as `false` with the server's
+ * reason written to its logger and nowhere else, so with the logger off a
+ * mailbox that would not move a message left no trace of why. The reason and the
+ * command are kept; the rest of the entry (connection ids, raw objects) is not.
+ */
+const IMAP_LOGGER = {
+    debug: () => undefined,
+    info: () => undefined,
+    warn: (entry: unknown) => console.warn("imap:", describeImapEntry(entry)),
+    error: (entry: unknown) => console.warn("imap:", describeImapEntry(entry))
+};
+
+export function describeImapEntry(entry: unknown): string {
+    if (!entry || typeof entry !== "object") return String(entry);
+    const { msg, err } = entry as { msg?: unknown; err?: unknown };
+    const failure = (err ?? {}) as { message?: unknown; responseText?: unknown; command?: unknown };
+    return [msg, failure.command, failure.message, failure.responseText]
+        .filter((part) => typeof part === "string" && part.length > 0)
+        .join(" - ");
+}
+
+/**
+ * The listener every client gets before it connects.
+ *
+ * imapflow reports a failure that lands after `connect()` has settled - a socket
+ * timeout during the session's own setup, a dropped connection between commands -
+ * as an `error` event, and an `error` event nobody listens to is thrown. Thrown
+ * inside imapflow's own promise chain, that became an unhandled rejection in the
+ * server log. Whatever command was waiting on the connection still fails on its
+ * own and is answered there; this only keeps the event from being thrown.
+ */
+function reportImapError(caught: unknown): void {
+    console.warn("imap:", describeImapEntry({ err: caught }));
+}
+
 /** What Polaris tells the server it is. Servers log this, and a client that
  *  refuses to name itself is the one that gets rate limited first. */
 const CLIENT_INFO = { name: "Polaris", vendor: "Polaris" };
@@ -112,7 +150,7 @@ export async function withImap<T>(
         // Nothing in this app waits on a connection between commands, so an
         // automatic IDLE would only be something the next command has to break.
         disableAutoIdle: true,
-        logger: false,
+        logger: IMAP_LOGGER,
         connectionTimeout: CONNECT_TIMEOUT_MS,
         greetingTimeout: GREETING_TIMEOUT_MS,
         socketTimeout: SOCKET_TIMEOUT_MS,
@@ -121,6 +159,7 @@ export async function withImap<T>(
         // never widened to a host that is not a loopback address.
         ...(isLoopback(account.imapHost) ? { tls: { rejectUnauthorized: false } } : {})
     });
+    client.on("error", reportImapError);
 
     try {
         await client.connect();
@@ -174,6 +213,7 @@ export async function checkImap(account: MailConnectionSource): Promise<void> {
         socketTimeout: CHECK_SOCKET_TIMEOUT_MS,
         ...(isLoopback(account.imapHost) ? { tls: { rejectUnauthorized: false } } : {})
     });
+    client.on("error", reportImapError);
     try {
         await client.connect();
     } catch (caught) {

@@ -12,8 +12,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
+import { OwnAppDialog, type OwnAppCard } from "./own-app-dialog";
 import { IntegrationLogo } from "@/components/logos";
-import { connectionSections, minecraftNameSchema, type ConnectionCategory } from "@polaris/core";
+import {
+    connectionSections,
+    lastfmNameSchema,
+    minecraftNameSchema,
+    type ConnectionCategory
+} from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -23,6 +29,7 @@ import {
     connectAwsAction,
     connectTokenAction,
     disconnectAccountAction,
+    saveLastfmNameAction,
     saveMinecraftNameAction
 } from "./actions";
 import {
@@ -74,6 +81,8 @@ export interface ConnectionProviderCard {
     /** Whether a name may be typed instead of proved. Such a link is shown as not
      *  verified, and a proved account replaces it. */
     acceptsTypedName?: boolean;
+    /** A typed name is the only way this one is linked, so it is never "not verified". */
+    typedOnly?: boolean;
     /** What the operator has to connect first, for the card that cannot offer one. */
     requires: string;
     /** How many accounts of this service the person may link. */
@@ -83,10 +92,18 @@ export interface ConnectionProviderCard {
     /** Whether the operator allows this service as a way into Polaris at all. */
     canSignIn: boolean;
     accounts: LinkedAccount[];
+    /** A provider app of one's own (Spotify), with the values its form asks for. */
+    ownApp?: OwnAppCard;
 }
 
 /** What the round trip to a provider came back with, as the callback flagged it. */
-const OUTCOMES: Record<string, { key: "linked" | "cancelled" | "stateError" | "taken" | "limit" | "unavailable" | "error"; bad: boolean }> = {
+const OUTCOMES: Record<
+    string,
+    {
+        key: "linked" | "cancelled" | "stateError" | "taken" | "limit" | "unavailable" | "error";
+        bad: boolean;
+    }
+> = {
     linked: { key: "linked", bad: false },
     cancelled: { key: "cancelled", bad: true },
     state_error: { key: "stateError", bad: true },
@@ -113,7 +130,12 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         const provider = params.get("provider");
         if (!outcome || !provider) return;
         const known = OUTCOMES[outcome];
-        if (known) setNotice({ provider, text: t(`connections.outcomes.${known.key}` as const), bad: known.bad });
+        if (known)
+            setNotice({
+                provider,
+                text: t(`connections.outcomes.${known.key}` as const),
+                bad: known.bad
+            });
         const url = new URL(window.location.href);
         url.searchParams.delete("connection");
         url.searchParams.delete("provider");
@@ -165,6 +187,7 @@ function ProviderCard({
     const [confirming, setConfirming] = useState<LinkedAccount | null>(null);
     const [tokenOpen, setTokenOpen] = useState(false);
     const [typing, setTyping] = useState(false);
+    const [ownAppOpen, setOwnAppOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const accounts = useMemo(
@@ -214,7 +237,10 @@ function ProviderCard({
                             <h3 className="truncate text-sm font-medium">{provider.name}</h3>
                             {provider.limit > 1 ? (
                                 <Badge variant="neutral">
-                                    {t("connections.ofLimit", { count: accounts.length, limit: provider.limit })}
+                                    {t("connections.ofLimit", {
+                                        count: accounts.length,
+                                        limit: provider.limit
+                                    })}
                                 </Badge>
                             ) : null}
                         </div>
@@ -250,7 +276,9 @@ function ProviderCard({
                                         variant="warning"
                                         title={
                                             account.missingScopes?.length
-                                                ? t("connections.badges.notGranted", { scopes: account.missingScopes.join(", ") })
+                                                ? t("connections.badges.notGranted", {
+                                                      scopes: account.missingScopes.join(", ")
+                                                  })
                                                 : t("connections.badges.connectAgain")
                                         }
                                     >
@@ -258,7 +286,10 @@ function ProviderCard({
                                     </Badge>
                                 ) : null}
                                 {account.signsIn ? (
-                                    <Badge variant="neutral" title={t("connections.badges.signsInTitle")}>
+                                    <Badge
+                                        variant="neutral"
+                                        title={t("connections.badges.signsInTitle")}
+                                    >
                                         {t("connections.badges.signsIn")}
                                     </Badge>
                                 ) : null}
@@ -270,7 +301,7 @@ function ProviderCard({
                                         {t("connections.badges.token")}
                                     </Badge>
                                 ) : null}
-                                {provider.acceptsTypedName ? (
+                                {provider.acceptsTypedName && !provider.typedOnly ? (
                                     account.method === "manual" ? (
                                         <Badge
                                             variant="warning"
@@ -281,7 +312,9 @@ function ProviderCard({
                                     ) : (
                                         <Badge
                                             variant="success"
-                                            title={t("connections.badges.verifiedTitle", { provider: provider.name })}
+                                            title={t("connections.badges.verifiedTitle", {
+                                                provider: provider.name
+                                            })}
                                         >
                                             {t("connections.badges.verified")}
                                         </Badge>
@@ -314,13 +347,21 @@ function ProviderCard({
                                         }
                                         aria-label={
                                             account.needsReauthorization
-                                                ? t("connections.reconnectToApprove", { account: account.label })
-                                                : t("connections.reconnect", { account: account.label })
+                                                ? t("connections.reconnectToApprove", {
+                                                      account: account.label
+                                                  })
+                                                : t("connections.reconnect", {
+                                                      account: account.label
+                                                  })
                                         }
                                         title={
                                             account.needsReauthorization
-                                                ? t("connections.reconnectToApprove", { account: account.label })
-                                                : t("connections.reconnect", { account: account.label })
+                                                ? t("connections.reconnectToApprove", {
+                                                      account: account.label
+                                                  })
+                                                : t("connections.reconnect", {
+                                                      account: account.label
+                                                  })
                                         }
                                         disabled={pending}
                                         onClick={() =>
@@ -334,7 +375,9 @@ function ProviderCard({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("connections.change", { account: account.label })}
+                                        aria-label={t("connections.change", {
+                                            account: account.label
+                                        })}
                                         title={t("connections.change", { account: account.label })}
                                         disabled={pending}
                                         onClick={() => setTyping(true)}
@@ -345,7 +388,9 @@ function ProviderCard({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    aria-label={t("connections.disconnect", { account: account.label })}
+                                    aria-label={t("connections.disconnect", {
+                                        account: account.label
+                                    })}
                                     title={t("connections.disconnect", { account: account.label })}
                                     disabled={pending}
                                     onClick={() => setConfirming(account)}
@@ -416,7 +461,9 @@ function ProviderCard({
                                 onClick={() => setTyping(true)}
                             >
                                 <Pencil className="size-4" />
-                                {t("connections.typeUsername")}
+                                {provider.typedOnly
+                                    ? t("connections.enterUsername")
+                                    : t("connections.typeUsername")}
                             </Button>
                         ) : null}
                         {!canAdd && (provider.canAuthorize || provider.acceptsToken) ? (
@@ -440,6 +487,30 @@ function ProviderCard({
                     </p>
                 ) : null}
 
+                {provider.ownApp ? (
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {provider.ownApp.clientId ? (
+                            <span className="min-w-0 truncate" title={provider.ownApp.clientId}>
+                                {t("connections.ownApp.inUse", {
+                                    clientId: provider.ownApp.clientId
+                                })}
+                            </span>
+                        ) : (
+                            <span className="min-w-0">{t("connections.ownApp.why")}</span>
+                        )}
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => setOwnAppOpen(true)}
+                        >
+                            {provider.ownApp.clientId
+                                ? t("connections.ownApp.change")
+                                : t("connections.ownApp.use")}
+                        </Button>
+                    </div>
+                ) : null}
+
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 {notice ? (
                     <p className={`text-sm ${notice.bad ? "text-danger" : "text-success"}`}>
@@ -447,6 +518,10 @@ function ProviderCard({
                     </p>
                 ) : null}
             </CardBody>
+
+            {ownAppOpen && provider.ownApp ? (
+                <OwnAppDialog ownApp={provider.ownApp} onClose={() => setOwnAppOpen(false)} />
+            ) : null}
 
             {confirming ? (
                 <DisconnectDialog
@@ -469,8 +544,9 @@ function ProviderCard({
                 />
             ) : null}
 
-            {typing && provider.slug === "minecraft" ? (
-                <MinecraftNameDialog
+            {typing && (provider.slug === "minecraft" || provider.slug === "lastfm") ? (
+                <TypedNameDialog
+                    kind={provider.slug}
                     current={typed?.label ?? null}
                     onClose={() => setTyping(false)}
                     onDone={() => {
@@ -504,9 +580,14 @@ function ProviderCard({
  * One sentence served every service and spoke of repositories and runner pools
  * - true of GitHub and nonsense on a Minecraft name somebody typed.
  */
-function disconnectSays(account: LinkedAccount, providerName: string, t: NamespaceTranslator<"account">): string {
+function disconnectSays(
+    account: LinkedAccount,
+    providerName: string,
+    t: NamespaceTranslator<"account">
+): string {
     if (account.method === "manual") return t("connections.disconnectDialog.manual");
-    if (account.provider === "github") return t("connections.disconnectDialog.github", { provider: providerName });
+    if (account.provider === "github")
+        return t("connections.disconnectDialog.github", { provider: providerName });
     return account.signsIn
         ? t("connections.disconnectDialog.signsIn", { provider: providerName })
         : t("connections.disconnectDialog.other", { provider: providerName });
@@ -531,10 +612,14 @@ function DisconnectDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {account.method === "manual"
-                            ? t("connections.disconnectDialog.removeTitle", { account: account.label })
+                            ? t("connections.disconnectDialog.removeTitle", {
+                                  account: account.label
+                              })
                             : t("connections.disconnectDialog.title", { account: account.label })}
                     </DialogTitle>
-                    <DialogDescription>{disconnectSays(account, providerName, t)}</DialogDescription>
+                    <DialogDescription>
+                        {disconnectSays(account, providerName, t)}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onCancel}>
@@ -597,7 +682,9 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("connections.aws.accessKeyId")}</span>
+                        <span className="text-sm font-medium">
+                            {t("connections.aws.accessKeyId")}
+                        </span>
                         <Input
                             autoComplete="off"
                             value={accessKeyId}
@@ -607,7 +694,9 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("connections.aws.secretAccessKey")}</span>
+                        <span className="text-sm font-medium">
+                            {t("connections.aws.secretAccessKey")}
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -623,7 +712,9 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                             placeholder="eu-west-1"
                             onChange={(event) => setRegion(event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">{t("connections.aws.regionHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("connections.aws.regionHint")}
+                        </span>
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
@@ -641,19 +732,37 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
     );
 }
 
+/** What each service that takes a typed name checks it with and saves it through. */
+const TYPED_NAMES = {
+    minecraft: {
+        schema: minecraftNameSchema,
+        save: (name: string) => saveMinecraftNameAction(name),
+        maxLength: 32,
+        example: "Steve"
+    },
+    lastfm: {
+        schema: lastfmNameSchema,
+        save: (name: string) => saveLastfmNameAction(name),
+        maxLength: 64,
+        example: "listener_01"
+    }
+} as const;
+
 /**
- * A Minecraft username, typed rather than proved.
+ * A Minecraft or Last.fm username, typed rather than proved.
  *
  * Checked as it is typed against the same schema the action checks, so what the
  * form accepts is what gets saved. An empty field is unfinished rather than
  * wrong, so it says nothing until there is something to judge, and saving the
  * name that is already there is not offered.
  */
-function MinecraftNameDialog({
+function TypedNameDialog({
+    kind,
     current,
     onClose,
     onDone
 }: {
+    kind: keyof typeof TYPED_NAMES;
     /** The name typed before, when this is a change. */
     current: string | null;
     onClose: () => void;
@@ -665,10 +774,14 @@ function MinecraftNameDialog({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
-    const checked = minecraftNameSchema.safeParse(name);
+    // A schema names its complaint by catalog key or, the older ones, in English.
+    const said = (message: string | undefined) =>
+        message && t.has(message) ? t(message as Parameters<typeof t>[0]) : message;
+    const typed = TYPED_NAMES[kind];
+    const checked = typed.schema.safeParse(name);
     const problem =
         name.trim().length > 0 && !checked.success
-            ? (checked.error.issues[0]?.message ?? null)
+            ? (said(checked.error.issues[0]?.message) ?? null)
             : null;
     const unchanged = checked.success && checked.data === current;
 
@@ -677,7 +790,7 @@ function MinecraftNameDialog({
         setError(null);
         startTransition(async () => {
             const result = await runAction(
-                () => saveMinecraftNameAction(checked.data),
+                () => typed.save(checked.data),
                 (message) => setError(message)
             );
             if (!result) return;
@@ -694,9 +807,11 @@ function MinecraftNameDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {current ? t("connections.minecraft.changeTitle") : t("connections.minecraft.typeTitle")}
+                        {current
+                            ? t(`connections.${kind}.changeTitle`)
+                            : t(`connections.${kind}.typeTitle`)}
                     </DialogTitle>
-                    <DialogDescription>{t("connections.minecraft.description")}</DialogDescription>
+                    <DialogDescription>{t(`connections.${kind}.description`)}</DialogDescription>
                 </DialogHeader>
                 <form
                     className="flex flex-col gap-2"
@@ -705,27 +820,26 @@ function MinecraftNameDialog({
                         submit();
                     }}
                 >
-                    <label className="text-sm font-medium" htmlFor="minecraft-name">
-                        {t("connections.minecraft.username")}
+                    <label className="text-sm font-medium" htmlFor={`${kind}-name`}>
+                        {t(`connections.${kind}.username`)}
                     </label>
                     <Input
-                        id="minecraft-name"
+                        id={`${kind}-name`}
                         autoFocus
                         autoComplete="off"
                         spellCheck={false}
-                        maxLength={32}
+                        maxLength={typed.maxLength}
                         value={name}
-                        // i18n-ignore: an example player name
-                        placeholder="Steve"
+                        placeholder={typed.example}
                         aria-invalid={problem ? true : undefined}
-                        aria-describedby="minecraft-name-hint"
+                        aria-describedby={`${kind}-name-hint`}
                         onChange={(event) => setName(event.target.value)}
                     />
                     <p
-                        id="minecraft-name-hint"
+                        id={`${kind}-name-hint`}
                         className={`text-xs ${problem ? "text-danger" : "text-muted-foreground"}`}
                     >
-                        {problem ?? t("connections.minecraft.hint")}
+                        {problem ?? t(`connections.${kind}.hint`)}
                     </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </form>
@@ -788,8 +902,12 @@ function TokenDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t("connections.token.title", { provider: providerName })}</DialogTitle>
-                    <DialogDescription>{t("connections.token.description", { provider: providerName })}</DialogDescription>
+                    <DialogTitle>
+                        {t("connections.token.title", { provider: providerName })}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {t("connections.token.description", { provider: providerName })}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium" htmlFor="connection-token">

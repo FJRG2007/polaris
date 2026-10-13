@@ -227,7 +227,12 @@ async function begin(
     // Steam has no application to look up: it proves an account over OpenID, so
     // the trip can start on an instance where nothing has been connected.
     if (provider === STEAM_PROVIDER) return beginSteam(origin, mode, target);
-    const client = await connectionOAuthClient(provider);
+    // A link goes through the application this person's link will use, which
+    // may be their own; a sign-in only ever through the deployment's.
+    const client = await connectionOAuthClient(
+        provider,
+        mode === "signin" ? undefined : (await requireUser()).id
+    );
     if (!client) {
         return mode === "signin"
             ? endSignIn(origin, provider, "unavailable")
@@ -362,7 +367,7 @@ export async function startConnectionLink(request: Request, provider: string): P
     // unproven because somebody has to be the first one through it.
     if (
         !findConnectionProvider(provider) ||
-        !(await connectionLinkAvailable(provider, { admin: user.isAdmin }))
+        !(await connectionLinkAvailable(provider, { admin: user.isAdmin, userId: user.id }))
     ) {
         return NextResponse.redirect(
             backToConnections(await connectionFlowOrigin(), provider, "unavailable")
@@ -526,7 +531,7 @@ async function finishLink(
 ): Promise<Response> {
     const user = await requireUser();
 
-    const client = await connectionOAuthClient(provider);
+    const client = await connectionOAuthClient(provider, user.id);
     if (!client) return endLink(origin, provider, "unavailable", screen, extra);
 
     try {
@@ -575,9 +580,13 @@ async function finishLink(
         // The one thing that settles whether this application works, and the only
         // moment it can be observed: the provider took somebody all the way through
         // and handed back an account. From here the service is offered to everybody.
-        await markConnectionProven(provider);
-        // Whatever it last refused, it does not refuse now.
-        await clearConnectionFailure(provider);
+        // Only when it went through the operator's application: somebody's own
+        // app working says nothing about the one everybody else is offered.
+        if ((await connectionOAuthClient(provider))?.clientId === client.clientId) {
+            await markConnectionProven(provider);
+            // Whatever it last refused, it does not refuse now.
+            await clearConnectionFailure(provider);
+        }
         return endLink(origin, provider, "linked", screen, extra);
     } catch (caught) {
         // The two refusals somebody can actually do something about are named;
@@ -588,7 +597,8 @@ async function finishLink(
             return endLink(origin, provider, "limit", screen, extra);
         // Those two are this person's to resolve. This one is the operator's, and
         // they are not the person standing at the redirect - so they are told.
-        await recordConnectionFailure(provider, describeFailure(caught));
+        if ((await connectionOAuthClient(provider))?.clientId === client.clientId)
+            await recordConnectionFailure(provider, describeFailure(caught));
         return endLink(origin, provider, "error", screen, extra);
     }
 }

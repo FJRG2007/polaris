@@ -572,7 +572,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         summary: "Let people show what they are listening to, and listen along with each other.",
         description:
             // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
-            "Create an app in Spotify's developer dashboard and everyone here gets a Connect button for their own Spotify. Beside their name, people who share it then see the song they are playing, and can press Listen along to hear it on their own Spotify. Spotify only lets an app control playback for a Premium account, so Listen along says so to anybody without one; showing the song works for everybody. Spotify also requires a secure (https) address for this Polaris, and keeps an app in development mode unless it is approved: in that mode the app's owner needs Premium and only the accounts added under User Management - five at most - can link.",
+            "Create an app in Spotify's developer dashboard and everyone here gets a Connect button for their own Spotify. Beside their name, people who share it then see the song they are playing, and can press Listen along to hear it on their own Spotify. Spotify only lets an app control playback for a Premium account, so Listen along says so to anybody without one; showing the song works for everybody. Spotify also requires a secure (https) address for this Polaris, and keeps an app in development mode unless it is approved: in that mode the app's owner needs Premium and only the accounts added under User Management - five at most - can link. Past that, anyone can add a Spotify app of their own from Connected accounts, and Last.fm shows the song for everybody with no limit.",
         docsUrl: "https://developer.spotify.com/documentation/web-api/concepts/apps",
         setupLinks: [
             {
@@ -598,6 +598,28 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         requiresApiKey: true,
         apiKeyLabel: "Client secret",
         apiKeyHelp: "On the app's Basic Information page, under View client secret."
+    },
+    {
+        slug: "lastfm",
+        name: "Last.fm",
+        category: "Chat",
+        summary: "Show what people are listening to, for everybody, through Last.fm.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Paste a Last.fm API key and anyone here can type their Last.fm username under Connected accounts. Beside their name, people who share it then see the song they are scrobbling - from Spotify or any other player connected to Last.fm. Unlike a Spotify app, it has no five-person limit and needs no Premium. Listen along opens the song in Spotify from the beginning rather than in step.",
+        docsUrl: "https://www.last.fm/api/show/user.getRecentTracks",
+        setupLinks: [
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Create an API account",
+                url: "https://www.last.fm/api/account/create",
+                help: "Any application name and description; the callback URL can stay empty. Last.fm shows the API key straight after."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp:
+            "The API key Last.fm shows for the application. The shared secret is not needed."
     },
     {
         slug: "krisp",
