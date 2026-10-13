@@ -139,6 +139,35 @@ describe("a message changed in place", () => {
         expect(frames[0]?.changed).toBeUndefined();
     });
 
+    it("does not count an edit as something that arrived", async () => {
+        const tab = await listen();
+        publishChatChange({
+            channelId: "room",
+            kind: "posted",
+            actorId: OTHER,
+            messageIds: ["m1"]
+        });
+        await wait(250);
+        tab.close();
+        expect(tab.frames()).toEqual([
+            expect.objectContaining({ channels: ["room"], arrived: [] })
+        ]);
+    });
+
+    it("counts a new message as arrived even when an edit rides with it", async () => {
+        const tab = await listen();
+        publishChatChange({
+            channelId: "room",
+            kind: "posted",
+            actorId: OTHER,
+            messageIds: ["m1"]
+        });
+        publishChatChange({ channelId: "room", kind: "posted", actorId: OTHER });
+        await wait(250);
+        tab.close();
+        expect(tab.frames()).toEqual([expect.objectContaining({ arrived: ["room"] })]);
+    });
+
     it("says nothing about a conversation this reader is not in", async () => {
         const tab = await listen();
         publishChatChange({

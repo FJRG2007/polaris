@@ -239,6 +239,10 @@
             "saidIn": "{author} en {channel}"
         },
         "actions": "Acciones",
+        "calculator": "Calculadora",
+        "calculationCopied": "{value} copiado al portapapeles",
+        "calculationCopyFailed": "No se pudo copiar el resultado. Prueba otra vez.",
+        "calculationLabel": "Copiar {value}",
         "clock": {
             "timer": "Iniciar un temporizador de {length}",
             "alarm": "Poner una alarma a las {time}",

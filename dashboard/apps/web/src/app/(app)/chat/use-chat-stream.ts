@@ -30,7 +30,11 @@ const frameSchema = z.discriminatedUnion("kind", [
         // conversation. An empty list means too many to name: read again
         // everything held. Absent from a server before this, and on a frame
         // where only new messages arrived.
-        changed: z.record(z.string(), z.array(z.string())).optional()
+        changed: z.record(z.string(), z.array(z.string())).optional(),
+        // The conversations where a new message landed, as against only
+        // changing in place. Absent from a server before this, which is read
+        // as every conversation in `channels`.
+        arrived: z.array(z.string()).optional()
     }),
     z.object({ kind: z.literal("channels") }),
     // A message was pinned or unpinned in a conversation this reader reaches.

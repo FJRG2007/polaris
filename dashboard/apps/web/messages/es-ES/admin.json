@@ -3150,7 +3150,8 @@
             "busy": "Hay un traslado de este servicio en curso.",
             "notDeployed": "Despliega primero este servicio; todavía no hay nada que mover.",
             "nowhere": "Añade un recurso NAS del propietario de este servicio para poder moverlo.",
-            "swarm": "Los servicios de un swarm todavía no se pueden mover desde aquí."
+            "swarm": "Los servicios de un swarm todavía no se pueden mover desde aquí.",
+            "parked": "En el NAS mientras está parado"
         },
         "move": {
             "title": "Mover {volume} de {app}",
@@ -3165,7 +3166,12 @@
                 "sameLocation": "El volumen ya está ahí.",
                 "notOffered": "Esa ubicación no está disponible para este servicio.",
                 "swarm": "Los servicios de un swarm todavía no se pueden mover desde aquí."
-            }
+            },
+            "keepLabel": "Cuánto tiempo se queda allí",
+            "keepAlways": "Siempre",
+            "keepStopped": "Solo si está parado",
+            "keepAlwaysHint": "Funciona desde allí. Más lento que el disco de este servidor.",
+            "keepStoppedHint": "Funciona desde el disco de este servidor. Tras 30 minutos parado se mueve allí y libera el disco; al arrancarlo, primero vuelve."
         },
         "moves": {
             "title": "Traslados",
@@ -3216,6 +3222,36 @@
             "notRestarted": "No se pudo volver a arrancar el servicio; arráncalo desde su página.",
             "notRestored": "No se pudo devolver su volumen al original y sigue apuntando a la copia. Muévelo de nuevo en Datos guardados.",
             "originShared": "Otro volumen sigue usando el original, así que solo se puede conservar."
+        },
+        "policy": {
+            "title": "Juegos",
+            "description": "Dónde guardan sus mundos los servidores de juego.",
+            "default": "Servidores nuevos",
+            "defaultHint": "Se aplica a los servidores que se creen a partir de ahora. Los que ya existen se quedan donde están hasta que alguien elija.",
+            "server": "Este servidor",
+            "park": "{nas} mientras está apagado (funciona aquí)",
+            "nas": "Siempre en {nas}",
+            "ownersChoose": "Los dueños eligen dónde se guardan sus servidores",
+            "ownersChooseOn": "Cada dueño elige en los Ajustes de su servidor, entre las ubicaciones permitidas abajo.",
+            "ownersChooseOff": "Todos los servidores de juego siguen el valor por defecto. Cada uno se mueve allí la próxima vez que se apague, nunca mientras funciona.",
+            "allowed": "Ubicaciones permitidas",
+            "noNas": "Añade arriba una ubicación NAS para ofrecérsela a los servidores de juego.",
+            "save": "Guardar",
+            "saved": "Guardado",
+            "invalid": "No se pudo guardar. Recarga y vuelve a intentarlo.",
+            "needsNas": "Elige qué NAS usa el valor por defecto.",
+            "outOfReach": "{count, plural, one {El dueño de este servidor de juego no tiene ese NAS, así que se queda donde está: {servers}} other {Los dueños de estos servidores de juego no tienen ese NAS, así que se quedan donde están: {servers}}}",
+            "refused": {
+                "missing": "Este servicio ya no existe.",
+                "notDeployed": "Despliega primero este servicio; todavía no hay nada que guardar.",
+                "busy": "Ya hay un traslado de este servicio en curso.",
+                "sameLocation": "Ya está ahí.",
+                "notOffered": "Esa ubicación no está disponible para este servicio.",
+                "swarm": "Los servicios de un swarm todavía no se pueden mover desde aquí.",
+                "locked": "Los servidores de juego siguen el valor por defecto mientras sus dueños no pueden elegir.",
+                "notParkable": "Solo para servicios que guardan sus datos en un único volumen.",
+                "noVolumes": "Este servicio no guarda archivos propios."
+            }
         }
     }
 }

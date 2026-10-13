@@ -32,6 +32,7 @@ import type { GameContext } from "./game-context";
 import { FivemResources } from "./fivem-resources";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
+import { ServerStorage } from "./server-storage";
 import { usePathname, useRouter } from "next/navigation";
 import type { PlayerSeen } from "../../lib/games-activity";
 import { timeoutRemaining } from "../../lib/player-timeout";
@@ -430,6 +431,10 @@ export function FivemPanel({
                         address={reading.address}
                     />
                     <ServerKeyCard
+                        installedAppId={installedAppId}
+                        canManage={held.includes("games.manage")}
+                    />
+                    <ServerStorage
                         installedAppId={installedAppId}
                         canManage={held.includes("games.manage")}
                     />

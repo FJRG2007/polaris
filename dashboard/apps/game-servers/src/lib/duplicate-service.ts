@@ -15,6 +15,9 @@
  * The source's storage is only ever read. If the copy fails, the source is
  * exactly what it was, running if it was running; the copy stays in the list
  * saying what went wrong, with a retry and a delete beside it.
+ *
+ * Both volumes are held for the copying window (`lib/storage-moves/hold`), so a
+ * storage move cannot start on either one while this is reading or writing it.
  */
 
 import { prisma } from "@polaris/db";
@@ -42,6 +45,7 @@ const { findApp } = host.appsCatalog;
 const { availableHostPort } = host.appsPortRegistry;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { deployApplication, setApplicationRunning } = host.deployService;
+const { holdStorage, releaseStorage } = host.storageHold;
 const duplicates = host.appsInstallDuplicate;
 
 /** How often progress is written while bytes move. */
@@ -217,6 +221,14 @@ async function copyThrough(ownerId: string, actorId: string | null, copyId: stri
         return;
     }
     const sourceApplicationId = source.applicationId;
+    const held = [sourceApplicationId, copy.applicationId];
+    let holding = true;
+    const release = async (): Promise<void> => {
+        if (!holding) return;
+        holding = false;
+        await releaseStorage(held).catch(() => undefined);
+    };
+    await holdStorage(held);
 
     try {
         // Read now, not when the copy was asked for: a retry comes after the source
@@ -247,6 +259,7 @@ async function copyThrough(ownerId: string, actorId: string | null, copyId: stri
             // Back up whatever happened to the copy: the source is the server
             // somebody is playing on, and this was never meant to cost it more than
             // the minutes the copy took.
+            await release();
             if (state.sourceWasRunning) await restartSource(ownerId, sourceApplicationId, actorId);
         }
 
@@ -272,6 +285,7 @@ async function copyThrough(ownerId: string, actorId: string | null, copyId: stri
                 })
                 .catch(() => undefined);
     } catch (error) {
+        await release();
         const refusal = error as {
             name?: unknown;
             code?: unknown;

@@ -12,6 +12,8 @@ import { requireAdmin } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import * as moves from "@/lib/storage-moves/service";
+import * as placement from "@/lib/storage-moves/placement";
+import * as appStorage from "@/lib/storage-moves/app-storage";
 import { createConnectionSchema } from "@polaris/core";
 import { createConnection } from "@/lib/storage-service";
 import {
@@ -116,6 +118,8 @@ export async function startMoveAction(input: unknown): Promise<{ id?: string; er
         serverLabel: t("storage.thisServer")
     });
     if ("refused" in result) return { error: t(`storage.move.refused.${result.refused}`) };
+    const volume = await moves.volumeApplication(parsed.data.volumeId);
+    if (volume) await appStorage.followManualMove(volume, parsed.data.destination);
     await recordAudit({
         actorId: admin.id,
         action: "storage.move.start",
@@ -145,6 +149,92 @@ export async function answerMoveAction(input: unknown): Promise<{ error?: string
                 : "storage.move.keep-original",
         targetType: "storage-move",
         targetId: parsed.data.id
+    });
+    return {};
+}
+
+/** The instance's rule for game servers. */
+export async function gamePolicyAction(): Promise<placement.StoragePolicy> {
+    await requireAdmin();
+    return appStorage.readPolicy();
+}
+
+/** The game servers the default applies to whose owner does not have its NAS. */
+export async function gamePolicyOutOfReachAction(): Promise<string[]> {
+    await requireAdmin();
+    return appStorage.gameServersOutOfReach();
+}
+
+const policyInputSchema = z.object({
+    defaultMode: z.enum(placement.STORAGE_MODES),
+    defaultConnectionId: z.string().uuid().nullable(),
+    ownersChoose: z.boolean(),
+    allowedConnectionIds: z.array(z.string().uuid()).max(100).nullable()
+});
+
+export async function saveGamePolicyAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = policyInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("storage.policy.invalid") };
+    const value = parsed.data;
+    if (value.defaultMode !== "server" && !value.defaultConnectionId)
+        return { error: t("storage.policy.needsNas") };
+    const before = await appStorage.readPolicy();
+    const defaultConnectionId = value.defaultMode === "server" ? null : value.defaultConnectionId;
+    const changedDefault =
+        before.defaultMode !== value.defaultMode ||
+        before.defaultConnectionId !== defaultConnectionId;
+    const next: placement.StoragePolicy = {
+        defaultMode: value.defaultMode,
+        defaultConnectionId,
+        ownersChoose: value.ownersChoose,
+        allowedConnectionIds: value.allowedConnectionIds,
+        // Game servers created from now on follow a new default; the ones already
+        // there stay where they are until somebody chooses.
+        since:
+            value.defaultMode === "server"
+                ? null
+                : changedDefault
+                  ? new Date().toISOString()
+                  : before.since
+    };
+    await appStorage.writePolicy(next);
+    await recordAudit({
+        actorId: admin.id,
+        action: "storage.policy.update",
+        targetType: "setting",
+        targetId: placement.POLICY_SETTING,
+        metadata: { ...next }
+    });
+    revalidatePath("/admin/storage");
+    return {};
+}
+
+const keepWhileStoppedSchema = z.object({
+    applicationId: z.string().uuid(),
+    connectionId: z.string().uuid()
+});
+
+/** Keep a service on a NAS only while it is stopped (`park`), from the move dialog. */
+export async function keepOnNasWhileStoppedAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = keepWhileStoppedSchema.safeParse(input);
+    if (!parsed.success) return { error: t("storage.move.refused.notOffered") };
+    const result = await appStorage.chooseAppStorage({
+        applicationId: parsed.data.applicationId,
+        choice: { mode: "park", connectionId: parsed.data.connectionId },
+        actorId: admin.id,
+        serverLabel: t("storage.thisServer")
+    });
+    if ("refused" in result) return { error: t(`storage.policy.refused.${result.refused}`) };
+    await recordAudit({
+        actorId: admin.id,
+        action: "storage.mode.park",
+        targetType: "application",
+        targetId: parsed.data.applicationId,
+        metadata: { connectionId: parsed.data.connectionId }
     });
     return {};
 }

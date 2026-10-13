@@ -83,6 +83,7 @@ import * as arrivals from "./call-arrivals";
 import { shareSound } from "./call-share-sound";
 import { withCameraDevice } from "./camera-device";
 import { callMuted, setCallMuted } from "./call-muted";
+import { rememberVoice, takeRememberedVoice } from "./call-voice-resume";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { pressDeafen, pressMic } from "./call-voice-controls";
 import { afterPaint, maskCamera, type MaskedCamera } from "./camera-filter";
@@ -1984,6 +1985,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             licensed.current = await actions.licensedFilterAction(inCall).catch(() => null);
             setLicensedFilter(licensed.current !== null);
 
+            // What this tab had asked for before it reloaded, if it did - read
+            // before anything is opened, so nothing is published live first.
+            const resumed = takeRememberedVoice(inCall);
+            if (resumed?.deafened && !deafenedRef.current) {
+                deafenedRef.current = true;
+                setDeafened(true);
+            }
             const opened = await openMedia(
                 withVideo,
                 quality.cameraConstraints(levelNow("camera"))
@@ -2002,7 +2010,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // Muted the way this browser was left, before anything is
                 // published. Opening a voice channel is now a single press, so
                 // without this a press opens a microphone - see `call-muted`.
-                if (mic.current && callMuted()) {
+                if (mic.current && (resumed ? !resumed.micOn : callMuted())) {
                     mic.current.enabled = false;
                     setMicOn(false);
                 }
@@ -2012,7 +2020,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 // shown as not listening talking into the room; undeafening
                 // gives back what they would have opened with.
                 if (mic.current && deafenedRef.current) {
-                    micBeforeDeafen.current = mic.current.enabled;
+                    micBeforeDeafen.current = resumed?.deafened
+                        ? resumed.micBeforeDeafen
+                        : mic.current.enabled;
                     mic.current.enabled = false;
                     micOnRef.current = false;
                     setMicOn(false);
@@ -2783,6 +2793,30 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
         say({ [DEAFENED]: next.deafened ? "1" : "" });
     }, [say, setVoiceEnabled, sound]);
+
+    /**
+     * Mute and deafen, written down as the page is left mid-call, so a reload
+     * walks back into the call the way the person left it - see
+     * `call-voice-resume`. What a moderator imposed is not theirs to keep: the
+     * seat is told again by the server, and lifting it gives back what they had.
+     */
+    useEffect(() => {
+        if (!meetingId) return;
+        const note = (event: PageTransitionEvent) => {
+            if (event.persisted) return;
+            const restriction = forced.current;
+            const quiet = restriction.serverMuted || restriction.serverDeafened;
+            rememberVoice(meetingId, {
+                micOn: quiet ? micBeforeForce.current : micOnRef.current,
+                deafened: restriction.serverDeafened
+                    ? deafenedBeforeForce.current
+                    : deafenedRef.current,
+                micBeforeDeafen: micBeforeDeafen.current
+            });
+        };
+        window.addEventListener("pagehide", note);
+        return () => window.removeEventListener("pagehide", note);
+    }, [meetingId]);
 
     /** Swap one input for another, mid-call. */
     const chooseDevice = useCallback(

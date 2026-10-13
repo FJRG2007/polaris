@@ -210,7 +210,10 @@ export function MessageToasts() {
 
             const t = words.current;
             const who = message.inChannel
-                ? t("messageToasts.inChannel", { author: message.authorName, channel: message.conversation })
+                ? t("messageToasts.inChannel", {
+                      author: message.authorName,
+                      channel: message.conversation
+                  })
                 : message.authorName;
             const replyTo = message.inChannel
                 ? t("messageToasts.messageChannel", { channel: message.conversation })
@@ -327,7 +330,11 @@ export function MessageToasts() {
                 if (!context.owner && !tabIsWatched()) return;
 
                 const attended = tabIsWatched();
-                for (const channelId of frame.channels) {
+                // Only what is new is announced. An edit, a reaction or a
+                // deletion wakes the conversation too, and notifying for it
+                // pinged everybody again on every edit of a message they had
+                // already been told about.
+                for (const channelId of frame.arrived ?? frame.channels) {
                     // Being read right here: the line is on screen, and the
                     // other tabs are told so they stay quiet about it too.
                     if (attended && showsConversation(here.current, channelId)) {

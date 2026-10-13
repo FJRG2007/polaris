@@ -22,28 +22,26 @@
   <hr />
 </div>
 
-Polaris is a self-hosted workspace for everything you run yourself: your files,
-your servers, the apps you deploy on them, the work you plan around them, and the
-people you do it with. One install, one login, one dark interface with an app
-switcher in the top-left corner.
+Polaris is a self-hosted platform to run your servers and your team from one
+place: deploy apps and databases to your own machines, manage files across every
+NAS and cloud drive, host game servers, and work together with chat, calls,
+tasks, calendar, mail and documents.
 
-It replaces the pile that usually grows around a home lab or a small team - a
-file browser, a deployment tool, a task board, a chat client, a password manager,
-an uptime monitor, an analytics script - with one control plane where those
-things already know about each other. A deploy can be discussed in a channel, a
-task can carry the file, and everybody in it has one account.
+It replaces the separate tools a home lab or a small team ends up running -
+deployments, file sharing, a password manager, uptime checks, analytics, chat, a
+task tracker - with one install and one set of accounts. The apps share data: a
+task links the deploy it is about, and a file in Drive attaches to a message
+without being uploaded again.
 
-Polaris runs in Docker and reaches out from there: native mounts, the host's own
-Docker engine, and the machines you enrol over SSH are all managed from the one
-container. After the install, nothing needs a terminal - updates, new features
-and repairs all happen from the interface.
+It runs in Docker and manages the host it is installed on plus any machine you
+add over SSH. After the install, updates and settings are handled from the web
+interface.
 
 ## A look inside
 
-Every picture below is the real interface, drawn from its own components with
-made-up data, and follows your light or dark setting. Most open a page on
-their area with more pictures and everything it does. Phone-sized versions sit
-beside them in [docs/assets/media](docs/assets/media).
+Screenshots of the real interface with sample data. Most link to a page with
+the full feature list. Mobile versions are in
+[docs/assets/media](docs/assets/media).
 
 ### Talk
 
@@ -210,8 +208,7 @@ beside them in [docs/assets/media](docs/assets/media).
 
 ## If you already pay for these
 
-The fastest way to say what Polaris is: it is the tools you are already using,
-on hardware you already own, sharing one account and one interface.
+What Polaris replaces, on your own hardware and with one account:
 
 | What you use today                 | What Polaris runs instead                                                                                                                                                           |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -229,14 +226,10 @@ on hardware you already own, sharing one account and one interface.
 | A backup tool and a database GUI   | Scheduled backups with restore, and Postgres, MySQL, MariaDB, MongoDB and Redis                                                                                                     |
 | Google Analytics, Plausible        | Cookieless analytics for the sites you host                                                                                                                                         |
 
-None of it is a fork of any of them. It is the same idea, built once, with the
-half those products cannot give you: it is yours, it is on your hardware, and
-every part of it knows about the others.
-
 ## Install
 
-One command. It brings up the whole stack - dashboard, database, reverse proxy
-and the privileged host daemon - generates its secrets, and needs no flags:
+One command installs the dashboard, database, reverse proxy and host daemon,
+and generates the secrets:
 
 ```bash
 # macOS / Linux
@@ -266,31 +259,24 @@ Then open `https://127.0.0.1/oauth/setup?token=` followed by the
 `POLARIS_SETUP_TOKEN` you put in `.env`, and create the administrator. The
 certificate is self-signed until a domain points here, so the browser warns once.
 
-Updating is a button in Settings. There is a script behind it for anybody who
-would rather drive it themselves.
+To update, use the Update button in Settings.
 
 ## What's in it
 
-Every app is switched on per account and per role, so somebody invited to help
-with one thing does not get the rest.
+Each app is enabled per account and per role.
 
 **Files and secrets**
 
-- **Drive** - a private drive for every account from the moment they open it, plus
-  a shelf for every organization, reached by everybody on its roster; browsing,
-  uploading, downloading and sharing across every NAS you own: local disks,
-  SFTP, S3-compatible, SMB/NFS, UniFi UNAS, Google Drive, OneDrive and Dropbox
-  (WebDAV, Synology, QNAP and TrueNAS are coming). Streaming transfers, so multi-gigabyte files never
-  buffer. Send a file or folder to a person or an organization, a copy by
-  default or the file itself on a move, kept with the sender until accepted;
-  share a file or folder with a person or group, with a role, a note and
-  an expiry; public links with passwords and expiry; drop points for people who
-  have no account; viewers and editors for documents, spreadsheets, PDFs and
-  media; and a grid that shows the picture of an image or a document's first
-  page instead of a generic icon.
-- **Vault** - a password manager that speaks the Bitwarden client protocol, so
-  the apps and extensions you already use point at your own instance. Everything
-  is encrypted in the browser; the server never sees a master password.
+- **Drive** - a private drive per account and a shared one per organization,
+  across local disks, SFTP, S3-compatible storage, SMB/NFS, UniFi UNAS, Google
+  Drive, OneDrive and Dropbox (WebDAV, Synology, QNAP and TrueNAS are coming).
+  Streaming transfers for large files; sharing with people and groups by role
+  and expiry; public links with password and expiry; drop points for people
+  without an account; viewers and editors for documents, spreadsheets, PDFs and
+  media; thumbnails in the grid.
+- **Vault** - a password manager compatible with the Bitwarden apps and
+  extensions. Encrypted in the browser; the server never sees the master
+  password.
 
 **Running things**
 
@@ -301,18 +287,17 @@ with one thing does not get the rest.
   terminal, files, metrics and Docker engine from here.
 - **Containers** and **Backups** - what is running on every host, and scheduled
   backups of it with restore.
-- **Marketplace** - one-press installs for the things people actually self-host,
-  including **game servers** (Minecraft, ARK and FiveM, with worlds, mods,
-  resources, players, schedules, crash detection and Minecraft challenges -
-  daily, weekly, a season pass, bingo and community goals).
+- **Marketplace** - one-click installs of self-hosted apps.
+- **Game servers** - Minecraft, ARK and FiveM, with worlds, mods, resources,
+  players, schedules, crash detection, and Minecraft challenges (daily, weekly,
+  season pass, bingo and community goals). Worlds can live on a NAS.
 - **Runners** - GitHub Actions compatible CI on your own machines, with per-repo
   policy and budgets.
-- **Agents** - coding agents that work in a repository: headless runs that open
-  pull requests and answer reviews with your own model keys, and live sessions
-  that run the vendor's own CLI (Claude Code, Codex and others) in a real
-  terminal you can watch and steer from anywhere. A task can be handed straight
-  to one from its panel, and the agent reads and moves it back through
-  Polaris's own MCP server.
+- **Agents** - coding agents on your repositories: headless runs that open pull
+  requests and answer reviews with your own model keys, and live sessions of
+  Claude Code, Codex and other CLIs in a terminal you can watch and steer. A
+  task can be assigned to an agent, which updates it through Polaris's MCP
+  server.
 - **Code** - the pull requests and issues you have open on GitHub, read as you.
 - **Databases** - Postgres, MySQL, MariaDB, MongoDB and Redis: browse, query and
   back up what you deployed, or connect to one elsewhere - directly or through an
@@ -327,20 +312,16 @@ with one thing does not get the rest.
   reminders, invitations, free/busy, meeting rooms and booking pages other
   people can reserve a slot on, plus a Time area with alarms, timers, focus
   cycles, a stopwatch and a world clock.
-- **Chat** - servers and channels, direct messages and groups, with calls,
-  meetings, screen sharing, voice messages, screen clips recorded in the browser,
-  and messages written now and sent at an hour that suits.
-- **Notes** - somewhere to write things down, nested the way a notebook is.
-- **Inbox** - conversations that arrive from outside, across every channel you
-  connect.
-- **Organizations** - teams, rosters and per-organization roles, so a group of
-  people can own work together.
+- **Chat** - servers and channels, direct messages and groups, calls, meetings,
+  screen sharing, voice messages, screen clips and scheduled messages.
+- **Notes** - nested notes; imports an Obsidian vault or a folder of Markdown.
+- **Inbox** - Telegram, WhatsApp, Discord and Slack conversations in one place.
+- **Organizations** - teams with their own members and roles.
 
 **Keeping an eye on it**
 
-- **Watch** - alarms on app health, spikes and outages, with webhooks, and a
-  record of every time the deployment itself lost its connection, with uptime
-  and a 90-day heatmap.
+- **Watch** - alerts on app health, spikes and outages, with webhooks, plus
+  uptime history and a 90-day heatmap.
 - **Analytics** - cookieless web analytics for the sites you host.
 - **Firewall** - a rule per protection: allow and deny lists, country and network
   rules, bot and scraper defences, injection scanning, and automatic bans.
@@ -348,22 +329,19 @@ with one thing does not get the rest.
   (SPF, DKIM, DMARC, MTA-STS), DNS exposure (DNSSEC, CAA, open zone transfers,
   dangling records), registration (expiry, transfer lock) and web hardening
   (TLS, HSTS, security headers), with one-click fixes where Polaris manages the
-  domain and a notice the moment a daily re-check finds it worse than before.
-- **Places** - the places you own, their cameras and their smart devices: live
-  views, clips, events, detections and alerts that arrive as messages; switches,
-  plugs, lights, locks, air conditioners and air purifiers from Tuya, TP-Link,
-  Shelly, Hue, IKEA, Gree, Philips (Air+, HomeID and Dynalite lighting), Home
-  Assistant and SwitchBot; automations
-  that react to any of them; plus a notice the moment
-  a camera itself stops answering.
+  domain and an alert when the daily check finds a regression.
+- **Places** - cameras and smart devices per location: live views, clips,
+  detections and alerts delivered as messages; switches, plugs, lights, locks,
+  air conditioners and purifiers from Tuya, TP-Link, Shelly, Hue, IKEA, Gree,
+  Philips (Air+, HomeID and Dynalite), Home Assistant and SwitchBot; automations
+  across all of them; an alert when a camera goes offline.
 
 **The account itself**
 
 Passwords, passkeys, two-factor, trusted devices, QR sign-in from another device,
-sessions, API keys, access rules, privacy settings, notification preferences, and
-a record of where your account stands. Claude, ChatGPT, Cursor, VS Code and any
-other MCP client can connect as you, with your own consent screen deciding what
-each one may touch - see
+sessions, API keys, access rules, privacy and notification settings. Claude,
+ChatGPT, Cursor, VS Code and any other MCP client can connect as you, limited to
+what you approve - see
 [`docs/connecting-ai-assistants.md`](docs/connecting-ai-assistants.md).
 
 What is built versus in progress is tracked in
@@ -524,34 +502,26 @@ flowchart TB
 Once it is up, open the dashboard and create your account - **the first account
 becomes the administrator**.
 
-**Reach it by name**, Home-Assistant style: the stack advertises itself over mDNS,
-so any device on your network can open **`http://polaris.local`**, and the machine
-running Polaris also resolves bare **`http://polaris`**.
+On your local network it is also reachable at **`http://polaris.local`** (mDNS),
+and at **`http://polaris`** from the machine running it.
 
-An install is one thing, with nothing to choose: the privileged host daemon that
-lets Polaris manage the machine it runs on - mounts, the Docker engine, its own
-updates - is part of it, along with the dedicated key it uses to reach that
-machine's Docker engine and the `polaris` command for the host.
-
-A native app for Windows, macOS and Linux (Account > Preferences) opens an
-instance in its own window with system notices, log windows and pushing a
-local build to it; see [`desktop/README.md`](desktop/README.md).
+The desktop app (Windows, macOS, Linux) opens an instance in its own window with
+system notifications; see [`desktop/README.md`](desktop/README.md).
 
 ## Requirements
 
 [Docker Engine](https://docs.docker.com/engine/install/) with the Compose v2
-plugin. That's it. For local development without containers, see the
+plugin. For local development without containers, see the
 [developer guide](docs/developers/README.md).
 
-**Run it on Linux** - Ubuntu Server is what it is developed and run against.
-Polaris manages the machine it lives on, and that means privileged mounts, the
-host's Docker engine and host networking, all of which are native there.
+**Run it on Linux** (Ubuntu Server is the tested target). Polaris uses
+privileged mounts, the host's Docker engine and host networking, which are
+native there.
 
-On Windows, Docker runs inside WSL, so the host Polaris would be managing is that
-virtual machine rather than the machine you installed it on: privileged mounts
-and host networking behave differently or not at all. It is not recommended as
-the host. A Windows machine is a perfectly good **server to add** to a Polaris
-running elsewhere, managed from it like any other.
+Windows is not recommended as the host: Docker runs inside WSL, so Polaris
+manages that virtual machine instead of the machine itself, and mounts and host
+networking behave differently or not at all. A Windows machine works fine as an
+additional **server** managed from a Linux install.
 
 ## Contributing
 

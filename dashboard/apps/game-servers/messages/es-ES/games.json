@@ -1269,5 +1269,82 @@
             "neverDeployed": "Este servidor nunca ha arrancado, así que no tiene archivos que copiar. Arráncalo una vez primero.",
             "notMounted": "{name} aún no usa su almacenamiento. Vuelve a desplegarlo una vez e inténtalo de nuevo."
         }
+    },
+    "storage": {
+        "title": "Ubicación",
+        "now": "Ahora: {place}",
+        "here": "Este servidor",
+        "nas": "NAS",
+        "apply": "Aplicar",
+        "modes": {
+            "server": {
+                "title": "Este servidor",
+                "hint": "Lo más rápido. Ocupa disco de este servidor."
+            },
+            "park": {
+                "title": "En el NAS mientras está apagado",
+                "recommended": "Recomendado",
+                "hint": "Funciona desde el disco de este servidor. Tras 30 minutos apagado, el mundo pasa al NAS y se libera el disco. Al encenderlo, primero vuelve el mundo, lo que tarda unos minutos si es grande."
+            },
+            "nas": {
+                "title": "Siempre en el NAS",
+                "hint": "Libera del todo el disco de este servidor, pero el servidor carga y guarda más despacio."
+            }
+        },
+        "noNas": "Aún no hay ningún NAS añadido. Quien administra Polaris puede añadirlo en Admin > Almacenamiento.",
+        "notParkable": "Solo para servidores que guardan sus datos en un único sitio.",
+        "noPermission": "Para cambiar esto hace falta permiso para gestionar este servidor.",
+        "outOfReach": "Quien administra Polaris eligió para los servidores de juego un NAS que no tienes, así que este se queda donde está.",
+        "locked": "Quien administra Polaris decide dónde se guardan los servidores de juego.",
+        "busy": "Su mundo se está moviendo. Podrás cambiarlo cuando termine.",
+        "loadFailed": "No se pudo leer dónde se guarda este servidor. Recarga para volver a intentarlo.",
+        "blocked": {
+            "notDeployed": "Arranca este servidor una vez primero: aún no tiene archivos que guardar.",
+            "swarm": "Este servidor funciona en un clúster, donde sus datos siguen a la máquina que lo ejecuta.",
+            "noVolumes": "Este servidor no guarda archivos propios."
+        },
+        "confirmTitle": "¿Apagar el servidor para moverlo?",
+        "confirmBody": "Quien esté jugando se desconecta mientras se copia y se comprueba su mundo. Vuelve a arrancar solo cuando la copia está en uso.",
+        "confirm": "Apagar y mover",
+        "cancel": "Cancelar",
+        "copying": "Copiando a {target}: {copied} de {total}",
+        "states": {
+            "queued": "Esperando para moverse a {target}",
+            "stopping": "Apagando el servidor para moverlo a {target}",
+            "copying": "Copiando a {target}",
+            "switching": "Cambiando a la copia en {target}",
+            "starting": "Arrancando en {target}",
+            "moved": "Movido a {target}",
+            "cleaning": "Borrando la copia antigua de {origin}",
+            "finished": "Movido a {target}",
+            "rolling-back": "Devolviéndolo a {origin}",
+            "failed": "No se pudo mover a {target}. Sigue en {origin}."
+        },
+        "errors": {
+            "mismatch": "La copia no coincidía con el original, así que no se usó.",
+            "noSpace": "No hay suficiente espacio libre allí.",
+            "unreadable": "No se pudieron leer sus archivos.",
+            "unwritable": "No se pudo escribir allí. Comprueba que la carpeta del NAS permite escribir.",
+            "copy": "La copia se detuvo antes de terminar.",
+            "mount": "No se pudo conectar con el NAS. Comprueba que está encendido y que la carpeta sigue existiendo.",
+            "stillRunning": "El servidor no se apagó, así que no se copió nada.",
+            "startFailed": "No arrancó con la copia, así que se devolvió a donde estaba.",
+            "gone": "El servidor se borró mientras se movía.",
+            "unexpected": "Algo salió mal. Polaris lo volverá a intentar en unas horas.",
+            "cleanFailed": "No se pudo borrar la copia antigua. Polaris lo volverá a intentar.",
+            "originShared": "La copia antigua la sigue usando otra cosa, así que se ha conservado."
+        },
+        "refused": {
+            "missing": "Este servidor ya no existe.",
+            "notDeployed": "Arranca este servidor una vez primero: aún no tiene archivos que guardar.",
+            "busy": "Su mundo ya se está moviendo.",
+            "sameLocation": "Ya está ahí.",
+            "notOffered": "Ese NAS no se puede usar para este servidor.",
+            "swarm": "Este servidor funciona en un clúster, donde sus datos no se pueden mover desde aquí.",
+            "locked": "Quien administra Polaris decide dónde se guardan los servidores de juego.",
+            "notParkable": "Solo para servidores que guardan sus datos en un único sitio.",
+            "noVolumes": "Este servidor no guarda archivos propios.",
+            "unexpected": "No se pudo guardar. Vuelve a intentarlo."
+        }
     }
 }

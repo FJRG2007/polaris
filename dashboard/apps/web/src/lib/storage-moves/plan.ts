@@ -221,6 +221,11 @@ export function destinationPlacement(
 export const COPIER_IMAGE =
     "alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8";
 
+/** The docker name compose gives a named volume of a project: `<project>_<name>`. */
+export function projectVolumeName(project: string, source: string): string {
+    return `${project}_${source}`;
+}
+
 export function copierName(moveId: string): string {
     return `polaris-move-${shortHash(moveId, 10)}`;
 }

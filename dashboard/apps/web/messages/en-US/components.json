@@ -239,6 +239,10 @@
             "saidIn": "{author} in {channel}"
         },
         "actions": "Actions",
+        "calculator": "Calculator",
+        "calculationCopied": "{value} copied to the clipboard",
+        "calculationCopyFailed": "The result could not be copied. Try again.",
+        "calculationLabel": "Copy {value}",
         "clock": {
             "timer": "Start a {length} timer",
             "alarm": "Set an alarm for {time}",

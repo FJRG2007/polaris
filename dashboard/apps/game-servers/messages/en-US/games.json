@@ -1269,5 +1269,82 @@
             "neverDeployed": "This server has never started, so it has no files to copy. Start it once first.",
             "notMounted": "{name} isn't using its storage yet. Redeploy it once, then try again."
         }
+    },
+    "storage": {
+        "title": "Storage",
+        "now": "Now: {place}",
+        "here": "This server",
+        "nas": "NAS",
+        "apply": "Apply",
+        "modes": {
+            "server": {
+                "title": "This server",
+                "hint": "Fastest. Uses this server's disk."
+            },
+            "park": {
+                "title": "On the NAS while it's off",
+                "recommended": "Recommended",
+                "hint": "Runs from this server's disk. After 30 minutes off, the world moves to the NAS and the disk is freed. Starting it brings the world back first, which takes a few minutes for a large one."
+            },
+            "nas": {
+                "title": "Always on the NAS",
+                "hint": "Frees this server's disk for good, but the server loads and saves more slowly."
+            }
+        },
+        "noNas": "No NAS has been added yet. Whoever runs Polaris can add one in Admin > Storage.",
+        "notParkable": "Only for servers that keep their data in one place.",
+        "noPermission": "Changing this needs permission to manage this server.",
+        "outOfReach": "Whoever runs Polaris chose a NAS for game servers that you don't have, so this one stays where it is.",
+        "locked": "Whoever runs Polaris decides where game servers are kept.",
+        "busy": "Its world is being moved. You can change this when that finishes.",
+        "loadFailed": "Couldn't read where this server is kept. Reload to try again.",
+        "blocked": {
+            "notDeployed": "Start this server once first: it has no files to keep yet.",
+            "swarm": "This server runs on a cluster, where its data follows whichever machine runs it.",
+            "noVolumes": "This server keeps no files of its own."
+        },
+        "confirmTitle": "Stop the server to move it?",
+        "confirmBody": "Everybody playing is disconnected while its world is copied and checked. It starts again by itself when the copy is in use.",
+        "confirm": "Stop and move",
+        "cancel": "Cancel",
+        "copying": "Copying to {target}: {copied} of {total}",
+        "states": {
+            "queued": "Waiting to move to {target}",
+            "stopping": "Stopping the server to move it to {target}",
+            "copying": "Copying to {target}",
+            "switching": "Switching to the copy on {target}",
+            "starting": "Starting on {target}",
+            "moved": "Moved to {target}",
+            "cleaning": "Removing the old copy from {origin}",
+            "finished": "Moved to {target}",
+            "rolling-back": "Putting it back on {origin}",
+            "failed": "Couldn't move it to {target}. It is still on {origin}."
+        },
+        "errors": {
+            "mismatch": "The copy didn't match the original, so it wasn't used.",
+            "noSpace": "There isn't enough free space there.",
+            "unreadable": "Its files couldn't be read.",
+            "unwritable": "Nothing could be written there. Check that the NAS share allows writing.",
+            "copy": "The copy stopped before it finished.",
+            "mount": "The NAS couldn't be reached. Check that it's on and the share still exists.",
+            "stillRunning": "The server didn't stop, so nothing was copied.",
+            "startFailed": "It didn't start on the copy, so it was put back.",
+            "gone": "The server was deleted while it was being moved.",
+            "unexpected": "Something went wrong. Polaris will try again in a few hours.",
+            "cleanFailed": "The old copy couldn't be removed. Polaris will try again.",
+            "originShared": "The old copy is still used by something else, so it was kept."
+        },
+        "refused": {
+            "missing": "This server no longer exists.",
+            "notDeployed": "Start this server once first: it has no files to keep yet.",
+            "busy": "Its world is already being moved.",
+            "sameLocation": "It's already there.",
+            "notOffered": "That NAS can't be used for this server.",
+            "swarm": "This server runs on a cluster, where its data can't be moved from here.",
+            "locked": "Whoever runs Polaris decides where game servers are kept.",
+            "notParkable": "Only for servers that keep their data in one place.",
+            "noVolumes": "This server keeps no files of its own.",
+            "unexpected": "That couldn't be saved. Try again."
+        }
     }
 }
