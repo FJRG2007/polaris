@@ -305,3 +305,32 @@ describe("record actions", () => {
         expect(db.crmWorkflow.create).not.toHaveBeenCalled();
     });
 });
+
+describe("a field changing", () => {
+    it("runs on the change the timeline logged, and refuses a field that is not there", async () => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored({ kind: "fieldChanged", field: "city", to: "madrid" }),
+            stored({ kind: "fieldChanged", field: "city", to: "Paris" }, { id: "other" })
+        ]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            {
+                recordId: RECORD,
+                kind: "updated",
+                changes: [{ key: "city", before: "", after: "Madrid" }]
+            }
+        ]);
+        expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
+        expect(db.crmWorkflow.update).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: FLOW } })
+        );
+
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", {
+                name: "x",
+                trigger: { kind: "fieldChanged", field: "nope", to: null },
+                actions: [],
+                enabled: true
+            })
+        ).rejects.toThrow();
+    });
+});

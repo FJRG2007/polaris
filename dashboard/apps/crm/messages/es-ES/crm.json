@@ -493,6 +493,7 @@
         "triggers": {
             "created": "Se crea un registro",
             "updated": "Se cambia un registro",
+            "fieldChanged": "Cambia un campo",
             "deleted": "Se elimina un registro"
         },
         "actionKinds": {
@@ -505,6 +506,11 @@
         "addValue": "Añadir campo",
         "removeValue": "Quitar campo",
         "value": "Valor",
-        "valueHint": "Escribe {example} para usar un campo del registro."
+        "valueHint": "Escribe {example} para usar un campo del registro.",
+        "changeField": "Campo",
+        "changeTo": "Cambia a",
+        "anyValue": "Cualquiera",
+        "summaryField": "Cambia {field}",
+        "summaryFieldTo": "{field} cambia a {value}"
     }
 }

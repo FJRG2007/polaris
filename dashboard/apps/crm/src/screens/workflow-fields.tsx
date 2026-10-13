@@ -10,7 +10,7 @@ import { useCrmT } from "./i18n";
 import { Plus, X } from "lucide-react";
 import * as model from "../model/workflows";
 import { Button, Input, Select } from "@polaris/ui";
-import { fieldLabel, useCustomFields } from "./custom-fields";
+import { fieldLabel, optionLabel, useCustomFields } from "./custom-fields";
 import {
     CRM_OBJECTS,
     fieldsOf,
@@ -32,10 +32,65 @@ export interface TriggerFieldsProps {
     readonly onChange: (trigger: model.WorkflowTrigger) => void;
 }
 
-/** The settings of a trigger beyond its kind. The record triggers have none. */
-export function TriggerFields(_props: TriggerFieldsProps) {
-    return null;
+/** The settings of a trigger beyond its kind. */
+export function TriggerFields({ object, trigger, onChange }: TriggerFieldsProps) {
+    const t = useCrmT();
+    const custom = useCustomFields();
+    if (trigger.kind !== "fieldChanged") return null;
+    const fields = fieldsOf(object, custom);
+    const field = fields.find((one) => one.key === trigger.field);
+    return (
+        <div className="flex min-w-0 flex-col gap-1.5 sm:flex-row">
+            <div className="min-w-0 sm:flex-1">
+                <Select
+                    aria-label={t("workflows.changeField")}
+                    value={trigger.field}
+                    onValueChange={(key) => onChange({ ...trigger, field: key, to: null })}
+                    options={fields.map((one) => ({
+                        value: one.key,
+                        label: fieldLabel(t, object, one)
+                    }))}
+                />
+            </div>
+            <div className="min-w-0 sm:flex-1">
+                {field?.kind === "select" || field?.kind === "boolean" ? (
+                    <Select
+                        aria-label={t("workflows.changeTo")}
+                        value={trigger.to ?? ANY}
+                        onValueChange={(value) =>
+                            onChange({ ...trigger, to: value === ANY ? null : value })
+                        }
+                        options={[
+                            { value: ANY, label: t("workflows.anyValue") },
+                            ...(field.kind === "boolean"
+                                ? [
+                                      { value: "true", label: t("values.yes") },
+                                      { value: "false", label: t("values.no") }
+                                  ]
+                                : (field.options ?? []).map((option) => ({
+                                      value: option,
+                                      label: optionLabel(t, object, field, option)
+                                  })))
+                        ]}
+                    />
+                ) : (
+                    <Input
+                        aria-label={t("workflows.changeTo")}
+                        placeholder={t("workflows.anyValue")}
+                        value={trigger.to ?? ""}
+                        maxLength={model.ACTION_TEXT_MAX}
+                        onChange={(event) =>
+                            onChange({ ...trigger, to: event.target.value || null })
+                        }
+                    />
+                )}
+            </div>
+        </div>
+    );
 }
+
+/** The "any value" choice of a value select. */
+const ANY = "__any";
 
 export interface ActionFieldsProps {
     readonly object: CrmObject;
@@ -184,8 +239,12 @@ function ValuesEditor({
 /** How the editor makes and describes triggers and actions. */
 export function useWorkflowWords(object: CrmObject) {
     const t = useCrmT();
+    const custom = useCustomFields();
     return {
         newTrigger(kind: model.TriggerKind): model.WorkflowTrigger {
+            if (kind === "fieldChanged") {
+                return { kind, field: primaryField(object).key, to: null };
+            }
             return { kind } as model.WorkflowTrigger;
         },
         newAction(kind: model.ActionKind): model.WorkflowAction {
@@ -205,6 +264,13 @@ export function useWorkflowWords(object: CrmObject) {
             return model.actionFits(kind, trigger.kind);
         },
         triggerSummary(trigger: model.WorkflowTrigger): string {
+            if (trigger.kind === "fieldChanged") {
+                const field = fieldsOf(object, custom).find((one) => one.key === trigger.field);
+                const name = field ? fieldLabel(t, object, field) : trigger.field;
+                return trigger.to
+                    ? t("workflows.summaryFieldTo", { field: name, value: trigger.to })
+                    : t("workflows.summaryField", { field: name });
+            }
             return t(`workflows.triggers.${trigger.kind}`);
         },
         /** What to tell the reader once a workflow is saved, beyond the list. */

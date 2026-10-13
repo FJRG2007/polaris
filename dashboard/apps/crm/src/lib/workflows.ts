@@ -100,6 +100,12 @@ async function checkActions(
     actions: readonly model.WorkflowAction[]
 ): Promise<void> {
     const t = await crmT();
+    if (trigger.kind === "fieldChanged") {
+        const custom = await loadFields(actor.shelf, object);
+        if (!fieldsOf(object, custom).some((field) => field.key === trigger.field)) {
+            throw new CrmRefusal(t("errors.unknownField"));
+        }
+    }
     for (const action of actions) {
         if (!model.actionFits(action.kind, trigger.kind)) {
             throw new CrmRefusal(t("workflows.actionNeedsRecord"));
@@ -330,11 +336,13 @@ export async function onRecordEvents(
         where: { ...shelfWhere(actor.shelf), object, enabled: true },
         take: model.MAX_WORKFLOWS
     })) as StoredWorkflow[];
+    if (rows.length === 0) return;
+    const fields = fieldsOf(object, await loadFields(actor.shelf, object));
     for (const row of rows) {
         const trigger = model.readTrigger(row.trigger);
         if (!trigger) continue;
         for (const event of events) {
-            if (!model.triggerMatches(trigger, event)) continue;
+            if (!model.triggerMatches(trigger, event, fields)) continue;
             await runWorkflow(row, { object, recordId: event.recordId, event });
         }
     }

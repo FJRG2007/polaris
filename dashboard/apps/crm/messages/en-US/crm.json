@@ -493,6 +493,7 @@
         "triggers": {
             "created": "A record is created",
             "updated": "A record is changed",
+            "fieldChanged": "A field changes",
             "deleted": "A record is deleted"
         },
         "actionKinds": {
@@ -505,6 +506,11 @@
         "addValue": "Add field",
         "removeValue": "Remove field",
         "value": "Value",
-        "valueHint": "Type {example} to use a field of the record."
+        "valueHint": "Type {example} to use a field of the record.",
+        "changeField": "Field",
+        "changeTo": "Changes to",
+        "anyValue": "Any value",
+        "summaryField": "{field} changes",
+        "summaryFieldTo": "{field} changes to {value}"
     }
 }

@@ -20,20 +20,32 @@ export const MAX_WORKFLOW_ACTIONS = 10;
 /** The most workflows one kind of record may have on a shelf. */
 export const MAX_WORKFLOWS = 50;
 
+/** The longest text an action holds in one place: a value, a title. */
+export const ACTION_TEXT_MAX = 2000;
+
 /** What sets a workflow off. */
 export const workflowTriggerSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("created") }),
     z.object({ kind: z.literal("updated") }),
-    z.object({ kind: z.literal("deleted") })
+    z.object({ kind: z.literal("deleted") }),
+    /** A field changes - to anything, or to the value named (as its CSV cell
+     *  reads, case aside). */
+    z.object({
+        kind: z.literal("fieldChanged"),
+        field: z.string().min(1).max(64),
+        to: z.string().trim().max(ACTION_TEXT_MAX).nullable()
+    })
 ]);
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;
 export type TriggerKind = WorkflowTrigger["kind"];
 
 /** The triggers in the order the screen offers them. */
-export const TRIGGER_KINDS: readonly TriggerKind[] = ["created", "updated", "deleted"];
-
-/** The longest text an action holds in one place: a value, a title. */
-export const ACTION_TEXT_MAX = 2000;
+export const TRIGGER_KINDS: readonly TriggerKind[] = [
+    "created",
+    "updated",
+    "fieldChanged",
+    "deleted"
+];
 
 /** The most fields one action writes. */
 export const MAX_ACTION_VALUES = 40;
@@ -63,7 +75,7 @@ export type ActionKind = WorkflowAction["kind"];
 export const ACTION_KINDS: readonly ActionKind[] = ["updateRecord", "createRecord"];
 
 /** The triggers that are about one record still out of the trash. */
-const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = ["created", "updated"];
+const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = ["created", "updated", "fieldChanged"];
 
 /** Whether an action can run under a kind of trigger: one that changes "the
  *  record" needs a trigger that is about one still there. */
@@ -145,9 +157,21 @@ export function eventsOf(
     });
 }
 
-/** Whether a record change sets a trigger off. */
-export function triggerMatches(trigger: WorkflowTrigger, event: RecordEvent): boolean {
-    return trigger.kind === event.kind;
+/** Whether a record change sets a trigger off. `fields` are the fields of the
+ *  record's kind, for reading a changed value as text. */
+export function triggerMatches(
+    trigger: WorkflowTrigger,
+    event: RecordEvent,
+    fields: readonly FieldDef[] = []
+): boolean {
+    if (trigger.kind !== "fieldChanged") return trigger.kind === event.kind;
+    if (event.kind !== "updated") return false;
+    const change = event.changes.find((one) => one.key === trigger.field);
+    if (!change) return false;
+    if (trigger.to === null || trigger.to === "") return true;
+    const field = fields.find((one) => one.key === trigger.field);
+    if (!field) return false;
+    return csvValue(field, change.after).trim().toLowerCase() === trigger.to.toLowerCase();
 }
 
 /** A stored trigger, or null when it no longer reads as one. */

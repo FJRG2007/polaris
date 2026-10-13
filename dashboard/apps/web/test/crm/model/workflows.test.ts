@@ -122,3 +122,59 @@ describe("record actions", () => {
         );
     });
 });
+
+describe("a field changing", () => {
+    const fields = [fieldOf("opportunities", "stage")!, fieldOf("opportunities", "company")!];
+    const [moved] = eventsOf([
+        {
+            recordId: RECORD,
+            kind: "updated",
+            changes: [
+                { key: "stage", before: "new", after: "meeting" },
+                { key: "company", before: null, after: { id: RECORD, name: "Acme" } }
+            ]
+        }
+    ]);
+
+    it("fires when the field changes at all, or to the value named", () => {
+        expect(
+            triggerMatches({ kind: "fieldChanged", field: "stage", to: null }, moved!, fields)
+        ).toBe(true);
+        expect(
+            triggerMatches({ kind: "fieldChanged", field: "stage", to: "MEETING" }, moved!, fields)
+        ).toBe(true);
+        expect(
+            triggerMatches({ kind: "fieldChanged", field: "stage", to: "won" }, moved!, fields)
+        ).toBe(false);
+        expect(
+            triggerMatches({ kind: "fieldChanged", field: "company", to: "acme" }, moved!, fields)
+        ).toBe(true);
+        expect(
+            triggerMatches({ kind: "fieldChanged", field: "amount", to: null }, moved!, fields)
+        ).toBe(false);
+    });
+
+    it("does not fire on a record made or deleted", () => {
+        const [created] = eventsOf([
+            {
+                recordId: RECORD,
+                kind: "created",
+                changes: [{ key: "stage", before: null, after: "new" }]
+            }
+        ]);
+        expect(
+            triggerMatches({ kind: "fieldChanged", field: "stage", to: null }, created!, fields)
+        ).toBe(false);
+    });
+
+    it("needs a field, and may update the record it is about", () => {
+        expect(
+            workflowInputSchema.safeParse({
+                name: "x",
+                trigger: { kind: "fieldChanged", field: "", to: null },
+                actions: []
+            }).success
+        ).toBe(false);
+        expect(actionFits("updateRecord", "fieldChanged")).toBe(true);
+    });
+});
