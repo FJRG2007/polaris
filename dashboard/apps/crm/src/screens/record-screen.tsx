@@ -24,7 +24,7 @@ import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { CellDisplay, RefChip } from "./cell-display";
 import type { RecordOpening } from "../lib/record-page";
-import { ArrowLeft, Link2, Maximize2, ShieldOff } from "lucide-react";
+import { ArrowLeft, Link2, Maximize2, RotateCcw, ShieldOff } from "lucide-react";
 import { Button, cn, DialogTitle, EmptyState, useToast } from "@polaris/ui";
 import {
     fieldsOf,
@@ -64,6 +64,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
     const data = opening.data;
     const record = data?.record ?? null;
     const canEdit = Boolean(data?.can[object].edit) && !record?.deletedAt;
+    const canRestore = Boolean(data?.can[object].delete) && Boolean(record?.deletedAt);
     const fields = fieldsOf(object, data?.fields ?? []);
     const plural = t(`objects.${object}.plural`);
 
@@ -81,6 +82,24 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                 put(saved);
                 onSaved?.(saved);
                 // The change is on the timeline now.
+                opening.refresh();
+            })
+            .catch((caught) => {
+                opening.replace(kept);
+                toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
+            });
+    };
+
+    const restore = () => {
+        if (!data || !record) return;
+        const kept = data;
+        const back = { ...record, deletedAt: null };
+        opening.replace({ ...kept, record: back });
+        unwrap(() => actions.restoreRecordsAction({ object, ids: [id] }), t("errors.generic"))
+            .then(({ count }) => {
+                if (count === 0) throw new Error(t("errors.notFound"));
+                onSaved?.(back);
+                toast.show({ title: t("trashView.restored") });
                 opening.refresh();
             })
             .catch((caught) => {
@@ -250,9 +269,15 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         <div className="flex h-full min-h-0 flex-col gap-3" data-crm-ready>
             {header}
             {record?.deletedAt ? (
-                <p className="rounded-md border border-border bg-muted/60 px-3 py-2 text-[0.8125rem]">
-                    {t("record.inTrash")}
-                </p>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-border bg-muted/60 px-3 py-2 text-[0.8125rem]">
+                    <p className="min-w-0 flex-1">{t("record.inTrash")}</p>
+                    {canRestore ? (
+                        <Button variant="outline" size="sm" onClick={restore}>
+                            <RotateCcw className="size-4" />
+                            {t("trashView.restore")}
+                        </Button>
+                    ) : null}
+                </div>
             ) : null}
             <div
                 className={cn(

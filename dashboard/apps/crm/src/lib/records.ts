@@ -11,7 +11,9 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
-import { dropEvents, logEvents } from "./timeline";
+import { relatedLists } from "../model/related";
+import { prisma } from "@polaris/db";
+import { dropEvents, logEvents, type NewEvent } from "./timeline";
 import { changesBetween, initialValues } from "../model/timeline";
 import { host } from "@polaris/app-host";
 import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
@@ -444,9 +446,10 @@ export async function restoreRecords(
 
 /**
  * Delete records for good - only ones already in the trash, so nothing leaves
- * a list without passing through it first. Whatever pointed at them is left
- * pointing at nothing (the foreign keys set it null), and their timeline goes
- * with them. Returns how many went.
+ * a list without passing through it first. Every record that pointed at them -
+ * a person at their company, a deal at its contact - is cleared in the same
+ * transaction and keeps a line on its timeline saying so; their own timeline
+ * goes with them. Returns how many went.
  */
 export async function destroyRecords(
     actor: CrmActor,
@@ -460,12 +463,49 @@ export async function destroyRecords(
         ...shelfWhere(actor.shelf),
         deletedAt: { not: null }
     };
-    const found = (await table(object).findMany({ where, select: { id: true } })) as {
-        id: string;
-    }[];
-    if (found.length === 0) return 0;
-    const gone = found.map((row) => row.id);
-    const result = await table(object).deleteMany({ where: { ...where, id: { in: gone } } });
-    await dropEvents(actor, gone);
-    return result.count as number;
+    const cleared: { object: CrmObject; events: NewEvent[] }[] = [];
+    const count = await prisma.$transaction(async (tx) => {
+        const found = (await table(object, tx).findMany({
+            where,
+            select: recordSelect(object)
+        })) as Record<string, unknown>[];
+        if (found.length === 0) return 0;
+        const doomed = found.map((row) => toRecord(object, row));
+        const gone = doomed.map((record) => record.id);
+        const names = new Map(doomed.map((record) => [record.id, recordName(object, record)]));
+        for (const list of relatedLists(object)) {
+            const pointing = { ...shelfWhere(actor.shelf), [list.column]: { in: gone } };
+            const rows = (await table(list.object, tx).findMany({
+                where: pointing,
+                select: { id: true, [list.column]: true }
+            })) as Record<string, string>[];
+            if (rows.length === 0) continue;
+            await table(list.object, tx).updateMany({
+                where: { ...pointing, id: { in: rows.map((row) => row.id) } },
+                data: { [list.column]: null }
+            });
+            const target = rows.map((row) => row[list.column]!);
+            cleared.push({
+                object: list.object,
+                events: rows.map((row, at) => ({
+                    recordId: row.id,
+                    kind: "updated" as const,
+                    changes: [
+                        {
+                            key: list.field,
+                            before: { id: target[at]!, name: names.get(target[at]!) ?? "" },
+                            after: null
+                        }
+                    ]
+                }))
+            });
+        }
+        const result = await table(object, tx).deleteMany({
+            where: { ...where, id: { in: gone } }
+        });
+        await dropEvents(actor, gone, tx);
+        return result.count as number;
+    });
+    for (const one of cleared) await logEvents(actor, one.object, one.events);
+    return count;
 }
