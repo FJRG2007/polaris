@@ -2784,7 +2784,7 @@
             "whoFailed": "No se pudo leer quién tiene los sonidos.",
             "whoPage": "{from}-{to} de {total}",
             "previousPage": "Página anterior",
-            "nextPage": "Página siguiente"
+            "nextPage": "Siguiente"
         },
         "required": "Obligatorio",
         "requiredHint": "Quien rechace el paquete queda desconectado.",

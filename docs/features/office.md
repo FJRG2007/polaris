@@ -20,6 +20,11 @@ Everything you made or were given, by kind, with starred, shared with me,
 archive and trash. Google Docs and Sheets open here as a copy, leaving the
 original in Google Drive as it was.
 
+Home opens on a grid of previews - each tile shows the document's first page,
+sheet or slide, so it is found by what is on it as well as by its name. The
+list view is one press away, for picking by name, date and who touched it
+last; the choice is remembered for next time.
+
 ## Editing
 
 <picture>

@@ -65,13 +65,13 @@
         "configuration": "Configuración"
     },
     "detail": {
-        "back": "Todas las apps",
+        "back": "Catálogo",
         "screenshots": "Capturas",
         "screenshotAlt": "{name}, captura {index}",
-        "about": "Acerca de",
+        "about": "Info",
         "features": "Qué hace",
         "information": "Información",
-        "developer": "Desarrollador",
+        "developer": "Autor",
         "category": "Categoría",
         "version": "Versión",
         "image": "Imagen",
@@ -79,7 +79,7 @@
         "installs": "Instaladas",
         "readOnly": "Instalar apps requiere permiso para gestionar apps. Pídeselo a un administrador.",
         "ownerOnly": "Solo quien instaló una app, o un administrador, puede desinstalarla.",
-        "deleteData": "Eliminar también sus datos",
+        "deleteData": "Borrar también sus datos",
         "deleteDataWarning": "{name} se elimina con todo lo que contiene: sus volúmenes, ajustes y lo que se creó en ella. No se puede deshacer.",
         "confirmDelete": "Desinstalar y eliminar datos",
         "uninstallFailed": "No se pudo desinstalar la app. Inténtalo de nuevo."

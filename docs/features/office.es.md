@@ -20,6 +20,12 @@ Todo lo que creaste o te pasaron, por tipo, con destacados, compartidos
 conmigo, archivo y papelera. Los Google Docs y Sheets se abren aquí como copia,
 y el original sigue igual en Google Drive.
 
+El inicio abre una cuadrícula de vistas previas: cada ficha muestra la primera
+página, hoja o diapositiva del documento, así que se encuentra por lo que
+contiene y no solo por su nombre. La vista de lista está a un clic, para
+elegir por nombre, fecha y quién lo tocó; la elección se recuerda para la
+próxima vez.
+
 ## Editar
 
 <picture>
