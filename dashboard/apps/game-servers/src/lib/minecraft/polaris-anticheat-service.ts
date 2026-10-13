@@ -23,6 +23,7 @@ import {
 } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { PUBLIC_MOD_FILES, anticheatBundled } from "./polaris-mod-files";
+import { modToken } from "./mod-token";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
 import { engineScore, reasonLine } from "./suspicion";
 import * as anticheat from "./polaris-anticheat";
@@ -102,7 +103,12 @@ export async function setAnticheat(
         const token =
             (await readInstallEnvSecret(applicationId, ownerId, TOKEN_KEY)) ??
             randomBytes(32).toString("hex");
-        writes = anticheat.anticheatEnableEnv(current, { baseUrl, installedAppId, token });
+        writes = anticheat.anticheatEnableEnv(current, {
+            baseUrl,
+            modKey: modToken(),
+            installedAppId,
+            token
+        });
     } else {
         writes = anticheat.anticheatDisableEnv(current);
     }
@@ -163,6 +169,7 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
                 randomBytes(32).toString("hex");
             const writes = anticheat.anticheatEnableEnv(current, {
                 baseUrl,
+                modKey: modToken(),
                 installedAppId: install.id,
                 token
             });
@@ -223,12 +230,12 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
         const env = envs.get(install.applicationId!) ?? new Map<string, string>();
         const file = componentFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
         const mods = env.get(MODS_KEY) ?? "";
-        const keyed = keyedMods(mods, PUBLIC_MOD_FILES);
+        const keyed = keyedMods(mods, PUBLIC_MOD_FILES, modToken());
         let wanted = keyed;
         if (baseUrl !== null && file !== null && !carriesFile(keyed, file)) {
             if (!bundled.has(file))
                 bundled.set(file, await anticheatBundled(file).catch(() => false));
-            if (bundled.get(file)) wanted = withMod(keyed, modUrl(baseUrl, file));
+            if (bundled.get(file)) wanted = withMod(keyed, modUrl(baseUrl, file, modToken()));
         }
         if (wanted === mods) continue;
         try {

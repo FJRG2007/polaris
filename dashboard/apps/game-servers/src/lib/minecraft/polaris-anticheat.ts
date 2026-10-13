@@ -169,7 +169,13 @@ export function anticheatActive(env: ReadonlyMap<string, string>): boolean {
  *  where it reports what it catches. */
 export function anticheatEnableEnv(
     current: ReadonlyMap<string, string>,
-    input: { readonly baseUrl: string; readonly installedAppId: string; readonly token: string }
+    input: {
+        readonly baseUrl: string;
+        /** The download key (`mod-token`). */
+        readonly modKey: string;
+        readonly installedAppId: string;
+        readonly token: string;
+    }
 ): Map<string, string> {
     const base = input.baseUrl.replace(/\/+$/, "");
     const build = anticheatBuildFor(current.get("TYPE") ?? "", current.get("VERSION") ?? "");
@@ -179,7 +185,7 @@ export function anticheatEnableEnv(
     );
     const projects = current.get(PROJECTS_KEY);
     return new Map([
-        [MODS_KEY, [...kept, modUrl(base, file)].join(",")],
+        [MODS_KEY, [...kept, modUrl(base, file, input.modKey)].join(",")],
         ...(build?.kind === "mod" ? [[ANTIXRAY_KEY, ""] as [string, string]] : []),
         ...(projects !== undefined && withoutReplacedAnticheats(projects) !== projects
             ? [[PROJECTS_KEY, withoutReplacedAnticheats(projects)] as [string, string]]

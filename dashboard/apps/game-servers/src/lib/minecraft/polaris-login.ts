@@ -22,12 +22,12 @@
  * is that a download that fails ends the boot: while this is on, a server only
  * starts when it can reach Polaris.
  *
- * Pure: nothing here reads or writes a server. The one thing it reads is the
- * instance's secret, for the key the download address carries (`mod-token`).
+ * Pure: nothing here reads or writes a server. The key a download address
+ * carries is passed in by the caller (`mod-token`), since this is also drawn in
+ * the browser, where the instance's secret is not.
  */
 
 import { loaderForType } from "./modrinth";
-import { modToken } from "./mod-token";
 
 /** The image's list of jars to download, by URL. */
 export const MODS_KEY = "MODS";
@@ -142,10 +142,10 @@ export function hasBuildFor(software: string): boolean {
     return loader !== null && MOD_BUILDS.some((build) => build.loaders.includes(loader));
 }
 
-/** Where a server downloads the build from: behind this instance's key, so the
- *  address is not one anybody can fetch. */
-export function modUrl(baseUrl: string, file: string): string {
-    return `${baseUrl.replace(/\/+$/, "")}${MOD_PATH}/${modToken()}/${file}`;
+/** Where a server downloads the build from: behind this instance's key
+ *  (`mod-token`), so the address is not one anybody can fetch. */
+export function modUrl(baseUrl: string, file: string, key: string): string {
+    return `${baseUrl.replace(/\/+$/, "")}${MOD_PATH}/${key}/${file}`;
 }
 
 /**
@@ -156,15 +156,14 @@ export function modUrl(baseUrl: string, file: string): string {
  * with, so a server reaching Polaris by another name keeps reaching it. Entries
  * for anybody else's jars are left exactly as they were.
  */
-export function keyedMods(mods: string, served: readonly string[]): string {
-    const token = modToken();
+export function keyedMods(mods: string, served: readonly string[], key: string): string {
     return modEntries(mods)
         .map((entry) => {
             const at = entry.lastIndexOf(`${MOD_PATH}/`);
             if (at < 0) return entry;
             const file = entry.slice(entry.lastIndexOf("/") + 1);
             if (!served.includes(file)) return entry;
-            return `${entry.slice(0, at)}${MOD_PATH}/${token}/${file}`;
+            return `${entry.slice(0, at)}${MOD_PATH}/${key}/${file}`;
         })
         .join(",");
 }
@@ -224,13 +223,15 @@ export function loginOn(env: ReadonlyMap<string, string>): boolean {
 export function enableEnv(input: {
     readonly current: ReadonlyMap<string, string>;
     readonly baseUrl: string;
+    /** The download key (`mod-token`). */
+    readonly modKey: string;
     readonly installedAppId: string;
     readonly file: string;
     readonly token: string;
 }): Map<string, string> {
     const { current } = input;
     return new Map([
-        [MODS_KEY, withMod(current.get(MODS_KEY) ?? "", modUrl(input.baseUrl, input.file))],
+        [MODS_KEY, withMod(current.get(MODS_KEY) ?? "", modUrl(input.baseUrl, input.file, input.modKey))],
         [LOGIN_KEY, "on"],
         [URL_KEY, input.baseUrl.replace(/\/+$/, "")],
         [SERVER_ID_KEY, input.installedAppId],
@@ -291,9 +292,12 @@ export function modMovedTo(
         const mods = env.get(MODS_KEY) ?? "";
         const listed = modEntries(mods).find(isModEntry) ?? "";
         if (listed.endsWith(`/${file}`)) return null;
-        const at = listed.lastIndexOf(MOD_PATH);
-        const base = at > 0 ? listed.slice(0, at) : "";
-        if (base) return new Map([[MODS_KEY, withMod(mods, modUrl(base, file))]]);
+        // The address it was written with, key and all, with only the file
+        // changed: the key is not this module's to know.
+        const path = listed.split(/[?#]/)[0] ?? "";
+        const at = path.lastIndexOf(MOD_PATH);
+        const base = at > 0 ? path.slice(0, path.lastIndexOf("/") + 1) : "";
+        if (base) return new Map([[MODS_KEY, withMod(mods, `${base}${file}`)]]);
     }
     // A build for the old release ends the new one's boot: it comes off, and the
     // component sweep puts on the one that loads there, if any.

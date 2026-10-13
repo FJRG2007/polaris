@@ -28,6 +28,7 @@ import { replyObject } from "./events/in-server";
 import { anticheatBundled } from "./polaris-mod-files";
 import { forgetMomentOverrides } from "./sound-moments-service";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { modToken } from "./mod-token";
 
 const { publicAppUrl, appBaseUrl } = host.domainService;
 const { listEnvVars, setEnvVars } = host.envVarService;
@@ -613,6 +614,7 @@ export async function enableSounds(
     const existing = await readInstallEnvSecret(applicationId, ownerId, TOKEN_KEY);
     const writes = soundsEnv.soundsEnableEnv(env, {
         baseUrl,
+        modKey: modToken(),
         installedAppId,
         token: existing ?? randomBytes(32).toString("hex"),
         hasToken: Boolean(existing)

@@ -23,6 +23,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { enableLogin, foreignLogin, PROJECTS_KEY, SOFTWARE_KEY } from "./join-guard";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
 import { host } from "@polaris/app-host";
+import { modToken } from "./mod-token";
 
 const { readInstallConfig } = host.appsInstallConfig;
 const { publicAppUrl } = host.domainService;
@@ -400,6 +401,7 @@ export async function setLogin(
         writes = enableLogin({
             current,
             baseUrl,
+            modKey: modToken(),
             installedAppId,
             file: build,
             token

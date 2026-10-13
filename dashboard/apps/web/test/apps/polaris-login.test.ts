@@ -12,11 +12,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import * as login from "@polaris-app/game-servers/src/lib/minecraft/polaris-login";
 
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
-    modToken: () => "key",
-    modTokenMatches: (token: string) => token === "key"
-}));
-
 const BASE = "https://polaris.example";
 const JAR = "polaris-neoforge-1.21.4.jar";
 const URL = `${BASE}/api/minecraft/mod/key/${JAR}`;
@@ -129,7 +124,9 @@ describe("the MODS list", () => {
         expect(
             login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/key/polaris-neoforge-1.21.4.jar")
         ).toBe(true);
-        expect(login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/key/polaris-paper.jar")).toBe(true);
+        expect(login.hasMod("http://10.0.0.2:3000/api/minecraft/mod/key/polaris-paper.jar")).toBe(
+            true
+        );
         expect(login.hasMod("https://example.org/polaris-helper.jar")).toBe(false);
         expect(login.hasMod("https://example.org/polaris-paperweight.jar")).toBe(false);
         expect(login.hasMod("")).toBe(false);
@@ -151,6 +148,7 @@ describe("switching it", () => {
         const env = login.enableEnv({
             current,
             baseUrl: `${BASE}/`,
+            modKey: "key",
             installedAppId: "0190c0de-0000-7000-8000-000000000001",
             file: JAR,
             token: "secret"

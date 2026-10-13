@@ -628,6 +628,13 @@ export async function stageTick(
 }
 
 /**
+ * How long each event has spent getting its structure up, and how many sites it
+ * tried: written to the log when it stands, because "the game took ages to
+ * start" is otherwise a report nobody can take apart.
+ */
+const raising = new Map<string, { since: number; sites: number }>();
+
+/**
  * Up to the point everybody is in: enough players, a site, the volume proved
  * empty, the structure built, the players brought in. One step a tick where it
  * has to wait for the world; the rest at once.
@@ -688,6 +695,11 @@ async function raise(
         }
     }
     if (!origin) {
+        const timing = raising.get(loop.run.id) ?? { since: Date.now(), sites: 0 };
+        // An event called off before it stood leaves its entry; the oldest go.
+        if (raising.size >= 64 && !raising.has(loop.run.id))
+            raising.delete(raising.keys().next().value!);
+        raising.set(loop.run.id, { ...timing, sites: timing.sites + 1 });
         const reach = layoutAt(loop.run, { x: 0, z: 0 }, 0).reach;
         const ground = await tools.findSite(options.place, reach);
         if (!ground) return;
@@ -759,6 +771,7 @@ async function raise(
     // and still taken out by its own block.
     if (surround.length > 0) await server.sayAll(surround.map(stage.buildLine));
     // Built a paced trip at a time (`pace.buildPacer`), every box counted.
+    const building = Date.now();
     const counts = await pace.answered(
         server,
         layout.boxes.map((box) => stage.buildLine(box)),
@@ -768,6 +781,14 @@ async function raise(
         (box, index) => stage.fillCount(counts[index]!) === stage.volumeOf(box)
     );
     change(loop, { built: true });
+    const timing = raising.get(loop.run.id);
+    raising.delete(loop.run.id);
+    console.info(
+        `[minecraft-events] ${preset.kind} ${loop.run.id}: structure up after ` +
+            `${timing ? Math.round((Date.now() - timing.since) / 1000) : "?"}s, ` +
+            `${timing?.sites ?? "?"} site(s) tried, ${layout.boxes.length} boxes built in ` +
+            `${Math.round((Date.now() - building) / 1000)}s`
+    );
     if (!whole) throw new CalledOff("Its structure could not be built whole");
     // Each into air, or in place of the block it names - never part of the game.
     if (pieces.length > 0) await server.sayAll(decor.decorLines(pieces));

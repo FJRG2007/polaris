@@ -98,6 +98,7 @@ import {
 } from "./minecraft/blueprints";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
+import { modToken } from "./minecraft/mod-token";
 
 const { availableHostPort } = host.appsPortRegistry;
 const { promptedEnvVars, findApp } = host.appsCatalog;
@@ -671,6 +672,7 @@ async function loginSeed(env: Map<string, string>): Promise<InstallSeed | undefi
     const written = enableLogin({
         current: env,
         baseUrl,
+        modKey: modToken(),
         installedAppId,
         file,
         token: randomBytes(32).toString("hex")
@@ -700,7 +702,12 @@ async function anticheatSeed(
     if (baseUrl === null || !(await anticheatBundled(build.file))) return seed;
     const installedAppId = seed?.installedAppId ?? randomUUID();
     const token = seeded.get(polarisLogin.TOKEN_KEY) || randomBytes(32).toString("hex");
-    const written = anticheatEnableEnv(seeded, { baseUrl, installedAppId, token });
+    const written = anticheatEnableEnv(seeded, {
+        baseUrl,
+        modKey: modToken(),
+        installedAppId,
+        token
+    });
     // The Modrinth list lives in the install's own settings, not the seed.
     const projects = written.get(PROJECTS_KEY);
     if (projects !== undefined) {

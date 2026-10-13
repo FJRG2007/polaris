@@ -46,7 +46,13 @@ export async function ensurePack(server: ServerContainer): Promise<boolean> {
         // Already on, with older functions: off and on again is what reads them.
         await server.say([`datapack disable "${pack.PACK_ID}"`]);
     }
+    const reloading = Date.now();
     await server.say(["datapack list available"]);
     await server.say([`datapack enable "${pack.PACK_ID}"`]);
+    // Switching it on reloads the game's data; on a server with many mods that
+    // is the pause somebody notices, so it is measured.
+    console.info(
+        `[minecraft-events] event pack switched on in ${Math.round((Date.now() - reloading) / 1000)}s`
+    );
     return enabled();
 }

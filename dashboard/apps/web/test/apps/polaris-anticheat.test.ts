@@ -19,11 +19,6 @@ import {
 } from "@polaris-app/game-servers/src/lib/minecraft/join-guard";
 import * as anticheat from "@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat";
 
-vi.mock("@polaris-app/game-servers/src/lib/minecraft/mod-token", () => ({
-    modToken: () => "key",
-    modTokenMatches: (token: string) => token === "key"
-}));
-
 const BASE = "https://polaris.example";
 const JAR = `${BASE}/api/minecraft/mod/key/polaris-anticheat-bukkit.jar`;
 const LOGIN = `${BASE}/api/minecraft/mod/key/polaris-paper.jar`;
@@ -55,7 +50,12 @@ describe("where the engine runs", () => {
 describe("switching it", () => {
     it("puts one entry on the list beside everything already there, and where to report", () => {
         const current = new Map([["MODS", `${LOGIN},https://elsewhere.example/other.jar`]]);
-        const input = { baseUrl: `${BASE}/`, installedAppId: SERVER, token: "secret" };
+        const input = {
+            baseUrl: `${BASE}/`,
+            modKey: "key",
+            installedAppId: SERVER,
+            token: "secret"
+        };
         const on = anticheat.anticheatEnableEnv(current, input);
         expect(on.get("MODS")).toBe(`${LOGIN},https://elsewhere.example/other.jar,${JAR}`);
         expect(on.get("POLARIS_ANTICHEAT")).toBe("on");
@@ -187,7 +187,7 @@ describe("on by default", () => {
         );
         const on = anticheat.anticheatEnableEnv(
             new Map([["MODRINTH_PROJECTS", "GrimAC?:alpha,coreprotect?"]]),
-            { baseUrl: BASE, installedAppId: SERVER, token: "t" }
+            { baseUrl: BASE, modKey: "key", installedAppId: SERVER, token: "t" }
         );
         expect(on.get("MODRINTH_PROJECTS")).toBe("coreprotect?");
         // A list that had nothing to take off is not written at all.
@@ -195,6 +195,7 @@ describe("on by default", () => {
             new Map([["MODRINTH_PROJECTS", "coreprotect?"]]),
             {
                 baseUrl: BASE,
+                modKey: "key",
                 installedAppId: SERVER,
                 token: "t"
             }
@@ -237,6 +238,7 @@ describe("on a NeoForge server, through the Polaris mod", () => {
     it("puts the mod on the list when turned on, and keeps it there when turned off", () => {
         const on = anticheat.anticheatEnableEnv(neo([["POLARIS_ANTIXRAY", "off"]]), {
             baseUrl: BASE,
+            modKey: "key",
             installedAppId: SERVER,
             token: "t"
         });

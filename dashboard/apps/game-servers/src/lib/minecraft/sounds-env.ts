@@ -83,6 +83,8 @@ export function soundsEnableEnv(
     current: ReadonlyMap<string, string>,
     input: {
         readonly baseUrl: string;
+        /** The download key (`mod-token`). */
+        readonly modKey: string;
         readonly installedAppId: string;
         readonly token: string;
         readonly hasToken: boolean;
@@ -93,7 +95,7 @@ export function soundsEnableEnv(
     if (build === null) return writes;
     const mods = current.get(MODS_KEY) ?? "";
     if (!carriesFile(mods, build.file))
-        writes.set(MODS_KEY, withMod(mods, modUrl(input.baseUrl, build.file)));
+        writes.set(MODS_KEY, withMod(mods, modUrl(input.baseUrl, build.file, input.modKey)));
     const base = input.baseUrl.replace(/\/+$/, "");
     if (!(current.get(URL_KEY) ?? "").trim()) writes.set(URL_KEY, base);
     if (current.get(SERVER_ID_KEY)?.trim() !== input.installedAppId)
