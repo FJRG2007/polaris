@@ -16,6 +16,7 @@ import { fieldLabel, useCustomFields } from "./custom-fields";
 import { fieldsOf, primaryField, type CrmObject, type FieldDef } from "../model/objects";
 import {
     Button,
+    Checkbox,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -72,6 +73,7 @@ export function ImportDialog(props: ImportDialogProps) {
     const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
     const [finished, setFinished] = useState<Finished | null>(null);
     const [dragging, setDragging] = useState(false);
+    const [skipDuplicates, setSkipDuplicates] = useState(true);
 
     const fields = useMemo(
         () => fieldsOf(object, custom).filter((field) => !field.readOnly),
@@ -147,7 +149,8 @@ export function ImportDialog(props: ImportDialogProps) {
                         actions.importRecordsAction({
                             object,
                             mapping: kept.map((index) => mapping[index]),
-                            rows: batch.map(({ cells }) => kept.map((index) => cells[index] ?? ""))
+                            rows: batch.map(({ cells }) => kept.map((index) => cells[index] ?? "")),
+                            skipDuplicates
                         }),
                     t("errors.generic")
                 );
@@ -332,6 +335,18 @@ export function ImportDialog(props: ImportDialogProps) {
                                 {t("import.refsChecked")}
                             </p>
                         ) : null}
+                        <label className="flex min-w-0 items-start gap-2 text-[0.8125rem]">
+                            <Checkbox
+                                checked={skipDuplicates}
+                                onChange={(event) => setSkipDuplicates(event.target.checked)}
+                            />
+                            <span className="min-w-0">
+                                <span className="block">{t("import.skipDuplicates")}</span>
+                                <span className="block text-muted-foreground">
+                                    {t("import.skipDuplicatesHint")}
+                                </span>
+                            </span>
+                        </label>
                     </div>
                 ) : (
                     <p role="alert" className="text-[0.8125rem] text-destructive">

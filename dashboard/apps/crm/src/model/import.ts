@@ -178,7 +178,7 @@ export function cellInput(field: FieldDef, cell: string): unknown {
 
 export interface RowProblem {
     readonly key: string;
-    readonly reason: InvalidReason | "missing" | "ambiguous" | "notOnShelf";
+    readonly reason: InvalidReason | "missing" | "ambiguous" | "notOnShelf" | "duplicate";
 }
 
 export interface CheckedRow {

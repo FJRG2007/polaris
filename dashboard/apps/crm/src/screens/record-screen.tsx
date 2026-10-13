@@ -12,6 +12,7 @@
 
 import Link from "next/link";
 import { useCrmT } from "./i18n";
+import { useDuplicateWarning } from "./use-duplicate-warning";
 import { Timeline } from "./timeline";
 import { RecordActivities } from "./record-activities";
 import { CellPicker } from "./cell-picker";
@@ -55,6 +56,7 @@ export interface RecordScreenProps {
 export function RecordScreen({ object, id, panel = false, onSaved }: RecordScreenProps) {
     const t = useCrmT();
     const toast = useToast();
+    const warnDuplicates = useDuplicateWarning(object);
     const format = hostUi.displayFormat.useDisplayFormat();
     const load = useCallback(
         () => unwrap(() => actions.openRecordAction({ object, id }), t("errors.loadFailed")),
@@ -81,8 +83,9 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             () => actions.updateRecordAction({ object, id, values: { [field.key]: stored } }),
             t("errors.generic")
         )
-            .then(({ record: saved }) => {
+            .then(({ record: saved, duplicates }) => {
                 put(saved);
+                warnDuplicates(duplicates);
                 onSaved?.(saved);
                 // The change is on the timeline now.
                 opening.refresh();

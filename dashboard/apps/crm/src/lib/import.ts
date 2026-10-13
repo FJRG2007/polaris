@@ -13,9 +13,11 @@ import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
 import { logEvents } from "./timeline";
 import { shelfPeople } from "./records";
+import { findDuplicates } from "./duplicates";
 import { initialValues } from "../model/timeline";
 import type { InputValue } from "../model/values";
 import { checkRow, splitName, type RowProblem } from "../model/import";
+import { duplicateKeys, sharedKey, type DuplicateKey } from "../model/duplicates";
 import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import { columnOf, recordSelect, table, toRecord, writable, writeData } from "./columns";
 import { primaryField, type CrmObject, type CrmRecord, type FieldDef } from "../model/objects";
@@ -24,6 +26,9 @@ export interface ImportBatch {
     /** The field each column goes to, or null for a column left out. */
     readonly mapping: readonly (string | null)[];
     readonly rows: readonly (readonly string[])[];
+    /** Leave out a row that looks like a record already there, or like an
+     *  earlier row: the same email, domain or name. */
+    readonly skipDuplicates?: boolean;
 }
 
 export interface ImportResult {
@@ -157,6 +162,38 @@ export async function readRows(
     return { values, failed, fields: mapped };
 }
 
+/**
+ * The rows left once every row that looks like a record already there, or like
+ * an earlier row of the batch, is moved to the failed ones as a duplicate.
+ */
+async function dropDuplicates(
+    actor: CrmActor,
+    object: CrmObject,
+    read: ReadRows
+): Promise<Pick<ReadRows, "values" | "failed">> {
+    const hidden = actor.rules?.[object].hidden ?? [];
+    const present = read.values.filter((row): row is Record<string, InputValue> => row !== null);
+    const found = await findDuplicates(actor, object, present);
+    const failed = [...read.failed];
+    const seen: DuplicateKey[][] = [];
+    let next = 0;
+    const values = read.values.map((row, index) => {
+        if (!row) return null;
+        const matches = found[next++] ?? [];
+        const keys = duplicateKeys(object, row, hidden);
+        const key =
+            matches[0]?.key ?? seen.map((earlier) => sharedKey(keys, earlier)).find(Boolean);
+        if (key) {
+            failed.push({ row: index, problems: [{ key, reason: "duplicate" }] });
+            return null;
+        }
+        seen.push(keys);
+        return row;
+    });
+    failed.sort((a, b) => a.row - b.row);
+    return { values, failed };
+}
+
 /** Import one batch of rows. */
 export async function importRecords(
     actor: CrmActor,
@@ -166,7 +203,11 @@ export async function importRecords(
     logAs: "imported" | "created" = "imported"
 ): Promise<ImportResult> {
     await requireCan(actor, object, "edit");
-    const { values, failed, fields } = await readRows(actor, object, batch);
+    const read = await readRows(actor, object, batch);
+    const { fields } = read;
+    const { values, failed } = batch.skipDuplicates
+        ? await dropDuplicates(actor, object, read)
+        : read;
     const ready: Record<string, unknown>[] = [];
     const readyKeys: string[][] = [];
     for (const row of values) {

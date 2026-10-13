@@ -97,7 +97,8 @@
         "option": "Choose one of the options.",
         "missing": "That record is gone or in the trash.",
         "notOnShelf": "That person is not a member here.",
-        "ambiguous": "More than one record has that name."
+        "ambiguous": "More than one record has that name.",
+        "duplicate": "A record like this is already here."
     },
     "list": {
         "loading": "Loading",
@@ -476,7 +477,9 @@
         "done": "{count, plural, one {# record imported} other {# records imported}}",
         "skipped": "{count, plural, one {# row was skipped} other {# rows were skipped}}",
         "failed": "The import stopped. {count, plural, =0 {Nothing was imported.} one {# record was imported before it stopped.} other {# records were imported before it stopped.}}",
-        "close": "Close"
+        "close": "Close",
+        "skipDuplicates": "Skip rows that match a record already here",
+        "skipDuplicatesHint": "Same email, domain or name, or an earlier row of the file."
     },
     "workflows": {
         "button": "Workflows",
@@ -757,5 +760,9 @@
         "noAccess": "Your role does not see the history of every record here. Each record's own activity is on its page.",
         "changes": "{count, plural, one {# field} other {# fields}}",
         "someone": "Someone"
+    },
+    "duplicates": {
+        "title": "{count, plural, one {A record like this is already here} other {# records like this are already here}}",
+        "body": "Same {field}: {names}"
     }
 }

@@ -22,6 +22,7 @@ import { customDef } from "../model/fields";
 import { FieldsDialog } from "./fields-dialog";
 import { CustomFieldsProvider, fieldLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
+import { useDuplicateWarning } from "./use-duplicate-warning";
 import * as views from "../model/views";
 import { useGroups } from "./use-groups";
 import { messageOf, unwrap } from "./call";
@@ -195,6 +196,7 @@ interface Layout {
 export function ListScreen({ object }: { object: CrmObject }) {
     const t = useCrmT();
     const toast = useToast();
+    const warnDuplicates = useDuplicateWarning(object);
     const format = hostUi.displayFormat.useDisplayFormat();
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const viewName = useViewName();
@@ -484,8 +486,9 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     }),
                 t("errors.generic")
             )
-                .then(({ record: saved }) => {
+                .then(({ record: saved, duplicates }) => {
                     if (latest.current.get(slot) !== turn) return;
+                    warnDuplicates(duplicates);
                     store.patch([
                         {
                             id: saved.id,
@@ -503,7 +506,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     failed(t("errors.notSaved"), caught);
                 });
         },
-        [object, store, refreshTotals, failed, t]
+        [object, store, refreshTotals, failed, t, warnDuplicates]
     );
 
     const bulkEdit = useCallback(
@@ -580,17 +583,18 @@ export function ListScreen({ object }: { object: CrmObject }) {
             };
             store.prepend(temporary);
             unwrap(() => actions.createRecordAction({ object, values }), t("errors.generic"))
-                .then(({ record }) => {
+                .then(({ record, duplicates }) => {
                     store.drop([temporary.id]);
                     store.prepend(record);
                     refreshTotals();
+                    warnDuplicates(duplicates);
                 })
                 .catch((caught) => {
                     store.drop([temporary.id]);
                     failed(t("errors.notCreated"), caught);
                 });
         },
-        [object, primary.key, groupField, store, refreshTotals, failed, t]
+        [object, primary.key, groupField, store, refreshTotals, failed, t, warnDuplicates]
     );
 
     const moveCard = useCallback(
@@ -800,7 +804,22 @@ export function ListScreen({ object }: { object: CrmObject }) {
         } else {
             setDrafting(true);
         }
-    }, [wantsNew, can, config, rows, canEdit, kind, grouped.groups, toast, t, object, boardBy, rule, primary, fieldName]);
+    }, [
+        wantsNew,
+        can,
+        config,
+        rows,
+        canEdit,
+        kind,
+        grouped.groups,
+        toast,
+        t,
+        object,
+        boardBy,
+        rule,
+        primary,
+        fieldName
+    ]);
     const boardable = views.groupFields(object, custom).length > 0;
     const narrowed = Boolean(search) || activeFilters > 0;
     const failure = (!opening.data && opening.error) || (readable && !rows && store.error) || null;

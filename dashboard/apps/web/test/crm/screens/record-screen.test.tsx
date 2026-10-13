@@ -33,6 +33,8 @@ const state = vi.hoisted(() => ({
     events: null as unknown[] | null
 }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
 vi.mock("@polaris-app/crm/src/actions/favorites", () => ({
     setFavoriteAction: async (input: { pinned: boolean }) => {
         state.pins.push(input);

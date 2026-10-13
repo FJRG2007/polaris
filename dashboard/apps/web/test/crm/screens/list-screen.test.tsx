@@ -53,7 +53,8 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({
-    useSearchParams: () => new URLSearchParams(window.location.search)
+    useSearchParams: () => new URLSearchParams(window.location.search),
+    useRouter: () => ({ push: vi.fn() })
 }));
 
 vi.mock("@polaris-app/crm/src/actions/favorites", () => ({

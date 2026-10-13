@@ -97,7 +97,8 @@
         "option": "Elige una de las opciones.",
         "missing": "Ese registro ya no existe o está en la papelera.",
         "notOnShelf": "Esa persona no es miembro aquí.",
-        "ambiguous": "Hay más de un registro con ese nombre."
+        "ambiguous": "Hay más de un registro con ese nombre.",
+        "duplicate": "Ya hay un registro como este."
     },
     "list": {
         "loading": "Cargando",
@@ -476,7 +477,9 @@
         "done": "{count, plural, one {# registro importado} other {# registros importados}}",
         "skipped": "{count, plural, one {Se omitió # fila} other {Se omitieron # filas}}",
         "failed": "La importación se detuvo. {count, plural, =0 {No se importó nada.} one {Se importó # registro antes.} other {Se importaron # registros antes.}}",
-        "close": "Cerrar"
+        "close": "Cerrar",
+        "skipDuplicates": "Omitir las filas que coinciden con un registro existente",
+        "skipDuplicatesHint": "Mismo email, dominio o nombre, o una fila anterior del archivo."
     },
     "workflows": {
         "button": "Flujos",
@@ -757,5 +760,9 @@
         "noAccess": "Tu rol no ve el historial de todos los registros. La actividad de cada registro está en su página.",
         "changes": "{count, plural, one {# campo} other {# campos}}",
         "someone": "Alguien"
+    },
+    "duplicates": {
+        "title": "{count, plural, one {Ya hay un registro como este} other {Ya hay # registros como este}}",
+        "body": "Mismo {field}: {names}"
     }
 }

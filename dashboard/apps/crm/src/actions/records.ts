@@ -16,13 +16,15 @@ import * as importer from "../lib/import";
 import * as page from "../lib/record-page";
 import * as timeline from "../lib/timeline";
 import * as favorites from "../lib/favorites";
+import * as duplicates from "../lib/duplicates";
 import type { TimelinePage } from "../model/timeline";
 import { MAX_SEARCH } from "../lib/query";
-import type { Abilities } from "../lib/access";
+import type { Abilities, CrmActor } from "../lib/access";
 import type { ObjectRule } from "../model/roles";
 import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
-import { CRM_OBJECTS, type CrmRecord, type Ref } from "../model/objects";
+import { CRM_OBJECTS, type CrmObject, type CrmRecord, type Ref } from "../model/objects";
+import { DUPLICATE_FIELDS, type Duplicate } from "../model/duplicates";
 import { filterSchema } from "../model/filters";
 import { IMPORT_BATCH, MAX_IMPORT_CELL, MAX_IMPORT_COLUMNS } from "../model/import";
 import { choiceRenamesSchema, fieldInputSchema, type CustomField } from "../model/fields";
@@ -191,7 +193,8 @@ export async function importRecordsAction(input: unknown): Promise<Outcome<impor
             rows: z
                 .array(z.array(z.string().max(MAX_IMPORT_CELL * 2)).max(MAX_IMPORT_COLUMNS))
                 .min(1)
-                .max(IMPORT_BATCH)
+                .max(IMPORT_BATCH),
+            skipDuplicates: z.boolean().default(false)
         })
         .safeParse(input);
     if (!parsed.success) return invalid();
@@ -247,29 +250,42 @@ export async function totalsAction(input: unknown): Promise<Outcome<{ totals: to
     }));
 }
 
-export async function createRecordAction(input: unknown): Promise<Outcome<{ record: CrmRecord }>> {
-    const parsed = z.object({ object, values }).safeParse(input);
-    if (!parsed.success) return invalid();
-    return outcome(async () => ({
-        record: await records.createRecord(
-            await requireCrmActor(),
-            parsed.data.object,
-            parsed.data.values
-        )
-    }));
+/** The records a saved one looks like, when the values sent could make it one. */
+async function lookalikes(
+    actor: CrmActor,
+    object: CrmObject,
+    sent: Readonly<Record<string, unknown>>,
+    record: CrmRecord
+): Promise<Duplicate[]> {
+    if (!DUPLICATE_FIELDS[object].some((key) => key in sent)) return [];
+    const [found] = await duplicates.findDuplicates(actor, object, [record.values], [record.id]);
+    return found ?? [];
 }
 
-export async function updateRecordAction(input: unknown): Promise<Outcome<{ record: CrmRecord }>> {
+export async function createRecordAction(
+    input: unknown
+): Promise<Outcome<{ record: CrmRecord; duplicates: Duplicate[] }>> {
+    const parsed = z.object({ object, values }).safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, values: sent } = parsed.data;
+    return outcome(async () => {
+        const actor = await requireCrmActor();
+        const record = await records.createRecord(actor, kind, sent);
+        return { record, duplicates: await lookalikes(actor, kind, sent, record) };
+    });
+}
+
+export async function updateRecordAction(
+    input: unknown
+): Promise<Outcome<{ record: CrmRecord; duplicates: Duplicate[] }>> {
     const parsed = z.object({ object, id, values }).safeParse(input);
     if (!parsed.success) return invalid();
-    return outcome(async () => ({
-        record: await records.updateRecord(
-            await requireCrmActor(),
-            parsed.data.object,
-            parsed.data.id,
-            parsed.data.values
-        )
-    }));
+    const { object: kind, id: recordId, values: sent } = parsed.data;
+    return outcome(async () => {
+        const actor = await requireCrmActor();
+        const record = await records.updateRecord(actor, kind, recordId, sent);
+        return { record, duplicates: await lookalikes(actor, kind, sent, record) };
+    });
 }
 
 const ids = z.array(id).min(1).max(records.MAX_BULK);
