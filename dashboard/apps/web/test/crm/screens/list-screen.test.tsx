@@ -18,7 +18,15 @@ import { MessagesWrapper } from "../../setup/i18n";
 import { defaultConfig, type ViewSummary } from "@polaris-app/crm/src/model/views";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CrmRecord, FieldValue } from "@polaris-app/crm/src/model/objects";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+    act,
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within
+} from "@testing-library/react";
 
 const VIEW_ID = "11111111-1111-4111-8111-111111111111";
 const ACME = "22222222-2222-4222-8222-222222222222";
@@ -130,7 +138,15 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
         updateRecordsAction: vi.fn(),
         trashRecordsAction: vi.fn(),
         searchRefsAction: async () => ({ ok: true, refs: [] }),
-        saveViewAction: async () => ({ ok: true })
+        saveViewAction: async () => ({ ok: true }),
+        openRecordAction: async (input: { id: string }) => ({
+            ok: true,
+            record: state.rows.find((one) => one.id === input.id) ?? null,
+            fields: [],
+            can: abilities(),
+            people: [],
+            related: []
+        })
     };
 });
 
@@ -341,6 +357,31 @@ describe("a CRM list", () => {
                 "Add the companies Dymo sells to, buys from or partners with. Dymo itself is the workspace, not a record here."
             )
         ).toBeTruthy();
+    });
+
+    it("opens a record in a side panel, and a change there shows in the list", async () => {
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        const row = screen.getByText("Acme").closest("tr")!;
+        const open = row.querySelector('a[aria-label="Open record"]')!;
+        expect(open.getAttribute("href")).toBe(`/crm/companies/${ACME}`);
+        fireEvent.click(open, { button: 0 });
+        const panel = await screen.findByRole("dialog");
+        expect(await within(panel).findByRole("heading", { name: "Acme" })).toBeTruthy();
+        expect(
+            within(panel).getByRole("link", { name: "Open full page" }).getAttribute("href")
+        ).toBe(`/crm/companies/${ACME}`);
+        fireEvent.click(within(panel).getByRole("button", { name: "City" }));
+        const input = within(panel).getByDisplayValue("Madrid");
+        fireEvent.change(input, { target: { value: "Valencia" } });
+        await act(async () => {
+            fireEvent.keyDown(input, { key: "Enter" });
+        });
+        await waitFor(() => expect(state.updates).toHaveLength(1));
+        expect(state.updates[0]).toMatchObject({ id: ACME, values: { city: "Valencia" } });
+        fireEvent.keyDown(panel, { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(cityCell("Acme").textContent).toContain("Valencia");
     });
 
     it("says so to somebody who may not see this kind of record", async () => {

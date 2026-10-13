@@ -367,6 +367,7 @@
     },
     "record": {
         "open": "Open record",
+        "openPage": "Open full page",
         "untitled": "Untitled",
         "fields": "Fields",
         "copyLink": "Copy link",
