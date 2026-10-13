@@ -462,6 +462,19 @@ html:has(.page-bleed) {
     outline-offset: 2px;
 }
 
+/* A field you type in shows focus on a mouse click too, so a ring drawn outside
+   it reads as a second box around the field, and a toolbar or card that clips
+   its overflow cuts that box in half. Fields draw the ring on their own edge. */
+:where(
+        input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"]),
+        select,
+        textarea
+    ):focus-visible {
+    outline-width: 1px;
+    outline-offset: -1px;
+    border-color: hsl(var(--ring));
+}
+
 /* Something that appears or leaves moves on the same curve as everything that
    changes colour. tailwindcss-animate sets a name and a duration and leaves the
    timing to the browser's default `ease`, which is a second curve nobody chose.
