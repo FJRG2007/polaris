@@ -227,7 +227,9 @@ describe("a stream in a direct message", () => {
             wrapper: MessagesWrapper
         });
         fireEvent.click(screen.getByTitle("Watch Bo - screen"));
-        const tile = document.querySelector("video")!.closest("[class*='group/tile']") as HTMLElement;
+        const tile = document
+            .querySelector("video")!
+            .closest("[class*='group/tile']") as HTMLElement;
         expect(within(tile).getAllByText("Live").length).toBeGreaterThan(0);
     });
 

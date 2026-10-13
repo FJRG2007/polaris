@@ -161,7 +161,10 @@ const THREADS: readonly ThreadDraft[] = [
     },
     {
         from: ["Mateo Silva", "mateo@example.com"],
-        subject: ["Q2 roadmap review moved to 3pm", "La revisión del roadmap del T2 pasa a las 15:00"],
+        subject: [
+            "Q2 roadmap review moved to 3pm",
+            "La revisión del roadmap del T2 pasa a las 15:00"
+        ],
         snippet: [
             "Room 4 was taken, so we are in the big room instead. Same agenda, same link.",
             "La sala 4 estaba ocupada, así que vamos a la grande. Mismo orden del día, mismo enlace."
@@ -270,7 +273,10 @@ const THREADS: readonly ThreadDraft[] = [
     },
     {
         from: ["The Weekly Build", "digest@news.example"],
-        subject: ["Issue 112: shipping smaller releases", "Número 112: publicar versiones más pequeñas"],
+        subject: [
+            "Issue 112: shipping smaller releases",
+            "Número 112: publicar versiones más pequeñas"
+        ],
         snippet: [
             "Three teams on how they cut release size in half, and what it cost them.",
             "Tres equipos cuentan cómo redujeron sus versiones a la mitad y lo que les costó."

@@ -513,10 +513,7 @@ export function CallRoom({
     const inlineStreams = place === "direct" && live === null ? stages : [];
     /** What the room is built around right now - see `stagingOf`, which is where
      *  the reasoning lives. */
-    const { showing, staged, enlarged } = stagingOf(
-        inlineStreams.length > 0 ? [] : stages,
-        live
-    );
+    const { showing, staged, enlarged } = stagingOf(inlineStreams.length > 0 ? [] : stages, live);
 
     /**
      * Whether there is a camera sending anywhere in this call, this browser's
@@ -552,8 +549,7 @@ export function CallRoom({
      * back the moment it is let go of. Expanded, there is room for both, and the
      * people are a row under the stream.
      */
-    const peopleShown =
-        place === "direct" ? !staged || layout === "stream-over-people" : !enlarged;
+    const peopleShown = place === "direct" ? !staged || layout === "stream-over-people" : !enlarged;
     /** Offered shares sit among the people, first, rather than in a row above
      *  them. Only where the people are drawn in the main area. */
     const offersInline = place === "direct" && peopleShown;

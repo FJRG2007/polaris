@@ -251,9 +251,39 @@ export function survivalEvents(ctx: SceneContext) {
                 online: survival(ctx).live.players
             },
             history: [
-                ended(1, "treasure-hunt", 5, [["PixelPriya", 3], ["nightowl", 2], ["Alex", 1]], "random"),
-                ended(2, "parkour", 26, [["lena_f", 30], ["kenjimori", 27], ["Builder_Ana", 22]], "manual"),
-                ended(3, "world-boss", 50, [["nightowl", 812], ["Alex", 640], ["RedstoneRiv", 455]], "scheduled")
+                ended(
+                    1,
+                    "treasure-hunt",
+                    5,
+                    [
+                        ["PixelPriya", 3],
+                        ["nightowl", 2],
+                        ["Alex", 1]
+                    ],
+                    "random"
+                ),
+                ended(
+                    2,
+                    "parkour",
+                    26,
+                    [
+                        ["lena_f", 30],
+                        ["kenjimori", 27],
+                        ["Builder_Ana", 22]
+                    ],
+                    "manual"
+                ),
+                ended(
+                    3,
+                    "world-boss",
+                    50,
+                    [
+                        ["nightowl", 812],
+                        ["Alex", 640],
+                        ["RedstoneRiv", 455]
+                    ],
+                    "scheduled"
+                )
             ],
             pending: [],
             stashFailures: [],
@@ -261,7 +291,10 @@ export function survivalEvents(ctx: SceneContext) {
             nextRandomAt: ctx.now + 95 * minute,
             waiting: null,
             drawCheckedAt: ctx.now - minute,
-            lastRandom: { name: preset("treasure-hunt").name, startedAt: ctx.now - 5 * 60 * minute },
+            lastRandom: {
+                name: preset("treasure-hunt").name,
+                startedAt: ctx.now - 5 * 60 * minute
+            },
             players: { online: 7, active: 6 }
         }
     };
@@ -272,7 +305,7 @@ export function survivalLog(ctx: SceneContext): string {
     const at = (minutesAgo: number) =>
         new Date(ctx.now - minutesAgo * 60_000).toISOString().slice(11, 19);
     return [
-        [42, "[Server thread/INFO]: Done (8.214s)! For help, type \"help\""],
+        [42, '[Server thread/INFO]: Done (8.214s)! For help, type "help"'],
         [38, "[Server thread/INFO]: Alex joined the game"],
         [31, "[Server thread/INFO]: nightowl joined the game"],
         [24, "[Server thread/INFO]: <nightowl> anyone up for the end tonight?"],
@@ -284,7 +317,10 @@ export function survivalLog(ctx: SceneContext): string {
         [6, "[Server thread/INFO]: RedstoneRiv joined the game"],
         [4, "[Server thread/INFO]: [Rcon: Mining rush starts now - 10 minutes]"],
         [2, "[Server thread/INFO]: <lena_f> gg"],
-        [1, "[Server thread/INFO]: There are 7 of a max of 20 players online: Alex, nightowl, Builder_Ana, kenjimori, RedstoneRiv, lena_f, PixelPriya"]
+        [
+            1,
+            "[Server thread/INFO]: There are 7 of a max of 20 players online: Alex, nightowl, Builder_Ana, kenjimori, RedstoneRiv, lena_f, PixelPriya"
+        ]
     ]
         .map(([minutes, line]) => `[${at(minutes as number)}] ${line}`)
         .join("\n");
