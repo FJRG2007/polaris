@@ -66,6 +66,16 @@ function abilities(granted: (object: CrmObject, verb: CrmVerb) => boolean): Abil
  */
 export async function crmActor(user: SessionUser): Promise<CrmActor> {
     const { orgId, orgName } = await host.crmHost.crmShelf(user.id);
+    return actorOn(user, orgId, orgName);
+}
+
+/** Somebody working on a given shelf - their own when `orgId` is null - with
+ *  what their role there lets them do now. A workflow runs as this. */
+export async function actorOn(
+    user: SessionUser,
+    orgId: string | null,
+    orgName: string | null
+): Promise<CrmActor> {
     if (!orgId) {
         return {
             user,

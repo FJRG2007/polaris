@@ -465,5 +465,36 @@
         "skipped": "{count, plural, one {Se omitió # fila} other {Se omitieron # filas}}",
         "failed": "La importación se detuvo. {count, plural, =0 {No se importó nada.} one {Se importó # registro antes.} other {Se importaron # registros antes.}}",
         "close": "Cerrar"
+    },
+    "workflows": {
+        "button": "Flujos",
+        "title": "Flujos de {objects}",
+        "hint": "Haz cosas solas al cambiar registros",
+        "empty": "Aún no hay flujos",
+        "new": "Nuevo flujo",
+        "edit": "Editar flujo",
+        "name": "Nombre",
+        "trigger": "Cuando",
+        "actions": "Después",
+        "noActions": "Sin acciones aún",
+        "addAction": "Añadir acción",
+        "removeAction": "Quitar acción",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "delete": "Eliminar flujo",
+        "deleteTitle": "¿Eliminar {name}?",
+        "deleteBody": "Deja de ejecutarse. Lo que ya hizo se queda hecho.",
+        "enabled": "Activo",
+        "runs": "{count, plural, =0 {Nunca se ejecutó} one {Se ejecutó una vez} other {Se ejecutó # veces}}",
+        "lastRun": "Última ejecución {when}",
+        "failed": "La última ejecución falló: {error}",
+        "tooMany": "Un tipo de registro puede tener hasta {max} flujos.",
+        "noRunner": "Quien guardó este flujo por última vez ya no puede usar el CRM. Guárdalo de nuevo para que se ejecute como tú.",
+        "triggers": {
+            "created": "Se crea un registro",
+            "updated": "Se cambia un registro",
+            "deleted": "Se elimina un registro"
+        },
+        "actionKinds": {}
     }
 }

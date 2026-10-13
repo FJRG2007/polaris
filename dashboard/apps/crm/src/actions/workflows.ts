@@ -1,0 +1,60 @@
+"use server";
+
+/**
+ * A kind of record's workflows: list them, save one, switch one on or off,
+ * delete one. Every input is checked against its schema here, and every rule
+ * about who may do what is in `lib/`.
+ */
+
+import { z } from "zod";
+import * as workflows from "../lib/workflows";
+import { CRM_OBJECTS } from "../model/objects";
+import { requireCrmActor } from "../lib/access";
+import { invalid, outcome, type Outcome } from "../lib/outcome";
+import { workflowInputSchema, type SavedWorkflow, type WorkflowView } from "../model/workflows";
+
+const object = z.enum(CRM_OBJECTS);
+const one = z.object({ object, id: z.string().uuid() });
+
+/** The workflows of a kind of record. */
+export async function listWorkflowsAction(
+    input: unknown
+): Promise<Outcome<{ workflows: WorkflowView[] }>> {
+    const parsed = z.object({ object }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        workflows: await workflows.listWorkflows(await requireCrmActor(), parsed.data.object)
+    }));
+}
+
+/** Make a workflow, or change one. */
+export async function saveWorkflowAction(input: unknown): Promise<Outcome<SavedWorkflow>> {
+    const parsed = z.object({ object, workflow: workflowInputSchema }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () =>
+        workflows.saveWorkflow(await requireCrmActor(), parsed.data.object, parsed.data.workflow)
+    );
+}
+
+/** Switch a workflow on or off. */
+export async function setWorkflowEnabledAction(
+    input: unknown
+): Promise<Outcome<{ enabled: boolean }>> {
+    const parsed = one.extend({ enabled: z.boolean() }).safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, id, enabled } = parsed.data;
+    return outcome(async () => {
+        await workflows.setWorkflowEnabled(await requireCrmActor(), kind, id, enabled);
+        return { enabled };
+    });
+}
+
+/** Delete a workflow. */
+export async function deleteWorkflowAction(input: unknown): Promise<Outcome<{ deleted: true }>> {
+    const parsed = one.safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => {
+        await workflows.deleteWorkflow(await requireCrmActor(), parsed.data.object, parsed.data.id);
+        return { deleted: true as const };
+    });
+}

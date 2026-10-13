@@ -380,6 +380,7 @@ model User {
     crmFields               CrmField[]       @relation("CrmFieldShelf")
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
     crmLinks                CrmLink[]        @relation("CrmLinkShelf")
+    crmWorkflows            CrmWorkflow[]    @relation("CrmWorkflowShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5876,6 +5877,7 @@ model Organization {
     crmFields        CrmField[]
     crmEvents        CrmEvent[]
     crmLinks         CrmLink[]
+    crmWorkflows     CrmWorkflow[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -13021,6 +13023,42 @@ model CrmLink {
 
     @@unique([recordId, kind, targetId])
     @@index([recordId, kind, id])
+}
+
+// A CRM workflow: when something happens to a kind of record (or on a
+// schedule, by hand, or from an outside call), do these things. It runs as the
+// person who last saved it, with what their role lets them do on its shelf now.
+model CrmWorkflow {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    orgId       String?   @db.Uuid
+    userId      String?   @db.Uuid
+    // companies | people | opportunities
+    object      String
+    name        String
+    // Stringified JSON: workflowTriggerSchema and an array of workflowActionSchema.
+    trigger     String
+    actions     String    @default("[]")
+    enabled     Boolean   @default(true)
+    // SHA-256 of the secret in a webhook trigger's address; the secret itself
+    // is shown once and never stored.
+    hookHash    String?   @unique
+    // When a schedule trigger next fires.
+    nextRunAt   DateTime?
+    runCount    Int       @default(0)
+    lastRunAt   DateTime?
+    lastError   String?
+    // Whoever saved it last: it runs as them. No FK - it outlives them, and
+    // stops running then.
+    runAsId     String?   @db.Uuid
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmWorkflowShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([orgId, object])
+    @@index([userId, object])
+    @@index([enabled, nextRunAt])
 }
 
 // A service volume being moved from one storage location to another (this

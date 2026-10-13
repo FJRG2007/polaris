@@ -15,6 +15,7 @@ import { resolveScope } from "@/lib/workspace-scope";
 import { isUuid } from "@/lib/uuid";
 import { normalizeRelPath } from "@polaris/core";
 import { mayReadDrive, requireDriveDriver } from "@/lib/drive-authz";
+import { sessionCan, type SessionUser } from "@/lib/session";
 import { listOrgMembers, orgCan, resolveOrgAccess, type OrgActor } from "@/lib/orgs/org-service";
 
 /** The shelf somebody is working from: an organization, or their own (null). */
@@ -259,4 +260,20 @@ export async function crmDriveFiles(
             }
         ];
     });
+}
+
+/**
+ * The account a CRM workflow runs as, when it still may: not deleted, banned or
+ * switched off, and still allowed to use the CRM. Null otherwise, and the
+ * workflow does not run.
+ */
+export async function crmRunner(userId: string): Promise<SessionUser | null> {
+    if (!isUuid(userId)) return null;
+    const found = await prisma.user.findFirst({
+        where: { id: userId, bannedAt: null, disabledAt: null },
+        select: { id: true, email: true, name: true, isAdmin: true }
+    });
+    if (!found) return null;
+    const user: SessionUser = { ...found, sessionId: "" };
+    return (await sessionCan(user, "crm.use")) ? user : null;
 }

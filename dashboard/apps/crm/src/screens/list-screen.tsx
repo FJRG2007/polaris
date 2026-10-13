@@ -28,6 +28,7 @@ import { RecordTable } from "./record-table";
 import { RecordScreen } from "./record-screen";
 import { TrashDialog } from "./trash-dialog";
 import { ImportDialog } from "./import-dialog";
+import { WorkflowsDialog } from "./workflows-dialog";
 import * as actions from "../actions/records";
 import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
@@ -42,6 +43,7 @@ import {
     Columns3,
     Download,
     Upload,
+    Workflow,
     Kanban,
     Pencil,
     Plus,
@@ -385,6 +387,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const [peek, setPeek] = useState<string | null>(null);
     const [trashOpen, setTrashOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
+    const [workflowsOpen, setWorkflowsOpen] = useState(false);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
@@ -1050,6 +1053,17 @@ export function ListScreen({ object }: { object: CrmObject }) {
                             {t("import.button")}
                         </Button>
                     ) : null}
+                    {canEdit ? (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setWorkflowsOpen(true)}
+                            aria-label={t("workflows.button")}
+                            title={t("workflows.hint")}
+                        >
+                            <Workflow className="size-4" />
+                        </Button>
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -1140,6 +1154,12 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     />
                 ) : null}
                 {confirmElement}
+                <WorkflowsDialog
+                    object={object}
+                    open={workflowsOpen}
+                    confirm={confirm}
+                    onClose={() => setWorkflowsOpen(false)}
+                />
                 <ImportDialog
                     object={object}
                     open={importOpen}
