@@ -312,6 +312,87 @@ export async function publishedStreams(endpoint: RelayEndpoint): Promise<string[
     return body ? Object.keys(body) : [];
 }
 
+/** Bytes received so far by each stream that has a connected producer and
+ *  somebody waiting on it, by stream name. */
+export type StreamTraffic = Record<string, number>;
+
+/**
+ * Restarting the relay drops every camera for the seconds it takes to come back,
+ * so it is done at most this often however many streams keep stalling.
+ */
+export const RELAY_RESTART_COOLDOWN_MS = 5 * 60_000;
+
+/**
+ * What each stream is receiving, from the relay's `GET /api/streams` answer.
+ *
+ * A connected producer reports its byte count and one that is not connected
+ * only its address, and a stream nobody is waiting on is idle rather than
+ * stalled - so only streams with both are counted.
+ */
+export function streamTraffic(body: Record<string, unknown>): StreamTraffic {
+    const traffic: StreamTraffic = {};
+    for (const [name, stream] of Object.entries(body)) {
+        if (!stream || typeof stream !== "object") continue;
+        const { producers, consumers } = stream as { producers?: unknown; consumers?: unknown };
+        if (!Array.isArray(consumers) || consumers.length === 0) continue;
+        if (!Array.isArray(producers)) continue;
+        let received: number | null = null;
+        for (const producer of producers) {
+            const bytes = (producer as { bytes_recv?: unknown } | null)?.bytes_recv;
+            if (typeof bytes === "number" && Number.isFinite(bytes)) {
+                received = (received ?? 0) + bytes;
+            }
+        }
+        if (received !== null) traffic[name] = received;
+    }
+    return traffic;
+}
+
+/** What each stream is receiving, or null when the relay could not be asked. */
+export async function relayTraffic(endpoint: RelayEndpoint): Promise<StreamTraffic | null> {
+    const response = await relayFetch(endpoint, "/api/streams", { timeoutMs: 3000 }).catch(
+        () => null
+    );
+    if (!response?.ok) return null;
+    const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    return body && typeof body === "object" ? streamTraffic(body) : null;
+}
+
+/**
+ * The streams whose byte count did not move between two looks: connected,
+ * waited on, and receiving nothing. A stream seen only once tells nothing.
+ */
+export function stalledStreams(before: StreamTraffic | undefined, now: StreamTraffic): string[] {
+    if (!before) return [];
+    return Object.keys(now).filter((name) => before[name] === now[name]);
+}
+
+/** Whether a relay with these stalled streams is restarted now. */
+export function restartDue(
+    stalled: readonly string[],
+    lastRestartAt: number | undefined,
+    now: number
+): boolean {
+    if (stalled.length === 0) return false;
+    return lastRestartAt === undefined || now - lastRestartAt >= RELAY_RESTART_COOLDOWN_MS;
+}
+
+/**
+ * Restart the relay in place.
+ *
+ * A stalled camera connection is not closed by replacing or deleting its stream
+ * - the relay only forgets the name - and a camera that caps its sessions then
+ * refuses the new one. Restarting closes every connection and reopens each
+ * camera from the relay's own file, which is the one recovery that frees them.
+ */
+export async function restartRelay(endpoint: RelayEndpoint): Promise<boolean> {
+    const response = await relayFetch(endpoint, "/api/restart", {
+        method: "POST",
+        timeoutMs: 3000
+    }).catch(() => null);
+    return response?.ok === true;
+}
+
 /**
  * A still from a camera, as JPEG bytes.
  *
