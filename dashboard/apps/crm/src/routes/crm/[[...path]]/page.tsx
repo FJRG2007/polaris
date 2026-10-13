@@ -1,5 +1,6 @@
 /**
- * The CRM: `/crm` and `/crm/<companies|people|opportunities>`.
+ * The CRM: `/crm`, `/crm/<companies|people|opportunities>` and one record's
+ * page, `/crm/<object>/<id>`.
  *
  * The server hands over the frame and nothing else - no record, view or total
  * is read here. The list reads them in the browser, painting what it kept from
@@ -14,8 +15,11 @@ import { requireCrmUser } from "../../../lib/access";
 import { isCrmObject } from "../../../model/objects";
 import { ListShell } from "../../../screens/list-shell";
 import { ListScreen } from "../../../screens/list-screen";
+import { RecordScreen } from "../../../screens/record-screen";
 
 export const dynamic = "force-dynamic";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function CrmPage({
     params
@@ -27,7 +31,16 @@ export default async function CrmPage({
     const path = Array.isArray(raw) ? raw : raw ? [raw] : [];
     if (path.length === 0) redirect("/crm/companies");
     const [object, ...rest] = path;
-    if (!object || !isCrmObject(object) || rest.length > 0) notFound();
+    if (!object || !isCrmObject(object) || rest.length > 1) notFound();
+    const [id] = rest;
+    if (id !== undefined) {
+        if (!UUID.test(id)) notFound();
+        return (
+            <div className={PAGE_FILL}>
+                <RecordScreen key={id} object={object} id={id} />
+            </div>
+        );
+    }
     const t = await crmT();
     const title = t(`objects.${object}.plural`);
     return (

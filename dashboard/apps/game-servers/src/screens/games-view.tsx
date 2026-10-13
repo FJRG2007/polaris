@@ -407,7 +407,7 @@ export function GamesView({
                 }
                 actions={
                     canCreate ? (
-                        <Button onClick={() => setCreating(true)}>
+                        <Button data-tour="games.new" onClick={() => setCreating(true)}>
                             <Plus className="size-4" /> {t("list.newServer")}
                         </Button>
                     ) : null
@@ -417,7 +417,7 @@ export function GamesView({
             {error && <p className="text-sm text-danger">{error}</p>}
 
             {rows.length === 0 ? (
-                <Card>
+                <Card data-tour="games.list">
                     <CardBody className="flex flex-col items-center gap-3 py-12 text-center">
                         <Gamepad2 className="size-8 text-muted-foreground" />
                         <p className="text-sm font-medium">{t("list.noServersYet")}</p>
@@ -433,7 +433,7 @@ export function GamesView({
                 </Card>
             ) : (
                 <>
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div data-tour="games.filters" className="flex flex-wrap items-center gap-2">
                         <div className="relative min-w-48 flex-1">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
@@ -485,7 +485,10 @@ export function GamesView({
                         )}
                     </div>
 
-                    <div className="overflow-x-auto rounded-lg border border-border">
+                    <div
+                        data-tour="games.list"
+                        className="overflow-x-auto rounded-lg border border-border"
+                    >
                         <table className="w-full min-w-[52rem] text-sm">
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>

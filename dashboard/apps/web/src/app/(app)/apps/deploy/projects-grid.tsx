@@ -148,7 +148,7 @@ export function ProjectsGrid({
                     {t("projects.title")}
                 </h1>
                 {canManage && (
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div data-tour="deploy.create" className="flex flex-wrap items-center gap-2">
                         <RegistryCredentialsButton />
                         <CreateProjectButton />
                     </div>
@@ -182,7 +182,7 @@ export function ProjectsGrid({
                 </div>
             )}
 
-            <div className="flex items-center justify-between gap-2">
+            <div data-tour="deploy.search" className="flex items-center justify-between gap-2">
                 <div className="relative max-w-xs flex-1">
                     <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input

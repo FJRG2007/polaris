@@ -11,6 +11,10 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
+import { relatedLists } from "../model/related";
+import { prisma } from "@polaris/db";
+import { dropEvents, logEvents, type NewEvent } from "./timeline";
+import { changesBetween, initialValues } from "../model/timeline";
 import { host } from "@polaris/app-host";
 import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
@@ -158,6 +162,7 @@ export async function moveRecord(
     const data = await prepare(actor, object, { [move.key]: move.value }, custom);
     const where = { id, ...shelfWhere(actor.shelf), deletedAt: null };
     const position = move.last ? await pastLast(actor, object, id, move) : move.position;
+    const before = await table(object).findFirst({ where, select: recordSelect(object) });
     const result = await table(object).updateMany({
         where,
         data: { ...data, position }
@@ -170,7 +175,14 @@ export async function moveRecord(
         const t = await crmT();
         throw new CrmRefusal(t("errors.notFound"));
     }
-    return toRecord(object, row as Record<string, unknown>);
+    const record = toRecord(object, row as Record<string, unknown>);
+    if (before) {
+        const was = toRecord(object, before as Record<string, unknown>);
+        await logEvents(actor, object, [
+            { recordId: id, kind: "updated", changes: changesBetween(was, record, [move.key]) }
+        ]);
+    }
+    return record;
 }
 
 /** A place after every other card of the group, even the ones the board has
@@ -315,7 +327,15 @@ export async function createRecord(
         },
         select: recordSelect(object)
     });
-    return toRecord(object, row as Record<string, unknown>);
+    const record = toRecord(object, row as Record<string, unknown>);
+    await logEvents(actor, object, [
+        {
+            recordId: record.id,
+            kind: "created",
+            changes: initialValues(record, Object.keys(values))
+        }
+    ]);
+    return record;
 }
 
 /** Change fields of one record. */
@@ -347,12 +367,37 @@ export async function updateRecords(
     if (ids.length === 0) return [];
     const data = await prepare(actor, object, values, await loadFields(actor.shelf, object));
     const where = { id: { in: [...new Set(ids)] }, ...shelfWhere(actor.shelf), deletedAt: null };
+    const before = (await table(object).findMany({
+        where,
+        select: recordSelect(object)
+    })) as Record<string, unknown>[];
     await table(object).updateMany({ where, data });
     const rows = (await table(object).findMany({ where, select: recordSelect(object) })) as Record<
         string,
         unknown
     >[];
-    return rows.map((row) => toRecord(object, row));
+    const saved = rows.map((row) => toRecord(object, row));
+    const was = new Map(
+        before.map((row) => toRecord(object, row)).map((record) => [record.id, record])
+    );
+    const keys = Object.keys(values);
+    await logEvents(
+        actor,
+        object,
+        saved.flatMap((record) => {
+            const old = was.get(record.id);
+            return old
+                ? [
+                      {
+                          recordId: record.id,
+                          kind: "updated" as const,
+                          changes: changesBetween(old, record, keys)
+                      }
+                  ]
+                : [];
+        })
+    );
+    return saved;
 }
 
 /** Move records to the trash. Returns how many moved. */
@@ -363,9 +408,118 @@ export async function trashRecords(
 ): Promise<number> {
     await requireCan(actor, object, "delete");
     if (ids.length === 0) return 0;
+    const where = { id: { in: [...new Set(ids)] }, ...shelfWhere(actor.shelf), deletedAt: null };
+    const found = (await table(object).findMany({ where, select: { id: true } })) as {
+        id: string;
+    }[];
+    if (found.length === 0) return 0;
     const result = await table(object).updateMany({
-        where: { id: { in: [...new Set(ids)] }, ...shelfWhere(actor.shelf), deletedAt: null },
+        where: { ...where, id: { in: found.map((row) => row.id) } },
         data: { deletedAt: new Date() }
     });
+    await logEvents(
+        actor,
+        object,
+        found.map((row) => ({ recordId: row.id, kind: "trashed" as const }))
+    );
     return result.count as number;
+}
+
+/** Take records out of the trash. Returns how many came back. */
+export async function restoreRecords(
+    actor: CrmActor,
+    object: CrmObject,
+    ids: readonly string[]
+): Promise<number> {
+    await requireCan(actor, object, "delete");
+    if (ids.length === 0) return 0;
+    const where = {
+        id: { in: [...new Set(ids)] },
+        ...shelfWhere(actor.shelf),
+        deletedAt: { not: null }
+    };
+    const found = (await table(object).findMany({ where, select: { id: true } })) as {
+        id: string;
+    }[];
+    if (found.length === 0) return 0;
+    const result = await table(object).updateMany({
+        where: { ...where, id: { in: found.map((row) => row.id) } },
+        data: { deletedAt: null }
+    });
+    await logEvents(
+        actor,
+        object,
+        found.map((row) => ({ recordId: row.id, kind: "restored" as const }))
+    );
+    return result.count as number;
+}
+
+/**
+ * Delete records for good - only ones already in the trash, so nothing leaves
+ * a list without passing through it first. Every record that pointed at them -
+ * a person at their company, a deal at its contact - is cleared in the same
+ * transaction and keeps a line on its timeline saying so; their own timeline
+ * and their links to notes, tasks and files go with them (the notes, tasks and
+ * files themselves stay). Returns how many went.
+ */
+export async function destroyRecords(
+    actor: CrmActor,
+    object: CrmObject,
+    ids: readonly string[]
+): Promise<number> {
+    await requireCan(actor, object, "delete");
+    if (ids.length === 0) return 0;
+    const where = {
+        id: { in: [...new Set(ids)] },
+        ...shelfWhere(actor.shelf),
+        deletedAt: { not: null }
+    };
+    const cleared: { object: CrmObject; events: NewEvent[] }[] = [];
+    const count = await prisma.$transaction(async (tx) => {
+        const found = (await table(object, tx).findMany({
+            where,
+            select: recordSelect(object)
+        })) as Record<string, unknown>[];
+        if (found.length === 0) return 0;
+        const doomed = found.map((row) => toRecord(object, row));
+        const gone = doomed.map((record) => record.id);
+        const names = new Map(doomed.map((record) => [record.id, recordName(object, record)]));
+        for (const list of relatedLists(object)) {
+            const pointing = { ...shelfWhere(actor.shelf), [list.column]: { in: gone } };
+            const rows = (await table(list.object, tx).findMany({
+                where: pointing,
+                select: { id: true, [list.column]: true }
+            })) as Record<string, string>[];
+            if (rows.length === 0) continue;
+            await table(list.object, tx).updateMany({
+                where: { ...pointing, id: { in: rows.map((row) => row.id) } },
+                data: { [list.column]: null }
+            });
+            const target = rows.map((row) => row[list.column]!);
+            cleared.push({
+                object: list.object,
+                events: rows.map((row, at) => ({
+                    recordId: row.id,
+                    kind: "updated" as const,
+                    changes: [
+                        {
+                            key: list.field,
+                            before: { id: target[at]!, name: names.get(target[at]!) ?? "" },
+                            after: null
+                        }
+                    ]
+                }))
+            });
+        }
+        const result = await table(object, tx).deleteMany({
+            where: { ...where, id: { in: gone } }
+        });
+        await dropEvents(actor, gone, tx);
+        await tx.crmLink.deleteMany({
+            where: { ...shelfWhere(actor.shelf), recordId: { in: gone } }
+        });
+        return result.count as number;
+    });
+    for (const one of cleared) await logEvents(actor, one.object, one.events);
+    return count;
 }

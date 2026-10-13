@@ -369,21 +369,37 @@ export async function assignedTasks(
                 ? { dueDate: null, completedAt: null }
                 : { dueDate: { gte: window.from, lt: window.to } })
         },
-        select: {
-            id: true,
-            name: true,
-            number: true,
-            dueDate: true,
-            timed: true,
-            completedAt: true,
-            list: { select: { name: true } },
-            space: { select: { prefix: true } },
-            status: { select: { type: true, color: true, name: true } }
-        },
+        select: TASK_SELECT,
         orderBy: { dueDate: "asc" },
         take: limit
     });
-    return rows.map((row) => ({
+    return rows.map(toCalendarTask);
+}
+
+const TASK_SELECT = {
+    id: true,
+    name: true,
+    number: true,
+    dueDate: true,
+    timed: true,
+    completedAt: true,
+    list: { select: { name: true } },
+    space: { select: { prefix: true } },
+    status: { select: { type: true, color: true, name: true } }
+} as const;
+
+function toCalendarTask(row: {
+    id: string;
+    name: string;
+    number: number;
+    dueDate: Date | null;
+    timed: boolean;
+    completedAt: Date | null;
+    list: { name: string };
+    space: { prefix: string };
+    status: { type: string; color: string; name: string } | null;
+}): CalendarTask {
+    return {
         id: row.id,
         name: row.name,
         reference: `${row.space.prefix}-${row.number}`,
@@ -394,7 +410,31 @@ export async function assignedTasks(
         statusType: statusTypeOf(row.status?.type, row.completedAt !== null),
         statusColor: row.status?.color ?? DEFAULT_STATUS_COLOR,
         statusName: row.status?.name ?? ""
-    }));
+    };
+}
+
+/**
+ * Some tasks by id, as far as this account may read them in Tasks: one gone,
+ * archived or not theirs to see is left out. For another app that keeps a
+ * link to tasks (a CRM record's), in the order the ids were given.
+ */
+export async function tasksByIds(
+    actor: { id: string; isAdmin: boolean },
+    ids: readonly string[]
+): Promise<CalendarTask[]> {
+    if (ids.length === 0) return [];
+    const { userHasPermission } = await import("@polaris/auth");
+    if (!actor.isAdmin && !(await userHasPermission(actor.id, "tasks.read"))) return [];
+    const access = await import("@/lib/tasks/access");
+    const scope = await access.visibleScope(actor);
+    const rows = await prisma.task.findMany({
+        where: {
+            AND: [{ id: { in: ids.slice(0, 200) }, archived: false }, access.scopeTaskWhere(scope)]
+        },
+        select: TASK_SELECT
+    });
+    const found = new Map(rows.map((row) => [row.id, toCalendarTask(row)]));
+    return ids.flatMap((id) => found.get(id) ?? []);
 }
 
 /** A stored status kind, or - for a task with none, or one that does not read -
@@ -520,7 +560,7 @@ export async function taskListsFor(actor: {
  */
 export async function createDueTask(
     actor: { id: string; isAdmin: boolean },
-    input: { listId: string; name: string; due: { at: string; timed: boolean } }
+    input: { listId: string; name: string; due?: { at: string; timed: boolean } | null }
 ): Promise<{ id: string; reference: string } | { refused: string }> {
     const { userHasPermission } = await import("@polaris/auth");
     const access = await import("@/lib/tasks/access");
@@ -539,8 +579,8 @@ export async function createDueTask(
             core.taskCreateSchema.parse({
                 listId: input.listId,
                 name: input.name,
-                dueDate: input.due.at,
-                timed: input.due.timed,
+                dueDate: input.due?.at ?? null,
+                timed: input.due?.timed ?? false,
                 assigneeIds: [actor.id]
             })
         );

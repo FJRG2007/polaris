@@ -11,6 +11,10 @@ import * as views from "../lib/views";
 import * as fields from "../lib/fields";
 import * as totals from "../lib/totals";
 import * as records from "../lib/records";
+import * as exporter from "../lib/export";
+import * as page from "../lib/record-page";
+import * as timeline from "../lib/timeline";
+import type { TimelinePage } from "../model/timeline";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities } from "../lib/access";
 import { requireCrmActor } from "../lib/access";
@@ -120,6 +124,48 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
             filter: sent
         })
     );
+}
+
+/** One record's page: the record, its fields and the records that point at it. */
+export async function openRecordAction(input: unknown): Promise<Outcome<page.RecordOpening>> {
+    const parsed = z.object({ object, id }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () =>
+        page.openRecord(await requireCrmActor(), parsed.data.object, parsed.data.id)
+    );
+}
+
+/** An older page of what happened to a record. */
+export async function recordTimelineAction(input: unknown): Promise<Outcome<TimelinePage>> {
+    const parsed = z.object({ object, id, before: id }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => {
+        const actor = await requireCrmActor();
+        return timeline.listTimeline(
+            actor,
+            parsed.data.object,
+            parsed.data.id,
+            await records.shelfPeople(actor),
+            parsed.data.before
+        );
+    });
+}
+
+/** The rows a view shows, in its columns, as a CSV file. */
+export async function exportRecordsAction(input: unknown): Promise<Outcome<exporter.CsvExport>> {
+    const parsed = z
+        .object({
+            object,
+            search,
+            sorts,
+            filter,
+            deleted: z.boolean().default(false),
+            columns: z.array(fieldKey).max(128).default([])
+        })
+        .safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, ...options } = parsed.data;
+    return outcome(async () => exporter.exportRecords(await requireCrmActor(), kind, options));
 }
 
 /** The first page of every group of a grouped list or a board. */
@@ -238,6 +284,32 @@ export async function trashRecordsAction(input: unknown): Promise<Outcome<{ coun
     if (!parsed.success) return invalid();
     return outcome(async () => ({
         count: await records.trashRecords(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.ids
+        )
+    }));
+}
+
+/** Take records out of the trash. */
+export async function restoreRecordsAction(input: unknown): Promise<Outcome<{ count: number }>> {
+    const parsed = z.object({ object, ids }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        count: await records.restoreRecords(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.ids
+        )
+    }));
+}
+
+/** Delete records in the trash for good. */
+export async function destroyRecordsAction(input: unknown): Promise<Outcome<{ count: number }>> {
+    const parsed = z.object({ object, ids }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        count: await records.destroyRecords(
             await requireCrmActor(),
             parsed.data.object,
             parsed.data.ids

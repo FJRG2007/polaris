@@ -304,10 +304,18 @@ export const serverHost = {
     // from, what their organization's role lets them do there, and who on it
     // may own a record.
     crmHost: {
+        crmCreateNote: later(load.crmHost, "crmCreateNote"),
+        crmNoteShelves: later(load.crmHost, "crmNoteShelves"),
+        crmNotesByIds: later(load.crmHost, "crmNotesByIds"),
         crmOrgPeople: later(load.crmHost, "crmOrgPeople"),
         crmOrgPermissions: later(load.crmHost, "crmOrgPermissions"),
+        crmReach: later(load.crmHost, "crmReach"),
         crmShelf: later(load.crmHost, "crmShelf"),
-        peopleByIds: later(load.calendarHost, "peopleByIds")
+        createTask: later(load.calendarHost, "createDueTask"),
+        peopleByIds: later(load.calendarHost, "peopleByIds"),
+        setTaskDone: later(load.calendarHost, "setTaskDone"),
+        taskListsFor: later(load.calendarHost, "taskListsFor"),
+        tasksByIds: later(load.calendarHost, "tasksByIds")
     },
     // What a game server may be linked to in Chat, and the line it writes into
     // the linked channel when an announcement is repeated there.

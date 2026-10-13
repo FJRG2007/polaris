@@ -1,0 +1,150 @@
+{
+    "menu": "Visitas guiadas",
+    "controls": {
+        "next": "Seguir",
+        "previous": "Atrás",
+        "done": "Hecho",
+        "skip": "Saltar",
+        "progress": "{current} de {total}"
+    },
+    "offer": {
+        "title": "¿Nuevo en Polaris?",
+        "body": "Un minuto para ver dónde está cada cosa.",
+        "start": "Empezar la visita"
+    },
+    "empty": {
+        "title": "Nada que mostrar aquí",
+        "body": "Ahora mismo esta pantalla no tiene ninguna de las partes que cubre la visita."
+    },
+    "list": {
+        "title": "Visitas guiadas",
+        "description": "Elige una. Esc o Saltar la terminan en cualquier paso."
+    },
+    "search": {
+        "take": "Hacer la visita de {name}"
+    },
+    "overview": {
+        "name": "Polaris",
+        "summary": "Apps, búsqueda, notificaciones y tu cuenta.",
+        "steps": {
+            "switcher": {
+                "title": "Apps",
+                "body": "Cambia aquí entre Chat, Drive, Deploy y el resto de apps."
+            },
+            "menu": {
+                "title": "Menú",
+                "body": "Todas las secciones de la app en la que estás."
+            },
+            "search": {
+                "title": "Búsqueda",
+                "body": "Encuentra cualquier página, archivo o persona. Ctrl+K la abre desde cualquier sitio."
+            },
+            "sidebar": {
+                "title": "Secciones",
+                "body": "Las partes de la app en la que estás."
+            },
+            "notifications": {
+                "title": "Notificaciones",
+                "body": "Menciones, invitaciones y avisos esperan aquí hasta que los leas."
+            },
+            "account": {
+                "title": "Tu cuenta",
+                "body": "Estado, ajustes, cerrar sesión y estas visitas."
+            }
+        }
+    },
+    "chat": {
+        "name": "Chat",
+        "summary": "Espacios, conversaciones y llamadas.",
+        "steps": {
+            "spaces": {
+                "title": "Espacios",
+                "body": "Tus mensajes directos y cada espacio del que formas parte."
+            },
+            "conversations": {
+                "title": "Conversaciones",
+                "body": "Canales y personas del espacio elegido. Las no leídas muestran un contador."
+            },
+            "conversation": {
+                "title": "Conversación",
+                "body": "Mensajes, archivos y llamadas de la que has abierto."
+            }
+        }
+    },
+    "drive": {
+        "name": "Drive",
+        "summary": "Ubicaciones, búsqueda y subidas.",
+        "steps": {
+            "locations": {
+                "title": "Ubicaciones",
+                "body": "Tus archivos y cada almacenamiento conectado a Polaris."
+            },
+            "search": {
+                "title": "Búsqueda",
+                "body": "Busca archivos por nombre en esta carpeta o en todo lo que contiene."
+            },
+            "upload": {
+                "title": "Subir",
+                "body": "Añade archivos o una carpeta entera. También puedes soltarlos en la lista."
+            }
+        }
+    },
+    "deploy": {
+        "name": "Deploy",
+        "summary": "Proyectos, servicios y dónde se ejecutan.",
+        "steps": {
+            "create": {
+                "title": "Nuevo proyecto",
+                "body": "Crea un proyecto desde un repositorio o una imagen."
+            },
+            "search": {
+                "title": "Tus proyectos",
+                "body": "Filtra por nombre y cambia entre cuadrícula y lista."
+            },
+            "sections": {
+                "title": "Infraestructura",
+                "body": "Servidores, contenedores, bases de datos y copias están en este panel."
+            }
+        }
+    },
+    "games": {
+        "name": "Juegos",
+        "summary": "Crea, encuentra y gestiona servidores de juegos.",
+        "steps": {
+            "create": {
+                "title": "Crear un servidor",
+                "body": "Elige un juego y quién puede entrar."
+            },
+            "filters": {
+                "title": "Buscar servidor",
+                "body": "Busca por nombre o dirección, o filtra por juego y estado."
+            },
+            "list": {
+                "title": "Servidores",
+                "body": "Abre uno para ver su consola, jugadores, copias y ajustes."
+            }
+        }
+    },
+    "settings": {
+        "name": "Ajustes",
+        "summary": "Perfil, seguridad y preferencias.",
+        "steps": {
+            "profile": {
+                "title": "Perfil",
+                "body": "Cómo te ven los demás: nombre, foto y detalles."
+            },
+            "sections": {
+                "title": "Ajustes",
+                "body": "Seguridad, dispositivos, notificaciones y preferencias, cada uno en su sección."
+            },
+            "menu": {
+                "title": "Ajustes",
+                "body": "En una pantalla pequeña, las secciones están en este menú."
+            },
+            "account": {
+                "title": "Atajo",
+                "body": "Tu foto abre estos ajustes desde cualquier pantalla."
+            }
+        }
+    }
+}

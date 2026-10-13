@@ -18,11 +18,12 @@ import { MessagesWrapper } from "../../setup/i18n";
 import { defaultConfig, type ViewSummary } from "@polaris-app/crm/src/model/views";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CrmRecord, FieldValue } from "@polaris-app/crm/src/model/objects";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const VIEW_ID = "11111111-1111-4111-8111-111111111111";
 const ACME = "22222222-2222-4222-8222-222222222222";
 const GLOBEX = "33333333-3333-4333-8333-333333333333";
+const INITECH = "55555555-5555-4555-8555-555555555555";
 
 const company = (id: string, name: string, city: string): CrmRecord => ({
     id,
@@ -43,7 +44,9 @@ const state = vi.hoisted(() => ({
     /** The views the list opens with; null is only the default table. */
     views: null as ViewSummary[] | null,
     shelfName: null as string | null,
-    groups: [] as { value: string; records: CrmRecord[]; total: number }[]
+    groups: [] as { value: string; records: CrmRecord[]; total: number }[],
+    trashed: [] as CrmRecord[],
+    restores: [] as unknown[]
 }));
 
 vi.mock("@polaris-app/crm/src/actions/records", () => {
@@ -73,7 +76,18 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
                 shelfName: state.shelfName
             };
         },
+        restoreRecordsAction: async (input: { ids: string[] }) => {
+            state.restores.push(input);
+            const back = state.trashed.filter((one) => input.ids.includes(one.id));
+            state.trashed = state.trashed.filter((one) => !input.ids.includes(one.id));
+            state.rows = [...state.rows, ...back.map((one) => ({ ...one, deletedAt: null }))];
+            return { ok: true, count: back.length };
+        },
+        destroyRecordsAction: async () => ({ ok: true, count: 1 }),
         listRecordsAction: async (input: unknown) => {
+            if ((input as { deleted?: boolean }).deleted) {
+                return { ok: true, records: state.trashed, total: state.trashed.length };
+            }
             state.lists.push(input);
             return { ok: true, records: state.rows, total: state.rows.length };
         },
@@ -130,9 +144,28 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
         updateRecordsAction: vi.fn(),
         trashRecordsAction: vi.fn(),
         searchRefsAction: async () => ({ ok: true, refs: [] }),
-        saveViewAction: async () => ({ ok: true })
+        saveViewAction: async () => ({ ok: true }),
+        openRecordAction: async (input: { id: string }) => ({
+            ok: true,
+            record: state.rows.find((one) => one.id === input.id) ?? null,
+            fields: [],
+            can: abilities(),
+            people: [],
+            related: []
+        })
     };
 });
+
+vi.mock("@polaris-app/crm/src/actions/activities", () => ({
+    recordActivitiesAction: async () => ({
+        ok: true,
+        activities: { notes: [], noteShelves: [], tasks: [], taskLists: [] }
+    }),
+    createRecordNoteAction: vi.fn(),
+    createRecordTaskAction: vi.fn(),
+    setRecordTaskDoneAction: vi.fn(),
+    unlinkAction: vi.fn()
+}));
 
 import { ListScreen } from "@polaris-app/crm/src/screens/list-screen";
 
@@ -148,6 +181,8 @@ beforeEach(() => {
     state.views = null;
     state.groups = [];
     state.shelfName = null;
+    state.trashed = [];
+    state.restores = [];
     if (typeof localStorage !== "undefined") localStorage.clear();
     // What the tab kept from the last test would paint before the read.
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
@@ -341,6 +376,52 @@ describe("a CRM list", () => {
                 "Add the companies Dymo sells to, buys from or partners with. Dymo itself is the workspace, not a record here."
             )
         ).toBeTruthy();
+    });
+
+    it("opens a record in a side panel, and a change there shows in the list", async () => {
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        const row = screen.getByText("Acme").closest("tr")!;
+        const open = row.querySelector('a[aria-label="Open record"]')!;
+        expect(open.getAttribute("href")).toBe(`/crm/companies/${ACME}`);
+        fireEvent.click(open, { button: 0 });
+        const panel = await screen.findByRole("dialog");
+        expect(await within(panel).findByRole("heading", { name: "Acme" })).toBeTruthy();
+        expect(
+            within(panel).getByRole("link", { name: "Open full page" }).getAttribute("href")
+        ).toBe(`/crm/companies/${ACME}`);
+        fireEvent.click(within(panel).getByRole("button", { name: "City" }));
+        const input = within(panel).getByDisplayValue("Madrid");
+        fireEvent.change(input, { target: { value: "Valencia" } });
+        await act(async () => {
+            fireEvent.keyDown(input, { key: "Enter" });
+        });
+        await waitFor(() => expect(state.updates).toHaveLength(1));
+        expect(state.updates[0]).toMatchObject({ id: ACME, values: { city: "Valencia" } });
+        fireEvent.keyDown(panel, { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect(cityCell("Acme").textContent).toContain("Valencia");
+    });
+
+    it("restores a record from the trash back into the list", async () => {
+        state.trashed = [
+            { ...company(INITECH, "Initech", "Oslo"), deletedAt: "2026-10-02T10:00:00.000Z" }
+        ];
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        fireEvent.click(screen.getByRole("button", { name: "Trash" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(await within(dialog).findByText("Initech")).toBeTruthy();
+        await act(async () => {
+            fireEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
+        });
+        await waitFor(() =>
+            expect(state.restores).toEqual([{ object: "companies", ids: [INITECH] }])
+        );
+        expect(within(dialog).queryByText("Initech")).toBeNull();
+        expect(await screen.findByText("The trash is empty")).toBeTruthy();
+        fireEvent.keyDown(dialog, { key: "Escape" });
+        expect(await screen.findByText("Initech")).toBeTruthy();
     });
 
     it("says so to somebody who may not see this kind of record", async () => {

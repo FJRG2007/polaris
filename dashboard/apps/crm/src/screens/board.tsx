@@ -20,7 +20,10 @@ import type { RowGroup } from "./use-groups";
 import type { ViewColumn } from "../model/views";
 import type { InputValue } from "../model/values";
 import { CellDisplay, optionDot } from "./cell-display";
-import { ArrowRightLeft, Check, Plus } from "lucide-react";
+import Link from "next/link";
+import { openInPanel } from "./record-table";
+import { recordHref } from "../model/related";
+import { ArrowRightLeft, ArrowUpRight, Check, Plus } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
 import {
     Button,
@@ -74,6 +77,8 @@ export interface BoardProps {
         stored: InputValue,
         shown: FieldValue
     ) => void;
+    /** Open a card's record in the side panel. */
+    readonly onOpen?: (id: string) => void;
 }
 
 export function Board(props: BoardProps) {
@@ -317,6 +322,20 @@ export function Board(props: BoardProps) {
                                                 >
                                                     {name}
                                                 </span>
+                                            )}
+                                            {pending ? null : (
+                                                <Link
+                                                    href={recordHref(object, record.id)}
+                                                    onClick={(event) =>
+                                                        openInPanel(event, record.id, props.onOpen)
+                                                    }
+                                                    draggable={false}
+                                                    aria-label={t("record.open")}
+                                                    title={t("record.open")}
+                                                    className="grid size-6 shrink-0 place-items-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/card:opacity-100 max-sm:opacity-100"
+                                                >
+                                                    <ArrowUpRight className="size-3.5" />
+                                                </Link>
                                             )}
                                             {props.canEdit && !pending ? (
                                                 <MoveMenu

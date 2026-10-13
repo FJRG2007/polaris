@@ -19,7 +19,9 @@ import { CellPicker } from "./cell-picker";
 import type { Total } from "../lib/totals";
 import { editorFor } from "./cell-editors";
 import { HeaderCell } from "./table-header";
-import { ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { recordHref } from "../model/related";
+import { ArrowUpRight, ChevronRight } from "lucide-react";
 import type { RowGroup } from "./use-groups";
 import { CellDisplay, OptionChip } from "./cell-display";
 import type { InputValue } from "../model/values";
@@ -38,6 +40,32 @@ import {
 
 /** The tick box column's width, and so where the name column is pinned. */
 const BOX_WIDTH = 36;
+
+/** What `openInPanel` reads of a press. */
+interface Press {
+    readonly button: number;
+    readonly metaKey: boolean;
+    readonly ctrlKey: boolean;
+    readonly shiftKey: boolean;
+    readonly altKey: boolean;
+    preventDefault(): void;
+}
+
+/**
+ * A plain press on a record's link opens it in the side panel when the list
+ * has one; a press with a modifier, or a middle press, is left to the browser
+ * so the page still opens in a new tab.
+ */
+export function openInPanel(
+    event: Press,
+    id: string,
+    onOpen: ((id: string) => void) | undefined
+): void {
+    if (!onOpen || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onOpen(id);
+}
 
 export interface TableProps {
     readonly object: CrmObject;
@@ -72,6 +100,8 @@ export interface TableProps {
     readonly hasMore: boolean;
     readonly loadingMore: boolean;
     readonly onLoadMore: () => void;
+    /** Open a record in the side panel; without it the name links to its page. */
+    readonly onOpen?: (id: string) => void;
     /** The rows in sections, one per choice of `groupField`; `rows` is then
      *  every row of every section, in order. */
     readonly grouping?: {
@@ -198,6 +228,20 @@ export function RecordTable(props: TableProps) {
             >
                 <div className="flex h-9 min-w-0 items-center overflow-hidden px-2.5">
                     <CellDisplay object={object} field={field} value={value} />
+                    {field.primary && !record.id.startsWith("draft:") ? (
+                        <Link
+                            href={recordHref(object, record.id)}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                openInPanel(event, record.id, props.onOpen);
+                            }}
+                            aria-label={t("record.open")}
+                            title={t("record.open")}
+                            className="ml-auto grid size-6 shrink-0 place-items-center rounded text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/row:opacity-100"
+                        >
+                            <ArrowUpRight className="size-3.5" />
+                        </Link>
+                    ) : null}
                 </div>
                 {Editor ? (
                     <Editor

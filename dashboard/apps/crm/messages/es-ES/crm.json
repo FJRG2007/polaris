@@ -357,5 +357,75 @@
             "duplicate": "Esta opción ya está.",
             "tooMany": "Usa hasta {max} opciones."
         }
+    },
+    "export": {
+        "button": "Exportar",
+        "hint": "Descarga las filas de esta vista como archivo CSV",
+        "done": "{count, plural, one {# fila exportada} other {# filas exportadas}}",
+        "truncated": "Se exportaron las primeras {count, plural, one {# fila} other {# filas}}. Acota la vista para exportar el resto.",
+        "failed": "No se pudo exportar"
+    },
+    "record": {
+        "open": "Abrir registro",
+        "openPage": "Abrir en página",
+        "untitled": "Sin nombre",
+        "fields": "Campos",
+        "copyLink": "Copiar URL",
+        "linkCopied": "Enlace copiado",
+        "inTrash": "Este registro está en la papelera y no se puede cambiar.",
+        "noRelated": "Ninguno aún",
+        "moreRelated": "{count, plural, one {# más} other {# más}}",
+        "related": {
+            "people": {
+                "company": "Personas"
+            },
+            "opportunities": {
+                "company": "Oportunidades",
+                "pointOfContact": "Oportunidades como contacto"
+            }
+        }
+    },
+    "timeline": {
+        "title": "Actividad",
+        "created": "{actor} creó este registro",
+        "updated": "{actor} lo cambió",
+        "trashed": "{actor} lo movió a la papelera",
+        "restored": "{actor} lo restauró",
+        "someone": "Alguien",
+        "empty": "Aún no ha pasado nada",
+        "more": "Ver más",
+        "to": "a"
+    },
+    "trashView": {
+        "title": "Papelera",
+        "empty": "La papelera está vacía",
+        "restore": "Restaurar",
+        "restored": "Restaurado",
+        "destroy": "Borrar",
+        "destroyed": "Borrado",
+        "destroyTitle": "¿Borrar {name} para siempre?",
+        "destroyBody": "Su actividad se borra con él. Lo que apunte a él quedará vacío.",
+        "deletedAt": "Movido aquí {when}",
+        "more": "Ver más"
+    },
+    "activities": {
+        "notes": "Notas",
+        "tasks": "Tareas",
+        "noNotes": "Sin notas",
+        "noTasks": "Sin tareas",
+        "addNote": "Nueva nota",
+        "addTask": "Nueva tarea",
+        "add": "Añadir",
+        "noteTitle": "Título",
+        "noteBody": "Nota",
+        "noteShelf": "Dónde guardarla",
+        "myNotes": "Mis notas",
+        "taskName": "Tarea",
+        "taskList": "Lista",
+        "taskDue": "Vence",
+        "done": "Marcar {name} como hecha",
+        "unlink": "Quitar de este registro",
+        "notesOff": "Tu cuenta no puede escribir notas.",
+        "tasksOff": "Tu cuenta no puede crear tareas."
     }
 }

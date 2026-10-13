@@ -38,6 +38,7 @@ import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { DiskAlertBanner } from "@/components/disk-alert-banner";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
+import { GuidedTours } from "@/components/tours/guided-tours";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { IncomingCalls } from "@/components/incoming-calls";
 import { CallElsewhere } from "@/app/(app)/chat/call-elsewhere";
@@ -290,6 +291,20 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                             />
                                                                             <ServiceWorkerRegistration />
                                                                             <VisitRecorder />
+                                                                            <GuidedTours
+                                                                                userId={user.id}
+                                                                                isAdmin={
+                                                                                    user.isAdmin
+                                                                                }
+                                                                                appIds={apps.ids}
+                                                                                held={held}
+                                                                                installed={
+                                                                                    installed
+                                                                                }
+                                                                                canOffer={
+                                                                                    !user.viewingAs
+                                                                                }
+                                                                            />
                                                                             {/* The bottom corner, laid out once. Each of these
                                     used to pin itself there, so an update landing
                                     while the phone was ringing drew one card on top
@@ -536,5 +551,5 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
 
     // The frame's own words - the rail, the switcher, the account menu - for
     // every client component in it.
-    return <Messages namespaces={["nav", "chat", "shortcuts"]}>{frame}</Messages>;
+    return <Messages namespaces={["nav", "chat", "shortcuts", "tours"]}>{frame}</Messages>;
 }

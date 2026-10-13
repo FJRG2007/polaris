@@ -103,6 +103,11 @@ const AT_BOTTOM_SLACK = 60;
  *  longer than the interval the composer sends them at. */
 const TYPING_TTL_MS = 4000;
 
+/** How often a call drawn from outside is asked about again. Half the window
+ *  the server gives a quiet browser before it lets the seat go, so somebody who
+ *  left without hanging up is gone from here within one window and a half. */
+const LIVE_CALL_RECHECK_MS = 15_000;
+
 /** Somebody who is mid-something in the box, and when they last said so. */
 interface Typist {
     readonly userId: string;
@@ -583,6 +588,20 @@ export function ChannelView({
     // effects is declared first is the one the other waits behind - and the
     // messages are what somebody opening a conversation is waiting to read.
     useEffect(checkCall, [checkCall]);
+
+    // A call drawn from outside is asked about again while it is drawn. Hanging
+    // up sends a frame; a browser that went away without hanging up - a closed
+    // tab, a dropped network, the last person out of a group - sends nothing,
+    // and its seat is only let go of by a request that sweeps the room. Nothing
+    // made one, so that person sat in the call, beside a Join button, until the
+    // page was reloaded. Only while there is a call to draw and this browser is
+    // not in it: inside, the call's own roster is what is on screen.
+    const liveMeetingId = live?.meetingId ?? null;
+    useEffect(() => {
+        if (!liveMeetingId || inCall) return;
+        const timer = setInterval(checkCall, LIVE_CALL_RECHECK_MS);
+        return () => clearInterval(timer);
+    }, [liveMeetingId, inCall, checkCall]);
 
     /**
      * Pull in the page above the oldest message on screen, and let go of as much

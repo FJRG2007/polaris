@@ -1299,7 +1299,7 @@ const SERVING_SINCE = Date.now();
  */
 async function sweep(meetingId: string): Promise<void> {
     if (Date.now() - SERVING_SINCE < PARTICIPANT_TTL_MS) return;
-    await prisma.meetingParticipant.updateMany({
+    const swept = await prisma.meetingParticipant.updateMany({
         where: {
             meetingId,
             leftAt: null,
@@ -1307,6 +1307,14 @@ async function sweep(meetingId: string): Promise<void> {
         },
         data: { leftAt: new Date() }
     });
+    // Said the way hanging up says it. A browser that went away without a word
+    // is only ever noticed here, and every screen that drew it - the call's own
+    // roster, the faces outside it, the rail - is corrected by a frame and by
+    // nothing else, so without one they drew the person until a reload. Whether
+    // the room closes is not decided here: that stays with the callers.
+    if (!swept?.count) return;
+    publishMeetingEvent({ meetingId, kind: "roster" });
+    await announceCall(meetingId, "moved", "");
 }
 
 /**

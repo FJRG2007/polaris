@@ -830,7 +830,7 @@ export function DriveExplorer({
 
     return (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
-            <aside className="flex flex-col gap-3">
+            <aside data-tour="drive.locations" className="flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                     <h2 className="text-sm font-medium text-muted-foreground">
                         {t("explorer.locations")}

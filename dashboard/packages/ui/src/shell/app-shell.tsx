@@ -71,7 +71,10 @@ export function AppShell({
                     // of the wheel over it scrolled the page instead, while the rail
                     // itself stayed exactly where it was. It looks like a fixed panel,
                     // so it has to behave like one.
-                    <aside className="sticky top-header hidden h-below-header w-56 shrink-0 self-start overflow-y-auto overscroll-contain border-r border-border bg-surface p-2 empty:hidden md:block">
+                    <aside
+                        data-tour="shell.sidebar"
+                        className="sticky top-header hidden h-below-header w-56 shrink-0 self-start overflow-y-auto overscroll-contain border-r border-border bg-surface p-2 empty:hidden md:block"
+                    >
                         {sidebar}
                     </aside>
                 ) : null}

@@ -8,14 +8,13 @@
  * or one person's sounds off, without anybody else hearing any difference. The
  * clip is never mixed into anybody's microphone.
  *
- * A space's sound is fetched once per tab and kept; a default is rendered once
- * per tab (`soundboard-synth`). Both become the same thing: a WAV behind an
- * object URL, played by an audio element so `setSinkId` can send it to the
- * chosen speaker.
+ * A space's sound and a default are each fetched once per tab and kept - a
+ * default from the files Polaris ships (`defaultSoundUrl`). Both become the
+ * same thing: a WAV behind an object URL, played by an audio element so
+ * `setSinkId` can send it to the chosen speaker.
  */
 
-import { parseSoundRef } from "@/lib/chat/soundboard";
-import { defaultSoundFile } from "./soundboard-synth";
+import { defaultSoundUrl, parseSoundRef } from "@/lib/chat/soundboard";
 import { playThroughChosenSpeaker } from "./speaker-device";
 
 /** Every clip this tab has, by reference, as an object URL. */
@@ -48,15 +47,10 @@ function clipFor(ref: string, url: string | null): Promise<string> | null {
     if (cached) return cached;
     const parsed = parseSoundRef(ref);
     if (!parsed) return null;
-    if (parsed.kind === "default") {
-        return remember(
-            ref,
-            defaultSoundFile(parsed.id).then((bytes) =>
-                URL.createObjectURL(new Blob([bytes as BlobPart], { type: "audio/wav" }))
-            )
-        );
-    }
-    const from = url ?? `/api/chat/sounds/${parsed.id}`;
+    const from =
+        parsed.kind === "default"
+            ? defaultSoundUrl(parsed.id)
+            : (url ?? `/api/chat/sounds/${parsed.id}`);
     return remember(
         ref,
         fetch(from, { cache: "force-cache" }).then(async (answer) => {

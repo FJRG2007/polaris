@@ -15,6 +15,7 @@
  */
 
 import { Board } from "./board";
+import { csvFileName } from "../model/csv";
 import { customDef } from "../model/fields";
 import { FieldsDialog } from "./fields-dialog";
 import { CustomFieldsProvider, fieldLabel } from "./custom-fields";
@@ -24,6 +25,8 @@ import { useGroups } from "./use-groups";
 import { messageOf, unwrap } from "./call";
 import * as filters from "../model/filters";
 import { RecordTable } from "./record-table";
+import { RecordScreen } from "./record-screen";
+import { TrashDialog } from "./trash-dialog";
 import * as actions from "../actions/records";
 import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
@@ -36,6 +39,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Building2,
     Columns3,
+    Download,
     Kanban,
     Pencil,
     Plus,
@@ -60,6 +64,7 @@ import {
 import {
     Button,
     cn,
+    Dialog,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -67,6 +72,7 @@ import {
     EmptyState,
     Input,
     SegmentedControl,
+    SheetContent,
     useToast
 } from "@polaris/ui";
 
@@ -373,6 +379,9 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const refreshTotals = totals.refresh;
 
     const [selected, setSelected] = useState<string[]>([]);
+    /** The record open in the side panel. */
+    const [peek, setPeek] = useState<string | null>(null);
+    const [trashOpen, setTrashOpen] = useState(false);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
@@ -389,6 +398,41 @@ export function ListScreen({ object }: { object: CrmObject }) {
         (title: string, caught: unknown) => toast.show({ title, body: messageOf(caught) }),
         [toast]
     );
+
+    const [exporting, setExporting] = useState(false);
+    const exportCsv = useCallback(async () => {
+        if (!config) return;
+        setExporting(true);
+        try {
+            const columns = config.columns.filter((column) => !column.hidden);
+            const file = await unwrap(
+                () =>
+                    actions.exportRecordsAction({
+                        object,
+                        search,
+                        sorts,
+                        filter,
+                        columns: columns.map((column) => column.key)
+                    }),
+                t("errors.generic")
+            );
+            const url = URL.createObjectURL(new Blob([file.csv], { type: "text/csv" }));
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = csvFileName(t(`objects.${object}.plural`), new Date());
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.show({
+                title: file.truncated
+                    ? t("export.truncated", { count: file.rows })
+                    : t("export.done", { count: file.rows })
+            });
+        } catch (caught) {
+            failed(t("export.failed"), caught);
+        } finally {
+            setExporting(false);
+        }
+    }, [config, object, search, sorts, filter, t, toast, failed]);
 
     // The newest edit of each cell: an older answer arriving late is not
     // allowed to overwrite a newer value.
@@ -739,6 +783,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 onMove={moveCard}
                 onCreate={(value, name) => create(name, { key: boardBy.key, value })}
                 onEdit={edit}
+                onOpen={setPeek}
             />
         );
     } else if (rows.length === 0 && !drafting && narrowed) {
@@ -797,6 +842,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 hasMore={rows.length < flat.total}
                 loadingMore={flat.loadingMore}
                 onLoadMore={flat.loadMore}
+                onOpen={setPeek}
                 grouping={
                     groupField && grouped.groups
                         ? {
@@ -980,6 +1026,26 @@ export function ListScreen({ object }: { object: CrmObject }) {
                                 ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={shaping || exporting}
+                        onClick={() => void exportCsv()}
+                        title={t("export.hint")}
+                    >
+                        <Download className="size-4" />
+                        {t("export.button")}
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!readable}
+                        onClick={() => setTrashOpen(true)}
+                        aria-label={t("trashView.title")}
+                        title={t("trashView.title")}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
                 </div>
 
                 {body}
@@ -1060,6 +1126,30 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     />
                 ) : null}
                 {confirmElement}
+                <TrashDialog
+                    object={object}
+                    open={trashOpen}
+                    canDelete={canDelete}
+                    confirm={confirm}
+                    onClose={() => setTrashOpen(false)}
+                    onRestored={() => {
+                        store.refresh();
+                        refreshTotals();
+                    }}
+                />
+                <Dialog open={peek !== null} onOpenChange={(open) => !open && setPeek(null)}>
+                    <SheetContent aria-describedby={undefined} className="p-4 sm:w-[38rem]">
+                        {peek ? (
+                            <RecordScreen
+                                key={peek}
+                                object={object}
+                                id={peek}
+                                panel
+                                onSaved={(record) => store.put([record])}
+                            />
+                        ) : null}
+                    </SheetContent>
+                </Dialog>
             </div>
         </CustomFieldsProvider>
     );

@@ -1,0 +1,150 @@
+{
+    "menu": "Guided tours",
+    "controls": {
+        "next": "Next",
+        "previous": "Back",
+        "done": "Done",
+        "skip": "Skip",
+        "progress": "{current} of {total}"
+    },
+    "offer": {
+        "title": "New to Polaris?",
+        "body": "A one-minute tour of where things are.",
+        "start": "Take the tour"
+    },
+    "empty": {
+        "title": "Nothing to show here",
+        "body": "This screen has none of the parts this tour covers right now."
+    },
+    "list": {
+        "title": "Guided tours",
+        "description": "Pick one. Esc or Skip ends it at any step."
+    },
+    "search": {
+        "take": "Take the tour of {name}"
+    },
+    "overview": {
+        "name": "Polaris",
+        "summary": "Apps, search, notifications and your account.",
+        "steps": {
+            "switcher": {
+                "title": "Apps",
+                "body": "Switch between Chat, Drive, Deploy and every other app here."
+            },
+            "menu": {
+                "title": "Menu",
+                "body": "Every section of the app you are in."
+            },
+            "search": {
+                "title": "Search",
+                "body": "Find any page, file or person. Ctrl+K opens it from anywhere."
+            },
+            "sidebar": {
+                "title": "Sections",
+                "body": "The parts of the app you are in."
+            },
+            "notifications": {
+                "title": "Notifications",
+                "body": "Mentions, invites and alerts wait here until you read them."
+            },
+            "account": {
+                "title": "Your account",
+                "body": "Status, settings, sign out and these tours."
+            }
+        }
+    },
+    "chat": {
+        "name": "Chat",
+        "summary": "Spaces, conversations and calls.",
+        "steps": {
+            "spaces": {
+                "title": "Spaces",
+                "body": "Your direct messages and every space you belong to."
+            },
+            "conversations": {
+                "title": "Conversations",
+                "body": "Channels and people in the space you picked. Unread ones show a count."
+            },
+            "conversation": {
+                "title": "Conversation",
+                "body": "Messages, files and calls for the one you opened."
+            }
+        }
+    },
+    "drive": {
+        "name": "Drive",
+        "summary": "Locations, search and uploads.",
+        "steps": {
+            "locations": {
+                "title": "Locations",
+                "body": "Your files and every storage connected to Polaris."
+            },
+            "search": {
+                "title": "Search",
+                "body": "Find files by name in this folder or everything under it."
+            },
+            "upload": {
+                "title": "Upload",
+                "body": "Add files or a whole folder. Dropping them on the list works too."
+            }
+        }
+    },
+    "deploy": {
+        "name": "Deploy",
+        "summary": "Projects, services and where they run.",
+        "steps": {
+            "create": {
+                "title": "New project",
+                "body": "Start a project from a repository or an image."
+            },
+            "search": {
+                "title": "Your projects",
+                "body": "Filter by name and switch between grid and list."
+            },
+            "sections": {
+                "title": "Infrastructure",
+                "body": "Servers, containers, databases and backups are in this rail."
+            }
+        }
+    },
+    "games": {
+        "name": "Game servers",
+        "summary": "Create, find and run game servers.",
+        "steps": {
+            "create": {
+                "title": "Create a server",
+                "body": "Pick a game and who can join."
+            },
+            "filters": {
+                "title": "Find a server",
+                "body": "Search by name or address, or filter by game and status."
+            },
+            "list": {
+                "title": "Servers",
+                "body": "Open one for its console, players, backups and settings."
+            }
+        }
+    },
+    "settings": {
+        "name": "Settings",
+        "summary": "Profile, security and preferences.",
+        "steps": {
+            "profile": {
+                "title": "Profile",
+                "body": "How you appear to others: name, picture and details."
+            },
+            "sections": {
+                "title": "Settings",
+                "body": "Security, devices, notifications and preferences, one section each."
+            },
+            "menu": {
+                "title": "Settings",
+                "body": "On a small screen, the sections are in this menu."
+            },
+            "account": {
+                "title": "Shortcut",
+                "body": "Your picture opens these settings from any screen."
+            }
+        }
+    }
+}
