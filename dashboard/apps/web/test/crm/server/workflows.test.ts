@@ -489,7 +489,12 @@ describe("delays and the run log", () => {
         const [[waiting]] = db.crmWorkflowRun.update.mock.calls as unknown as [
             [{ data: { status: string; step: number; resumeAt: Date; body: string } }]
         ];
-        expect(waiting.data).toMatchObject({ status: "waiting", step: 2, body: '{"a":1}' });
+        expect(waiting.data).toMatchObject({
+            status: "waiting",
+            step: 2,
+            body: '{"a":1}',
+            actions: JSON.stringify(flow)
+        });
         expect(waiting.data.resumeAt.getTime()).toBeGreaterThanOrEqual(before + 3_600_000);
         expect(db.records.updateMany).toHaveBeenCalledTimes(1);
         expect(db.crmWorkflow.update).not.toHaveBeenCalled();
@@ -522,6 +527,64 @@ describe("delays and the run log", () => {
             data: expect.objectContaining({ status: "done", error: null })
         });
         expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes on with the actions it started with when the workflow is edited while it waits", async () => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.findMany.mockResolvedValue([record]);
+        const edited = [
+            { kind: "delay", minutes: 5 },
+            { kind: "updateRecord", values: { city: "edited" } },
+            { kind: "updateRecord", values: { city: "edited too" } }
+        ];
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([
+            {
+                id: RUN,
+                recordId: RECORD,
+                step: 2,
+                body: null,
+                actions: JSON.stringify(flow),
+                workflow: stored({ kind: "created" }, { actions: JSON.stringify(edited) })
+            }
+        ]);
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
+        expect(db.records.updateMany).toHaveBeenCalledTimes(1);
+        expect(db.records.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ city: "after" }) })
+        );
+        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
+            where: { id: RUN },
+            data: expect.objectContaining({ status: "done", actions: null })
+        });
+    });
+
+    it("keeps its snapshot through a second delay", async () => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.findMany.mockResolvedValue([record]);
+        const twice = [
+            ...flow,
+            { kind: "delay", minutes: 1 },
+            { kind: "updateRecord", values: { city: "last" } }
+        ];
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([
+            {
+                id: RUN,
+                recordId: RECORD,
+                step: 2,
+                body: null,
+                actions: JSON.stringify(twice),
+                workflow: stored({ kind: "created" }, { actions: JSON.stringify([]) })
+            }
+        ]);
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
+        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
+            where: { id: RUN },
+            data: expect.objectContaining({
+                status: "waiting",
+                step: 4,
+                actions: JSON.stringify(twice)
+            })
+        });
     });
 
     it("cancels a waiting run of a workflow switched off, and skips one claimed elsewhere", async () => {

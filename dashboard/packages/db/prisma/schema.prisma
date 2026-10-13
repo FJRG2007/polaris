@@ -13162,6 +13162,9 @@ model CrmWorkflowRun {
     resumeAt   DateTime?
     // Stringified JSON: the body of the outside call a waiting run carries on with.
     body       String?
+    // Stringified JSON: the actions a waiting run started with, as they were
+    // saved then. Null on a run that is not waiting (and on runs from before).
+    actions    String?
     startedAt  DateTime  @default(now())
     finishedAt DateTime?
 

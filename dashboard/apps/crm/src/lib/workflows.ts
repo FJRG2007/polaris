@@ -582,13 +582,17 @@ async function failureText(caught: unknown): Promise<string> {
 interface Resume {
     readonly runId: string;
     readonly step: number;
+    /** The actions the run started with, stored as text; null on a run from
+     *  before they were kept, which goes on with the workflow as saved now. */
+    readonly actions: string | null;
 }
 
 /**
  * Run one workflow to the end, its first failure or a delay, and note how it
  * went - on the run in its log, and on the workflow once the run is over. A
- * run that waits is picked up by `resumeWaitingRuns` at the action after the
- * delay, as the workflow reads then.
+ * run that waits keeps the actions it started with, and is picked up by
+ * `resumeWaitingRuns` at the action after the delay - an edit to the workflow
+ * meanwhile does not change what a waiting run goes on to do.
  */
 export async function runWorkflow(
     workflow: StoredWorkflow,
@@ -611,19 +615,14 @@ export async function runWorkflow(
                 select: { id: true }
             })
         ).id;
+    const actions = resume?.actions ?? workflow.actions;
     let lastError: string | null = null;
     let reached: Reached = { kind: "done" };
     try {
         const runner = await runnerOf(workflow);
         if (!runner) throw new CrmRefusal((await crmT())("workflows.noRunner"));
         reached = await withinWorkflow(() =>
-            runActions(
-                runner,
-                workflow,
-                model.readActions(workflow.actions),
-                context,
-                resume?.step ?? 0
-            )
+            runActions(runner, workflow, model.readActions(actions), context, resume?.step ?? 0)
         );
     } catch (caught) {
         lastError = await failureText(caught);
@@ -636,7 +635,8 @@ export async function runWorkflow(
                 status: "waiting",
                 step: reached.step,
                 resumeAt: reached.resumeAt,
-                body: context.body === undefined ? null : JSON.stringify(context.body)
+                body: context.body === undefined ? null : JSON.stringify(context.body),
+                actions
             }
         });
         return null;
@@ -648,7 +648,8 @@ export async function runWorkflow(
             error: lastError,
             finishedAt: now,
             resumeAt: null,
-            body: null
+            body: null,
+            actions: null
         }
     });
     await prisma.crmWorkflow.update({
@@ -749,7 +750,13 @@ export async function resumeWaitingRuns(now: Date = new Date()): Promise<number>
         if (!run.workflow.enabled) {
             await prisma.crmWorkflowRun.update({
                 where: { id: run.id },
-                data: { status: "cancelled", finishedAt: now, resumeAt: null, body: null }
+                data: {
+                    status: "cancelled",
+                    finishedAt: now,
+                    resumeAt: null,
+                    body: null,
+                    actions: null
+                }
             });
             continue;
         }
@@ -761,7 +768,7 @@ export async function resumeWaitingRuns(now: Date = new Date()): Promise<number>
                 event: null,
                 body: storedBody(run.body)
             },
-            { runId: run.id, step: run.step }
+            { runId: run.id, step: run.step, actions: run.actions }
         );
         ran += 1;
     }
