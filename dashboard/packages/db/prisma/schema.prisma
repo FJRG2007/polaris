@@ -13138,10 +13138,37 @@ model CrmWorkflow {
 
     org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
     user User?         @relation("CrmWorkflowShelf", fields: [userId], references: [id], onDelete: Cascade)
+    runs CrmWorkflowRun[]
 
     @@index([orgId, object])
     @@index([userId, object])
     @@index([enabled, nextRunAt])
+}
+
+// One run of a CRM workflow: what set it off, how it ended, and - for a run
+// waiting out a delay - where it picks up again and when. Only the latest runs
+// of each workflow are kept.
+model CrmWorkflowRun {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    workflowId String    @db.Uuid
+    // running | waiting | done | stopped | failed | cancelled
+    status     String
+    // The kind of trigger that started it.
+    cause      String
+    recordId   String?   @db.Uuid
+    error      String?
+    // A waiting run: the action it picks up at, and when.
+    step       Int       @default(0)
+    resumeAt   DateTime?
+    // Stringified JSON: the body of the outside call a waiting run carries on with.
+    body       String?
+    startedAt  DateTime  @default(now())
+    finishedAt DateTime?
+
+    workflow CrmWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+    @@index([workflowId, startedAt])
+    @@index([status, resumeAt])
 }
 
 // A service volume being moved from one storage location to another (this

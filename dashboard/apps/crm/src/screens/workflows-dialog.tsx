@@ -13,7 +13,8 @@ import * as actions from "../actions/workflows";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2, Workflow } from "lucide-react";
+import { recordHref } from "../model/related";
+import { History, Pencil, Plus, Trash2, Workflow } from "lucide-react";
 import { ActionList, TriggerFields, useWorkflowWords } from "./workflow-fields";
 import {
     Button,
@@ -68,6 +69,21 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     const [saving, setSaving] = useState(false);
     const [notice, setNotice] = useState<{ text: string; copy: string } | null>(null);
     const [options, setOptions] = useState<model.WorkflowOptions>({ taskLists: [], people: [] });
+    /** The workflow whose runs are shown, and its runs once read. */
+    const [runsOf, setRunsOf] = useState<model.WorkflowView | null>(null);
+    const [runs, setRuns] = useState<model.WorkflowRunView[] | null>(null);
+
+    const showRuns = (row: model.WorkflowView) => {
+        setNotice(null);
+        setRunsOf(row);
+        setRuns(null);
+        unwrap(() => actions.listWorkflowRunsAction({ object, id: row.id }), t("errors.loadFailed"))
+            .then((answer) => setRuns(answer.runs))
+            .catch((caught) => {
+                setRuns([]);
+                toast.show({ title: t("errors.loadFailed"), body: messageOf(caught) });
+            });
+    };
 
     const load = useCallback(() => {
         unwrap(() => actions.listWorkflowsAction({ object }), t("errors.loadFailed"))
@@ -96,6 +112,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
         else {
             setDraft(null);
             setNotice(null);
+            setRunsOf(null);
         }
     }, [open, load]);
 
@@ -216,6 +233,58 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                 </div>
             </div>
         );
+    } else if (runsOf) {
+        body =
+            runs === null ? (
+                <p className="text-[0.8125rem] text-muted-foreground">{t("list.loading")}</p>
+            ) : runs.length === 0 ? (
+                <EmptyState icon={<History />} title={t("workflows.noRuns")} />
+            ) : (
+                <ul className="flex max-h-[60vh] min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain">
+                    {runs.map((run) => (
+                        <li
+                            key={run.id}
+                            className="flex min-w-0 flex-col gap-0.5 rounded-lg px-2 py-2"
+                        >
+                            <span className="flex min-w-0 items-center gap-2 text-[0.8125rem]">
+                                <span
+                                    className={
+                                        run.status === "failed"
+                                            ? "font-medium text-destructive"
+                                            : "font-medium"
+                                    }
+                                >
+                                    {t(`workflows.runStatus.${run.status}`)}
+                                </span>
+                                <span className="truncate text-muted-foreground">
+                                    {format.dateTime(run.startedAt)} -{" "}
+                                    {t(`workflows.triggers.${model.causeKind(run.cause)}`)}
+                                </span>
+                                {run.recordId ? (
+                                    <a
+                                        className="ml-auto shrink-0 text-primary hover:underline"
+                                        href={recordHref(object, run.recordId)}
+                                    >
+                                        {t("workflows.openRecord")}
+                                    </a>
+                                ) : null}
+                            </span>
+                            {run.status === "waiting" && run.resumeAt ? (
+                                <span className="text-[0.75rem] text-muted-foreground">
+                                    {t("workflows.resumesAt", {
+                                        when: format.dateTime(run.resumeAt)
+                                    })}
+                                </span>
+                            ) : null}
+                            {run.error ? (
+                                <span className="break-words text-[0.75rem] text-destructive">
+                                    {run.error}
+                                </span>
+                            ) : null}
+                        </li>
+                    ))}
+                </ul>
+            );
     } else if (rows === null) {
         body = <p className="text-[0.8125rem] text-muted-foreground">{t("list.loading")}</p>;
     } else if (rows.length === 0) {
@@ -265,6 +334,16 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                             variant="ghost"
                             size="sm"
                             className="size-8 shrink-0 p-0"
+                            aria-label={t("workflows.showRuns")}
+                            title={t("workflows.showRuns")}
+                            onClick={() => showRuns(row)}
+                        >
+                            <History className="size-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="size-8 shrink-0 p-0"
                             aria-label={t("workflows.edit")}
                             title={t("workflows.edit")}
                             onClick={() => {
@@ -305,7 +384,9 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                             ? draft.id
                                 ? t("workflows.edit")
                                 : t("workflows.new")
-                            : t("workflows.title", { objects: t(`objects.${object}.plural`) })}
+                            : runsOf
+                              ? t("workflows.runsOf", { name: runsOf.name })
+                              : t("workflows.title", { objects: t(`objects.${object}.plural`) })}
                     </DialogTitle>
                     <DialogDescription>{t("workflows.hint")}</DialogDescription>
                 </DialogHeader>
@@ -342,6 +423,10 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                                 {t("workflows.save")}
                             </Button>
                         </>
+                    ) : runsOf ? (
+                        <Button variant="ghost" onClick={() => setRunsOf(null)}>
+                            {t("workflows.back")}
+                        </Button>
                     ) : (
                         <Button
                             disabled={rows !== null && rows.length >= model.MAX_WORKFLOWS}

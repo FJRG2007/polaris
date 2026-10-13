@@ -155,6 +155,9 @@ export const MAX_FOUND = 50;
 /** The most actions one workflow holds, counting the ones inside branches. */
 export const MAX_TOTAL_ACTIONS = 30;
 
+/** The longest a workflow may wait, in minutes: thirty days. */
+export const MAX_DELAY_MINUTES = 30 * 24 * 60;
+
 /** The actions that do one thing, each on its own. */
 const LEAF_ACTIONS = [
     z.object({ kind: z.literal("updateRecord"), values: valuesSchema }),
@@ -220,6 +223,11 @@ export const workflowActionSchema = z.discriminatedUnion("kind", [
         where: filterSchema,
         limit: z.number().int().min(1).max(MAX_FOUND),
         actions: branchSchema.min(1)
+    }),
+    /** Wait, then go on with the actions after it. */
+    z.object({
+        kind: z.literal("delay"),
+        minutes: z.number().int().min(1).max(MAX_DELAY_MINUTES)
     })
 ]);
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
@@ -236,7 +244,13 @@ export const LEAF_KINDS: readonly LeafAction["kind"][] = [
 ];
 
 /** The actions in the order the screen offers them. */
-export const ACTION_KINDS: readonly ActionKind[] = [...LEAF_KINDS, "filter", "ifElse", "forEach"];
+export const ACTION_KINDS: readonly ActionKind[] = [
+    ...LEAF_KINDS,
+    "filter",
+    "ifElse",
+    "forEach",
+    "delay"
+];
 
 /** The actions a workflow's list holds, with the ones inside branches. */
 export function allActions(actions: readonly WorkflowAction[]): WorkflowAction[] {
@@ -333,6 +347,38 @@ export interface SavedWorkflow {
     /** A webhook's new address, `/api/crm/hooks/<secret>`: shown this once,
      *  since only its hash is kept. */
     readonly hookPath?: string;
+}
+
+/** How a run ended, or where it stands. */
+export const RUN_STATUSES = [
+    "running",
+    "waiting",
+    "done",
+    "stopped",
+    "failed",
+    "cancelled"
+] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+/** A run's cause as a trigger kind the screen can name. */
+export function causeKind(cause: string): TriggerKind {
+    return (TRIGGER_KINDS as readonly string[]).includes(cause) ? (cause as TriggerKind) : "manual";
+}
+
+/** The most runs of one workflow that are kept. */
+export const MAX_RUNS = 100;
+
+/** One run as the editor's log shows it. */
+export interface WorkflowRunView {
+    readonly id: string;
+    readonly status: RunStatus;
+    readonly cause: string;
+    readonly recordId: string | null;
+    readonly error: string | null;
+    readonly startedAt: string;
+    readonly finishedAt: string | null;
+    /** When a waiting run goes on. */
+    readonly resumeAt: string | null;
 }
 
 /** The most bytes of an outside call's body a workflow reads. */

@@ -15,6 +15,7 @@ import {
     workflowInputSchema,
     type SavedWorkflow,
     type WorkflowOptions,
+    type WorkflowRunView,
     type WorkflowView
 } from "../model/workflows";
 
@@ -69,6 +70,21 @@ export async function deleteWorkflowAction(input: unknown): Promise<Outcome<{ de
         await workflows.deleteWorkflow(await requireCrmActor(), parsed.data.object, parsed.data.id);
         return { deleted: true as const };
     });
+}
+
+/** A workflow's latest runs. */
+export async function listWorkflowRunsAction(
+    input: unknown
+): Promise<Outcome<{ runs: WorkflowRunView[] }>> {
+    const parsed = one.safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        runs: await workflows.listWorkflowRuns(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.id
+        )
+    }));
 }
 
 /** The workflows a record's page can run by hand. */

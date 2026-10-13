@@ -25,6 +25,14 @@ const db = vi.hoisted(() => ({
         updateMany: vi.fn(async () => ({ count: 1 })),
         deleteMany: vi.fn(async () => ({ count: 1 }))
     },
+    crmWorkflowRun: {
+        create: vi.fn(async () => ({ id: "77777777-7777-4777-8777-777777777777" })),
+        update: vi.fn(async () => ({})),
+        updateMany: vi.fn(async () => ({ count: 1 })),
+        findFirst: vi.fn(async (): Promise<Record<string, unknown> | null> => null),
+        findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
+        deleteMany: vi.fn(async () => ({ count: 0 }))
+    },
     crmLink: { createMany: vi.fn(async () => ({ count: 1 })) },
     records: {
         count: vi.fn(async () => 1),
@@ -83,6 +91,7 @@ const limits = vi.hoisted(() => ({ ok: true }));
 vi.mock("@polaris/db", () => {
     const client: Record<string, unknown> = {
         crmWorkflow: db.crmWorkflow,
+        crmWorkflowRun: db.crmWorkflowRun,
         crmCompany: db.records,
         crmPerson: db.records,
         crmOpportunity: db.records,
@@ -451,6 +460,141 @@ describe("branches and loops", () => {
             })
         ).rejects.toThrow();
         expect(db.crmWorkflow.create).not.toHaveBeenCalled();
+    });
+});
+
+describe("delays and the run log", () => {
+    const RUN = "77777777-7777-4777-8777-777777777777";
+    const record = { id: RECORD, name: "Acme", city: "", position: 0, deletedAt: null, ...stamp };
+    const flow = [
+        { kind: "updateRecord", values: { city: "first" } },
+        { kind: "delay", minutes: 60 },
+        { kind: "updateRecord", values: { city: "after" } }
+    ];
+
+    it("logs a run, and one that reaches a delay waits with what it needs to go on", async () => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.findMany.mockResolvedValue([record]);
+        const before = Date.now();
+        expect(
+            await workflows.runWorkflow(
+                stored({ kind: "webhook" }, { actions: JSON.stringify(flow) }),
+                { object: "companies", recordId: RECORD, event: null, body: { a: 1 } }
+            )
+        ).toBeNull();
+        expect(db.crmWorkflowRun.create).toHaveBeenCalledWith({
+            data: { workflowId: FLOW, status: "running", cause: "webhook", recordId: RECORD },
+            select: { id: true }
+        });
+        const [[waiting]] = db.crmWorkflowRun.update.mock.calls as unknown as [
+            [{ data: { status: string; step: number; resumeAt: Date; body: string } }]
+        ];
+        expect(waiting.data).toMatchObject({ status: "waiting", step: 2, body: '{"a":1}' });
+        expect(waiting.data.resumeAt.getTime()).toBeGreaterThanOrEqual(before + 3_600_000);
+        expect(db.records.updateMany).toHaveBeenCalledTimes(1);
+        expect(db.crmWorkflow.update).not.toHaveBeenCalled();
+    });
+
+    it("picks a waiting run up after its delay, once, and ends it", async () => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.findMany.mockResolvedValue([record]);
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([
+            {
+                id: RUN,
+                recordId: RECORD,
+                step: 2,
+                body: null,
+                workflow: stored({ kind: "created" }, { actions: JSON.stringify(flow) })
+            }
+        ]);
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "waiting" },
+            data: { status: "running" }
+        });
+        expect(db.crmWorkflowRun.create).not.toHaveBeenCalled();
+        expect(db.records.updateMany).toHaveBeenCalledTimes(1);
+        expect(db.records.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ city: "after" }) })
+        );
+        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
+            where: { id: RUN },
+            data: expect.objectContaining({ status: "done", error: null })
+        });
+        expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("cancels a waiting run of a workflow switched off, and skips one claimed elsewhere", async () => {
+        const waiting = (enabled: boolean) => ({
+            id: RUN,
+            recordId: RECORD,
+            step: 2,
+            body: null,
+            workflow: stored({ kind: "created" }, { actions: JSON.stringify(flow), enabled })
+        });
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([waiting(false)]);
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(0);
+        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
+            where: { id: RUN },
+            data: expect.objectContaining({ status: "cancelled" })
+        });
+
+        vi.clearAllMocks();
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([waiting(true)]);
+        db.crmWorkflowRun.updateMany.mockResolvedValueOnce({ count: 0 });
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(0);
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("notes a failure on the run and keeps only the latest runs", async () => {
+        db.crmWorkflowRun.findFirst.mockResolvedValueOnce({ startedAt: stamp.createdAt });
+        expect(
+            await workflows.runWorkflow(stored({ kind: "manual" }, { runAsId: null }), {
+                object: "companies",
+                recordId: null,
+                event: null
+            })
+        ).not.toBeNull();
+        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
+            where: { id: RUN },
+            data: expect.objectContaining({ status: "failed", error: expect.any(String) })
+        });
+        expect(db.crmWorkflowRun.deleteMany).toHaveBeenCalledWith({
+            where: {
+                workflowId: FLOW,
+                startedAt: { lte: stamp.createdAt },
+                status: { not: "waiting" }
+            }
+        });
+    });
+
+    it("shows a workflow's runs only to an editor on its shelf", async () => {
+        await expect(
+            workflows.listWorkflowRuns(actorWith(allowed), "companies", FLOW)
+        ).rejects.toThrow();
+        await expect(
+            workflows.listWorkflowRuns(actorWith(reader), "companies", FLOW)
+        ).rejects.toThrow();
+        db.crmWorkflow.findFirst.mockResolvedValueOnce({ id: FLOW });
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([
+            {
+                id: RUN,
+                status: "stopped",
+                cause: "created",
+                recordId: RECORD,
+                error: null,
+                startedAt: stamp.createdAt,
+                finishedAt: stamp.createdAt,
+                resumeAt: null
+            }
+        ]);
+        expect(await workflows.listWorkflowRuns(actorWith(allowed), "companies", FLOW)).toEqual([
+            expect.objectContaining({ id: RUN, status: "stopped", recordId: RECORD })
+        ]);
+        expect(db.crmWorkflow.findFirst).toHaveBeenLastCalledWith({
+            where: { id: FLOW, orgId: "o1", object: "companies" },
+            select: { id: true }
+        });
     });
 });
 

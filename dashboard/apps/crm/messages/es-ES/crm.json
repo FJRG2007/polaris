@@ -523,7 +523,8 @@
             "httpRequest": "Enviar a una dirección",
             "filter": "Seguir solo si el registro coincide",
             "ifElse": "Si el registro coincide",
-            "forEach": "Para cada registro encontrado"
+            "forEach": "Para cada registro encontrado",
+            "delay": "Esperar"
         },
         "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
         "createNeedsName": "Pon nombre al nuevo registro.",
@@ -579,7 +580,25 @@
         "otherwise": "Si no",
         "foundLimit": "Cuántos registros",
         "foundUpTo": "Hasta {count}",
-        "forEachFound": "En cada registro encontrado"
+        "forEachFound": "En cada registro encontrado",
+        "delayFor": "Cuánto tiempo",
+        "delayMinutes": "{count, plural, one {# minuto} other {# minutos}}",
+        "delayHours": "{count, plural, one {# hora} other {# horas}}",
+        "delayDays": "{count, plural, one {# día} other {# días}}",
+        "showRuns": "Ejecuciones",
+        "runsOf": "Ejecuciones de {name}",
+        "noRuns": "Aún no se ha ejecutado",
+        "openRecord": "Abrir registro",
+        "resumesAt": "Sigue {when}",
+        "back": "Volver",
+        "runStatus": {
+            "running": "En curso",
+            "waiting": "En espera",
+            "done": "Hecha",
+            "stopped": "Detenida por un filtro",
+            "failed": "Fallida",
+            "cancelled": "Cancelada"
+        }
     },
     "favorites": {
         "add": "Añadir a favoritos",

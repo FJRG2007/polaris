@@ -399,7 +399,33 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
                     />
                 </div>
             );
+        case "delay": {
+            const choices = DELAY_CHOICES.includes(action.minutes)
+                ? DELAY_CHOICES
+                : [...DELAY_CHOICES, action.minutes].sort((a, b) => a - b);
+            return (
+                <Select
+                    aria-label={t("workflows.delayFor")}
+                    value={String(action.minutes)}
+                    onValueChange={(minutes) => onChange({ ...action, minutes: Number(minutes) })}
+                    options={choices.map((minutes) => ({
+                        value: String(minutes),
+                        label: delayLabel(t, minutes)
+                    }))}
+                />
+            );
+        }
     }
+}
+
+/** The waits offered, in minutes. */
+const DELAY_CHOICES = [5, 15, 30, 60, 120, 360, 720, 1440, 2880, 4320, 10080, 20160, 43200];
+
+/** A wait in minutes, as the editor names it. */
+function delayLabel(t: ReturnType<typeof useCrmT>, minutes: number): string {
+    if (minutes % 1440 === 0) return t("workflows.delayDays", { count: minutes / 1440 });
+    if (minutes % 60 === 0) return t("workflows.delayHours", { count: minutes / 60 });
+    return t("workflows.delayMinutes", { count: minutes });
 }
 
 /** How many records a "for each record found" may go through, offered. */
@@ -742,6 +768,8 @@ export function useWorkflowWords(object: CrmObject) {
                     return { kind, when: EMPTY_FILTER, then: [], otherwise: [] };
                 case "forEach":
                     return { kind, where: EMPTY_FILTER, limit: 10, actions: [] };
+                case "delay":
+                    return { kind, minutes: 60 };
             }
         },
         /** Whether an action can run under a trigger. */

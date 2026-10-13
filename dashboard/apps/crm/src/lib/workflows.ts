@@ -361,18 +361,35 @@ async function recordMatches(
     return count > 0;
 }
 
-/** Actions in turn, to the end or to a filter the record does not pass:
- *  false when one stopped the run. */
+/** Where a run got to: the end, a filter that stopped it, or a delay it now
+ *  waits out before the action at `step`. */
+type Reached =
+    | { readonly kind: "done" | "stopped" }
+    | { readonly kind: "waiting"; readonly step: number; readonly resumeAt: Date };
+
+/** Actions in turn from `from`, to the end, a filter the record does not pass,
+ *  or a delay. */
 async function runActions(
     runner: CrmActor,
     workflow: StoredWorkflow,
     list: readonly model.WorkflowAction[],
-    context: RunContext
-): Promise<boolean> {
-    for (const action of list) {
-        if ((await runAction(runner, workflow, action, context)) === "stop") return false;
+    context: RunContext,
+    from = 0
+): Promise<Reached> {
+    for (let at = from; at < list.length; at += 1) {
+        const action = list[at]!;
+        if (action.kind === "delay") {
+            return {
+                kind: "waiting",
+                step: at + 1,
+                resumeAt: new Date(Date.now() + action.minutes * 60_000)
+            };
+        }
+        if ((await runAction(runner, workflow, action, context)) === "stop") {
+            return { kind: "stopped" };
+        }
     }
-    return true;
+    return { kind: "done" };
 }
 
 /** One action, done as the runner; "stop" when a filter ends the run. */
@@ -561,26 +578,194 @@ async function failureText(caught: unknown): Promise<string> {
     return (await crmT())("errors.generic");
 }
 
-/** Run one workflow to the end or its first failure, and note how it went. */
+/** A run that waited out a delay, picking up where it stopped. */
+interface Resume {
+    readonly runId: string;
+    readonly step: number;
+}
+
+/**
+ * Run one workflow to the end, its first failure or a delay, and note how it
+ * went - on the run in its log, and on the workflow once the run is over. A
+ * run that waits is picked up by `resumeWaitingRuns` at the action after the
+ * delay, as the workflow reads then.
+ */
 export async function runWorkflow(
     workflow: StoredWorkflow,
-    context: RunContext
+    context: RunContext,
+    resume?: Resume
 ): Promise<string | null> {
+    const runId =
+        resume?.runId ??
+        (
+            await prisma.crmWorkflowRun.create({
+                data: {
+                    workflowId: workflow.id,
+                    status: "running",
+                    cause:
+                        context.event?.kind ??
+                        model.readTrigger(workflow.trigger)?.kind ??
+                        "manual",
+                    recordId: context.recordId
+                },
+                select: { id: true }
+            })
+        ).id;
     let lastError: string | null = null;
+    let reached: Reached = { kind: "done" };
     try {
         const runner = await runnerOf(workflow);
         if (!runner) throw new CrmRefusal((await crmT())("workflows.noRunner"));
-        await withinWorkflow(async () => {
-            await runActions(runner, workflow, model.readActions(workflow.actions), context);
-        });
+        reached = await withinWorkflow(() =>
+            runActions(
+                runner,
+                workflow,
+                model.readActions(workflow.actions),
+                context,
+                resume?.step ?? 0
+            )
+        );
     } catch (caught) {
         lastError = await failureText(caught);
     }
+    const now = new Date();
+    if (lastError === null && reached.kind === "waiting") {
+        await prisma.crmWorkflowRun.update({
+            where: { id: runId },
+            data: {
+                status: "waiting",
+                step: reached.step,
+                resumeAt: reached.resumeAt,
+                body: context.body === undefined ? null : JSON.stringify(context.body)
+            }
+        });
+        return null;
+    }
+    await prisma.crmWorkflowRun.update({
+        where: { id: runId },
+        data: {
+            status: lastError !== null ? "failed" : reached.kind,
+            error: lastError,
+            finishedAt: now,
+            resumeAt: null,
+            body: null
+        }
+    });
     await prisma.crmWorkflow.update({
         where: { id: workflow.id },
-        data: { runCount: { increment: 1 }, lastRunAt: new Date(), lastError }
+        data: { runCount: { increment: 1 }, lastRunAt: now, lastError }
     });
+    await pruneRuns(workflow.id);
     return lastError;
+}
+
+/** Keep the latest runs of a workflow, and every run still waiting. */
+async function pruneRuns(workflowId: string): Promise<void> {
+    const oldest = await prisma.crmWorkflowRun.findFirst({
+        where: { workflowId },
+        orderBy: { startedAt: "desc" },
+        skip: model.MAX_RUNS,
+        select: { startedAt: true }
+    });
+    if (!oldest) return;
+    await prisma.crmWorkflowRun.deleteMany({
+        where: { workflowId, startedAt: { lte: oldest.startedAt }, status: { not: "waiting" } }
+    });
+}
+
+/** The latest runs of a workflow on the reader's shelf, newest first. */
+export async function listWorkflowRuns(
+    actor: CrmActor,
+    object: CrmObject,
+    id: string
+): Promise<model.WorkflowRunView[]> {
+    await requireCan(actor, object, "edit");
+    const workflow = await prisma.crmWorkflow.findFirst({
+        where: { id, ...shelfWhere(actor.shelf), object },
+        select: { id: true }
+    });
+    if (!workflow) throw new CrmRefusal((await crmT())("errors.notFound"));
+    const runs = await prisma.crmWorkflowRun.findMany({
+        where: { workflowId: id },
+        orderBy: { startedAt: "desc" },
+        take: RUNS_SHOWN,
+        select: {
+            id: true,
+            status: true,
+            cause: true,
+            recordId: true,
+            error: true,
+            startedAt: true,
+            finishedAt: true,
+            resumeAt: true
+        }
+    });
+    return runs.map((run) => ({
+        id: run.id,
+        status: (model.RUN_STATUSES as readonly string[]).includes(run.status)
+            ? (run.status as model.RunStatus)
+            : "failed",
+        cause: run.cause,
+        recordId: run.recordId,
+        error: run.error,
+        startedAt: run.startedAt.toISOString(),
+        finishedAt: run.finishedAt?.toISOString() ?? null,
+        resumeAt: run.resumeAt?.toISOString() ?? null
+    }));
+}
+
+/** The most runs the log shows. */
+const RUNS_SHOWN = 50;
+
+/** A waiting run's stored call body, or nothing. */
+function storedBody(text: string | null): unknown {
+    if (text === null) return undefined;
+    try {
+        return JSON.parse(text);
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * Pick up the runs whose delay is over, once each: a run is claimed by moving
+ * it out of waiting before it goes on. A run of a workflow switched off since
+ * is cancelled instead. Returns how many went on.
+ */
+export async function resumeWaitingRuns(now: Date = new Date()): Promise<number> {
+    const due = await prisma.crmWorkflowRun.findMany({
+        where: { status: "waiting", resumeAt: { lte: now } },
+        orderBy: { resumeAt: "asc" },
+        take: SCHEDULE_BATCH,
+        include: { workflow: true }
+    });
+    let ran = 0;
+    for (const run of due) {
+        const claimed = await prisma.crmWorkflowRun.updateMany({
+            where: { id: run.id, status: "waiting" },
+            data: { status: "running" }
+        });
+        if (claimed.count === 0) continue;
+        if (!run.workflow.enabled) {
+            await prisma.crmWorkflowRun.update({
+                where: { id: run.id },
+                data: { status: "cancelled", finishedAt: now, resumeAt: null, body: null }
+            });
+            continue;
+        }
+        await runWorkflow(
+            run.workflow,
+            {
+                object: run.workflow.object as CrmObject,
+                recordId: run.recordId,
+                event: null,
+                body: storedBody(run.body)
+            },
+            { runId: run.id, step: run.step }
+        );
+        ran += 1;
+    }
+    return ran;
 }
 
 /** The workflows a kind of record can be run through by hand, for its page. */
@@ -679,7 +864,7 @@ export async function runDueSchedules(now: Date = new Date()): Promise<number> {
         await runWorkflow(row, { object: row.object as CrmObject, recordId: null, event: null });
         ran += 1;
     }
-    return ran;
+    return ran + (await resumeWaitingRuns(now));
 }
 
 /** What an outside call to a webhook address came to. */

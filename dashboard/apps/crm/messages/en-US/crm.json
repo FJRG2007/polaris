@@ -523,7 +523,8 @@
             "httpRequest": "Send to an address",
             "filter": "Go on only if the record matches",
             "ifElse": "If the record matches",
-            "forEach": "For each record found"
+            "forEach": "For each record found",
+            "delay": "Wait"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -579,7 +580,25 @@
         "otherwise": "Otherwise",
         "foundLimit": "How many records",
         "foundUpTo": "Up to {count}",
-        "forEachFound": "On each record found"
+        "forEachFound": "On each record found",
+        "delayFor": "How long",
+        "delayMinutes": "{count, plural, one {# minute} other {# minutes}}",
+        "delayHours": "{count, plural, one {# hour} other {# hours}}",
+        "delayDays": "{count, plural, one {# day} other {# days}}",
+        "showRuns": "Runs",
+        "runsOf": "Runs of {name}",
+        "noRuns": "It has not run yet",
+        "openRecord": "Open record",
+        "resumesAt": "Goes on {when}",
+        "back": "Back",
+        "runStatus": {
+            "running": "Running",
+            "waiting": "Waiting",
+            "done": "Done",
+            "stopped": "Stopped by a filter",
+            "failed": "Failed",
+            "cancelled": "Cancelled"
+        }
     },
     "favorites": {
         "add": "Add to favorites",
