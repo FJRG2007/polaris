@@ -258,7 +258,7 @@ export function PointsTable({
     valueHeading: string;
 }) {
     return (
-        <div className="max-h-64 overflow-auto">
+        <div className="max-h-64 min-h-0 overflow-auto overscroll-contain">
             <table className="w-full text-[0.8125rem]">
                 <thead>
                     <tr className="text-left text-muted-foreground">

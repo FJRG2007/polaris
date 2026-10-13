@@ -309,7 +309,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             ) : null}
             <div
                 className={cn(
-                    "grid min-h-0 flex-1 content-start gap-3 overflow-y-auto",
+                    "grid min-h-0 flex-1 content-start gap-3 overflow-y-auto overscroll-contain",
                     !panel && "lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]"
                 )}
             >

@@ -176,7 +176,7 @@ export function ImportDialog(props: ImportDialogProps) {
     };
 
     const problemList = (rows: Finished["failed"]) => (
-        <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto text-[0.8125rem]">
+        <ul className="flex max-h-48 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain text-[0.8125rem]">
             {rows.slice(0, SHOWN_PROBLEMS).map((one) => (
                 <li key={one.row} className="min-w-0">
                     <span className="font-medium tabular-nums">
@@ -265,7 +265,7 @@ export function ImportDialog(props: ImportDialogProps) {
         ];
         body = (
             <div className="flex min-w-0 flex-col gap-3">
-                <div className="max-h-72 overflow-y-auto">
+                <div className="max-h-72 min-h-0 overflow-y-auto overscroll-contain">
                     <table className="w-full table-fixed text-[0.8125rem]">
                         <thead>
                             <tr className="text-left text-muted-foreground">

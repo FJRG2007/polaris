@@ -274,7 +274,10 @@ export function DashboardsScreen() {
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto" data-crm-ready>
+        <div
+            className="flex h-full min-h-0 flex-col gap-3 overflow-auto overscroll-contain"
+            data-crm-ready
+        >
             <ChartColors />
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h1 className="text-[1.0625rem] font-semibold leading-tight tracking-tight">

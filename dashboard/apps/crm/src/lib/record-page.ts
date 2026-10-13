@@ -57,6 +57,8 @@ export async function openRecord(
         ? listTimeline(actor, object, id, people)
         : Promise.resolve({ events: [], next: null });
     const pinned = record ? pinnedAmong(actor, "record", [id]) : Promise.resolve([]);
+    // enigma: bounded - `relatedLists` comes from the built-in relation fields
+    // (two lists at most), never from data, so one read per list stays fixed.
     const related = await Promise.all(
         lists.map(async (list): Promise<RelatedRecords> => {
             const where = { ...shelfWhere(actor.shelf), deletedAt: null, [list.column]: id };

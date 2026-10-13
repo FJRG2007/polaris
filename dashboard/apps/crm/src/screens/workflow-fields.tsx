@@ -327,7 +327,7 @@ function NotifyFields({
                 <legend className="mb-1 text-[0.75rem] font-medium text-muted-foreground">
                     {t("workflows.recipients")}
                 </legend>
-                <div className="flex max-h-40 min-w-0 flex-col gap-1 overflow-y-auto">
+                <div className="flex max-h-40 min-h-0 min-w-0 flex-col gap-1 overflow-y-auto overscroll-contain">
                     {choices.map((choice) => (
                         <label
                             key={choice.value}

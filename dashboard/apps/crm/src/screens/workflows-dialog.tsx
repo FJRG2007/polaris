@@ -300,7 +300,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
         body = <EmptyState icon={<Workflow />} title={t("workflows.empty")} />;
     } else {
         body = (
-            <ul className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
+            <ul className="flex max-h-[60vh] min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain">
                 {rows.map((row) => (
                     <li
                         key={row.id}
