@@ -29,7 +29,9 @@ export type InvalidReason =
     | "currency"
     | "date"
     | "option"
-    | "rating";
+    | "rating"
+    | "tooMany"
+    | "address";
 
 export type Normalized =
     | { readonly ok: true; readonly value: InputValue }
@@ -50,6 +52,39 @@ export function readChoices(value: unknown): string[] {
     } catch {
         return [];
     }
+}
+
+/** The most web addresses one links field keeps. */
+export const MAX_LINKS = 10;
+
+/** The web addresses of a links field as stored: a JSON list, or "" for none.
+ *  Anything unreadable is none. */
+export function readLinks(value: unknown): string[] {
+    return readChoices(value);
+}
+
+/** The lines of an address, in the order they are written on an envelope. */
+export const ADDRESS_PARTS = ["street", "city", "state", "postcode", "country"] as const;
+
+export type AddressPart = (typeof ADDRESS_PARTS)[number];
+export type Address = Record<AddressPart, string>;
+
+/** An address as stored: its parts one per line, in `ADDRESS_PARTS` order, or
+ *  "" for none. Text with no line breaks - typed or imported on one line - is
+ *  all street. */
+export function readAddress(value: unknown): Address {
+    const lines = typeof value === "string" && value !== "" ? value.split("\n") : [];
+    return Object.fromEntries(
+        ADDRESS_PARTS.map((part, index) => [part, lines[index]?.trim() ?? ""])
+    ) as Address;
+}
+
+/** An address on one line, its empty parts left out: "Main St 1, Springfield". */
+export function addressLine(value: unknown): string {
+    const address = readAddress(value);
+    return ADDRESS_PARTS.map((part) => address[part])
+        .filter(Boolean)
+        .join(", ");
 }
 
 /** The longest text any field keeps. */
@@ -149,15 +184,48 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
         case "url": {
             const value = text(raw);
             if (value === null) return no("url");
-            if (!value) return ok("");
-            try {
-                const url = new URL(withScheme(value));
-                if (url.protocol !== "https:" && url.protocol !== "http:") return no("url");
-                if (!HOST.test(url.hostname.toLowerCase())) return no("url");
-                return url.href.length > MAX_TEXT ? no("tooLong") : ok(url.href);
-            } catch {
-                return no("url");
+            return value ? webAddress(value) : ok("");
+        }
+        case "links": {
+            if (raw === null || raw === "") return ok("");
+            // A list, as it is stored, or typed with spaces or line breaks
+            // between them; a comma or semicolon left at either end is a
+            // separator, one inside an address is kept.
+            const list =
+                typeof raw !== "string"
+                    ? raw
+                    : raw.trim().startsWith("[")
+                      ? readLinks(raw)
+                      : raw.split(/\s+/).map((one) => one.replace(/^[,;]+|[,;]+$/g, ""));
+            if (!Array.isArray(list)) return no("url");
+            const kept: string[] = [];
+            for (const one of list) {
+                const value = text(one);
+                if (value === null) return no("url");
+                if (value === "") continue;
+                const link = webAddress(value);
+                if (!link.ok) return link;
+                if (!kept.includes(link.value as string)) kept.push(link.value as string);
             }
+            if (kept.length > MAX_LINKS) return no("tooMany");
+            return ok(kept.length === 0 ? "" : JSON.stringify(kept));
+        }
+        case "address": {
+            if (raw === null || raw === "") return ok("");
+            const parts =
+                typeof raw === "string"
+                    ? readAddress(raw)
+                    : z.record(z.string(), z.unknown()).safeParse(raw).data;
+            if (!parts) return no("address");
+            const lines: string[] = [];
+            for (const part of ADDRESS_PARTS) {
+                const value = parts[part] === undefined ? "" : text(parts[part]);
+                if (value === null) return no("address");
+                const line = value.replace(/\s+/g, " ");
+                if (line.length > 200) return no("tooLong");
+                lines.push(line);
+            }
+            return ok(lines.some(Boolean) ? lines.join("\n") : "");
         }
         case "domain": {
             const value = text(raw);
@@ -243,6 +311,18 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             return typeof raw === "string" && uuid.safeParse(raw).success ? ok(raw) : no("option");
         case "dateTime":
             return no("option");
+    }
+}
+
+/** A web address as it is kept: http or https, with a real host. */
+function webAddress(value: string): Normalized {
+    try {
+        const url = new URL(withScheme(value));
+        if (url.protocol !== "https:" && url.protocol !== "http:") return no("url");
+        if (!HOST.test(url.hostname.toLowerCase())) return no("url");
+        return url.href.length > MAX_TEXT ? no("tooLong") : ok(url.href);
+    } catch {
+        return no("url");
     }
 }
 

@@ -20,9 +20,12 @@ import { hostUi } from "@polaris/app-host/client";
 import type { FieldDef, FieldValue, FullName, Money } from "../model/objects";
 import {
     MAX_RATING,
+    ADDRESS_PARTS,
     normalizeInput,
     parseAmount,
     readChoices,
+    readLinks,
+    readAddress,
     typedCount,
     type InputValue
 } from "../model/values";
@@ -182,6 +185,66 @@ export function NameEditor({ field, value, onCommit, onCancel }: EditorProps) {
                     onChange={(event) => edit("last")(event.target.value)}
                     onKeyDown={(event) => keys(event, keep, onCancel)}
                 />
+            </div>
+        </Overlay>
+    );
+}
+
+/** Several web addresses, typed with spaces between them. */
+export function LinksEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const check = useCheck(field);
+    const [text, setText] = useState(readLinks(value).join(" "));
+    const [touched, setTouched] = useState(false);
+    const result = check(text);
+    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
+    return (
+        <Overlay onOutside={keep} error={touched ? result.error : null} className="w-[22rem]">
+            <input
+                autoFocus
+                className={FIELD_INPUT}
+                value={text}
+                inputMode="url"
+                placeholder={t("placeholders.links")}
+                aria-invalid={Boolean(touched && result.error)}
+                onChange={(event) => {
+                    setText(event.target.value);
+                    setTouched(true);
+                }}
+                onKeyDown={(event) => keys(event, keep, onCancel)}
+            />
+        </Overlay>
+    );
+}
+
+/** An address, one box per line of it. */
+export function AddressEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const check = useCheck(field);
+    const [address, setAddress] = useState(() => readAddress(value));
+    const [touched, setTouched] = useState(false);
+    const result = check(address);
+    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
+    return (
+        <Overlay onOutside={keep} error={touched ? result.error : null} className="w-[20rem]">
+            <div className="grid grid-cols-2 gap-px">
+                {ADDRESS_PARTS.map((part, index) => (
+                    <input
+                        key={part}
+                        autoFocus={index === 0}
+                        className={cn(FIELD_INPUT, index === 0 && "col-span-2")}
+                        value={address[part]}
+                        placeholder={t(`placeholders.${part}`)}
+                        aria-label={t(`placeholders.${part}`)}
+                        autoComplete="off"
+                        onChange={(event) => {
+                            const typed = event.target.value;
+                            setAddress((current) => ({ ...current, [part]: typed }));
+                            setTouched(true);
+                        }}
+                        onKeyDown={(event) => keys(event, keep, onCancel)}
+                    />
+                ))}
             </div>
         </Overlay>
     );
@@ -385,6 +448,10 @@ export function editorFor(field: FieldDef): ((props: EditorProps) => ReactNode) 
             return RatingEditor;
         case "multiSelect":
             return ChoicesEditor;
+        case "links":
+            return LinksEditor;
+        case "address":
+            return AddressEditor;
         default:
             return null;
     }

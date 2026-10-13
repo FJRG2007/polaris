@@ -20,6 +20,8 @@ export type FieldKind =
     | "email"
     | "phone"
     | "url"
+    | "links"
+    | "address"
     | "domain"
     | "number"
     | "currency"
@@ -64,6 +66,8 @@ export const CUSTOM_KINDS = [
     "multiSelect",
     "rating",
     "url",
+    "links",
+    "address",
     "email",
     "phone"
 ] as const;

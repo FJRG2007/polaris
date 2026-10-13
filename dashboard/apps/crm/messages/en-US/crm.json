@@ -84,7 +84,13 @@
     "placeholders": {
         "email": "name@company.com",
         "firstName": "First name",
-        "lastName": "Last name"
+        "lastName": "Last name",
+        "links": "company.com blog.company.com",
+        "street": "Street and number",
+        "city": "City",
+        "state": "State or province",
+        "postcode": "Postal code",
+        "country": "Country"
     },
     "invalid": {
         "required": "A name is required.",
@@ -102,7 +108,9 @@
         "notOnShelf": "That person is not a member here.",
         "ambiguous": "More than one record has that name.",
         "duplicate": "A record like this is already here.",
-        "rating": "Choose from 1 to 5 stars."
+        "rating": "Choose from 1 to 5 stars.",
+        "tooMany": "Keep it to 10 links or fewer.",
+        "address": "Enter the address in its boxes."
     },
     "list": {
         "loading": "Loading",
@@ -345,6 +353,8 @@
             "multiSelect": "Several choices",
             "rating": "Rating",
             "url": "Link",
+            "links": "Links",
+            "address": "Address",
             "email": "Email",
             "phone": "Phone"
         },
