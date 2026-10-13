@@ -146,6 +146,14 @@ focusable element through a zero-specificity `:where()` rule. A component must
 not restate it, and must not disable it. It is keyboard-only
 (`:focus-visible`): a mouse press already told the user what it hit.
 
+A text field is the exception: browsers treat a click into an `input`,
+`select` or `textarea` as `:focus-visible` too, since typing is about to
+follow. A second, more specific rule after the general one draws that ring on
+the field's own edge (`outline-offset: -1px`) instead of outside it, so it
+never reads as a second box around the field and a toolbar or card that clips
+its overflow cannot cut it in half. Checkboxes, radios and the other
+non-typing input types keep the outside ring.
+
 ## Where it lives
 
 ```
