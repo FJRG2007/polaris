@@ -69,7 +69,10 @@ const INTERVALS: Record<Exclude<BackupEvery, "off">, number> = {
     weekly: 7 * 24 * 60 * 60 * 1000
 };
 
-export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; readonly label: GameKey<"minecraft"> }[] = [
+export const BACKUP_EVERY_OPTIONS: readonly {
+    readonly value: BackupEvery;
+    readonly label: GameKey<"minecraft">;
+}[] = [
     { value: "off", label: "world.every.never" },
     { value: "hourly", label: "world.every.hourly" },
     { value: "six-hourly", label: "world.every.sixHourly" },
@@ -78,7 +81,13 @@ export const BACKUP_EVERY_OPTIONS: readonly { readonly value: BackupEvery; reado
 ];
 
 function isEvery(value: unknown): value is BackupEvery {
-    return value === "off" || value === "hourly" || value === "six-hourly" || value === "daily" || value === "weekly";
+    return (
+        value === "off" ||
+        value === "hourly" ||
+        value === "six-hourly" ||
+        value === "daily" ||
+        value === "weekly"
+    );
 }
 
 /** A whole number inside a range, from whatever was in the config column. */
@@ -107,7 +116,10 @@ export function readBackupPolicy(config: Record<string, unknown>): BackupPolicy 
             typeof held.notifyOnFailure === "boolean"
                 ? held.notifyOnFailure
                 : DEFAULT_BACKUP_POLICY.notifyOnFailure,
-        onShutdown: typeof held.onShutdown === "boolean" ? held.onShutdown : DEFAULT_BACKUP_POLICY.onShutdown
+        onShutdown:
+            typeof held.onShutdown === "boolean"
+                ? held.onShutdown
+                : DEFAULT_BACKUP_POLICY.onShutdown
     };
 }
 
