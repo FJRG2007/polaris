@@ -10,7 +10,9 @@ import {
     clipText,
     LAUNCHER_TEXT_MAX,
     launcherWaitingSchema,
+    markableApps,
     markLauncherReadSchema,
+    withoutAll,
     withoutApp,
     withoutItem,
     type LauncherWaiting
@@ -22,16 +24,44 @@ const waiting: LauncherWaiting = {
             app: "chat",
             total: 7,
             items: [
-                { id: "a", title: "Ada", detail: "", href: "/chat/c/a", count: 5, dismissable: true },
-                { id: "b", title: "Ops", detail: "", href: "/chat/c/b", count: 2, dismissable: true }
+                {
+                    id: "a",
+                    title: "Ada",
+                    detail: "",
+                    href: "/chat/c/a",
+                    count: 5,
+                    dismissable: true
+                },
+                {
+                    id: "b",
+                    title: "Ops",
+                    detail: "",
+                    href: "/chat/c/b",
+                    count: 2,
+                    dismissable: true
+                }
             ]
         },
         {
             app: "admin",
             total: 4,
             items: [
-                { id: "reports", title: "", detail: "", href: "/admin/safety", count: 3, dismissable: true },
-                { id: "apis", title: "", detail: "", href: "/admin/integrations", count: 1, dismissable: false }
+                {
+                    id: "reports",
+                    title: "",
+                    detail: "",
+                    href: "/admin/safety",
+                    count: 3,
+                    dismissable: true
+                },
+                {
+                    id: "apis",
+                    title: "",
+                    detail: "",
+                    href: "/admin/integrations",
+                    count: 1,
+                    dismissable: false
+                }
             ]
         }
     ]
@@ -68,12 +98,41 @@ describe("marking a whole app read", () => {
     });
 });
 
+describe("marking everything read", () => {
+    it("leaves only the faults, and moves each badge by what it dismissed", () => {
+        const after = withoutAll(waiting);
+        expect(after.groups).toEqual([
+            expect.objectContaining({
+                app: "admin",
+                total: 1,
+                items: [expect.objectContaining({ id: "apis" })]
+            })
+        ]);
+        expect(badgeDelta(waiting, after, "chat")).toBe(-7);
+        expect(badgeDelta(waiting, after, "admin")).toBe(-3);
+    });
+
+    it("offers a tile's mark only for an app with something dismissable", () => {
+        expect([...markableApps(waiting)].sort()).toEqual(["admin", "chat"]);
+        expect([...markableApps(withoutAll(waiting))]).toEqual([]);
+        expect(markableApps(null).size).toBe(0);
+    });
+});
+
 describe("the shapes both ends check", () => {
-    it("accepts an entry or an app, and nothing else", () => {
-        expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail", id: "t1" }).success).toBe(true);
+    it("accepts an entry, an app or everything, and nothing else", () => {
+        expect(markLauncherReadSchema.safeParse({ scope: "all" }).success).toBe(true);
+        expect(markLauncherReadSchema.safeParse({ scope: "every" }).success).toBe(false);
+        expect(
+            markLauncherReadSchema.safeParse({ scope: "item", app: "mail", id: "t1" }).success
+        ).toBe(true);
         expect(markLauncherReadSchema.safeParse({ scope: "app", app: "admin" }).success).toBe(true);
-        expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail" }).success).toBe(false);
-        expect(markLauncherReadSchema.safeParse({ scope: "app", app: "drive" }).success).toBe(false);
+        expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail" }).success).toBe(
+            false
+        );
+        expect(markLauncherReadSchema.safeParse({ scope: "app", app: "drive" }).success).toBe(
+            false
+        );
     });
 
     it("cuts text to what an entry carries, never through a character", () => {
