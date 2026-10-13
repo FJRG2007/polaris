@@ -1374,8 +1374,8 @@
         },
         "setupValue": {
             "label": {
-                "appName": "Nombre de la app",
-                "appDescription": "Descripción de la app",
+                "appName": "Nombre",
+                "appDescription": "Descripción",
                 "redirectUri": "URI de retorno",
                 "homeUrl": "URL de inicio",
                 "privacyUrl": "URL de privacidad",
@@ -1384,8 +1384,8 @@
                 "domain": "Dominio"
             },
             "copy": {
-                "appName": "Copiar el nombre de la app",
-                "appDescription": "Copiar la descripción de la app",
+                "appName": "Copiar el nombre",
+                "appDescription": "Copiar la descripción",
                 "redirectUri": "Copiar la URI de retorno",
                 "homeUrl": "Copiar la URL de inicio",
                 "privacyUrl": "Copiar la URL de privacidad",
