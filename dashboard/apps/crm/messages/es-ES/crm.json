@@ -853,6 +853,7 @@
     "merge": {
         "count": "Elige de 2 a {count} registros para fusionar.",
         "missing": "Uno de estos registros ya no existe o está en la papelera. Actualiza la lista y vuelve a intentarlo.",
+        "linked": "Tu rol no puede cambiar algunos registros vinculados a estos, así que no se pueden fusionar.",
         "button": "Fusionar",
         "title": "Fusionar {count} registros",
         "keep": "Conservar este registro. Sus campos vacíos se rellenan con los demás, que van a la papelera.",

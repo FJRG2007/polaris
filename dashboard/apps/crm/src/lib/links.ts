@@ -12,16 +12,16 @@ import { table } from "./columns";
 import { CrmRefusal } from "./errors";
 import type { CrmObject } from "../model/objects";
 import { LINK_PAGE, type LinkKind } from "../model/links";
-import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
+import { recordWhere, requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 
-/** The record, on the reader's shelf and out of the trash, or a refusal. */
+/** The record, among those the reader reaches and out of the trash, or a refusal. */
 export async function requireLiveRecord(
     actor: CrmActor,
     object: CrmObject,
     recordId: string
 ): Promise<void> {
     const found = await table(object).count({
-        where: { id: recordId, ...shelfWhere(actor.shelf), deletedAt: null }
+        where: { id: recordId, ...recordWhere(actor, object), deletedAt: null }
     });
     if (found === 0) throw new CrmRefusal((await crmT())("errors.notFound"));
 }

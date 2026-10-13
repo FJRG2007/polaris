@@ -62,7 +62,43 @@ describe("searching every kind of record", () => {
         const [[query]] = mocks.companies.mock.calls as unknown as [
             [{ where: Record<string, unknown> }]
         ];
-        expect(query.where).toMatchObject({ userId: "u1", orgId: null, deletedAt: null });
+        expect(query.where).toMatchObject({
+            AND: [{ userId: "u1", orgId: null, deletedAt: null }, expect.anything()]
+        });
+    });
+
+    it("never matches a field the role hides, and keeps a role to its own records", async () => {
+        const { searchRefs } = await import("@polaris-app/crm/src/lib/records");
+        const ownOnly = {
+            user: { id: "u1", name: "Test User" },
+            shelf: { orgId: "o1", userId: null, key: "org:o1" },
+            can: {
+                companies: { read: true, edit: true, delete: true },
+                people: { read: true, edit: true, delete: true },
+                opportunities: { read: true, edit: true, delete: true }
+            },
+            rules: {
+                companies: { rows: "all", hidden: [], readOnly: [] },
+                people: { rows: "own", hidden: ["email", "jobTitle"], readOnly: [] },
+                opportunities: { rows: "all", hidden: [], readOnly: [] }
+            }
+        } as never;
+        await searchRefs(ownOnly, "people", "rival.com");
+        const [[query]] = mocks.people.mock.calls as unknown as [
+            [{ where: { AND: Record<string, unknown>[] } }]
+        ];
+        expect(query.where.AND[0]).toMatchObject({ AND: [{ createdById: "u1" }] });
+        expect(JSON.stringify(query.where)).not.toMatch(/email|jobTitle/);
+        expect(query.where.AND[1]).toEqual({
+            AND: [
+                {
+                    OR: [
+                        { firstName: { contains: "rival.com", mode: "insensitive" } },
+                        { lastName: { contains: "rival.com", mode: "insensitive" } }
+                    ]
+                }
+            ]
+        });
     });
 
     it("leaves out what an organization's role cannot see, and names the organization", async () => {

@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { isTimeZone, nextCronRun, parseCron } from "@polaris/core";
+import { CRM_REQUEST_URL_MAX, isTimeZone, nextCronRun, parseCron } from "@polaris/core";
 import { csvValue } from "./csv";
 import { filterSchema, type ViewFilter } from "./filters";
 import type { EventKind, FieldChange } from "./timeline";
@@ -87,7 +87,7 @@ export interface WorkflowOptions {
 }
 
 /** The longest address a workflow may call. */
-export const REQUEST_URL_MAX = 2048;
+export const REQUEST_URL_MAX = CRM_REQUEST_URL_MAX;
 
 /** Whether a text is an http or https address with no credentials in it. Where
  *  it resolves to is checked when it is called, every time. */

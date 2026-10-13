@@ -22,12 +22,31 @@ const SECRET = /^[A-Za-z0-9_-]{32}$/;
 const status = (code: number, body: unknown = null) =>
     body === null ? new Response(null, { status: code }) : Response.json(body, { status: code });
 
-/** The body as text, or null past the limit. */
+/** The body as text, or null past the limit - read no further than it. */
 async function capped(request: Request): Promise<string | null> {
     const declared = Number(request.headers.get("content-length") ?? 0);
     if (declared > MAX_HOOK_BODY) return null;
-    const text = await request.text();
-    return new TextEncoder().encode(text).byteLength > MAX_HOOK_BODY ? null : text;
+    if (!request.body) return "";
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > MAX_HOOK_BODY) {
+            await reader.cancel().catch(() => undefined);
+            return null;
+        }
+        chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, at);
+        at += chunk.byteLength;
+    }
+    return new TextDecoder().decode(bytes);
 }
 
 export async function POST(
@@ -51,9 +70,7 @@ export async function POST(
         const answer = await runHook(secret, text);
         if (answer === "unknown") return status(404);
         if (answer === "badBody") return status(400);
-        return answer.error === null
-            ? status(200, { ok: true })
-            : status(200, { ok: false, error: answer.error });
+        return status(200, { ok: answer.error === null });
     } catch (caught) {
         console.error("crm: a webhook call could not be answered", caught);
         return status(500, { error: "unavailable" });

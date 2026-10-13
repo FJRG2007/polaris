@@ -11,7 +11,13 @@ const db = vi.hoisted(() => {
     const delegate = () => ({
         findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
         findFirst: vi.fn(async (): Promise<Record<string, unknown>> => ({ id: "c1" })),
-        updateMany: vi.fn(async () => ({ count: 1 })),
+        count: vi.fn(async (): Promise<number> => 0),
+        updateMany: vi.fn(async ({ where }: { where: { id?: unknown } }) => ({
+            count:
+                where.id && typeof where.id === "object" && "in" in where.id
+                    ? (where.id.in as unknown[]).length
+                    : 1
+        })),
         update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "c1", ...data }))
     });
     return {
@@ -40,18 +46,27 @@ vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }
 import { mergeRecords } from "@polaris-app/crm/src/lib/merge";
 
 const allowed = { read: true, edit: true, delete: true };
-const actorWith = (can: typeof allowed, hidden: string[] = []) =>
+const actorWith = (
+    can: typeof allowed,
+    hidden: string[] = [],
+    options: { people?: typeof allowed; readOnly?: string[]; rows?: "all" | "own" } = {}
+) =>
     ({
         user: { id: "u1", name: "Test User" },
         shelf: { orgId: "o1", userId: null, key: "org:o1" },
-        can: { companies: can, people: can, opportunities: can },
-        rules: hidden.length
-            ? {
-                  companies: { rows: "all", hidden, readOnly: [] },
-                  people: { rows: "all", hidden, readOnly: [] },
-                  opportunities: { rows: "all", hidden, readOnly: [] }
-              }
-            : undefined
+        can: { companies: can, people: options.people ?? can, opportunities: can },
+        rules:
+            hidden.length || options.readOnly || options.rows
+                ? {
+                      companies: { rows: "all", hidden, readOnly: [] },
+                      people: {
+                          rows: options.rows ?? "all",
+                          hidden,
+                          readOnly: options.readOnly ?? []
+                      },
+                      opportunities: { rows: "all", hidden, readOnly: [] }
+                  }
+                : undefined
     }) as never;
 
 beforeEach(() => vi.clearAllMocks());
@@ -63,13 +78,16 @@ describe("merging records", () => {
             { id: "c2", name: "Example", domain: "example.test", city: null, annualRevenue: null, annualRevenueCurrency: null },
             { id: "c3", name: "Ex", domain: "other.test", city: "Testville", annualRevenue: 10, annualRevenueCurrency: "EUR" }
         ]);
+        db.crmCompany.findFirst
+            .mockResolvedValueOnce({ id: "c1", name: "Example Co", domain: "" })
+            .mockResolvedValueOnce({ id: "c1", name: "Example Co", domain: "example.test" });
         await mergeRecords(actorWith(allowed), "companies", "c1", ["c2", "c3", "c1"]);
 
         const [[find]] = db.crmCompany.findMany.mock.calls as unknown as [[{ where: Record<string, unknown> }]];
         expect(find.where).toEqual({ orgId: "o1", deletedAt: null, id: { in: ["c1", "c2", "c3"] } });
 
-        const [[saved]] = db.crmCompany.update.mock.calls as unknown as [[{ where: unknown; data: Record<string, unknown> }]];
-        expect(saved.where).toEqual({ id: "c1" });
+        const [saved] = db.crmCompany.updateMany.mock.calls[0] as unknown as [{ where: unknown; data: Record<string, unknown> }];
+        expect(saved.where).toEqual({ orgId: "o1", deletedAt: null, id: "c1", updatedAt: undefined });
         expect(saved.data).toMatchObject({
             domain: "example.test",
             city: "Testville",
@@ -105,7 +123,7 @@ describe("merging records", () => {
             { id: "c2", name: "Example", domain: "example.test", city: "Testville" }
         ]);
         await mergeRecords(actorWith(allowed, ["city"]), "companies", "c1", ["c2"]);
-        const [[saved]] = db.crmCompany.update.mock.calls as unknown as [[{ data: Record<string, unknown> }]];
+        const [saved] = db.crmCompany.updateMany.mock.calls[0] as unknown as [{ data: Record<string, unknown> }];
         expect(saved.data).toHaveProperty("domain", "example.test");
         expect(saved.data).not.toHaveProperty("city");
     });
@@ -152,5 +170,38 @@ describe("merging records", () => {
         ).rejects.toThrow();
         expect(db.crmCompany.update).not.toHaveBeenCalled();
         expect(db.crmCompany.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses when the kept record changed or one of them was trashed since it was read", async () => {
+        db.crmCompany.findMany.mockResolvedValueOnce([
+            { id: "c1", name: "Example Co", domain: null, updatedAt: new Date(1) },
+            { id: "c2", name: "Example", domain: "example.test", updatedAt: new Date(1) }
+        ]);
+        db.crmCompany.updateMany.mockResolvedValueOnce({ count: 0 });
+        await expect(mergeRecords(actorWith(allowed), "companies", "c1", ["c2"])).rejects.toThrow(
+            /gone or in the trash/
+        );
+        expect(db.crmCompany.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: expect.objectContaining({ updatedAt: new Date(1) }) })
+        );
+        expect(db.crmPerson.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("refuses to repoint people the reader may not change", async () => {
+        db.crmPerson.count.mockResolvedValue(2);
+        const people = { read: true, edit: false, delete: false };
+        await expect(
+            mergeRecords(actorWith(allowed, [], { people }), "companies", "c1", ["c2"])
+        ).rejects.toThrow();
+        await expect(
+            mergeRecords(actorWith(allowed, [], { readOnly: ["company"] }), "companies", "c1", ["c2"])
+        ).rejects.toThrow(/Company/);
+        db.crmPerson.count.mockResolvedValueOnce(2).mockResolvedValueOnce(1);
+        await expect(
+            mergeRecords(actorWith(allowed, [], { rows: "own" }), "companies", "c1", ["c2"])
+        ).rejects.toThrow(/role cannot change/);
+        expect(db.crmCompany.findMany).not.toHaveBeenCalled();
+        expect(db.crmPerson.updateMany).not.toHaveBeenCalled();
+        db.crmPerson.count.mockResolvedValue(0);
     });
 });

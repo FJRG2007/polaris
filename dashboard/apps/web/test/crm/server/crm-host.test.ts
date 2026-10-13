@@ -244,7 +244,7 @@ describe("mail and events with a record's people", () => {
         const found = await crmEventsWith(actor, ["first_last@example.test"], 20);
         const [, ...values] = mocks.prisma.$queryRaw.mock.calls[0] as unknown as unknown[];
         expect(values).toContain("u1");
-        expect(values).toContainEqual(["%mailto:first\_last@example.test%"]);
+        expect(values).toContainEqual(["%mailto:first\\_last@example.test%"]);
         expect(found).toEqual([
             expect.objectContaining({
                 id: "e1",

@@ -16,7 +16,7 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { recordHref } from "../model/related";
 import { recordSelect, table, toRecord } from "./columns";
-import { crmActor, requireCan, shelfWhere, type CrmActor } from "./access";
+import { crmActor, recordWhere, requireCan, type CrmActor } from "./access";
 import { CRM_OBJECTS, recordName, type CrmObject } from "../model/objects";
 
 /** The most favorites one person keeps on one shelf: a rail, not a list. */
@@ -50,7 +50,7 @@ export async function addFavorite(
     const there =
         kind === "record"
             ? await table(object).findFirst({
-                  where: { id: targetId, ...shelfWhere(actor.shelf), deletedAt: null },
+                  where: { id: targetId, ...recordWhere(actor, object), deletedAt: null },
                   select: { id: true }
               })
             : await prisma.crmView.findFirst({
@@ -125,7 +125,7 @@ export async function listFavorites(actor: CrmActor): Promise<Favorite[]> {
                 .map((row) => row.targetId);
             if (ids.length === 0) return;
             const found = (await table(object).findMany({
-                where: { id: { in: ids }, ...shelfWhere(actor.shelf), deletedAt: null },
+                where: { id: { in: ids }, ...recordWhere(actor, object), deletedAt: null },
                 select: recordSelect(object)
             })) as Record<string, unknown>[];
             for (const row of found) {

@@ -136,6 +136,17 @@ describe("address", () => {
         });
     });
 
+    it("keeps the lines past the last part with the street, not shifted", () => {
+        const pasted = "Flat 2\r\nMain Street 1\nSpringfield\nIL\n12345\nExample Land";
+        expect(readAddress(pasted)).toEqual({
+            street: "Flat 2, Main Street 1",
+            city: "Springfield",
+            state: "IL",
+            postcode: "12345",
+            country: "Example Land"
+        });
+    });
+
     it("refuses a part that is not text, or too long", () => {
         expect(normalizeInput(office, { street: 3 })).toEqual({ ok: false, reason: "address" });
         expect(normalizeInput(office, 3)).toEqual({ ok: false, reason: "address" });

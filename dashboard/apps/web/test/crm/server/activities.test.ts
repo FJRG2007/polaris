@@ -214,6 +214,31 @@ describe("notes and tasks on a record", () => {
         expect(crmHost.createTask).not.toHaveBeenCalled();
     });
 
+    it("looks the record up among the reader's own when their role is held to those", async () => {
+        const ownOnly = {
+            user: { id: "u1", name: "Test User", isAdmin: false },
+            shelf: { orgId: "o1", userId: null, key: "org:o1" },
+            can: { companies: allowed, people: allowed, opportunities: allowed },
+        rules: {
+            companies: { rows: "own", hidden: [], readOnly: [] },
+            people: { rows: "own", hidden: [], readOnly: [] },
+            opportunities: { rows: "own", hidden: [], readOnly: [] }
+        }
+        } as never;
+        db.records.count.mockResolvedValueOnce(0);
+        await expect(
+            activities.createRecordTask(ownOnly, "people", RECORD, {
+                name: "Call back",
+                listId: LIST,
+                due: null
+            })
+        ).rejects.toThrow();
+        expect(db.records.count).toHaveBeenCalledWith({
+            where: { id: RECORD, orgId: "o1", AND: [{ createdById: "u1" }], deletedAt: null }
+        });
+        expect(crmHost.createTask).not.toHaveBeenCalled();
+    });
+
     it("ticks off only a task the record links to", async () => {
         db.crmLink.count.mockResolvedValueOnce(0);
         await expect(

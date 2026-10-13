@@ -104,4 +104,14 @@ describe("useSwipeStep", () => {
         expect(phone.step).not.toHaveBeenCalled();
         act(() => phone.root.unmount());
     });
+
+    it("leaves a sideways pan alone while the page is pinched in", () => {
+        const { step, host, root } = mount(true);
+        vi.stubGlobal("visualViewport", { scale: 2 });
+        const cell = host.querySelector("#cell")!;
+        touch(cell, "touchstart", 300, 200);
+        touch(cell, "touchend", 100, 200);
+        expect(step).not.toHaveBeenCalled();
+        act(() => root.unmount());
+    });
 });

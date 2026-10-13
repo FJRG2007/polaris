@@ -18,7 +18,14 @@ import { initialValues } from "../model/timeline";
 import type { InputValue } from "../model/values";
 import { checkRow, splitName, type RowProblem } from "../model/import";
 import { duplicateKeys, sharedKey, type DuplicateKey } from "../model/duplicates";
-import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
+import {
+    recordWhere,
+    requireCan,
+    requireChangeable,
+    shelfData,
+    shelfWhere,
+    type CrmActor
+} from "./access";
 import { columnOf, recordSelect, table, toRecord, writable, writeData } from "./columns";
 import { primaryField, type CrmObject, type CrmRecord, type FieldDef } from "../model/objects";
 
@@ -70,7 +77,7 @@ async function findByName(
                   }
               };
     const rows = (await table(target).findMany({
-        where: { ...where, ...shelfWhere(actor.shelf), deletedAt: null },
+        where: { ...where, ...recordWhere(actor, target), deletedAt: null },
         // Two per name at most tell one record from several.
         take: names.length * 2,
         select: recordSelect(target)
@@ -120,6 +127,16 @@ export async function readRows(
         const t = await crmT();
         throw new CrmRefusal(t("import.duplicateMapping"));
     }
+    await requireChangeable(
+        actor,
+        object,
+        mapped.map((field) => field.key),
+        async (fieldKey) => {
+            const t = await crmT();
+            const field = mapped.find((one) => one.key === fieldKey);
+            return field?.label ?? t(`fields.${object}.${fieldKey}` as Parameters<typeof t>[0]);
+        }
+    );
     const primary = primaryField(object);
     const checked = batch.rows.map((cells) => checkRow(columns, cells, primary, needsName));
 

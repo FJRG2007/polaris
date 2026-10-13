@@ -11,10 +11,10 @@
  * The page keeps its vertical scroll: nothing is claimed while the finger moves,
  * and the decision is taken once it lifts. A touch only counts when it went far
  * enough, clearly more sideways than up or down, and quickly - a slow drag is
- * somebody reading or selecting, not flicking a page. A second finger, a touch
- * the system cancelled, a touch that started on something that scrolls sideways
- * itself or inside a dialog, and a touch that leaves text selected are never a
- * swipe.
+ * somebody reading or selecting, not flicking a page. A second finger, a page
+ * pinched in, a touch the system cancelled, a touch that started on something
+ * that scrolls sideways itself or inside a dialog, and a touch that leaves text
+ * selected are never a swipe.
  *
  * The rules live in `swipeDirection`, which takes plain numbers, so the tests can
  * drive it without a DOM.
@@ -60,6 +60,12 @@ function ownedElsewhere(target: EventTarget | null, root: Element): boolean {
     return false;
 }
 
+/** Whether the page is pinched in, where a sideways move pans the zoomed view. */
+function zoomedIn(): boolean {
+    const scale = window.visualViewport?.scale ?? 1;
+    return scale > 1.01;
+}
+
 /** Listen for swipes on `ref` and step the calendar with them, on a phone only. */
 export function useSwipeStep(ref: RefObject<HTMLElement | null>, step: (direction: 1 | -1) => void) {
     // Read at the moment of the swipe, so a new `step` each render does not
@@ -75,7 +81,11 @@ export function useSwipeStep(ref: RefObject<HTMLElement | null>, step: (directio
         const onStart = (event: TouchEvent) => {
             const touch = event.touches[0];
             start =
-                phone.matches && event.touches.length === 1 && touch && !ownedElsewhere(event.target, element)
+                phone.matches &&
+                event.touches.length === 1 &&
+                touch &&
+                !zoomedIn() &&
+                !ownedElsewhere(event.target, element)
                     ? { x: touch.clientX, y: touch.clientY, at: event.timeStamp }
                     : null;
         };

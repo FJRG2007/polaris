@@ -259,7 +259,12 @@ export async function searchRefs(
 ): Promise<Ref[]> {
     await requireCan(actor, object, "read");
     const rows = (await table(object).findMany({
-        where: { ...recordWhere(actor, object), deletedAt: null, ...searchWhere(object, search) },
+        where: {
+            AND: [
+                { ...recordWhere(actor, object), deletedAt: null },
+                searchWhere(object, search, actor.rules?.[object].hidden ?? [])
+            ]
+        },
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         take: Math.min(limit, 50),
         select: recordSelect(object)

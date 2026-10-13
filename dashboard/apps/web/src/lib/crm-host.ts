@@ -13,7 +13,7 @@
 import { prisma } from "@polaris/db";
 import { resolveScope } from "@/lib/workspace-scope";
 import { isUuid } from "@/lib/uuid";
-import { chatSendSchema, normalizeRelPath } from "@polaris/core";
+import { CRM_REQUEST_URL_MAX, chatSendSchema, normalizeRelPath } from "@polaris/core";
 import { mayReadDrive, requireDriveDriver } from "@/lib/drive-authz";
 import { follow, safeUrl } from "@/lib/safe-fetch";
 import { sessionCan, type SessionUser } from "@/lib/session";
@@ -330,7 +330,7 @@ export async function crmPostJson(
     address: string,
     body: string
 ): Promise<{ status: number } | { failed: "address" | "unreachable" }> {
-    const url = safeUrl(address);
+    const url = safeUrl(address, CRM_REQUEST_URL_MAX);
     if (!url) return { failed: "address" };
     const response = await follow(url, "application/json", {
         contentType: "application/json",
@@ -535,7 +535,7 @@ export async function crmMailWith(
 }
 
 /** Escape what ILIKE reads as a wildcard, so `a_b@x` matches only itself. */
-const likeLiteral = (value: string) => value.replace(/[\%_]/g, "\$&");
+const likeLiteral = (value: string) => value.replace(/[\\%_]/g, "\\$&");
 
 /**
  * The events in this account's own calendars that any of these addresses is

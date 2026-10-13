@@ -853,6 +853,7 @@
     "merge": {
         "count": "Choose from 2 to {count} records to merge.",
         "missing": "One of these records is gone or in the trash. Refresh the list and try again.",
+        "linked": "Some records linked to these are ones your role cannot change, so they cannot be merged.",
         "button": "Merge",
         "title": "Merge {count} records",
         "keep": "Keep this record. Its empty fields are filled from the others, which go to the trash.",

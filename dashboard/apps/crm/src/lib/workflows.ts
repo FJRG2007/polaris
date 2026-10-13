@@ -838,14 +838,17 @@ function storedBody(text: string | null): unknown {
     }
 }
 
+/** How long a resumed run may go on before it is taken for cut short. */
+const RESUME_LEASE = 30 * 60_000;
+
 /**
  * Pick up the runs whose delay is over, once each: a run is claimed by moving
- * it out of waiting before it goes on. A run of a workflow switched off since
- * is cancelled instead. Returns how many went on.
+ * it out of waiting, for a lease, before it goes on. A run of a workflow
+ * switched off since is cancelled instead. Returns how many went on.
  */
 export async function resumeWaitingRuns(now: Date = new Date()): Promise<number> {
     const due = await prisma.crmWorkflowRun.findMany({
-        where: { status: "waiting", resumeAt: { lte: now } },
+        where: { status: { in: ["waiting", "running"] }, resumeAt: { lte: now } },
         orderBy: { resumeAt: "asc" },
         take: SCHEDULE_BATCH,
         include: { workflow: true }
@@ -853,8 +856,8 @@ export async function resumeWaitingRuns(now: Date = new Date()): Promise<number>
     let ran = 0;
     for (const run of due) {
         const claimed = await prisma.crmWorkflowRun.updateMany({
-            where: { id: run.id, status: "waiting" },
-            data: { status: "running" }
+            where: { id: run.id, status: run.status, resumeAt: run.resumeAt },
+            data: { status: "running", resumeAt: new Date(now.getTime() + RESUME_LEASE) }
         });
         if (claimed.count === 0) continue;
         if (!run.workflow.enabled) {

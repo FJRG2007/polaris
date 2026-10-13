@@ -122,6 +122,45 @@ describe("importRecords", () => {
         });
     });
 
+    it("holds the import to the role's field and row rules", async () => {
+        const ruled = (rows: "all" | "own", readOnly: string[], hidden: string[] = []) =>
+            ({
+                user: { id: "u1", name: "Test User" },
+                shelf: { orgId: "o1", userId: null, key: "org:o1" },
+                can: { companies: allowed, people: allowed, opportunities: allowed },
+                rules: {
+                    companies: { rows, hidden: [], readOnly: [] },
+                    people: { rows: "all", hidden, readOnly },
+                    opportunities: { rows: "all", hidden: [], readOnly: [] }
+                }
+            }) as never;
+        await expect(
+            importRecords(ruled("all", ["jobTitle"]), "people", {
+                mapping: ["name", "jobTitle"],
+                rows: [["Ada Lovelace", "Engineer"]]
+            })
+        ).rejects.toThrow(/cannot change Job title/);
+        await expect(
+            importRecords(ruled("all", [], ["email"]), "people", {
+                mapping: ["name", "email"],
+                rows: [["Ada Lovelace", "ada@example.test"]]
+            })
+        ).rejects.toThrow(/cannot change/);
+        expect(db.companies.create).not.toHaveBeenCalled();
+
+        await importRecords(ruled("own", []), "people", {
+            mapping: ["name", "company"],
+            rows: [["Ada Lovelace", "Acme"]]
+        });
+        const [[find]] = db.companies.findMany.mock.calls as unknown as [
+            [{ where: Record<string, unknown> }]
+        ];
+        expect(find.where).toMatchObject({
+            orgId: "o1",
+            AND: [{ OR: [{ accountOwnerId: "u1" }, { createdById: "u1" }] }]
+        });
+    });
+
     it("refuses an actor who may not edit, an unknown field and a field mapped twice", async () => {
         const batch = { mapping: ["name"], rows: [["Acme"]] };
         await expect(

@@ -71,11 +71,21 @@ export type Address = Record<AddressPart, string>;
 
 /** An address as stored: its parts one per line, in `ADDRESS_PARTS` order, or
  *  "" for none. Text with no line breaks - typed or imported on one line - is
- *  all street. */
+ *  all street, and the lines past the last part's are the street's too. */
 export function readAddress(value: unknown): Address {
-    const lines = typeof value === "string" && value !== "" ? value.split("\n") : [];
+    const lines = typeof value === "string" && value !== "" ? value.split(/\r?\n/) : [];
+    const extra = Math.max(0, lines.length - ADDRESS_PARTS.length);
+    const street = lines
+        .slice(0, extra + 1)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(", ");
+    const rest = lines.slice(extra + 1);
     return Object.fromEntries(
-        ADDRESS_PARTS.map((part, index) => [part, lines[index]?.trim() ?? ""])
+        ADDRESS_PARTS.map((part, index) => [
+            part,
+            index === 0 ? street : (rest[index - 1]?.trim() ?? "")
+        ])
     ) as Address;
 }
 

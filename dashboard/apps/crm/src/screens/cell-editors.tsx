@@ -41,10 +41,22 @@ export interface EditorProps {
     readonly defaultCurrency?: string;
 }
 
+/** Whether Tab moves the focus to another control inside the box. */
+function tabStaysIn(box: HTMLElement, back: boolean): boolean {
+    const controls = [
+        ...box.querySelectorAll<HTMLElement>(
+            "input, button, select, textarea, [tabindex]:not([tabindex='-1'])"
+        )
+    ].filter((one) => !one.hasAttribute("disabled"));
+    const at = controls.indexOf(document.activeElement as HTMLElement);
+    const next = at + (back ? -1 : 1);
+    return at !== -1 && next >= 0 && next < controls.length;
+}
+
 /**
- * The box over the cell. A press outside it keeps what was typed (or drops it
- * when it is not valid); a press inside a menu it opened - the currency list -
- * is still inside.
+ * The box over the cell. A press outside it, or Tab out of its last box, keeps
+ * what was typed (or drops it when it is not valid); a press inside a menu it
+ * opened - the currency list - is still inside.
  */
 function Overlay({
     onOutside,
@@ -78,6 +90,11 @@ function Overlay({
                 className
             )}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+                const inside = box.current?.contains(event.target as Node);
+                if (event.key !== "Tab" || !inside || event.defaultPrevented) return;
+                if (!tabStaysIn(box.current!, event.shiftKey)) outside.current();
+            }}
         >
             {children}
             {error ? (
@@ -90,18 +107,21 @@ function Overlay({
 const FIELD_INPUT =
     "h-7 w-full min-w-0 rounded bg-transparent px-1.5 text-[0.8125rem] text-foreground outline-none placeholder:text-foreground-subtle";
 
-/** Enter keeps, Escape drops; Tab keeps and lets the focus move on. */
+/** Enter keeps, Escape drops. Tab is the box's: see `Overlay`. */
 function keys(event: KeyboardEvent, keep: () => void, drop: () => void) {
     if (event.key === "Enter") {
         event.preventDefault();
         keep();
     } else if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        drop();
-    } else if (event.key === "Tab") {
-        keep();
+        cancel(event, drop);
     }
+}
+
+/** Escape: drop the edit, and only this box's. */
+function cancel(event: KeyboardEvent, drop: () => void) {
+    event.preventDefault();
+    event.stopPropagation();
+    drop();
 }
 
 function useCheck(field: FieldDef) {
@@ -335,7 +355,7 @@ export function DateEditor({ field, value, onCommit, onCancel }: EditorProps) {
 
 /** A rating: a star clicked, or a digit typed (0 clears it). Clicking the
  *  stars it already has clears it too. */
-export function RatingEditor({ value, onCommit, onCancel }: EditorProps) {
+export function RatingEditor({ field, value, onCommit, onCancel }: EditorProps) {
     const t = useCrmT();
     const current = typeof value === "number" ? value : 0;
     const [hover, setHover] = useState(0);
@@ -344,15 +364,15 @@ export function RatingEditor({ value, onCommit, onCancel }: EditorProps) {
         <Overlay onOutside={onCancel} error={null}>
             <div
                 role="radiogroup"
-                aria-label={t("fields.valueOf")}
+                aria-label={field.label ?? t("fields.valueOf")}
                 className="flex items-center gap-0.5 p-1"
                 onKeyDown={(event) => {
                     const digit = Number(event.key);
                     if (/^[0-9]$/.test(event.key) && digit <= MAX_RATING) {
                         event.preventDefault();
                         onCommit(digit === 0 ? null : digit);
-                    } else {
-                        keys(event, onCancel, onCancel);
+                    } else if (event.key === "Escape") {
+                        cancel(event, onCancel);
                     }
                 }}
             >
@@ -388,17 +408,17 @@ export function RatingEditor({ value, onCommit, onCancel }: EditorProps) {
 /** Several choices, ticked; kept when the editor is left or Enter is pressed. */
 export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps) {
     const t = useCrmT();
-    const [chosen, setChosen] = useState(() => readChoices(value));
-    const keep = () => {
-        const result = normalizeInput(field, chosen);
-        if (result.ok) onCommit(result.value);
-        else onCancel();
-    };
+    const check = useCheck(field);
+    const [chosen, setChosen] = useState(() =>
+        readChoices(value).filter((option) => (field.options ?? []).includes(option))
+    );
+    const result = check(chosen);
+    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
     return (
-        <Overlay onOutside={keep} error={null}>
+        <Overlay onOutside={keep} error={result.error}>
             <div
                 role="group"
-                aria-label={t("fields.valueOf")}
+                aria-label={field.label ?? t("fields.valueOf")}
                 className="flex max-h-64 min-w-48 flex-col overflow-y-auto p-1"
                 onKeyDown={(event) => keys(event, keep, onCancel)}
             >

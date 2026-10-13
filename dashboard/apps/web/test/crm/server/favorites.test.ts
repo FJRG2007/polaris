@@ -97,6 +97,31 @@ describe("pinning", () => {
         expect(db.crmFavorite.upsert).not.toHaveBeenCalled();
     });
 
+    it("pins only a record the reader reaches when their role is held to their own", async () => {
+        const ownOnly = {
+            user: { id: "u1", name: "Test User" },
+            shelf: { orgId: "o1", userId: null, key: "org:o1", orgName: "Example Org" },
+            can: { companies: can(true), people: can(true), opportunities: can(true) },
+        rules: {
+            companies: { rows: "own", hidden: [], readOnly: [] },
+            people: { rows: "own", hidden: [], readOnly: [] },
+            opportunities: { rows: "own", hidden: [], readOnly: [] }
+        }
+        } as never;
+        db.companies.findFirst.mockResolvedValueOnce(null);
+        await expect(
+            favorites.addFavorite(ownOnly, "record", "companies", C1)
+        ).rejects.toBeInstanceOf(CrmRefusal);
+        const [[find]] = db.companies.findFirst.mock.calls as unknown as [[{ where: unknown }]];
+        expect(find.where).toEqual({
+            id: C1,
+            orgId: "o1",
+            AND: [{ OR: [{ accountOwnerId: "u1" }, { createdById: "u1" }] }],
+            deletedAt: null
+        });
+        expect(db.crmFavorite.upsert).not.toHaveBeenCalled();
+    });
+
     it("unpins only the reader's own, on this shelf", async () => {
         await favorites.removeFavorite(actor(), "view", C1);
         expect(db.crmFavorite.deleteMany).toHaveBeenCalledWith({
