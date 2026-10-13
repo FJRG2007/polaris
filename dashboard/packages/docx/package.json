@@ -27,8 +27,8 @@
     },
     "dependencies": {
         "@polaris/pptx": "*",
-        "fast-xml-parser": "5.11.1",
-        "jszip": "3.10.1",
+        "fast-xml-parser": "5.11.2",
+        "jszip": "3.10.2",
         "utif2": "4.1.0"
     }
 }
