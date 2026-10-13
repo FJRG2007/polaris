@@ -291,6 +291,32 @@ export async function trashRecordsAction(input: unknown): Promise<Outcome<{ coun
     }));
 }
 
+/** Take records out of the trash. */
+export async function restoreRecordsAction(input: unknown): Promise<Outcome<{ count: number }>> {
+    const parsed = z.object({ object, ids }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        count: await records.restoreRecords(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.ids
+        )
+    }));
+}
+
+/** Delete records in the trash for good. */
+export async function destroyRecordsAction(input: unknown): Promise<Outcome<{ count: number }>> {
+    const parsed = z.object({ object, ids }).safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        count: await records.destroyRecords(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.ids
+        )
+    }));
+}
+
 /** Records to point a reference at, by name. */
 export async function searchRefsAction(input: unknown): Promise<Outcome<{ refs: Ref[] }>> {
     const parsed = z.object({ object, search }).safeParse(input);

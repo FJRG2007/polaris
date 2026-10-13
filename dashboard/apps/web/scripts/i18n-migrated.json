@@ -1838,6 +1838,7 @@
         "crm/src/screens/table-header.tsx",
         "crm/src/screens/timeline.tsx",
         "crm/src/screens/totals-row.tsx",
+        "crm/src/screens/trash-dialog.tsx",
         "crm/src/screens/use-groups.ts",
         "crm/src/screens/use-records.ts",
         "crm/src/screens/view-picker.tsx",
