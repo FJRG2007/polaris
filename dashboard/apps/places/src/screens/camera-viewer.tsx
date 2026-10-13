@@ -489,10 +489,14 @@ export function CameraViewer({
         // Before its first frame the element has only its own report to give;
         // the frame follows at once (`onLoadedData`) and is the better one.
         if (coded === null && element.readyState < 2) return;
-        setShape((known) => streamShape(known, coded, { width: videoWidth, height: videoHeight }));
+        const picture = still.current;
+        const stillShape =
+            picture && picture.naturalWidth > 0 && picture.naturalHeight > 0
+                ? picture.naturalWidth / picture.naturalHeight
+                : null;
+        setShape(streamShape(stillShape, coded, { width: videoWidth, height: videoHeight }));
         if (sizeLogged.current || coded === null) return;
         sizeLogged.current = true;
-        const picture = still.current;
         console.debug(
             `[camera-viewer] video ${videoWidth}x${videoHeight} (decoded shape ${coded.toFixed(3)}), still ${picture?.naturalWidth ?? 0}x${picture?.naturalHeight ?? 0}`
         );

@@ -52,16 +52,17 @@ export function viewerFrame(shape: number | null): { aspectRatio: string; maxWid
  * shape of its own (some cameras' do, wrongly), and the browser then reports
  * and draws a 2304x1296 picture as 4:3 - every timestamp and face a third
  * taller than it is. So the pixels actually decoded (`coded`) come first, then
- * the shape already known from a still (decoded by the relay, square pixels),
- * and the element's own report only when there is nothing else.
+ * the shape of a still (decoded by the relay, square pixels), and the
+ * element's own report only when there is neither - fresh on every call, so a
+ * stream that changes size in-band is followed even where no frame can be read.
  */
 export function streamShape(
-    known: number | null,
+    still: number | null,
     coded: number | null,
     reported?: { width: number; height: number }
 ): number {
     if (coded !== null && Number.isFinite(coded) && coded > 0) return coded;
-    if (known !== null && Number.isFinite(known) && known > 0) return known;
+    if (still !== null && Number.isFinite(still) && still > 0) return still;
     return pictureShape(null, reported);
 }
 

@@ -64,6 +64,11 @@ describe("a stream whose declared shape is not its picture's", () => {
         expect(streamShape(Number.NaN, 0, { width: 0, height: 0 })).toBeCloseTo(16 / 9);
     });
 
+    it("follows an in-band resize where no frame can be read and no still is known", () => {
+        expect(streamShape(null, null, { width: 1280, height: 720 })).toBeCloseTo(16 / 9);
+        expect(streamShape(null, null, { width: 640, height: 480 })).toBeCloseTo(4 / 3);
+    });
+
     it("is drawn at the measured shape, as large as the frame or the screen allows", () => {
         expect(streamBox(16 / 9)).toEqual({
             aspectRatio: String(16 / 9),

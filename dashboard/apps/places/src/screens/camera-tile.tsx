@@ -163,6 +163,8 @@ export function CameraTile({
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. Null until one has arrived. */
     const [shape, setShape] = useState<number | null>(null);
+    /** The last still's shape on its own, which a stream's report never overrides. */
+    const stillShape = useRef<number | null>(null);
     const format = useDisplayFormat();
     const t = usePlacesT();
     /** When this camera stopped answering, in the reader's own format, or null
@@ -387,7 +389,8 @@ export function CameraTile({
                                 if (shownSrc) rememberFrame(camera.id, shownSrc);
                                 const { naturalWidth, naturalHeight } = loaded.currentTarget;
                                 if (naturalWidth > 0 && naturalHeight > 0) {
-                                    setShape(naturalWidth / naturalHeight);
+                                    stillShape.current = naturalWidth / naturalHeight;
+                                    setShape(stillShape.current);
                                 }
                                 if (wantFrames) after(attempt ? FRAME_GAP_MS : COLD_GAP_MS);
                             }}
@@ -436,8 +439,8 @@ export function CameraTile({
                                     const { videoWidth, videoHeight } = element;
                                     if (videoWidth <= 0 || videoHeight <= 0) return;
                                     const coded = codedShape(element);
-                                    setShape((known) =>
-                                        streamShape(known, coded, {
+                                    setShape(
+                                        streamShape(stillShape.current, coded, {
                                             width: videoWidth,
                                             height: videoHeight
                                         })
