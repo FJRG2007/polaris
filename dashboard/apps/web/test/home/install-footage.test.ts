@@ -47,11 +47,23 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+const unreachable = new Set<string>();
+const missing = new Set<string>();
+const opened: string[] = [];
+const disposed: string[] = [];
+
 vi.mock("@/lib/storage-target", () => ({
-    driverForTarget: async (targetId: string) => ({
-        delete: async (path: string) => void deleted.push(`${targetId}:${path}`),
-        dispose: async () => undefined
-    })
+    driverForTarget: async (targetId: string) => {
+        if (unreachable.has(targetId)) throw new Error("connection refused");
+        opened.push(targetId);
+        return {
+            delete: async (path: string) => {
+                if (missing.has(path)) throw Object.assign(new Error("gone"), { code: "ENOENT" });
+                deleted.push(`${targetId}:${path}`);
+            },
+            dispose: async () => void disposed.push(targetId)
+        };
+    }
 }));
 
 const { deleteInstallFootage } = await import("@polaris-app/places/src/lib/recording");
@@ -59,6 +71,10 @@ const { deleteInstallFootage } = await import("@polaris-app/places/src/lib/recor
 describe("deleteInstallFootage", () => {
     beforeEach(() => {
         deleted.length = 0;
+        opened.length = 0;
+        disposed.length = 0;
+        unreachable.clear();
+        missing.clear();
         clips = [];
         events = [];
     });
@@ -90,6 +106,34 @@ describe("deleteInstallFootage", () => {
         }));
         await deleteInstallFootage("install-1");
         expect(new Set(deleted).size).toBe(1201);
+    });
+
+    it("opens one connection per storage for the whole run, and closes it", async () => {
+        clips = Array.from({ length: 1201 }, (_, index) => ({
+            id: `c${String(index).padStart(5, "0")}`,
+            cameraId: "cam-a",
+            path: `${index % 2 ? "nas-1" : "local"}:polaris/home/clips/cam-a/${index}.mp4`
+        }));
+        await deleteInstallFootage("install-1");
+        expect(opened.sort()).toEqual(["local", "nas-1"]);
+        expect(disposed.sort()).toEqual(["local", "nas-1"]);
+    });
+
+    it("takes a file that is already gone as removed", async () => {
+        clips = [{ id: "c1", cameraId: "cam-a", path: "local:polaris/home/clips/cam-a/1.mp4" }];
+        missing.add("polaris/home/clips/cam-a/1.mp4");
+        await expect(deleteInstallFootage("install-1")).resolves.toBeUndefined();
+    });
+
+    it("throws when a storage is unreachable, after removing what it could", async () => {
+        clips = [
+            { id: "c1", cameraId: "cam-a", path: "local:polaris/home/clips/cam-a/1.mp4" },
+            { id: "c2", cameraId: "cam-b", path: "nas-1:polaris/home/clips/cam-b/2.mp4" }
+        ];
+        unreachable.add("nas-1");
+        await expect(deleteInstallFootage("install-1")).rejects.toThrow(/1 footage files/);
+        expect(deleted).toEqual(["local:polaris/home/clips/cam-a/1.mp4"]);
+        expect(disposed).toEqual(["local"]);
     });
 
     it("does nothing for an install with no cameras", async () => {

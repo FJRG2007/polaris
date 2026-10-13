@@ -17,7 +17,11 @@ import { recordAudit } from "@/lib/audit-service";
 import { clearResourceGrants } from "@polaris/auth";
 import { z } from "zod";
 import { installRef, uninstallAccess } from "@/lib/apps/install-access";
-import { afterInstallStarts, beforeInstallStops } from "@/lib/app-extensions/registry";
+import {
+    afterInstallStarts,
+    beforeInstallStops,
+    InstallFilesLeftError
+} from "@/lib/app-extensions/registry";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import type { DeployStrategy } from "@/lib/deploy/releases";
@@ -121,6 +125,9 @@ export async function uninstallInstalledAppAction(
         revalidatePath("/apps/marketplace");
         return {};
     } catch (caught) {
+        if (caught instanceof InstallFilesLeftError) {
+            return { error: (await getTranslations("installed"))("errors.filesLeft") };
+        }
         return {
             error:
                 caught instanceof Error

@@ -107,6 +107,18 @@ describe("uninstallApp", () => {
         expect(pauseOwnedServices).not.toHaveBeenCalled();
     });
 
+    it("stops before anything else goes when an install's files could not be removed", async () => {
+        const { InstallFilesLeftError } = await import("@/lib/app-extensions/registry");
+        purgeInstallFiles.mockRejectedValueOnce(new InstallFilesLeftError(["home"]) as never);
+        await expect(
+            uninstallApp(ROW.ownerId, ROW.id, { deleteData: true })
+        ).rejects.toBeInstanceOf(InstallFilesLeftError);
+        expect(deleteApplication).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(db.installedApp.deleteMany).not.toHaveBeenCalled();
+        expect(db.installedApp.updateMany).not.toHaveBeenCalled();
+    });
+
     it("uninstalls a builtin app's helpers with their data when the data goes", async () => {
         const home = { ...ROW, catalogId: "home", applicationId: null };
         const helper = { id: "00000000-0000-7000-8000-000000000002", ownerId: ROW.ownerId };

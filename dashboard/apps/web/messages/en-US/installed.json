@@ -37,6 +37,7 @@
         "update": "Could not update the app",
         "ownerOnly": "Only the person who installed this app can remove it",
         "uninstall": "Could not uninstall the app",
+        "filesLeft": "Some of its files could not be deleted. Check that its storage is reachable and try again. Nothing else was removed.",
         "readAccess": "Could not read who can reach this server",
         "checkDetails": "Check the details and try again",
         "give": "Could not give access",

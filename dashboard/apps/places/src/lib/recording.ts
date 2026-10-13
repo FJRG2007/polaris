@@ -24,7 +24,7 @@ import { prisma } from "@polaris/db";
 import { HomeError } from "./home-error";
 import { randomUUID } from "node:crypto";
 import { getCamera } from "./cameras";
-import { deleteStill, footageTarget } from "./stills";
+import { footageTarget } from "./stills";
 import { relayEndpoint, relayServerFor, relayStream, streamPath } from "./relay";
 import { LOCAL_TARGET } from "@polaris/core";
 import { host } from "@polaris/app-host";
@@ -363,11 +363,26 @@ export async function deleteClips(
 /** How many rows one page of an install's footage reads. */
 const FOOTAGE_PAGE = 500;
 
+/** How many of those files are removed at once from one storage. */
+const FOOTAGE_DELETES_AT_ONCE = 16;
+
+type FootageDriver = Awaited<ReturnType<typeof driverForTarget>>;
+
+/** Whether a delete failed only because the file was already gone. */
+function alreadyGone(error: unknown): boolean {
+    const code = (error as { code?: unknown } | null)?.code;
+    return code === "ENOENT" || code === "not_found";
+}
+
 /**
  * Remove every file an install's cameras wrote - each clip, kept ones included,
  * and each event's still - before its data is purged. The rows go with the purge
  * (they cascade from the camera), so this only touches files, and it reads them
  * a page at a time by id so a house with years of footage is never one query.
+ *
+ * One connection per storage for the whole run, a few files at a time on each.
+ * Unlike retention this is not best effort: a file that could not be removed
+ * throws once the rest are done, so the rows that find it are kept.
  */
 export async function deleteInstallFootage(installedAppId: string): Promise<void> {
     const cameras = await prisma.camera.findMany({
@@ -377,31 +392,86 @@ export async function deleteInstallFootage(installedAppId: string): Promise<void
     if (cameras.length === 0) return;
     const cameraId = { in: cameras.map((camera) => camera.id) };
 
-    let after: string | undefined;
-    for (;;) {
-        const clips = await prisma.cameraClip.findMany({
-            where: { cameraId, ...(after ? { id: { gt: after } } : {}) },
-            orderBy: { id: "asc" },
-            take: FOOTAGE_PAGE,
-            select: { id: true, path: true }
-        });
-        for (const clip of clips) await deleteClipFile(clip.path);
-        if (clips.length < FOOTAGE_PAGE) break;
-        after = clips[clips.length - 1].id;
-    }
+    const drivers = new Map<string, Promise<FootageDriver | null>>();
+    let left = 0;
+    const driverFor = (targetId: string): Promise<FootageDriver | null> => {
+        let driver = drivers.get(targetId);
+        if (!driver) {
+            driver = driverForTarget(targetId, LOCAL_FOLDER).catch((error: unknown) => {
+                console.error(`places: storage ${targetId} is unreachable:`, error);
+                return null;
+            });
+            drivers.set(targetId, driver);
+        }
+        return driver;
+    };
+    const remove = async (keys: readonly string[]): Promise<void> => {
+        const byTarget = new Map<string, string[]>();
+        for (const key of keys) {
+            const split = key.indexOf(":");
+            if (split <= 0) continue;
+            const targetId = key.slice(0, split);
+            const paths = byTarget.get(targetId) ?? [];
+            paths.push(key.slice(split + 1));
+            byTarget.set(targetId, paths);
+        }
+        await Promise.all(
+            [...byTarget].map(async ([targetId, paths]) => {
+                const driver = await driverFor(targetId);
+                if (!driver) {
+                    left += paths.length;
+                    return;
+                }
+                for (let at = 0; at < paths.length; at += FOOTAGE_DELETES_AT_ONCE) {
+                    await Promise.all(
+                        paths.slice(at, at + FOOTAGE_DELETES_AT_ONCE).map((path) =>
+                            driver.delete(path).catch((error: unknown) => {
+                                if (alreadyGone(error)) return;
+                                left += 1;
+                                console.error(`places: could not delete ${path}:`, error);
+                            })
+                        )
+                    );
+                }
+            })
+        );
+    };
 
-    after = undefined;
-    for (;;) {
-        const events = await prisma.cameraEvent.findMany({
-            where: { cameraId, stillKey: { not: null }, ...(after ? { id: { gt: after } } : {}) },
-            orderBy: { id: "asc" },
-            take: FOOTAGE_PAGE,
-            select: { id: true, stillKey: true }
-        });
-        for (const event of events) if (event.stillKey) await deleteStill(event.stillKey);
-        if (events.length < FOOTAGE_PAGE) break;
-        after = events[events.length - 1].id;
+    try {
+        let after: string | undefined;
+        for (;;) {
+            const clips = await prisma.cameraClip.findMany({
+                where: { cameraId, ...(after ? { id: { gt: after } } : {}) },
+                orderBy: { id: "asc" },
+                take: FOOTAGE_PAGE,
+                select: { id: true, path: true }
+            });
+            await remove(clips.map((clip) => clip.path));
+            if (clips.length < FOOTAGE_PAGE) break;
+            after = clips[clips.length - 1].id;
+        }
+
+        after = undefined;
+        for (;;) {
+            const events = await prisma.cameraEvent.findMany({
+                where: {
+                    cameraId,
+                    stillKey: { not: null },
+                    ...(after ? { id: { gt: after } } : {})
+                },
+                orderBy: { id: "asc" },
+                take: FOOTAGE_PAGE,
+                select: { id: true, stillKey: true }
+            });
+            await remove(events.flatMap((event) => (event.stillKey ? [event.stillKey] : [])));
+            if (events.length < FOOTAGE_PAGE) break;
+            after = events[events.length - 1].id;
+        }
+    } finally {
+        for (const driver of drivers.values())
+            await (await driver)?.dispose?.().catch(() => undefined);
     }
+    if (left > 0) throw new Error(`${left} footage files could not be deleted`);
 }
 
 /** Remove a clip and its file. */

@@ -248,13 +248,6 @@ export function appVolumeDescription(app: {
     return where ? `Data of ${app.name} (${where})` : `Data of ${app.name}`;
 }
 
-/**
- * Before an app is deleted: note its volumes as belonging to something that no
- * longer exists, rather than letting them become nameless.
- *
- * Its named volumes are known from its own rows - compose creates each as
- * `<project>_<name>` - and any note already about it is marked too.
- */
 /** The Docker volume compose creates for one of an app's volumes: `<project>_<name>`. */
 export function appVolumeName(applicationId: string, source: string): string {
     return `polaris-${shortHash(applicationId, 8)}_${source}`;
@@ -271,6 +264,13 @@ export async function appDataVolumeNames(applicationId: string): Promise<string[
     );
 }
 
+/**
+ * Before an app is deleted: note its volumes as belonging to something that no
+ * longer exists, rather than letting them become nameless.
+ *
+ * Its named volumes are known from its own rows - compose creates each as
+ * `<project>_<name>` - and any note already about it is marked too.
+ */
 export async function noteAppDeleted(applicationId: string, now = new Date()): Promise<void> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },

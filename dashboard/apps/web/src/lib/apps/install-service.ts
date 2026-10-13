@@ -625,15 +625,6 @@ export async function uninstallApp(
             ? await mailServerUninstallRefusal()
             : await appUninstallRefusal(row);
     if (refusal) throw new Error(refusal);
-    if (row.applicationId) {
-        try {
-            await deleteApplication(row.applicationId, ownerId, {
-                deleteData: options.deleteData
-            });
-        } catch {
-            // The application may already have been removed in Deploy; proceed.
-        }
-    }
     const app = findApp(row.catalogId);
     const copies =
         app?.singleton && app.instanceWide
@@ -643,12 +634,21 @@ export async function uninstallApp(
               })
             : [];
     const ids = [...new Set([row.id, ...copies.map((copy) => copy.id)])];
-    if (options.deleteData) {
-        for (const installId of ids) {
-            // Files first, while the rows that find them (clips, stills) still exist.
-            await purgeInstallFiles(installId);
-            await purgeInstallData(installId);
+    // Files first, while the rows that find them (clips, stills) still exist, and
+    // before anything else goes: a file that stays stops the uninstall here, so
+    // trying again still finds it.
+    if (options.deleteData) for (const installId of ids) await purgeInstallFiles(installId);
+    if (row.applicationId) {
+        try {
+            await deleteApplication(row.applicationId, ownerId, {
+                deleteData: options.deleteData
+            });
+        } catch {
+            // The application may already have been removed in Deploy; proceed.
         }
+    }
+    if (options.deleteData) {
+        for (const installId of ids) await purgeInstallData(installId);
         await prisma.installedApp.deleteMany({ where: { id: { in: ids } } });
     } else {
         // Kept so a reinstall finds what was made in it, but not the credential:

@@ -107,7 +107,8 @@ export interface AppExtension {
     readonly afterStart?: (installedAppId: string) => Promise<void>;
 
     /** Before an install's data is purged: remove the files it wrote outside the
-     *  database (recordings, pictures), while the rows that find them still exist. */
+     *  database (recordings, pictures), while the rows that find them still exist.
+     *  Throws when any file could not be removed, so those rows are kept. */
     readonly purgeInstallFiles?: (installedAppId: string) => Promise<void>;
 
     /**
