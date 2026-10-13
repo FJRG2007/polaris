@@ -13020,6 +13020,9 @@ model CrmEvent {
     user User?         @relation("CrmEventShelf", fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([recordId, id])
+    // The audit log: a shelf's events, newest first.
+    @@index([orgId, id])
+    @@index([userId, id])
 }
 
 // A CRM record linked to something another app keeps: a note, a task, a Drive

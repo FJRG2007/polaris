@@ -722,5 +722,40 @@
             "unknownField": "A field in this rule no longer exists. Reload and try again.",
             "nameLocked": "The name field cannot be hidden or locked."
         }
+    },
+    "audit": {
+        "title": "Audit log",
+        "when": "When",
+        "who": "Who",
+        "object": "Kind of record",
+        "record": "Record",
+        "what": "What happened",
+        "field": "Field",
+        "before": "Before",
+        "after": "After",
+        "kinds": {
+            "created": "Created",
+            "updated": "Changed",
+            "trashed": "Moved to the trash",
+            "restored": "Restored",
+            "imported": "Imported"
+        },
+        "allObjects": "All records",
+        "allKinds": "Anything",
+        "everyone": "Anyone",
+        "from": "From",
+        "to": "To",
+        "clear": "Clear filters",
+        "export": "Export",
+        "exported": "{count, plural, one {# event exported} other {# events exported}}",
+        "truncated": "Only the newest {count} events were exported",
+        "exportFailed": "The log could not be exported.",
+        "empty": "Nothing has happened in the CRM yet",
+        "emptyFiltered": "No events match these filters",
+        "more": "Show older",
+        "deleted": "Deleted record",
+        "noAccess": "Your role does not see the history of every record here. Each record's own activity is on its page.",
+        "changes": "{count, plural, one {# field} other {# fields}}",
+        "someone": "Someone"
     }
 }

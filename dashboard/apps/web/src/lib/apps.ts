@@ -1237,6 +1237,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["permissions", "field access", "hidden fields", "read-only", "own records"]
         },
         {
+            label: "Audit log", // i18n-ignore
+            href: "/crm/audit",
+            icon: History,
+            keywords: ["activity", "history", "who changed", "changes", "events", "export"]
+        },
+        {
             label: "New company", // i18n-ignore
             href: "/crm/companies?new=1",
             icon: Building2,

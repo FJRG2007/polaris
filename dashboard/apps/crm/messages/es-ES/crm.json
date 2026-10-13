@@ -722,5 +722,40 @@
             "unknownField": "Un campo de esta regla ya no existe. Recarga e inténtalo de nuevo.",
             "nameLocked": "El campo nombre no se puede ocultar ni bloquear."
         }
+    },
+    "audit": {
+        "title": "Registro de auditoría",
+        "when": "Cuándo",
+        "who": "Quién",
+        "object": "Tipo de registro",
+        "record": "Registro",
+        "what": "Qué pasó",
+        "field": "Campo",
+        "before": "Antes",
+        "after": "Después",
+        "kinds": {
+            "created": "Creado",
+            "updated": "Modificado",
+            "trashed": "Movido a la papelera",
+            "restored": "Restaurado",
+            "imported": "Importado"
+        },
+        "allObjects": "Todos los registros",
+        "allKinds": "Cualquier cosa",
+        "everyone": "Cualquiera",
+        "from": "Desde",
+        "to": "Hasta",
+        "clear": "Quitar filtros",
+        "export": "Exportar",
+        "exported": "{count, plural, one {# evento exportado} other {# eventos exportados}}",
+        "truncated": "Solo se exportaron los {count} eventos más recientes",
+        "exportFailed": "No se pudo exportar el registro.",
+        "empty": "Todavía no ha pasado nada en el CRM",
+        "emptyFiltered": "Ningún evento coincide con estos filtros",
+        "more": "Ver anteriores",
+        "deleted": "Registro eliminado",
+        "noAccess": "Tu rol no ve el historial de todos los registros. La actividad de cada registro está en su página.",
+        "changes": "{count, plural, one {# campo} other {# campos}}",
+        "someone": "Alguien"
     }
 }

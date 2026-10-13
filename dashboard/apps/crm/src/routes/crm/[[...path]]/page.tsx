@@ -1,8 +1,8 @@
 /**
  * The CRM: `/crm`, `/crm/<companies|people|opportunities>`, one record's
  * page, `/crm/<object>/<id>`, the dashboards, `/crm/dashboards`, and the sales
- * forecast, `/crm/forecast`, and what each role of the organization may see,
- * `/crm/roles`.
+ * forecast, `/crm/forecast`, what each role of the organization may see,
+ * `/crm/roles`, and the audit log, `/crm/audit`.
  *
  * The server hands over the frame and nothing else - no record, view or total
  * is read here. The list reads them in the browser, painting what it kept from
@@ -21,6 +21,7 @@ import { RecordScreen } from "../../../screens/record-screen";
 import { DashboardsScreen } from "../../../screens/dashboards-screen";
 import { ForecastScreen } from "../../../screens/forecast-screen";
 import { RolesScreen } from "../../../screens/roles-screen";
+import { AuditScreen } from "../../../screens/audit-screen";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,13 @@ export default async function CrmPage({
         return (
             <div className={PAGE_FILL}>
                 <ForecastScreen />
+            </div>
+        );
+    }
+    if (object === "audit" && rest.length === 0) {
+        return (
+            <div className={PAGE_FILL}>
+                <AuditScreen />
             </div>
         );
     }

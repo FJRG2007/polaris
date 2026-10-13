@@ -133,8 +133,13 @@ const REF_SELECT: Readonly<Record<CrmObject | "user", Record<string, true>>> = {
     user: { id: true, name: true }
 };
 
+/** The `select` that reads only what a record of a kind is named by. */
+export function nameSelect(object: CrmObject): Record<string, true> {
+    return REF_SELECT[object];
+}
+
 /** The name a referenced row is drawn by. */
-function refName(row: Record<string, unknown>): string {
+export function refName(row: Record<string, unknown>): string {
     if ("firstName" in row) {
         return [row.firstName, row.lastName]
             .filter((part) => typeof part === "string" && part)
