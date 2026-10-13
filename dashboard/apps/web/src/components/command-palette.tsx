@@ -20,7 +20,8 @@
  */
 
 import * as core from "@polaris/core";
-import { Loader2, Search, X } from "lucide-react";
+import { Compass, Loader2, Search, X } from "lucide-react";
+import { useTourEntries } from "@/components/tours/guided-tours";
 import * as recentStore from "@/lib/search/recent";
 import { dropSnapshots } from "@/lib/snapshot-cache";
 import { PlainNames } from "@/components/person-name";
@@ -404,14 +405,34 @@ export function CommandPalette({
         [isAdmin, appKey, heldKey, installedKey]
     );
 
+    // "Take the tour of Chat": found by typing, never listed in the empty map.
+    const reachable = useMemo(
+        () => new Set(navigation.map((entry) => entry.href)),
+        [navigation]
+    );
+    const tTours = useTranslations("tours");
+    const tourRows = useTourEntries(reachable);
+    const tours = useMemo<CommandEntry[]>(
+        () =>
+            tourRows.map(({ tour, label, href }) => ({
+                id: `tour:${tour.id}`,
+                label,
+                group: tTours("list.title"),
+                href,
+                icon: Compass,
+                keywords: [tTours("menu"), "tour", "guide"]
+            })),
+        [tourRows, tTours]
+    );
+
     /** What fuse matches against: everything, or one scope's slice of the index. */
     const pool = useMemo(() => {
-        if (!scope) return [...navigation, ...resourceEntries(resources)];
+        if (!scope) return [...navigation, ...tours, ...resourceEntries(resources)];
         if (!scope.resourceKind) return [];
         return resourceEntries(
             resources.filter((resource) => resource.kind === scope.resourceKind)
         );
-    }, [scope, navigation, resources]);
+    }, [scope, navigation, tours, resources]);
 
     const suggestions = useMemo(() => (scope ? [] : commandSuggestions(query)), [scope, query]);
 
@@ -712,6 +733,7 @@ export function CommandPalette({
         <>
             <button
                 type="button"
+                data-tour="shell.search"
                 onClick={() => {
                     presetRef.current = null;
                     setOpen(true);

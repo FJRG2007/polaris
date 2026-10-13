@@ -388,7 +388,7 @@ export function AppSwitcher({
         <DropdownMenu open={isOpen} onOpenChange={setOpen}>
             {/* On a phone the bar also carries the page's own controls, so the
                 trigger keeps its glyph and drops the app name and the chevron. */}
-            <DropdownMenuTrigger className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted sm:px-2">
+            <DropdownMenuTrigger data-tour="shell.switcher" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted sm:px-2">
                 <span className="relative grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
                     <CurrentIcon className="size-4" />
                     {alert ? (

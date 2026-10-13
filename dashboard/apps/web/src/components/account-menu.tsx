@@ -11,6 +11,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePresenceRefresh } from "@/components/presence-store";
+import { openTourList } from "@/lib/tours/target";
 import { AccountSwitcherDialog } from "@/components/device-accounts";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
 import {
@@ -24,6 +25,7 @@ import {
     Download,
     CalendarClock,
     Check,
+    Compass,
     Link2,
     LogOut,
     MessageSquareText,
@@ -140,6 +142,7 @@ export function AccountMenu({
 }) {
     const router = useRouter();
     const t = useTranslations("nav");
+    const tTours = useTranslations("tours");
     const tc = useTranslations("common");
     const toast = useToast();
     const format = useDisplayFormat();
@@ -385,6 +388,7 @@ export function AccountMenu({
             face it was aimed at. */}
             <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
                 <DropdownMenuTrigger
+                    data-tour="shell.account"
                     aria-label={t("account.trigger")}
                     title={t("account.triggerHint")}
                     // Straight there. Your own face is the way to your own account
@@ -597,6 +601,10 @@ export function AccountMenu({
                             <Link2 className="size-4" />
                             {t("account.sharedLinks")}
                         </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={openTourList}>
+                        <Compass className="size-4" />
+                        {tTours("menu")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {/* Where Discord keeps it: beside signing out, since both are

@@ -106,7 +106,7 @@ export default async function AccountPage() {
 
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
-            <div>
+            <div data-tour="settings.profile">
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("profile.page.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("profile.page.intro")}</p>
             </div>
