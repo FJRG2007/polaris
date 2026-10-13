@@ -357,5 +357,12 @@
             "duplicate": "This choice is already there.",
             "tooMany": "Use up to {max} choices."
         }
+    },
+    "export": {
+        "button": "Export",
+        "hint": "Download the rows of this view as a CSV file",
+        "done": "{count, plural, one {# row} other {# rows}} exported",
+        "truncated": "Exported the first {count, plural, one {# row} other {# rows}}. Narrow the view to export the rest.",
+        "failed": "The export failed"
     }
 }

@@ -11,6 +11,7 @@ import * as views from "../lib/views";
 import * as fields from "../lib/fields";
 import * as totals from "../lib/totals";
 import * as records from "../lib/records";
+import * as exporter from "../lib/export";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities } from "../lib/access";
 import { requireCrmActor } from "../lib/access";
@@ -120,6 +121,23 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
             filter: sent
         })
     );
+}
+
+/** The rows a view shows, in its columns, as a CSV file. */
+export async function exportRecordsAction(input: unknown): Promise<Outcome<exporter.CsvExport>> {
+    const parsed = z
+        .object({
+            object,
+            search,
+            sorts,
+            filter,
+            deleted: z.boolean().default(false),
+            columns: z.array(fieldKey).max(128).default([])
+        })
+        .safeParse(input);
+    if (!parsed.success) return invalid();
+    const { object: kind, ...options } = parsed.data;
+    return outcome(async () => exporter.exportRecords(await requireCrmActor(), kind, options));
 }
 
 /** The first page of every group of a grouped list or a board. */
