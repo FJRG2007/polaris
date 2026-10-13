@@ -2392,7 +2392,7 @@ export async function deleteApplication(
             id: true,
             environmentId: true,
             volumes: { select: { id: true } },
-            target: { select: { kind: true } }
+            target: { select: { id: true, kind: true } }
         }
     });
     if (!app) throw new Error("Application not found");
@@ -2403,8 +2403,7 @@ export async function deleteApplication(
     // only way in to the volume - so it runs before the deployment comes down.
     const flags = await getFlagsForEnvironment(app.environmentId);
     // The Docker volumes it used, named before the rows that name them go.
-    const dataVolumes =
-        deleteData && app.target?.kind === "local" ? await appDataVolumeNames(applicationId) : [];
+    const dataVolumes = deleteData ? await appDataVolumeNames(applicationId) : [];
     if (flags.wipeVolumesOnDelete || deleteData) {
         for (const volume of app.volumes) {
             await wipeVolume(volume.id, ownerId).catch(() => undefined);
@@ -2439,9 +2438,43 @@ export async function deleteApplication(
     // The emptied volumes themselves, now nothing is attached to them. Each goes
     // through `removeHostVolume`'s own checks; one it refuses is left for the
     // leftover-volume sweep rather than failing a delete that already happened.
-    for (const name of dataVolumes) {
-        const result = await removeHostVolume(name).catch(() => null);
-        if (!result?.ok) console.error(`polaris: volume ${name} was left for the leftover sweep`);
+    if (dataVolumes.length === 0) return;
+    if (app.target?.kind === "local") {
+        for (const name of dataVolumes) {
+            const result = await removeHostVolume(name).catch(() => null);
+            if (!result?.ok)
+                console.error(`polaris: volume ${name} was left for the leftover sweep`);
+        }
+    } else if (app.target) {
+        await removeServerVolumes(app.target.id, ownerId, dataVolumes);
+    }
+}
+
+/**
+ * A deleted app's emptied volumes on another server, removed over its own
+ * connection. Best effort like the local removal: the app is already gone, and a
+ * volume the server refuses is named in the log rather than failing that.
+ */
+async function removeServerVolumes(
+    targetId: string,
+    ownerId: string,
+    names: readonly string[]
+): Promise<void> {
+    const target = await prisma.deployTarget.findFirst({ where: { id: targetId, ownerId } });
+    if (!target) return;
+    const ports = await getPorts(target as TargetRow, ownerId).catch(() => null);
+    if (!ports?.removeVolume) {
+        await ports?.dispose();
+        return;
+    }
+    try {
+        for (const name of names) {
+            await ports.removeVolume(name).catch((error: unknown) => {
+                console.error(`polaris: volume ${name} was left on its server:`, error);
+            });
+        }
+    } finally {
+        await ports.dispose();
     }
 }
 
