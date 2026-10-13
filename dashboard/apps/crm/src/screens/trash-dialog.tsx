@@ -81,7 +81,7 @@ export function TrashDialog(props: TrashDialogProps) {
             });
             if (!ok) return;
         }
-        const kept = rows;
+        const at = (rows ?? []).findIndex((one) => one.id === record.id);
         setRows((before) => (before ?? []).filter((one) => one.id !== record.id));
         setTotal((count) => count - 1);
         const call = forever ? actions.destroyRecordsAction : actions.restoreRecordsAction;
@@ -93,7 +93,11 @@ export function TrashDialog(props: TrashDialogProps) {
                 });
             })
             .catch((caught) => {
-                setRows(kept);
+                setRows((before) => {
+                    const list = (before ?? []).filter((one) => one.id !== record.id);
+                    list.splice(at < 0 ? 0 : Math.min(at, list.length), 0, record);
+                    return list;
+                });
                 setTotal((count) => count + 1);
                 toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
             });

@@ -80,6 +80,17 @@ async function mayUseNotes(actor: OrgActor): Promise<boolean> {
     return userHasPermission(actor.id, "notes.use");
 }
 
+/** Whether this account may read Notes and Tasks at all, so a record leaves out what it may not open. */
+export async function crmReach(actor: OrgActor): Promise<{ notes: boolean; tasks: boolean }> {
+    if (actor.isAdmin) return { notes: true, tasks: true };
+    const { userHasPermission } = await import("@polaris/auth");
+    const [notes, tasks] = await Promise.all([
+        userHasPermission(actor.id, "notes.use"),
+        userHasPermission(actor.id, "tasks.read")
+    ]);
+    return { notes, tasks };
+}
+
 /**
  * Some notes by id, as far as this account may read them in Notes: one gone,
  * archived, or on a shelf that is not theirs is left out. In the order given.

@@ -309,6 +309,7 @@ export const serverHost = {
         crmNotesByIds: later(load.crmHost, "crmNotesByIds"),
         crmOrgPeople: later(load.crmHost, "crmOrgPeople"),
         crmOrgPermissions: later(load.crmHost, "crmOrgPermissions"),
+        crmReach: later(load.crmHost, "crmReach"),
         crmShelf: later(load.crmHost, "crmShelf"),
         createTask: later(load.calendarHost, "createDueTask"),
         peopleByIds: later(load.calendarHost, "peopleByIds"),

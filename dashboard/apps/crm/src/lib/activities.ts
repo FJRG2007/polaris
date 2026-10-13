@@ -42,20 +42,21 @@ export async function openActivities(
 ): Promise<RecordActivities> {
     await requireCan(actor, object, "read");
     const editing = actor.can[object].edit;
-    const [noteIds, taskIds, shelves, lists] = await Promise.all([
+    const [noteIds, taskIds, reach, shelves, lists] = await Promise.all([
         linkedIds(actor, object, recordId, "note"),
         linkedIds(actor, object, recordId, "task"),
-        host.crmHost.crmNoteShelves(who(actor)),
+        host.crmHost.crmReach(who(actor)),
+        editing ? host.crmHost.crmNoteShelves(who(actor)) : Promise.resolve(null),
         editing ? host.crmHost.taskListsFor(who(actor)) : Promise.resolve(null)
     ]);
     const [notes, tasks] = await Promise.all([
-        shelves ? host.crmHost.crmNotesByIds(who(actor), noteIds) : Promise.resolve(null),
-        host.crmHost.tasksByIds(who(actor), taskIds)
+        reach.notes ? host.crmHost.crmNotesByIds(who(actor), noteIds) : Promise.resolve(null),
+        reach.tasks ? host.crmHost.tasksByIds(who(actor), taskIds) : Promise.resolve(null)
     ]);
     return {
         notes: notes ? notes.map((note: LinkedNote) => ({ ...note })) : null,
-        noteShelves: editing ? (shelves ?? []) : [],
-        tasks: tasks.map(toTask),
+        noteShelves: editing && reach.notes ? (shelves ?? []) : [],
+        tasks: tasks ? tasks.map(toTask) : null,
         taskLists: (lists ?? []).map((list: { id: string; name: string; spaceName: string }) => ({
             id: list.id,
             name: list.name,
