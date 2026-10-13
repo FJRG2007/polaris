@@ -42,6 +42,10 @@ api:
     # this, a working camera and a rejected one are the same answer, and the
     # person reading the screen has no container to look in.
     - /api/log
+    # Polaris restarts the relay when a camera connection stalls without
+    # closing: only a restart closes it, and a camera that caps its sessions
+    # refuses a new one while the stalled one is held.
+    - /api/restart
     - /api/frame.jpeg
     - /api/stream.mp4
     - /api/stream.m3u8

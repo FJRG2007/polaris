@@ -166,7 +166,7 @@ function props(patch: Partial<GridViewProps>): GridViewProps {
         showWeekends: true,
         showWeekNumbers: false,
         now: new Date("2026-10-07T10:00:00Z"),
-        dimPast: false,
+        fadePast: false,
         scrollToNowSignal: 0,
         slotMinutes: 30,
         dayStart: "08:00",

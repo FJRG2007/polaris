@@ -478,7 +478,7 @@
         "defaultView": "Abrir en",
         "defaultViewHint": "Cambia al cambiar de vista.",
         "description": "Cómo se ve tu calendario y con qué empiezan los eventos nuevos.",
-        "dimPast": "Atenuar días y eventos pasados",
+        "fadePast": "Atenuar días y eventos pasados",
         "display": "Vista",
         "endAfterStart": "El fin debe ser posterior al inicio.",
         "eventLimit": "Eventos por día en el mes",

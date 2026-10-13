@@ -312,6 +312,164 @@ export async function publishedStreams(endpoint: RelayEndpoint): Promise<string[
     return body ? Object.keys(body) : [];
 }
 
+/** Bytes received so far by each stream that has a connected producer and
+ *  somebody waiting on it, by stream name. */
+export type StreamTraffic = Record<string, number>;
+
+/**
+ * Restarting the relay drops every camera for the seconds it takes to come back,
+ * so it is done at most this often however many streams keep stalling.
+ */
+export const RELAY_RESTART_COOLDOWN_MS = 5 * 60_000;
+
+/** The longest a relay that keeps stalling waits between restarts. */
+export const RELAY_RESTART_COOLDOWN_MAX_MS = 60 * 60_000;
+
+/**
+ * How long after a restart the next one waits.
+ *
+ * Doubles for each restart in a row that did not free the streams it was for:
+ * a camera that stays stalled through a restart is not one a restart fixes, and
+ * every restart drops every other camera on the relay with it.
+ */
+export function relayRestartCooldownMs(fruitless: number): number {
+    const doublings = Math.max(0, Math.min(fruitless, 10));
+    return Math.min(RELAY_RESTART_COOLDOWN_MS * 2 ** doublings, RELAY_RESTART_COOLDOWN_MAX_MS);
+}
+
+/**
+ * What each stream is receiving, from the relay's `GET /api/streams` answer.
+ *
+ * A connected producer reports its byte count and one that is not connected
+ * only its address, and a stream nobody is waiting on is idle rather than
+ * stalled - so only streams with both are counted.
+ */
+export function streamTraffic(body: Record<string, unknown>): StreamTraffic {
+    const traffic: StreamTraffic = {};
+    for (const [name, stream] of Object.entries(body)) {
+        if (!stream || typeof stream !== "object") continue;
+        const { producers, consumers } = stream as { producers?: unknown; consumers?: unknown };
+        if (!Array.isArray(consumers) || consumers.length === 0) continue;
+        if (!Array.isArray(producers)) continue;
+        let received: number | null = null;
+        for (const producer of producers) {
+            const bytes = (producer as { bytes_recv?: unknown } | null)?.bytes_recv;
+            if (typeof bytes === "number" && Number.isFinite(bytes)) {
+                received = (received ?? 0) + bytes;
+            }
+        }
+        if (received !== null) traffic[name] = received;
+    }
+    return traffic;
+}
+
+/** What each stream is receiving, or null when the relay could not be asked. */
+export async function relayTraffic(endpoint: RelayEndpoint): Promise<StreamTraffic | null> {
+    const response = await relayFetch(endpoint, "/api/streams", { timeoutMs: 3000 }).catch(
+        () => null
+    );
+    if (!response?.ok) return null;
+    const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    return body && typeof body === "object" ? streamTraffic(body) : null;
+}
+
+/**
+ * The streams whose byte count did not move between two looks: connected,
+ * waited on, and receiving nothing. A stream seen only once tells nothing.
+ */
+export function stalledStreams(before: StreamTraffic | undefined, now: StreamTraffic): string[] {
+    if (!before) return [];
+    return Object.keys(now).filter((name) => before[name] === now[name]);
+}
+
+/** Whether a relay with these stalled streams is restarted now. */
+export function restartDue(
+    stalled: readonly string[],
+    lastRestartAt: number | undefined,
+    now: number,
+    fruitless = 0
+): boolean {
+    if (stalled.length === 0) return false;
+    return lastRestartAt === undefined || now - lastRestartAt >= relayRestartCooldownMs(fruitless);
+}
+
+/**
+ * Restart the relay in place.
+ *
+ * A stalled camera connection is not closed by replacing or deleting its stream
+ * - the relay only forgets the name - and a camera that caps its sessions then
+ * refuses the new one. Restarting closes every connection and reopens each
+ * camera from the relay's own file, which is the one recovery that frees them.
+ */
+export async function restartRelay(endpoint: RelayEndpoint): Promise<boolean> {
+    const response = await relayFetch(endpoint, "/api/restart", {
+        method: "POST",
+        timeoutMs: 3000
+    }).catch(() => null);
+    return response?.ok === true;
+}
+
+/**
+ * How long a stream is left alone after a frame request to it ran out of time.
+ *
+ * The relay holds a frame request open until the camera sends a keyframe and
+ * does not let go of one whose caller gave up, so asking a stalled stream again
+ * at once only adds another request it will hold.
+ */
+export const FRAME_PAUSE_MS = 20_000;
+
+/** A frame request's answer, read whole: frames are small. */
+type FrameAnswer = { ok: boolean; status: number; body: Buffer };
+
+/** The frame request out to each relay address right now, shared by every caller. */
+const framesAsked = new Map<string, Promise<FrameAnswer | null>>();
+/** Until when each stream is left alone, by relay and stream name. */
+const framesPausedUntil = new Map<string, number>();
+
+/**
+ * One frame request per stream at a time, and none for a while after one timed
+ * out. "paused" when the stream is being left alone; null when the relay did
+ * not answer, or the caller left before it did.
+ */
+async function askFrame(
+    endpoint: RelayEndpoint,
+    query: URLSearchParams,
+    timeoutMs: number,
+    signal?: AbortSignal
+): Promise<FrameAnswer | null | "paused"> {
+    const stream = `${endpoint.baseUrl}|${query.get("src") ?? ""}`;
+    if ((framesPausedUntil.get(stream) ?? 0) > Date.now()) return "paused";
+    const path = `/api/frame.jpeg?${query.toString()}`;
+    const key = `${endpoint.baseUrl}${path}`;
+    let asked = framesAsked.get(key);
+    if (!asked) {
+        // Not tied to any one caller's signal: it is shared, and one viewer
+        // leaving must not cancel it for the others.
+        asked = relayFetch(endpoint, path, { timeoutMs })
+            .then(async (response) => ({
+                ok: response.ok,
+                status: response.status,
+                body: Buffer.from(await response.arrayBuffer())
+            }))
+            .catch((error: unknown) => {
+                if (error instanceof Error && error.name === "AbortError") {
+                    framesPausedUntil.set(stream, Date.now() + FRAME_PAUSE_MS);
+                }
+                return null;
+            })
+            .finally(() => framesAsked.delete(key));
+        framesAsked.set(key, asked);
+    }
+    if (!signal) return asked;
+    if (signal.aborted) return null;
+    return Promise.race([
+        asked,
+        new Promise<null>((resolve) =>
+            signal.addEventListener("abort", () => resolve(null), { once: true })
+        )
+    ]);
+}
+
 /**
  * A still from a camera, as JPEG bytes.
  *
@@ -340,13 +498,10 @@ export async function snapshot(
     // the same frame, which is a slideshow however often it is asked for. The
     // wall still asks for a second; one camera on its own asks for less.
     if (options.cacheMs) query.set("cache", `${options.cacheMs}ms`);
-    const response = await relayFetch(endpoint, `/api/frame.jpeg?${query.toString()}`, {
-        // A camera that is asleep takes a moment to produce its first frame.
-        timeoutMs: 8000,
-        ...(options.signal ? { signal: options.signal } : {})
-    }).catch(() => null);
-    if (!response?.ok) return null;
-    return Buffer.from(await response.arrayBuffer());
+    // A camera that is asleep takes a moment to produce its first frame.
+    const answer = await askFrame(endpoint, query, 8000, options.signal);
+    if (!answer || answer === "paused" || !answer.ok) return null;
+    return answer.body;
 }
 
 /**
@@ -378,19 +533,18 @@ export async function frameOrReason(
     quality: "main" | "sub" = "sub"
 ): Promise<{ frame: Buffer } | { reason: string }> {
     const query = new URLSearchParams({ src: streamName(cameraId, quality) });
-    const response = await relayFetch(endpoint, `/api/frame.jpeg?${query.toString()}`, {
-        timeoutMs: 15_000
-    }).catch(() => null);
+    const response = await askFrame(endpoint, query, 15_000);
+    if (response === "paused") return { reason: "The camera is not sending a picture." };
     if (!response) return { reason: "The relay did not answer." };
     if (response.ok) {
-        const frame = Buffer.from(await response.arrayBuffer());
+        const frame = response.body;
         if (frame.length > 0) return { frame };
         // A 200 with nothing in it is what a refused camera looks like: go2rtc
         // did its job, there was no picture at the end of it, and neither the
         // status nor the stream record says why. Its log does.
         return { reason: await explained(endpoint) };
     }
-    const said = (await response.text().catch(() => "")).trim();
+    const said = response.body.toString("utf8").trim();
     const reason = said || (await streamError(endpoint, cameraId, quality));
     return {
         reason: reason

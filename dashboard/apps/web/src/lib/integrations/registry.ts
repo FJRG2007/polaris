@@ -68,6 +68,8 @@ export const INTEGRATION_CATEGORIES: ReadonlyArray<{ name: IntegrationCategory; 
  * to match up by eye.
  */
 export type IntegrationSetupValue =
+    | "appName"
+    | "appDescription"
     | "redirectUri"
     | "homeUrl"
     | "privacyUrl"
@@ -318,7 +320,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 label: "Fill in the consent screen",
                 url: "https://console.cloud.google.com/auth/branding",
                 help: "Google refuses to create a client until this exists. Audience: External, unless everybody here is in the same Workspace. Name the app exactly Polaris - verification compares it against the name on the home page - and give it these three URLs and the logo.",
-                values: ["homeUrl", "privacyUrl", "termsUrl", "logoUrl"]
+                values: ["appName", "homeUrl", "privacyUrl", "termsUrl", "logoUrl"]
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
@@ -474,7 +476,7 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 label: "Create the application and link the client to it",
                 url: "https://dev.epicgames.com/portal",
                 help: "Product settings -> Epic Account Services. Brand settings take the name, the 128x128 logo and these URLs; Permissions needs only Basic Profile, which is always on; Linked clients has to name the client you just made, or the two never meet.",
-                values: ["homeUrl", "privacyUrl", "logoUrl"]
+                values: ["appName", "homeUrl", "privacyUrl", "logoUrl"]
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
@@ -542,7 +544,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an application",
                 url: "https://discord.com/developers/applications",
-                help: "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected for the inbox is a different application from this one."
+                help: "New Application, then a name. Nothing else on the first screen matters here - Polaris does not use a bot, and a bot connected for the inbox is a different application from this one.",
+                values: ["appName"]
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
@@ -576,14 +579,14 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Create an app",
                 url: "https://developer.spotify.com/dashboard/create",
-                help: "Any name and description. Paste the redirect URI below into Redirect URIs, and tick Web API where it asks which APIs the app uses.",
-                values: ["redirectUri", "homeUrl"]
+                help: "Copy each value below into the field of the same name - the home page URL goes in Website - and tick Web API where it asks which APIs the app uses.",
+                values: ["appName", "appDescription", "homeUrl", "redirectUri"]
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Add the people who will link",
                 url: "https://developer.spotify.com/dashboard",
-                help: "The app -> Settings -> User Management: each person's name and the address of their Spotify account. In development mode nobody else can link, and they are told so by Spotify rather than by Polaris."
+                help: "The app -> Settings -> User Management: each person's name and the address of their Spotify account. There is no way around this list for most deployments: Spotify only lifts it (extended quota) for registered businesses with at least 250,000 monthly users, applied for from the app's Quota extension Request tab. Anybody not on it is refused by Spotify rather than by Polaris."
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts

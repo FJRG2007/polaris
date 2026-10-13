@@ -36,7 +36,11 @@ const AUTHORIZE = "https://accounts.spotify.com/authorize";
 const TOKEN = "https://accounts.spotify.com/api/token";
 const API = "https://api.spotify.com/v1";
 
-const SCOPES = ["user-read-currently-playing", "user-read-playback-state", "user-modify-playback-state"];
+const SCOPES = [
+    "user-read-currently-playing",
+    "user-read-playback-state",
+    "user-modify-playback-state"
+];
 
 /** What a link has to carry to be worth anything, so one granted before this
  *  list grew is spotted and its owner asked to authorize again. */
@@ -167,8 +171,19 @@ export async function exchangeSpotifyCode(
         headers: { authorization: `Bearer ${token.access_token}` },
         signal: AbortSignal.timeout(TIMEOUT_MS)
     });
+    // A development-mode app gets a 403 here for every account that is not on
+    // its User Management list, and for all of them while its owner has no
+    // Premium. Said as that, because "403" is all Spotify gives and the fix is
+    // on Spotify's dashboard, not here.
+    if (response.status === 403) {
+        throw new Error(
+            "Spotify refused this account (403). It only lets an app in development mode link the accounts added under the app's Settings -> User Management, and only while the app's owner has Spotify Premium."
+        );
+    }
     if (!response.ok) {
-        throw new Error(await refusalMessage(response, "Spotify would not say which account authorized"));
+        throw new Error(
+            await refusalMessage(response, "Spotify would not say which account authorized")
+        );
     }
     const user = userSchema.parse(await response.json());
     return {
@@ -205,8 +220,10 @@ export async function spotifyAccessToken(
     client: SpotifyOAuthClient,
     credential: ConnectionCredential
 ): Promise<{ accessToken: string; refreshed: ConnectionCredential | null } | null> {
-    const fresh = credential.expiresAt === undefined || credential.expiresAt - REFRESH_MARGIN_MS > Date.now();
-    if (credential.accessToken && fresh) return { accessToken: credential.accessToken, refreshed: null };
+    const fresh =
+        credential.expiresAt === undefined || credential.expiresAt - REFRESH_MARGIN_MS > Date.now();
+    if (credential.accessToken && fresh)
+        return { accessToken: credential.accessToken, refreshed: null };
     if (!credential.refreshToken) return null;
     const token = await postToken(client, {
         grant_type: "refresh_token",
@@ -299,7 +316,8 @@ export async function readSpotifyPlaying(accessToken: string): Promise<SpotifyTr
     if (response.status === 204) return null;
     if (response.status === 429) throw new SpotifyRateLimited(retryAfter(response));
     if (response.status === 401) throw new SpotifyUnauthorized();
-    if (!response.ok) throw new Error(await refusalMessage(response, "Spotify would not say what is playing"));
+    if (!response.ok)
+        throw new Error(await refusalMessage(response, "Spotify would not say what is playing"));
     const text = await response.text();
     if (!text.trim()) return null;
     const parsed = playingSchema.safeParse(JSON.parse(text));
@@ -337,7 +355,11 @@ const DEVICE_SENTENCE =
     "Open Spotify on your phone or computer and play anything for a second, then try again. Spotify only plays on a device that is on.";
 
 const playerErrorSchema = z.object({
-    error: z.object({ status: z.number().optional(), message: z.string().optional(), reason: z.string().optional() })
+    error: z.object({
+        status: z.number().optional(),
+        message: z.string().optional(),
+        reason: z.string().optional()
+    })
 });
 
 /** Turn a refused player request into the sentence its owner is shown. */
@@ -367,7 +389,11 @@ export async function playerRefusal(response: Response): Promise<SpotifyPlayerRe
 }
 
 /** Play one track from a position on the account's active device. */
-export async function spotifyPlay(accessToken: string, uri: string, positionMs: number): Promise<void> {
+export async function spotifyPlay(
+    accessToken: string,
+    uri: string,
+    positionMs: number
+): Promise<void> {
     const response = await fetch(`${API}/me/player/play`, {
         method: "PUT",
         headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },

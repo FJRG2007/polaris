@@ -1374,6 +1374,8 @@
         },
         "setupValue": {
             "label": {
+                "appName": "Nombre",
+                "appDescription": "Descripción",
                 "redirectUri": "URI de retorno",
                 "homeUrl": "URL de inicio",
                 "privacyUrl": "URL de privacidad",
@@ -1382,6 +1384,8 @@
                 "domain": "Dominio"
             },
             "copy": {
+                "appName": "Copiar el nombre",
+                "appDescription": "Copiar la descripción",
                 "redirectUri": "Copiar la URI de retorno",
                 "homeUrl": "Copiar la URL de inicio",
                 "privacyUrl": "Copiar la URL de privacidad",
@@ -1813,11 +1817,11 @@
                 "links": {
                     "0": {
                         "label": "Crear una app",
-                        "help": "Cualquier nombre y descripción. Pega el URI de redirección de abajo en Redirect URIs, y marca Web API donde pregunta qué API usa la app."
+                        "help": "Copia cada valor de abajo en el campo del mismo nombre - la URL de inicio va en Website - y marca Web API donde pregunta qué API usa la app."
                     },
                     "1": {
                         "label": "Añadir a quienes vayan a vincular",
-                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En modo de desarrollo nadie más puede vincular, y quien lo intente lo sabrá por Spotify, no por Polaris."
+                        "help": "La app -> Settings -> User Management: el nombre de cada persona y la dirección de su cuenta de Spotify. En casi todas las instalaciones no hay forma de evitar esta lista: Spotify solo la quita (extended quota) a empresas registradas con al menos 250.000 usuarios al mes, y se pide desde la pestaña Quota extension Request de la app. A quien no esté en ella lo rechaza Spotify, no Polaris."
                     },
                     "2": {
                         "label": "Copiar el id y el secreto del cliente",

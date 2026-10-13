@@ -177,7 +177,7 @@ describe("the grid's events", () => {
             now: new Date(now),
             showDeclined: true,
             showTasks: true,
-            dimPast: true,
+            fadePast: true,
             surface: SURFACES.light,
             calendars: new Map([["c1", calendar]]),
             t: ((key: string) => key) as never
@@ -226,7 +226,7 @@ describe("the grid's events", () => {
             showDeclined: true,
             showTasks: true,
             showDoneTasks,
-            dimPast: true,
+            fadePast: true,
             surface: SURFACES.light,
             calendars: new Map([["c1", calendar]]),
             t: ((key: string) => key) as never

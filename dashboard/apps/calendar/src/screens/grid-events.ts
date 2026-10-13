@@ -24,7 +24,7 @@ export interface GridOptions {
     readonly showTasks: boolean;
     /** Draw tasks already done; drawn when omitted. */
     readonly showDoneTasks?: boolean;
-    readonly dimPast: boolean;
+    readonly fadePast: boolean;
     /** The colour the grid is drawn on (the card, as hex), which a faded or
      *  outlined event is mixed toward; the dark theme's when omitted. */
     readonly surface?: string;
@@ -180,7 +180,7 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
         if (calendar?.hidden) continue;
         if (occurrence.myPartstat === "DECLINED" && !options.showDeclined) continue;
         const color = occurrence.color ?? calendar?.color ?? FALLBACK_COLOR;
-        const past = options.dimPast && new Date(occurrence.end) < options.now;
+        const past = options.fadePast && new Date(occurrence.end) < options.now;
         const response = responseOf(occurrence);
         const paint = paintFor(
             color,
@@ -246,7 +246,7 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
         const day = wallOf(task.due, options.zone).slice(0, 10);
         // A task is due at a moment rather than spanning one: past once that
         // moment has gone, and faded once done whenever it was due.
-        const faded = task.done || (options.dimPast && new Date(task.due) < options.now);
+        const faded = task.done || (options.fadePast && new Date(task.due) < options.now);
         const paint = paintFor(
             color,
             {

@@ -73,7 +73,12 @@ const fields = {
     showDeclined: z.boolean(),
     /** Draw tasks already done (Google's "Show completed tasks"). */
     showDoneTasks: z.boolean(),
-    dimPast: z.boolean(),
+    /** Draw days and events that are over in a fainter shade. Off unless
+     *  somebody turns it on. Stored as `fadePast`: `dimPast` defaulted to on,
+     *  and since any change in settings stored the whole document it is `true`
+     *  in nearly every one whether or not somebody chose it, so it is not
+     *  read. */
+    fadePast: z.boolean(),
     keyboardShortcuts: z.boolean(),
     /** The hour day and week views scroll to first. */
     dayStart: hhmm,
@@ -115,7 +120,7 @@ export const DEFAULT_PREFERENCES: CalendarPreferences = {
     showTasks: true,
     showDeclined: true,
     showDoneTasks: true,
-    dimPast: true,
+    fadePast: false,
     keyboardShortcuts: true,
     dayStart: "07:00",
     workingHours: { "1": WORKDAY, "2": WORKDAY, "3": WORKDAY, "4": WORKDAY, "5": WORKDAY },
