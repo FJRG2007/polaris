@@ -52,9 +52,13 @@ export async function logEvents(
 }
 
 /** Remove the log of records deleted for good. */
-export async function dropEvents(actor: CrmActor, ids: readonly string[]): Promise<void> {
+export async function dropEvents(
+    actor: CrmActor,
+    ids: readonly string[],
+    client: Pick<typeof prisma, "crmEvent"> = prisma
+): Promise<void> {
     if (ids.length === 0) return;
-    await prisma.crmEvent.deleteMany({
+    await client.crmEvent.deleteMany({
         where: { ...shelfWhere(actor.shelf), recordId: { in: [...ids] } }
     });
 }

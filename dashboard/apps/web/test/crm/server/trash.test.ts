@@ -1,14 +1,15 @@
 /**
  * The trash: records come back out of it, or are deleted for good - only ever
  * ones already in it, only on the reader's shelf, only by somebody who may
- * delete - and a record deleted for good takes its timeline with it.
+ * delete - and a record deleted for good takes its timeline with it and leaves
+ * nothing pointing at it.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
     records: {
-        findMany: vi.fn(async (): Promise<{ id: string }[]> => []),
+        findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
         updateMany: vi.fn(async () => ({ count: 1 })),
         deleteMany: vi.fn(async () => ({ count: 1 }))
     },
@@ -18,15 +19,16 @@ const db = vi.hoisted(() => ({
     }
 }));
 
-vi.mock("@polaris/db", () => ({
-    prisma: {
+vi.mock("@polaris/db", () => {
+    const client: Record<string, unknown> = {
         crmCompany: db.records,
         crmPerson: db.records,
         crmOpportunity: db.records,
         crmEvent: db.crmEvent
-    },
-    Prisma: { Decimal: class {} }
-}));
+    };
+    client.$transaction = async (run: (tx: unknown) => unknown) => run(client);
+    return { prisma: client, Prisma: { Decimal: class {} } };
+});
 vi.mock("@polaris/app-host", () => ({
     host: { crmHost: {}, i18nRequest: { getLocale: async () => "en-US" } }
 }));
@@ -74,6 +76,32 @@ describe("the trash", () => {
         expect(db.crmEvent.deleteMany).toHaveBeenCalledWith({
             where: { orgId: "o1", recordId: { in: ["c1"] } }
         });
+    });
+
+    it("clears what pointed at a record deleted for good, and says so on its timeline", async () => {
+        db.records.findMany
+            .mockResolvedValueOnce([{ id: "c1", name: "Example Company" }])
+            .mockResolvedValueOnce([{ id: "p1", companyId: "c1" }])
+            .mockResolvedValueOnce([]);
+        expect(await destroyRecords(actorWith(allowed), "companies", ["c1"])).toBe(1);
+        expect(db.records.updateMany).toHaveBeenCalledTimes(1);
+        expect(db.records.updateMany).toHaveBeenCalledWith({
+            where: { orgId: "o1", companyId: { in: ["c1"] }, id: { in: ["p1"] } },
+            data: { companyId: null }
+        });
+        const [[logged]] = db.crmEvent.createMany.mock.calls as unknown as [
+            [{ data: { kind: string; recordId: string; object: string; changes: string }[] }]
+        ];
+        expect(logged.data).toEqual([
+            expect.objectContaining({ kind: "updated", recordId: "p1", object: "people" })
+        ]);
+        expect(JSON.parse(logged.data[0]!.changes)).toEqual([
+            { key: "company", before: { id: "c1", name: "Example Company" }, after: null }
+        ]);
+        // The clearing is done before the record goes, so no foreign key does it unseen.
+        expect(db.records.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+            db.records.deleteMany.mock.invocationCallOrder[0]!
+        );
     });
 
     it("touches nothing when none of the records is in the trash", async () => {
