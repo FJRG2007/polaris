@@ -17,6 +17,8 @@ import { Pencil, Plus, Trash2, Workflow, X } from "lucide-react";
 import { ActionFields, TriggerFields, useWorkflowWords } from "./workflow-fields";
 import {
     Button,
+    Checkbox,
+    CopyButton,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -54,6 +56,7 @@ interface Draft {
     readonly trigger: model.WorkflowTrigger;
     readonly actions: model.WorkflowAction[];
     readonly enabled: boolean;
+    readonly newHookSecret?: boolean;
 }
 
 const blank = (): Draft => ({ name: "", trigger: { kind: "created" }, actions: [], enabled: true });
@@ -67,7 +70,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     const [rows, setRows] = useState<model.WorkflowView[] | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [saving, setSaving] = useState(false);
-    const [notice, setNotice] = useState<string | null>(null);
+    const [notice, setNotice] = useState<{ text: string; copy: string } | null>(null);
 
     const load = useCallback(() => {
         unwrap(() => actions.listWorkflowsAction({ object }), t("errors.loadFailed"))
@@ -179,6 +182,17 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                         trigger={draft.trigger}
                         onChange={(trigger) => setDraft({ ...draft, trigger })}
                     />
+                    {draft.id && draft.trigger.kind === "webhook" ? (
+                        <label className="flex items-center gap-2 text-[0.8125rem]">
+                            <Checkbox
+                                checked={Boolean(draft.newHookSecret)}
+                                onChange={() =>
+                                    setDraft({ ...draft, newHookSecret: !draft.newHookSecret })
+                                }
+                            />
+                            {t("workflows.newAddress")}
+                        </label>
+                    ) : null}
                 </div>
                 <div className="flex flex-col gap-2">
                     <span className="text-[0.8125rem] font-medium">{t("workflows.actions")}</span>
@@ -355,10 +369,16 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                 </DialogHeader>
                 {notice ? (
                     <div
-                        className="break-words rounded-lg bg-muted px-3 py-2 text-[0.8125rem]"
+                        className="flex min-w-0 flex-col gap-1.5 rounded-lg bg-muted px-3 py-2 text-[0.8125rem]"
                         role="status"
                     >
-                        {notice}
+                        <span>{notice.text}</span>
+                        <span className="flex min-w-0 items-center gap-1">
+                            <code className="min-w-0 flex-1 truncate" title={notice.copy}>
+                                {notice.copy}
+                            </code>
+                            <CopyButton value={notice.copy} />
+                        </span>
                     </div>
                 ) : null}
                 {body}

@@ -39,6 +39,13 @@ export function TriggerFields({ object, trigger, onChange }: TriggerFieldsProps)
     const custom = useCustomFields();
     if (trigger.kind === "schedule")
         return <ScheduleFields trigger={trigger} onChange={onChange} />;
+    if (trigger.kind === "webhook") {
+        return (
+            <p className="text-[0.75rem] text-muted-foreground">
+                {t("workflows.webhookHint", { example: "{{body.email}}" })}
+            </p>
+        );
+    }
     if (trigger.kind !== "fieldChanged") return null;
     const fields = fieldsOf(object, custom);
     const field = fields.find((one) => one.key === trigger.field);
@@ -321,9 +328,12 @@ export function useWorkflowWords(object: CrmObject) {
             if (trigger.kind === "schedule") return `${trigger.cron} (${trigger.timeZone})`;
             return t(`workflows.triggers.${trigger.kind}`);
         },
-        /** What to tell the reader once a workflow is saved, beyond the list. */
-        savedNotice(_saved: model.SavedWorkflow): string | null {
-            return null;
+        /** What to tell the reader once a workflow is saved, beyond the list,
+         *  and what they may want to copy from it. */
+        savedNotice(saved: model.SavedWorkflow): { text: string; copy: string } | null {
+            if (!saved.hookPath) return null;
+            const url = `${window.location.origin}${saved.hookPath}`;
+            return { text: t("workflows.hookAddress", { name: saved.workflow.name }), copy: url };
         }
     };
 }

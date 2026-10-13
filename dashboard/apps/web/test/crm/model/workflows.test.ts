@@ -226,3 +226,25 @@ describe("on a schedule", () => {
         expect(actionFits("createRecord", "schedule")).toBe(true);
     });
 });
+
+describe("an outside call", () => {
+    it("fills a template from the call's body as well", () => {
+        const fields = [fieldOf("companies", "name")!];
+        expect(
+            renderTemplate(
+                "{{body.lead.name}} ({{ body.score }}) {{body.tags}} {{body.none}} for {{name}}",
+                fields,
+                { name: "Acme" },
+                { lead: { name: "Ada" }, score: 7, tags: ["a", "b"] }
+            )
+        ).toBe('Ada (7) ["a","b"]  for Acme');
+    });
+
+    it("is about no record", () => {
+        expect(
+            workflowInputSchema.safeParse({ name: "x", trigger: { kind: "webhook" }, actions: [] })
+                .success
+        ).toBe(true);
+        expect(actionFits("updateRecord", "webhook")).toBe(false);
+    });
+});

@@ -496,7 +496,8 @@
             "fieldChanged": "A field changes",
             "deleted": "A record is deleted",
             "manual": "Run by hand on a record",
-            "schedule": "On a schedule"
+            "schedule": "On a schedule",
+            "webhook": "An outside call"
         },
         "actionKinds": {
             "updateRecord": "Update the record",
@@ -523,6 +524,9 @@
         "scheduleHint": "Minute, hour, day of month, month, day of week. 0 9 * * 1 is Mondays at 9:00.",
         "badSchedule": "That is not a schedule. Use five fields, like 0 9 * * 1.",
         "nextRun": "Next run {when}",
-        "timeZone": "Time zone: {zone}"
+        "timeZone": "Time zone: {zone}",
+        "webhookHint": "Saving gives it a secret address. POST JSON to it, and use {example} in the actions for a value from the call.",
+        "hookAddress": "Send {name} a POST with a JSON body at this address. Copy it now: it is not shown again.",
+        "newAddress": "Give it a new address (the old one stops working)"
     }
 }

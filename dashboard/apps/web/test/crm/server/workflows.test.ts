@@ -59,6 +59,8 @@ const crmHost = vi.hoisted(() => ({
     crmOrgPermissions: vi.fn(async (): Promise<string[] | null> => ["*"])
 }));
 
+const limits = vi.hoisted(() => ({ ok: true }));
+
 vi.mock("@polaris/db", () => {
     const client: Record<string, unknown> = {
         crmWorkflow: db.crmWorkflow,
@@ -71,11 +73,18 @@ vi.mock("@polaris/db", () => {
     return { prisma: client, Prisma: { Decimal: class {} } };
 });
 vi.mock("@polaris/app-host", () => ({
-    host: { crmHost, i18nRequest: { getLocale: async () => "en-US" } }
+    host: {
+        crmHost,
+        i18nRequest: { getLocale: async () => "en-US" },
+        rateLimitService: { rateLimit: async () => ({ ok: limits.ok }) },
+        requestContext: { clientIp: async () => "203.0.113.9" }
+    }
 }));
 vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }));
 
 import * as workflows from "@polaris-app/crm/src/lib/workflows";
+import { createHash } from "node:crypto";
+import { POST as hook } from "@polaris-app/crm/src/routes/api/crm/hooks/[secret]/route";
 
 const stamp = {
     updatedAt: new Date("2026-10-01T10:00:00Z"),
@@ -107,7 +116,10 @@ const stored = (trigger: unknown, extra: Record<string, unknown> = {}) => ({
     ...extra
 });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+    vi.clearAllMocks();
+    limits.ok = true;
+});
 
 describe("saving a workflow", () => {
     it("keeps it on the reader's shelf, running as them", async () => {
@@ -441,6 +453,92 @@ describe("on a schedule", () => {
         expect(db.crmWorkflow.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({ data: { nextRunAt: null } })
         );
+        expect(db.crmWorkflow.update).not.toHaveBeenCalled();
+    });
+});
+
+describe("an outside call", () => {
+    const save = (extra: Record<string, unknown> = {}) =>
+        workflows.saveWorkflow(actorWith(allowed), "companies", {
+            name: "Leads",
+            trigger: { kind: "webhook" },
+            actions: [],
+            enabled: true,
+            ...extra
+        });
+
+    it("gets a secret address once, keeping only its hash", async () => {
+        const saved = await save();
+        expect(saved.hookPath).toMatch(/^\/api\/crm\/hooks\/[\w-]{32,}$/);
+        const secret = saved.hookPath!.split("/").at(-1)!;
+        const [[made]] = db.crmWorkflow.create.mock.calls as unknown as [
+            [{ data: { hookHash: string } }]
+        ];
+        expect(made.data.hookHash).toBe(createHash("sha256").update(secret).digest("hex"));
+        expect(JSON.stringify(made.data)).not.toContain(secret);
+    });
+
+    it("keeps the address on a later save, and changes it only when asked", async () => {
+        db.crmWorkflow.findFirst.mockResolvedValue(
+            stored({ kind: "webhook" }, { hookHash: "kept" })
+        );
+        expect((await save({ id: FLOW })).hookPath).toBeUndefined();
+        expect(db.crmWorkflow.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.not.objectContaining({ hookHash: expect.anything() })
+            })
+        );
+        expect((await save({ id: FLOW, newHookSecret: true })).hookPath).toMatch(
+            /^\/api\/crm\/hooks\//
+        );
+        db.crmWorkflow.findFirst.mockReset();
+    });
+
+    const call = (secret: string, body: string) =>
+        hook(
+            new Request(`https://polaris.example.invalid/api/crm/hooks/${secret}`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body
+            }) as never,
+            { params: Promise.resolve({ secret }) }
+        );
+
+    it("runs the workflow its address names with the call's body", async () => {
+        const secret = "s".repeat(32);
+        db.crmWorkflow.findFirst.mockResolvedValueOnce(
+            stored(
+                { kind: "webhook" },
+                {
+                    actions: JSON.stringify([
+                        {
+                            kind: "createRecord",
+                            object: "companies",
+                            values: { name: "{{body.company}}" }
+                        }
+                    ])
+                }
+            )
+        );
+        const answer = await call(secret, JSON.stringify({ company: "Initech" }));
+        expect(answer.status).toBe(200);
+        expect(await answer.json()).toEqual({ ok: true });
+        expect(db.crmWorkflow.findFirst).toHaveBeenCalledWith({
+            where: { hookHash: createHash("sha256").update(secret).digest("hex"), enabled: true }
+        });
+        expect(db.records.create).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ name: "Initech" }) })
+        );
+    });
+
+    it("answers 404 to an unknown address, 400 to a body that is not JSON, 429 past the limit", async () => {
+        const secret = "s".repeat(32);
+        expect((await call(secret, "{}")).status).toBe(404);
+        db.crmWorkflow.findFirst.mockResolvedValueOnce(stored({ kind: "webhook" }));
+        expect((await call(secret, "not json")).status).toBe(400);
+        expect((await call("short", "{}")).status).toBe(404);
+        limits.ok = false;
+        expect((await call(secret, "{}")).status).toBe(429);
         expect(db.crmWorkflow.update).not.toHaveBeenCalled();
     });
 });

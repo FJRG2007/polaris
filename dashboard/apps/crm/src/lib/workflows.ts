@@ -22,6 +22,7 @@ import { importRecords, readRows } from "./import";
 import type { RowProblem } from "../model/import";
 import { fieldsOf, primaryField, type CrmObject, type CrmRecord } from "../model/objects";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { createHash, randomBytes } from "node:crypto";
 import { actorOn, requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import * as model from "../model/workflows";
 
@@ -48,6 +49,13 @@ export interface RunContext {
     /** The record it is about, when it is about one. */
     readonly recordId: string | null;
     readonly event: model.RecordEvent | null;
+    /** The body of the outside call that set it off. */
+    readonly body?: unknown;
+}
+
+/** How a webhook's secret is kept: its SHA-256, never the secret. */
+export function hookHash(secret: string): string {
+    return createHash("sha256").update(secret).digest("hex");
 }
 
 /** The longest failure kept on a workflow, in characters. */
@@ -137,7 +145,7 @@ export async function saveWorkflow(
     const t = await crmT();
     const parsed = model.workflowInputSchema.safeParse(input);
     if (!parsed.success) throw new CrmRefusal(t("errors.checkInput"));
-    const { id, name, trigger, actions, enabled } = parsed.data;
+    const { id, name, trigger, actions, enabled, newHookSecret } = parsed.data;
     await checkActions(actor, object, trigger, actions);
     const data = {
         name,
@@ -149,23 +157,38 @@ export async function saveWorkflow(
         lastError: null
     };
     const where = { ...shelfWhere(actor.shelf), object };
+    // A webhook keeps its address across saves; it gets one when it has none,
+    // a new one when asked, and loses it when it stops being a webhook.
+    let secret: string | null = null;
+    const hook = (had: string | null): { hookHash?: string | null } => {
+        if (trigger.kind !== "webhook") return { hookHash: null };
+        if (had && !newHookSecret) return {};
+        secret = randomBytes(24).toString("base64url");
+        return { hookHash: hookHash(secret) };
+    };
     let row: StoredWorkflow;
     if (id) {
         const found = (await prisma.crmWorkflow.findFirst({
             where: { id, ...where }
-        })) as StoredWorkflow | null;
+        })) as (StoredWorkflow & { hookHash?: string | null }) | null;
         if (!found) throw new CrmRefusal(t("errors.notFound"));
-        row = (await prisma.crmWorkflow.update({ where: { id }, data })) as StoredWorkflow;
+        row = (await prisma.crmWorkflow.update({
+            where: { id },
+            data: { ...data, ...hook(found.hookHash ?? null) }
+        })) as StoredWorkflow;
     } else {
         const count = await prisma.crmWorkflow.count({ where });
         if (count >= model.MAX_WORKFLOWS) {
             throw new CrmRefusal(t("workflows.tooMany", { max: model.MAX_WORKFLOWS }));
         }
         row = (await prisma.crmWorkflow.create({
-            data: { ...shelfData(actor.shelf), object, ...data }
+            data: { ...shelfData(actor.shelf), object, ...data, ...hook(null) }
         })) as StoredWorkflow;
     }
-    return { workflow: toView(row)! };
+    const made = secret as string | null;
+    return made
+        ? { workflow: toView(row)!, hookPath: `/api/crm/hooks/${made}` }
+        : { workflow: toView(row)! };
 }
 
 /** Switch a workflow on or off. */
@@ -255,7 +278,7 @@ async function filled(
         : [];
     const keys = Object.keys(values);
     const cells = keys.map((key) =>
-        model.renderTemplate(values[key]!, fields, record?.values ?? {})
+        model.renderTemplate(values[key]!, fields, record?.values ?? {}, context.body)
     );
     return { keys, cells };
 }
@@ -434,4 +457,36 @@ export async function runDueSchedules(now: Date = new Date()): Promise<number> {
         ran += 1;
     }
     return ran;
+}
+
+/** What an outside call to a webhook address came to. */
+export type HookAnswer = "unknown" | "badBody" | { readonly error: string | null };
+
+/**
+ * An outside call to a webhook address: the enabled webhook workflow its
+ * secret names, run with the call's body read as JSON (an empty body is
+ * nothing). Nothing about the workflow - not even whether its body would have
+ * read - is told to a caller whose address names none.
+ */
+export async function runHook(secret: string, text: string): Promise<HookAnswer> {
+    const row = (await prisma.crmWorkflow.findFirst({
+        where: { hookHash: hookHash(secret), enabled: true }
+    })) as StoredWorkflow | null;
+    if (!row || model.readTrigger(row.trigger)?.kind !== "webhook") return "unknown";
+    let body: unknown = null;
+    if (text.trim() !== "") {
+        try {
+            body = JSON.parse(text);
+        } catch {
+            return "badBody";
+        }
+    }
+    return {
+        error: await runWorkflow(row, {
+            object: row.object as CrmObject,
+            recordId: null,
+            event: null,
+            body
+        })
+    };
 }

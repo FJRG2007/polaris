@@ -496,7 +496,8 @@
             "fieldChanged": "Cambia un campo",
             "deleted": "Se elimina un registro",
             "manual": "Se ejecuta a mano",
-            "schedule": "Programado"
+            "schedule": "Programado",
+            "webhook": "Una llamada externa"
         },
         "actionKinds": {
             "updateRecord": "Actualizar el registro",
@@ -523,6 +524,9 @@
         "scheduleHint": "Minuto, hora, día del mes, mes, día de la semana. 0 9 * * 1 es los lunes a las 9:00.",
         "badSchedule": "Eso no es un horario. Usa cinco campos, como 0 9 * * 1.",
         "nextRun": "Próxima ejecución {when}",
-        "timeZone": "Zona horaria: {zone}"
+        "timeZone": "Zona horaria: {zone}",
+        "webhookHint": "Al guardar recibe una dirección secreta. Envíale JSON por POST y usa {example} en las acciones para tomar un valor de la llamada.",
+        "hookAddress": "Envía a {name} un POST con cuerpo JSON a esta dirección. Cópiala ahora: no se vuelve a mostrar.",
+        "newAddress": "Darle una dirección nueva (la anterior deja de funcionar)"
     }
 }

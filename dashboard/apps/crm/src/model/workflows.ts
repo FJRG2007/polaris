@@ -48,6 +48,8 @@ export const workflowTriggerSchema = z.discriminatedUnion("kind", [
     }),
     /** Somebody runs it on a record from the record's page. */
     z.object({ kind: z.literal("manual") }),
+    /** A call to the workflow's secret address. */
+    z.object({ kind: z.literal("webhook") }),
     /** A cron schedule, read in a time zone. */
     z.object({
         kind: z.literal("schedule"),
@@ -65,7 +67,8 @@ export const TRIGGER_KINDS: readonly TriggerKind[] = [
     "fieldChanged",
     "deleted",
     "manual",
-    "schedule"
+    "schedule",
+    "webhook"
 ];
 
 /** The most fields one action writes. */
@@ -117,12 +120,28 @@ export function actionFits(kind: ActionKind, trigger: TriggerKind): boolean {
 export function renderTemplate(
     text: string,
     fields: readonly FieldDef[],
-    values: Readonly<Record<string, FieldValue | undefined>>
+    values: Readonly<Record<string, FieldValue | undefined>>,
+    /** The body of the outside call that set the workflow off, if one did:
+     *  `{{body.a.b}}` is its `a.b`, as text. */
+    body: unknown = undefined
 ): string {
     return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => {
+        if (key.startsWith("body.")) return bodyText(body, key.slice("body.".length));
         const field = fields.find((one) => one.key === key);
         return field ? csvValue(field, values[key]) : "";
     });
+}
+
+/** One value out of a call's body, as text: a string as it is, anything else
+ *  as JSON, nothing for what is not there. */
+function bodyText(body: unknown, path: string): string {
+    let at: unknown = body;
+    for (const step of path.split(".")) {
+        if (at === null || typeof at !== "object" || !Object.hasOwn(at, step)) return "";
+        at = (at as Record<string, unknown>)[step];
+    }
+    if (at === null || at === undefined) return "";
+    return typeof at === "string" ? at : JSON.stringify(at);
 }
 
 /** A workflow as the screen sends it. */
@@ -131,7 +150,9 @@ export const workflowInputSchema = z.object({
     name: z.string().trim().min(1).max(WORKFLOW_NAME_MAX),
     trigger: workflowTriggerSchema,
     actions: z.array(workflowActionSchema).max(MAX_WORKFLOW_ACTIONS),
-    enabled: z.boolean().default(true)
+    enabled: z.boolean().default(true),
+    /** Give a webhook trigger a new address, ending the old one. */
+    newHookSecret: z.boolean().optional()
 });
 export type WorkflowInput = z.input<typeof workflowInputSchema>;
 
@@ -152,7 +173,13 @@ export interface WorkflowView {
 /** A workflow just saved, and what the reader is told about it once. */
 export interface SavedWorkflow {
     readonly workflow: WorkflowView;
+    /** A webhook's new address, `/api/crm/hooks/<secret>`: shown this once,
+     *  since only its hash is kept. */
+    readonly hookPath?: string;
 }
+
+/** The most bytes of an outside call's body a workflow reads. */
+export const MAX_HOOK_BODY = 64 * 1024;
 
 /** A change to a record, as a trigger reads it. */
 export interface RecordEvent {
