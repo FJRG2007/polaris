@@ -43,6 +43,7 @@ import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
 import { sweepStorageMoves } from "@/lib/storage-moves/service";
+import { sweepAppStorage } from "@/lib/storage-moves/app-storage";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
@@ -214,6 +215,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: Number(process.env.POLARIS_STORAGE_MOVES_MS) || MINUTE,
         leaseMs: null,
         run: sweepStorageMoves
+    },
+    {
+        key: "app-storage",
+        // Takes each stopped service with a storage mode to where that mode keeps
+        // it: a parked one to the NAS once it has been stopped for a while, and
+        // every game server to the instance's choice when owners may not choose.
+        everyMs: Number(process.env.POLARIS_APP_STORAGE_MS) || 5 * MINUTE,
+        leaseMs: 10 * MINUTE,
+        run: sweepAppStorage
     },
     {
         key: "drive-jobs-prune",

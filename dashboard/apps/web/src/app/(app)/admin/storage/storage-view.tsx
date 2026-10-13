@@ -25,11 +25,13 @@ import type {
     SpaceResult,
     VolumeLocationView
 } from "@/lib/storage-moves/service";
+import type { StorageMode, StoragePolicy } from "@/lib/storage-moves/placement";
 import {
     Badge,
     Button,
     Card,
     CardBody,
+    Checkbox,
     CardHeader,
     CardTitle,
     ConfirmDeleteDialog,
@@ -44,6 +46,7 @@ import {
     SegmentedControl,
     Select,
     Skeleton,
+    Switch,
     cn
 } from "@polaris/ui";
 import * as actions from "./actions";
@@ -357,19 +360,31 @@ function MoveDialog({
     t: T;
 }) {
     const [destination, setDestination] = useState("");
+    const [keep, setKeep] = useState<"always" | "stopped">("always");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     useEffect(() => {
         setDestination(volume?.destinations[0]?.value ?? "");
+        setKeep("always");
         setError(null);
     }, [volume]);
     if (!volume) return null;
+    // Only to a NAS, and only for a service with this one volume: bringing it home
+    // before it starts is then one move.
+    const canPark = destination !== "server" && destination !== "" && volume.single;
+    const parking = canPark && keep === "stopped";
 
     const start = async () => {
         setPending(true);
         setError(null);
         const result = await runAction(
-            () => actions.startMoveAction({ volumeId: volume.id, destination }),
+            () =>
+                parking
+                    ? actions.keepOnNasWhileStoppedAction({
+                          applicationId: volume.applicationId,
+                          connectionId: destination
+                      })
+                    : actions.startMoveAction({ volumeId: volume.id, destination }),
             setError
         );
         setPending(false);
@@ -406,6 +421,24 @@ function MoveDialog({
                             }))}
                         />
                     </label>
+                    {canPark ? (
+                        <div className="flex flex-col gap-1">
+                            <SegmentedControl
+                                value={keep}
+                                onValueChange={setKeep}
+                                aria-label={t("storage.move.keepLabel")}
+                                options={[
+                                    { value: "always", label: t("storage.move.keepAlways") },
+                                    { value: "stopped", label: t("storage.move.keepStopped") }
+                                ]}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                {parking
+                                    ? t("storage.move.keepStoppedHint")
+                                    : t("storage.move.keepAlwaysHint")}
+                            </p>
+                        </div>
+                    ) : null}
                     {error ? (
                         <p role="alert" className="text-danger-ink">
                             {error}
@@ -625,9 +658,195 @@ function MoveRow({
     );
 }
 
+/** A policy's default as one select value: `server`, `park:<id>` or `nas:<id>`. */
+function defaultValue(policy: StoragePolicy): string {
+    return policy.defaultMode === "server" || !policy.defaultConnectionId
+        ? "server"
+        : `${policy.defaultMode}:${policy.defaultConnectionId}`;
+}
+
+function samePolicy(left: StoragePolicy, right: StoragePolicy): boolean {
+    const allowed = (policy: StoragePolicy) =>
+        policy.allowedConnectionIds === null
+            ? null
+            : [...policy.allowedConnectionIds].sort().join(",");
+    return (
+        defaultValue(left) === defaultValue(right) &&
+        left.ownersChoose === right.ownersChoose &&
+        allowed(left) === allowed(right)
+    );
+}
+
+/**
+ * Where game servers keep their worlds: the default for new ones, which NAS
+ * locations their owners may pick, and whether owners pick at all.
+ */
+function GamePolicyCard({ t, nas }: { t: T; nas: { id: string; name: string }[] }) {
+    const policy = useLiveRead<StoragePolicy>({
+        load: useCallback(() => actions.gamePolicyAction(), []),
+        cacheKey: "admin-storage-game-policy",
+        intervalMs: 120_000
+    });
+    const [draft, setDraft] = useState<StoragePolicy | null>(null);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [saved, setSaved] = useState(false);
+    useEffect(() => {
+        if (policy.data) setDraft(policy.data);
+    }, [policy.data]);
+
+    const options = useMemo(
+        () => [
+            { value: "server", label: t("storage.policy.server") },
+            ...nas.flatMap((location) => [
+                {
+                    value: `park:${location.id}`,
+                    label: t("storage.policy.park", { nas: location.name })
+                },
+                {
+                    value: `nas:${location.id}`,
+                    label: t("storage.policy.nas", { nas: location.name })
+                }
+            ])
+        ],
+        [nas, t]
+    );
+
+    const save = async () => {
+        if (!draft) return;
+        setPending(true);
+        setError(null);
+        setSaved(false);
+        const result = await runAction(() => actions.saveGamePolicyAction(draft), setError);
+        setPending(false);
+        if (!result) return;
+        if (result.error) return setError(result.error);
+        setSaved(true);
+        policy.refresh();
+    };
+
+    const allowed = (id: string) =>
+        draft?.allowedConnectionIds === null || Boolean(draft?.allowedConnectionIds?.includes(id));
+    const toggleAllowed = (id: string, on: boolean) => {
+        if (!draft) return;
+        const current = draft.allowedConnectionIds ?? nas.map((location) => location.id);
+        const next = on ? [...new Set([...current, id])] : current.filter((value) => value !== id);
+        setSaved(false);
+        setDraft({ ...draft, allowedConnectionIds: next.length === nas.length ? null : next });
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>{t("storage.policy.title")}</CardTitle>
+                <p className="text-sm text-muted-foreground">{t("storage.policy.description")}</p>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-4 text-sm">
+                {policy.error && !draft ? (
+                    <p className="text-danger-ink">{t("storage.loadFailed")}</p>
+                ) : !draft ? (
+                    <Skeleton className="h-24 w-full" />
+                ) : (
+                    <>
+                        <label className="flex flex-col gap-1">
+                            <span className="font-medium">{t("storage.policy.default")}</span>
+                            <Select
+                                value={defaultValue(draft)}
+                                onValueChange={(value) => {
+                                    const [mode, id] = value.split(":") as [StorageMode, string?];
+                                    setSaved(false);
+                                    setDraft({
+                                        ...draft,
+                                        defaultMode: mode,
+                                        defaultConnectionId: id ?? null
+                                    });
+                                }}
+                                aria-label={t("storage.policy.default")}
+                                options={options}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                {t("storage.policy.defaultHint")}
+                            </span>
+                        </label>
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-medium">{t("storage.policy.ownersChoose")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {draft.ownersChoose
+                                        ? t("storage.policy.ownersChooseOn")
+                                        : t("storage.policy.ownersChooseOff")}
+                                </p>
+                            </div>
+                            <Switch
+                                checked={draft.ownersChoose}
+                                onChange={(checked) => {
+                                    setSaved(false);
+                                    setDraft({ ...draft, ownersChoose: checked });
+                                }}
+                                aria-label={t("storage.policy.ownersChoose")}
+                            />
+                        </div>
+                        {nas.length > 0 ? (
+                            <fieldset className="flex flex-col gap-2">
+                                <legend className="mb-1 font-medium">
+                                    {t("storage.policy.allowed")}
+                                </legend>
+                                {nas.map((location) => (
+                                    <label
+                                        key={location.id}
+                                        className="flex min-w-0 items-center gap-2"
+                                    >
+                                        <Checkbox
+                                            checked={allowed(location.id)}
+                                            onChange={(event) =>
+                                                toggleAllowed(location.id, event.target.checked)
+                                            }
+                                        />
+                                        <span className="truncate" title={location.name}>
+                                            {location.name}
+                                        </span>
+                                    </label>
+                                ))}
+                            </fieldset>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                {t("storage.policy.noNas")}
+                            </p>
+                        )}
+                        {error ? (
+                            <p role="alert" className="text-danger-ink">
+                                {error}
+                            </p>
+                        ) : null}
+                        <div className="flex items-center justify-end gap-3">
+                            {saved ? (
+                                <span className="text-xs text-muted-foreground">
+                                    {t("storage.policy.saved")}
+                                </span>
+                            ) : null}
+                            <Button
+                                size="sm"
+                                disabled={
+                                    pending || !policy.data || samePolicy(draft, policy.data)
+                                }
+                                onClick={() => void save()}
+                            >
+                                {pending ? (
+                                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                                ) : null}
+                                {t("storage.policy.save")}
+                            </Button>
+                        </div>
+                    </>
+                )}
+            </CardBody>
+        </Card>
+    );
+}
+
 export function StorageView() {
     const t = useTranslations("admin");
-    const serverName = useCallback((label: string | null) => label ?? t("storage.thisServer"), [t]);
+    const serverName = useCallback((label: string | null) => label || t("storage.thisServer"), [t]);
     const [adding, setAdding] = useState(false);
     const [moving, setMoving] = useState<VolumeLocationView | null>(null);
     const [version, setVersion] = useState(0);
@@ -760,6 +979,11 @@ export function StorageView() {
                 </CardBody>
             </Card>
 
+            <GamePolicyCard
+                t={t}
+                nas={(locations.data?.nas ?? []).map((nas) => ({ id: nas.id, name: nas.name }))}
+            />
+
             <Card>
                 <CardHeader>
                     <CardTitle>{t("storage.moves.title")}</CardTitle>
@@ -838,6 +1062,9 @@ export function StorageView() {
                                                     <Badge variant="primary">
                                                         {t("storage.volumes.game")}
                                                     </Badge>
+                                                ) : null}
+                                                {volume.mode === "park" ? (
+                                                    <Badge>{t("storage.volumes.parked")}</Badge>
                                                 ) : null}
                                             </p>
                                             <p

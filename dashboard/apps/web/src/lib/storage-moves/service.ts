@@ -21,7 +21,7 @@
 import * as plan from "./plan";
 import { prisma } from "@polaris/db";
 import { parseContainerState } from "@polaris/deploy";
-import { currentReleaseRef } from "@/lib/deploy/releases";
+import { currentReleaseRef, serviceRef } from "@/lib/deploy/releases";
 import { restartFromKeptImage } from "@/lib/deploy-service";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { getDriver, getDriverForConnection, resolveMountTarget } from "@/lib/storage-service";
@@ -252,6 +252,10 @@ export interface VolumeLocationView {
     readonly destinations: DestinationView[];
     /** A move of this app that has not ended, if any. */
     readonly busy: boolean;
+    /** The app's storage mode (`placement.ts`), null when nobody chose one. */
+    readonly mode: string | null;
+    /** Whether the app has this one volume only, so `park` can be offered. */
+    readonly single: boolean;
 }
 
 /** The server a target names, or null for this one. */
@@ -279,6 +283,7 @@ export async function listVolumeLocations(): Promise<VolumeLocationView[]> {
                     id: true,
                     name: true,
                     currentDeploymentId: true,
+                    storageMode: true,
                     target: { select: { kind: true, hostId: true, runtime: true } },
                     environment: {
                         select: { project: { select: { id: true, name: true, ownerId: true } } }
@@ -290,6 +295,9 @@ export async function listVolumeLocations(): Promise<VolumeLocationView[]> {
         take: 1000
     });
     const appIds = [...new Set(volumes.map((volume) => volume.application!.id))];
+    const perApp = new Map<string, number>();
+    for (const volume of volumes)
+        perApp.set(volume.application!.id, (perApp.get(volume.application!.id) ?? 0) + 1);
     const ownerIds = [
         ...new Set(volumes.map((volume) => volume.application!.environment.project.ownerId))
     ];
@@ -361,7 +369,9 @@ export async function listVolumeLocations(): Promise<VolumeLocationView[]> {
                     ? server
                     : (connectionName.get(here.connectionId) ?? here.connectionId),
             destinations,
-            busy: moving.has(app.id)
+            busy: moving.has(app.id),
+            mode: app.storageMode,
+            single: perApp.get(app.id) === 1
         });
     }
     return views.sort((left, right) => Number(right.game) - Number(left.game));
@@ -454,13 +464,17 @@ export async function listMoves(): Promise<MoveView[]> {
     });
 }
 
+/** The app a volume belongs to, or null. */
+export async function volumeApplication(volumeId: string): Promise<string | null> {
+    const row = await prisma.volume.findUnique({
+        where: { id: volumeId },
+        select: { applicationId: true }
+    });
+    return row?.applicationId ?? null;
+}
+
 export type StartRefusal =
-    | "missing"
-    | "notDeployed"
-    | "busy"
-    | "sameLocation"
-    | "notOffered"
-    | "swarm";
+    "missing" | "notDeployed" | "busy" | "sameLocation" | "notOffered" | "swarm";
 
 /**
  * Queue a move of one volume to `destination` (`server` or a connection id) and
@@ -469,9 +483,15 @@ export type StartRefusal =
 export async function startMove(input: {
     volumeId: string;
     destination: string;
-    actorId: string;
+    actorId: string | null;
     /** What the screen calls the machine Polaris runs on. */
     serverLabel: string;
+    /** Polaris following the app's storage mode, not a person: the original is
+     *  emptied without asking once the app is on the checked copy. */
+    auto?: boolean;
+    /** Start the app on the copy whatever state it was found in - a stopped app
+     *  somebody just started, whose data had to come home first. */
+    startAfter?: boolean;
 }): Promise<{ id: string } | { refused: StartRefusal }> {
     const volume = await prisma.volume.findUnique({
         where: { id: input.volumeId },
@@ -549,7 +569,9 @@ export async function startMove(input: {
                 origin: JSON.stringify(origin),
                 destination: JSON.stringify(destination),
                 originLabel,
-                targetLabel
+                targetLabel,
+                auto: input.auto ?? false,
+                ...(input.startAfter ? { wasRunning: true } : {})
             },
             select: { id: true }
         });
@@ -722,10 +744,20 @@ export async function runMove(id: string): Promise<void> {
             const state = row.state;
             try {
                 await step(row, state, lease);
+                let next = plan.nextState(state, "ok");
+                // A move Polaris made by itself does not wait for anybody: the app is
+                // on the checked copy, so the original is emptied - or kept, when
+                // another volume still reaches the same files.
+                let kept = false;
+                if (next === "moved" && row.auto) {
+                    kept = await originShared(row.volumeId, plan.parsePlacement(row.origin));
+                    next = plan.nextState("moved", kept ? "keep" : "remove");
+                }
                 const advanced = await prisma.storageMove.updateMany({
                     where: held,
                     data: {
-                        state: plan.nextState(state, "ok"),
+                        state: next,
+                        ...(kept ? { originRemoved: false, finishedAt: new Date() } : {}),
                         ...(state === "cleaning"
                             ? { originRemoved: true, finishedAt: new Date() }
                             : {}),
@@ -843,6 +875,16 @@ async function dockerNameOf(
 ): Promise<string | undefined> {
     if (context.origin.kind !== "volume") return undefined;
     const inspect = await ports.inspect(await appContainer(context)).catch(() => null);
+    // A stopped app whose container was removed still has its volume: the one its
+    // project created, named after it. Should that guess be wrong the copy cannot
+    // start - the copier declares the volume external - so nothing is copied from
+    // a volume that is not the app's.
+    if (inspect === null)
+        return plan.projectVolumeName(
+            serviceRef(context.app.environment.project.slug, context.app.slug, context.app.id)
+                .project,
+            context.origin.source
+        );
     const mounts = (inspect as { Mounts?: unknown } | null)?.Mounts;
     if (Array.isArray(mounts)) {
         for (const mount of mounts) {

@@ -2246,6 +2246,11 @@ export async function setApplicationRunning(
     // stopping just halts the container while keeping the deployment record.
     if (running) {
         await refuseWhileCopying(applicationId);
+        // A service kept on the NAS while stopped runs from this server's disk:
+        // its data is brought home first, and that move starts it. Loaded here,
+        // not at the top: storage moves restart services through this module.
+        const { bringHomeBeforeStart } = await import("@/lib/storage-moves/app-storage");
+        if (await bringHomeBeforeStart(applicationId, actorId)) return;
         await restartFromKeptImage(applicationId, ownerId, actorId, "settings", audit);
         await prisma.application.update({
             where: { id: applicationId },

@@ -30,6 +30,7 @@ import type { GameContext } from "./game-context";
 import { loadArkCatalog } from "./ark-item-picker";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
+import { ServerStorage } from "./server-storage";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
 import type { ArkProfile } from "../../lib/ark/profile";
@@ -481,6 +482,10 @@ export function ArkPanel({
                         playersOnline={status?.players.length ?? 0}
                         running={isRunning}
                         onSaved={reloadSettings}
+                    />
+                    <ServerStorage
+                        installedAppId={installedAppId}
+                        canManage={held.includes("games.manage")}
                     />
                 </div>
             )}

@@ -74,6 +74,8 @@ import type {
     SealedSecret
 } from "@/lib/calendar-host";
 import type { CrmShelf, CrmShelfPerson } from "@/lib/crm-host";
+import type { AppStorageView } from "@/lib/storage-moves/app-storage";
+import type { StorageChoice } from "@/lib/storage-moves/placement";
 
 /** A service that is loaded when it is first called, so it always answers later. */
 type Later<F> = F extends (...args: infer A) => infer R
@@ -107,6 +109,7 @@ const load = {
     appsInstallSharing: once(() => import("@/lib/apps/install-sharing")),
     appsPortBlockStore: once(() => import("@/lib/apps/port-block-store")),
     appsPortRegistry: once(() => import("@/lib/apps/port-registry")),
+    appStorage: once(() => import("@/lib/storage-moves/app-storage")),
     auditService: once(() => import("@/lib/audit-service")),
     backupsManage: once(() => import("@/lib/backups/manage")),
     calendarHost: once(() => import("@/lib/calendar-host")),
@@ -247,6 +250,10 @@ export const serverHost = {
         availableHostPortRun: later(load.appsPortRegistry, "availableHostPortRun"),
         portKey,
         takenHostPorts: later(load.appsPortRegistry, "takenHostPorts")
+    },
+    appStorage: {
+        appStorageView: later(load.appStorage, "appStorageView"),
+        chooseAppStorage: later(load.appStorage, "chooseAppStorage")
     },
     auditService: {
         recordAudit: later(load.auditService, "recordAudit")
@@ -490,6 +497,7 @@ declare module "@polaris/app-host" {
         AppWidgetDefinition: AppWidgetDefinition;
         AppWidgetView: AppWidgetView;
         AppSlot: AppSlot;
+        AppStorageView: AppStorageView;
         BackupSource: BackupSource;
         CalendarLink: CalendarLink;
         CalendarPerson: CalendarPerson;
@@ -525,6 +533,7 @@ declare module "@polaris/app-host" {
         SessionUser: SessionUser;
         SourceResource: SourceResource;
         StagedArtifact: StagedArtifact;
+        StorageChoice: StorageChoice;
         TargetRow: TargetRow;
     }
 }

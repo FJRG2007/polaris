@@ -3150,7 +3150,8 @@
             "busy": "A move of this service is in progress.",
             "notDeployed": "Deploy this service first; there is nothing to move yet.",
             "nowhere": "Add a NAS share owned by this service's owner to move it.",
-            "swarm": "Services on a swarm cannot be moved from here yet."
+            "swarm": "Services on a swarm cannot be moved from here yet.",
+            "parked": "On the NAS while stopped"
         },
         "move": {
             "title": "Move {volume} of {app}",
@@ -3165,7 +3166,12 @@
                 "sameLocation": "The volume is already there.",
                 "notOffered": "That location is not available for this service.",
                 "swarm": "Services on a swarm cannot be moved from here yet."
-            }
+            },
+            "keepLabel": "How long it stays there",
+            "keepAlways": "Always",
+            "keepStopped": "Only while stopped",
+            "keepAlwaysHint": "It runs from there. Slower than this server's disk.",
+            "keepStoppedHint": "It runs from this server's disk. After 30 minutes stopped it moves there and frees the disk; starting it brings it back first."
         },
         "moves": {
             "title": "Data moves",
@@ -3216,6 +3222,35 @@
             "notRestarted": "The service could not be started again; start it from its page.",
             "notRestored": "Its volume could not be put back on the original and still points at the copy. Move it again under Service data.",
             "originShared": "Another volume still uses the original, so it can only be kept."
+        },
+        "policy": {
+            "title": "Game servers",
+            "description": "Where game servers keep their worlds.",
+            "default": "New game servers",
+            "defaultHint": "Applies to servers created from now on. Existing ones stay where they are until someone chooses.",
+            "server": "This server",
+            "park": "{nas} while stopped (runs here)",
+            "nas": "Always on {nas}",
+            "ownersChoose": "Owners choose where their servers are kept",
+            "ownersChooseOn": "Each owner picks from their server's Settings, among the locations allowed below.",
+            "ownersChooseOff": "Every game server follows the default. Each one moves there the next time it's stopped, never while running.",
+            "allowed": "Locations owners may pick",
+            "noNas": "Add a NAS location above to offer it to game servers.",
+            "save": "Save",
+            "saved": "Saved",
+            "invalid": "That couldn't be saved. Reload and try again.",
+            "needsNas": "Choose which NAS the default uses.",
+            "refused": {
+                "missing": "This service no longer exists.",
+                "notDeployed": "Deploy this service first; there is nothing to keep yet.",
+                "busy": "A move of this service is already under way.",
+                "sameLocation": "It's already there.",
+                "notOffered": "That location isn't available for this service.",
+                "swarm": "Services on a swarm can't be moved from here yet.",
+                "locked": "Game servers follow the default above while owners may not choose.",
+                "notParkable": "Only for services that keep their data in one volume.",
+                "noVolumes": "This service keeps no files of its own."
+            }
         }
     }
 }

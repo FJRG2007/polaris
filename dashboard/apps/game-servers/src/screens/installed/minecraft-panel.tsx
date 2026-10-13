@@ -44,6 +44,7 @@ import { MinecraftWorld } from "./minecraft-world";
 import { findMap } from "../../lib/minecraft/maps";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
+import { ServerStorage } from "./server-storage";
 import { isConfigCrash, isLoaderCrash } from "../../lib/crash-loop";
 import { usePathname, useRouter } from "next/navigation";
 import { MinecraftSettings } from "./minecraft-settings";
@@ -895,6 +896,12 @@ export function MinecraftPanel({
                                 )}
                                 playersOnline={status?.players.online ?? 0}
                                 onDone={reloadSettings}
+                            />
+                        </CardBoundary>
+                        <CardBoundary name="Storage">
+                            <ServerStorage
+                                installedAppId={installedAppId}
+                                canManage={held.includes("games.manage")}
                             />
                         </CardBoundary>
                     </div>

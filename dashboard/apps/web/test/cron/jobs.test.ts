@@ -87,6 +87,9 @@ describe("the work Polaris runs on a schedule", () => {
             // same minute both see the same crossing and both tell somebody. An
             // alarm that arrives twice is one people learn to ignore.
             "alarms",
+            // Two sweeps would both see the same stopped server off its place and
+            // both start moving it, and the second copy fails on the first's lease.
+            "app-storage",
             // The audit chain has exactly one writer, and two sealing passes
             // would hand out the same places twice. Verification walks the whole
             // chain and has no reason to do that twice at once.
