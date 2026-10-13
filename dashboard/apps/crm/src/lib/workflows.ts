@@ -39,6 +39,7 @@ interface StoredWorkflow {
     readonly runCount: number;
     readonly lastRunAt: Date | null;
     readonly lastError: string | null;
+    readonly nextRunAt?: Date | null;
 }
 
 /** What a run knows about why it started. */
@@ -71,7 +72,8 @@ function toView(row: StoredWorkflow): model.WorkflowView | null {
         enabled: row.enabled,
         runCount: row.runCount,
         lastRunAt: row.lastRunAt ? row.lastRunAt.toISOString() : null,
-        lastError: row.lastError
+        lastError: row.lastError,
+        nextRunAt: row.nextRunAt ? row.nextRunAt.toISOString() : null
     };
 }
 
@@ -139,6 +141,7 @@ export async function saveWorkflow(
     await checkActions(actor, object, trigger, actions);
     const data = {
         name,
+        nextRunAt: model.nextScheduledRun(trigger, new Date()),
         trigger: JSON.stringify(trigger),
         actions: JSON.stringify(actions),
         enabled,
@@ -173,9 +176,20 @@ export async function setWorkflowEnabled(
     enabled: boolean
 ): Promise<void> {
     await requireCan(actor, object, "edit");
+    const row = (await prisma.crmWorkflow.findFirst({
+        where: { id, ...shelfWhere(actor.shelf), object }
+    })) as StoredWorkflow | null;
+    const trigger = row ? model.readTrigger(row.trigger) : null;
+    // Switched back on, a schedule picks up from now rather than catching up on
+    // every run it missed while off.
     const result = await prisma.crmWorkflow.updateMany({
         where: { id, ...shelfWhere(actor.shelf), object },
-        data: { enabled }
+        data: {
+            enabled,
+            ...(enabled && trigger
+                ? { nextRunAt: model.nextScheduledRun(trigger, new Date()) }
+                : {})
+        }
     });
     if (result.count === 0) throw new CrmRefusal((await crmT())("errors.notFound"));
 }
@@ -390,4 +404,34 @@ export async function onRecordEvents(
             await runWorkflow(row, { object, recordId: event.recordId, event });
         }
     }
+}
+
+/** The most scheduled runs one pass starts. The rest wait a minute. */
+const SCHEDULE_BATCH = 50;
+
+/**
+ * Run the scheduled workflows that are due, once each. A run is claimed by
+ * moving its next run on before it starts, so two passes never both start it;
+ * a missed run is not caught up on - the next is counted from now. Returns how
+ * many ran.
+ */
+export async function runDueSchedules(now: Date = new Date()): Promise<number> {
+    const rows = (await prisma.crmWorkflow.findMany({
+        where: { enabled: true, nextRunAt: { lte: now } },
+        orderBy: { nextRunAt: "asc" },
+        take: SCHEDULE_BATCH
+    })) as (StoredWorkflow & { nextRunAt: Date })[];
+    let ran = 0;
+    for (const row of rows) {
+        const trigger = model.readTrigger(row.trigger);
+        const next = trigger ? model.nextScheduledRun(trigger, now) : null;
+        const claimed = await prisma.crmWorkflow.updateMany({
+            where: { id: row.id, nextRunAt: row.nextRunAt },
+            data: { nextRunAt: next }
+        });
+        if (claimed.count === 0 || trigger?.kind !== "schedule") continue;
+        await runWorkflow(row, { object: row.object as CrmObject, recordId: null, event: null });
+        ran += 1;
+    }
+    return ran;
 }

@@ -8,6 +8,7 @@ import { fieldOf } from "@polaris-app/crm/src/model/objects";
 import {
     actionFits,
     eventsOf,
+    nextScheduledRun,
     renderTemplate,
     triggerMatches,
     workflowInputSchema
@@ -184,5 +185,44 @@ describe("run by hand", () => {
         const [created] = eventsOf([{ recordId: RECORD, kind: "created", changes: [] }]);
         expect(triggerMatches({ kind: "manual" }, created!)).toBe(false);
         expect(actionFits("updateRecord", "manual")).toBe(true);
+    });
+});
+
+describe("on a schedule", () => {
+    const base = { name: "x", actions: [] };
+
+    it("takes a schedule in a time zone, and refuses one that does not read", () => {
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                trigger: { kind: "schedule", cron: "0 9 * * 1", timeZone: "Europe/Madrid" }
+            }).success
+        ).toBe(true);
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                trigger: { kind: "schedule", cron: "every day", timeZone: "UTC" }
+            }).success
+        ).toBe(false);
+        expect(
+            workflowInputSchema.safeParse({
+                ...base,
+                trigger: { kind: "schedule", cron: "0 9 * * *", timeZone: "Mars/Olympus" }
+            }).success
+        ).toBe(false);
+    });
+
+    it("next runs at the schedule's next minute in its time zone", () => {
+        const next = nextScheduledRun(
+            { kind: "schedule", cron: "0 9 * * *", timeZone: "Europe/Madrid" },
+            new Date("2026-10-13T10:00:00Z")
+        );
+        expect(next?.toISOString()).toBe("2026-10-14T07:00:00.000Z");
+        expect(nextScheduledRun({ kind: "created" }, new Date())).toBeNull();
+    });
+
+    it("is about no record, so it cannot update one", () => {
+        expect(actionFits("updateRecord", "schedule")).toBe(false);
+        expect(actionFits("createRecord", "schedule")).toBe(true);
     });
 });

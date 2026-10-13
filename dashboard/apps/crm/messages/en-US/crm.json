@@ -495,7 +495,8 @@
             "updated": "A record is changed",
             "fieldChanged": "A field changes",
             "deleted": "A record is deleted",
-            "manual": "Run by hand on a record"
+            "manual": "Run by hand on a record",
+            "schedule": "On a schedule"
         },
         "actionKinds": {
             "updateRecord": "Update the record",
@@ -517,6 +518,11 @@
         "run": "Run workflow",
         "noManual": "No workflows to run. Add one that runs by hand.",
         "ran": "{name} ran",
-        "runFailed": "{name} failed"
+        "runFailed": "{name} failed",
+        "schedule": "Schedule",
+        "scheduleHint": "Minute, hour, day of month, month, day of week. 0 9 * * 1 is Mondays at 9:00.",
+        "badSchedule": "That is not a schedule. Use five fields, like 0 9 * * 1.",
+        "nextRun": "Next run {when}",
+        "timeZone": "Time zone: {zone}"
     }
 }

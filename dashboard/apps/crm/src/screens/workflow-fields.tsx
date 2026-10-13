@@ -7,6 +7,7 @@
  */
 
 import { useCrmT } from "./i18n";
+import { hostUi } from "@polaris/app-host/client";
 import { Plus, X } from "lucide-react";
 import * as model from "../model/workflows";
 import { Button, Input, Select } from "@polaris/ui";
@@ -36,6 +37,8 @@ export interface TriggerFieldsProps {
 export function TriggerFields({ object, trigger, onChange }: TriggerFieldsProps) {
     const t = useCrmT();
     const custom = useCustomFields();
+    if (trigger.kind === "schedule")
+        return <ScheduleFields trigger={trigger} onChange={onChange} />;
     if (trigger.kind !== "fieldChanged") return null;
     const fields = fieldsOf(object, custom);
     const field = fields.find((one) => one.key === trigger.field);
@@ -85,6 +88,43 @@ export function TriggerFields({ object, trigger, onChange }: TriggerFieldsProps)
                     />
                 )}
             </div>
+        </div>
+    );
+}
+
+/** A schedule: the cron expression, when it would next run, in which zone. */
+function ScheduleFields({
+    trigger,
+    onChange
+}: {
+    trigger: Extract<model.WorkflowTrigger, { kind: "schedule" }>;
+    onChange: (trigger: model.WorkflowTrigger) => void;
+}) {
+    const t = useCrmT();
+    const format = hostUi.displayFormat.useDisplayFormat();
+    const valid = model.isCron(trigger.cron);
+    const next = valid ? model.nextScheduledRun(trigger, new Date()) : null;
+    return (
+        <div className="flex min-w-0 flex-col gap-1.5">
+            <Input
+                aria-label={t("workflows.schedule")}
+                aria-invalid={trigger.cron !== "" && !valid}
+                className="font-mono"
+                value={trigger.cron}
+                maxLength={120}
+                onChange={(event) => onChange({ ...trigger, cron: event.target.value })}
+            />
+            {trigger.cron !== "" && !valid ? (
+                <p className="text-[0.75rem] text-destructive">{t("workflows.badSchedule")}</p>
+            ) : (
+                <p className="text-[0.75rem] text-muted-foreground">
+                    {t("workflows.scheduleHint")}
+                </p>
+            )}
+            <p className="break-words text-[0.75rem] text-muted-foreground">
+                {next ? `${t("workflows.nextRun", { when: format.dateTime(next) })} - ` : null}
+                {t("workflows.timeZone", { zone: trigger.timeZone })}
+            </p>
         </div>
     );
 }
@@ -242,6 +282,13 @@ export function useWorkflowWords(object: CrmObject) {
     const custom = useCustomFields();
     return {
         newTrigger(kind: model.TriggerKind): model.WorkflowTrigger {
+            if (kind === "schedule") {
+                return {
+                    kind,
+                    cron: "0 9 * * 1",
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+                };
+            }
             if (kind === "fieldChanged") {
                 return { kind, field: primaryField(object).key, to: null };
             }
@@ -271,6 +318,7 @@ export function useWorkflowWords(object: CrmObject) {
                     ? t("workflows.summaryFieldTo", { field: name, value: trigger.to })
                     : t("workflows.summaryField", { field: name });
             }
+            if (trigger.kind === "schedule") return `${trigger.cron} (${trigger.timeZone})`;
             return t(`workflows.triggers.${trigger.kind}`);
         },
         /** What to tell the reader once a workflow is saved, beyond the list. */

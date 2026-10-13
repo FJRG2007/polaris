@@ -388,3 +388,59 @@ describe("run by hand", () => {
         expect(db.crmWorkflow.update).not.toHaveBeenCalled();
     });
 });
+
+describe("on a schedule", () => {
+    it("is saved with when it next runs, and a record trigger with none", async () => {
+        await workflows.saveWorkflow(actorWith(allowed), "companies", {
+            name: "Weekly",
+            trigger: { kind: "schedule", cron: "0 9 * * 1", timeZone: "UTC" },
+            actions: [],
+            enabled: true
+        });
+        const [[made]] = db.crmWorkflow.create.mock.calls as unknown as [
+            [{ data: { nextRunAt: Date | null } }]
+        ];
+        expect(made.data.nextRunAt).toBeInstanceOf(Date);
+        expect(made.data.nextRunAt!.getUTCDay()).toBe(1);
+        expect(made.data.nextRunAt!.getUTCHours()).toBe(9);
+    });
+
+    it("runs what is due once, claiming the run before it starts", async () => {
+        const due = new Date("2026-10-13T09:00:00Z");
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored({ kind: "schedule", cron: "0 9 * * *", timeZone: "UTC" }, { nextRunAt: due }),
+            stored(
+                { kind: "schedule", cron: "0 9 * * *", timeZone: "UTC" },
+                { id: "taken", nextRunAt: due }
+            )
+        ]);
+        db.crmWorkflow.updateMany
+            .mockResolvedValueOnce({ count: 1 })
+            .mockResolvedValueOnce({ count: 0 });
+        expect(await workflows.runDueSchedules(new Date("2026-10-13T09:00:30Z"))).toBe(1);
+        expect(db.crmWorkflow.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { enabled: true, nextRunAt: { lte: new Date("2026-10-13T09:00:30Z") } }
+            })
+        );
+        expect(db.crmWorkflow.updateMany).toHaveBeenCalledWith({
+            where: { id: FLOW, nextRunAt: due },
+            data: { nextRunAt: new Date("2026-10-14T09:00:00Z") }
+        });
+        expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
+        expect(db.crmWorkflow.update).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: FLOW } })
+        );
+    });
+
+    it("stops a schedule that is no longer one", async () => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([
+            stored({ kind: "created" }, { nextRunAt: new Date("2026-10-13T09:00:00Z") })
+        ]);
+        expect(await workflows.runDueSchedules(new Date("2026-10-13T09:01:00Z"))).toBe(0);
+        expect(db.crmWorkflow.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { nextRunAt: null } })
+        );
+        expect(db.crmWorkflow.update).not.toHaveBeenCalled();
+    });
+});

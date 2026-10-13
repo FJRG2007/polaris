@@ -63,6 +63,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     const t = useCrmT();
     const toast = useToast();
     const words = useWorkflowWords(object);
+    const format = hostUi.displayFormat.useDisplayFormat();
     const [rows, setRows] = useState<model.WorkflowView[] | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
     const [saving, setSaving] = useState(false);
@@ -283,6 +284,14 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                             <span className="truncate text-[0.75rem] text-muted-foreground">
                                 {words.triggerSummary(row.trigger)} -{" "}
                                 {t("workflows.runs", { count: row.runCount })}
+                                {row.enabled && row.nextRunAt ? (
+                                    <>
+                                        {" - "}
+                                        {t("workflows.nextRun", {
+                                            when: format.dateTime(row.nextRunAt)
+                                        })}
+                                    </>
+                                ) : null}
                                 {row.lastRunAt ? (
                                     <>
                                         {" - "}

@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { isTimeZone, nextCronRun, parseCron } from "@polaris/core";
 import { csvValue } from "./csv";
 import type { EventKind, FieldChange } from "./timeline";
 import { CRM_OBJECTS, type FieldDef, type FieldValue } from "./objects";
@@ -23,6 +24,16 @@ export const MAX_WORKFLOWS = 50;
 /** The longest text an action holds in one place: a value, a title. */
 export const ACTION_TEXT_MAX = 2000;
 
+/** Whether a cron expression reads as a schedule. */
+export function isCron(expression: string): boolean {
+    try {
+        parseCron(expression);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** What sets a workflow off. */
 export const workflowTriggerSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("created") }),
@@ -36,7 +47,13 @@ export const workflowTriggerSchema = z.discriminatedUnion("kind", [
         to: z.string().trim().max(ACTION_TEXT_MAX).nullable()
     }),
     /** Somebody runs it on a record from the record's page. */
-    z.object({ kind: z.literal("manual") })
+    z.object({ kind: z.literal("manual") }),
+    /** A cron schedule, read in a time zone. */
+    z.object({
+        kind: z.literal("schedule"),
+        cron: z.string().trim().min(1).max(120).refine(isCron),
+        timeZone: z.string().min(1).max(64).refine(isTimeZone)
+    })
 ]);
 export type WorkflowTrigger = z.infer<typeof workflowTriggerSchema>;
 export type TriggerKind = WorkflowTrigger["kind"];
@@ -47,7 +64,8 @@ export const TRIGGER_KINDS: readonly TriggerKind[] = [
     "updated",
     "fieldChanged",
     "deleted",
-    "manual"
+    "manual",
+    "schedule"
 ];
 
 /** The most fields one action writes. */
@@ -127,6 +145,8 @@ export interface WorkflowView {
     readonly runCount: number;
     readonly lastRunAt: string | null;
     readonly lastError: string | null;
+    /** When a schedule next runs it. */
+    readonly nextRunAt: string | null;
 }
 
 /** A workflow just saved, and what the reader is told about it once. */
@@ -180,6 +200,16 @@ export function triggerMatches(
     const field = fields.find((one) => one.key === trigger.field);
     if (!field) return false;
     return csvValue(field, change.after).trim().toLowerCase() === trigger.to.toLowerCase();
+}
+
+/** When a schedule trigger next fires after `after`; null for any other. */
+export function nextScheduledRun(trigger: WorkflowTrigger, after: Date): Date | null {
+    if (trigger.kind !== "schedule") return null;
+    try {
+        return nextCronRun(parseCron(trigger.cron), after, trigger.timeZone);
+    } catch {
+        return null;
+    }
 }
 
 /** A stored trigger, or null when it no longer reads as one. */

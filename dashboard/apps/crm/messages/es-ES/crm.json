@@ -495,7 +495,8 @@
             "updated": "Se cambia un registro",
             "fieldChanged": "Cambia un campo",
             "deleted": "Se elimina un registro",
-            "manual": "Se ejecuta a mano"
+            "manual": "Se ejecuta a mano",
+            "schedule": "Programado"
         },
         "actionKinds": {
             "updateRecord": "Actualizar el registro",
@@ -517,6 +518,11 @@
         "run": "Ejecutar flujo",
         "noManual": "No hay flujos que ejecutar. Añade uno manual.",
         "ran": "{name} se ejecutó",
-        "runFailed": "{name} falló"
+        "runFailed": "{name} falló",
+        "schedule": "Horario",
+        "scheduleHint": "Minuto, hora, día del mes, mes, día de la semana. 0 9 * * 1 es los lunes a las 9:00.",
+        "badSchedule": "Eso no es un horario. Usa cinco campos, como 0 9 * * 1.",
+        "nextRun": "Próxima ejecución {when}",
+        "timeZone": "Zona horaria: {zone}"
     }
 }
