@@ -1456,6 +1456,10 @@
             "search": "Buscar GIF y stickers",
             "hint": "Añade la búsqueda al selector de Chat. Un GIF elegido se guarda aquí como cualquier otro adjunto, así que nadie que lea una conversación queda expuesto a terceros."
         },
+        "lastfm": {
+            "switch": "Mostrar lo que registra la gente",
+            "hint": "Permite que cada persona escriba su usuario de Last.fm en Cuentas conectadas y muestra su canción junto a su nombre."
+        },
         "oauth": {
             "idLabel": {
                 "clientId": "ID cliente",
@@ -1826,6 +1830,18 @@
                     "2": {
                         "label": "Copiar el id y el secreto del cliente",
                         "help": "La app -> Settings -> Basic Information. View client secret lo muestra."
+                    }
+                }
+            },
+            "lastfm": {
+                "summary": "Muestra lo que escucha la gente, para todos, a través de Last.fm.",
+                "description": "Pega una clave de API de Last.fm y cualquiera aquí podrá escribir su usuario de Last.fm en Cuentas conectadas. Junto a su nombre, quienes lo compartan mostrarán la canción que están registrando, desde Spotify o cualquier otro reproductor conectado a Last.fm. A diferencia de una app de Spotify, no tiene límite de cinco personas ni necesita Premium. Escuchar juntos abre la canción en Spotify desde el principio, no sincronizada.",
+                "apiKeyLabel": "Clave API",
+                "apiKeyHelp": "La clave de API que Last.fm muestra para la aplicación. El secreto compartido no hace falta.",
+                "links": {
+                    "0": {
+                        "label": "Crear una cuenta de API",
+                        "help": "Cualquier nombre y descripción; la URL de callback puede quedar vacía. Last.fm muestra la clave de API justo después."
                     }
                 }
             },

@@ -59,6 +59,7 @@ describe("which section a service is listed under", () => {
             "dropbox",
             "epic",
             "google",
+            "lastfm",
             "microsoft",
             "minecraft",
             "spotify",
@@ -77,6 +78,7 @@ describe("which section a service is listed under", () => {
             "minecraft",
             "discord",
             "spotify",
+            "lastfm",
             "dropbox"
         ]);
         expect(sections[1]?.providers.map((provider) => provider.slug)).toEqual(["github", "vercel", "railway", "aws"]);

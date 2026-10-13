@@ -1456,6 +1456,10 @@
             "search": "Search for GIFs and stickers",
             "hint": "Adds the search to the picker in Chat. A chosen GIF is stored here like any other attachment, so nobody reading a conversation is announced to anyone."
         },
+        "lastfm": {
+            "switch": "Show what people scrobble",
+            "hint": "Lets everybody type their Last.fm username under Connected accounts and shows their song beside their name."
+        },
         "oauth": {
             "idLabel": {
                 "clientId": "Client ID",
@@ -1826,6 +1830,18 @@
                     "2": {
                         "label": "Copy the client id and secret",
                         "help": "The app -> Settings -> Basic Information. View client secret shows it."
+                    }
+                }
+            },
+            "lastfm": {
+                "summary": "Show what people are listening to, for everybody, through Last.fm.",
+                "description": "Paste a Last.fm API key and anyone here can type their Last.fm username under Connected accounts. Beside their name, people who share it then see the song they are scrobbling - from Spotify or any other player connected to Last.fm. Unlike a Spotify app, it has no five-person limit and needs no Premium. Listen along opens the song in Spotify from the beginning rather than in step.",
+                "apiKeyLabel": "API key",
+                "apiKeyHelp": "The API key Last.fm shows for the application. The shared secret is not needed.",
+                "links": {
+                    "0": {
+                        "label": "Create an API account",
+                        "help": "Any application name and description; the callback URL can stay empty. Last.fm shows the API key straight after."
                     }
                 }
             },

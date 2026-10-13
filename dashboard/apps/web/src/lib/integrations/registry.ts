@@ -600,6 +600,27 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "On the app's Basic Information page, under View client secret."
     },
     {
+        slug: "lastfm",
+        name: "Last.fm",
+        category: "Chat",
+        summary: "Show what people are listening to, for everybody, through Last.fm.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Paste a Last.fm API key and anyone here can type their Last.fm username under Connected accounts. Beside their name, people who share it then see the song they are scrobbling - from Spotify or any other player connected to Last.fm. Unlike a Spotify app, it has no five-person limit and needs no Premium. Listen along opens the song in Spotify from the beginning rather than in step.",
+        docsUrl: "https://www.last.fm/api/show/user.getRecentTracks",
+        setupLinks: [
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Create an API account",
+                url: "https://www.last.fm/api/account/create",
+                help: "Any application name and description; the callback URL can stay empty. Last.fm shows the API key straight after."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "The API key Last.fm shows for the application. The shared secret is not needed."
+    },
+    {
         slug: "krisp",
         name: "Krisp",
         category: "Chat",
