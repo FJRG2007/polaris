@@ -3,7 +3,8 @@
  * of its own with cameras on, and a call in a group chat being recorded.
  */
 
-import { VIEWER } from "../fixtures/people";
+import { TEAM, VIEWER } from "../fixtures/people";
+import { label } from "../runtime/interact";
 import { defineScene } from "../runtime/scene";
 import { ChatScreen, chatActions } from "./chat";
 import { MeetingRoom } from "@/app/(app)/chat/meetings/[meetingId]/meeting-room";
@@ -50,5 +51,17 @@ export const callGroup = defineScene({
     path: `/chat/c/${GROUP_ID}`,
     params: { channelId: GROUP_ID },
     actions: (ctx) => chatActions(ctx, GROUP_ID),
-    render: (ctx) => <ChatScreen channelId={GROUP_ID} hold={callHold(ctx, groupShape(ctx))} />
+    render: (ctx) => <ChatScreen channelId={GROUP_ID} hold={callHold(ctx, groupShape(ctx))} />,
+    // A screen arriving in a group call is offered rather than taken; the
+    // picture is of one being watched, among the people.
+    prepare: (ctx) => {
+        const screen = label(ctx.locale, "chat.callRoom.theirScreen").replace(
+            "{name}",
+            TEAM.lena.name
+        );
+        const title = label(ctx.locale, "chat.callRoom.watchNamed").replace("{name}", screen);
+        const card = document.querySelector<HTMLElement>(`button[title="${title}"]`);
+        if (!card) throw new Error(`no card titled "${title}"`);
+        card.click();
+    }
 });
