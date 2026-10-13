@@ -80,11 +80,14 @@ import {
     X
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
+import * as view from "../../lib/minecraft/players-view";
 
 const { relativeTime } = hostUi.relativeTime;
 const { useConfirm } = hostUi.confirmDialog;
 const { ToolbarSwitch } = hostUi.toolbarSwitch;
 const { useDisplayFormat } = hostUi.displayFormat;
+const { writeSnapshot } = hostUi.snapshotCache;
+const { useKeptSnapshot } = hostUi.liveRead;
 
 /** Nobody known to be idle: the screen before the first answer about it. */
 const NOBODY_IDLE: Readonly<Record<string, number>> = {};
@@ -168,6 +171,8 @@ export function MinecraftPlayers({
     const [note, setNote] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
+    /** Rows drawn so far: a server of thousands draws a screenful, then more. */
+    const [rowLimit, setRowLimit] = useState(view.PLAYER_ROWS_STEP);
     // Refusals cleared here, hidden at once and put back if the save fails.
     const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
     const refusalKey = (refusal: { player: string; at: string }) =>
@@ -218,13 +223,23 @@ export function MinecraftPlayers({
         () => foldPlayers(status, roster, access, sessions, now, seen, passwords ?? []),
         [status, roster, access, sessions, now, seen, passwords]
     );
+    // The last whole list, drawn on a reload until every read is back in, so
+    // the rows do not reshuffle as each read lands (see players-view).
+    const keptKey = `minecraft-players:${installedAppId}`;
+    const [kept, setKept] = useState<readonly PlayerEntry[] | null>(null);
+    useKeptSnapshot<PlayerEntry[]>(keptKey, view.KEPT_PLAYERS_MS, (value) => setKept(value.value));
+    const complete = view.playersComplete({ status, roster, access });
+    useEffect(() => {
+        if (complete) writeSnapshot(keptKey, view.keptPlayers(known));
+    }, [complete, known, keptKey]);
+    const onScreen = view.playersOnScreen(known, kept, complete);
     const players = useMemo(
         () =>
-            known.map((player) => ({
+            onScreen.map((player) => ({
                 ...player,
                 ...(applied.get(player.name.toLowerCase()) ?? {})
             })),
-        [known, applied]
+        [onScreen, applied]
     );
     const registered = access?.rules.length ?? 0;
     // Folded to lower case, because the server reports a name the way it stored
@@ -746,7 +761,7 @@ export function MinecraftPlayers({
                           ? t("playersTab.nobodyAtAll")
                           : t("playersTab.nobodyMatches")
                 }
-                rows={shown.map((player) => (
+                rows={shown.slice(0, rowLimit).map((player) => (
                     <PlayerRow
                         key={player.name.toLowerCase()}
                         player={player}
@@ -793,6 +808,16 @@ export function MinecraftPlayers({
                     />
                 ))}
             />
+            {shown.length > rowLimit && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="self-center"
+                    onClick={() => setRowLimit((limit) => limit + view.PLAYER_ROWS_STEP)}
+                >
+                    {t("playersTab.showMore", { count: shown.length - rowLimit })}
+                </Button>
+            )}
 
             {acting?.dialog === "access" && (
                 <PlayerAccessDialog

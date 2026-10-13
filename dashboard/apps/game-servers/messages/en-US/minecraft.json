@@ -490,6 +490,7 @@
         "searchPlaceholder": "Search by name, address or note",
         "connecting": "Connecting to the server...",
         "nobodyAtAll": "Nobody is registered and nobody is playing.",
+        "showMore": "Show {count, plural, one {# more} other {# more}}",
         "nobodyMatches": "Nobody matches that.",
         "whitelisted": "whitelisted",
         "waitingCount": "{count} waiting",

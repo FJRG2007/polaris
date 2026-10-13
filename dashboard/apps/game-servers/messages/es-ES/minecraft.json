@@ -490,6 +490,7 @@
         "searchPlaceholder": "Buscar por nombre, dirección o nota",
         "connecting": "Conectando con el servidor...",
         "nobodyAtAll": "No hay nadie registrado ni nadie jugando.",
+        "showMore": "Mostrar {count, plural, one {# más} other {# más}}",
         "nobodyMatches": "Nadie coincide.",
         "whitelisted": "en lista",
         "waitingCount": "{count} pendientes",
