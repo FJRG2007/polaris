@@ -95,6 +95,7 @@ export async function listTimeline(
         createdAt: Date;
     }[];
     const names = new Map(people.map((person) => [person.id, person]));
+    const hidden = actor.rules?.[object].hidden ?? [];
     const shown = rows.slice(0, TIMELINE_PAGE);
     return {
         events: shown.flatMap((row) =>
@@ -105,7 +106,9 @@ export async function listTimeline(
                           kind: row.kind,
                           actor: row.actorId ? (names.get(row.actorId) ?? null) : null,
                           at: row.createdAt.toISOString(),
-                          changes: readChanges(row.changes)
+                          changes: readChanges(row.changes).filter(
+                              (change) => !hidden.includes(change.key)
+                          )
                       }
                   ]
                 : []

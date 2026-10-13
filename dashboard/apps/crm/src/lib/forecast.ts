@@ -13,7 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import * as model from "../model/forecast";
-import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
+import { ownClause, requireCan, requireShown, shelfData, shelfWhere, type CrmActor } from "./access";
 
 /** Groups a forecast reads at most; past this it says it is incomplete. */
 export const ROW_CAP = 20_000;
@@ -57,6 +57,8 @@ export async function forecast(
     now = new Date()
 ): Promise<model.Forecast> {
     await requireCan(actor, "opportunities", "read");
+    await requireShown(actor, "opportunities", ["amount", "stage", "closeDate"]);
+    const own = ownClause(actor, "opportunities");
     const range = model.forecastRange(now, input.granularity, input.periods);
     const start = new Date(`${range.starts[0]}T00:00:00Z`);
     const end = new Date(`${range.end}T00:00:00Z`);
@@ -70,7 +72,8 @@ export async function forecast(
                 ...(input.mine ? { ownerId: actor.user.id } : {}),
                 AND: [
                     { OR: [{ closeDate: null }, { closeDate: { lt: end } }] },
-                    { OR: [{ stage: { not: model.WON_STAGE } }, { closeDate: { gte: start } }] }
+                    { OR: [{ stage: { not: model.WON_STAGE } }, { closeDate: { gte: start } }] },
+                    ...(own ? [own] : [])
                 ]
             },
             _count: { _all: true },

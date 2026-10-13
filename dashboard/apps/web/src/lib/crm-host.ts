@@ -17,6 +17,7 @@ import { normalizeRelPath } from "@polaris/core";
 import { mayReadDrive, requireDriveDriver } from "@/lib/drive-authz";
 import { follow, safeUrl } from "@/lib/safe-fetch";
 import { sessionCan, type SessionUser } from "@/lib/session";
+import { listOrgRoles } from "@/lib/orgs/role-service";
 import { listOrgMembers, orgCan, resolveOrgAccess, type OrgActor } from "@/lib/orgs/org-service";
 
 /** The shelf somebody is working from: an organization, or their own (null). */
@@ -41,6 +42,36 @@ export async function crmOrgPermissions(
     orgId: string
 ): Promise<readonly string[] | null> {
     return (await resolveOrgAccess(actor, orgId))?.permissions ?? null;
+}
+
+/** This account's role in one organization and what it holds, or null when
+ *  the organization is not theirs to see. The owner has no role here (null):
+ *  nothing an organization writes about its roles holds them back. */
+export async function crmOrgAccess(
+    actor: OrgActor,
+    orgId: string
+): Promise<{ readonly role: string | null; readonly permissions: readonly string[] } | null> {
+    const access = await resolveOrgAccess(actor, orgId);
+    if (!access) return null;
+    return { role: access.isOwner ? null : access.role, permissions: access.permissions };
+}
+
+/** A role of an organization, as the CRM's rules screen names it. */
+export interface CrmOrgRole {
+    readonly slug: string;
+    readonly name: string;
+    readonly permissions: readonly string[];
+}
+
+/** The organization's roles, for somebody whose role manages them; nothing
+ *  for anybody else. */
+export async function crmOrgRoles(actor: OrgActor, orgId: string): Promise<CrmOrgRole[]> {
+    if (!orgCan(await resolveOrgAccess(actor, orgId), "roles.manage")) return [];
+    return (await listOrgRoles(orgId)).map((role) => ({
+        slug: role.slug,
+        name: role.name,
+        permissions: role.permissions
+    }));
 }
 
 /** Somebody who can own a record on a shelf. */

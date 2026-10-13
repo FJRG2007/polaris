@@ -5884,6 +5884,7 @@ model Organization {
     crmFavorites     CrmFavorite[]
     crmDashboards    CrmDashboard[]
     crmForecasts     CrmForecast[]
+    crmRoleRules     CrmRoleRule[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -13173,4 +13174,25 @@ model StorageMove {
 
     @@index([state])
     @@index([volumeId])
+}
+
+// What one role of an organization is held to in its CRM for one kind of
+// record, beyond the permissions the role carries (apps/crm model/roles).
+model CrmRoleRule {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    orgId     String   @db.Uuid
+    // The role's slug in the organization.
+    role      String
+    // companies | people | opportunities
+    object    String
+    // all | own
+    rows      String   @default("all")
+    // JSON arrays of field keys.
+    hidden    String   @default("[]")
+    readOnly  String   @default("[]")
+    updatedAt DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@unique([orgId, role, object])
 }

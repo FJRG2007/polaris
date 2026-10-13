@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
         async (): Promise<unknown> => ({ id: "u1", name: "Test User", isAdmin: false })
     ),
     crmShelf: vi.fn(async () => ({ orgId: null as string | null, orgName: null as string | null })),
-    crmOrgPermissions: vi.fn(async (): Promise<string[] | null> => [])
+    crmOrgAccess: vi.fn(async (): Promise<unknown> => ({ role: null, permissions: [] }))
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -30,7 +30,7 @@ vi.mock("@polaris/app-host", () => ({
         crmHost: {
             crmRunner: mocks.crmRunner,
             crmShelf: mocks.crmShelf,
-            crmOrgPermissions: mocks.crmOrgPermissions
+            crmOrgAccess: mocks.crmOrgAccess
         },
         i18nRequest: { getLocale: async () => "en-US" }
     }
@@ -68,7 +68,7 @@ describe("searching every kind of record", () => {
     it("leaves out what an organization's role cannot see, and names the organization", async () => {
         mocks.crmShelf.mockResolvedValueOnce({ orgId: "o1", orgName: "Example Org" });
         // A restricted role holding only "edit" on companies: companies, nothing else.
-        mocks.crmOrgPermissions.mockResolvedValueOnce(["crm.companies.edit"]);
+        mocks.crmOrgAccess.mockResolvedValueOnce({ role: null, permissions: ["crm.companies.edit"] });
         mocks.companies.mockResolvedValueOnce([{ id: "c1", name: "Example Co" }]);
         const hits = await searchAllRecords("u1", "", 12);
         expect(hits).toEqual([

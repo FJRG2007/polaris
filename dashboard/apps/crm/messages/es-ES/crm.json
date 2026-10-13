@@ -223,7 +223,9 @@
         "fieldSlots": "Esta lista no admite otro campo de este tipo. Elimina uno primero.",
         "fieldNameTaken": "Ya existe un campo con este nombre.",
         "fieldNotSaved": "El campo no se guardó",
-        "fieldNotDeleted": "El campo no se eliminó"
+        "fieldNotDeleted": "El campo no se eliminó",
+        "fieldHidden": "Tu rol no puede ver un campo que usa esta lista. Elige otra vista.",
+        "fieldLocked": "Tu rol no puede cambiar {field} aquí."
     },
     "views": {
         "title": "Vistas",
@@ -681,5 +683,34 @@
         "wonAlways": "{stage} cuenta como ganado, entero.",
         "save": "Guardar",
         "close": "Cerrar"
+    },
+    "roles": {
+        "title": "Roles",
+        "intro": "Lo que cada rol de {org} ve y cambia en el CRM, además de lo que permiten sus permisos.",
+        "personal": "Los roles se aplican al CRM de una organización. Este es el tuyo.",
+        "forbidden": "Solo quien gestiona los roles de la organización puede cambiar esto.",
+        "loading": "Cargando roles",
+        "full": "Acceso total",
+        "fullHint": "Tiene todos los permisos, así que estas reglas no se aplican.",
+        "rows": "Registros",
+        "rowsAll": "Todos",
+        "rowsOwn": "Solo los suyos",
+        "rowsOwnHint": "Registros de los que es responsable o que creó.",
+        "field": "Campo",
+        "access": "Acceso",
+        "see": "Puede cambiar",
+        "readOnly": "Solo lectura",
+        "hidden": "Oculto",
+        "nameHint": "El nombre siempre se muestra.",
+        "save": "Guardar",
+        "saved": "Guardado",
+        "notSaved": "Las reglas no se guardaron",
+        "permissions": "Cambia lo que cada rol puede añadir, cambiar y borrar en los ajustes de roles de la organización.",
+        "errors": {
+            "manage": "Tu rol no puede gestionar los roles de la organización.",
+            "role": "Ese rol ya no existe o tiene acceso total.",
+            "unknownField": "Un campo de esta regla ya no existe. Recarga e inténtalo de nuevo.",
+            "nameLocked": "El campo nombre no se puede ocultar ni bloquear."
+        }
     }
 }

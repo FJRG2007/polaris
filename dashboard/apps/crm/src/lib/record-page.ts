@@ -9,10 +9,11 @@ import { pinnedAmong } from "./favorites";
 import { loadFields } from "./fields";
 import { listTimeline } from "./timeline";
 import type { TimelinePage } from "../model/timeline";
-import { getRecord, shelfPeople } from "./records";
-import { recordSelect, table, toRecord } from "./columns";
+import { getRecord, shelfPeople, shown } from "./records";
+import { recordSelect, table } from "./columns";
 import { relatedLists, type RelatedList } from "../model/related";
-import { shelfWhere, type Abilities, type CrmActor } from "./access";
+import type { ObjectRule } from "../model/roles";
+import { recordWhere, type Abilities, type CrmActor } from "./access";
 import {
     recordName,
     type CrmObject,
@@ -40,6 +41,8 @@ export interface RecordOpening {
     readonly timeline: TimelinePage;
     /** Whether the reader pinned it to the rail. */
     readonly favorite: boolean;
+    /** What the reader's role is held to for this kind of record. */
+    readonly rule?: ObjectRule;
 }
 
 export async function openRecord(
@@ -61,7 +64,7 @@ export async function openRecord(
     // (two lists at most), never from data, so one read per list stays fixed.
     const related = await Promise.all(
         lists.map(async (list): Promise<RelatedRecords> => {
-            const where = { ...shelfWhere(actor.shelf), deletedAt: null, [list.column]: id };
+            const where = { ...recordWhere(actor, list.object), deletedAt: null, [list.column]: id };
             const [rows, total] = await Promise.all([
                 table(list.object).findMany({
                     where,
@@ -75,7 +78,7 @@ export async function openRecord(
                 ...list,
                 total,
                 records: (rows as Record<string, unknown>[]).map((row) => {
-                    const one = toRecord(list.object, row);
+                    const one = shown(actor, list.object, row);
                     return { id: one.id, name: recordName(list.object, one) };
                 })
             };
@@ -88,6 +91,7 @@ export async function openRecord(
         people,
         related,
         timeline: await timeline,
-        favorite: (await pinned).length > 0
+        favorite: (await pinned).length > 0,
+        rule: actor.rules?.[object]
     };
 }

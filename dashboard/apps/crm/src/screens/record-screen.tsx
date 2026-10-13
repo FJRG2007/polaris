@@ -37,6 +37,7 @@ import {
     type FieldDef,
     type FieldValue
 } from "../model/objects";
+import { ruleFields } from "../model/roles";
 
 function Block({ className }: { className?: string }) {
     return <span aria-hidden className={cn("block animate-pulse rounded bg-muted", className)} />;
@@ -68,7 +69,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
     const record = data?.record ?? null;
     const canEdit = Boolean(data?.can[object].edit) && !record?.deletedAt;
     const canRestore = Boolean(data?.can[object].delete) && Boolean(record?.deletedAt);
-    const fields = fieldsOf(object, data?.fields ?? []);
+    const fields = ruleFields(fieldsOf(object, data?.fields ?? []), data?.rule);
     const plural = t(`objects.${object}.plural`);
 
     const save = (field: FieldDef, stored: InputValue, shown: FieldValue) => {

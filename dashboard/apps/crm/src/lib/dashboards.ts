@@ -27,7 +27,8 @@ import { shelfPeople } from "./records";
 import { readConfig } from "../model/views";
 import * as model from "../model/dashboards";
 import { recordSelect, table, toRecord, columnOf } from "./columns";
-import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
+import { filterKeys } from "../model/roles";
+import { recordWhere, requireCan, requireShown, shelfData, type CrmActor } from "./access";
 import { CRM_OBJECTS, fieldOf, recordName, type CrmObject } from "../model/objects";
 
 /** Distinct values of a field a split may group: past this it is not a chart. */
@@ -233,7 +234,12 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
         }
         filter = readConfig(object, stored, custom).filter;
     }
-    const base = listWhere(object, actor.shelf, { filter, custom });
+    await requireShown(actor, object, [
+        ...filterKeys(filter),
+        ...(checked.field ? [checked.field] : []),
+        ...(checked.groupBy ? [checked.groupBy] : [])
+    ]);
+    const base = listWhere(object, actor, { filter, custom });
 
     // The column measured, and, for an amount, only the rows in its currency.
     let column: string | null = null;
@@ -378,7 +384,7 @@ async function groupLabels(
         for (const person of await shelfPeople(actor)) names.set(person.id, person.name);
     } else if (kind === "relation" && target && actor.can[target].read) {
         const rows = (await table(target).findMany({
-            where: { id: { in: ids }, ...shelfWhere(actor.shelf) },
+            where: { id: { in: ids }, ...recordWhere(actor, target) },
             select: recordSelect(target)
         })) as Record<string, unknown>[];
         for (const row of rows) {

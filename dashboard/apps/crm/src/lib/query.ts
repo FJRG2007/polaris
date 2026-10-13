@@ -12,7 +12,7 @@
 import type { ViewSort } from "../model/views";
 import { contains, filterWhere } from "./filters";
 import { readFilter, type ViewFilter } from "../model/filters";
-import { shelfWhere, type Shelf } from "./access";
+import { ownClause, shelfWhere, type CrmActor, type Shelf } from "./access";
 import { slotOf, type CrmObject, type FieldDef } from "../model/objects";
 import { columnOf, type ColumnSpec } from "./columns";
 
@@ -57,13 +57,17 @@ export interface ListScope {
 }
 
 /** The rows a list reads: this shelf, in or out of the trash, matching the
- *  search and the filter, in one group when it is grouped. */
+ *  search and the filter, in one group when it is grouped - and, read for a
+ *  reader whose role is held to their own records, only those. */
 export function listWhere(
     object: CrmObject,
-    shelf: Shelf,
+    scope: Shelf | CrmActor,
     options: ListScope
 ): Record<string, unknown> {
+    const actor = "user" in scope ? scope : null;
+    const shelf = actor ? actor.shelf : (scope as Shelf);
     const narrowed = [
+        (actor && ownClause(actor, object)) ?? {},
         searchWhere(object, options.search ?? ""),
         options.filter
             ? filterWhere(

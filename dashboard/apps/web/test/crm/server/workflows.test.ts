@@ -57,7 +57,7 @@ const crmHost = vi.hoisted(() => ({
             sessionId: ""
         })
     ),
-    crmOrgPermissions: vi.fn(async (): Promise<string[] | null> => ["*"]),
+    crmOrgAccess: vi.fn(async (): Promise<unknown> => ({ role: null, permissions: ["*"] })),
     crmOrgPeople: vi.fn(async () => [
         { id: "u1", name: "Test User", contact: "" },
         { id: "u3", name: "Other User", contact: "" }

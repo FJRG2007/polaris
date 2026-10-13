@@ -223,7 +223,9 @@
         "fieldSlots": "This list has no room for another field of this type. Delete one first.",
         "fieldNameTaken": "A field with this name already exists.",
         "fieldNotSaved": "The field was not saved",
-        "fieldNotDeleted": "The field was not deleted"
+        "fieldNotDeleted": "The field was not deleted",
+        "fieldHidden": "Your role cannot see a field this list uses. Choose another view.",
+        "fieldLocked": "Your role cannot change {field} here."
     },
     "views": {
         "title": "Views",
@@ -681,5 +683,34 @@
         "wonAlways": "{stage} counts as won, in full.",
         "save": "Save",
         "close": "Close"
+    },
+    "roles": {
+        "title": "Roles",
+        "intro": "What each role of {org} sees and changes in the CRM, on top of what its permissions allow.",
+        "personal": "Roles apply to an organization's CRM. This is your own.",
+        "forbidden": "Only people who manage the organization's roles can change these.",
+        "loading": "Loading roles",
+        "full": "Full access",
+        "fullHint": "Holds every permission, so these rules do not apply.",
+        "rows": "Records",
+        "rowsAll": "Every record",
+        "rowsOwn": "Only their own",
+        "rowsOwnHint": "Records they own or created.",
+        "field": "Field",
+        "access": "Access",
+        "see": "Can change",
+        "readOnly": "Read-only",
+        "hidden": "Hidden",
+        "nameHint": "The name is always shown.",
+        "save": "Save",
+        "saved": "Saved",
+        "notSaved": "The rules were not saved",
+        "permissions": "Change what each role may add, change and delete in the organization's role settings.",
+        "errors": {
+            "manage": "Your role cannot manage the organization's roles.",
+            "role": "That role no longer exists or has full access.",
+            "unknownField": "A field in this rule no longer exists. Reload and try again.",
+            "nameLocked": "The name field cannot be hidden or locked."
+        }
     }
 }

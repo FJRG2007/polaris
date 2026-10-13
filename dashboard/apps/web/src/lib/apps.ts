@@ -1231,6 +1231,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["sales forecast", "pipeline", "weighted", "quota", "close date", "revenue"]
         },
         {
+            label: "Roles", // i18n-ignore
+            href: "/crm/roles",
+            icon: ShieldCheck,
+            keywords: ["permissions", "field access", "hidden fields", "read-only", "own records"]
+        },
+        {
             label: "New company", // i18n-ignore
             href: "/crm/companies?new=1",
             icon: Building2,

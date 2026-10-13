@@ -214,6 +214,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     openingRef.current = opening;
     const can = opening.data?.can[object] ?? null;
     const people = opening.data?.people ?? [];
+    const rule = opening.data?.rule ?? null;
     // An answer kept from before fields could be added carries none.
     const addedFields = opening.data?.fields;
     const custom = useMemo(() => (addedFields ?? []).map(customDef), [addedFields]);
@@ -432,7 +433,9 @@ export function ListScreen({ object }: { object: CrmObject }) {
         if (!config) return;
         setExporting(true);
         try {
-            const columns = config.columns.filter((column) => !column.hidden);
+            const columns = config.columns.filter(
+                (column) => !column.hidden && !rule?.hidden.includes(column.key)
+            );
             const file = await unwrap(
                 () =>
                     actions.exportRecordsAction({
@@ -460,7 +463,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
         } finally {
             setExporting(false);
         }
-    }, [config, object, search, sorts, filter, t, toast, failed]);
+    }, [config, object, search, sorts, filter, t, toast, failed, rule]);
 
     // The newest edit of each cell: an older answer arriving late is not
     // allowed to overwrite a newer value.
@@ -705,8 +708,11 @@ export function ListScreen({ object }: { object: CrmObject }) {
     );
 
     const columns = useMemo(
-        () => (config?.columns ?? []).filter((column) => !column.hidden),
-        [config]
+        () =>
+            (config?.columns ?? []).filter(
+                (column) => !column.hidden && !rule?.hidden.includes(column.key)
+            ),
+        [config, rule]
     );
     const setConfig = (next: Partial<views.ViewConfig>) => {
         if (!config) return;
@@ -879,6 +885,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     } else {
         body = (
             <RecordTable
+                locked={rule?.readOnly}
                 object={object}
                 columns={columns}
                 sorts={config.sorts}

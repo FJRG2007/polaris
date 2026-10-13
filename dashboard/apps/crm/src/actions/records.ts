@@ -19,6 +19,7 @@ import * as favorites from "../lib/favorites";
 import type { TimelinePage } from "../model/timeline";
 import { MAX_SEARCH } from "../lib/query";
 import type { Abilities } from "../lib/access";
+import type { ObjectRule } from "../model/roles";
 import { requireCrmActor } from "../lib/access";
 import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { CRM_OBJECTS, type CrmRecord, type Ref } from "../model/objects";
@@ -70,6 +71,8 @@ export interface ListOpening {
     readonly fields: CustomField[];
     /** The views the reader pinned to the rail. */
     readonly favoriteViews?: string[];
+    /** What the reader's role is held to for this kind of record. */
+    readonly rule?: ObjectRule;
 }
 
 /** Everything a list needs before its rows: its view, what the reader may do,
@@ -103,6 +106,7 @@ export async function openListAction(input: unknown): Promise<Outcome<ListOpenin
             people,
             shelfName: actor.shelf.orgName,
             fields: added,
+            rule: actor.rules?.[parsed.data.object],
             favoriteViews: await favorites.pinnedAmong(
                 actor,
                 "view",
