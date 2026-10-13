@@ -58,6 +58,35 @@ vi.mock("@polaris-app/crm/src/actions/workflows", () => ({
             }
         ]
     }),
+    listWorkflowVersionsAction: async () => ({
+        ok: true,
+        versions: [
+            {
+                id: "v2",
+                name: "Welcome",
+                trigger: { kind: "created" },
+                actions: [],
+                savedById: "u1",
+                createdAt: "2026-10-02T10:00:00.000Z"
+            },
+            {
+                id: "v1",
+                name: "Welcome first",
+                trigger: { kind: "created" },
+                actions: [
+                    {
+                        kind: "ifElse",
+                        when: { conjunction: "and", rules: [] },
+                        then: [{ kind: "httpRequest", url: "https://example.invalid/hook" }],
+                        otherwise: []
+                    },
+                    { kind: "delay", minutes: 120 }
+                ],
+                savedById: "u3",
+                createdAt: "2026-10-01T10:00:00.000Z"
+            }
+        ]
+    }),
     workflowOptionsAction: async () => ({
         ok: true,
         mail: true,
@@ -219,5 +248,31 @@ describe("the workflows dialog", () => {
         );
         fireEvent.click(screen.getByRole("button", { name: "Back" }));
         expect(await screen.findByText("Welcome")).toBeTruthy();
+    });
+
+    it("shows a workflow's steps and saved versions, and edits from an older one", async () => {
+        open();
+        await screen.findByText("Welcome");
+        fireEvent.click(screen.getByRole("button", { name: "Versions and steps" }));
+        expect(await screen.findByText("Versions of Welcome")).toBeTruthy();
+        expect(screen.getByText("How it runs now")).toBeTruthy();
+        expect(await screen.findByText("Welcome first")).toBeTruthy();
+        expect(screen.getByText(/by Other User/)).toBeTruthy();
+        expect(screen.queryByText("If the record matches")).toBeNull();
+        fireEvent.click(screen.getAllByRole("button", { name: "Show steps" })[1]!);
+        expect(screen.getByText("If the record matches")).toBeTruthy();
+        expect(screen.getByText("https://example.invalid/hook")).toBeTruthy();
+        expect(screen.getByText("2 hours")).toBeTruthy();
+        fireEvent.click(screen.getAllByRole("button", { name: "Edit from this version" })[1]!);
+        expect(await screen.findByText("Edit workflow")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await waitFor(() => expect(state.saved).toHaveLength(1));
+        expect(state.saved[0]).toMatchObject({
+            workflow: {
+                id: FLOW,
+                name: "Welcome first",
+                actions: [{ kind: "ifElse" }, { kind: "delay" }]
+            }
+        });
     });
 });

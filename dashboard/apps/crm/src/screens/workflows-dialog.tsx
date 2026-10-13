@@ -14,7 +14,8 @@ import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
 import { useCallback, useEffect, useState } from "react";
 import { recordHref } from "../model/related";
-import { History, Pencil, Plus, Trash2, Workflow } from "lucide-react";
+import { WorkflowDiagram } from "./workflow-diagram";
+import { History, Layers, Pencil, Plus, Trash2, Workflow } from "lucide-react";
 import { ActionList, TriggerFields, useWorkflowWords } from "./workflow-fields";
 import {
     Button,
@@ -72,6 +73,31 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     /** The workflow whose runs are shown, and its runs once read. */
     const [runsOf, setRunsOf] = useState<model.WorkflowView | null>(null);
     const [runs, setRuns] = useState<model.WorkflowRunView[] | null>(null);
+    /** The workflow whose saved versions are shown, its versions once read,
+     *  and the one whose steps are open. */
+    const [versionsOf, setVersionsOf] = useState<model.WorkflowView | null>(null);
+    const [versions, setVersions] = useState<model.WorkflowVersionView[] | null>(null);
+    const [openVersion, setOpenVersion] = useState<string | null>(null);
+
+    const showVersions = (row: model.WorkflowView) => {
+        setNotice(null);
+        setVersionsOf(row);
+        setVersions(null);
+        setOpenVersion(null);
+        unwrap(
+            () => actions.listWorkflowVersionsAction({ object, id: row.id }),
+            t("errors.loadFailed")
+        )
+            .then((answer) => setVersions(answer.versions))
+            .catch((caught) => {
+                setVersions([]);
+                toast.show({ title: t("errors.loadFailed"), body: messageOf(caught) });
+            });
+    };
+
+    /** Who saved a version, by the name the shelf knows them by. */
+    const savedBy = (id: string | null): string | null =>
+        (id && options.people.find((person) => person.id === id)?.name) || null;
 
     const showRuns = (row: model.WorkflowView) => {
         setNotice(null);
@@ -113,6 +139,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
             setDraft(null);
             setNotice(null);
             setRunsOf(null);
+            setVersionsOf(null);
         }
     }, [open, load]);
 
@@ -159,6 +186,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
             );
             setNotice(words.savedNotice(saved));
             setDraft(null);
+            setVersionsOf(null);
             load();
         } catch (caught) {
             toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
@@ -285,6 +313,107 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                     ))}
                 </ul>
             );
+    } else if (versionsOf) {
+        body = (
+            <div className="flex max-h-[60vh] min-h-0 min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain">
+                <section className="flex min-w-0 flex-col gap-1.5">
+                    <span className="text-[0.8125rem] font-medium">{t("workflows.current")}</span>
+                    <WorkflowDiagram
+                        object={object}
+                        trigger={versionsOf.trigger}
+                        actions={versionsOf.actions}
+                    />
+                </section>
+                <section className="flex min-w-0 flex-col gap-1">
+                    <span className="text-[0.8125rem] font-medium">
+                        {t("workflows.savedVersions")}
+                    </span>
+                    {versions === null ? (
+                        <p className="text-[0.8125rem] text-muted-foreground">
+                            {t("list.loading")}
+                        </p>
+                    ) : versions.length === 0 ? (
+                        <p className="text-[0.8125rem] text-muted-foreground">
+                            {t("workflows.noVersions")}
+                        </p>
+                    ) : (
+                        <ul className="flex min-w-0 flex-col gap-1">
+                            {versions.map((version, index) => {
+                                const who = savedBy(version.savedById);
+                                const shown = openVersion === version.id;
+                                return (
+                                    <li
+                                        key={version.id}
+                                        className="flex min-w-0 flex-col gap-2 rounded-lg px-2 py-2 hover:bg-muted/50"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-2">
+                                            <div className="flex min-w-0 flex-1 flex-col">
+                                                <span
+                                                    className="truncate text-[0.8125rem] font-medium"
+                                                    title={version.name}
+                                                >
+                                                    {version.name}
+                                                    {index === 0 ? (
+                                                        <span className="ml-2 font-normal text-muted-foreground">
+                                                            {t("workflows.latest")}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                                <span className="truncate text-[0.75rem] text-muted-foreground">
+                                                    {format.dateTime(version.createdAt)}
+                                                    {who
+                                                        ? ` - ${t("workflows.savedBy", { name: who })}`
+                                                        : ""}
+                                                </span>
+                                            </div>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="shrink-0"
+                                                aria-expanded={shown}
+                                                onClick={() =>
+                                                    setOpenVersion(shown ? null : version.id)
+                                                }
+                                            >
+                                                {shown
+                                                    ? t("workflows.hideSteps")
+                                                    : t("workflows.showSteps")}
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="size-8 shrink-0 p-0"
+                                                aria-label={t("workflows.editFrom")}
+                                                title={t("workflows.editFrom")}
+                                                onClick={() => {
+                                                    setNotice(null);
+                                                    setDraft({
+                                                        id: versionsOf.id,
+                                                        name: version.name,
+                                                        trigger: version.trigger,
+                                                        actions: version.actions,
+                                                        enabled: versionsOf.enabled
+                                                    });
+                                                }}
+                                            >
+                                                <Pencil className="size-4" />
+                                            </Button>
+                                        </div>
+                                        {shown ? (
+                                            <WorkflowDiagram
+                                                object={object}
+                                                trigger={version.trigger}
+                                                actions={version.actions}
+                                            />
+                                        ) : null}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </section>
+            </div>
+        );
     } else if (rows === null) {
         body = <p className="text-[0.8125rem] text-muted-foreground">{t("list.loading")}</p>;
     } else if (rows.length === 0) {
@@ -344,6 +473,16 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                             variant="ghost"
                             size="sm"
                             className="size-8 shrink-0 p-0"
+                            aria-label={t("workflows.showVersions")}
+                            title={t("workflows.showVersions")}
+                            onClick={() => showVersions(row)}
+                        >
+                            <Layers className="size-4" />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="size-8 shrink-0 p-0"
                             aria-label={t("workflows.edit")}
                             title={t("workflows.edit")}
                             onClick={() => {
@@ -386,7 +525,9 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                                 : t("workflows.new")
                             : runsOf
                               ? t("workflows.runsOf", { name: runsOf.name })
-                              : t("workflows.title", { objects: t(`objects.${object}.plural`) })}
+                              : versionsOf
+                                ? t("workflows.versionsOf", { name: versionsOf.name })
+                                : t("workflows.title", { objects: t(`objects.${object}.plural`) })}
                     </DialogTitle>
                     <DialogDescription>{t("workflows.hint")}</DialogDescription>
                 </DialogHeader>
@@ -423,8 +564,14 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                                 {t("workflows.save")}
                             </Button>
                         </>
-                    ) : runsOf ? (
-                        <Button variant="ghost" onClick={() => setRunsOf(null)}>
+                    ) : runsOf || versionsOf ? (
+                        <Button
+                            variant="ghost"
+                            onClick={() => {
+                                setRunsOf(null);
+                                setVersionsOf(null);
+                            }}
+                        >
                             {t("workflows.back")}
                         </Button>
                     ) : (

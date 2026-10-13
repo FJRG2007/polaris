@@ -13140,7 +13140,8 @@ model CrmWorkflow {
 
     org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
     user User?         @relation("CrmWorkflowShelf", fields: [userId], references: [id], onDelete: Cascade)
-    runs CrmWorkflowRun[]
+    runs     CrmWorkflowRun[]
+    versions CrmWorkflowVersion[]
 
     @@index([orgId, object])
     @@index([userId, object])
@@ -13150,6 +13151,24 @@ model CrmWorkflow {
 // One run of a CRM workflow: what set it off, how it ended, and - for a run
 // waiting out a delay - where it picks up again and when. Only the latest runs
 // of each workflow are kept.
+// A CRM workflow as somebody saved it: the editor lists the newest and can
+// open one to save it again.
+model CrmWorkflowVersion {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    workflowId String   @db.Uuid
+    name       String
+    // Stringified JSON, as on CrmWorkflow.
+    trigger    String
+    actions    String   @default("[]")
+    // Who saved it. No FK - it outlives them.
+    savedById  String?  @db.Uuid
+    createdAt  DateTime @default(now())
+
+    workflow CrmWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+    @@index([workflowId, createdAt])
+}
+
 model CrmWorkflowRun {
     id         String    @id @default(uuid(7)) @db.Uuid
     workflowId String    @db.Uuid

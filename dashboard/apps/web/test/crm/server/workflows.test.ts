@@ -33,6 +33,12 @@ const db = vi.hoisted(() => ({
         findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
         deleteMany: vi.fn(async () => ({ count: 0 }))
     },
+    crmWorkflowVersion: {
+        findFirst: vi.fn(async (): Promise<Record<string, unknown> | null> => null),
+        findMany: vi.fn(async (): Promise<Record<string, unknown>[]> => []),
+        create: vi.fn(async () => ({})),
+        deleteMany: vi.fn(async () => ({ count: 0 }))
+    },
     crmLink: { createMany: vi.fn(async () => ({ count: 1 })) },
     records: {
         count: vi.fn(async () => 1),
@@ -76,7 +82,9 @@ const crmHost = vi.hoisted(() => ({
     crmPostJson: vi.fn(async (): Promise<unknown> => ({ status: 200 })),
     crmCanSendMail: vi.fn(async () => true),
     crmSendMail: vi.fn(async (): Promise<unknown> => ({ sent: true })),
-    crmChatChannels: vi.fn(async () => [{ id: "33333333-3333-4333-8333-333333333333", name: "sales" }]),
+    crmChatChannels: vi.fn(async () => [
+        { id: "33333333-3333-4333-8333-333333333333", name: "sales" }
+    ]),
     crmSendChat: vi.fn(async (): Promise<unknown> => ({ sent: true })),
     createTask: vi.fn(
         async (): Promise<unknown> => ({
@@ -94,6 +102,7 @@ vi.mock("@polaris/db", () => {
     const client: Record<string, unknown> = {
         crmWorkflow: db.crmWorkflow,
         crmWorkflowRun: db.crmWorkflowRun,
+        crmWorkflowVersion: db.crmWorkflowVersion,
         crmCompany: db.records,
         crmPerson: db.records,
         crmOpportunity: db.records,
@@ -202,6 +211,97 @@ describe("saving a workflow", () => {
                 enabled: true
             })
         ).rejects.toThrow();
+    });
+});
+
+describe("versions", () => {
+    const input = {
+        name: "On create",
+        trigger: { kind: "created" as const },
+        actions: [],
+        enabled: true
+    };
+
+    it("keeps each save as a version, by whoever saved it", async () => {
+        await workflows.saveWorkflow(actorWith(allowed), "companies", input);
+        expect(db.crmWorkflowVersion.create).toHaveBeenCalledWith({
+            data: {
+                workflowId: FLOW,
+                name: "On create",
+                trigger: JSON.stringify({ kind: "created" }),
+                actions: "[]",
+                savedById: "u1"
+            }
+        });
+    });
+
+    it("keeps no new version when nothing changed, and drops the oldest past the cap", async () => {
+        db.crmWorkflowVersion.findFirst.mockResolvedValueOnce({
+            name: "On create",
+            trigger: JSON.stringify({ kind: "created" }),
+            actions: "[]"
+        });
+        await workflows.saveWorkflow(actorWith(allowed), "companies", input);
+        expect(db.crmWorkflowVersion.create).not.toHaveBeenCalled();
+
+        db.crmWorkflowVersion.findFirst
+            .mockResolvedValueOnce({ name: "Before", trigger: "{}", actions: "[]" })
+            .mockResolvedValueOnce({ createdAt: stamp.createdAt });
+        await workflows.saveWorkflow(actorWith(allowed), "companies", input);
+        expect(db.crmWorkflowVersion.create).toHaveBeenCalledTimes(1);
+        expect(db.crmWorkflowVersion.deleteMany).toHaveBeenCalledWith({
+            where: { workflowId: FLOW, createdAt: { lte: stamp.createdAt } }
+        });
+    });
+
+    it("saves nothing at all when the workflow is not on the shelf", async () => {
+        await expect(
+            workflows.saveWorkflow(actorWith(allowed), "companies", { ...input, id: FLOW })
+        ).rejects.toThrow();
+        expect(db.crmWorkflowVersion.create).not.toHaveBeenCalled();
+    });
+
+    it("lists versions only to an editor on its shelf, leaving out unreadable ones", async () => {
+        await expect(
+            workflows.listWorkflowVersions(actorWith(allowed), "companies", FLOW)
+        ).rejects.toThrow();
+        await expect(
+            workflows.listWorkflowVersions(actorWith(reader), "companies", FLOW)
+        ).rejects.toThrow();
+        db.crmWorkflow.findFirst.mockResolvedValueOnce({ id: FLOW });
+        db.crmWorkflowVersion.findMany.mockResolvedValueOnce([
+            {
+                id: "v2",
+                name: "On create",
+                trigger: JSON.stringify({ kind: "created" }),
+                actions: JSON.stringify([{ kind: "delay", minutes: 60 }]),
+                savedById: "u1",
+                createdAt: stamp.createdAt
+            },
+            {
+                id: "v1",
+                name: "Old",
+                trigger: "not json",
+                actions: "[]",
+                savedById: null,
+                createdAt: stamp.createdAt
+            }
+        ]);
+        expect(await workflows.listWorkflowVersions(actorWith(allowed), "companies", FLOW)).toEqual(
+            [
+                {
+                    id: "v2",
+                    name: "On create",
+                    trigger: { kind: "created" },
+                    actions: [{ kind: "delay", minutes: 60 }],
+                    savedById: "u1",
+                    createdAt: stamp.createdAt.toISOString()
+                }
+            ]
+        );
+        expect(db.crmWorkflowVersion.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { workflowId: FLOW }, take: 20 })
+        );
     });
 });
 

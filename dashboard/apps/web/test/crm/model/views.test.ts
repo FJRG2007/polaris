@@ -75,7 +75,10 @@ describe("readConfig", () => {
                         id: "r1",
                         key: "stage",
                         operator: "isAnyOf",
-                        value: [{ id: "proposal", name: "" }, { id: "customer", name: "" }]
+                        value: [
+                            { id: "proposal", name: "" },
+                            { id: "customer", name: "" }
+                        ]
                     }
                 ]
             },
@@ -90,7 +93,10 @@ describe("readConfig", () => {
         });
         expect(config.columns.slice(0, -1).every((column) => !column.hidden)).toBe(true);
         expect(config.filter.rules[0]).toMatchObject({
-            value: [{ id: "proposal", name: "" }, { id: "customer", name: "" }]
+            value: [
+                { id: "proposal", name: "" },
+                { id: "customer", name: "" }
+            ]
         });
         expect(config.sorts).toEqual([{ key: "stage", direction: "asc" }]);
         expect(config.boardBy).toBe("stage");

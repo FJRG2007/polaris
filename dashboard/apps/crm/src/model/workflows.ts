@@ -391,6 +391,20 @@ export interface WorkflowRunView {
     readonly resumeAt: string | null;
 }
 
+/** The most saved versions of one workflow that are kept. */
+export const MAX_VERSIONS = 20;
+
+/** A workflow as somebody saved it, newest first in the editor's list. */
+export interface WorkflowVersionView {
+    readonly id: string;
+    readonly name: string;
+    readonly trigger: WorkflowTrigger;
+    readonly actions: WorkflowAction[];
+    /** Who saved it, by id: the editor names them from the shelf's people. */
+    readonly savedById: string | null;
+    readonly createdAt: string;
+}
+
 /** The most bytes of an outside call's body a workflow reads. */
 export const MAX_HOOK_BODY = 64 * 1024;
 

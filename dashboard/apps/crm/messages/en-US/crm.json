@@ -610,7 +610,18 @@
         "chatBody": "Message",
         "chatNoChannel": "Pick a chat channel you can post in.",
         "chatEmpty": "The chat message came out empty.",
-        "chatRefused": "Chat would not take the message: the channel may be archived, or you may no longer be in it."
+        "chatRefused": "Chat would not take the message: the channel may be archived, or you may no longer be in it.",
+        "showVersions": "Versions and steps",
+        "versionsOf": "Versions of {name}",
+        "current": "How it runs now",
+        "savedVersions": "Saved versions",
+        "noVersions": "No saved versions yet",
+        "latest": "Latest",
+        "savedBy": "by {name}",
+        "showSteps": "Show steps",
+        "hideSteps": "Hide steps",
+        "editFrom": "Edit from this version",
+        "steps": "Steps"
     },
     "favorites": {
         "add": "Add to favorites",

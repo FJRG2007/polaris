@@ -212,29 +212,120 @@ export async function saveWorkflow(
         secret = randomBytes(24).toString("base64url");
         return { hookHash: hookHash(secret) };
     };
-    let row: StoredWorkflow;
-    if (id) {
-        const found = (await prisma.crmWorkflow.findFirst({
-            where: { id, ...where }
-        })) as (StoredWorkflow & { hookHash?: string | null }) | null;
-        if (!found) throw new CrmRefusal(t("errors.notFound"));
-        row = (await prisma.crmWorkflow.update({
-            where: { id },
-            data: { ...data, ...hook(found.hookHash ?? null) }
-        })) as StoredWorkflow;
-    } else {
-        const count = await prisma.crmWorkflow.count({ where });
-        if (count >= model.MAX_WORKFLOWS) {
-            throw new CrmRefusal(t("workflows.tooMany", { max: model.MAX_WORKFLOWS }));
+    const row = await prisma.$transaction(async (tx) => {
+        let saved: StoredWorkflow;
+        if (id) {
+            const found = (await tx.crmWorkflow.findFirst({
+                where: { id, ...where }
+            })) as (StoredWorkflow & { hookHash?: string | null }) | null;
+            if (!found) throw new CrmRefusal(t("errors.notFound"));
+            saved = (await tx.crmWorkflow.update({
+                where: { id },
+                data: { ...data, ...hook(found.hookHash ?? null) }
+            })) as StoredWorkflow;
+        } else {
+            const count = await tx.crmWorkflow.count({ where });
+            if (count >= model.MAX_WORKFLOWS) {
+                throw new CrmRefusal(t("workflows.tooMany", { max: model.MAX_WORKFLOWS }));
+            }
+            saved = (await tx.crmWorkflow.create({
+                data: { ...shelfData(actor.shelf), object, ...data, ...hook(null) }
+            })) as StoredWorkflow;
         }
-        row = (await prisma.crmWorkflow.create({
-            data: { ...shelfData(actor.shelf), object, ...data, ...hook(null) }
-        })) as StoredWorkflow;
-    }
+        await keepVersion(tx, saved.id, data, actor.user.id);
+        return saved;
+    });
     const made = secret as string | null;
     return made
         ? { workflow: toView(row)!, hookPath: `/api/crm/hooks/${made}` }
         : { workflow: toView(row)! };
+}
+
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/** Keep what was just saved as the workflow's newest version, unless it is
+ *  the newest already, and drop the oldest past `MAX_VERSIONS`. */
+async function keepVersion(
+    tx: Tx,
+    workflowId: string,
+    saved: { readonly name: string; readonly trigger: string; readonly actions: string },
+    savedById: string
+): Promise<void> {
+    const newest = await tx.crmWorkflowVersion.findFirst({
+        where: { workflowId },
+        orderBy: { createdAt: "desc" },
+        select: { name: true, trigger: true, actions: true }
+    });
+    if (
+        newest &&
+        newest.name === saved.name &&
+        newest.trigger === saved.trigger &&
+        newest.actions === saved.actions
+    ) {
+        return;
+    }
+    await tx.crmWorkflowVersion.create({
+        data: {
+            workflowId,
+            name: saved.name,
+            trigger: saved.trigger,
+            actions: saved.actions,
+            savedById
+        }
+    });
+    const oldest = await tx.crmWorkflowVersion.findFirst({
+        where: { workflowId },
+        orderBy: { createdAt: "desc" },
+        skip: model.MAX_VERSIONS,
+        select: { createdAt: true }
+    });
+    if (oldest) {
+        await tx.crmWorkflowVersion.deleteMany({
+            where: { workflowId, createdAt: { lte: oldest.createdAt } }
+        });
+    }
+}
+
+/** The saved versions of a workflow on the reader's shelf, newest first. A
+ *  version the editor can no longer read is left out. */
+export async function listWorkflowVersions(
+    actor: CrmActor,
+    object: CrmObject,
+    id: string
+): Promise<model.WorkflowVersionView[]> {
+    await requireCan(actor, object, "edit");
+    const workflow = await prisma.crmWorkflow.findFirst({
+        where: { id, ...shelfWhere(actor.shelf), object },
+        select: { id: true }
+    });
+    if (!workflow) throw new CrmRefusal((await crmT())("errors.notFound"));
+    const versions = await prisma.crmWorkflowVersion.findMany({
+        where: { workflowId: id },
+        orderBy: { createdAt: "desc" },
+        take: model.MAX_VERSIONS,
+        select: {
+            id: true,
+            name: true,
+            trigger: true,
+            actions: true,
+            savedById: true,
+            createdAt: true
+        }
+    });
+    return versions.flatMap((version) => {
+        const trigger = model.readTrigger(version.trigger);
+        if (!trigger) return [];
+        return [
+            {
+                id: version.id,
+                name: version.name,
+                trigger,
+                actions: model.readActions(version.actions),
+                savedById: version.savedById,
+                createdAt: version.createdAt.toISOString()
+            }
+        ];
+    });
 }
 
 /** Switch a workflow on or off. */

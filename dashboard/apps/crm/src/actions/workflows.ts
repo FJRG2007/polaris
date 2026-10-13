@@ -16,6 +16,7 @@ import {
     type SavedWorkflow,
     type WorkflowOptions,
     type WorkflowRunView,
+    type WorkflowVersionView,
     type WorkflowView
 } from "../model/workflows";
 
@@ -80,6 +81,21 @@ export async function listWorkflowRunsAction(
     if (!parsed.success) return invalid();
     return outcome(async () => ({
         runs: await workflows.listWorkflowRuns(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.id
+        )
+    }));
+}
+
+/** A workflow's saved versions. */
+export async function listWorkflowVersionsAction(
+    input: unknown
+): Promise<Outcome<{ versions: WorkflowVersionView[] }>> {
+    const parsed = one.safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({
+        versions: await workflows.listWorkflowVersions(
             await requireCrmActor(),
             parsed.data.object,
             parsed.data.id

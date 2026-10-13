@@ -445,7 +445,7 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
 const DELAY_CHOICES = [5, 15, 30, 60, 120, 360, 720, 1440, 2880, 4320, 10080, 20160, 43200];
 
 /** A wait in minutes, as the editor names it. */
-function delayLabel(t: ReturnType<typeof useCrmT>, minutes: number): string {
+export function delayLabel(t: ReturnType<typeof useCrmT>, minutes: number): string {
     if (minutes % 1440 === 0) return t("workflows.delayDays", { count: minutes / 1440 });
     if (minutes % 60 === 0) return t("workflows.delayHours", { count: minutes / 60 });
     return t("workflows.delayMinutes", { count: minutes });

@@ -610,7 +610,18 @@
         "chatBody": "Mensaje",
         "chatNoChannel": "Elige un canal de chat en el que puedas escribir.",
         "chatEmpty": "El mensaje de chat quedó vacío.",
-        "chatRefused": "El chat no aceptó el mensaje: puede que el canal esté archivado o que ya no estés en él."
+        "chatRefused": "El chat no aceptó el mensaje: puede que el canal esté archivado o que ya no estés en él.",
+        "showVersions": "Versiones y pasos",
+        "versionsOf": "Versiones de {name}",
+        "current": "Cómo funciona ahora",
+        "savedVersions": "Versiones guardadas",
+        "noVersions": "Aún no hay versiones guardadas",
+        "latest": "La más reciente",
+        "savedBy": "por {name}",
+        "showSteps": "Ver pasos",
+        "hideSteps": "Ocultar pasos",
+        "editFrom": "Editar desde esta versión",
+        "steps": "Pasos"
     },
     "favorites": {
         "add": "Añadir a favoritos",
