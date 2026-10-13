@@ -110,6 +110,8 @@ describe("the queue tells every tab a message left", () => {
     it("publishes a sending frame when a draft leaves the queue", async () => {
         const { readFile } = await import("node:fs/promises");
         const compose = await readFile("src/lib/mailbox/compose.ts", "utf8");
-        expect(compose).toContain('publishMail({ accountId: account.id, kind: "sending", actorId: account.userId });');
+        expect(compose).toContain(
+            'publishMail({ accountId: account.id, kind: "sending", actorId: account.userId });'
+        );
     });
 });

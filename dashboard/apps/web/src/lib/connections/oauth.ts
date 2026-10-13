@@ -324,7 +324,11 @@ export async function connectionLinkAvailable(
         return (await getIntegrationState(STEAM_PROVIDER))?.enabled === true;
     // Somebody who registered their own application has proved nothing to
     // anybody else, but needs nothing from the operator either.
-    if (options?.userId && supportsOAuth(provider) && (await ownOAuthAppClientId(options.userId, provider))) {
+    if (
+        options?.userId &&
+        supportsOAuth(provider) &&
+        (await ownOAuthAppClientId(options.userId, provider))
+    ) {
         return true;
     }
     if (!supportsOAuth(provider) || (await connectionOAuthClient(provider)) === null) return false;
@@ -405,7 +409,10 @@ export async function verifyConnectionOAuthApp(
 /** The operator's application for this provider, or null when there is none.
  *  With a user, the application that person's link goes through, which may be
  *  their own. */
-export function connectionOAuthClient(provider: string, userId?: string): Promise<OAuthClient | null> {
+export function connectionOAuthClient(
+    provider: string,
+    userId?: string
+): Promise<OAuthClient | null> {
     return adapter(provider).client(userId);
 }
 

@@ -17,7 +17,12 @@ import { lastfmApiKey } from "@/lib/presence-activity/lastfm-poll";
 import { ownOAuthAppClientId } from "@/lib/connections/own-oauth-app";
 import { commonSetupValues, setupValuesFor } from "@/lib/integrations/setup-values";
 import type { OwnAppCard } from "./own-app-dialog";
-import { connectionFlowOrigin, connectionLinkAvailable, linkScopesSatisfied, missingLinkScopes } from "@/lib/connections/oauth";
+import {
+    connectionFlowOrigin,
+    connectionLinkAvailable,
+    linkScopesSatisfied,
+    missingLinkScopes
+} from "@/lib/connections/oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +60,10 @@ export default async function ConnectionsPage() {
             // is no screen worth sending anybody to, so the card says what to ask
             // for instead of offering a button that fails. An administrator is
             // offered it anyway: theirs is the authorization that proves it.
-            canAuthorize: await connectionLinkAvailable(provider.slug, { admin: user.isAdmin, userId: user.id }),
+            canAuthorize: await connectionLinkAvailable(provider.slug, {
+                admin: user.isAdmin,
+                userId: user.id
+            }),
             // Whether the operator allows this service as a way in. Without it,
             // the card says nothing about signing in rather than pointing at a
             // switch that would do nothing.
@@ -79,7 +87,9 @@ export default async function ConnectionsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("connections.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("connections.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("connections.page.intro")}</p>
             </div>
             <ConnectionsView providers={providers} />
@@ -91,14 +101,23 @@ export default async function ConnectionsPage() {
  *  use, never the secret, and the values Spotify's create-app form asks for on
  *  this deployment's address. */
 async function ownSpotifyApp(userId: string): Promise<OwnAppCard> {
-    const [clientId, origin] = await Promise.all([ownOAuthAppClientId(userId, "spotify"), connectionFlowOrigin()]);
-    const values = setupValuesFor("spotify", commonSetupValues(origin), { oauthApp: true, baseUrl: origin });
+    const [clientId, origin] = await Promise.all([
+        ownOAuthAppClientId(userId, "spotify"),
+        connectionFlowOrigin()
+    ]);
+    const values = setupValuesFor("spotify", commonSetupValues(origin), {
+        oauthApp: true,
+        baseUrl: origin
+    });
     return {
         clientId,
         values: [
             // Pasted into Spotify's form, which is in English, so not translated.
             { key: "appName", value: "Polaris" },
-            { key: "appDescription", value: "Shows what I am listening to on Polaris, and lets me listen along." },
+            {
+                key: "appDescription",
+                value: "Shows what I am listening to on Polaris, and lets me listen along."
+            },
             { key: "homeUrl", value: values.homeUrl ?? origin },
             { key: "redirectUri", value: values.redirectUri ?? "" }
         ]

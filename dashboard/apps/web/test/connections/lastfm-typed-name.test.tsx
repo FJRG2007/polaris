@@ -18,7 +18,9 @@ const saved: { userId: string; provider: string; label: string }[] = [];
 const fake = vi.hoisted(() => ({ key: "key-1" as string | null, asked: [] as string[] }));
 
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: () => undefined, refresh: () => undefined })
+}));
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1", isAdmin: false }) }));
 vi.mock("@/lib/device-grace", () => ({ newDeviceRefusal: async () => null }));
 vi.mock("@/lib/github-service", () => ({ readGithubAccount: async () => ({}) }));
@@ -55,7 +57,9 @@ vi.mock("@/lib/connections/store", () => {
 });
 
 const { saveLastfmNameAction } = await import("../../src/app/(app)/account/connections/actions");
-const { ConnectionsView } = await import("../../src/app/(app)/account/connections/connections-view");
+const { ConnectionsView } = await import(
+    "../../src/app/(app)/account/connections/connections-view"
+);
 
 type Card = Parameters<typeof ConnectionsView>[0]["providers"][number];
 
@@ -107,7 +111,9 @@ function lastfm(accounts: Card["accounts"] = []): Card {
 
 describe("the Last.fm card", () => {
     it("offers to enter a username, and never calls it unverified", () => {
-        const empty = renderToStaticMarkup(withMessages(<ConnectionsView providers={[lastfm()]} />));
+        const empty = renderToStaticMarkup(
+            withMessages(<ConnectionsView providers={[lastfm()]} />)
+        );
         expect(empty).toContain("Enter your username");
         const linked = renderToStaticMarkup(
             withMessages(

@@ -33,7 +33,10 @@ import { usePresence, type PresenceOf } from "@/components/presence-store";
 import { isLastfmKey, spotifySearchUrl } from "@/lib/connections/spotify-search";
 
 /** The icon a source is drawn with where there is no art. */
-const SOURCE_ICONS: Record<core.ActivitySource, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
+const SOURCE_ICONS: Record<
+    core.ActivitySource,
+    ComponentType<{ className?: string; "aria-hidden"?: boolean }>
+> = {
     spotify: SpotifyMark,
     game: Gamepad2,
     minecraft: Pickaxe
@@ -57,7 +60,8 @@ export function activityLine(
 /** The small heading over a card. */
 function heading(activity: core.ActivityView, t: NamespaceTranslator<"components">): string {
     // A song read from Last.fm may have been played anywhere that scrobbles.
-    if (activity.source === "spotify" && isLastfmKey(activity.key)) return t("activity.heading.music");
+    if (activity.source === "spotify" && isLastfmKey(activity.key))
+        return t("activity.heading.music");
     if (activity.source === "spotify") return t("activity.heading.spotify");
     if (activity.source === "minecraft") return t("activity.heading.minecraft");
     return t("activity.heading.playing");
@@ -95,10 +99,17 @@ export function ActivityLine({
     const line = activityLine(first, t);
     return (
         <span
-            className={cn("flex min-w-0 items-center gap-1 text-xs text-muted-foreground", className)}
+            className={cn(
+                "flex min-w-0 items-center gap-1 text-xs text-muted-foreground",
+                className
+            )}
             title={line}
         >
-            {game ? <GameLogo game={game} className="size-3" /> : <Icon className="size-3 shrink-0" aria-hidden />}
+            {game ? (
+                <GameLogo game={game} className="size-3" />
+            ) : (
+                <Icon className="size-3 shrink-0" aria-hidden />
+            )}
             <span className="min-w-0 truncate">{line}</span>
         </span>
     );
@@ -157,7 +168,11 @@ function OpenInSpotify({ activity }: { activity: core.ActivityView }) {
     return (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
             <Button asChild size="sm" variant="secondary">
-                <a href={spotifySearchUrl(activity.name, activity.details)} target="_blank" rel="noopener noreferrer">
+                <a
+                    href={spotifySearchUrl(activity.name, activity.details)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
                     <SpotifyMark className="size-3.5" aria-hidden />
                     {t("activity.openInSpotify")}
                 </a>
@@ -230,18 +245,25 @@ export function ActivityCard({
                             {activity.name}
                         </a>
                     ) : (
-                        <span className="truncate font-semibold text-foreground" title={activity.name}>
+                        <span
+                            className="truncate font-semibold text-foreground"
+                            title={activity.name}
+                        >
                             {activity.name}
                         </span>
                     )}
                     {activity.details ? (
                         <span className="truncate text-muted-foreground" title={activity.details}>
-                            {activity.source === "spotify" ? t("activity.by", { artist: activity.details }) : activity.details}
+                            {activity.source === "spotify"
+                                ? t("activity.by", { artist: activity.details })
+                                : activity.details}
                         </span>
                     ) : null}
                     {activity.state ? (
                         <span className="truncate text-muted-foreground" title={activity.state}>
-                            {activity.source === "spotify" ? t("activity.on", { album: activity.state }) : activity.state}
+                            {activity.source === "spotify"
+                                ? t("activity.on", { album: activity.state })
+                                : activity.state}
                         </span>
                     ) : null}
                     {activity.endsAt ? null : <Elapsed startedAt={activity.startedAt} />}

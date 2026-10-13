@@ -81,7 +81,13 @@ const REGISTRY = Symbol.for("polaris.activity.lastfm");
 
 function schedule(): Schedule {
     const holder = globalThis as { [REGISTRY]?: Schedule };
-    holder[REGISTRY] ??= { due: new Map(), idle: new Map(), started: new Map(), pausedUntil: 0, pausedFor: "" };
+    holder[REGISTRY] ??= {
+        due: new Map(),
+        idle: new Map(),
+        started: new Map(),
+        pausedUntil: 0,
+        pausedFor: ""
+    };
     return holder[REGISTRY];
 }
 
@@ -127,7 +133,11 @@ export async function pollLastfm(now: number = Date.now()): Promise<LastfmPass> 
 
     const [spotify, here, settings] = await Promise.all([
         prisma.userConnection.findMany({
-            where: { provider: SPOTIFY_PROVIDER, userId: { in: userIds }, encryptedToken: { not: null } },
+            where: {
+                provider: SPOTIFY_PROVIDER,
+                userId: { in: userIds },
+                encryptedToken: { not: null }
+            },
             select: { userId: true }
         }),
         prisma.sessionState.groupBy({
@@ -142,7 +152,10 @@ export async function pollLastfm(now: number = Date.now()): Promise<LastfmPass> 
     const due: { userId: string; name: string; at: number }[] = [];
     for (const [userId, name] of byUser) {
         if (onSpotify.has(userId)) continue;
-        const shares = core.activitySourceOn(settings.get(userId) ?? core.DEFAULT_ACTIVITY_SETTINGS, "spotify");
+        const shares = core.activitySourceOn(
+            settings.get(userId) ?? core.DEFAULT_ACTIVITY_SETTINGS,
+            "spotify"
+        );
         if (!shares || !present.has(userId)) {
             if (held.due.has(userId)) {
                 held.due.delete(userId);
@@ -168,7 +181,9 @@ export async function pollLastfm(now: number = Date.now()): Promise<LastfmPass> 
             if (caught instanceof LastfmRateLimited || caught instanceof LastfmKeyRefused) {
                 const limited = caught instanceof LastfmRateLimited;
                 held.pausedUntil = now + (limited ? RATE_LIMITED_MS : KEY_REFUSED_MS);
-                held.pausedFor = limited ? "Last.fm asked for fewer requests" : "Last.fm refused the API key";
+                held.pausedFor = limited
+                    ? "Last.fm asked for fewer requests"
+                    : "Last.fm refused the API key";
                 held.due.set(entry.userId, { name: entry.name, at: held.pausedUntil });
                 break;
             }
@@ -179,7 +194,11 @@ export async function pollLastfm(now: number = Date.now()): Promise<LastfmPass> 
     return { asked };
 }
 
-async function askOne(apiKey: string, entry: { userId: string; name: string }, now: number): Promise<void> {
+async function askOne(
+    apiKey: string,
+    entry: { userId: string; name: string },
+    now: number
+): Promise<void> {
     const held = schedule();
     const track = await readLastfmPlaying(apiKey, entry.name);
     if (!track) {

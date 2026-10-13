@@ -49,7 +49,11 @@ const trackSchema = z
         nowplaying: z.string().optional(),
         "@attr": z.object({ nowplaying: z.string().optional() }).passthrough().optional(),
         image: z
-            .array(z.object({ size: z.string().optional(), "#text": z.string().optional() }).passthrough())
+            .array(
+                z
+                    .object({ size: z.string().optional(), "#text": z.string().optional() })
+                    .passthrough()
+            )
             .optional()
     })
     .passthrough();
@@ -125,7 +129,10 @@ function picture(images: z.infer<typeof trackSchema>["image"]): string | null {
  * Throws `LastfmRateLimited`, `LastfmKeyRefused`, `LastfmUnknownUser`, or a
  * plain error for anything else (a timeout, a 5xx), which is a blip.
  */
-export async function readLastfmPlaying(apiKey: string, username: string): Promise<LastfmTrack | null> {
+export async function readLastfmPlaying(
+    apiKey: string,
+    username: string
+): Promise<LastfmTrack | null> {
     const url = new URL(API);
     url.searchParams.set("method", "user.getrecenttracks");
     url.searchParams.set("user", username);

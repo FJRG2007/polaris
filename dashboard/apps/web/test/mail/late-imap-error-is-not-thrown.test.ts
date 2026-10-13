@@ -27,7 +27,11 @@ vi.mock("imapflow", () => ({
 
 vi.mock("@/lib/mailbox/credentials", () => ({
     MailAuthError: class extends Error {},
-    mailCredential: async () => ({ kind: "password", user: "fixture@example.test", pass: "fixture" })
+    mailCredential: async () => ({
+        kind: "password",
+        user: "fixture@example.test",
+        pass: "fixture"
+    })
 }));
 
 const { checkImap, withImap } = await import("@/lib/mailbox/imap");
@@ -43,7 +47,9 @@ describe("a late IMAP error", () => {
     it("is logged on a working connection instead of thrown", async () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         await withImap(ACCOUNT, async () => {
-            expect(() => clients[0].emit("error", new Error("Connection not available"))).not.toThrow();
+            expect(() =>
+                clients[0].emit("error", new Error("Connection not available"))
+            ).not.toThrow();
         });
         expect(warn).toHaveBeenCalledWith("imap:", "Connection not available");
     });

@@ -14,7 +14,12 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { OwnAppDialog, type OwnAppCard } from "./own-app-dialog";
 import { IntegrationLogo } from "@/components/logos";
-import { connectionSections, lastfmNameSchema, minecraftNameSchema, type ConnectionCategory } from "@polaris/core";
+import {
+    connectionSections,
+    lastfmNameSchema,
+    minecraftNameSchema,
+    type ConnectionCategory
+} from "@polaris/core";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -92,7 +97,13 @@ export interface ConnectionProviderCard {
 }
 
 /** What the round trip to a provider came back with, as the callback flagged it. */
-const OUTCOMES: Record<string, { key: "linked" | "cancelled" | "stateError" | "taken" | "limit" | "unavailable" | "error"; bad: boolean }> = {
+const OUTCOMES: Record<
+    string,
+    {
+        key: "linked" | "cancelled" | "stateError" | "taken" | "limit" | "unavailable" | "error";
+        bad: boolean;
+    }
+> = {
     linked: { key: "linked", bad: false },
     cancelled: { key: "cancelled", bad: true },
     state_error: { key: "stateError", bad: true },
@@ -119,7 +130,12 @@ export function ConnectionsView({ providers }: { providers: ConnectionProviderCa
         const provider = params.get("provider");
         if (!outcome || !provider) return;
         const known = OUTCOMES[outcome];
-        if (known) setNotice({ provider, text: t(`connections.outcomes.${known.key}` as const), bad: known.bad });
+        if (known)
+            setNotice({
+                provider,
+                text: t(`connections.outcomes.${known.key}` as const),
+                bad: known.bad
+            });
         const url = new URL(window.location.href);
         url.searchParams.delete("connection");
         url.searchParams.delete("provider");
@@ -221,7 +237,10 @@ function ProviderCard({
                             <h3 className="truncate text-sm font-medium">{provider.name}</h3>
                             {provider.limit > 1 ? (
                                 <Badge variant="neutral">
-                                    {t("connections.ofLimit", { count: accounts.length, limit: provider.limit })}
+                                    {t("connections.ofLimit", {
+                                        count: accounts.length,
+                                        limit: provider.limit
+                                    })}
                                 </Badge>
                             ) : null}
                         </div>
@@ -257,7 +276,9 @@ function ProviderCard({
                                         variant="warning"
                                         title={
                                             account.missingScopes?.length
-                                                ? t("connections.badges.notGranted", { scopes: account.missingScopes.join(", ") })
+                                                ? t("connections.badges.notGranted", {
+                                                      scopes: account.missingScopes.join(", ")
+                                                  })
                                                 : t("connections.badges.connectAgain")
                                         }
                                     >
@@ -265,7 +286,10 @@ function ProviderCard({
                                     </Badge>
                                 ) : null}
                                 {account.signsIn ? (
-                                    <Badge variant="neutral" title={t("connections.badges.signsInTitle")}>
+                                    <Badge
+                                        variant="neutral"
+                                        title={t("connections.badges.signsInTitle")}
+                                    >
                                         {t("connections.badges.signsIn")}
                                     </Badge>
                                 ) : null}
@@ -288,7 +312,9 @@ function ProviderCard({
                                     ) : (
                                         <Badge
                                             variant="success"
-                                            title={t("connections.badges.verifiedTitle", { provider: provider.name })}
+                                            title={t("connections.badges.verifiedTitle", {
+                                                provider: provider.name
+                                            })}
                                         >
                                             {t("connections.badges.verified")}
                                         </Badge>
@@ -321,13 +347,21 @@ function ProviderCard({
                                         }
                                         aria-label={
                                             account.needsReauthorization
-                                                ? t("connections.reconnectToApprove", { account: account.label })
-                                                : t("connections.reconnect", { account: account.label })
+                                                ? t("connections.reconnectToApprove", {
+                                                      account: account.label
+                                                  })
+                                                : t("connections.reconnect", {
+                                                      account: account.label
+                                                  })
                                         }
                                         title={
                                             account.needsReauthorization
-                                                ? t("connections.reconnectToApprove", { account: account.label })
-                                                : t("connections.reconnect", { account: account.label })
+                                                ? t("connections.reconnectToApprove", {
+                                                      account: account.label
+                                                  })
+                                                : t("connections.reconnect", {
+                                                      account: account.label
+                                                  })
                                         }
                                         disabled={pending}
                                         onClick={() =>
@@ -341,7 +375,9 @@ function ProviderCard({
                                     <Button
                                         size="sm"
                                         variant="ghost"
-                                        aria-label={t("connections.change", { account: account.label })}
+                                        aria-label={t("connections.change", {
+                                            account: account.label
+                                        })}
                                         title={t("connections.change", { account: account.label })}
                                         disabled={pending}
                                         onClick={() => setTyping(true)}
@@ -352,7 +388,9 @@ function ProviderCard({
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    aria-label={t("connections.disconnect", { account: account.label })}
+                                    aria-label={t("connections.disconnect", {
+                                        account: account.label
+                                    })}
                                     title={t("connections.disconnect", { account: account.label })}
                                     disabled={pending}
                                     onClick={() => setConfirming(account)}
@@ -423,7 +461,9 @@ function ProviderCard({
                                 onClick={() => setTyping(true)}
                             >
                                 <Pencil className="size-4" />
-                                {provider.typedOnly ? t("connections.enterUsername") : t("connections.typeUsername")}
+                                {provider.typedOnly
+                                    ? t("connections.enterUsername")
+                                    : t("connections.typeUsername")}
                             </Button>
                         ) : null}
                         {!canAdd && (provider.canAuthorize || provider.acceptsToken) ? (
@@ -451,13 +491,22 @@ function ProviderCard({
                     <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         {provider.ownApp.clientId ? (
                             <span className="min-w-0 truncate" title={provider.ownApp.clientId}>
-                                {t("connections.ownApp.inUse", { clientId: provider.ownApp.clientId })}
+                                {t("connections.ownApp.inUse", {
+                                    clientId: provider.ownApp.clientId
+                                })}
                             </span>
                         ) : (
                             <span className="min-w-0">{t("connections.ownApp.why")}</span>
                         )}
-                        <Button size="sm" variant="ghost" disabled={pending} onClick={() => setOwnAppOpen(true)}>
-                            {provider.ownApp.clientId ? t("connections.ownApp.change") : t("connections.ownApp.use")}
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => setOwnAppOpen(true)}
+                        >
+                            {provider.ownApp.clientId
+                                ? t("connections.ownApp.change")
+                                : t("connections.ownApp.use")}
                         </Button>
                     </div>
                 ) : null}
@@ -531,9 +580,14 @@ function ProviderCard({
  * One sentence served every service and spoke of repositories and runner pools
  * - true of GitHub and nonsense on a Minecraft name somebody typed.
  */
-function disconnectSays(account: LinkedAccount, providerName: string, t: NamespaceTranslator<"account">): string {
+function disconnectSays(
+    account: LinkedAccount,
+    providerName: string,
+    t: NamespaceTranslator<"account">
+): string {
     if (account.method === "manual") return t("connections.disconnectDialog.manual");
-    if (account.provider === "github") return t("connections.disconnectDialog.github", { provider: providerName });
+    if (account.provider === "github")
+        return t("connections.disconnectDialog.github", { provider: providerName });
     return account.signsIn
         ? t("connections.disconnectDialog.signsIn", { provider: providerName })
         : t("connections.disconnectDialog.other", { provider: providerName });
@@ -558,10 +612,14 @@ function DisconnectDialog({
                 <DialogHeader>
                     <DialogTitle>
                         {account.method === "manual"
-                            ? t("connections.disconnectDialog.removeTitle", { account: account.label })
+                            ? t("connections.disconnectDialog.removeTitle", {
+                                  account: account.label
+                              })
                             : t("connections.disconnectDialog.title", { account: account.label })}
                     </DialogTitle>
-                    <DialogDescription>{disconnectSays(account, providerName, t)}</DialogDescription>
+                    <DialogDescription>
+                        {disconnectSays(account, providerName, t)}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onCancel}>
@@ -624,7 +682,9 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("connections.aws.accessKeyId")}</span>
+                        <span className="text-sm font-medium">
+                            {t("connections.aws.accessKeyId")}
+                        </span>
                         <Input
                             autoComplete="off"
                             value={accessKeyId}
@@ -634,7 +694,9 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                         />
                     </label>
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-sm font-medium">{t("connections.aws.secretAccessKey")}</span>
+                        <span className="text-sm font-medium">
+                            {t("connections.aws.secretAccessKey")}
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -650,7 +712,9 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
                             placeholder="eu-west-1"
                             onChange={(event) => setRegion(event.target.value)}
                         />
-                        <span className="text-xs text-muted-foreground">{t("connections.aws.regionHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("connections.aws.regionHint")}
+                        </span>
                     </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
@@ -670,8 +734,18 @@ function AwsDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
 
 /** What each service that takes a typed name checks it with and saves it through. */
 const TYPED_NAMES = {
-    minecraft: { schema: minecraftNameSchema, save: (name: string) => saveMinecraftNameAction(name), maxLength: 32, example: "Steve" },
-    lastfm: { schema: lastfmNameSchema, save: (name: string) => saveLastfmNameAction(name), maxLength: 64, example: "listener_01" }
+    minecraft: {
+        schema: minecraftNameSchema,
+        save: (name: string) => saveMinecraftNameAction(name),
+        maxLength: 32,
+        example: "Steve"
+    },
+    lastfm: {
+        schema: lastfmNameSchema,
+        save: (name: string) => saveLastfmNameAction(name),
+        maxLength: 64,
+        example: "listener_01"
+    }
 } as const;
 
 /**
@@ -733,7 +807,9 @@ function TypedNameDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {current ? t(`connections.${kind}.changeTitle`) : t(`connections.${kind}.typeTitle`)}
+                        {current
+                            ? t(`connections.${kind}.changeTitle`)
+                            : t(`connections.${kind}.typeTitle`)}
                     </DialogTitle>
                     <DialogDescription>{t(`connections.${kind}.description`)}</DialogDescription>
                 </DialogHeader>
@@ -826,8 +902,12 @@ function TokenDialog({
         <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t("connections.token.title", { provider: providerName })}</DialogTitle>
-                    <DialogDescription>{t("connections.token.description", { provider: providerName })}</DialogDescription>
+                    <DialogTitle>
+                        {t("connections.token.title", { provider: providerName })}
+                    </DialogTitle>
+                    <DialogDescription>
+                        {t("connections.token.description", { provider: providerName })}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium" htmlFor="connection-token">

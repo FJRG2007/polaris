@@ -146,8 +146,12 @@ vi.mock("@/lib/connections/spotify", async (original) => {
     const real = await original<typeof import("@/lib/connections/spotify")>();
     return {
         ...real,
-        getSpotifyOAuthClient: async () => (fake.deployment ? { clientId: "c", clientSecret: "s" } : null),
-        spotifyAccessToken: async (client: { clientId: string }, credential: { accessToken: string }) => {
+        getSpotifyOAuthClient: async () =>
+            fake.deployment ? { clientId: "c", clientSecret: "s" } : null,
+        spotifyAccessToken: async (
+            client: { clientId: string },
+            credential: { accessToken: string }
+        ) => {
             fake.clients.push(client.clientId);
             if (fake.refreshRefused.has(credential.accessToken))
                 throw new real.SpotifyUnauthorized();

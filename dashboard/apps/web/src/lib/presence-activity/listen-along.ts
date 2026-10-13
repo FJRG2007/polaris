@@ -91,7 +91,12 @@ async function listenerToken(
         ownOAuthApp(userId, SPOTIFY_PROVIDER),
         getSpotifyOAuthClient()
     ]);
-    const client = pickOAuthClient({ own, deployment, issuedTo: credential.clientId, existing: true });
+    const client = pickOAuthClient({
+        own,
+        deployment,
+        issuedTo: credential.clientId,
+        existing: true
+    });
     if (!client) return null;
     const token = await spotifyAccessToken(client, credential).catch((caught: unknown) => {
         if (caught instanceof SpotifyUnauthorized) return null;
@@ -114,7 +119,10 @@ async function visibleTrack(
 
 /** Whether the host is still somebody this listener may see listening, with
  *  nothing playing to see: here to them, and sharing Spotify with them. */
-async function hostVisible(listener: { id: string; isAdmin: boolean }, hostId: string): Promise<boolean> {
+async function hostVisible(
+    listener: { id: string; isAdmin: boolean },
+    hostId: string
+): Promise<boolean> {
     const found = await presenceFor(listener, [hostId]);
     if ((found.get(hostId)?.status ?? "offline") === "offline") return false;
     return (await sourceSharedWith(listener, [hostId], "spotify")).has(hostId);
@@ -139,13 +147,16 @@ export async function startListenAlong(
     // Last.fm names a song but not the Spotify track, so there is nothing to
     // follow in step: the card opens it in Spotify instead.
     if (isLastfmKey(track.key)) {
-        throw new ListenAlongError("This song comes from their Last.fm. Open it in Spotify to play it from the start.");
+        throw new ListenAlongError(
+            "This song comes from their Last.fm. Open it in Spotify to play it from the start."
+        );
     }
     let token: Awaited<ReturnType<typeof listenerToken>>;
     try {
         token = await listenerToken(listener.id);
     } catch (caught) {
-        if (caught instanceof SpotifyRateLimited) throw new ListenAlongError("Spotify is busy. Try again in a moment.");
+        if (caught instanceof SpotifyRateLimited)
+            throw new ListenAlongError("Spotify is busy. Try again in a moment.");
         throw new ListenAlongError("Spotify could not be reached. Try again in a moment.");
     }
     if (!token) {
@@ -155,13 +166,19 @@ export async function startListenAlong(
         );
     }
     try {
-        await spotifyPlay(token.accessToken, trackUri(track.key), now - Date.parse(track.startedAt));
+        await spotifyPlay(
+            token.accessToken,
+            trackUri(track.key),
+            now - Date.parse(track.startedAt)
+        );
     } catch (caught) {
         if (caught instanceof SpotifyPlayerRefusal) throw new ListenAlongError(caught.message);
         if (caught instanceof SpotifyRateLimited) {
             throw new ListenAlongError("Spotify is busy. Try again in a moment.");
         }
-        throw new ListenAlongError("Spotify would not play it. Link your account again if this keeps happening.");
+        throw new ListenAlongError(
+            "Spotify would not play it. Link your account again if this keeps happening."
+        );
     }
     await prisma.spotifyListenAlong.upsert({
         where: { listenerId: listener.id },
@@ -210,7 +227,12 @@ export async function followHost(
 ): Promise<void> {
     const rows = await prisma.spotifyListenAlong.findMany({
         where: { hostId },
-        select: { listenerId: true, trackId: true, syncedAt: true, listener: { select: { isAdmin: true } } }
+        select: {
+            listenerId: true,
+            trackId: true,
+            syncedAt: true,
+            listener: { select: { isAdmin: true } }
+        }
     });
     for (const row of rows) {
         const listener = { id: row.listenerId, isAdmin: row.listener.isAdmin };

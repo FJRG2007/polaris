@@ -28,7 +28,9 @@ export default async function PrivacyPage() {
         listBlocked(session.id),
         activitySettingsOf(session.id),
         listConnections(session.id, "spotify"),
-        connectionLinkAvailable("spotify", { admin: session.isAdmin, userId: session.id }).catch(() => false)
+        connectionLinkAvailable("spotify", { admin: session.isAdmin, userId: session.id }).catch(
+            () => false
+        )
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
@@ -46,7 +48,9 @@ export default async function PrivacyPage() {
             <ActivitySharingCard
                 settings={activity.settings}
                 seenGames={activity.seenGames}
-                spotify={spotifyLinks.length > 0 ? "linked" : spotifyOffered ? "unlinked" : "unavailable"}
+                spotify={
+                    spotifyLinks.length > 0 ? "linked" : spotifyOffered ? "unlinked" : "unavailable"
+                }
             />
             {/* The same question by the clock rather than by audience, which is
                 why it is on this screen and not beside the display preferences.

@@ -27,7 +27,9 @@ const scrobbled: ActivityView = {
 
 vi.mock("@/components/presence", () => ({ useNow: () => Date.now() }));
 vi.mock("@/components/session-scope", () => ({ useSessionScope: () => "viewer" }));
-vi.mock("@/components/listen-along-button", () => ({ ListenAlongButton: () => <span>synced button</span> }));
+vi.mock("@/components/listen-along-button", () => ({
+    ListenAlongButton: () => <span>synced button</span>
+}));
 vi.mock("@/components/presence-store", () => ({ usePresence: () => ({ activity: [scrobbled] }) }));
 
 const { ActivityCards } = await import("@/components/activity-card");

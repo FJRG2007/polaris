@@ -72,8 +72,16 @@ export async function spotifyClientFor(
     userId: string,
     credential?: ConnectionCredential | null
 ): Promise<SpotifyOAuthClient | null> {
-    const [own, deployment] = await Promise.all([ownOAuthApp(userId, SPOTIFY_PROVIDER), getSpotifyOAuthClient()]);
-    return pickOAuthClient({ own, deployment, issuedTo: credential?.clientId, existing: Boolean(credential) });
+    const [own, deployment] = await Promise.all([
+        ownOAuthApp(userId, SPOTIFY_PROVIDER),
+        getSpotifyOAuthClient()
+    ]);
+    return pickOAuthClient({
+        own,
+        deployment,
+        issuedTo: credential?.clientId,
+        existing: Boolean(credential)
+    });
 }
 
 /**
@@ -267,7 +275,10 @@ export async function spotifyAccessToken(
         grant_type: "refresh_token",
         refresh_token: credential.refreshToken
     });
-    return { accessToken: token.access_token, refreshed: credentialFrom(token, client.clientId, credential) };
+    return {
+        accessToken: token.access_token,
+        refreshed: credentialFrom(token, client.clientId, credential)
+    };
 }
 
 /** Spotify asked to be left alone, for this long. */

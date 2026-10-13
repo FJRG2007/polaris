@@ -47,7 +47,11 @@ export function pickOAuthClient(options: {
     return own ?? deployment;
 }
 
-function decrypt(row: { encryptedSecret: Uint8Array; secretNonce: Uint8Array; secretKeyId: string }): string | null {
+function decrypt(row: {
+    encryptedSecret: Uint8Array;
+    secretNonce: Uint8Array;
+    secretKeyId: string;
+}): string | null {
     try {
         return decryptSecret(
             {
@@ -64,10 +68,19 @@ function decrypt(row: { encryptedSecret: Uint8Array; secretNonce: Uint8Array; se
     }
 }
 
-const COLUMNS = { userId: true, clientId: true, encryptedSecret: true, secretNonce: true, secretKeyId: true } as const;
+const COLUMNS = {
+    userId: true,
+    clientId: true,
+    encryptedSecret: true,
+    secretNonce: true,
+    secretKeyId: true
+} as const;
 
 /** This person's own app for a provider, or null. */
-export async function ownOAuthApp(userId: string, provider: string): Promise<OAuthAppClient | null> {
+export async function ownOAuthApp(
+    userId: string,
+    provider: string
+): Promise<OAuthAppClient | null> {
     const row = await prisma.userOAuthApp.findUnique({
         where: { userId_provider: { userId, provider } },
         select: COLUMNS
@@ -101,7 +114,10 @@ export async function countOwnOAuthApps(provider: string): Promise<number> {
 }
 
 /** The client id alone, for the screen: never the secret. */
-export async function ownOAuthAppClientId(userId: string, provider: string): Promise<string | null> {
+export async function ownOAuthAppClientId(
+    userId: string,
+    provider: string
+): Promise<string | null> {
     const row = await prisma.userOAuthApp.findUnique({
         where: { userId_provider: { userId, provider } },
         select: { clientId: true }
@@ -110,7 +126,11 @@ export async function ownOAuthAppClientId(userId: string, provider: string): Pro
 }
 
 /** Store or replace this person's app. Already validated and verified. */
-export async function saveOwnOAuthApp(userId: string, provider: string, app: OwnOAuthAppInput): Promise<void> {
+export async function saveOwnOAuthApp(
+    userId: string,
+    provider: string,
+    app: OwnOAuthAppInput
+): Promise<void> {
     const blob = encryptSecret(app.clientSecret, loadEnv().POLARIS_MASTER_KEY);
     const data = {
         clientId: app.clientId,

@@ -17,8 +17,12 @@ const SRC = fileURLToPath(new URL("../../src/", import.meta.url));
 describe("a refused move or delete", () => {
     it("is marked refused where the server said no", async () => {
         const messages = await readFile(`${SRC}lib/mailbox/messages.ts`, "utf8");
-        expect(messages).toContain('if (!removed) return { done: 0, movedTo: "", unseen: 0, refused: true };');
-        expect(messages).toContain('if (!moved) return { done: 0, movedTo: "", unseen: 0, refused: true };');
+        expect(messages).toContain(
+            'if (!removed) return { done: 0, movedTo: "", unseen: 0, refused: true };'
+        );
+        expect(messages).toContain(
+            'if (!moved) return { done: 0, movedTo: "", unseen: 0, refused: true };'
+        );
         expect(messages).toContain("if (options.strict && refused.length > 0) {");
     });
 
@@ -31,7 +35,11 @@ describe("a refused move or delete", () => {
         expect(
             describeImapEntry({
                 msg: "Command failed",
-                err: { command: "UID MOVE", message: "Command failed", responseText: "[OVERQUOTA] Quota exceeded" },
+                err: {
+                    command: "UID MOVE",
+                    message: "Command failed",
+                    responseText: "[OVERQUOTA] Quota exceeded"
+                },
                 cid: "abc"
             })
         ).toBe("Command failed - UID MOVE - Command failed - [OVERQUOTA] Quota exceeded");

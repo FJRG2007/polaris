@@ -38,7 +38,11 @@ import {
     type SpotifyTrack
 } from "@/lib/connections/spotify";
 import { followHost, noticeListener, stopListenAlong } from "./listen-along";
-import { countOwnOAuthApps, ownOAuthAppsFor, pickOAuthClient } from "@/lib/connections/own-oauth-app";
+import {
+    countOwnOAuthApps,
+    ownOAuthAppsFor,
+    pickOAuthClient
+} from "@/lib/connections/own-oauth-app";
 
 /** How recently a session has to have been seen for its owner to count as here.
  *  The same window the presence dot uses. */

@@ -91,7 +91,9 @@ export function OwnAppDialog({ ownApp, onClose }: { ownApp: OwnAppCard; onClose:
                                 {t("connections.ownApp.create")}
                                 <ExternalLink className="size-3.5" aria-hidden />
                             </a>
-                            <span className="block text-xs text-muted-foreground">{t("connections.ownApp.createHelp")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("connections.ownApp.createHelp")}
+                            </span>
                         </li>
                         <li>{t("connections.ownApp.paste")}</li>
                     </ol>
@@ -121,10 +123,14 @@ export function OwnAppDialog({ ownApp, onClose }: { ownApp: OwnAppCard; onClose:
                             aria-invalid={idProblem ? true : undefined}
                             onChange={(event) => setClientId(event.target.value)}
                         />
-                        {idProblem ? <span className="text-xs text-danger">{idProblem}</span> : null}
+                        {idProblem ? (
+                            <span className="text-xs text-danger">{idProblem}</span>
+                        ) : null}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{t("connections.ownApp.clientSecret")} *</span>
+                        <span className="font-medium">
+                            {t("connections.ownApp.clientSecret")} *
+                        </span>
                         <Input
                             type="password"
                             autoComplete="off"
@@ -133,9 +139,13 @@ export function OwnAppDialog({ ownApp, onClose }: { ownApp: OwnAppCard; onClose:
                             aria-invalid={secretProblem ? true : undefined}
                             onChange={(event) => setClientSecret(event.target.value)}
                         />
-                        {secretProblem ? <span className="text-xs text-danger">{secretProblem}</span> : null}
+                        {secretProblem ? (
+                            <span className="text-xs text-danger">{secretProblem}</span>
+                        ) : null}
                     </label>
-                    <p className="text-xs text-muted-foreground">{t("connections.ownApp.premium")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("connections.ownApp.premium")}
+                    </p>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>
                 <DialogFooter>
@@ -153,7 +163,9 @@ export function OwnAppDialog({ ownApp, onClose }: { ownApp: OwnAppCard; onClose:
                         {tc("actions.cancel")}
                     </Button>
                     <Button
-                        onClick={() => checked.success && run(() => saveOwnSpotifyAppAction(checked.data))}
+                        onClick={() =>
+                            checked.success && run(() => saveOwnSpotifyAppAction(checked.data))
+                        }
                         disabled={pending || !checked.success}
                     >
                         {pending ? <Loader2 className="size-4 animate-spin" /> : null}

@@ -81,14 +81,21 @@ describe("reading what is playing", () => {
 
     it("reads a lone track and the attribute written straight on it", async () => {
         const { "@attr": _drop, ...bare } = playing();
-        state.replies.push({ status: 200, body: { recenttracks: { track: { ...bare, nowplaying: "true" } } } });
+        state.replies.push({
+            status: 200,
+            body: { recenttracks: { track: { ...bare, nowplaying: "true" } } }
+        });
         expect((await lastfm.readLastfmPlaying("k", "u"))?.name).toBe("Example Song");
     });
 
     it("is nothing when the newest track is only the last one scrobbled", async () => {
         state.replies.push({
             status: 200,
-            body: { recenttracks: { track: [playing({ "@attr": undefined, date: { uts: "1", "#text": "x" } })] } }
+            body: {
+                recenttracks: {
+                    track: [playing({ "@attr": undefined, date: { uts: "1", "#text": "x" } })]
+                }
+            }
         });
         expect(await lastfm.readLastfmPlaying("k", "u")).toBeNull();
         state.replies.push({ status: 200, body: { recenttracks: { track: [] } } });
@@ -98,20 +105,30 @@ describe("reading what is playing", () => {
     it("drops a picture that is not an https address", async () => {
         state.replies.push({
             status: 200,
-            body: { recenttracks: { track: [playing({ image: [{ size: "large", "#text": "" }] })] } }
+            body: {
+                recenttracks: { track: [playing({ image: [{ size: "large", "#text": "" }] })] }
+            }
         });
         expect((await lastfm.readLastfmPlaying("k", "u"))?.imageUrl).toBeNull();
     });
 
     it("turns Last.fm's error codes into what a caller can act on", async () => {
         state.replies.push({ status: 429, body: { error: 29, message: "Rate Limit Exceeded" } });
-        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(lastfm.LastfmRateLimited);
+        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(
+            lastfm.LastfmRateLimited
+        );
         state.replies.push({ status: 403, body: { error: 10, message: "Invalid API key" } });
-        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(lastfm.LastfmKeyRefused);
+        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(
+            lastfm.LastfmKeyRefused
+        );
         state.replies.push({ status: 403, body: { error: 26, message: "Suspended API key" } });
-        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(lastfm.LastfmKeyRefused);
+        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(
+            lastfm.LastfmKeyRefused
+        );
         state.replies.push({ status: 404, body: { error: 6, message: "User not found" } });
-        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(lastfm.LastfmUnknownUser);
+        await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toBeInstanceOf(
+            lastfm.LastfmUnknownUser
+        );
         state.replies.push({ status: 500, body: { error: 8, message: "Operation failed" } });
         await expect(lastfm.readLastfmPlaying("k", "u")).rejects.toThrow();
     });

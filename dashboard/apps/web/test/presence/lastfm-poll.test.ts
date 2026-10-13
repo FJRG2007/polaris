@@ -20,7 +20,13 @@ const fake = vi.hoisted(() => ({
     spotify: [] as { userId: string }[],
     here: new Set<string>(),
     settings: new Map<string, Record<string, unknown>>(),
-    activity: [] as { userId: string; source: string; key: string; startedAt: Date; expiresAt: Date }[],
+    activity: [] as {
+        userId: string;
+        source: string;
+        key: string;
+        startedAt: Date;
+        expiresAt: Date;
+    }[],
     playing: new Map<string, unknown>(),
     asked: [] as string[],
     fail: null as Error | null
@@ -47,9 +53,15 @@ vi.mock("@polaris/db", () => ({
                     .map((id) => ({ userId: id, ...fake.settings.get(id) }))
         },
         userActivity: {
-            findUnique: async ({ where }: { where: { userId_source: { userId: string; source: string } } }) =>
+            findUnique: async ({
+                where
+            }: {
+                where: { userId_source: { userId: string; source: string } };
+            }) =>
                 fake.activity.find(
-                    (row) => row.userId === where.userId_source.userId && row.source === where.userId_source.source
+                    (row) =>
+                        row.userId === where.userId_source.userId &&
+                        row.source === where.userId_source.source
                 ) ?? null,
             upsert: async ({ create }: { create: (typeof fake.activity)[number] }) => {
                 fake.activity = fake.activity.filter(
@@ -118,7 +130,10 @@ beforeEach(() => {
 describe("a pass", () => {
     it("asks nothing without a key", async () => {
         fake.key = null;
-        expect(await poll.pollLastfm(0)).toEqual({ asked: 0, skipped: "no Last.fm API key is connected" });
+        expect(await poll.pollLastfm(0)).toEqual({
+            asked: 0,
+            skipped: "no Last.fm API key is connected"
+        });
         expect(fake.asked).toEqual([]);
     });
 
@@ -126,7 +141,9 @@ describe("a pass", () => {
         fake.playing.set("listener_a", song("one"));
         expect((await poll.pollLastfm(0)).asked).toBe(1);
         expect(fake.asked).toEqual(["listener_a"]);
-        expect(fake.activity).toMatchObject([{ userId: USER_A, source: "spotify", key: "lastfm:artist|one" }]);
+        expect(fake.activity).toMatchObject([
+            { userId: USER_A, source: "spotify", key: "lastfm:artist|one" }
+        ]);
     });
 
     it("leaves somebody with a Spotify link to the Spotify poll", async () => {
@@ -136,7 +153,15 @@ describe("a pass", () => {
     });
 
     it("does not ask somebody who switched music sharing off", async () => {
-        fake.settings.set(USER_A, { share: true, spotify: false, games: true, minecraft: true, hiddenGames: "[]", customGames: "[]", seenGames: "[]" });
+        fake.settings.set(USER_A, {
+            share: true,
+            spotify: false,
+            games: true,
+            minecraft: true,
+            hiddenGames: "[]",
+            customGames: "[]",
+            seenGames: "[]"
+        });
         await poll.pollLastfm(0);
         expect(fake.asked).toEqual([]);
     });
@@ -167,7 +192,9 @@ describe("a pass", () => {
         fake.here = new Set([USER_A, USER_B]);
         fake.fail = new lastfm.LastfmRateLimited();
         expect((await poll.pollLastfm(0)).asked).toBe(1);
-        expect((await poll.pollLastfm(poll.LASTFM_WINDOW_MS)).skipped).toBe("Last.fm asked for fewer requests");
+        expect((await poll.pollLastfm(poll.LASTFM_WINDOW_MS)).skipped).toBe(
+            "Last.fm asked for fewer requests"
+        );
         poll.resetLastfmSchedule();
         fake.fail = new lastfm.LastfmKeyRefused();
         await poll.pollLastfm(0);

@@ -618,7 +618,8 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         ],
         requiresApiKey: true,
         apiKeyLabel: "API key",
-        apiKeyHelp: "The API key Last.fm shows for the application. The shared secret is not needed."
+        apiKeyHelp:
+            "The API key Last.fm shows for the application. The shared secret is not needed."
     },
     {
         slug: "krisp",

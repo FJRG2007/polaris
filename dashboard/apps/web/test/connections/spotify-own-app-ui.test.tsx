@@ -20,7 +20,9 @@ const fake = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, refresh: () => undefined }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ push: () => undefined, refresh: () => undefined })
+}));
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1", isAdmin: false }) }));
 vi.mock("@/lib/device-grace", () => ({ newDeviceRefusal: async () => null }));
 vi.mock("@/lib/github-service", () => ({ readGithubAccount: async () => ({}) }));
@@ -54,11 +56,16 @@ vi.mock("@/lib/connections/spotify", () => ({
 }));
 
 const actions = await import("../../src/app/(app)/account/connections/actions");
-const { ConnectionsView } = await import("../../src/app/(app)/account/connections/connections-view");
+const { ConnectionsView } = await import(
+    "../../src/app/(app)/account/connections/connections-view"
+);
 
 type Card = Parameters<typeof ConnectionsView>[0]["providers"][number];
 
-const PAIR = { clientId: "0123456789abcdef0123456789abcdef", clientSecret: "fedcba9876543210fedcba9876543210" };
+const PAIR = {
+    clientId: "0123456789abcdef0123456789abcdef",
+    clientSecret: "fedcba9876543210fedcba9876543210"
+};
 
 beforeEach(() => {
     fake.saved = [];
@@ -68,10 +75,17 @@ beforeEach(() => {
 
 describe("saving one's own app", () => {
     it("checks it with Spotify and stores it", async () => {
-        expect(await actions.saveOwnSpotifyAppAction({ clientId: ` ${PAIR.clientId} `, clientSecret: PAIR.clientSecret })).toEqual({
+        expect(
+            await actions.saveOwnSpotifyAppAction({
+                clientId: ` ${PAIR.clientId} `,
+                clientSecret: PAIR.clientSecret
+            })
+        ).toEqual({
             clientId: PAIR.clientId
         });
-        expect(fake.saved).toEqual([{ userId: "user-1", provider: "spotify", clientId: PAIR.clientId }]);
+        expect(fake.saved).toEqual([
+            { userId: "user-1", provider: "spotify", clientId: PAIR.clientId }
+        ]);
     });
 
     it("keeps nothing Spotify refuses or that cannot be a pair", async () => {
@@ -105,17 +119,30 @@ function spotify(ownApp: Card["ownApp"], canAuthorize = false): Card {
     };
 }
 
-const VALUES = [{ key: "redirectUri" as const, value: "https://polaris.example.test/api/connections/spotify/callback" }];
+const VALUES = [
+    {
+        key: "redirectUri" as const,
+        value: "https://polaris.example.test/api/connections/spotify/callback"
+    }
+];
 
 describe("the Spotify card", () => {
     it("offers one's own app even where the operator connected none", () => {
-        const html = renderToStaticMarkup(withMessages(<ConnectionsView providers={[spotify({ clientId: null, values: VALUES })]} />));
+        const html = renderToStaticMarkup(
+            withMessages(
+                <ConnectionsView providers={[spotify({ clientId: null, values: VALUES })]} />
+            )
+        );
         expect(html).toContain("Use your own Spotify app");
     });
 
     it("says which app is in use, never the secret", () => {
         const html = renderToStaticMarkup(
-            withMessages(<ConnectionsView providers={[spotify({ clientId: PAIR.clientId, values: VALUES }, true)]} />)
+            withMessages(
+                <ConnectionsView
+                    providers={[spotify({ clientId: PAIR.clientId, values: VALUES }, true)]}
+                />
+            )
         );
         expect(html).toContain("Your own Spotify app");
         expect(html).toContain(PAIR.clientId.slice(0, 8));
@@ -124,7 +151,10 @@ describe("the Spotify card", () => {
 
     it("reads in Spanish", () => {
         const html = renderToStaticMarkup(
-            withMessages(<ConnectionsView providers={[spotify({ clientId: null, values: VALUES })]} />, "es-ES")
+            withMessages(
+                <ConnectionsView providers={[spotify({ clientId: null, values: VALUES })]} />,
+                "es-ES"
+            )
         );
         expect(html).toContain("Usar tu propia app de Spotify");
     });
