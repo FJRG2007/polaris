@@ -44,14 +44,25 @@ export interface MailConnectionSource extends MailCredentialSource {
 /**
  * How long any one connection may take.
  *
- * Generous by the standards of an HTTP request and tight by the standards of
- * IMAP: a large mailbox's first sync is many commands rather than one slow one,
- * and a server that has not answered a single command in a minute is not going
- * to.
+ * Connecting and the greeting are tight: a server that has not said hello in
+ * twenty seconds is not going to.
  */
 const CONNECT_TIMEOUT_MS = 20_000;
 const GREETING_TIMEOUT_MS = 20_000;
-const SOCKET_TIMEOUT_MS = 60_000;
+
+/**
+ * How long a connection may sit with a command unanswered, during work.
+ *
+ * imapflow's own five minutes rather than one. Gmail answers the odd FETCH or
+ * STATUS a minute and more late on an ordinary day, and at sixty seconds every
+ * one of those threw the whole pass away and put "cannot reach this mail server"
+ * on the screen over a server that was answering. A pass is one per mailbox at a
+ * time, so a server that really has stopped holds up only its own mailbox.
+ */
+const SOCKET_TIMEOUT_MS = 5 * 60_000;
+
+/** The account form's check waits on a person, so it keeps the short one. */
+const CHECK_SOCKET_TIMEOUT_MS = 60_000;
 
 /** What Polaris tells the server it is. Servers log this, and a client that
  *  refuses to name itself is the one that gets rate limited first. */
@@ -159,7 +170,7 @@ export async function checkImap(account: MailConnectionSource): Promise<void> {
         verifyOnly: true,
         connectionTimeout: CONNECT_TIMEOUT_MS,
         greetingTimeout: GREETING_TIMEOUT_MS,
-        socketTimeout: SOCKET_TIMEOUT_MS,
+        socketTimeout: CHECK_SOCKET_TIMEOUT_MS,
         ...(isLoopback(account.imapHost) ? { tls: { rejectUnauthorized: false } } : {})
     });
     try {

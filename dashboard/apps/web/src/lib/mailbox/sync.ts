@@ -151,6 +151,11 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
     // and that is worse than any amount of mail arriving late.
     if (!mayTryMailbox(account, { force })) return;
 
+    // Where the pass was when it failed, for the log line: "Socket timeout" on
+    // its own does not say whether it was the login, the folder list or one
+    // folder's fetch that the server sat on.
+    const started = Date.now();
+    let step = "connecting";
     try {
         // Read before the pass rather than during it, so every folder decides
         // against the same line. Mail arriving in the meantime is newer than the
@@ -159,6 +164,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         // reads the edge again, settles it.
         const edge = await bodyWindowEdge(account.id);
         await withImap(account, async (client) => {
+            step = "listing folders";
             await syncFolders(client, account.id);
             const folders = await prisma.mailFolder.findMany({
                 where: { accountId: account.id }
@@ -166,6 +172,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             folders.sort((left, right) => syncRank(left.role) - syncRank(right.role));
             for (const folder of folders) {
                 if (!worthSyncing(folder)) continue;
+                step = `folder ${folder.role}`;
                 await syncFolder(client, account, folder, edge);
             }
         });
@@ -197,6 +204,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             console.warn(
                 "mail sync failed",
                 accountId,
+                `${step} after ${Math.round((Date.now() - started) / 1000)}s:`,
                 caught instanceof MailUnreachableError
                     ? caught.detail || caught.message
                     : caught instanceof Error
