@@ -3,7 +3,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rememberVoice, takeRememberedVoice } from "@/app/(app)/chat/call-voice-resume";
+import {
+    rememberVoice,
+    startingVoice,
+    takeRememberedVoice
+} from "@/app/(app)/chat/call-voice-resume";
 
 const MEETING = "019f8506-683f-7dd0-9c13-1e9ee9237fe3";
 
@@ -71,5 +75,39 @@ describe("the voice a reload carries", () => {
         };
         rememberVoice(MEETING, { micOn: false, deafened: true, micBeforeDeafen: true });
         expect(takeRememberedVoice(MEETING)).toBeNull();
+    });
+});
+
+describe("the voice a seat taken back carries", () => {
+    // A tab the browser discarded, a reload slower than the note, or the call
+    // picked up on another device: no note, but the seat remembers.
+    it("keeps somebody deafened when only the seat remembers it", () => {
+        expect(startingVoice(null, { deafened: true, serverDeafened: false }, true)).toEqual({
+            micOn: true,
+            deafened: true,
+            micBeforeDeafen: true
+        });
+    });
+
+    it("gives back the microphone this browser would have opened with", () => {
+        expect(startingVoice(null, { deafened: true, serverDeafened: false }, false)).toEqual({
+            micOn: false,
+            deafened: true,
+            micBeforeDeafen: false
+        });
+    });
+
+    it("lets this tab's own note win over the seat", () => {
+        const note = { micOn: true, deafened: false, micBeforeDeafen: true };
+        expect(startingVoice(note, { deafened: true, serverDeafened: false }, true)).toBe(note);
+    });
+
+    it("never takes a moderator's deafen for the person's own", () => {
+        expect(startingVoice(null, { deafened: true, serverDeafened: true }, true)).toBeNull();
+    });
+
+    it("opens the default way for a seat that was not deafened, or none", () => {
+        expect(startingVoice(null, { deafened: false, serverDeafened: false }, true)).toBeNull();
+        expect(startingVoice(null, null, true)).toBeNull();
     });
 });

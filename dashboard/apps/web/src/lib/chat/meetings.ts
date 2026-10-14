@@ -982,6 +982,25 @@ export async function inCallTogether(meetingId: string, userId: string): Promise
     return seated > 0;
 }
 
+/**
+ * What this seat last said about its own voice, apart from a moderator's.
+ *
+ * The seat outlives the browser holding it: a discarded tab, a reload slower
+ * than the tab's own note, or the call picked up on another device all take the
+ * same row back. Without this, whoever was deafened came back hearing everybody
+ * and with a live microphone. `serverDeafened` is returned beside it because a
+ * moderator's deafen is written into `deafened` too, and must not be mistaken
+ * for the person's own choice.
+ */
+export async function ownVoice(
+    seat: MeetingSeat
+): Promise<{ deafened: boolean; serverDeafened: boolean } | null> {
+    return prisma.meetingParticipant.findFirst({
+        where: { id: seat.participantId, meetingId: seat.meetingId, leftAt: null },
+        select: { deafened: true, serverDeafened: true }
+    });
+}
+
 /** Resolve an account's seat in a meeting they say they are in. */
 export async function seatForUser(userId: string, meetingId: string): Promise<MeetingSeat | null> {
     const participant = await prisma.meetingParticipant.findFirst({
