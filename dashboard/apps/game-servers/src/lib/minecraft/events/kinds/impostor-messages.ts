@@ -29,7 +29,21 @@ const ROOMS: Readonly<Record<PlaceName, Readonly<Record<Language, string>>>> = {
     archive: { en: "Archive", es: "Archivo" },
     armory: { en: "Armory", es: "Armería" },
     infirmary: { en: "Infirmary", es: "Enfermería" },
-    radio: { en: "Radio room", es: "Sala de radio" }
+    radio: { en: "Radio room", es: "Sala de radio" },
+    cafeteria: { en: "Cafeteria", es: "Cafetería" },
+    reactor: { en: "Reactor", es: "Reactor" },
+    upperEngine: { en: "Upper engine", es: "Motor superior" },
+    lowerEngine: { en: "Lower engine", es: "Motor inferior" },
+    security: { en: "Security", es: "Seguridad" },
+    medbay: { en: "MedBay", es: "Enfermería" },
+    electrical: { en: "Electrical", es: "Electricidad" },
+    admin: { en: "Admin", es: "Administración" },
+    storage: { en: "Storage", es: "Almacén" },
+    weapons: { en: "Weapons", es: "Armamento" },
+    o2: { en: "O2", es: "Oxígeno" },
+    navigation: { en: "Navigation", es: "Navegación" },
+    shields: { en: "Shields", es: "Escudos" },
+    communications: { en: "Communications", es: "Comunicaciones" }
 };
 
 const KINDS: Readonly<Record<StationKind, Readonly<Record<Language, string>>>> = {
