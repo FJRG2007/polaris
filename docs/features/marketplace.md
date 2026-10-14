@@ -41,6 +41,8 @@ and language, and the details its manifest knows - developer, category,
 version, image. Install, Configure, Open and Uninstall sit on the page and are
 offered only when you are allowed to use them.
 
-Uninstalling can also delete the app's data - its volumes, settings and
+Uninstalling deletes the app's data by default - its volumes, settings and
 everything made in it, including files such as camera footage - and leaves
-nothing behind; by default the data is kept for a reinstall.
+nothing behind. Unticking that in the dialog keeps the data for a reinstall
+instead; it stays on the server and is listed under Storage, where it can be
+freed later.

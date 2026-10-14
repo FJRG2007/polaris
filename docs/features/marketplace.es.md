@@ -41,6 +41,8 @@ y tu idioma, y los datos que conoce su manifiesto - desarrollador, categoría,
 versión, imagen. Instalar, Configurar, Abrir y Desinstalar están en la página
 y solo se ofrecen cuando tienes permiso para usarlos.
 
-Desinstalar también puede borrar los datos de la app - sus volúmenes, ajustes
-y todo lo hecho en ella, incluidos archivos como las grabaciones de cámaras -
-y no deja nada atrás; por defecto los datos se conservan para una reinstalación.
+Desinstalar borra los datos de la app por defecto - sus volúmenes, ajustes y
+todo lo hecho en ella, incluidos archivos como las grabaciones de cámaras - y
+no deja nada atrás. Si desmarcas esa opción en el diálogo, los datos se
+conservan para una reinstalación; se quedan en el servidor y aparecen en
+Almacenamiento, donde puedes liberarlos más tarde.
