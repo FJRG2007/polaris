@@ -52,7 +52,7 @@ document is the source of truth; keep it current as phases land.
   transaction, and runs each app's `purgeInstallFiles` hook first so files the
   rows pointed at (camera footage) are deleted before the rows that found them
   - refused while any remain, so a storage outage never half-deletes an
-  install.
+    install.
 - Uninstall ordering + retry - DONE (6dfacb9, a19a223, 8a48219): uninstalling
   works like uninstalling a phone app - an ordered teardown, retryable after a
   partial failure, and one shared dialog across every door to it (see
