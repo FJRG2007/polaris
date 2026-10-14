@@ -87,6 +87,7 @@ import { rememberVoice, takeRememberedVoice } from "./call-voice-resume";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { pressDeafen, pressMic } from "./call-voice-controls";
 import { afterPaint, maskCamera, type MaskedCamera } from "./camera-filter";
+import type { CameraProblem } from "./camera-problem";
 import { cameraLook, lookIsPlain, lookKey, useCameraLook, type CameraLook } from "./camera-look";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -427,7 +428,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
     /** Which background is actually being drawn behind this browser, and why
      *  there is none when one was asked for - see `camera-filter`. */
     const [cameraMask, setCameraMask] = useState<CameraBackground | null>(null);
-    const [maskProblem, setMaskProblem] = useState<string | null>(null);
+    const [maskProblem, setMaskProblem] = useState<CameraProblem | null>(null);
     /**
      * Everything about sharing one microphone with the people sitting next to
      * you - see `call-combine` for what a group is and `call-nearby` for how a

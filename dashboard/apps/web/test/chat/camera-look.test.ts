@@ -37,6 +37,9 @@ class FakeContext {
         // A dark, even frame: luminance about 0.16.
         return { data: new Uint8ClampedArray(width * height * 4).fill(40) };
     }
+    public getExtension(): null {
+        return null;
+    }
 }
 
 class FakeWorker {
@@ -295,6 +298,6 @@ describe("the camera pipeline", () => {
         });
         expect(fetches).toBe(1);
         expect(built?.track).toBeNull();
-        expect(built?.problem).toMatch(/background model is not on this server/);
+        expect(built?.problem).toEqual({ code: "noModel", said: null });
     });
 });

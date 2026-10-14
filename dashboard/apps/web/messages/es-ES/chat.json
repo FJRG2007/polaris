@@ -1796,5 +1796,15 @@
         "volumeHint": "Lo fuerte que suena para todos.",
         "cancel": "Cancelar",
         "save": "Guardar"
+    },
+    "cameraProblem": {
+        "noCanvas": "Este navegador no tiene un lienzo en el que dibujar.",
+        "noVideoOut": "Este navegador no permite enviar un lienzo como vídeo.",
+        "noWebgl": "Este navegador no puede dibujar un fondo: WebGL 2 está desactivado o no es compatible.",
+        "noModel": "El modelo de fondo no está en este servidor. Una actualización lo añade.",
+        "graphics": "La tarjeta gráfica no pudo crear el fondo.",
+        "graphicsSaid": "La tarjeta gráfica no pudo crear el fondo: {said}",
+        "tooSlow": "Tardó demasiado en iniciarse.",
+        "silent": "No se inició y no dijo por qué."
     }
 }

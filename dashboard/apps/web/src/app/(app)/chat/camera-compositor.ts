@@ -23,6 +23,7 @@
  */
 
 import * as mask from "./camera-mask";
+import { CameraFailure } from "./camera-problem";
 
 type Size = { width: number; height: number };
 
@@ -386,20 +387,20 @@ function program(gl: WebGL2RenderingContext, fragment: string): WebGLProgram {
     if (!gl.getProgramParameter(built, gl.LINK_STATUS)) {
         const log = gl.getProgramInfoLog(built) ?? "";
         gl.deleteProgram(built);
-        throw new Error(`The graphics card would not build the background: ${log.trim() || "no reason given"}.`);
+        throw new CameraFailure("graphics", log.trim() || null);
     }
     return built;
 }
 
 function shader(gl: WebGL2RenderingContext, kind: number, source: string): WebGLShader {
     const built = gl.createShader(kind);
-    if (!built) throw new Error("The graphics card would not build the background.");
+    if (!built) throw new CameraFailure("graphics");
     gl.shaderSource(built, source);
     gl.compileShader(built);
     if (!gl.getShaderParameter(built, gl.COMPILE_STATUS)) {
         const log = gl.getShaderInfoLog(built) ?? "";
         gl.deleteShader(built);
-        throw new Error(`The graphics card would not build the background: ${log.trim() || "no reason given"}.`);
+        throw new CameraFailure("graphics", log.trim() || null);
     }
     return built;
 }

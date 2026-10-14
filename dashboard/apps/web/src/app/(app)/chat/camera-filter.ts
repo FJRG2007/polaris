@@ -44,6 +44,7 @@
 
 import type { ImageSegmenter } from "@mediapipe/tasks-vision";
 import { createCompositor, type Compositor } from "./camera-compositor";
+import { CameraFailure, problemOf, type CameraProblem } from "./camera-problem";
 import { backgroundImage, BLUR_PIXELS, type CameraBackground } from "./camera-background";
 import {
     compositeParams,
@@ -116,7 +117,7 @@ export interface MaskedCamera {
      * Kept for the same reason the microphone's is: a filter that has never once
      * started in a deployment looks exactly like one that works.
      */
-    readonly problem: string | null;
+    readonly problem: CameraProblem | null;
 }
 
 /**
@@ -148,7 +149,7 @@ export async function maskCamera(
     const segmenting = background !== "off" || look.frame === "auto";
 
     const path = framePath(frameSupport(window as unknown as Record<string, unknown>));
-    if (!path) return refusal(background, "This browser would not let a canvas be sent as video.");
+    if (!path) return refusal(background, { code: "noVideoOut", said: null });
 
     // What is sent when there is a look to apply; the GPU canvas otherwise.
     const canvas = finishing ? document.createElement("canvas") : null;
@@ -156,7 +157,7 @@ export async function maskCamera(
     const sample = finishing ? document.createElement("canvas") : null;
     const sampling = sample?.getContext("2d", { willReadFrequently: true }) ?? null;
     if (finishing && (!context || !sampling)) {
-        return refusal(background, "This browser has no canvas to draw on.");
+        return refusal(background, { code: "noCanvas", said: null });
     }
     if (sample) {
         sample.width = SAMPLE_WIDTH;
@@ -177,10 +178,7 @@ export async function maskCamera(
           }) as WebGL2RenderingContext | null)
         : null;
     if (segmenting && !gl) {
-        return refusal(
-            background,
-            "This browser cannot draw a background: WebGL 2 is turned off or not supported."
-        );
+        return refusal(background, { code: "noWebgl", said: null });
     }
 
     let video: HTMLVideoElement | null = null;
@@ -215,6 +213,7 @@ export async function maskCamera(
             // Already gone with its context; nothing left to free.
         }
         segmenter = null;
+        gl?.getExtension("WEBGL_lose_context")?.loseContext();
         if (video) video.srcObject = null;
     };
 
@@ -242,7 +241,7 @@ export async function maskCamera(
         }
     } catch (caught) {
         await teardown();
-        return refusal(background, reasonOf(caught));
+        return refusal(background, problemOf(caught));
     }
 
     /**
@@ -405,7 +404,7 @@ export async function maskCamera(
             tick();
             const sent = (canvas ?? surface) as HTMLCanvasElement;
             out = sent.captureStream(fps).getVideoTracks()[0] ?? null;
-            if (!out) throw new Error("This browser would not let a canvas be sent as video.");
+            if (!out) throw new CameraFailure("noVideoOut");
 
             ticker = new Worker(tickerScript(), { name: "Call background" });
             ticker.onmessage = () => {
@@ -417,7 +416,7 @@ export async function maskCamera(
     } catch (caught) {
         await teardown();
         out?.stop();
-        return refusal(background, reasonOf(caught));
+        return refusal(background, problemOf(caught));
     }
 
     const sending = out;
@@ -433,7 +432,7 @@ export async function maskCamera(
 }
 
 /** A background that was asked for and could not be built. */
-function refusal(background: CameraBackground, problem: string): MaskedCamera {
+function refusal(background: CameraBackground, problem: CameraProblem): MaskedCamera {
     return { track: null, using: background, problem, stop: async () => undefined };
 }
 
@@ -462,7 +461,7 @@ function loader(): Promise<Loaded> {
     loading = (async () => {
         const response = await fetch(`${ASSETS}/${MODEL_FILE}`).catch(() => null);
         if (!response?.ok) {
-            throw new Error("The background model is not on this server. An update adds it.");
+            throw new CameraFailure("noModel");
         }
         const model = new Uint8Array(await response.arrayBuffer());
         const vision = await import("@mediapipe/tasks-vision");
@@ -559,21 +558,7 @@ function within<T>(ms: number, promise: Promise<T>): Promise<T> {
     return Promise.race([
         promise,
         new Promise<T>((_, reject) => {
-            timer = setTimeout(() => reject(new Error("It took too long to start.")), ms);
+            timer = setTimeout(() => reject(new CameraFailure("tooSlow")), ms);
         })
     ]).finally(() => clearTimeout(timer));
-}
-
-/**
- * A failure in words, and deliberately the browser's own.
- *
- * The same reasoning as `mic-filter`'s: "the model is not on this server" and
- * "out of memory" send somebody to two different places, and the line under the
- * setting is the only place either of them appears.
- */
-function reasonOf(caught: unknown): string {
-    const message = caught instanceof Error ? caught.message : String(caught ?? "");
-    const said = message.trim().replace(/\s+/g, " ");
-    if (!said) return "It would not start, and said nothing about why.";
-    return said.length > 160 ? `${said.slice(0, 157)}...` : said;
 }

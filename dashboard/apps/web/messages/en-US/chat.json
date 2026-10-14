@@ -1796,5 +1796,15 @@
         "volumeHint": "How loud it plays for everybody.",
         "cancel": "Cancel",
         "save": "Save"
+    },
+    "cameraProblem": {
+        "noCanvas": "This browser has no canvas to draw on.",
+        "noVideoOut": "This browser would not let a canvas be sent as video.",
+        "noWebgl": "This browser cannot draw a background: WebGL 2 is turned off or not supported.",
+        "noModel": "The background model is not on this server. An update adds it.",
+        "graphics": "The graphics card would not build the background.",
+        "graphicsSaid": "The graphics card would not build the background: {said}",
+        "tooSlow": "It took too long to start.",
+        "silent": "It would not start, and said nothing about why."
     }
 }

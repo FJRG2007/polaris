@@ -30,6 +30,8 @@ let fetches = 0;
 let webgl = true;
 /** Whether the model throws instead of answering. */
 let modelBroken = false;
+/** How many WebGL contexts were handed back to the browser. */
+let released = 0;
 
 let segments = 0;
 const renders: { blind: boolean }[] = [];
@@ -76,7 +78,11 @@ class FakeCanvas {
     width = 0;
     height = 0;
     getContext(kind: string): unknown {
-        if (kind === "webgl2") return webgl ? {} : null;
+        if (kind === "webgl2") {
+            if (!webgl) return null;
+            const loss = { loseContext: () => void (released += 1) };
+            return { getExtension: (name: string) => (name === "WEBGL_lose_context" ? loss : null) };
+        }
         return { globalCompositeOperation: "source-over", filter: "none", drawImage: () => undefined };
     }
     captureStream(): { getVideoTracks: () => unknown[] } {
@@ -151,6 +157,7 @@ beforeEach(() => {
     modelServed = false;
     modelBroken = false;
     webgl = true;
+    released = 0;
     tick = null;
 });
 
@@ -176,7 +183,7 @@ describe("a model that will not load", () => {
         expect(built).not.toBeNull();
         expect(built?.track).toBeNull();
         expect(built?.using).toBe("blur");
-        expect(built?.problem).toMatch(/not on this server/);
+        expect(built?.problem).toEqual({ code: "noModel", said: null });
     });
 
     it("is tried again next time rather than remembered as broken", async () => {
@@ -187,6 +194,11 @@ describe("a model that will not load", () => {
         // until the tab was reloaded.
         expect(fetches).toBe(2);
     });
+
+    it("hands its graphics context back rather than leaving it for the collector", async () => {
+        await maskCamera(track, "blur");
+        expect(released).toBe(1);
+    });
 });
 
 describe("a browser without WebGL 2", () => {
@@ -195,7 +207,7 @@ describe("a browser without WebGL 2", () => {
         modelServed = true;
         const built = await maskCamera(track, "blur");
         expect(built?.track).toBeNull();
-        expect(built?.problem).toMatch(/WebGL 2/);
+        expect(built?.problem).toEqual({ code: "noWebgl", said: null });
         // Refused before anything was downloaded.
         expect(fetches).toBe(0);
     });
@@ -221,6 +233,14 @@ describe("starting the model", () => {
         // The background mask in the fake is 1 wide; the person's is 256.
         expect(tracked).toEqual([256]);
         await built?.stop();
+    });
+
+    it("hands its graphics context back when it is stopped", async () => {
+        modelServed = true;
+        const built = await maskCamera(track, "blur");
+        expect(released).toBe(0);
+        await built?.stop();
+        expect(released).toBe(1);
     });
 });
 
