@@ -294,18 +294,24 @@ export function MailShell({
      * nothing - or doing it a second later - for as long as Mail was open was
      * this, and nothing else.
      */
-    const [rail, setRail] = useState({
+    const [rail, setRail] = useState(() => ({
         accounts: sentAccounts,
         folders: sentFolders,
         unread: sentUnread,
-        // When these were asked for: 0 for what the server rendered, which is
-        // older than every change this browser has made.
-        at: 0
-    });
+        // When these were asked for. What the server rendered arrived now, so
+        // it already counts every change confirmed before it; one still waiting
+        // on the server is laid over it regardless.
+        at: Date.now()
+    }));
     // The server has rendered again - a mailbox added, a label written, a shelf
     // switched - and what it says now is the truth this was standing in for.
     useEffect(() => {
-        setRail({ accounts: sentAccounts, folders: sentFolders, unread: sentUnread, at: 0 });
+        setRail({
+            accounts: sentAccounts,
+            folders: sentFolders,
+            unread: sentUnread,
+            at: Date.now()
+        });
     }, [sentAccounts, sentFolders, sentUnread]);
     const accounts = rail.accounts;
     const folders = rail.folders;

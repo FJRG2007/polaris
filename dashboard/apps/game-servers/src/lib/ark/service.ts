@@ -658,7 +658,7 @@ export async function revealArkPasswords(
     // install's 48 hex characters, which `enablecheats` refuses - nobody could
     // administer them from inside the game. Replaced the first time the owner looks,
     // so every one of those servers is repaired without anybody having to notice.
-    if (adminPassword && !arkAccess.isJoinPassword(adminPassword)) {
+    if (adminPassword && arkAccess.isLegacyAdminPassword(adminPassword)) {
         const fresh = mintJoinPassword();
         await setAdminPassword(ownerId, installedAppId, fresh);
         return { joinPassword, adminPassword: fresh, adminReplaced: true };

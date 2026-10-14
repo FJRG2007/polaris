@@ -42,6 +42,15 @@ export function isJoinPassword(value: string): boolean {
     return JOIN_PASSWORD.test(value);
 }
 
+/** The install's 48 hex characters, which servers created before the create flow
+ *  minted an admin password of its own were given and `enablecheats` refuses.
+ *  Only that shape: a password the owner chose is theirs, whatever it looks like. */
+const LEGACY_ADMIN_PASSWORD = /^[0-9a-f]{48}$/i;
+
+export function isLegacyAdminPassword(value: string): boolean {
+    return LEGACY_ADMIN_PASSWORD.test(value);
+}
+
 /** What to say when a password is refused, in the terms it was refused on. */
 /** A carried key (see `lib/game-message`): shown through the reader's language. */
 export const JOIN_PASSWORD_HINT = gameMessage("games", "schema.joinPasswordRule");

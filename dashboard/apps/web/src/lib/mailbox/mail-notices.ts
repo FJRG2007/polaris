@@ -34,35 +34,25 @@ export async function readNoticesAboutThreads(
     }
 }
 
-/** Mark read the notices about the conversations these messages belong to. */
-export async function readNoticesAboutMessages(
+/**
+ * The conversations these messages belong to, read before an action that may
+ * remove the messages themselves - filing or deleting one drops its row, so
+ * asking afterwards finds nothing to mark.
+ */
+export async function threadsOfMessages(
     userId: string,
     messageIds: readonly string[]
-): Promise<void> {
-    if (messageIds.length === 0) return;
+): Promise<string[]> {
+    if (messageIds.length === 0) return [];
     try {
         const rows = await prisma.mailMessage.findMany({
             where: { id: { in: [...messageIds] }, account: { userId } },
             select: { threadId: true },
             distinct: ["threadId"]
         });
-        await readNoticesAboutThreads(
-            userId,
-            rows.map((row) => row.threadId)
-        );
+        return rows.map((row) => row.threadId);
     } catch (caught) {
         console.error("polaris: mail notices could not be marked read:", caught);
-    }
-}
-
-/** Mark read every notice about a conversation, for "mark all mail read". */
-export async function readEveryMailNotice(userId: string): Promise<void> {
-    try {
-        await prisma.notification.updateMany({
-            where: { userId, readAt: null, href: { startsWith: conversationLink("") } },
-            data: { readAt: new Date() }
-        });
-    } catch (caught) {
-        console.error("polaris: mail notices could not be marked read:", caught);
+        return [];
     }
 }

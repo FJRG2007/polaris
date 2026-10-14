@@ -59,6 +59,19 @@ describe("a join password", () => {
     });
 });
 
+describe("a legacy admin password", () => {
+    it("is the install's 48 hex characters", () => {
+        expect(access.isLegacyAdminPassword("0123456789abcdef".repeat(3))).toBe(true);
+    });
+
+    it("leaves a password the owner chose alone, whatever it looks like", () => {
+        expect(access.isLegacyAdminPassword("Correct9Horse")).toBe(false);
+        expect(access.isLegacyAdminPassword("short1")).toBe(false);
+        expect(access.isLegacyAdminPassword("my-admin_pass!")).toBe(false);
+        expect(access.isLegacyAdminPassword("0123456789abcdef".repeat(2))).toBe(false);
+    });
+});
+
 describe("the closed-server flag", () => {
     it("is added without disturbing the options somebody else set", () => {
         expect(access.withExclusiveJoin("-PreventHibernation", true)).toBe(

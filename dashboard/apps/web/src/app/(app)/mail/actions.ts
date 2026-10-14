@@ -41,7 +41,7 @@ import * as accounts from "@/lib/mailbox/accounts";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
-import { readNoticesAboutMessages } from "@/lib/mailbox/mail-notices";
+import * as mailNotices from "@/lib/mailbox/mail-notices";
 import * as contacts from "@/lib/mailbox/contacts";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import * as templates from "@/lib/mailbox/templates";
@@ -436,6 +436,9 @@ export async function actOnAction(input: unknown) {
     const parsed = core.mailActionSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
+        const threads = DEALT_WITH.has(parsed.data.action)
+            ? await mailNotices.threadsOfMessages(userId, parsed.data.messageIds)
+            : [];
         const done = await messages.actOnMessages(
             userId,
             parsed.data.messageIds,
@@ -443,9 +446,7 @@ export async function actOnAction(input: unknown) {
             { scope: parsed.data.scope, strict: true }
         );
         // Read, filed or thrown away: the bell's notices about it go too.
-        if (DEALT_WITH.has(parsed.data.action)) {
-            await readNoticesAboutMessages(userId, parsed.data.messageIds);
-        }
+        await mailNotices.readNoticesAboutThreads(userId, threads);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -474,13 +475,14 @@ export async function moveAction(input: unknown) {
     const parsed = core.mailMoveSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
+        const threads = await mailNotices.threadsOfMessages(userId, parsed.data.messageIds);
         const done = await messages.moveMessages(
             userId,
             parsed.data.messageIds,
             parsed.data.folderId,
             { scope: parsed.data.scope, strict: true }
         );
-        await readNoticesAboutMessages(userId, parsed.data.messageIds);
+        await mailNotices.readNoticesAboutThreads(userId, threads);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -1084,13 +1086,14 @@ export async function moveToFolderAction(input: unknown) {
     const parsed = core.mailMoveSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.nothingMoved") };
     try {
+        const threads = await mailNotices.threadsOfMessages(userId, parsed.data.messageIds);
         const done = await messages.moveMessages(
             userId,
             parsed.data.messageIds,
             parsed.data.folderId,
             { scope: parsed.data.scope, strict: true }
         );
-        await readNoticesAboutMessages(userId, parsed.data.messageIds);
+        await mailNotices.readNoticesAboutThreads(userId, threads);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.moveFailed");

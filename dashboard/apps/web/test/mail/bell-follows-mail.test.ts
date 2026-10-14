@@ -14,10 +14,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock("@polaris/db", () => ({ prisma: db }));
 
-import {
-    readNoticesAboutMessages,
-    readNoticesAboutThreads
-} from "@/lib/mailbox/mail-notices";
+import { readNoticesAboutThreads, threadsOfMessages } from "@/lib/mailbox/mail-notices";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
 const COMPONENTS = fileURLToPath(new URL("../../src/components/", import.meta.url));
@@ -42,15 +39,12 @@ describe("on the server", () => {
 
     it("finds the conversations of the messages named, among the user's own", async () => {
         db.mailMessage.findMany.mockResolvedValue([{ threadId: "thread-9" }]);
-        await readNoticesAboutMessages("user-1", ["message-1"]);
+        await expect(threadsOfMessages("user-1", ["message-1"])).resolves.toEqual(["thread-9"]);
         expect(db.mailMessage.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: { id: { in: ["message-1"] }, account: { userId: "user-1" } }
             })
         );
-        expect(db.notification.updateMany.mock.calls[0][0].where.href).toEqual({
-            in: ["/mail/t/thread-9"]
-        });
     });
 
     it("never fails the mail action it follows", async () => {
@@ -62,24 +56,41 @@ describe("on the server", () => {
 
     it("asks nothing for nothing", async () => {
         await readNoticesAboutThreads("user-1", []);
-        await readNoticesAboutMessages("user-1", []);
+        await expect(threadsOfMessages("user-1", [])).resolves.toEqual([]);
         expect(db.notification.updateMany).not.toHaveBeenCalled();
         expect(db.mailMessage.findMany).not.toHaveBeenCalled();
     });
 });
 
 describe("in the browser", () => {
-    it("Mail's actions read the notices once the mail has moved", async () => {
+    it("Mail's actions find the conversations before the mail moves and read them after", async () => {
         const actions = await readFile(`${SCREENS}actions.ts`, "utf8");
-        expect(actions).toContain("if (DEALT_WITH.has(parsed.data.action)) {");
-        expect(actions.match(/await readNoticesAboutMessages\(userId, parsed\.data\.messageIds\);/g))
-            .toHaveLength(3);
+        expect(actions).toContain("DEALT_WITH.has(parsed.data.action)");
+        const found =
+            /const threads = (?:[^;]*?)mailNotices\.threadsOfMessages\(userId, parsed\.data\.messageIds\)/g;
+        const acted = /await messages\.(?:actOnMessages|moveMessages)\(/g;
+        const read = /await mailNotices\.readNoticesAboutThreads\(userId, threads\);/g;
+        expect(actions.match(found)).toHaveLength(3);
+        expect(actions.match(read)).toHaveLength(3);
+        for (const at of [...actions.matchAll(found)].map((match) => match.index ?? 0)) {
+            acted.lastIndex = at;
+            read.lastIndex = at;
+            const action = acted.exec(actions)?.index ?? -1;
+            const marked = read.exec(actions)?.index ?? -1;
+            expect(action).toBeGreaterThan(at);
+            expect(marked).toBeGreaterThan(action);
+        }
     });
 
     it("the bell shows them read at once and puts them back on a refusal", async () => {
-        const feed = await readFile(`${COMPONENTS}notifications/notifications-provider.tsx`, "utf8");
+        const feed = await readFile(
+            `${COMPONENTS}notifications/notifications-provider.tsx`,
+            "utf8"
+        );
         expect(feed).toContain("export function useHoldConversationNotices()");
-        expect(feed).toContain('setItems((rows) => applyFeedMutation(rows, { kind: "readMany", ids: held }));');
+        expect(feed).toContain(
+            'setItems((rows) => applyFeedMutation(rows, { kind: "readMany", ids: held }));'
+        );
         expect(feed).toContain("held.includes(row.id) ? { ...row, read: false } : row");
         const shell = await readFile(`${SCREENS}mail-shell.tsx`, "utf8");
         expect(shell).toContain("const notices = holdNotices(threads);");
