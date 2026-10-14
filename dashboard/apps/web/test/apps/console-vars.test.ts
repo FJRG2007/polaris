@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
     commandLines,
     commandUses,
+    commandVariables,
     consoleVariables,
     customVariablesProblem,
     fillCommand,
@@ -174,6 +175,60 @@ describe("a typed value", () => {
             data: { player: "Steve" }
         });
         expect(runTargetSchema.safeParse({ player: "Steve\nop Eve" }).success).toBe(false);
+    });
+});
+
+describe("a variable the command declares itself", () => {
+    const TP = "tp {who=@p} {x=100} {y=64} {z} {Invulnerable:1b}";
+
+    it("asks for {x} and {x=default}, keeps game data and catalogue names as written", () => {
+        const read = commandVariables(TP, []);
+        expect(read.command).toBe("tp {who} {x} {y} {z} {Invulnerable:1b}");
+        expect(read.custom).toEqual([
+            { name: "who", label: "who", type: "text", initial: "@p" },
+            { name: "x", label: "x", type: "number", initial: "100" },
+            { name: "y", label: "y", type: "number", initial: "64" },
+            { name: "z", label: "z", type: "text", initial: "" }
+        ]);
+        expect(commandVariables("say {player=x} {Name}", [])).toEqual({
+            command: "say {player=x} {Name}",
+            custom: []
+        });
+        expect(needsAsking("tp @s {x=1} 64 0", "java", [])).toBe(true);
+        expect(needsAsking("tp @s 1 64 0", "java", [])).toBe(false);
+    });
+
+    it("lets the declared list name it, taking the command's default when it has none", () => {
+        const read = commandVariables("tp @s {x=100} 64 0", [declared("x", "number")]);
+        expect(read.custom).toEqual([{ name: "x", label: "x", type: "number", initial: "100" }]);
+        const own = commandVariables("tp @s {x=100} 64 0", [declared("x", "number", "5")]);
+        expect(own.custom[0]?.initial).toBe("5");
+        expect(customVariablesProblem("tp @s {x=100} 64 0", [declared("x", "number")])).toBeNull();
+    });
+
+    it("sends the default for a value left empty or out, and asks for one without", () => {
+        const asked = commandVariables(TP, []).custom;
+        const parsed = valuesSchema(asked).safeParse({ x: "", y: " 70 ", z: "5" });
+        expect(parsed.success && parsed.data).toEqual({ who: "@p", x: "100", y: "70", z: "5" });
+        expect(valuesSchema(asked).safeParse({ x: "1" }).success).toBe(false);
+        expect(valuesSchema(asked).safeParse({ z: "1", x: "ten" }).success).toBe(false);
+        expect(fillCommand(TP, fill({ values: { z: "-3" } }), null)).toBe(
+            "tp @p 100 64 -3 {Invulnerable:1b}"
+        );
+    });
+
+    it("refuses a default that is not a valid value, and too many variables", () => {
+        expect(customVariablesProblem("say {msg=a;b}", [])).toBeNull();
+        expect(
+            english(customVariablesProblem("give @s bread {n=ten}", [declared("n", "number")]))
+        ).toBe("A number, like 5 or 2.5");
+        const nine = Array.from({ length: 9 }, (_, at) => `{v${at}=1}`).join(" ");
+        expect(english(customVariablesProblem(`say ${nine}`, []))).toBe("8 variables at most");
+    });
+
+    it("keeps a command kept before, with no variables, exactly as it was", () => {
+        expect(commandVariables(HORSE, [])).toEqual({ command: HORSE, custom: [] });
+        expect(hasVariables("time set day", "java", [])).toBe(false);
     });
 });
 

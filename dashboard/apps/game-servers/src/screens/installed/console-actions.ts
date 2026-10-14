@@ -30,6 +30,7 @@ import {
     MAX_CUSTOM_VARIABLES,
     MAX_VARIABLE_LABEL,
     MAX_VARIABLE_VALUE,
+    commandVariables,
     customVariablesProblem,
     normalizeCustomVariable,
     runTargetSchema,
@@ -213,11 +214,14 @@ async function keptRun(input: RunKeptCommandInput) {
     );
     if (!entry) return { error: words("errors.thatCommandCouldNotBe2") } as const;
     const variables = entry.variables ?? [];
-    const values = valuesSchema(variables).safeParse(parsed.data.values);
+    // Asked for: the declared ones and the ones the command declares itself,
+    // each left empty taking its default.
+    const asked = commandVariables(entry.command, variables).custom;
+    const values = valuesSchema(asked).safeParse(parsed.data.values);
     if (!values.success) {
         const issue = values.error.issues[0];
         const name = typeof issue?.path[0] === "string" ? issue.path[0] : "";
-        const label = variables.find((declared) => declared.name === name)?.label ?? name;
+        const label = asked.find((declared) => declared.name === name)?.label ?? name;
         const why = (await issueText(issue?.message)) ?? words("errors.checkTheCommandAndTry");
         return { error: label ? `${label}: ${why}` : why } as const;
     }
