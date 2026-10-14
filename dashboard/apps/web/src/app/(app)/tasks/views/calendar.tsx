@@ -454,7 +454,7 @@ function MonthGrid({
         // rows share the height, so a month is a month-sized thing on a laptop
         // and on a 32-inch screen. The floor keeps it usable when the window is
         // short instead of squeezing six rows into nothing.
-        <div className="flex h-[calc(100dvh-19rem)] min-h-[26rem] flex-col overflow-hidden rounded-lg border border-border">
+        <div className="flex h-[calc(100dvh-19rem-var(--notice-height))] min-h-[26rem] flex-col overflow-hidden rounded-lg border border-border">
             <div
                 className="grid border-b border-border bg-muted/40"
                 style={{ gridTemplateColumns: `repeat(${headings.length}, minmax(0, 1fr))` }}
@@ -675,7 +675,7 @@ function YearGrid({
     );
 
     return (
-        <div className="h-[calc(100dvh-19rem)] min-h-[26rem] overflow-y-auto overscroll-contain rounded-lg border border-border p-3">
+        <div className="h-[calc(100dvh-19rem-var(--notice-height))] min-h-[26rem] overflow-y-auto overscroll-contain rounded-lg border border-border p-3">
             <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {Array.from({ length: 12 }, (_, month) => (
                     <section key={month} className="min-w-0">
@@ -757,7 +757,7 @@ function ScheduleList({
         .filter((entry) => entry.entries.length > 0);
 
     return (
-        <div className="h-[calc(100dvh-19rem)] min-h-[26rem] overflow-y-auto overscroll-contain rounded-lg border border-border">
+        <div className="h-[calc(100dvh-19rem-var(--notice-height))] min-h-[26rem] overflow-y-auto overscroll-contain rounded-lg border border-border">
             {filled.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                     {t("calendar.scheduleEmpty")}
@@ -919,7 +919,7 @@ function TimeGrid({
     });
 
     return (
-        <div className="flex h-[calc(100dvh-19rem)] min-h-[26rem] flex-col overflow-hidden rounded-lg border border-border">
+        <div className="flex h-[calc(100dvh-19rem-var(--notice-height))] min-h-[26rem] flex-col overflow-hidden rounded-lg border border-border">
             <div className={cn("min-w-0", wide && "overflow-x-auto")}>
                 <div className={cn("flex flex-col", wide && "min-w-[42rem]")}>
                     {/* Column headings and the all-day strip scroll horizontally

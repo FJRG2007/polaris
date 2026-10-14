@@ -37,7 +37,7 @@ function Notice() {
     return (
         <div
             role="status"
-            className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-warning-edge bg-warning-soft p-3"
+            className="flex items-start justify-between gap-3 rounded-lg border border-warning-edge bg-warning-soft p-3"
         >
             <p className="min-w-0 text-sm">
                 {t("denied.notice")}

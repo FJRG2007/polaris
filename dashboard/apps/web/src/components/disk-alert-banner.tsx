@@ -107,7 +107,7 @@ export function DiskAlertBanner() {
     };
 
     return (
-        <div className="flex flex-col gap-2 px-3 pt-3 sm:px-4">
+        <div className="flex flex-col gap-2">
             {shown.map((reading) => {
                 const critical = reading.level === "critical";
                 const percent = Math.round(((reading.total - reading.free) / reading.total) * 100);
@@ -119,14 +119,14 @@ export function DiskAlertBanner() {
                         key={reading.machine}
                         role="alert"
                         className={cn(
-                            "flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border px-3 py-2 text-sm",
+                            "flex flex-wrap items-start gap-x-3 gap-y-1.5 rounded-lg border px-2.5 py-1.5 text-sm sm:gap-y-2 sm:px-3 sm:py-2",
                             critical
                                 ? "border-danger-edge bg-danger-soft text-danger-ink"
                                 : "border-warning-edge bg-warning-soft text-warning-ink"
                         )}
                     >
                         <HardDrive className="mt-0.5 size-4 shrink-0" aria-hidden />
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 grow basis-56">
                             <p className="font-medium">
                                 {t(critical ? "diskAlert.critical" : "diskAlert.low", {
                                     name,
@@ -134,7 +134,7 @@ export function DiskAlertBanner() {
                                     free: size(reading.free)
                                 })}
                             </p>
-                            <p className="mt-0.5 text-xs opacity-90">
+                            <p className="mt-0.5 hidden text-xs opacity-90 sm:block">
                                 {usage
                                     ? t("diskAlert.usage", {
                                           images: size(usage.images),
@@ -155,7 +155,7 @@ export function DiskAlertBanner() {
                                 </p>
                             ) : null}
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex shrink-0 flex-wrap items-center gap-1">
                             <Button
                                 size="sm"
                                 variant="secondary"
@@ -175,7 +175,7 @@ export function DiskAlertBanner() {
                                     {t("diskAlert.move")}
                                 </Link>
                             </Button>
-                            <Button size="sm" variant="ghost" asChild>
+                            <Button size="sm" variant="ghost" className="hidden sm:inline-flex" asChild>
                                 <Link href="/apps/servers">{t("diskAlert.details")}</Link>
                             </Button>
                             <button
