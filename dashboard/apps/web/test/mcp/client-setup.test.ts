@@ -82,5 +82,11 @@ describe("client setup", () => {
             `kimi mcp add --transport http --auth oauth polaris ${URL_}`
         );
         expect(setup.kimiAuthCommand()).toBe("kimi mcp auth polaris");
+        // Saved for the account rather than the folder it was typed in, which
+        // is the CLI's default and would lose Polaris in every other project.
+        expect(setup.geminiAddCommand(URL_)).toBe(
+            `gemini mcp add --scope user --transport http polaris ${URL_}`
+        );
+        expect(setup.geminiAuthCommand()).toBe("/mcp auth polaris");
     });
 });
