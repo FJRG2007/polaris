@@ -70,6 +70,12 @@ const preset: Omit<Config, "content"> = {
                 warning: status("warning"),
                 danger: status("danger")
             },
+            // What a bare `border` or `divide-y` is drawn in. Tailwind's own default
+            // is a fixed light grey, which on the dark theme is a bright white line
+            // around anything that forgot to name its colour.
+            borderColor: {
+                DEFAULT: withAlpha("border")
+            },
             // 4/6/8/12px. Anything rounder starts to read as a toy rather than an
             // instrument, and the whole set moves together from --radius.
             borderRadius: {
