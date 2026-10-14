@@ -1818,6 +1818,12 @@ A new kind follows all of them. A change to an old kind must not undo one.
   the time of day, not a sunrise (`f7b2a8a6b`, `6aa49c493`).
 - **Summoned mobs get their weapon by hand.** A summon with data skips the
   game's own equipping, and nothing they hold may drop (`aa3924bf5`).
+- **Taking a hostile out leaves nothing behind.** `kill` drops a skeleton's
+  bones and arrows where it stood, so the minute sweep and a wave or horde's
+  own cleanup filled a dark maze with them run after run. `hostilesOut` and
+  every cleanup now send the creature under the world first
+  (`commands.underTheWorld`) and only kill it there, so a cleared hostile
+  drops nothing a player can see (`9445a2ada`).
 - **Refuse what cannot work.** Hostile kinds refuse Peaceful, and PvP kinds
   refuse a server with PvP off, each saying how to fix it (`f7b2a8a6b`).
 - **Chunks**: force-load only what the event needs, and never unload a chunk

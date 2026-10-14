@@ -15,7 +15,9 @@
  *   may see it, and it belongs to the machine somebody was typing on rather than
  *   to their account. Storing it on the server would mean an unfinished, unsent
  *   sentence sitting in a database, which is a promise about privacy nobody
- *   asked us to make and one more thing to have to delete.
+ *   asked us to make and one more thing to have to delete. A browser shared
+ *   between accounts still forgets it on a switch (`account-switch.ts`): the
+ *   next person to sign in there is not who it was written for either.
  * - **Only where the conversation outlives the sitting.** A room that exists for
  *   the length of a call has nothing to come back to tomorrow, so what was typed
  *   into it is not a draft, it is a message that was not sent. The caller says

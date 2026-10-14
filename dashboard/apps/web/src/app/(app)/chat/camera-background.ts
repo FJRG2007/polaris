@@ -20,7 +20,10 @@
  *
  * Kept per browser, like the microphone cleanup and the volumes: it is a fact
  * about a room and a camera rather than about an account, and the laptop at the
- * kitchen table and the desk in the office want different answers.
+ * kitchen table and the desk in the office want different answers. A browser
+ * shared between accounts still loses it on a switch (`account-switch.ts`):
+ * the next person gets the room as it is rather than whoever logged in before
+ * them having picked their scene, or their picture, for them.
  *
  * The picture is kept here too, because there is nowhere else for it to be: it
  * never leaves this browser, it is nobody else's business, and uploading a

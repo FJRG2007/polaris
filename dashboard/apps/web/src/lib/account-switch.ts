@@ -18,9 +18,9 @@
  * What a tab keeps of an account between loads goes too: recent places and
  * searches, the last place in each app, the snapshots painted before a read
  * lands, the mail kept for offline reading, unsent chat drafts, copied tasks,
- * recent emoji and media, and the photo put behind the camera in a call. Those are the previous account's
- * titles and subject lines, and keying them by account would only keep them on a
- * shared device for longer.
+ * recent emoji and media, and the photo put behind the camera in a call - all
+ * of it the previous account's own, and keying it by account would only keep
+ * it on a shared device for longer.
  */
 
 import { dropAllSnapshots } from "@/lib/snapshot-cache";

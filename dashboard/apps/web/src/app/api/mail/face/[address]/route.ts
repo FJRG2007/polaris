@@ -28,7 +28,11 @@
  * Marks are cached in this process by domain rather than by address, because a
  * hundred messages from one shop are one question, and in the browser for an
  * hour so scrolling a mailbox does not re-ask - and so an address that turns out
- * to be a colleague's shows their face the same day.
+ * to be a colleague's shows their face the same day. The cache is bounded
+ * (`bounded-map.ts`), so a server running for months does not hold one entry per
+ * domain it has ever seen. A reader who scrolls past more new domains than a
+ * mailbox reasonably has in ten minutes gets initials instead of a hunt, rather
+ * than this process fetching a mark per row for somebody else's page.
  */
 
 import { apiPermission } from "@/lib/api-session";
