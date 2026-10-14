@@ -221,6 +221,8 @@ export type SkinReply =
     | {
           readonly ok: true;
           readonly skin: { hash: string; model: SkinModel; signed: boolean } | null;
+          /** Not on the server: the skin is what is kept for their next join. */
+          readonly offline?: true;
       }
     | { readonly ok: false; readonly why: string };
 
@@ -229,7 +231,8 @@ const replySchema = z.union([
         ok: z.literal(true),
         hash: z.string().regex(HASH).optional(),
         model: z.enum(SKIN_MODELS).optional(),
-        signed: z.boolean().optional()
+        signed: z.boolean().optional(),
+        offline: z.boolean().optional()
     }),
     z.object({ ok: z.literal(false), why: z.string().max(40) })
 ]);
@@ -255,7 +258,8 @@ export function parseSkinReply(reply: string): SkinReply | null {
                   model: parsed.data.model ?? "classic",
                   signed: parsed.data.signed ?? false
               }
-            : null
+            : null,
+        ...(parsed.data.offline ? { offline: true as const } : {})
     };
 }
 

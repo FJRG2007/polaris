@@ -3034,6 +3034,7 @@
         "accountSkin": "La skin de su cuenta",
         "unsigned": "Solo esta persona ve esta skin. Aplícala de nuevo para que la vean todos.",
         "notOnline": "{name} no está en el servidor. Su skin se puede ver y cambiar mientras esté.",
+        "nextJoin": "{name} no está en el servidor. El cambio se aplica cuando vuelva a entrar.",
         "import": "Cambiar skin",
         "importTitle": "Cambiar la skin de {name}",
         "importHint": "Un archivo de skin, un enlace o un nombre de usuario de Minecraft.",

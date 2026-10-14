@@ -184,6 +184,8 @@ export type LiveSkin =
     | {
           readonly state: "read";
           readonly skin: { hash: string; model: skin.SkinModel; signed: boolean } | null;
+          /** Not on the server: the skin goes on when they next join. */
+          readonly offline?: true;
       };
 
 export async function readLiveSkin(server: ServerContainer, player: string): Promise<LiveSkin> {
@@ -192,7 +194,10 @@ export async function readLiveSkin(server: ServerContainer, player: string): Pro
         await server.say([skin.skinReadCommand(player)]).catch(() => "")
     );
     if (!reply) return { state: "unanswered" };
-    return reply.ok ? { state: "read", skin: reply.skin } : { state: "refused", why: reply.why };
+    if (!reply.ok) return { state: "refused", why: reply.why };
+    return reply.offline
+        ? { state: "read", skin: reply.skin, offline: true }
+        : { state: "read", skin: reply.skin };
 }
 
 /**

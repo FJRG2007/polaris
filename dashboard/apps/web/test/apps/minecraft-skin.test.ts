@@ -152,6 +152,23 @@ describe("parseSkinReply", () => {
         });
         expect(skin.parseSkinReply("Unknown command")).toBeNull();
     });
+
+    it("keeps the mark on a skin kept for a player who is not on", () => {
+        expect(
+            skin.parseSkinReply(
+                `{"ok":true,"pending":true,"player":"player_one","offline":true,"hash":"${HASH}","model":"classic","signed":true}`
+            )
+        ).toEqual({
+            ok: true,
+            skin: { hash: HASH, model: "classic", signed: true },
+            offline: true
+        });
+        expect(skin.parseSkinReply(`{"ok":true,"player":"player_one","offline":true}`)).toEqual({
+            ok: true,
+            skin: null,
+            offline: true
+        });
+    });
 });
 
 describe("export names", () => {
