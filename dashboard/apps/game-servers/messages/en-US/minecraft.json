@@ -504,7 +504,8 @@
             "experience": "Experience",
             "resetPassword": "Reset password",
             "gameMode": "Game mode",
-            "kill": "Kill"
+            "kill": "Kill",
+            "skin": "Skin"
         },
         "modes": {
             "survival": "Survival",
@@ -3024,6 +3025,53 @@
             "newYearHint": "A ten-second countdown, fireworks around each player and a small gift at midnight.",
             "sparkles": "Sparkles before midnight",
             "sparklesHint": "Sparkles around players in the last hour of the year."
+        }
+    },
+    "skins": {
+        "title": "{name}'s skin",
+        "description": "What other players see them wearing.",
+        "current": "Wearing now",
+        "accountSkin": "Their account's own skin",
+        "unsigned": "Only they can see this skin. Apply it again to show it to everyone.",
+        "notOnline": "Changes show once they are on the server.",
+        "import": "Change skin",
+        "importTitle": "Change {name}'s skin",
+        "importHint": "A skin file, a link, or a Minecraft username.",
+        "chooseFile": "Choose file",
+        "dropHere": "Drop or paste a skin image here",
+        "sourcePlaceholder": "Username or link",
+        "load": "Load",
+        "loading": "Loading",
+        "model": "Arms",
+        "models": {
+            "classic": "Classic",
+            "slim": "Slim"
+        },
+        "apply": "Apply",
+        "applying": "Applying",
+        "applied": "Skin applied.",
+        "export": "Export",
+        "reset": "Reset to account skin",
+        "resetDone": "Back to their account's skin.",
+        "viewerFailed": "The 3D preview could not load.",
+        "needsUpdate": "This server's Polaris mod is older than skins. The new one installs when the server restarts.",
+        "noJar": "Skins need the Polaris mod, which this server does not run.",
+        "couldNotRead": "Could not read the skin.",
+        "couldNotLoad": "Could not load that skin.",
+        "couldNotApply": "Could not change the skin.",
+        "refused": "The server refused: {why}",
+        "failures": {
+            "unknownSource": "Not a username, a link or a skin file.",
+            "noSuchPlayer": "No Minecraft account has that name.",
+            "unreachable": "That address did not answer. Try again in a moment.",
+            "noSkinThere": "No skin found there.",
+            "notPng": "That is not a PNG image.",
+            "wrongSize": "A skin is 64x64 or 64x32 pixels.",
+            "tooBig": "That file is too big for a skin.",
+            "signingBusy": "The skin service is busy. Try again in a minute.",
+            "signingBusyFor": "The skin service is busy. Try again in {seconds} seconds.",
+            "signingFailed": "The skin service could not take that image. Try again or use another one.",
+            "tooMany": "Too many tries. Wait a minute and try again."
         }
     }
 }

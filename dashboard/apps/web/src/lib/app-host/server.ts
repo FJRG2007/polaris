@@ -148,6 +148,7 @@ const load = {
     rateLimitService: once(() => import("@/lib/rate-limit-service")),
     registry: once(() => import("@/lib/registry")),
     requestContext: once(() => import("@/lib/request-context")),
+    safeFetch: once(() => import("@/lib/safe-fetch")),
     seasonalService: once(() => import("@/lib/seasonal-service")),
     serverMetricsService: once(() => import("@/lib/server-metrics-service")),
     session: once(() => import("@/lib/session")),
@@ -470,6 +471,13 @@ export const serverHost = {
     },
     requestContext: {
         clientIp: later(load.requestContext, "clientIp")
+    },
+    // An address a person typed, fetched with every hop checked for a private
+    // address, a timeout and a byte ceiling.
+    safeFetch: {
+        follow: later(load.safeFetch, "follow"),
+        readCapped: later(load.safeFetch, "readCapped"),
+        safeUrl: later(load.safeFetch, "safeUrl")
     },
     seasonalService: {
         seasonsAllowed: later(load.seasonalService, "seasonsAllowed")
