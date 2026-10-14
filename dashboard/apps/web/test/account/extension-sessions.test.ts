@@ -501,4 +501,107 @@ describe("the list", () => {
 
         expect(listed?.pinnedByRule).toBe(true);
     });
+
+    it("shows the browser a row written with the user agent's guess actually declared", async () => {
+        // A connection made before the declaration was read: Brave's Chrome user
+        // agent left "Chrome" in the row, while the name says Brave.
+        sessions.push({
+            id: "old-1",
+            userId: ALICE,
+            deviceId: "install-old",
+            name: "Brave on Windows",
+            browser: "Chrome",
+            os: "Windows",
+            ip: SEEN.ip,
+            host: SEEN.host,
+            userAgent: SEEN.userAgent,
+            createdAt: new Date(),
+            lastSeenAt: new Date(),
+            revokedAt: null,
+            _count: { vaultDevices: 0 }
+        });
+
+        const [listed] = await listExtensionSessions(ALICE);
+
+        expect(listed).toMatchObject({ id: "old-1", browser: "Brave", os: "Windows" });
+    });
+
+    it("keeps the stored reading when the name declares nothing it knows", async () => {
+        sessions.push({
+            id: "old-2",
+            userId: ALICE,
+            deviceId: "install-old",
+            name: "Something else entirely",
+            browser: "Chrome",
+            os: "Linux",
+            ip: null,
+            host: null,
+            userAgent: SEEN.userAgent,
+            createdAt: new Date(),
+            lastSeenAt: new Date(),
+            revokedAt: null,
+            _count: { vaultDevices: 0 }
+        });
+
+        const [listed] = await listExtensionSessions(ALICE);
+
+        expect(listed).toMatchObject({ browser: "Chrome", os: "Linux" });
+    });
+});
+
+describe("a declared browser", () => {
+    async function connectAs(deviceName: string) {
+        const opened = await openExtensionConnection(
+            {
+                deviceId: "install-1",
+                deviceName,
+                requestIp: SEEN.ip,
+                requestUserAgent: SEEN.userAgent,
+                requestHost: SEEN.host
+            },
+            fixedRandom
+        );
+        return opened!;
+    }
+
+    it("is what the approval screen shows, not the Chrome its user agent claims", async () => {
+        const opened = await connectAs("Brave on Linux");
+
+        expect(await describeExtensionConnection(opened.userCode)).toMatchObject({
+            device: "Brave on Linux",
+            browser: "Brave",
+            os: "Linux"
+        });
+    });
+
+    it("is what the connection is stored with", async () => {
+        const opened = await connectAs("Brave");
+        await answerExtensionConnection({
+            userId: ALICE,
+            userCode: opened.userCode,
+            approve: true,
+            sessionId: "session-1"
+        });
+        await claimExtensionConnection(opened.deviceCode, SEEN);
+
+        expect(sessions[0]).toMatchObject({ name: "Brave", browser: "Brave", os: "Windows" });
+    });
+
+    it("names the browser when a locked connection is cut off", async () => {
+        const opened = await connectAs("Brave on Windows");
+        await answerExtensionConnection({
+            userId: ALICE,
+            userCode: opened.userCode,
+            approve: true,
+            sessionId: "session-1"
+        });
+        const claim = await claimExtensionConnection(opened.deviceCode, SEEN);
+        if (claim.status !== "approved") throw new Error("not approved");
+        // As an older row would hold it.
+        sessions[0]!["browser"] = "Chrome";
+        await pinExtensionSession(ALICE, sessions[0]!["id"] as string, true);
+
+        expect(await readExtensionToken(claim.token, { ...SEEN, ip: "198.51.100.9" })).toBeNull();
+        expect(closed[0]?.["reason"]).toContain("The Brave extension");
+    });
 });

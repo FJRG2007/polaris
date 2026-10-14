@@ -34,6 +34,7 @@
 
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
+import { extensionClient } from "@/lib/extension/declared-client";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { addressPinned, describeClient, isHandheld, type AddressPinScope } from "@polaris/core";
@@ -177,7 +178,7 @@ export async function describeExtensionConnection(
 ): Promise<PendingConnection | null> {
     const row = await prisma.extensionAuthorization.findUnique({ where: { userCode } });
     if (!row || row.status !== "pending" || row.expiresAt <= now) return null;
-    const client = describeClient(row.requestUserAgent);
+    const client = extensionClient(row.deviceName, describeClient(row.requestUserAgent));
     return {
         userCode: row.userCode,
         device: row.deviceName,
@@ -266,7 +267,10 @@ export async function claimExtensionConnection(
     }
 
     const token = generateToken();
-    const client = describeClient(seen.userAgent ?? row.requestUserAgent);
+    const client = extensionClient(
+        row.deviceName,
+        describeClient(seen.userAgent ?? row.requestUserAgent)
+    );
     const session = await prisma.extensionSession.upsert({
         where: { userId_deviceId: { userId: account.id, deviceId: row.deviceId } },
         create: {
@@ -360,7 +364,19 @@ export async function readExtensionToken(
     // seen, and only where both ends name an address. A request with nothing to
     // compare is not a move.
     const moved = Boolean(seen?.ip && row.ip && seen.ip !== row.ip);
-    if (moved && isPinned(row, row.user.security?.pinSessionsToAddress)) {
+    // Rows written before the declaration was read hold the user agent's guess,
+    // so the name is read again here rather than trusted as stored.
+    const client = extensionClient(row.name, {
+        browser: row.browser ?? "browser",
+        os: row.os ?? "Unknown OS"
+    });
+    if (
+        moved &&
+        isPinned(
+            { os: client.os, pinToAddress: row.pinToAddress },
+            row.user.security?.pinSessionsToAddress
+        )
+    ) {
         await endConnections(row.userId, [row.id]);
         await recordAudit({
             actorId: row.userId,
@@ -372,7 +388,7 @@ export async function readExtensionToken(
         await notifySessionsClosed({
             userId: row.userId,
             count: 1,
-            reason: `The ${row.browser ?? "browser"} extension was used from a different network address than the one it is locked to, so it was disconnected.`
+            reason: `The ${client.browser} extension was used from a different network address than the one it is locked to, so it was disconnected.`
         });
         return null;
     }
@@ -414,12 +430,19 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
         }
     });
     return rows.map((row) => {
-        const client = describeClient(row.userAgent);
+        // Read again from the name rather than taken as stored, so a row written
+        // with the user agent's guess (Brave reads as Chrome) shows what the
+        // extension said.
+        const agent = describeClient(row.userAgent);
+        const client = extensionClient(row.name, {
+            browser: row.browser ?? agent.browser,
+            os: row.os ?? agent.os
+        });
         return {
             id: row.id,
             name: row.name,
-            browser: row.browser ?? client.browser,
-            os: row.os ?? client.os,
+            browser: client.browser,
+            os: client.os,
             ip: row.ip,
             host: row.host,
             createdAt: row.createdAt.toISOString(),
@@ -427,7 +450,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             vaultClients: row._count.vaultDevices,
             pinToAddress: row.pinToAddress ?? null,
             pinnedByRule: isPinned(
-                { os: row.os ?? client.os, pinToAddress: null },
+                { os: client.os, pinToAddress: null },
                 security?.pinSessionsToAddress
             )
         };
