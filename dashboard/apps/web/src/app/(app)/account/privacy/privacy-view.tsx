@@ -52,6 +52,7 @@ export function PrivacyView({
     // changed, so this moves without the Save button and is what "dirty" means.
     const [saved, setSaved] = useState(settings);
     const [saving, setSaving] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
     const [error, setError] = useState("");
     const [editing, setEditing] = useState<core.PrivacyField | null>(null);
     // Grows as people are picked, so a chip has a name the moment it appears
@@ -77,7 +78,8 @@ export function PrivacyView({
     const saveProfile = async (audience: core.PrivacyAudience) => {
         const previous = saved.profile;
         const rule = { ...previous, audience };
-        if (rule.audience === previous.audience) return;
+        if (rule.audience === previous.audience || savingProfile) return;
+        setSavingProfile(true);
         setError("");
         setDraft((current) => ({ ...current, profile: rule }));
         setSaved((current) => ({ ...current, profile: rule }));
@@ -85,10 +87,12 @@ export function PrivacyView({
             () => savePrivacyAction({ ...saved, profile: rule }),
             setError
         );
-        if (result && !result.error) return;
-        if (result?.error) setError(result.error);
-        setDraft((current) => ({ ...current, profile: previous }));
-        setSaved((current) => ({ ...current, profile: previous }));
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            setDraft((current) => ({ ...current, profile: previous }));
+            setSaved((current) => ({ ...current, profile: previous }));
+        }
+        setSavingProfile(false);
     };
 
     const nameOf = (id: string) => named.find((person) => person.id === id)?.name ?? t("somebody");
@@ -117,9 +121,12 @@ export function PrivacyView({
                                             </span>
                                         </span>
                                         <Select
-                                            className="h-8 w-40 shrink-0 text-xs"
+                                            className="h-8 w-full shrink-0 text-xs sm:w-64"
                                             aria-label={t(`fields.${field}.label` as const)}
                                             value={draft[field].audience}
+                                            disabled={
+                                                field === "profile" && (savingProfile || saving)
+                                            }
                                             options={(field === "profile"
                                                 ? core.PROFILE_AUDIENCES
                                                 : core.PRIVACY_AUDIENCES
@@ -177,7 +184,7 @@ export function PrivacyView({
                     )}
 
                     <div className="flex items-center gap-3">
-                        <Button size="sm" onClick={() => void save()} disabled={!dirty || saving}>
+                        <Button size="sm" onClick={() => void save()} disabled={!dirty || saving || savingProfile}>
                             {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
                             {tc("actions.save")}
                         </Button>

@@ -16,6 +16,8 @@ let spaces: { id: string; ownerId: string; archived: boolean; members: string[] 
 let stored = new Map<string, string>();
 let friends = new Set<string>();
 let counts = 0;
+/** Reads that need a viewer id: their friends and their spaces. */
+let lookups = 0;
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -31,6 +33,7 @@ vi.mock("@polaris/db", () => ({
         friendship: { findMany: async () => [] },
         chatSpace: {
             findMany: async ({ where }: { where: { OR: [{ ownerId: string }, unknown] } }) => {
+                lookups += 1;
                 const viewerId = where.OR[0].ownerId;
                 return spaces
                     .filter((space) => !space.archived)
@@ -57,7 +60,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-vi.mock("@/lib/friends-service", () => ({ friendIds: async () => friends }));
+vi.mock("@/lib/friends-service", () => ({
+    friendIds: async () => {
+        lookups += 1;
+        return friends;
+    }
+}));
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => {} }));
 
@@ -82,6 +90,7 @@ beforeEach(() => {
     stored = new Map();
     friends = new Set();
     counts = 0;
+    lookups = 0;
 });
 
 describe("the rule, for every answer and every relation", () => {
@@ -212,5 +221,17 @@ describe("a page of people", () => {
         stored.set("b", "everyone");
         await allowedBy(viewer, "profile", ["a", "b"]);
         expect(counts).toBe(0);
+    });
+});
+
+describe("a reader with no account", () => {
+    const anonymous = { id: "", isAdmin: false };
+
+    it("is shown only what is shown to everybody, without looking up who they know", async () => {
+        stored.set("open", "everyone");
+        for (const audience of ["spaces", "smallSpaces", "friends", "nobody"]) stored.set(audience, audience);
+        const allowed = await allowedBy(anonymous, "profile", ["open", "spaces", "smallSpaces", "friends", "nobody"]);
+        expect(allowed).toEqual(new Set(["open"]));
+        expect(lookups).toBe(0);
     });
 });

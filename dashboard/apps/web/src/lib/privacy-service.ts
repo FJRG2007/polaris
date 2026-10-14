@@ -257,22 +257,23 @@ export async function allowedBy(
     });
     const needsSpaces = wanted.filter((userId) => core.audienceNeedsSpaces(audiences.get(userId)!));
 
+    const anonymous = viewer.id === "";
     const [listed, friends, reach, shared, rooms] = await Promise.all([
         listingViewer(
             viewer.id,
             field,
-            wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
+            anonymous ? [] : wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
         ),
-        needsFriends.length > 0 ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
+        !anonymous && needsFriends.length > 0 ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
         reachBetween(
             viewer.id,
-            needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
+            anonymous ? [] : needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
         ),
         sharingAFriend(
             viewer.id,
-            needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
+            anonymous ? [] : needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
         ),
-        sharingASpace(viewer.id, needsSpaces)
+        sharingASpace(viewer.id, anonymous ? [] : needsSpaces)
     ]);
 
     return new Set(
