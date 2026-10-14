@@ -60,7 +60,8 @@ vi.mock("@polaris/app-host", () => ({
         rateLimitService: { rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) },
         appsInstallAccess: {
             requireGameServer: async (permission: string) => {
-                if (permission === "games.moderate" && !moderates) throw new Error("Server not found");
+                if (permission === "games.moderate" && !moderates)
+                    throw new Error("Server not found");
                 return {
                     user: { id: "user-one" },
                     access: { ownerId: "owner-one", install: { id: INSTALL } }
@@ -78,7 +79,11 @@ vi.mock("@polaris/app-host", () => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         gamePlayerLink: {
-            findFirst: async ({ where }: { where: { userId: string; player: { equals: string } } }) =>
+            findFirst: async ({
+                where
+            }: {
+                where: { userId: string; player: { equals: string } };
+            }) =>
                 where.userId === "user-one" &&
                 linked.some((name) => name.toLowerCase() === where.player.equals.toLowerCase())
                     ? { id: "link-one" }
@@ -110,7 +115,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
                 said.push(line!);
                 if (line === "polaris caps")
                     return JSON.stringify({ ok: true, polaris: "1", caps });
-                if (line!.startsWith("polaris skin get")) return JSON.stringify(live ?? { ok: true });
+                if (line!.startsWith("polaris skin get"))
+                    return JSON.stringify(live ?? { ok: true });
                 if (line!.startsWith("polaris skin stage")) return JSON.stringify(stageReply);
                 if (line!.startsWith("polaris skin apply")) {
                     const hash = line!.includes(SIGNATURE) ? SLIM_HASH : HASH;
@@ -131,7 +137,9 @@ const actions = await import("@polaris-app/game-servers/src/screens/installed/sk
 
 const fetched: { url: string; init?: RequestInit }[] = [];
 const signed = () =>
-    Response.json({ skin: { texture: { data: { value: packed(SLIM_HASH, "slim"), signature: SIGNATURE } } } });
+    Response.json({
+        skin: { texture: { data: { value: packed(SLIM_HASH, "slim"), signature: SIGNATURE } } }
+    });
 let signingReply: () => Response = signed;
 
 beforeEach(() => {
@@ -170,7 +178,10 @@ afterEach(() => {
 describe("reading a skin", () => {
     it("reports what the mod says the player wears", async () => {
         live = { ok: true, hash: HASH, model: "slim", signed: true };
-        const result = await actions.readSkinAction({ installedAppId: INSTALL, player: "player_one" });
+        const result = await actions.readSkinAction({
+            installedAppId: INSTALL,
+            player: "player_one"
+        });
         expect(result.live).toEqual({
             state: "read",
             skin: { hash: HASH, model: "slim", signed: true }
@@ -180,13 +191,19 @@ describe("reading a skin", () => {
 
     it("says the mod lacks skins and asks it nothing more", async () => {
         caps = ["stash"];
-        const result = await actions.readSkinAction({ installedAppId: INSTALL, player: "player_one" });
+        const result = await actions.readSkinAction({
+            installedAppId: INSTALL,
+            player: "player_one"
+        });
         expect(result.live).toEqual({ state: "unsupported" });
         expect(said).toEqual(["polaris caps"]);
     });
 
     it("refuses a name the game would not take", async () => {
-        const result = await actions.readSkinAction({ installedAppId: INSTALL, player: "no spaces" });
+        const result = await actions.readSkinAction({
+            installedAppId: INSTALL,
+            player: "no spaces"
+        });
         expect(result.error).toBe("errors.checkTheDetailsAndTry");
         expect(said).toEqual([]);
     });
@@ -371,7 +388,10 @@ describe("whose skin a player may change", () => {
 
     it("says on the read whether the skin is the viewer's own", async () => {
         linked = ["player_one"];
-        const result = await actions.readSkinAction({ installedAppId: INSTALL, player: "player_one" });
+        const result = await actions.readSkinAction({
+            installedAppId: INSTALL,
+            player: "player_one"
+        });
         expect(result.ownSkin).toBe(true);
     });
 });
@@ -379,7 +399,10 @@ describe("whose skin a player may change", () => {
 describe("clearing a skin", () => {
     it("takes it off and reads back the account's own", async () => {
         live = { ok: true, hash: HASH, model: "classic", signed: true };
-        const result = await actions.clearSkinAction({ installedAppId: INSTALL, player: "player_one" });
+        const result = await actions.clearSkinAction({
+            installedAppId: INSTALL,
+            player: "player_one"
+        });
         expect(said).toContain("polaris skin clear player_one");
         expect(result.live).toEqual({ state: "read", skin: null });
         expect(audits[0]?.action).toBe("minecraft.skin-clear");

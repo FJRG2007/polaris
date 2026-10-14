@@ -93,8 +93,7 @@ export async function mojangSkin(name: string): Promise<SkinPreview> {
     if (found.status === 204 || found.status === 404) throw new SkinError("noSuchPlayer");
     if (!found.ok) throw new SkinError("unreachable");
     const id = ((await found.json().catch(() => null)) as { id?: unknown } | null)?.id;
-    if (typeof id !== "string" || !/^[0-9a-f]{32}$/i.test(id))
-        throw new SkinError("noSuchPlayer");
+    if (typeof id !== "string" || !/^[0-9a-f]{32}$/i.test(id)) throw new SkinError("noSuchPlayer");
     const profile = await fixedFetch(`${MOJANG_PROFILE}${id}?unsigned=false`);
     if (!profile.ok) throw new SkinError("unreachable");
     const signed = skin.profileSkin(await profile.json().catch(() => null));
@@ -135,14 +134,17 @@ async function linkPng(address: string): Promise<Uint8Array> {
 
 /** What the import box was given, as a skin to show. */
 export async function resolveSource(
-    input: { kind: "file"; bytes: Uint8Array; model: skin.SkinModel | null } | { kind: "text"; text: string }
+    input:
+        | { kind: "file"; bytes: Uint8Array; model: skin.SkinModel | null }
+        | { kind: "text"; text: string }
 ): Promise<SkinPreview> {
     if (input.kind === "file")
         return { png: checked(input.bytes), model: input.model ?? "classic", signed: null };
     const source = skin.classifySource(input.text);
     if (!source) throw new SkinError("unknownSource");
     if (source.kind === "player") return mojangSkin(source.name);
-    const png = source.kind === "texture" ? await texturePng(source.hash) : await linkPng(source.url);
+    const png =
+        source.kind === "texture" ? await texturePng(source.hash) : await linkPng(source.url);
     return { png, model: "classic", signed: null };
 }
 

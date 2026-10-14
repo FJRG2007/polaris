@@ -53,7 +53,11 @@ async function requireSkinEditor(installedAppId: string, player: string | null) 
     }
 }
 
-async function isLinkedTo(installedAppId: string, player: string, userId: string): Promise<boolean> {
+async function isLinkedTo(
+    installedAppId: string,
+    player: string,
+    userId: string
+): Promise<boolean> {
     const link = await prisma.gamePlayerLink.findFirst({
         where: { installedAppId, userId, player: { equals: player, mode: "insensitive" } },
         select: { id: true }

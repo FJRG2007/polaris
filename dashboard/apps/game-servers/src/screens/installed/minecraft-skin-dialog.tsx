@@ -326,7 +326,11 @@ export function SkinDialog({
                             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                             {readError}
                         </p>
-                        <Button variant="secondary" size="sm" onClick={() => setAttempt((n) => n + 1)}>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setAttempt((n) => n + 1)}
+                        >
                             <RotateCcw className="size-4" aria-hidden />
                             {t("skins.retry")}
                         </Button>
@@ -376,7 +380,9 @@ export function SkinDialog({
 
                         <div className="flex min-w-0 flex-col gap-3">
                             {worn && !worn.signed && !preview && (
-                                <p className="text-sm text-muted-foreground">{t("skins.unsigned")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("skins.unsigned")}
+                                </p>
                             )}
                             {offline && (
                                 <p className="text-sm text-muted-foreground">
@@ -443,12 +449,17 @@ export function SkinDialog({
                                             disabled={working || !source.trim()}
                                         >
                                             {busy === "load" && (
-                                                <Loader2 className="size-4 animate-spin" aria-hidden />
+                                                <Loader2
+                                                    className="size-4 animate-spin"
+                                                    aria-hidden
+                                                />
                                             )}
                                             {busy === "load" ? t("skins.loading") : t("skins.load")}
                                         </Button>
                                     </form>
-                                    <p className="text-xs text-muted-foreground">{t("skins.importHint")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("skins.importHint")}
+                                    </p>
                                     {(preview || current?.png) && (
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="text-sm">{t("skins.model")}</span>
@@ -478,7 +489,10 @@ export function SkinDialog({
                             )}
 
                             {error && (
-                                <p role="alert" className="flex items-start gap-2 text-sm text-danger">
+                                <p
+                                    role="alert"
+                                    className="flex items-start gap-2 text-sm text-danger"
+                                >
                                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                     {error}
                                 </p>
@@ -505,8 +519,15 @@ export function SkinDialog({
                         </Button>
                     )}
                     {changeable && !unsupported && !readError && worn && !preview && (
-                        <Button variant="outline" size="sm" onClick={() => void reset()} disabled={working}>
-                            {busy === "reset" && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void reset()}
+                            disabled={working}
+                        >
+                            {busy === "reset" && (
+                                <Loader2 className="size-4 animate-spin" aria-hidden />
+                            )}
                             {t("skins.reset")}
                         </Button>
                     )}
@@ -525,7 +546,9 @@ export function SkinDialog({
                     )}
                     {preview && changeable ? (
                         <Button size="sm" onClick={() => void apply()} disabled={working}>
-                            {busy === "apply" && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                            {busy === "apply" && (
+                                <Loader2 className="size-4 animate-spin" aria-hidden />
+                            )}
                             {busy === "apply" ? t("skins.applying") : t("skins.apply")}
                         </Button>
                     ) : (

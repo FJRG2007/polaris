@@ -6,14 +6,22 @@
 
 import { describe, expect, it } from "vitest";
 import * as skin from "@polaris-app/game-servers/src/lib/minecraft/skin";
-import { COMMAND_BYTES_MAX, commandBytes } from "@polaris-app/game-servers/src/lib/minecraft/command-size";
+import {
+    COMMAND_BYTES_MAX,
+    commandBytes
+} from "@polaris-app/game-servers/src/lib/minecraft/command-size";
 
 const HASH = "a".repeat(64);
 
 function packed(url: string, slim = false): string {
     const textures = { SKIN: { url, ...(slim ? { metadata: { model: "slim" } } : {}) } };
     return Buffer.from(
-        JSON.stringify({ timestamp: 1, profileId: "0".repeat(32), profileName: "player-one", textures })
+        JSON.stringify({
+            timestamp: 1,
+            profileId: "0".repeat(32),
+            profileName: "player-one",
+            textures
+        })
     ).toString("base64");
 }
 
@@ -39,7 +47,9 @@ describe("checkSkinPng", () => {
 
     it("refuses other sizes, other formats and oversized files", () => {
         expect(skin.checkSkinPng(png(128, 128))).toEqual({ ok: false, problem: "wrongSize" });
-        expect(skin.checkSkinPng(new TextEncoder().encode("GIF89a not a png at all, padded out"))).toEqual({
+        expect(
+            skin.checkSkinPng(new TextEncoder().encode("GIF89a not a png at all, padded out"))
+        ).toEqual({
             ok: false,
             problem: "notPng"
         });
@@ -107,7 +117,9 @@ describe("signed skins", () => {
         expect(lines[0]).toBe(`polaris skin stage player_one 0123456789abcdef ${VALUE}`);
         expect(lines[1]).toBe(`polaris skin apply player_one 0123456789abcdef ${SIGNATURE}`);
         for (const line of lines) expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
-        expect(() => skin.skinCommands("player one", { value: VALUE, signature: SIGNATURE })).toThrow();
+        expect(() =>
+            skin.skinCommands("player one", { value: VALUE, signature: SIGNATURE })
+        ).toThrow();
         expect(() =>
             skin.skinCommands("player_one", { value: VALUE, signature: SIGNATURE }, "not a token")
         ).toThrow();
@@ -126,10 +138,18 @@ describe("signed skins", () => {
 describe("parseSkinReply", () => {
     it("reads what the mod answered, signed or not", () => {
         expect(
-            skin.parseSkinReply(`{"ok":true,"player":"player_one","hash":"${HASH}","model":"slim","signed":true}`)
+            skin.parseSkinReply(
+                `{"ok":true,"player":"player_one","hash":"${HASH}","model":"slim","signed":true}`
+            )
         ).toEqual({ ok: true, skin: { hash: HASH, model: "slim", signed: true } });
-        expect(skin.parseSkinReply(`{"ok":true,"player":"player_one"}`)).toEqual({ ok: true, skin: null });
-        expect(skin.parseSkinReply(`{"ok":false,"why":"offline"}`)).toEqual({ ok: false, why: "offline" });
+        expect(skin.parseSkinReply(`{"ok":true,"player":"player_one"}`)).toEqual({
+            ok: true,
+            skin: null
+        });
+        expect(skin.parseSkinReply(`{"ok":false,"why":"offline"}`)).toEqual({
+            ok: false,
+            why: "offline"
+        });
         expect(skin.parseSkinReply("Unknown command")).toBeNull();
     });
 });
