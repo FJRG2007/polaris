@@ -22,7 +22,7 @@ own roles. Three kinds of record: `companies`, `people`, `opportunities`
 Nineteen built-in field kinds (`model/objects.ts`'s `FieldKind`): `text`,
 `fullName`, `email`, `phone`, `url`, `links`, `address`, `domain`, `number`,
 `currency`, `money`, `date`, `dateTime`, `select`, `multiSelect`, `rating`,
-`boolean`, `member`, `relation`. A person may add a field of thirteen of those
+`boolean`, `member`, `relation`. A person may add a field of fourteen of those
 kinds (`CUSTOM_KINDS`); companies, people and opportunities carry a few
 built-in ones each (name, domain, employees, stage, close reason, and so on)
 plus `createdAt`/`updatedAt`/`createdBy`/`updatedBy`, the last two a `member`
@@ -35,17 +35,33 @@ carries its own currency per record (`Money`, an amount plus a code); `money`
 is the plain-amount alternative for a table kept in a single currency, read
 and written as a bare number.
 
+A `relation` field somebody adds points at one kind of record and holds either
+one record or a list (`RELATION_CARDINALITIES`: "one" or "many"); both the
+target and the cardinality are chosen when the field is made and fixed after,
+for the same reason a `money` field's currency is (`model/fields.ts`'s
+`fixedOptions`). Its value is a list of record ids either way, stored in a
+`cRel` slot; deleting a record it points at - trashing it or destroying it -
+takes it out of every list it is in (`lib/linked.ts`), restoring it brings it
+back. The linked record's own page then lists back every record whose added
+relation points at it, beside the lists built-in relations already gave it
+(`model/related.ts`'s `relatedLists`), with no separate configuration either
+way. It filters and totals (empty/not empty, any/none of a chosen list) like
+any other field, but never sorts a table - a list has no one name to order
+rows by (`model/views.ts`'s `sortable`).
+
 A field somebody adds claims a free slot column of the record's table
-(`SLOT_FAMILIES`: ten text, five number, five date, five boolean slots per
-object), so filtering, sorting, grouping and totals run in the database exactly
-as for a built-in field (`lib/fields.ts`). Deleting a field, or one of a
-select's choices, empties what records held there and drops it from every
-saved view's filter, sort and columns in the same transaction.
+(`SLOT_FAMILIES`: ten text, five number, five date, five boolean, three
+relation slots per object), so filtering, sorting, grouping and totals run in
+the database exactly as for a built-in field (`lib/fields.ts`). Deleting a
+field, or one of a select's choices, empties what records held there and
+drops it from every saved view's filter, sort and columns in the same
+transaction.
 
 What a person may write into a field is normalized the same way on both sides
 (`model/values.ts`'s `normalizeInput`): trimmed, an address lowercased, a web
 address reduced to its host, a rating bounded 1-5, an amount rounded, a
-multi-select or links list read as JSON.
+multi-select or links list read as JSON, a relation somebody added deduped and
+capped at one record or `MAX_LINKED` = 50 depending on its cardinality.
 
 ## Roles: who reaches what
 
@@ -82,8 +98,9 @@ pointing at it, with its own audit trail, and removes its links, favorites and
 events. Up to 500 records at once (`MAX_BULK`) can be edited together.
 
 A record's page shows the other objects that point at it - a company's people
-and deals, a person's deals - derived automatically from the `relation` field
-definitions (`model/related.ts`), with no separate configuration.
+and deals, a person's deals, and anything linked to it through a `relation`
+field somebody added - derived automatically from the field definitions
+(`model/related.ts`), with no separate configuration.
 
 ### Duplicates and merging
 
@@ -97,10 +114,11 @@ what it found.
 Merging (`lib/merge.ts`'s `mergeRecords`, up to `MAX_MERGE` = 5 records at
 once) fills the kept record's empty fields from the others in the order given,
 repoints everything that pointed at the merged records (people and
-opportunities at a company, opportunities at a contact), requires edit rights
-and an unlocked field on the pointing side before it repoints anything, dedupes
-and repoints linked notes/tasks/files, and sends the merged-away records to the
-trash rather than deleting them outright. `screens/merge-dialog.tsx` is where
+opportunities at a company, opportunities at a contact, and any added relation
+that held one of them), requires edit rights and an unlocked field on the
+pointing side before it repoints anything, dedupes and repoints linked
+notes/tasks/files, and sends the merged-away records to the trash rather than
+deleting them outright. `screens/merge-dialog.tsx` is where
 somebody picks which record to keep.
 
 ## Views, filters, totals, import, export
@@ -123,7 +141,10 @@ columns auto-map onto fields by name, overridable in `screens/import-dialog.tsx`
 the preview runs the exact `normalizeInput` checks the server will, so what is
 shown is what will be refused; an optional duplicate skip catches a match
 already on the shelf or within the same batch; every row lands inside one
-transaction, each new record logged as an "imported" event.
+transaction, each new record logged as an "imported" event. A relation cell
+names the record (or records, "; "-separated for one that holds many) rather
+than an id; a name matching nothing, matching more than one record, or naming
+more than the field holds, refuses the cell.
 
 CSV export (`lib/export.ts`'s `exportRecords`) streams the view's own filter,
 search, sort and columns in batches, capped at `MAX_EXPORT` = 10,000 rows with
@@ -158,7 +179,9 @@ address). It then runs up to `MAX_WORKFLOW_ACTIONS` = 10 actions per workflow
   `ifElse` (one list of actions or the other), `forEach` (run the actions over
   up to `MAX_FOUND` = 50 matching records), `delay` (wait up to
   `MAX_DELAY_MINUTES` - thirty days - then go on; the run persists as
-  "waiting" and resumes from a scheduled job).
+  "waiting" and resumes from a scheduled job), `waitFor` (wait until the
+  record matches a filter, for up to `MAX_WAIT_DAYS` = 30 days, then either
+  stop the run or go on anyway, `onTimeout`).
 
 Every value an action writes can hold a `{{field}}` template read off the
 record the workflow is about, or `{{body.a.b}}` off an inbound webhook's JSON
@@ -192,6 +215,12 @@ mid-step - and fails it rather than resuming it, since the steps already taken
 would otherwise run again (`lib/workflows.ts`'s `resumeWaitingRuns` and
 `failCutShort`).
 
+A run waiting on `waitFor` is also woken the moment its record changes again
+(`wakeWaitingRuns`, called from the same place every other trigger is
+checked), not only when its `days` run out: it re-checks the filter right
+then and either goes on or keeps waiting, so a record that starts matching
+does not sit until the timeout to be noticed.
+
 ## Sales pipeline: stage, forecast, stage flow
 
 An opportunity moves through six fixed stages
@@ -219,7 +248,12 @@ up to `MAX_WIDGETS` = 24 widgets. A widget (`model/dashboards.ts`) is a
 `number`, `bar`, `line` or `donut` chart over a measure (count, sum, average,
 min, max of a number/money/currency/rating field), optionally split by a categorical
 field or by date at a chosen granularity, optionally scoped to a saved view's
-filter. Every figure is computed by the database (`aggregate`/`groupBy`),
+filter. Opportunities offer a sixth measure, `weighted`, on top of the other
+five: an amount field's sum with each row counted at its stage's odds of
+closing rather than in full - won in full, lost not at all - the same odds the
+forecast weighs by (`measuresOf`/`isAmount`); no other object has stage odds to
+weigh with, so `weighted` is not offered there. Every figure is computed by
+the database (`aggregate`/`groupBy`),
 reading at most `CATEGORY_CAP` = 1,000 distinct values for a categorical split
 or `DATE_CAP` = 20,000 for a date one, flagging `capped` past that; a
 categorical split then shows only the top `MAX_GROUPS` = 10 values on the
