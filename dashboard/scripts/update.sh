@@ -433,12 +433,18 @@ main() {
         # reported below as a single line; a pull that fails still explains itself on
         # stderr, which is the part an operator needs.
         if ! git -C "$dash_dir" pull --ff-only --quiet; then
-            if [ "$source" = "build" ]; then
-                err "could not fast-forward the checkout, and this deployment builds its own image"
-                err "resolve the checkout at $repo_root, or switch Settings back to the published build"
-                exit 1
+            # A source build realigns too: upstream history that was rewritten can
+            # never be fast-forwarded, and failing here would strand the deployment
+            # on a checkout nobody can repair from the dashboard. Whatever this
+            # checkout held is kept under its own ref first, as on an image update.
+            if ! realign_checkout; then
+                if [ "$source" = "build" ]; then
+                    err "could not fast-forward the checkout, and this deployment builds its own image"
+                    err "resolve the checkout at $repo_root, or switch Settings back to the published build"
+                    exit 1
+                fi
+                err "could not fast-forward the checkout; continuing with the published images"
             fi
-            realign_checkout || err "could not fast-forward the checkout; continuing with the published images"
         fi
         after=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
         if [ -n "$after" ] && [ "$before" != "$after" ]; then
