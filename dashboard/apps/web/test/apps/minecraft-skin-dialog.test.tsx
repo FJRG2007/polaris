@@ -7,6 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defaultSkin } from "@polaris-app/game-servers/src/lib/minecraft/default-skin";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const confirm = vi.fn(async () => true);
@@ -116,6 +117,16 @@ describe("SkinDialog", () => {
         await waitFor(() => expect(screen.getByText("Wearing now - Slim")).toBeTruthy());
     });
 
+    it("draws the default skin the game picks from a known UUID, and names it", async () => {
+        const uuid = "00000000-0000-4000-8000-000000000001";
+        actions.readSkinAction.mockResolvedValue({ live: { state: "read", skin: null }, uuid });
+        open(true);
+        const { name } = defaultSkin(uuid);
+        const caption = `Minecraft's default skin - ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+        expect(await screen.findByText(caption)).toBeTruthy();
+        expect(screen.queryByText("Minecraft's default skin")).toBeNull();
+    });
+
     it("shows an import's failure inline", async () => {
         actions.readSkinAction.mockResolvedValue({ live: { state: "read", skin: null } });
         actions.previewSkinAction.mockResolvedValue({
@@ -159,7 +170,9 @@ describe("SkinDialog", () => {
         });
         open(true, false, false);
         expect(
-            await screen.findByText("player-one is not on the server. A change goes on when they next join.")
+            await screen.findByText(
+                "player-one is not on the server. A change goes on when they next join."
+            )
         ).toBeTruthy();
         expect(screen.getByRole("button", { name: "Load" })).toBeTruthy();
     });
