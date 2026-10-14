@@ -8,12 +8,18 @@
  * is what a category looks like, not what an app looks like. A store where every
  * shelf is the same six glyphs is a store nobody can scan.
  *
- * **A real logo is used where Polaris already has the official one**, from
- * `brand-icons`, which holds marks taken from each project's own assets. Nothing
- * is drawn from memory and nothing is fetched at runtime: an app whose logo
- * Polaris does not have keeps its icon, on a tile tinted from its own id so at
- * least two of them are tellable apart before their names are read. That is a
- * deliberately boring fallback rather than a guess at somebody's brand.
+ * A catalog entry that installs one of Polaris's own apps (Tools, Calendar,
+ * CRM, Places, Game servers) wears that app's own `AppLogo` (`OWN_APPS`
+ * below), so the card in the store is the tile the launcher will show once it
+ * is installed.
+ *
+ * **Otherwise a real logo is used where Polaris already has the official
+ * one**, from `brand-icons`, which holds marks taken from each project's own
+ * assets. Nothing is drawn from memory and nothing is fetched at runtime: an
+ * app whose logo Polaris does not have keeps its icon, on a tile tinted from
+ * its own id so at least two of them are tellable apart before their names
+ * are read. That is a deliberately boring fallback rather than a guess at
+ * somebody's brand.
  *
  * The tint is `tintFor`, the same function behind every face in Polaris, so an
  * app and a person drawn side by side are coloured by the same rule.
