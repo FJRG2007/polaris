@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { customDef } from "@polaris-app/crm/src/model/fields";
 import { recordHref, relatedLists } from "@polaris-app/crm/src/model/related";
 
 describe("relatedLists", () => {
@@ -22,6 +23,30 @@ describe("relatedLists", () => {
 
     it("lists nothing for an opportunity, which nothing points at", () => {
         expect(relatedLists("opportunities")).toEqual([]);
+    });
+
+    it("adds every relation somebody added that targets the kind, after the built-in ones", () => {
+        const relation = (slot: string, label: string, target: string) =>
+            customDef({ id: slot, slot, label, kind: "relation", options: [target, "many"] });
+        const text = customDef({
+            id: "t",
+            slot: "cText1",
+            label: "Notes",
+            kind: "text",
+            options: []
+        });
+        expect(
+            relatedLists("opportunities", {
+                companies: [relation("cRel1", "Bids", "opportunities"), text],
+                opportunities: [
+                    relation("cRel1", "Follows", "opportunities"),
+                    relation("cRel2", "Partner", "companies")
+                ]
+            })
+        ).toEqual([
+            { object: "companies", field: "cRel1", column: "cRel1", label: "Bids" },
+            { object: "opportunities", field: "cRel1", column: "cRel1", label: "Follows" }
+        ]);
     });
 });
 

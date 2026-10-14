@@ -5,14 +5,16 @@
  * record back to whoever may, shows it back at once and goes back to the
  * trash if the server refuses. Its notes and tasks are listed, a note is
  * written from it, and a task ticked off shows at once and goes back when the
- * server refuses.
+ * server refuses. The records pointing at it through a relation somebody
+ * added are listed under that relation's name, each opening its record.
  */
 
 import "@/components/app-host/client";
+import { crmHost } from "./crm-host";
 import { MessagesWrapper } from "../../setup/i18n";
 import type { CrmRecord } from "@polaris-app/crm/src/model/objects";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const ACME = "22222222-2222-4222-8222-222222222222";
 
@@ -30,7 +32,8 @@ const state = vi.hoisted(() => ({
     pins: [] as unknown[],
     refusePin: false,
     mail: null as unknown[] | null,
-    events: null as unknown[] | null
+    events: null as unknown[] | null,
+    related: [] as unknown[]
 }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -90,7 +93,7 @@ vi.mock("@polaris-app/crm/src/actions/records", () => ({
         fields: [],
         can: { companies: state.can, people: state.can, opportunities: state.can },
         people: [],
-        related: [],
+        related: state.related,
         timeline: { events: [], next: null },
         favorite: state.favorite
     }),
@@ -127,6 +130,7 @@ beforeEach(() => {
     state.refusePin = false;
     state.mail = null;
     state.events = null;
+    state.related = [];
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
     if (typeof localStorage !== "undefined") localStorage.clear();
 });
@@ -272,5 +276,33 @@ describe("notes and tasks on a record", () => {
         await waitFor(() => expect(state.ticks).toHaveLength(1));
         expect(state.ticks[0]).toMatchObject({ done: true });
         await waitFor(() => expect(ticked()).toBe("false"));
+    });
+});
+
+describe("records that link here", () => {
+    it("lists them under the relation's name, each opening its record", async () => {
+        state.record = { ...state.record!, deletedAt: null };
+        state.related = [
+            {
+                object: "people",
+                field: "cRel1",
+                column: "cRel1",
+                label: "Partners at",
+                total: 23,
+                records: [
+                    { id: "00000000-0000-4000-8000-00000000000a", name: "Example One" },
+                    { id: "00000000-0000-4000-8000-00000000000b", name: "Example Two" }
+                ]
+            }
+        ];
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: crmHost() });
+        const list = await screen.findByRole("region", { name: "Partners at" });
+        expect(list.textContent).toContain("23");
+        expect(list.textContent).toContain("21 more");
+        const links = within(list).getAllByRole("link");
+        expect(links.map((link) => link.getAttribute("href"))).toEqual([
+            "/crm/people/00000000-0000-4000-8000-00000000000a",
+            "/crm/people/00000000-0000-4000-8000-00000000000b"
+        ]);
     });
 });

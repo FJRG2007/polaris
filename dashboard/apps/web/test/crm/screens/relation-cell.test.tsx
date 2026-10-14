@@ -3,7 +3,8 @@
 /**
  * A relation somebody added, in a cell: each linked record is a chip that
  * opens it, a field that holds one swaps it in a single pick, and a field that
- * holds several toggles records and saves them once, as the menu closes.
+ * holds several toggles records and saves them once, as the menu closes. The
+ * filter panel finds records of its target by name and keeps the ones chosen.
  */
 
 import { crmHost } from "./crm-host";
@@ -26,6 +27,8 @@ vi.mock("@polaris-app/crm/src/actions/records", () => ({
 
 import { RefChips } from "@polaris-app/crm/src/screens/cell-display";
 import { CellPicker } from "@polaris-app/crm/src/screens/cell-picker";
+import { FilterButton } from "@polaris-app/crm/src/screens/filter-panel";
+import { CustomFieldsProvider } from "@polaris-app/crm/src/screens/custom-fields";
 
 const field = (many: boolean) =>
     customDef({
@@ -120,5 +123,47 @@ describe("a relation cell", () => {
         fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
         await waitFor(() => expect(onClose).toHaveBeenCalled());
         expect(onPick).not.toHaveBeenCalled();
+    });
+});
+
+describe("filtering on a relation", () => {
+    it("chooses records of its target, found by name, and takes one back out", async () => {
+        const onChange = vi.fn();
+        const filter = {
+            conjunction: "and" as const,
+            rules: [{ id: "r1", key: "cRel1", operator: "isAnyOf" as const, value: null }]
+        };
+        const { rerender } = render(
+            <CustomFieldsProvider value={[field(true)]}>
+                <FilterButton object="people" filter={filter} people={[]} onChange={onChange} />
+            </CustomFieldsProvider>,
+            { wrapper: crmHost() }
+        );
+        fireEvent.click(screen.getByRole("button", { name: /Filter/ }));
+        fireEvent.keyDown(await screen.findByRole("button", { name: "Value" }), { key: "Enter" });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /Example Two/ }));
+        expect(onChange).toHaveBeenLastCalledWith({
+            ...filter,
+            rules: [{ ...filter.rules[0], value: [{ id: B, name: "Example Two" }] }]
+        });
+
+        const chosen = {
+            ...filter,
+            rules: [{ ...filter.rules[0]!, value: [{ id: B, name: "Example Two" }] }]
+        };
+        rerender(
+            <CustomFieldsProvider value={[field(true)]}>
+                <FilterButton object="people" filter={chosen} people={[]} onChange={onChange} />
+            </CustomFieldsProvider>
+        );
+        // The open menu hides the rest of the dialog from assistive tech.
+        expect(screen.getByRole("button", { name: "Value", hidden: true }).textContent).toContain(
+            "Example Two"
+        );
+        fireEvent.click(await screen.findByRole("menuitem", { name: /Example Two/ }));
+        expect(onChange).toHaveBeenLastCalledWith({
+            ...filter,
+            rules: [{ ...filter.rules[0], value: null }]
+        });
     });
 });

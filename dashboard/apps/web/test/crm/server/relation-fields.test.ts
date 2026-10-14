@@ -47,6 +47,7 @@ vi.mock("@polaris/app-host", () => ({
 }));
 
 import { csvValue } from "@polaris-app/crm/src/model/csv";
+import type { CrmRecord } from "@polaris-app/crm/src/model/objects";
 import { ruleWhere } from "@polaris-app/crm/src/lib/filters";
 import { linkedIds } from "@polaris-app/crm/src/model/import";
 import { normalizeInput } from "@polaris-app/crm/src/model/values";
@@ -170,7 +171,7 @@ describe("export and import", () => {
 
 describe("naming the links", () => {
     const record = (values: Record<string, unknown>) =>
-        ({ id: "p1", position: 0, deletedAt: null, values }) as never;
+        ({ id: "p1", position: 0, deletedAt: null, values }) as unknown as CrmRecord;
 
     it("names each id with one read per kind, leaving out what the reader cannot see", async () => {
         tables.crmCompany!.findMany.mockResolvedValueOnce([{ id: A, name: "Example One" }]);

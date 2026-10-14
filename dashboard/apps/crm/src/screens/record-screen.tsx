@@ -327,16 +327,17 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                     {(data?.related ?? []).map((list) => (
                         <section
                             key={`${list.object}:${list.field}`}
-                            aria-label={t(`objects.${list.object}.plural`)}
+                            aria-label={list.label ?? t(`objects.${list.object}.plural`)}
                             className="min-w-0 rounded-lg border border-border bg-card"
                         >
                             <h2 className="flex items-center justify-between gap-2 border-b border-border px-3 py-2 text-[0.8125rem] font-medium">
-                                <span className="truncate">
-                                    {t(
-                                        `record.related.${list.object}.${list.field}` as Parameters<
-                                            typeof t
-                                        >[0]
-                                    )}
+                                <span className="truncate" title={list.label}>
+                                    {list.label ??
+                                        t(
+                                            `record.related.${list.object}.${list.field}` as Parameters<
+                                                typeof t
+                                            >[0]
+                                        )}
                                 </span>
                                 <span className="tabular-nums text-muted-foreground">
                                     {list.total}

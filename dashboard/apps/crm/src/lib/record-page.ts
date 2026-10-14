@@ -1,6 +1,7 @@
 /**
  * One record's page: the record, what the reader may do with it, and the
- * records that point at it - a company's people and deals, a person's deals.
+ * records that point at it - a company's people and deals, a person's deals,
+ * and the records whose added relation fields link to it.
  *
  * Server-only.
  */
@@ -15,6 +16,7 @@ import { relatedLists, type RelatedList } from "../model/related";
 import type { ObjectRule } from "../model/roles";
 import { recordWhere, type Abilities, type CrmActor } from "./access";
 import {
+    CRM_OBJECTS,
     recordName,
     type CrmObject,
     type CrmRecord,
@@ -50,24 +52,41 @@ export async function openRecord(
     object: CrmObject,
     id: string
 ): Promise<RecordOpening> {
-    const [record, fields, people] = await Promise.all([
+    // The fields of every kind the reader may read, in the same round trip as
+    // the record: an added relation on any of them may point at this one.
+    const [record, people, ...loaded] = await Promise.all([
         getRecord(actor, object, id),
-        loadFields(actor.shelf, object),
-        shelfPeople(actor)
+        shelfPeople(actor),
+        ...CRM_OBJECTS.map((other) =>
+            other === object || actor.can[other].read
+                ? loadFields(actor.shelf, other)
+                : Promise.resolve([])
+        )
     ]);
-    const lists = record ? relatedLists(object).filter((list) => actor.can[list.object].read) : [];
+    const added = Object.fromEntries(
+        CRM_OBJECTS.map((other, at) => [other, loaded[at]!])
+    ) as Record<CrmObject, FieldDef[]>;
+    const fields = added[object];
+    const lists = record
+        ? relatedLists(object, added).filter(
+              (list) =>
+                  actor.can[list.object].read &&
+                  !(actor.rules?.[list.object].hidden ?? []).includes(list.field)
+          )
+        : [];
     const timeline: Promise<TimelinePage> = record
         ? listTimeline(actor, object, id, people)
         : Promise.resolve({ events: [], next: null });
     const pinned = record ? pinnedAmong(actor, "record", [id]) : Promise.resolve([]);
     // enigma: bounded - `relatedLists` comes from the built-in relation fields
-    // (two lists at most), never from data, so one read per list stays fixed.
+    // (two lists at most) and the relation slots (three per kind), so the
+    // reads per page stay fixed however many records there are.
     const related = await Promise.all(
         lists.map(async (list): Promise<RelatedRecords> => {
             const where = {
                 ...recordWhere(actor, list.object),
                 deletedAt: null,
-                [list.column]: id
+                [list.column]: list.label === undefined ? id : { has: id }
             };
             const [rows, total] = await Promise.all([
                 table(list.object).findMany({
