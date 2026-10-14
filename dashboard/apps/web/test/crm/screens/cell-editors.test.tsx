@@ -14,7 +14,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
     AddressEditor,
     ChoicesEditor,
-    RatingEditor
+    RatingEditor,
+    editorFor
 } from "@polaris-app/crm/src/screens/cell-editors";
 
 const office = customDef({
@@ -95,5 +96,47 @@ describe("cell editors", () => {
         fireEvent.keyDown(group, { key: "Enter" });
         expect(onCommit).toHaveBeenCalledWith(JSON.stringify(["Red", "Blue"]));
         expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("writes nothing when choices are opened and left, a removed one included", () => {
+        const onCommit = vi.fn();
+        const onCancel = vi.fn();
+        render(
+            <ChoicesEditor
+                field={tags}
+                value={JSON.stringify(["Red", "Green"])}
+                onCommit={onCommit}
+                onCancel={onCancel}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+        expect(screen.getByText("Green")).toBeTruthy();
+        fireEvent.pointerDown(document.body);
+        expect(onCommit).not.toHaveBeenCalled();
+        expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes instead of committing a value the cell already holds", () => {
+        const name = customDef({ id: "f4", slot: "cText3", label: "Nick", kind: "text", options: [] });
+        const Editor = editorFor(name)!;
+        expect(editorFor(name)).toBe(Editor);
+        const onCommit = vi.fn();
+        const onCancel = vi.fn();
+        render(<Editor field={name} value="Sample" onCommit={onCommit} onCancel={onCancel} />, {
+            wrapper: MessagesWrapper
+        });
+        const box = screen.getByRole("textbox");
+        fireEvent.change(box, { target: { value: " Sample " } });
+        fireEvent.keyDown(box, { key: "Enter" });
+        expect(onCommit).not.toHaveBeenCalled();
+        expect(onCancel).toHaveBeenCalledTimes(1);
+        cleanup();
+        const blank = vi.fn();
+        render(<Editor field={name} value={null} onCommit={blank} onCancel={vi.fn()} />, {
+            wrapper: MessagesWrapper
+        });
+        fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+        expect(blank).not.toHaveBeenCalled();
     });
 });

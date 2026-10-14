@@ -409,11 +409,19 @@ export function RatingEditor({ field, value, onCommit, onCancel }: EditorProps) 
 export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps) {
     const t = useCrmT();
     const check = useCheck(field);
-    const [chosen, setChosen] = useState(() =>
-        readChoices(value).filter((option) => (field.options ?? []).includes(option))
-    );
-    const result = check(chosen);
-    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
+    // A choice since taken off the field is still listed, ticked and struck
+    // through: opening and leaving the editor writes nothing, and only an
+    // actual change keeps the list - without the choices the field lost, which
+    // could not be stored, so they never lock the field.
+    const [opened] = useState(() => readChoices(value));
+    const [chosen, setChosen] = useState(opened);
+    const known = field.options ?? [];
+    const stale = opened.filter((option) => !known.includes(option));
+    const result = check(chosen.filter((option) => known.includes(option)));
+    const changed =
+        chosen.length !== opened.length || chosen.some((option) => !opened.includes(option));
+    const keep = () =>
+        !changed || result.value === undefined ? onCancel() : onCommit(result.value);
     return (
         <Overlay onOutside={keep} error={result.error}>
             <div
@@ -422,7 +430,7 @@ export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps)
                 className="flex max-h-64 min-w-48 flex-col overflow-y-auto p-1"
                 onKeyDown={(event) => keys(event, keep, onCancel)}
             >
-                {(field.options ?? []).map((option, index) => (
+                {[...known, ...stale].map((option, index) => (
                     <label
                         key={option}
                         className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-card-hover"
@@ -439,7 +447,13 @@ export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps)
                                 )
                             }
                         />
-                        <OptionChip field={field} option={option} label={option} />
+                        {known.includes(option) ? (
+                            <OptionChip field={field} option={option} label={option} />
+                        ) : (
+                            <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground line-through">
+                                {option}
+                            </span>
+                        )}
                     </label>
                 ))}
             </div>
@@ -447,9 +461,61 @@ export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps)
     );
 }
 
+type Editor = (props: EditorProps) => ReactNode;
+
+/** Whether two kept values are the same: none is none, whether "" or null. */
+function sameValue(a: unknown, b: unknown): boolean {
+    const none = (one: unknown) => one === null || one === undefined || one === "";
+    if (none(a) || none(b)) return none(a) && none(b);
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Whether keeping `next` would leave the cell as it is. The stored value is put
+ * through the same normalizer first, so a value kept as it was opened never
+ * counts as an edit.
+ */
+export function keepsValue(field: FieldDef, value: FieldValue | undefined, next: InputValue): boolean {
+    if (value === undefined) return false;
+    const before = normalizeInput(field, value);
+    return sameValue(before.ok ? before.value : value, next);
+}
+
+const guarded = new Map<Editor, Editor>();
+
+/**
+ * An editor that never commits the value the cell already holds: leaving a box
+ * untouched closes it instead of writing, so no audit entry, "last updated by"
+ * or "record changed" workflow follows from merely opening a cell.
+ */
+function unchangedIsCancel(Inner: Editor): Editor {
+    let wrapped = guarded.get(Inner);
+    if (!wrapped) {
+        wrapped = function Guarded(props: EditorProps) {
+            return (
+                <Inner
+                    {...props}
+                    onCommit={(next) =>
+                        keepsValue(props.field, props.value, next)
+                            ? props.onCancel()
+                            : props.onCommit(next)
+                    }
+                />
+            );
+        };
+        guarded.set(Inner, wrapped);
+    }
+    return wrapped;
+}
+
 /** The editor a kind of field is typed into, or null for one that is picked
  *  from a menu or toggled. */
-export function editorFor(field: FieldDef): ((props: EditorProps) => ReactNode) | null {
+export function editorFor(field: FieldDef): Editor | null {
+    const editor = typedEditor(field);
+    return editor ? unchangedIsCancel(editor) : null;
+}
+
+function typedEditor(field: FieldDef): Editor | null {
     switch (field.kind) {
         case "text":
         case "email":
