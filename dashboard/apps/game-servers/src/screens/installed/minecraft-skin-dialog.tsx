@@ -179,6 +179,9 @@ export function SkinDialog({
         setLive(next);
     }
     const shown: Shown | null = preview ? { png: preview.png, url: null, model } : current;
+    // A preview of exactly what they wear already - the same picture, the same
+    // arms - changes nothing, so there is nothing to apply.
+    const unchanged = preview !== null && current?.png === preview.png && current.model === model;
 
     async function importFile(file: File) {
         setError(null);
@@ -363,7 +366,15 @@ export function SkinDialog({
                                     style={{ width: VIEWER_WIDTH, height: VIEWER_HEIGHT }}
                                 />
                             ) : (
-                                <SkinView shown={shown} label={t("skins.viewer")} />
+                                <SkinView
+                                    shown={shown}
+                                    label={t("skins.viewer")}
+                                    empty={
+                                        !offline && live?.state === "read" && !live.skin
+                                            ? t("skins.noSkinSet")
+                                            : null
+                                    }
+                                />
                             )}
                             <p className="text-center text-xs text-muted-foreground">
                                 {preview
@@ -545,7 +556,12 @@ export function SkinDialog({
                         </Button>
                     )}
                     {preview && changeable ? (
-                        <Button size="sm" onClick={() => void apply()} disabled={working}>
+                        <Button
+                            size="sm"
+                            onClick={() => void apply()}
+                            disabled={working || unchanged}
+                            title={unchanged ? t("skins.alreadyWorn") : undefined}
+                        >
                             {busy === "apply" && (
                                 <Loader2 className="size-4 animate-spin" aria-hidden />
                             )}
@@ -567,7 +583,18 @@ export function SkinDialog({
  * The 3D view. The library is loaded only once the dialog opens, and the canvas
  * and its GPU context are released when it closes.
  */
-function SkinView({ shown, label }: { shown: Shown | null; label: string }) {
+/** `empty` is said over the viewer while there is nothing to draw: a profile
+ *  with no skin of its own wears Minecraft's default, which each player's game
+ *  draws for itself and the server never holds a texture for. */
+function SkinView({
+    shown,
+    label,
+    empty
+}: {
+    shown: Shown | null;
+    label: string;
+    empty: string | null;
+}) {
     const t = useGameText("minecraft");
     const canvas = useRef<HTMLCanvasElement>(null);
     const viewer = useRef<import("skinview3d").SkinViewer | null>(null);
@@ -626,6 +653,11 @@ function SkinView({ shown, label }: { shown: Shown | null; label: string }) {
                 className="cursor-grab touch-none rounded-md bg-muted active:cursor-grabbing"
                 style={{ width: VIEWER_WIDTH, height: VIEWER_HEIGHT }}
             />
+            {!failed && !shown && empty && (
+                <p className="absolute inset-0 flex items-center justify-center rounded-md px-4 text-center text-sm text-muted-foreground">
+                    {empty}
+                </p>
+            )}
             {failed && (
                 <p className="absolute inset-0 flex items-center justify-center rounded-md bg-muted px-4 text-center text-sm text-muted-foreground">
                     {t("skins.viewerFailed")}

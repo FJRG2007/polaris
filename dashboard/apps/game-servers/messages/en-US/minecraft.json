@@ -3054,6 +3054,8 @@
         "reset": "Reset to account skin",
         "resetDone": "Back to their account's skin.",
         "viewerFailed": "The 3D preview could not load.",
+        "noSkinSet": "Minecraft's default skin",
+        "alreadyWorn": "They already wear this skin.",
         "needsUpdate": "This server's Polaris mod is older than skins. The new one installs when the server restarts.",
         "noJar": "Skins need the Polaris mod, which this server does not run.",
         "couldNotRead": "Could not read the skin.",

@@ -3054,6 +3054,8 @@
         "reset": "Restaurar skin original",
         "resetDone": "Vuelve a llevar la skin de su cuenta.",
         "viewerFailed": "No se pudo cargar la vista 3D.",
+        "noSkinSet": "Skin por defecto de Minecraft",
+        "alreadyWorn": "Ya lleva esta skin.",
         "needsUpdate": "El mod de Polaris de este servidor es anterior a las skins. El nuevo se instala al reiniciar el servidor.",
         "noJar": "Las skins necesitan el mod de Polaris, que este servidor no usa.",
         "couldNotRead": "No se pudo leer la skin.",

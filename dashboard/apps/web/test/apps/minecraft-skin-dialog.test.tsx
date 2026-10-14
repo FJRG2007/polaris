@@ -87,12 +87,15 @@ describe("SkinDialog", () => {
         });
         open(true);
         expect(await screen.findByText("Their account's own skin")).toBeTruthy();
+        // Nothing to draw for a profile with no skin of its own, and it says why.
+        expect(screen.getByText("Minecraft's default skin")).toBeTruthy();
 
         fireEvent.change(screen.getByPlaceholderText("Username or link"), {
             target: { value: "player-two" }
         });
         fireEvent.click(screen.getByRole("button", { name: "Load" }));
         expect(await screen.findByText("Preview only. Apply to put it on.")).toBeTruthy();
+        expect(screen.queryByText("Minecraft's default skin")).toBeNull();
         expect(actions.previewSkinAction).toHaveBeenCalledWith({
             installedAppId: INSTALLED,
             player: "player-one",
