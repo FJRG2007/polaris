@@ -26,7 +26,7 @@ vi.mock("@/app/(app)/mail/mail-shell", () => ({
 
 afterEach(cleanup);
 
-const ENTRY = { name: "Albert Kampde", address: "albert@example.test" };
+const ENTRY = { name: "Pat Sample", address: "albert@example.test" };
 
 /** The chip's own element, reached from the one thing in it with a name. */
 function chipFor(address: string): { chip: HTMLElement; copy: HTMLElement } {

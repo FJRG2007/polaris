@@ -21,8 +21,8 @@ import {
 
 /** What the composer is seeded with when somebody answers a message. */
 const REPLY = `\n\n${quoteForReply(
-    "Hola Javier,\n\nLa ventana escalonada nos va bien.",
-    { name: "Albert Kampde", address: "albert@example.com" },
+    "Hola Samuel,\n\nLa ventana escalonada nos va bien.",
+    { name: "Pat Sample", address: "albert@example.com" },
     new Date("2026-09-21T09:12:00Z")
 )}`;
 
@@ -35,7 +35,7 @@ describe("opening a reply", () => {
         expect(first?.content ?? []).toEqual([]);
         // And the quote is still the thing under it, rather than something the
         // blank line replaced.
-        expect(docToMarkdown(doc)).toContain("Albert Kampde");
+        expect(docToMarkdown(doc)).toContain("Pat Sample");
     });
 
     // The editor decides whether to put the document back by comparing what it
@@ -56,7 +56,7 @@ describe("opening a reply", () => {
     });
 
     it("puts the writer above their own signature on a new message", () => {
-        const doc = withLeadingBlankLine(markdownToDoc("-- \nJavier"));
+        const doc = withLeadingBlankLine(markdownToDoc("-- \nSamuel"));
 
         expect(doc.content?.[0]?.content ?? []).toEqual([]);
         expect(doc.content).toHaveLength(2);

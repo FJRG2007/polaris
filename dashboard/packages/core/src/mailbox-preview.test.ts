@@ -19,10 +19,10 @@ describe("mail that came out unreadable", () => {
     it("reads a part that is base64 from end to end", () => {
         // What a bank's mail looked like in the list: one run of base64.
         const encoded = Buffer.from(
-            "<html><head></head><body><p>JAVIER, recuerda las fechas de los proximos pagos.</p></body></html>",
+            "<html><head></head><body><p>SAMUEL, recuerda las fechas de los proximos pagos.</p></body></html>",
             "utf8"
         ).toString("base64");
-        expect(snippetFrom(encoded)).toBe("JAVIER, recuerda las fechas de los proximos pagos.");
+        expect(snippetFrom(encoded)).toBe("SAMUEL, recuerda las fechas de los proximos pagos.");
     });
 
     it("reads a run of base64 the preview cut mid-group", () => {

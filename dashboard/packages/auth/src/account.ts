@@ -45,7 +45,7 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
  * The display name and the two halves of a name are treated differently on
  * purpose. A name is recorded, so it is written the way a name is written
  * wherever it was typed - a phone capitalizes sentences and not words, and
- * "rahma" typed on one should not be stored differently from the same name typed
+ * "amina" typed on one should not be stored differently from the same name typed
  * on a laptop. A display name is chosen, so it is left exactly as it was typed:
  * somebody who writes their name in lower case meant to.
  *

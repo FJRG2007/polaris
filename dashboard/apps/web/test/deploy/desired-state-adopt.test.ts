@@ -26,7 +26,7 @@ vi.mock("@polaris/db", () => ({
             findMany: async () => [
                 {
                     id: APP,
-                    slug: "offgrid",
+                    slug: "survival",
                     target: {
                         id: "target-1",
                         kind: "local",
@@ -76,7 +76,7 @@ const { runDesiredStatePass } = await import("@/lib/deploy/desired-state");
 
 beforeEach(() => {
     adopts = false;
-    running = ["marketplace-offgrid-ad8d"];
+    running = ["marketplace-survival-ad8d"];
     stopped = [];
     lines = [];
     audits = [];
@@ -96,7 +96,7 @@ describe("a container running under a stopped service", () => {
     it("is stopped otherwise - and the service's history and the audit log say so", async () => {
         const pass = await runDesiredStatePass();
         expect(pass).toMatchObject({ stopped: 1, adopted: 0 });
-        expect(stopped).toEqual(["marketplace-offgrid-ad8d"]);
+        expect(stopped).toEqual(["marketplace-survival-ad8d"]);
         expect(lines.map((line) => [line.action, line.userId])).toEqual([
             ["stopped-unasked", null]
         ]);
@@ -106,7 +106,7 @@ describe("a container running under a stopped service", () => {
                 action: "deploy.app.stop-unasked",
                 targetType: "application",
                 targetId: APP,
-                metadata: { containers: ["marketplace-offgrid-ad8d"] }
+                metadata: { containers: ["marketplace-survival-ad8d"] }
             }
         ]);
     });
