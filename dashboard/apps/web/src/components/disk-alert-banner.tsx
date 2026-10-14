@@ -20,16 +20,21 @@ import { HardDrive, Loader2, X } from "lucide-react";
 import type { DiskReading } from "@/lib/deploy/disk-watch";
 import { useLiveRead } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { diskAlertsAction, freeDiskSpaceAction } from "@/app/(app)/disk-alert-actions";
+import type { ActiveMoveView } from "@/lib/storage-moves/service";
+import { moveSize, movePhaseText, moveTarget } from "@/components/storage-move-words";
+import {
+    diskAlertsAction,
+    diskMovesAction,
+    freeDiskSpaceAction
+} from "@/app/(app)/disk-alert-actions";
 
 /** A disk does not change between two glances; re-read after a clean-up. */
 const REFRESH_MS = 5 * 60_000;
+/** A move's step changes far more often than a disk. */
+const MOVES_REFRESH_MS = 30_000;
 const DISMISSED = "polaris.diskAlert.dismissed";
 
-function size(bytes: number): string {
-    if (bytes < 1000 ** 3) return `${Math.max(0, Math.round(bytes / 1000 ** 2))} MB`;
-    return `${(bytes / 1000 ** 3).toFixed(1)} GB`;
-}
+const size = moveSize;
 
 function dismissedKeys(): string[] {
     try {
@@ -55,7 +60,17 @@ export function DiskAlertBanner() {
     });
 
     const shown = (data ?? []).filter((one) => !dismissed.includes(`${one.machine}:${one.level}`));
+    // Asked only while a warning is up: a move under way is why the disk is about
+    // to get room back, and an original left behind is why it has not.
+    const loadMoves = useCallback(() => diskMovesAction(), []);
+    const { data: movesRead } = useLiveRead({
+        load: loadMoves,
+        cacheKey: "disk-alerts.moves",
+        intervalMs: MOVES_REFRESH_MS,
+        enabled: shown.length > 0
+    });
     if (shown.length === 0) return null;
+    const canAnswer = movesRead?.canAnswer ?? false;
 
     const dismiss = (reading: DiskReading) => {
         const next = [...dismissed, `${reading.machine}:${reading.level}`];
@@ -129,6 +144,11 @@ export function DiskAlertBanner() {
                                       })
                                     : t("diskAlert.usageUnknown")}
                             </p>
+                            {(movesRead?.moves ?? [])
+                                .filter((move) => move.machine === reading.machine)
+                                .map((move) => (
+                                    <MoveLine key={move.id} move={move} canAnswer={canAnswer} />
+                                ))}
                             {message ? (
                                 <p className={cn("mt-1 text-xs", message.ok ? "" : "font-medium")}>
                                     {message.text}
@@ -172,5 +192,42 @@ export function DiskAlertBanner() {
                 );
             })}
         </div>
+    );
+}
+
+/**
+ * One move off this disk: under way, with when its room comes back - at the end
+ * when Polaris empties the original itself, otherwise only once somebody says
+ * the original can go - or done and still holding the original's room, with the
+ * way to remove it after the check the storage screen asks for.
+ */
+function MoveLine({ move, canAnswer }: { move: ActiveMoveView; canAnswer: boolean }) {
+    const t = useTranslations("components");
+    const volume = move.volumeName || move.appName;
+    const target = moveTarget(move, t);
+    if (move.phase !== "waiting")
+        return (
+            <p className="mt-1 text-xs">
+                {t("storageMove.banner.inProgress", {
+                    volume,
+                    target,
+                    phase: movePhaseText(move, t)
+                })}{" "}
+                {t(move.auto ? "storageMove.banner.freesAfter" : "storageMove.banner.freesAfterAnswer")}
+            </p>
+        );
+    return (
+        <p className="mt-1 text-xs">
+            {move.totalBytes !== null
+                ? t("storageMove.banner.waiting", { volume, target, size: size(move.totalBytes) })
+                : t("storageMove.banner.waitingNoSize", { volume, target })}{" "}
+            {canAnswer ? (
+                <Link href="/admin/storage" className="font-medium underline underline-offset-2">
+                    {t("storageMove.banner.removeOriginal")}
+                </Link>
+            ) : (
+                t("storageMove.banner.askAdmin")
+            )}
+        </p>
     );
 }

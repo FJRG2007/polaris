@@ -233,6 +233,77 @@ describe("mount rendering", () => {
         // The original is only ever read.
         expect(script).not.toMatch(/\/from[^ ]* -delete|rm [^;]*\/from/);
     });
+
+    // busybox awk's %d is a 32-bit int: a 22 GB volume printed -2147483648 for
+    // both the size and the free room, and the room check compared nonsense.
+    it("never sums or compares bytes through a 32-bit integer", () => {
+        const script = plan.copyScript();
+        expect(script).not.toMatch(/%d/);
+        expect(script).not.toMatch(/-lt|-gt|-le|-ge/);
+        expect(script.match(/printf \\?"%\.0f\\?"/g)?.length).toBe(3);
+    });
+
+    it("prints the copy's figures before the manifests are compared", () => {
+        const script = plan.copyScript();
+        expect(script.indexOf("POLARIS_COPY")).toBeGreaterThan(script.indexOf("cp -a"));
+        expect(script.indexOf("POLARIS_COPY")).toBeLessThan(script.indexOf("md5sum"));
+        expect(script.indexOf("POLARIS_VERIFIED")).toBeGreaterThan(script.indexOf("md5sum"));
+    });
+});
+
+describe("a move's progress", () => {
+    it("reads sizes past 2^31 back exactly", () => {
+        const log = [
+            "POLARIS_SOURCE files=136752 bytes=23622320128",
+            "POLARIS_FREE bytes=107374182400",
+            "POLARIS_COPY files=136752 bytes=23622320128",
+            "POLARIS_VERIFIED"
+        ].join("\n");
+        expect(plan.parseCopyLog(log)).toEqual({
+            sourceFiles: 136752,
+            sourceBytes: 23622320128,
+            freeBytes: 107374182400,
+            copiedFiles: 136752,
+            copiedBytes: 23622320128,
+            verified: true,
+            mismatch: false
+        });
+    });
+
+    it("does not take an overflowed figure for a size", () => {
+        const report = plan.parseCopyLog(
+            "POLARIS_SOURCE files=136752 bytes=-2147483648\nPOLARIS_FREE bytes=-2147483648"
+        );
+        expect(report.sourceBytes).toBeUndefined();
+        expect(report.freeBytes).toBeUndefined();
+    });
+
+    it("holds the du figure under the total until the copy reports itself", () => {
+        const counted = plan.parseCopyLog("POLARIS_SOURCE files=3 bytes=1000");
+        expect(plan.copiedSoFar(400, counted)).toBe(400);
+        // du counts blocks and overshoots: still copying.
+        expect(plan.copiedSoFar(4096, counted)).toBe(999);
+        expect(plan.copiedSoFar(null, counted)).toBeNull();
+        // An earlier attempt's files, before the size is known.
+        expect(plan.copiedSoFar(5000, plan.parseCopyLog(""))).toBe(5000);
+        const copied = plan.parseCopyLog(
+            "POLARIS_SOURCE files=3 bytes=1000\nPOLARIS_COPY files=3 bytes=1000"
+        );
+        expect(plan.copiedSoFar(4096, copied)).toBe(1000);
+    });
+
+    it("names the phase a person is told about", () => {
+        expect(plan.movePhase("queued", null, null)).toBe("queued");
+        expect(plan.movePhase("copying", null, 5000)).toBe("counting");
+        expect(plan.movePhase("copying", 1000, 999)).toBe("copying");
+        expect(plan.movePhase("copying", 1000, null)).toBe("copying");
+        expect(plan.movePhase("copying", 1000, 1000)).toBe("verifying");
+        expect(plan.movePhase("copying", 0, 0)).toBe("verifying");
+        expect(plan.movePhase("switching", 1000, 1000)).toBe("switching");
+        expect(plan.movePhase("moved", 1000, 1000)).toBe("waiting");
+        expect(plan.movePhase("finished", 1000, 1000)).toBeNull();
+        expect(plan.movePhase("failed", null, null)).toBeNull();
+    });
 });
 
 describe("the copy's report", () => {

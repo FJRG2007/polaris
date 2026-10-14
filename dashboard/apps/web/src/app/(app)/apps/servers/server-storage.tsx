@@ -34,6 +34,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ContainerStorage } from "./container-storage";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { HostVolume } from "@/lib/deploy/host-volumes";
+import type { ActiveMoveView } from "@/lib/storage-moves/service";
+import { moveOfVolume, movePhaseText, moveTarget } from "@/components/storage-move-words";
 import type { StrayContainer } from "@/lib/deploy/host-containers";
 import { useLiveRead } from "@/components/use-live-resource";
 import { Badge, Button, EmptyState, Switch } from "@polaris/ui";
@@ -46,11 +48,14 @@ import {
     removeHostVolumeAction,
     setLeftoverAutoRemoveAction,
     removeStrayContainerAction,
-    strayContainersAction
+    strayContainersAction,
+    volumeMovesAction
 } from "./actions";
 
 /** A disk does not change between two glances at it. */
 const REFRESH_MS = 60_000;
+/** A data move changes by the second; its progress is read this often. */
+const MOVE_REFRESH_MS = 10_000;
 
 type Words = NamespaceTranslator<"servers">;
 
@@ -97,6 +102,7 @@ function unusedFor(volume: HostVolume, t: Words): string | null {
 export function ServerStorage() {
     const t = useTranslations("servers");
     const tcommon = useTranslations("common");
+    const tmove = useTranslations("components");
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -144,6 +150,20 @@ export function ServerStorage() {
         cacheKey: "servers.host-volumes",
         intervalMs: REFRESH_MS
     });
+
+    // Read beside the volumes, not after them, and far more often: a copy of a
+    // large volume runs for hours, and a minute-old figure is the difference
+    // between "it is moving" and "it is stuck". One indexed query, usually empty.
+    const loadMoves = useCallback(async () => {
+        return (await volumeMovesAction()) ?? { moves: [] as ActiveMoveView[], canAnswer: false };
+    }, []);
+    const { data: movesRead } = useLiveRead({
+        load: loadMoves,
+        cacheKey: "servers.volume-moves",
+        intervalMs: MOVE_REFRESH_MS
+    });
+    const local = (movesRead?.moves ?? []).filter((move) => move.machine === "local");
+    const canAnswer = movesRead?.canAnswer ?? false;
 
     const remove = async (volume: HostVolume) => {
         const ok = await confirm({
@@ -247,7 +267,9 @@ export function ServerStorage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {[...used, ...spare].map((volume) => (
+                                {[...used, ...spare].map((volume) => {
+                                    const move = moveOfVolume(volume, local);
+                                    return (
                                     <tr key={volume.name} className="border-t border-border">
                                         <td className="w-full max-w-0 px-3 py-2">
                                             <span className="flex min-w-0 items-center gap-2">
@@ -260,7 +282,28 @@ export function ServerStorage() {
                                                 {/* The verdict first, because it is the
                                                     question: can this go. The reason is
                                                     in the title for anybody who wants it. */}
-                                                {volume.verdict === "safe" ? (
+                                                {move ? (
+                                                    <Badge
+                                                        variant={move.phase === "waiting" ? "warning" : "neutral"}
+                                                        className="min-w-0 shrink"
+                                                        title={moveTarget(move, tmove)}
+                                                    >
+                                                        {move.phase === "waiting" ? null : (
+                                                            <Loader2
+                                                                className="mr-1 size-3 shrink-0 animate-spin"
+                                                                aria-hidden
+                                                            />
+                                                        )}
+                                                        <span className="truncate">
+                                                            {tmove(
+                                                                move.phase === "waiting"
+                                                                    ? "storageMove.movedTo"
+                                                                    : "storageMove.moving",
+                                                                { target: moveTarget(move, tmove) }
+                                                            )}
+                                                        </span>
+                                                    </Badge>
+                                                ) : volume.verdict === "safe" ? (
                                                     <Badge
                                                         variant="success"
                                                         className="shrink-0"
@@ -294,11 +337,30 @@ export function ServerStorage() {
                                                       : volume.project
                                                         ? t("storage.createdBy", { project: volume.project })
                                                         : t("storage.noRecord")}
-                                                {volume.heldBy.length > 0
-                                                    ? ` - ${holders(volume, t)}`
-                                                    : ""}
+                                                {/* A move's copier is what holds it: the
+                                                    step it is on says more than its name. */}
+                                                {move
+                                                    ? ` - ${movePhaseText(move, tmove)}`
+                                                    : volume.heldBy.length > 0
+                                                      ? ` - ${holders(volume, t)}`
+                                                      : ""}
                                                 {unusedFor(volume, t) ? ` - ${unusedFor(volume, t)}` : ""}
                                             </span>
+                                            {move?.percent !== null && move?.percent !== undefined ? (
+                                                <span
+                                                    role="progressbar"
+                                                    aria-valuemin={0}
+                                                    aria-valuemax={100}
+                                                    aria-valuenow={move.percent}
+                                                    aria-label={movePhaseText(move, tmove)}
+                                                    className="mt-1 block h-1 overflow-hidden rounded-full bg-muted"
+                                                >
+                                                    <span
+                                                        className="block h-full rounded-full bg-primary transition-[width]"
+                                                        style={{ width: `${move.percent}%` }}
+                                                    />
+                                                </span>
+                                            ) : null}
                                             {!volume.inUse && !volume.owner ? (
                                                 <span className="text-muted-foreground block text-xs">
                                                     {volume.reason}
@@ -332,7 +394,17 @@ export function ServerStorage() {
                                                         </Link>
                                                     </Button>
                                                 ) : null}
-                                                {volume.spare ? (
+                                                {/* An original a move left behind goes the
+                                                    way the move was checked, not as a loose
+                                                    volume: the storage screen removes it. */}
+                                                {move?.phase === "waiting" && canAnswer ? (
+                                                    <Button asChild variant="outline" size="sm">
+                                                        <Link href="/admin/storage">
+                                                            {tmove("storageMove.banner.removeOriginal")}
+                                                        </Link>
+                                                    </Button>
+                                                ) : null}
+                                                {volume.spare && !move ? (
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
@@ -351,7 +423,8 @@ export function ServerStorage() {
                                             </span>
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
