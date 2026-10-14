@@ -673,7 +673,8 @@ export async function uninstallApp(
         try {
             await deleteApplication(application.id, ownerId, {
                 deleteData: options.deleteData,
-                strict: true
+                strict: true,
+                keepInstalls: ids
             });
         } catch (error) {
             console.error(`polaris: uninstalling ${row.catalogId} stopped:`, error);

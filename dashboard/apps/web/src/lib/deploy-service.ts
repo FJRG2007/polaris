@@ -2401,6 +2401,9 @@ export async function deleteApplication(
          *  the database no longer knows. Off for the canvas, which deletes a
          *  service on a server that may never answer again. */
         strict?: boolean;
+        /** Installs the caller retires itself once everything else is gone, so a
+         *  later step that fails leaves them listed and the uninstall retryable. */
+        keepInstalls?: readonly string[];
     }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
@@ -2433,12 +2436,27 @@ export async function deleteApplication(
     // Off the edge before it comes down, so its names never answer for a
     // container that is going: a visitor sees it gone, not broken. Only its own
     // domains - every other app's routes are rendered again exactly as they were.
+    const routed = await prisma.domain.findMany({
+        where: { applicationId, enabled: true },
+        select: { id: true }
+    });
     await prisma.domain.updateMany({ where: { applicationId }, data: { enabled: false } });
     await syncAppRoutes().catch(() => undefined);
     const teardown = removeApplicationDeployment(applicationId, ownerId);
     // A service that was never placed on a server has nothing running to fail on.
-    if (options?.strict && app.target) await teardown;
-    else await teardown.catch(() => undefined);
+    if (options?.strict && app.target) {
+        try {
+            await teardown;
+        } catch (error) {
+            // Still running, so it answers for its names again.
+            await prisma.domain.updateMany({
+                where: { id: { in: routed.map((domain) => domain.id) } },
+                data: { enabled: true }
+            });
+            await syncAppRoutes().catch(() => undefined);
+            throw error;
+        }
+    } else await teardown.catch(() => undefined);
     await prisma.deployment.deleteMany({
         where: { deployableType: "application", deployableId: applicationId }
     });
@@ -2456,7 +2474,7 @@ export async function deleteApplication(
     await prisma.application.delete({ where: { id: applicationId } });
     // The folder it was built from, when it was uploaded rather than cloned.
     await sourceUpload.forgetUploadedSources(applicationId).catch(() => undefined);
-    await releaseInstallsOf(applicationId);
+    await releaseInstallsOf(applicationId, options?.keepInstalls ?? []);
     // The delete cascades the app's Domain rows, but the edge is not the database: its
     // routers stay until they are rewritten, and one pointing at a container that no
     // longer exists answers for the hostname as an app that is merely down. Resynced
@@ -2525,15 +2543,15 @@ async function removeServerVolumes(
  * cleared it is on that page. So the install is marked removed here, at the one
  * point every caller comes through, rather than at each of them.
  */
-async function releaseInstallsOf(applicationId: string): Promise<void> {
+async function releaseInstallsOf(applicationId: string, keep: readonly string[]): Promise<void> {
     const installs = await prisma.installedApp.findMany({
-        where: { applicationId, status: { not: "removed" } },
+        where: { applicationId, status: { not: "removed" }, id: { notIn: [...keep] } },
         select: { catalogId: true }
     });
     if (installs.length === 0) return;
     // Removed means no bridge left to dial, so not the credential either.
     await prisma.installedApp.updateMany({
-        where: { applicationId },
+        where: { applicationId, id: { notIn: [...keep] } },
         data: { status: "removed", encryptedSecret: null, secretNonce: null, secretKeyId: null }
     });
     // Cycle: bridge-endpoint reaches this module for the hub's port, so the cache

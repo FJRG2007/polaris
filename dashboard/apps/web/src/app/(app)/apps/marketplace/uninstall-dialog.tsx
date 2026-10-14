@@ -48,12 +48,24 @@ function deletingDescription(t: Words, catalogId: string, name: string): string 
     return catalogId === "game-servers" ? `${t("uninstall.games", { name })} ${warning}` : warning;
 }
 
+/**
+ * What uninstalling says when its data is kept. Only an app with containers
+ * leaves volumes behind, and those are what the storage screen lists.
+ */
+function keptDescription(
+    t: Words,
+    install: Pick<InstalledAppView, "name" | "catalogId" | "applicationId">
+): string {
+    const description = uninstallDescription(t, install.catalogId, install.name);
+    return install.applicationId ? `${description} ${t("uninstall.keptListed")}` : description;
+}
+
 export function UninstallDialog({
     install,
     onClose,
     onDone
 }: {
-    install: Pick<InstalledAppView, "id" | "name" | "catalogId">;
+    install: Pick<InstalledAppView, "id" | "name" | "catalogId" | "applicationId">;
     onClose: () => void;
     /** After a finished uninstall; refreshes the page when not given. */
     onDone?: () => void;
@@ -89,7 +101,7 @@ export function UninstallDialog({
                     <DialogDescription>
                         {deleteData
                             ? deletingDescription(t, install.catalogId, install.name)
-                            : `${uninstallDescription(t, install.catalogId, install.name)} ${t("uninstall.keptListed")}`}
+                            : keptDescription(t, install)}
                     </DialogDescription>
                 </DialogHeader>
                 <label className="flex items-start gap-2 text-sm">

@@ -111,6 +111,32 @@ describe("deleting an app", () => {
         expect(sweepReleaseImages).not.toHaveBeenCalled();
     });
 
+    it("strictly, routes its domains again when its containers cannot come down", async () => {
+        named.domain = { findMany: async () => [{ id: "domain-1" }] };
+        try {
+            await expect(deleteApplication(APP, OWNER, { strict: true })).rejects.toThrow();
+        } finally {
+            delete named.domain;
+        }
+        const writes = calls.filter((call) => call.name === "domain.updateMany");
+        expect(writes.map((call) => call.args)).toEqual([
+            { where: { applicationId: APP }, data: { enabled: false } },
+            { where: { id: { in: ["domain-1"] } }, data: { enabled: true } }
+        ]);
+    });
+
+    it("leaves the installs the caller retires itself listed", async () => {
+        getPorts.mockResolvedValueOnce({
+            dispose: async () => undefined,
+            down: async () => undefined
+        } as never);
+        await deleteApplication(APP, OWNER, { keepInstalls: ["install-1"] });
+        const release = calls.find((call) => call.name === "installedApp.findMany");
+        expect(release?.args).toMatchObject({
+            where: { applicationId: APP, id: { notIn: ["install-1"] } }
+        });
+    });
+
     it("strictly, asks for the same thing again on a retry", async () => {
         await deleteApplication(APP, OWNER, { strict: true }).catch(() => undefined);
         const first = calls.map((call) => call.name);

@@ -81,7 +81,8 @@ describe("uninstallApp", () => {
         await uninstallApp(ROW.ownerId, ROW.id);
         expect(deleteApplication).toHaveBeenCalledWith(ROW.applicationId, ROW.ownerId, {
             deleteData: false,
-            strict: true
+            strict: true,
+            keepInstalls: [ROW.id]
         });
         expect(db.installedApp.updateMany).toHaveBeenCalledWith({
             where: { id: { in: [ROW.id] } },
@@ -98,7 +99,8 @@ describe("uninstallApp", () => {
         await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true });
         expect(deleteApplication).toHaveBeenCalledWith(ROW.applicationId, ROW.ownerId, {
             deleteData: true,
-            strict: true
+            strict: true,
+            keepInstalls: [ROW.id]
         });
         expect(db.$transaction).toHaveBeenCalledTimes(1);
         // The files go while the rows that find them still exist.
@@ -147,7 +149,8 @@ describe("uninstallApp", () => {
         await uninstallApp(home.ownerId, home.id, { deleteData: true });
         expect(deleteApplication).toHaveBeenCalledWith("app-helper", ROW.ownerId, {
             deleteData: true,
-            strict: true
+            strict: true,
+            keepInstalls: [helper.id]
         });
         expect(db.installedApp.deleteMany).toHaveBeenCalledWith({
             where: { id: { in: [helper.id] } }

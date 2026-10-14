@@ -38,7 +38,7 @@
         "ownerOnly": "Only the person who installed this app can remove it",
         "uninstall": "Could not uninstall the app",
         "filesLeft": "Some of its files could not be deleted. Check that its storage is reachable and try again. Nothing else was removed.",
-        "stoppedContainers": "It could not be stopped and removed from its server, so nothing else was touched. Check the server is online and try again.",
+        "stoppedContainers": "It could not be stopped and removed from its server, so it is still installed. Check the server is online and try again.",
         "stoppedData": "Its app is gone, but some of its data could not be deleted. Try again to finish.",
         "readAccess": "Could not read who can reach this server",
         "checkDetails": "Check the details and try again",

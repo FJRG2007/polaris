@@ -82,7 +82,8 @@ describe("uninstalling from the marketplace grid", () => {
         // Keeping the data is the choice that says what stays.
         fireEvent.click(within(dialog).getByRole("checkbox"));
         expect(within(dialog).getByText(/camera and recognition containers stop/)).toBeTruthy();
-        expect(within(dialog).getByText(/listed under Storage/)).toBeTruthy();
+        // Its data is rows, not volumes, so the storage screen never lists it.
+        expect(within(dialog).queryByText(/listed under Storage/)).toBeNull();
 
         fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall, keep data" }));
         await waitFor(() =>
@@ -91,6 +92,27 @@ describe("uninstalling from the marketplace grid", () => {
             })
         );
         await waitFor(() => expect(refresh).toHaveBeenCalled());
+    });
+
+    it("says where kept data is listed for an app with containers", async () => {
+        render(
+            <MarketplaceView
+                installed={[
+                    installed({
+                        id: "install-3",
+                        catalogId: "messaging-bridge",
+                        name: "Messaging bridge",
+                        applicationId: "app-3"
+                    })
+                ]}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+
+        fireEvent.click(screen.getByRole("button", { name: "Uninstall Messaging bridge" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.click(within(dialog).getByRole("checkbox"));
+        expect(within(dialog).getByText(/listed under Storage/)).toBeTruthy();
     });
 
     it("leaves the app installed when Cancel is pressed", async () => {
