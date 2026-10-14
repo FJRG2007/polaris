@@ -51,6 +51,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger
 } from "../components/dropdown-menu";
+import { AppLogo, hasAppLogo } from "./app-logo";
 
 export interface PolarisApp {
     readonly id: string;
@@ -209,16 +210,13 @@ export function AppSwitcher({
 
     const current = currentApp ?? apps.find((app) => app.id === currentAppId) ?? apps[0];
     if (!current) return null;
-    const CurrentIcon = current.icon;
     // An account whose role opens no app has nothing to switch to. It still needs
     // to be told where it is, but a menu that opens onto an empty list is a
     // control that does nothing - so it becomes a plain label instead.
     if (apps.length === 0) {
         return (
             <span className="flex shrink-0 items-center gap-2 px-1.5 py-1.5 text-sm font-medium sm:px-2">
-                <span className="grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
-                    <CurrentIcon className="size-4" />
-                </span>
+                <CurrentMark app={current} />
                 <span className="sr-only sm:not-sr-only">{current.label}</span>
             </span>
         );
@@ -392,8 +390,8 @@ export function AppSwitcher({
                 data-tour="shell.switcher"
                 className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted sm:px-2"
             >
-                <span className="relative grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
-                    <CurrentIcon className="size-4" />
+                <span className="relative grid size-6 shrink-0 place-items-center">
+                    <CurrentMark app={current} />
                     {alert ? (
                         <span
                             aria-hidden="true"
@@ -571,6 +569,7 @@ function AppTile({
     };
 }) {
     const Icon = app.icon;
+    const logo = hasAppLogo(app.id);
     return (
         <div
             className={cn("group/tile relative min-w-0", drag?.lifted && "opacity-40")}
@@ -597,8 +596,16 @@ function AppTile({
                         drag && "cursor-grab active:cursor-grabbing"
                     )}
                 >
-                    <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
-                        <Icon className="!size-5" />
+                    {/* A logo stands on its own, with no tile behind it: its colour is
+                        what tells it apart. An app without one keeps its icon on the
+                        accent tile. */}
+                    <span
+                        className={cn(
+                            "relative grid size-10 shrink-0 place-items-center",
+                            !logo && "rounded-xl bg-primary/15 text-primary"
+                        )}
+                    >
+                        <AppLogo appId={app.id} size={34} fallback={<Icon className="!size-5" />} />
                         {app.badge ? (
                             <span className="absolute -right-2 -top-1.5 min-w-4 rounded-full bg-primary px-1 text-center text-[0.625rem] font-medium leading-4 text-primary-foreground ring-2 ring-elevated">
                                 {app.badge}
@@ -631,5 +638,21 @@ function AppTile({
                 </DropdownMenuItem>
             ) : null}
         </div>
+    );
+}
+
+/** The open app's mark beside its name on the menu's trigger. */
+function CurrentMark({ app }: { app: PolarisApp }) {
+    const Icon = app.icon;
+    return (
+        <AppLogo
+            appId={app.id}
+            size={22}
+            fallback={
+                <span className="grid size-6 shrink-0 place-items-center rounded bg-primary/15 text-primary">
+                    <Icon className="size-4" />
+                </span>
+            }
+        />
     );
 }

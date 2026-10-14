@@ -19,7 +19,7 @@
  * app and a person drawn side by side are coloured by the same rule.
  */
 
-import { cn } from "@polaris/ui";
+import { AppLogo, cn, hasAppLogo } from "@polaris/ui";
 import type { JSX, SVGProps } from "react";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
@@ -43,6 +43,19 @@ const BRAND_MARKS: Record<string, (props: SVGProps<SVGSVGElement>) => JSX.Elemen
     "ark-manager": SteamMark
 };
 
+/**
+ * Catalog entries that install one of Polaris's own apps, by the app id they
+ * become. They wear that app's logo here too, so the card in the store is the
+ * tile the launcher will show once it is installed.
+ */
+const OWN_APPS: Readonly<Record<string, string>> = {
+    tools: "tools",
+    calendar: "calendar",
+    crm: "crm",
+    home: "home",
+    "game-servers": "games"
+};
+
 export function AppMark({
     app,
     size = 36,
@@ -54,6 +67,18 @@ export function AppMark({
 }) {
     const Brand = BRAND_MARKS[app.id];
     const Icon = app.icon;
+
+    const own = OWN_APPS[app.id];
+    if (own && hasAppLogo(own)) {
+        return (
+            <span
+                className={cn("grid shrink-0 place-items-center", className)}
+                style={{ width: size, height: size }}
+            >
+                <AppLogo appId={own} size={Math.round(size * 0.9)} />
+            </span>
+        );
+    }
 
     if (Brand) {
         return (

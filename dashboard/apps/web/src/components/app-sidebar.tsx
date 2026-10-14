@@ -25,7 +25,7 @@
  */
 
 import Link from "next/link";
-import { cn } from "@polaris/ui";
+import { AppLogo, cn } from "@polaris/ui";
 import * as nav from "@/lib/apps";
 import { railApps } from "@/lib/app-launcher";
 import { ChevronLeft, LayoutGrid, Star } from "lucide-react";
@@ -288,11 +288,19 @@ function RailLink({
                 active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
             )}
         >
-            <Icon
-                className={cn(
-                    "size-4 shrink-0",
-                    active ? "text-primary" : "text-foreground-subtle"
-                )}
+            {/* The list of apps shows each app's own logo, so an app is found by
+                its colour before its name is read; an app's screens stay plain. */}
+            <AppLogo
+                appId={inApp ? "" : appId}
+                size={16}
+                fallback={
+                    <Icon
+                        className={cn(
+                            "size-4 shrink-0",
+                            active ? "text-primary" : "text-foreground-subtle"
+                        )}
+                    />
+                }
             />
             <span className="truncate" title={label}>
                 {label}

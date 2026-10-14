@@ -13,7 +13,7 @@
  * query itself, like a clock command, wear an icon.
  */
 
-import { Badge, cn } from "@polaris/ui";
+import { AppLogo, Badge, cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import type { LucideIcon } from "lucide-react";
 import type { ClockCommand, RecentSearch } from "@polaris/core";
@@ -75,7 +75,11 @@ export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) 
     const Icon: LucideIcon = entry.icon;
     return (
         <Row {...row} label={entry.label}>
-            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <AppLogo
+                appId={entry.appId ?? ""}
+                size={18}
+                fallback={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+            />
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm" title={entry.label}>
                     {entry.label}

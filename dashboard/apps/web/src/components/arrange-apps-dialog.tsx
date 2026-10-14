@@ -13,7 +13,7 @@
  */
 
 import { useState, type ReactNode } from "react";
-import type { PolarisApp } from "@polaris/ui";
+import { AppLogo, type PolarisApp } from "@polaris/ui";
 import { moveFavorite } from "@/lib/app-launcher";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -106,8 +106,16 @@ function Row({ app, children }: { app: PolarisApp; children: ReactNode }) {
     const Icon = app.icon;
     return (
         <li className="flex min-w-0 items-center gap-2.5 rounded-md px-1 py-0.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary">
-                <Icon className="size-4" aria-hidden="true" />
+            <span className="grid size-7 shrink-0 place-items-center">
+                <AppLogo
+                    appId={app.id}
+                    size={24}
+                    fallback={
+                        <span className="grid size-7 place-items-center rounded-lg bg-primary/15 text-primary">
+                            <Icon className="size-4" aria-hidden="true" />
+                        </span>
+                    }
+                />
             </span>
             <span className="min-w-0 flex-1 truncate text-[0.8125rem]" title={app.label}>
                 {app.label}
