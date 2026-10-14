@@ -416,12 +416,14 @@ export function progressPercent(
  * ends, `du` of the destination is the only measure, and it counts blocks, so it
  * can pass the original's byte total before the copy is done; it is held one byte
  * under the total, so "all of it is copied" is only ever said by the copy itself
- * once it printed its own figures. Null when there is nothing to record.
+ * once it printed its own figures. Null when there is nothing to record, or when
+ * the original is empty and no figure can sit under its total.
  */
 export function copiedSoFar(du: number | null, report: CopyReport): number | null {
     if (report.copiedBytes !== undefined) return report.copiedBytes;
     if (du === null) return null;
     if (report.sourceBytes === undefined) return du;
+    if (report.sourceBytes <= 0) return null;
     return Math.max(0, Math.min(du, report.sourceBytes - 1));
 }
 

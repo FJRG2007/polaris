@@ -284,6 +284,13 @@ describe("a move's progress", () => {
         // du counts blocks and overshoots: still copying.
         expect(plan.copiedSoFar(4096, counted)).toBe(999);
         expect(plan.copiedSoFar(null, counted)).toBeNull();
+        const empty = plan.parseCopyLog("POLARIS_SOURCE files=0 bytes=0");
+        expect(plan.copiedSoFar(0, empty)).toBeNull();
+        expect(plan.movePhase("copying", 0, plan.copiedSoFar(0, empty))).toBe("copying");
+        const emptyCopied = plan.parseCopyLog(
+            "POLARIS_SOURCE files=0 bytes=0\nPOLARIS_COPY files=0 bytes=0"
+        );
+        expect(plan.copiedSoFar(0, emptyCopied)).toBe(0);
         // An earlier attempt's files, before the size is known.
         expect(plan.copiedSoFar(5000, plan.parseCopyLog(""))).toBe(5000);
         const copied = plan.parseCopyLog(

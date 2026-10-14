@@ -19,8 +19,10 @@ export function moveTarget(move: ActiveMoveView, t: Words): string {
 }
 
 /**
- * The move a volume on this machine is part of: the one whose copier holds it,
- * or whose original it is by name. Null when it is not moving.
+ * The move a volume on this machine is the original of: by name once the move
+ * recorded it, else the one whose copier holds it. The copier also holds the
+ * destination, so a move that knows its original's name never claims another
+ * volume. Null when it is not moving.
  */
 export function moveOfVolume(
     volume: { readonly name: string; readonly heldBy: readonly { readonly name: string }[] },
@@ -28,11 +30,13 @@ export function moveOfVolume(
 ): ActiveMoveView | null {
     const holders = new Set(volume.heldBy.map((holder) => holder.name.replace(/^\//, "")));
     return (
+        moves.find((move) => move.dockerName === volume.name) ??
         moves.find(
             (move) =>
-                move.dockerName === volume.name ||
+                move.dockerName === null &&
                 move.containers.some((container) => holders.has(container))
-        ) ?? null
+        ) ??
+        null
     );
 }
 
