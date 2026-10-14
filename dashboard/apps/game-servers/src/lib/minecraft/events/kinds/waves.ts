@@ -25,7 +25,8 @@ import {
     armLines,
     equipLines,
     hillTick,
-    readTest
+    readTest,
+    underTheWorld
 } from "../commands";
 
 export type WaveMix = EventOptions<"waves">["mix"];
@@ -485,7 +486,7 @@ export const KEEP_INVENTORY = ["keepInventory", "keep_inventory"] as const;
  * chunk is let go - then its objectives. Safe to send again and again.
  */
 export function wavesCleanup(mix: WaveKinds): string[] {
-    const lines = [`kill @e[tag=${MOB_TAG}]`];
+    const lines = [underTheWorld(`@e[tag=${MOB_TAG}]`), `kill @e[tag=${MOB_TAG}]`];
     for (const one of [...killObjectives(mix), ...killObjectives(mix, true)])
         lines.push(`scoreboard objectives remove ${one.objective}`);
     lines.push(

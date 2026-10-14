@@ -1435,11 +1435,25 @@ const HOSTILES = [
 /** How far above an arena a hostile is still taken out: a phantom circles there. */
 export const HOSTILE_MARGIN = 16;
 
+/** Where a creature taken out of an event is sent: far under the world, where
+ *  whatever it drops is lost instead of left lying about. */
+const UNDER_THE_WORLD = -1000;
+
+/** Sent under the world, to be killed there: a creature Polaris takes away,
+ *  rather than one a player beat, leaves no loot behind. */
+export function underTheWorld(selector: string): string {
+    return `execute as ${selector} at @s run tp @s ~ ${UNDER_THE_WORLD} ~`;
+}
+
 /**
  * Every hostile creature inside an event's own box - and the air above it - taken
  * out, one line each, and nothing outside it. A named mob is kept: naming one
  * (a name tag) makes it persistent, and a persistent one is never touched - nor
  * is anything tamed, since nothing on the list can be.
+ *
+ * Sent under the world rather than killed: this runs every tick an event is on,
+ * and a killed skeleton drops its bones and arrows where it stood, so a dark maze
+ * filled up with them. Whatever drops down there falls out of the world with it.
  */
 export function hostilesOut(box: {
     readonly x1: number;
@@ -1457,7 +1471,7 @@ export function hostilesOut(box: {
     const dz = Math.abs(box.z2 - box.z1);
     return HOSTILES.map(
         (type) =>
-            `execute in minecraft:overworld run kill @e[type=minecraft:${type},x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz},nbt=!{PersistenceRequired:1b}]`
+            `execute in minecraft:overworld as @e[type=minecraft:${type},x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz},nbt=!{PersistenceRequired:1b}] at @s run tp @s ~ ${UNDER_THE_WORLD} ~`
     );
 }
 
@@ -1508,6 +1522,7 @@ export function daybreak(
     return [
         frozen ? `time set ${timeBefore}` : "time set 23500",
         "weather clear",
+        underTheWorld(`@e[tag=${MOB_TAG}]`),
         `kill @e[tag=${MOB_TAG}]`
     ];
 }

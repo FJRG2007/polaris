@@ -71,7 +71,10 @@ describe("a villager defense's monsters", () => {
             "scoreboard objectives add pe_wk3 minecraft.killed:minecraft.vindicator"
         );
         expect(waves.wavesCleanup(kinds)).toContain("scoreboard objectives remove pe_wk4");
-        expect(waves.wavesCleanup(kinds)[0]).toBe("kill @e[tag=pe_mob]");
+        expect(waves.wavesCleanup(kinds).slice(0, 2)).toEqual([
+            "execute as @e[tag=pe_mob] at @s run tp @s ~ -1000 ~",
+            "kill @e[tag=pe_mob]"
+        ]);
         // A horde defense by name is what it always was.
         expect(waves.wavesSetup("classic")).toEqual(waves.wavesSetup(waves.MIX_MOBS.classic));
     });
