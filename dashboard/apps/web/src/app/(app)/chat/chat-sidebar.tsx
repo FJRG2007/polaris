@@ -38,7 +38,7 @@ import { NewDirectDialog } from "./new-direct-dialog";
 import * as core from "@polaris/core";
 import { LiveBadge, VoiceStateIcons } from "./call-roster";
 import { SeatMenu } from "./call-moderation-menu";
-import { useChatStream } from "./use-chat-stream";
+import { useVoiceRooms } from "./voice-rooms";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useParams, usePathname, useRouter } from "next/navigation";
@@ -157,7 +157,6 @@ export function ChatSidebar() {
     const [deleting, setDeleting] = useState<ChatChannelView | null>(null);
     const [deleteError, setDeleteError] = useState("");
     const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
-    const [inRoom, setInRoom] = useState<Record<string, VoicePresence[]>>({});
 
     const space = useMemo(
         () => spaces.find((entry) => entry.id === activeSpaceId) ?? null,
@@ -214,29 +213,9 @@ export function ChatSidebar() {
         [inSpace]
     );
 
-    const readPresence = useCallback(() => {
-        if (voiceIds.length === 0) {
-            setInRoom({});
-            return;
-        }
-        void actions
-            .voicePresenceAction(voiceIds)
-            .then((result) => setInRoom(result.inRoom))
-            .catch(() => undefined);
-    }, [voiceIds]);
-
-    // Somebody walking into a room, leaving it or muting is announced, so the
-    // names under it follow at once rather than at the next poll.
-    useChatStream((frame) => {
-        if (frame.kind === "call" && voiceIds.includes(frame.channelId)) readPresence();
-    });
-
-    useEffect(() => {
-        readPresence();
-        if (voiceIds.length === 0) return;
-        const timer = setInterval(readPresence, PRESENCE_EVERY_MS);
-        return () => clearInterval(timer);
-    }, [readPresence, voiceIds.length]);
+    // Somebody walking in, leaving or muting is announced on the stream; the
+    // poll is for the count beside a room a missed frame would leave wrong.
+    const { inRoom, read: readPresence } = useVoiceRooms(voiceIds, PRESENCE_EVERY_MS);
 
     const manages = space !== null && space.access !== "member";
     const t = useTranslations("chat");

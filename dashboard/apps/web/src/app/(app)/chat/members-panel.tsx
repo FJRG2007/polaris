@@ -31,9 +31,11 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { Avatar } from "@/components/avatar";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Crown, Users, X } from "lucide-react";
+import Link from "next/link";
+import { Crown, Headphones, Users, X } from "lucide-react";
 import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
+import { spaceVoiceIds, useVoiceRooms, voiceSeats, type VoiceSeat } from "./voice-rooms";
 import { NicknameDialog } from "./nickname-dialog";
 import { nameplateCss } from "@/lib/profile-style-css";
 import { useKnownPresence, usePresence } from "@/components/presence-store";
@@ -207,8 +209,21 @@ function MemberRows({
     className: string;
 }) {
     const t = useTranslations("chat");
+    const { channels } = useChat();
     const [error, setError] = useState("");
     const direct = useOpenDirect(setError);
+    // Who is in a voice room of this space, from the same answer the rail draws
+    // its rooms from and only for rooms this reader can reach. Live off the
+    // stream; a direct message or a group has no rooms and asks nothing.
+    const voiceIds = useMemo(
+        () => spaceVoiceIds(channels, channel.spaceId),
+        [channels, channel.spaceId]
+    );
+    const { inRoom } = useVoiceRooms(voiceIds);
+    const seats = useMemo(
+        () => voiceSeats(channels, channel.spaceId, inRoom),
+        [channels, channel.spaceId, inRoom]
+    );
     /** Whose nickname is being changed. Held here rather than in the menu: the
      *  menu is unmounted the moment an item is chosen, and a dialog opened by
      *  something that is about to disappear never appears. */
@@ -274,6 +289,7 @@ function MemberRows({
                                     <MemberRow
                                         member={item.member}
                                         away={item.away}
+                                        voice={seats.get(item.member.userId) ?? null}
                                         you={item.member.userId === viewerId}
                                         channel={channel}
                                         viewerId={viewerId}
@@ -308,9 +324,10 @@ function MemberRows({
  * hook inside the loop above would be a hook called a different number of times
  * whenever somebody joins the room.
  */
-function MemberRow({
+export function MemberRow({
     member,
     away,
+    voice,
     you,
     channel,
     viewerId,
@@ -325,6 +342,8 @@ function MemberRow({
     /** Not around, in a list split by presence: drawn faint, below the people
      *  who could answer now. */
     away: boolean;
+    /** The voice room they are sitting in, when the reader can see it. */
+    voice: VoiceSeat | null;
     you: boolean;
     channel: ChatChannelView;
     viewerId: string;
@@ -346,7 +365,10 @@ function MemberRow({
     // lines under a name in a 14rem column is a wall.
     // What they are doing comes after what they said and before the role, for
     // the same reason: it is this afternoon, and the role is every afternoon.
+    // Being in a voice room wins over all of it while it lasts: it is the one
+    // thing on this list somebody can act on by walking in.
     const under = presenceLine(where, tc) || role;
+    const inVoice = voice ? t("members.inVoiceIn", { channel: voice.channelName }) : "";
     // Asked from the same store the face asked, so it is one request for the
     // panel rather than one per member.
     const plate = usePersonNameplate(member.userId);
@@ -363,68 +385,98 @@ function MemberRow({
             onChanged={onChanged}
             onError={onError}
         >
-            <button
-                type="button"
-                disabled={press ? false : you || busy}
-                title={
-                    press
-                        ? t("messageList.viewProfile", { name: member.name })
-                        : you
-                          ? member.name
-                          : t("messageList.messageNamed", { name: member.name })
-                }
-                onClick={(event) =>
-                    press
-                        ? press({ id: member.userId, name: member.name }, event.currentTarget)
-                        : onOpen()
-                }
-                className={cn(
-                    "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                    you && !press ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
-                    away && "opacity-50 hover:opacity-100 focus-visible:opacity-100",
-                    // A plate replaces the row's own hover tint
-                    // rather than being tinted by it.
-                    plate && platedRow(plate, "hover:bg-transparent")
-                )}
-                // The plate somebody chose, drawn behind their
-                // whole row - which is where a nameplate goes,
-                // and the only place in a list narrow enough for
-                // a pill around a name to look like a mistake.
-                style={plate ? nameplateCss(plate) : undefined}
-            >
-                <Avatar decorated person={{ id: member.userId, name: member.name }} size={28} />
-                <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1">
-                        <PersonName
-                            id={member.userId}
-                            name={member.name}
-                            className="truncate text-sm"
-                        >
-                            {you && (
-                                <span className={plate ? "opacity-80" : "text-muted-foreground"}>
-                                    {" "}
-                                    {t("members.you")}
-                                </span>
+            <div className="relative">
+                <button
+                    type="button"
+                    disabled={press ? false : you || busy}
+                    title={
+                        press
+                            ? t("messageList.viewProfile", { name: member.name })
+                            : you
+                              ? member.name
+                              : t("messageList.messageNamed", { name: member.name })
+                    }
+                    onClick={(event) =>
+                        press
+                            ? press({ id: member.userId, name: member.name }, event.currentTarget)
+                            : onOpen()
+                    }
+                    className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
+                        you && !press
+                            ? "cursor-default"
+                            : "hover:bg-card-hover disabled:opacity-70",
+                        away && "opacity-50 hover:opacity-100 focus-visible:opacity-100",
+                        // A plate replaces the row's own hover tint
+                        // rather than being tinted by it.
+                        plate && platedRow(plate, "hover:bg-transparent")
+                    )}
+                    // The plate somebody chose, drawn behind their
+                    // whole row - which is where a nameplate goes,
+                    // and the only place in a list narrow enough for
+                    // a pill around a name to look like a mistake.
+                    style={plate ? nameplateCss(plate) : undefined}
+                >
+                    <Avatar decorated person={{ id: member.userId, name: member.name }} size={28} />
+                    <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1">
+                            <PersonName
+                                id={member.userId}
+                                name={member.name}
+                                className="truncate text-sm"
+                            >
+                                {you && (
+                                    <span
+                                        className={plate ? "opacity-80" : "text-muted-foreground"}
+                                    >
+                                        {" "}
+                                        {t("members.you")}
+                                    </span>
+                                )}
+                            </PersonName>
+                            {member.role === "owner" && (
+                                <Crown
+                                    role="img"
+                                    aria-label={t("members.owner")}
+                                    className="size-3.5 text-warning"
+                                />
                             )}
-                        </PersonName>
-                        {member.role === "owner" && (
-                            <Crown
-                                role="img"
-                                aria-label={t("members.owner")}
-                                className="size-3.5 text-warning"
-                            />
+                        </span>
+                        {voice ? (
+                            // Room kept for the line drawn over it below: a link
+                            // cannot sit inside the row's own button.
+                            <span aria-hidden="true" className="invisible block text-[0.6875rem]">
+                                {"\u00a0"}
+                            </span>
+                        ) : (
+                            under && (
+                                <span
+                                    className="block truncate text-[0.6875rem] text-muted-foreground"
+                                    title={under}
+                                >
+                                    {under}
+                                </span>
+                            )
                         )}
                     </span>
-                    {under && (
-                        <span
-                            className="block truncate text-[0.6875rem] text-muted-foreground"
-                            title={under}
-                        >
-                            {under}
-                        </span>
-                    )}
-                </span>
-            </button>
+                </button>
+                {voice && (
+                    // Opens the room rather than walking into it: seeing who is
+                    // there is the question, and joining is one press further.
+                    <Link
+                        href={`/chat/c/${voice.channelId}`}
+                        title={inVoice}
+                        aria-label={inVoice}
+                        className={cn(
+                            "absolute bottom-1 left-11 flex max-w-[calc(100%-3.25rem)] min-w-0 items-center gap-1 rounded-sm text-[0.6875rem] text-muted-foreground transition-colors hover:text-foreground hover:underline",
+                            away && "opacity-50"
+                        )}
+                    >
+                        <Headphones aria-hidden="true" className="size-3 shrink-0" />
+                        <span className="min-w-0 truncate">{t("members.inVoice")}</span>
+                    </Link>
+                )}
+            </div>
         </MemberMenu>
     );
 }
