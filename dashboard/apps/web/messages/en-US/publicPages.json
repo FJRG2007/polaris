@@ -60,6 +60,7 @@
         "edit": "Edit",
         "orgHere": "An organization on this Polaris",
         "typedCompany": "Typed by them. Polaris knows nothing about it.",
+        "restricted": "This profile is private.",
         "hereSince": "Here since {date}",
         "followersCount": "{count, plural, other {followers}}",
         "followingCount": "{count, plural, other {following}}",

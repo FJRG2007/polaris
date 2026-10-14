@@ -47,7 +47,10 @@ export async function GET(
           : null;
     if (!viewer) return new Response("Unauthorized", { status: 401 });
 
-    const visible = await maySee(userId, "avatar", viewer);
+    // The banner is part of the profile, not of the face beside a name, so a
+    // reader outside the profile audience gets none whatever the photo allows.
+    const visible =
+        (await maySee(userId, "avatar", viewer)) && (await maySee(userId, "profile", viewer));
     if (!visible) return blankAvatarResponse(CACHE);
 
     const picture = await resolveBanner(userId);

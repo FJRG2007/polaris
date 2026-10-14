@@ -112,7 +112,12 @@ export async function loadFollowListAction(
     // this Polaris is a reason to be able to read the database from the
     // administration screens, not a reason for somebody's profile to quietly
     // show more to one reader than it says it shows to anybody.
-    const allowed = await maySee(parsed.data.personId, "followers", { id: user.id, isAdmin: false });
+    const reader = { id: user.id, isAdmin: false };
+    // A profile this reader is outside of has no lists either, whatever the
+    // follower setting says: the counts are not drawn for them in the first place.
+    const allowed =
+        (await maySee(parsed.data.personId, "profile", reader)) &&
+        (await maySee(parsed.data.personId, "followers", reader));
     if (!allowed) return { error: (await getTranslations("publicPages"))("profile.errors.listHidden") };
 
     const page = await listFollow(parsed.data.personId, parsed.data.which, {

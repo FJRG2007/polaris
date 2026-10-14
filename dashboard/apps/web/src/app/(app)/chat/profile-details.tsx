@@ -21,7 +21,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { AtSign } from "lucide-react";
+import { AtSign, Lock } from "lucide-react";
 import { profileAction } from "./actions";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
@@ -224,7 +224,7 @@ export function ProfileDetails({
                     profile page draws it from. Not on the card: a glance is the
                     name, the face and what they said, and this is the part of a
                     profile somebody reads when they have sat down with it. */}
-                {size !== "card" && profile?.mutual ? (
+                {size !== "card" && profile?.mutual && !profile.restricted ? (
                     <div className="w-full text-left">
                         <MutualPanel
                             compact={!full}
@@ -252,6 +252,13 @@ export function ProfileDetails({
                         </p>
                     </div>
                 )}
+
+                {profile?.restricted ? (
+                    <p className="flex w-full items-center gap-1.5 text-left text-xs text-muted-foreground">
+                        <Lock className="size-3.5 shrink-0" />
+                        {t("profileDetails.restricted")}
+                    </p>
+                ) : null}
             </div>
         </div>
     );

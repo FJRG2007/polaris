@@ -69,7 +69,9 @@ vi.mock("@/lib/privacy-service", () => ({
         ids: readonly string[]
     ) => {
         asked.push(viewer);
-        return new Set(open[field] ? ids : []);
+        // The profile audience is open unless a test closes it, as it is for
+        // every account that never chose.
+        return new Set((open[field] ?? field === "profile") ? ids : []);
     },
     maySee: async (_id: string, _field: string, viewer: { id: string; isAdmin: boolean }) => {
         asked.push(viewer);

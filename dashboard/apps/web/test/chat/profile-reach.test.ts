@@ -56,7 +56,9 @@ let blocked = new Set<string>();
 let namesOpen = new Set<string>();
 
 vi.mock("@/lib/privacy-service", () => ({
-    maySee: async (subjectId: string) => namesOpen.has(subjectId)
+    // The profile itself is open, as it is for every account that never chose.
+    maySee: async (subjectId: string, field: string) =>
+        field === "profile" || namesOpen.has(subjectId)
 }));
 
 vi.mock("@/lib/blocks", () => ({

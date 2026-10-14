@@ -174,6 +174,11 @@ export interface PublicProfile {
         readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
         readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
     } | null;
+    /**
+     * True when this reader is outside the profile audience and is being shown
+     * only the name and the photo. Everything else above is empty.
+     */
+    readonly restricted: boolean;
 }
 
 /** A stored JSON list of strings, out of its own column. Anything unparseable
@@ -417,6 +422,7 @@ export async function publicProfile(
 
     const allowed = await visible(user.id, viewer, [
         "discoverable",
+        "profile",
         "avatar",
         "fullName",
         "email",
@@ -434,7 +440,7 @@ export async function publicProfile(
 }
 
 type Fields = Record<
-    "discoverable" | "avatar" | "fullName" | "email" | "companies" | "followers",
+    "discoverable" | "profile" | "avatar" | "fullName" | "email" | "companies" | "followers",
     boolean
 >;
 
@@ -461,6 +467,7 @@ async function visible(
         where: { userId },
         select: {
             discoverable: true,
+            profile: true,
             avatar: true,
             fullName: true,
             email: true,
@@ -478,6 +485,7 @@ async function visible(
     const followers = row?.followers ?? (await defaultFollowerAudience());
     return {
         discoverable: open("discoverable"),
+        profile: open("profile"),
         avatar: open("avatar"),
         fullName: open("fullName"),
         email: open("email"),
@@ -510,6 +518,10 @@ async function draw(
     viewer: PrivacyViewer | null,
     own: boolean
 ): Promise<PublicProfile> {
+    // Outside the profile audience: the card a name needs and nothing else.
+    // Your own page is always the whole page.
+    if (!own && !allowed.profile) return restrictedProfile(user, allowed, viewer);
+
     const marked = storedList(user.profileOrgIds);
     const organizations =
         allowed.companies && marked.length > 0
@@ -552,7 +564,45 @@ async function draw(
         links: profileLinks(user.links),
         follows: { ...counts, showsNames: allowed.followers },
         standing,
-        mutual
+        mutual,
+        restricted: false
+    };
+}
+
+/**
+ * The profile somebody outside its audience is shown.
+ *
+ * The name, the handle and the photo as the photo setting allows - what every
+ * list already draws beside a message, so withholding them would hide nothing -
+ * and what this reader may do about them, since a friend request is how somebody
+ * gets into a "friends" audience at all. Nothing they wrote, nothing they link
+ * to, no banner, no counts, no date and nothing in common: the same card the
+ * messengers with this setting draw for a private profile.
+ */
+async function restrictedProfile(
+    user: { id: string; name: string; username: string | null },
+    allowed: Fields,
+    viewer: PrivacyViewer | null
+): Promise<PublicProfile> {
+    return {
+        id: user.id,
+        name: user.name,
+        username: user.username ?? "",
+        fullName: "",
+        description: "",
+        showsAvatar: allowed.avatar,
+        style: core.NO_PROFILE_STYLE,
+        organizations: [],
+        companies: [],
+        email: "",
+        joinedAt: "",
+        headline: "",
+        pronouns: "",
+        links: [],
+        follows: { followers: 0, following: 0, showsNames: false },
+        standing: await standingOf(user.id, viewer, false),
+        mutual: null,
+        restricted: true
     };
 }
 

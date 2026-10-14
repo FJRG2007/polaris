@@ -1526,6 +1526,7 @@
         "anythingPastThisCountsAs": "Lo que pase de aquí cuenta como que hablas"
     },
     "profileDetails": {
+        "restricted": "Este perfil es privado.",
         "about": "Sobre mí"
     },
     "notifyMenu": {
