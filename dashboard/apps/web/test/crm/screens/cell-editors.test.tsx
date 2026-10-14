@@ -118,7 +118,13 @@ describe("cell editors", () => {
     });
 
     it("closes instead of committing a value the cell already holds", () => {
-        const name = customDef({ id: "f4", slot: "cText3", label: "Nick", kind: "text", options: [] });
+        const name = customDef({
+            id: "f4",
+            slot: "cText3",
+            label: "Nick",
+            kind: "text",
+            options: []
+        });
         const Editor = editorFor(name)!;
         expect(editorFor(name)).toBe(Editor);
         const onCommit = vi.fn();

@@ -482,7 +482,11 @@ function sameValue(a: unknown, b: unknown): boolean {
  * through the same normalizer first, so a value kept as it was opened never
  * counts as an edit.
  */
-export function keepsValue(field: FieldDef, value: FieldValue | undefined, next: InputValue): boolean {
+export function keepsValue(
+    field: FieldDef,
+    value: FieldValue | undefined,
+    next: InputValue
+): boolean {
     if (value === undefined) return false;
     const before = normalizeInput(field, value);
     return sameValue(before.ok ? before.value : value, next);

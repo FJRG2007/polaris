@@ -427,7 +427,9 @@ export function CalendarScreen({ path }: { path: string[] }) {
         setNowSignal((value) => value + 1);
     };
     const step = (direction: 1 | -1) =>
-        setAnchor((current) => time.stepAnchor(view, current ?? today, direction, preferences.customDays));
+        setAnchor((current) =>
+            time.stepAnchor(view, current ?? today, direction, preferences.customDays)
+        );
     const swipeArea = useRef<HTMLElement>(null);
     useSwipeStep(swipeArea, step);
 
