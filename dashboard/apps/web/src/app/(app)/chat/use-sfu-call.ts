@@ -3739,13 +3739,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const rosterOf = useRef<string | null>(null);
     useEffect(() => {
-        const inside = new Map(
-            (meeting?.participants ?? [])
-                .filter((person) => person.admission === "admitted")
-                .map((person) => [person.id, person.name] as const)
-        );
         const self = me.current;
-        if (!meeting || meeting.ended || (self !== null && !inside.has(self))) {
+        const inside = arrivals.othersInRoom(meeting?.participants ?? [], self);
+        if (!meeting || meeting.ended || !inside) {
             presence.current = null;
             rosterOf.current = null;
             return;

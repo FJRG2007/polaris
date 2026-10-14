@@ -14,6 +14,7 @@ import {
     fromMediaJoined,
     fromMediaLeft,
     fromRoster,
+    othersInRoom,
     startPresence
 } from "@/app/(app)/chat/call-arrivals";
 
@@ -98,5 +99,40 @@ describe("the toast", () => {
     it("leads with arrivals, and says nothing for nothing", () => {
         expect(arrivalNotice(["Bea"], ["Ana"])?.key).toBe("joined");
         expect(arrivalNotice([], [])).toBeNull();
+    });
+});
+
+describe("othersInRoom", () => {
+    const seat = (id: string, userId: string | null, name: string, admission = "admitted") => ({
+        id,
+        userId,
+        name,
+        admission
+    });
+
+    it("waits until this browser's own seat is in the room", () => {
+        const room = [seat("seat-ana", "user-ana", "Ana")];
+        expect(othersInRoom(room, null)).toBeNull();
+        expect(othersInRoom(room, "seat-me")).toBeNull();
+        expect(
+            othersInRoom([...room, seat("seat-me", "user-me", "Me", "waiting")], "seat-me")
+        ).toBeNull();
+    });
+
+    it("leaves out every seat of this account, so another tab or device is not an arrival", () => {
+        const room = [
+            seat("seat-me", "user-me", "Me"),
+            seat("seat-me-phone", "user-me", "Me"),
+            seat("seat-ana", "user-ana", "Ana"),
+            seat("seat-bea", "user-bea", "Bea", "waiting")
+        ];
+        expect([...othersInRoom(room, "seat-me")!.keys()]).toEqual(["seat-ana"]);
+        const start = startPresence(othersInRoom(room.slice(0, 1).concat(room[2]!), "seat-me")!);
+        expect(fromRoster(start, othersInRoom(room, "seat-me")!, "seat-me").joined).toEqual([]);
+    });
+
+    it("leaves out only a guest's own seat", () => {
+        const room = [seat("seat-guest", null, "Guest"), seat("seat-other", null, "Other guest")];
+        expect([...othersInRoom(room, "seat-guest")!.keys()]).toEqual(["seat-other"]);
     });
 });
