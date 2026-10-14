@@ -521,6 +521,7 @@
         "failed": "La última ejecución falló: {error}",
         "tooMany": "Un tipo de registro puede tener hasta {max} flujos.",
         "noRunner": "Quien guardó este flujo por última vez ya no puede usar el CRM. Guárdalo de nuevo para que se ejecute como tú.",
+        "cutShort": "Esta ejecución se detuvo antes de terminar, quizá porque Polaris se reinició. Sus pasos restantes no se ejecutaron.",
         "triggers": {
             "created": "Se crea un registro",
             "updated": "Se cambia un registro",

@@ -716,6 +716,9 @@ export async function runWorkflow(
                 data: {
                     workflowId: workflow.id,
                     status: "running",
+                    // The same lease a resumed run holds: a run whose process
+                    // dies is failed by `resumeWaitingRuns` once it lapses.
+                    resumeAt: new Date(Date.now() + RESUME_LEASE),
                     cause:
                         context.event?.kind ??
                         model.readTrigger(workflow.trigger)?.kind ??
@@ -838,13 +841,16 @@ function storedBody(text: string | null): unknown {
     }
 }
 
-/** How long a resumed run may go on before it is taken for cut short. */
+/** How long a run may go on before it is taken for cut short. */
 const RESUME_LEASE = 30 * 60_000;
 
 /**
  * Pick up the runs whose delay is over, once each: a run is claimed by moving
  * it out of waiting, for a lease, before it goes on. A run of a workflow
- * switched off since is cancelled instead. Returns how many went on.
+ * switched off since is cancelled instead. A run still running once its lease
+ * is up was cut short - its process stopped - and is failed rather than run
+ * again, since the steps it already took would be repeated. Returns how many
+ * went on.
  */
 export async function resumeWaitingRuns(now: Date = new Date()): Promise<number> {
     const due = await prisma.crmWorkflowRun.findMany({
@@ -855,6 +861,10 @@ export async function resumeWaitingRuns(now: Date = new Date()): Promise<number>
     });
     let ran = 0;
     for (const run of due) {
+        if (run.status === "running") {
+            await failCutShort(run.id, run.workflow.id, run.resumeAt, now);
+            continue;
+        }
         const claimed = await prisma.crmWorkflowRun.updateMany({
             where: { id: run.id, status: run.status, resumeAt: run.resumeAt },
             data: { status: "running", resumeAt: new Date(now.getTime() + RESUME_LEASE) }
@@ -886,6 +896,25 @@ export async function resumeWaitingRuns(now: Date = new Date()): Promise<number>
         ran += 1;
     }
     return ran;
+}
+
+/** End a run whose lease lapsed as failed, and note it on its workflow. */
+async function failCutShort(
+    runId: string,
+    workflowId: string,
+    lease: Date | null,
+    now: Date
+): Promise<void> {
+    const error = (await crmT())("workflows.cutShort");
+    const claimed = await prisma.crmWorkflowRun.updateMany({
+        where: { id: runId, status: "running", resumeAt: lease },
+        data: { status: "failed", error, finishedAt: now, resumeAt: null, body: null, actions: null }
+    });
+    if (claimed.count === 0) return;
+    await prisma.crmWorkflow.update({
+        where: { id: workflowId },
+        data: { runCount: { increment: 1 }, lastRunAt: now, lastError: error }
+    });
 }
 
 /** The workflows a kind of record can be run through by hand, for its page. */

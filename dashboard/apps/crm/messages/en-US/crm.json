@@ -521,6 +521,7 @@
         "failed": "Last run failed: {error}",
         "tooMany": "A kind of record can have up to {max} workflows.",
         "noRunner": "The person who last saved this workflow can no longer use the CRM. Save it again to run it as you.",
+        "cutShort": "This run stopped before it finished, likely because Polaris restarted. Its remaining steps did not run.",
         "triggers": {
             "created": "A record is created",
             "updated": "A record is changed",
