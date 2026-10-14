@@ -20,10 +20,11 @@ sigue tu ajuste claro u oscuro. Las versiones para móvil están en
 Un espacio agrupa sus canales en categorías. La barra lateral muestra quién
 está en cada canal de voz, quién tiene el micro o el sonido silenciado, quién
 comparte pantalla (DIRECTO) y cuánto se ha llenado la sala frente a su límite.
-Los mensajes admiten reacciones con emoji estándar o propios del espacio, citan
-el mensaje al que responden y usan Markdown, con bloques de código que se
-copian con un botón. Los mensajes de voz se reproducen ahí mismo, con su onda y
-un control de velocidad.
+La lista de miembros marca a esas mismas personas con una línea "En voz" y un
+enlace directo a la sala en la que están. Los mensajes admiten reacciones con
+emoji estándar o propios del espacio, citan el mensaje al que responden y usan
+Markdown, con bloques de código que se copian con un botón. Los mensajes de voz
+se reproducen ahí mismo, con su onda y un control de velocidad.
 
 Las decoraciones de perfil, los colores de nombre y las placas aparecen allí
 donde aparece un nombre.
