@@ -16,7 +16,7 @@ import { shelfPeople } from "./records";
 import { findDuplicates } from "./duplicates";
 import { initialValues } from "../model/timeline";
 import type { InputValue } from "../model/values";
-import { checkRow, splitName, type RowProblem } from "../model/import";
+import { checkRow, linkedIds, refNames, splitName, type RowProblem } from "../model/import";
 import { duplicateKeys, sharedKey, type DuplicateKey } from "../model/duplicates";
 import {
     recordWhere,
@@ -27,7 +27,13 @@ import {
     type CrmActor
 } from "./access";
 import { columnOf, recordSelect, table, toRecord, writable, writeData } from "./columns";
-import { primaryField, type CrmObject, type CrmRecord, type FieldDef } from "../model/objects";
+import {
+    isLinkList,
+    primaryField,
+    type CrmObject,
+    type CrmRecord,
+    type FieldDef
+} from "../model/objects";
 
 export interface ImportBatch {
     /** The field each column goes to, or null for a column left out. */
@@ -146,7 +152,9 @@ export async function readRows(
     for (const field of relations) {
         await requireCan(actor, field.target!, "read");
         const names = new Set(
-            checked.flatMap((row) => (row.refs[field.key] ? [key(row.refs[field.key]!)] : []))
+            checked.flatMap((row) =>
+                row.refs[field.key] ? refNames(field, row.refs[field.key]!).map(key) : []
+            )
         );
         found.set(field.key, await findByName(actor, field.target!, [...names]));
     }
@@ -164,7 +172,14 @@ export async function readRows(
         const out: Record<string, InputValue> = { ...(row.values as Record<string, InputValue>) };
         for (const [fieldKey, name] of Object.entries(row.refs)) {
             const ids = found.get(fieldKey)?.get(key(name)) ?? [];
-            const member = columns.find((field) => field?.key === fieldKey)?.kind === "member";
+            const field = columns.find((one) => one?.key === fieldKey);
+            const member = field?.kind === "member";
+            if (field && isLinkList(field)) {
+                const linked = linkedIds(field, name, found.get(fieldKey));
+                if (typeof linked === "string") problems.push({ key: fieldKey, reason: linked });
+                else out[fieldKey] = linked;
+                continue;
+            }
             if (ids.length === 1) out[fieldKey] = ids[0]!;
             else
                 problems.push({

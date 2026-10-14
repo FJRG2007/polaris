@@ -53,6 +53,8 @@ function emptyWhere(
             return { [spec.amount]: null };
         case "ref":
             return { [spec.column]: null };
+        case "refs":
+            return { [spec.column]: { isEmpty: true } };
     }
 }
 
@@ -64,6 +66,7 @@ function groupColumns(spec: ColumnSpec): string[] {
         case "scalar":
         case "day":
         case "ref":
+        case "refs":
             return [spec.column];
         case "name":
             return [spec.first, spec.last];

@@ -11,6 +11,7 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
+import { nameLinks, unlinkRecords } from "./linked";
 import { recordHref, relatedLists } from "../model/related";
 import { prisma } from "@polaris/db";
 import { dropEvents, logEvents, type NewEvent } from "./timeline";
@@ -25,6 +26,8 @@ import { crmActor, recordWhere, requireCan, shelfData, shelfWhere, type CrmActor
 import { recordSelect, table, toRecord, writable, writeData } from "./columns";
 import {
     fieldOf,
+    isLinkList,
+    linksOf,
     primaryField,
     recordName,
     type CrmObject,
@@ -76,7 +79,11 @@ export async function listRecords(
         table(object).count({ where })
     ]);
     return {
-        records: (rows as Record<string, unknown>[]).map((row) => shown(actor, object, row)),
+        records: await nameLinks(
+            actor,
+            (rows as Record<string, unknown>[]).map((row) => shown(actor, object, row)),
+            custom
+        ),
         total
     };
 }
@@ -204,7 +211,11 @@ export async function moveRecord(
         const t = await crmT();
         throw new CrmRefusal(t("errors.notFound"));
     }
-    const record = toRecord(object, row as Record<string, unknown>);
+    const [record] = (await nameLinks(
+        actor,
+        [toRecord(object, row as Record<string, unknown>)],
+        custom
+    )) as [CrmRecord];
     if (before) {
         const was = toRecord(object, before as Record<string, unknown>);
         await logEvents(actor, object, [
@@ -244,7 +255,13 @@ export async function getRecord(
         where: { id, ...recordWhere(actor, object) },
         select: recordSelect(object)
     });
-    return row ? shown(actor, object, row as Record<string, unknown>) : null;
+    if (!row) return null;
+    const [record] = await nameLinks(
+        actor,
+        [shown(actor, object, row as Record<string, unknown>)],
+        await loadFields(actor.shelf, object)
+    );
+    return record!;
 }
 
 /**
@@ -323,7 +340,18 @@ async function prepare(
         const normalized = normalizeInput(field, raw);
         if (!normalized.ok) await refuseValue(object, field, normalized.reason);
         const value = (normalized as { value: InputValue }).value;
-        if (value !== null && field.kind === "relation") {
+        if (isLinkList(field) && (value as readonly string[]).length > 0) {
+            const ids = value as readonly string[];
+            await requireCan(actor, field.target!, "read");
+            const found = await table(field.target!).count({
+                where: {
+                    id: { in: [...ids] },
+                    ...recordWhere(actor, field.target!),
+                    deletedAt: null
+                }
+            });
+            if (found !== ids.length) await refuseValue(object, field, "missing");
+        } else if (value !== null && field.kind === "relation" && !isLinkList(field)) {
             await requireCan(actor, field.target!, "read");
             const found = await table(field.target!).count({
                 where: {
@@ -354,7 +382,8 @@ export async function createRecord(
     await requireCan(actor, object, "edit");
     const primary = primaryField(object);
     if (!(primary.key in values)) await refuseValue(object, primary, "required");
-    const data = await prepare(actor, object, values, await loadFields(actor.shelf, object));
+    const custom = await loadFields(actor.shelf, object);
+    const data = await prepare(actor, object, values, custom);
     // New rows go to the top of a board column: below everything by position.
     const first = (await table(object).findFirst({
         where: shelfWhere(actor.shelf),
@@ -370,7 +399,11 @@ export async function createRecord(
         },
         select: recordSelect(object)
     });
-    const record = toRecord(object, row as Record<string, unknown>);
+    const [record] = (await nameLinks(
+        actor,
+        [toRecord(object, row as Record<string, unknown>)],
+        custom
+    )) as [CrmRecord];
     await logEvents(actor, object, [
         {
             recordId: record.id,
@@ -408,7 +441,8 @@ export async function updateRecords(
 ): Promise<CrmRecord[]> {
     await requireCan(actor, object, "edit");
     if (ids.length === 0) return [];
-    const data = await prepare(actor, object, values, await loadFields(actor.shelf, object));
+    const custom = await loadFields(actor.shelf, object);
+    const data = await prepare(actor, object, values, custom);
     const where = { id: { in: [...new Set(ids)] }, ...recordWhere(actor, object), deletedAt: null };
     const before = (await table(object).findMany({
         where,
@@ -419,10 +453,13 @@ export async function updateRecords(
         string,
         unknown
     >[];
-    const saved = rows.map((row) => toRecord(object, row));
-    const was = new Map(
-        before.map((row) => toRecord(object, row)).map((record) => [record.id, record])
+    const named = await nameLinks(
+        actor,
+        [...rows, ...before].map((row) => toRecord(object, row)),
+        custom
     );
+    const saved = named.slice(0, rows.length);
+    const was = new Map(named.slice(rows.length).map((record) => [record.id, record]));
     const keys = Object.keys(values);
     await logEvents(
         actor,
@@ -557,6 +594,45 @@ export async function destroyRecords(
         const result = await table(object, tx).deleteMany({
             where: { ...where, id: { in: gone } }
         });
+        // A relation somebody added holds ids, not a foreign key: take them out.
+        const lists = await unlinkRecords(tx, actor, gone);
+        // The links that stay are named the way any list is; the ones that
+        // went by the names read above.
+        const kept = new Map<string, string>();
+        for (const other of new Set(lists.map((list) => list.object))) {
+            const custom = await loadFields(actor.shelf, other);
+            const named = await nameLinks(
+                actor,
+                lists
+                    .filter((list) => list.object === other)
+                    .map((list) => ({
+                        id: list.recordId,
+                        position: 0,
+                        deletedAt: null,
+                        values: { [list.slot]: list.after.map((id) => ({ id, name: "" })) }
+                    })),
+                custom
+            );
+            for (const record of named)
+                for (const value of Object.values(record.values))
+                    for (const ref of linksOf(value)) kept.set(ref.id, ref.name);
+        }
+        for (const list of lists) {
+            const named = (ids: readonly string[]) =>
+                ids.map((id) => ({ id, name: names.get(id) ?? kept.get(id) ?? "" }));
+            cleared.push({
+                object: list.object,
+                events: [
+                    {
+                        recordId: list.recordId,
+                        kind: "updated" as const,
+                        changes: [
+                            { key: list.slot, before: named(list.before), after: named(list.after) }
+                        ]
+                    }
+                ]
+            });
+        }
         await dropEvents(actor, gone, tx);
         await tx.crmLink.deleteMany({
             where: { ...shelfWhere(actor.shelf), recordId: { in: gone } }

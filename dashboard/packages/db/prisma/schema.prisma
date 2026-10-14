@@ -12813,6 +12813,9 @@ model CrmCompany {
     cBool3                Boolean   @default(false)
     cBool4                Boolean   @default(false)
     cBool5                Boolean   @default(false)
+    cRel1                 String[]  @default([]) @db.Uuid
+    cRel2                 String[]  @default([]) @db.Uuid
+    cRel3                 String[]  @default([]) @db.Uuid
     createdById           String?   @db.Uuid
     // Who last changed it; null until somebody does.
     updatedById String? @db.Uuid
@@ -12876,6 +12879,9 @@ model CrmPerson {
     cBool3      Boolean   @default(false)
     cBool4      Boolean   @default(false)
     cBool5      Boolean   @default(false)
+    cRel1       String[]  @default([]) @db.Uuid
+    cRel2       String[]  @default([]) @db.Uuid
+    cRel3       String[]  @default([]) @db.Uuid
     createdById String?   @db.Uuid
     // Who last changed it; null until somebody does.
     updatedById String? @db.Uuid
@@ -12942,6 +12948,9 @@ model CrmOpportunity {
     cBool3           Boolean   @default(false)
     cBool4           Boolean   @default(false)
     cBool5           Boolean   @default(false)
+    cRel1            String[]  @default([]) @db.Uuid
+    cRel2            String[]  @default([]) @db.Uuid
+    cRel3            String[]  @default([]) @db.Uuid
     createdById      String?   @db.Uuid
     // Who last changed it; null until somebody does.
     updatedById String? @db.Uuid

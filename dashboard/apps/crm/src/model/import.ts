@@ -8,7 +8,7 @@
  */
 
 import type { FieldDef } from "./objects";
-import { normalizeInput, parseAmount, type InvalidReason } from "./values";
+import { MAX_LINKED, normalizeInput, parseAmount, type InvalidReason } from "./values";
 
 /** The most rows one import takes. */
 export const MAX_IMPORT_ROWS = 10_000;
@@ -279,4 +279,32 @@ export function batches<T>(rows: readonly T[], size: number = IMPORT_BATCH): T[]
     for (let start = 0; start < rows.length; start += size)
         out.push(rows.slice(start, start + size));
     return out;
+}
+
+/** The names one reference cell holds: one, or for a relation somebody added
+ *  that holds many, each of the "; "-separated ones. */
+export function refNames(field: FieldDef, cell: string): string[] {
+    const names = field.many ? cell.split(";") : [cell];
+    return names.map((name) => name.trim()).filter(Boolean);
+}
+
+/**
+ * The ids a relation somebody added takes from its cell, given the records
+ * each lowercased name was found as; the reason the cell is refused when a
+ * name matches nothing or more than one record, or names more than the field
+ * holds.
+ */
+export function linkedIds(
+    field: FieldDef,
+    cell: string,
+    found: ReadonlyMap<string, readonly string[]> | undefined
+): string[] | "missing" | "ambiguous" | "tooManyRecords" {
+    const ids: string[] = [];
+    for (const name of refNames(field, cell)) {
+        const matches = found?.get(name.replace(/\s+/g, " ").toLowerCase()) ?? [];
+        if (matches.length === 0) return "missing";
+        if (matches.length > 1) return "ambiguous";
+        if (!ids.includes(matches[0]!)) ids.push(matches[0]!);
+    }
+    return ids.length > (field.many ? MAX_LINKED : 1) ? "tooManyRecords" : ids;
 }

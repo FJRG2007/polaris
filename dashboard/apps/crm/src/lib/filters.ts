@@ -139,6 +139,18 @@ export function ruleWhere(
                 default:
                     return { [spec.column]: { not: null } };
             }
+        case "refs":
+            // A list of linked records: any of them, none of them, or none at all.
+            switch (rule.operator) {
+                case "isAnyOf":
+                    return { [spec.column]: { hasSome: ids } };
+                case "isNoneOf":
+                    return { NOT: { [spec.column]: { hasSome: ids } } };
+                case "isEmpty":
+                    return { [spec.column]: { isEmpty: true } };
+                default:
+                    return { [spec.column]: { isEmpty: false } };
+            }
         case "scalar":
             switch (field.kind) {
                 case "select":

@@ -9,6 +9,7 @@
 import { crmT } from "./i18n";
 import { toCsv } from "../model/csv";
 import { loadFields } from "./fields";
+import { nameLinks } from "./linked";
 import type { ViewSort } from "../model/views";
 import { requireCan, type CrmActor } from "./access";
 import { recordSelect, table, toRecord } from "./columns";
@@ -72,7 +73,13 @@ export async function exportRecords(
             take: Math.min(BATCH, MAX_EXPORT + 1 - records.length),
             select: recordSelect(object)
         })) as Record<string, unknown>[];
-        records.push(...rows.map((row) => toRecord(object, row)));
+        records.push(
+            ...(await nameLinks(
+                actor,
+                rows.map((row) => toRecord(object, row)),
+                custom
+            ))
+        );
         if (rows.length === 0 || records.length > MAX_EXPORT || rows.length < BATCH) break;
     }
     const t = await crmT();

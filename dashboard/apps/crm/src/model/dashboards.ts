@@ -90,7 +90,8 @@ export function categorical(field: FieldDef): boolean {
         (field.kind === "select" && (field.options?.length ?? 0) > 0) ||
         field.kind === "boolean" ||
         field.kind === "member" ||
-        field.kind === "relation"
+        // A relation somebody added holds a list, not one group.
+        (field.kind === "relation" && !field.custom)
     );
 }
 

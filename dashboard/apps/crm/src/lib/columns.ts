@@ -30,6 +30,9 @@ export type ColumnSpec =
     | { readonly type: "day"; readonly column: string }
     | { readonly type: "name"; readonly first: string; readonly last: string }
     | { readonly type: "money"; readonly amount: string; readonly currency: string }
+    /** A relation somebody added: a list of record ids, named on the way out
+     *  by `nameLinks` (`lib/linked`). */
+    | { readonly type: "refs"; readonly column: string }
     | {
           readonly type: "ref";
           readonly column: string;
@@ -103,7 +106,9 @@ export const COLUMNS: Readonly<Record<CrmObject, Readonly<Record<string, ColumnS
 export function columnOf(object: CrmObject, key: string): ColumnSpec {
     // A slot column holds a field somebody added: a day, or the value as is.
     const family = slotOf(key);
-    if (family) return family === "cDate" ? { type: "day", column: key } : scalar(key);
+    if (family === "cDate") return { type: "day", column: key };
+    if (family === "cRel") return { type: "refs", column: key };
+    if (family) return scalar(key);
     const spec = COLUMNS[object][key];
     if (!spec) throw new Error(`crm: ${object} has no field ${key}`);
     return spec;
@@ -153,7 +158,8 @@ export function refName(row: Record<string, unknown>): string {
 export function recordSelect(object: CrmObject): Record<string, unknown> {
     const select: Record<string, unknown> = { id: true, position: true, deletedAt: true };
     for (const spec of Object.values(COLUMNS[object])) {
-        if (spec.type === "scalar" || spec.type === "day") select[spec.column] = true;
+        if (spec.type === "scalar" || spec.type === "day" || spec.type === "refs")
+            select[spec.column] = true;
         else if (spec.type === "name")
             Object.assign(select, { [spec.first]: true, [spec.last]: true });
         else if (spec.type === "money")
@@ -199,6 +205,10 @@ export function readValue(spec: ColumnSpec, row: Record<string, unknown>): Field
             const related = row[spec.relation] as Record<string, unknown> | null | undefined;
             return related ? { id: String(related.id), name: refName(related) } : null;
         }
+        case "refs": {
+            const ids = row[spec.column];
+            return Array.isArray(ids) ? ids.map((id) => ({ id: String(id), name: "" })) : [];
+        }
     }
 }
 
@@ -242,6 +252,8 @@ export function writeData(
         }
         case "ref":
             return { [spec.column]: value };
+        case "refs":
+            return { [spec.column]: Array.isArray(value) ? [...value] : [] };
     }
 }
 

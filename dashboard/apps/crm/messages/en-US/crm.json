@@ -110,6 +110,7 @@
         "duplicate": "A record like this is already here.",
         "rating": "Choose from 1 to 5 stars.",
         "tooMany": "Keep it to 10 links or fewer.",
+        "tooManyRecords": "Keep it to 50 records or fewer.",
         "address": "Enter the address in its boxes."
     },
     "list": {
@@ -357,7 +358,8 @@
             "links": "Links",
             "address": "Address",
             "email": "Email",
-            "phone": "Phone"
+            "phone": "Phone",
+            "relation": "Linked records"
         },
         "options": "Choices",
         "optionPlaceholder": "New choice",
@@ -366,6 +368,13 @@
         "kindFixed": "The type cannot change once the field exists.",
         "currency": "Currency",
         "currencyFixed": "The currency cannot change once the field exists.",
+        "target": "Links to",
+        "targetFixed": "What it links to cannot change once the field exists.",
+        "cardinality": "Holds",
+        "cardinalities": {
+            "one": "One record",
+            "many": "Several records"
+        },
         "save": "Save",
         "create": "Add field",
         "delete": "Delete field",
@@ -381,6 +390,7 @@
             "tooLong": "Use up to {length} characters.",
             "noOptions": "Add at least one choice.",
             "currency": "Choose a currency.",
+            "relation": "Choose what it links to.",
             "duplicate": "This choice is already there.",
             "tooMany": "Use up to {max} choices."
         }
