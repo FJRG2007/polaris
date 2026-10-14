@@ -19,14 +19,21 @@ own roles. Three kinds of record: `companies`, `people`, `opportunities`
 
 ## Fields
 
-Eighteen built-in field kinds (`model/objects.ts`'s `FieldKind`): `text`,
+Nineteen built-in field kinds (`model/objects.ts`'s `FieldKind`): `text`,
 `fullName`, `email`, `phone`, `url`, `links`, `address`, `domain`, `number`,
-`currency`, `date`, `dateTime`, `select`, `multiSelect`, `rating`, `boolean`,
-`member`, `relation`. A person may add a field of twelve of those kinds
-(`CUSTOM_KINDS`); companies, people and opportunities carry a few built-in ones
-each (name, domain, employees, stage, close reason, and so on) plus
-`createdAt`/`updatedAt`/`createdBy`/`updatedBy`, the last two a `member` field
-that is read-only and hidden by default.
+`currency`, `money`, `date`, `dateTime`, `select`, `multiSelect`, `rating`,
+`boolean`, `member`, `relation`. A person may add a field of thirteen of those
+kinds (`CUSTOM_KINDS`); companies, people and opportunities carry a few
+built-in ones each (name, domain, employees, stage, close reason, and so on)
+plus `createdAt`/`updatedAt`/`createdBy`/`updatedBy`, the last two a `member`
+field that is read-only and hidden by default.
+
+A `money` field is counted in one currency, chosen when the field is made and
+fixed after: the figures it already holds were typed in that currency, so
+changing it later would relabel them into another one. `currency` instead
+carries its own currency per record (`Money`, an amount plus a code); `money`
+is the plain-amount alternative for a table kept in a single currency, read
+and written as a bare number.
 
 A field somebody adds claims a free slot column of the record's table
 (`SLOT_FAMILIES`: ten text, five number, five date, five boolean slots per
@@ -177,6 +184,14 @@ unknown secret is refused. A `schedule` trigger is read by a one-minute cron
 job (`lib/crm-extension.ts`'s `crm-workflow-schedules`, leased so two passes
 cannot claim the same due run twice).
 
+Every run - a `delay`'s wait included - holds that same lease (`RESUME_LEASE`
+= 30 minutes) from the moment it starts, even one fired directly rather than
+picked up by the cron job. The cron job's pass over due runs also catches any
+run still marked `running` once its lease has lapsed - its process died
+mid-step - and fails it rather than resuming it, since the steps already taken
+would otherwise run again (`lib/workflows.ts`'s `resumeWaitingRuns` and
+`failCutShort`).
+
 ## Sales pipeline: stage, forecast, stage flow
 
 An opportunity moves through six fixed stages
@@ -202,7 +217,7 @@ draw the two together.
 Named, per-shelf dashboards (`CrmDashboard`, up to `MAX_DASHBOARDS` = 50), each
 up to `MAX_WIDGETS` = 24 widgets. A widget (`model/dashboards.ts`) is a
 `number`, `bar`, `line` or `donut` chart over a measure (count, sum, average,
-min, max of a number/currency/rating field), optionally split by a categorical
+min, max of a number/money/currency/rating field), optionally split by a categorical
 field or by date at a chosen granularity, optionally scoped to a saved view's
 filter. Every figure is computed by the database (`aggregate`/`groupBy`),
 reading at most `CATEGORY_CAP` = 1,000 distinct values for a categorical split

@@ -347,6 +347,7 @@
         "kinds": {
             "text": "Texto",
             "number": "Número",
+            "money": "Importe",
             "date": "Fecha",
             "boolean": "Sí / no",
             "select": "Opción",
@@ -363,6 +364,8 @@
         "addOption": "Añadir opción",
         "removeOption": "Quitar opción",
         "kindFixed": "El tipo no se puede cambiar una vez creado el campo.",
+        "currency": "Moneda",
+        "currencyFixed": "La moneda no se puede cambiar una vez creado el campo.",
         "save": "Guardar",
         "create": "Añadir campo",
         "delete": "Eliminar campo",
@@ -377,6 +380,7 @@
             "required": "Ponle un nombre.",
             "tooLong": "Usa hasta {length} caracteres.",
             "noOptions": "Añade al menos una opción.",
+            "currency": "Elige una moneda.",
             "duplicate": "Esta opción ya está.",
             "tooMany": "Usa hasta {max} opciones."
         }
@@ -521,6 +525,7 @@
         "failed": "La última ejecución falló: {error}",
         "tooMany": "Un tipo de registro puede tener hasta {max} flujos.",
         "noRunner": "Quien guardó este flujo por última vez ya no puede usar el CRM. Guárdalo de nuevo para que se ejecute como tú.",
+        "cutShort": "Esta ejecución se detuvo antes de terminar, quizá porque Polaris se reinició. Sus pasos restantes no se ejecutaron.",
         "triggers": {
             "created": "Se crea un registro",
             "updated": "Se cambia un registro",

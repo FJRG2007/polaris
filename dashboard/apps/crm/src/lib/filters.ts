@@ -160,6 +160,7 @@ export function ruleWhere(
                     return compareRule(spec.column, field, { ...rule, value: whole });
                 }
                 case "dateTime":
+                case "money":
                 case "rating":
                     return compareRule(spec.column, field, rule);
                 case "multiSelect":

@@ -218,6 +218,8 @@ export async function updateField(
     const field = existing.find((one) => one.id === id);
     if (!field || field.kind !== input.kind) return refuse("fieldMissing");
     if (sameLabel(existing, input.label, id)) await refuse("fieldNameTaken");
+    // An amount keeps the currency it was made with: its figures were typed in it.
+    if (field.kind === "money") input = { ...input, options: [...field.options] };
     const { renamed, removed } = choiceChanges(field.options, input.options, renames);
     if (removed.length > 0) await requireCan(actor, object, "delete");
     const before = existing.map(customDef);

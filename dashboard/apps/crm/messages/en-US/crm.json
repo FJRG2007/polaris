@@ -347,6 +347,7 @@
         "kinds": {
             "text": "Text",
             "number": "Number",
+            "money": "Amount",
             "date": "Date",
             "boolean": "Yes / no",
             "select": "Choice",
@@ -363,6 +364,8 @@
         "addOption": "Add choice",
         "removeOption": "Remove choice",
         "kindFixed": "The type cannot change once the field exists.",
+        "currency": "Currency",
+        "currencyFixed": "The currency cannot change once the field exists.",
         "save": "Save",
         "create": "Add field",
         "delete": "Delete field",
@@ -377,6 +380,7 @@
             "required": "Give it a name.",
             "tooLong": "Use up to {length} characters.",
             "noOptions": "Add at least one choice.",
+            "currency": "Choose a currency.",
             "duplicate": "This choice is already there.",
             "tooMany": "Use up to {max} choices."
         }
@@ -521,6 +525,7 @@
         "failed": "Last run failed: {error}",
         "tooMany": "A kind of record can have up to {max} workflows.",
         "noRunner": "The person who last saved this workflow can no longer use the CRM. Save it again to run it as you.",
+        "cutShort": "This run stopped before it finished, likely because Polaris restarted. Its remaining steps did not run.",
         "triggers": {
             "created": "A record is created",
             "updated": "A record is changed",

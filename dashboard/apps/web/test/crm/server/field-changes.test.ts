@@ -194,6 +194,38 @@ describe("changing a select's choices", () => {
     });
 });
 
+describe("changing an amount field", () => {
+    const budget = {
+        id: "f2",
+        slot: "cNum1",
+        label: "Budget",
+        kind: "money",
+        options: JSON.stringify(["USD"]),
+        position: 2
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        db.crmField.findMany.mockResolvedValue([budget]);
+        db.crmField.update.mockImplementation(async (...args: unknown[]) => {
+            const { data } = args[0] as { data: { label: string; options: string } };
+            return { ...budget, ...data };
+        });
+        db.crmView.findMany.mockResolvedValue([]);
+    });
+
+    it("keeps the currency its figures were typed in, and touches no record", async () => {
+        const saved = await updateField(actorWith(noDelete), "companies", "f2", {
+            label: "Spend",
+            kind: "money",
+            options: ["EUR"]
+        });
+        expect(saved.label).toBe("Spend");
+        expect(saved.options).toEqual(["USD"]);
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+    });
+});
+
 describe("adding a field", () => {
     beforeEach(() => vi.clearAllMocks());
 

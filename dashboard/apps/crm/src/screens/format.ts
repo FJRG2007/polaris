@@ -64,6 +64,11 @@ export function plainText(
         }
         case "currency":
             return formatMoney(value as Money, locale);
+        case "money":
+            return formatMoney(
+                { amount: value as number, currency: field.options?.[0] ?? "" },
+                locale
+            );
         case "number":
             return format.number(value as number);
         case "rating":

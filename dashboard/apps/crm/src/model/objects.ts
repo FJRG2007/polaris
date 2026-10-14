@@ -25,6 +25,7 @@ export type FieldKind =
     | "domain"
     | "number"
     | "currency"
+    | "money"
     | "date"
     | "dateTime"
     | "select"
@@ -42,7 +43,7 @@ export interface FieldDef {
     /** Written by Polaris, never by a person (created, updated). */
     readonly readOnly?: boolean;
     /** The choices of a `select` or `multiSelect`, in the order a board draws
-     *  its columns. */
+     *  its columns; for a `money` field, its one currency code. */
     readonly options?: readonly string[];
     /** The record kind a `relation` points at. */
     readonly target?: CrmObject;
@@ -60,6 +61,7 @@ export interface FieldDef {
 export const CUSTOM_KINDS = [
     "text",
     "number",
+    "money",
     "date",
     "boolean",
     "select",
@@ -81,7 +83,7 @@ export type SlotFamily = keyof typeof SLOT_FAMILIES;
 
 /** The family of slot columns a kind of custom field is stored in. */
 export function slotFamily(kind: CustomKind): SlotFamily {
-    if (kind === "number" || kind === "rating") return "cNum";
+    if (kind === "number" || kind === "money" || kind === "rating") return "cNum";
     if (kind === "date") return "cDate";
     if (kind === "boolean") return "cBool";
     return "cText";

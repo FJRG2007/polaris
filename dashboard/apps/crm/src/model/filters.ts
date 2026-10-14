@@ -56,6 +56,7 @@ const TEXT_OPERATORS: readonly FilterOperator[] = [
 export function operatorsFor(kind: FieldKind): readonly FilterOperator[] {
     switch (kind) {
         case "number":
+        case "money":
         case "currency":
         case "rating":
             return ["is", "greaterThan", "lessThan", "isEmpty", "isNotEmpty"];

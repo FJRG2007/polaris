@@ -586,10 +586,16 @@ describe("delays and the run log", () => {
             )
         ).toBeNull();
         expect(db.crmWorkflowRun.create).toHaveBeenCalledWith({
-            data: { workflowId: FLOW, status: "running", cause: "webhook", recordId: RECORD },
+            data: expect.objectContaining({
+                workflowId: FLOW,
+                status: "running",
+                cause: "webhook",
+                recordId: RECORD,
+                resumeAt: expect.any(Date)
+            }),
             select: { id: true }
         });
-        const [[waiting]] = db.crmWorkflowRun.update.mock.calls as unknown as [
+        const [[waiting]] = db.crmWorkflowRun.updateMany.mock.calls as unknown as [
             [{ data: { status: string; step: number; resumeAt: Date; body: string } }]
         ];
         expect(waiting.data).toMatchObject({
@@ -622,7 +628,16 @@ describe("delays and the run log", () => {
         expect(await workflows.resumeWaitingRuns(now)).toBe(1);
         expect(db.crmWorkflowRun.findMany).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { status: { in: ["waiting", "running"] }, resumeAt: { lte: now } }
+                where: {
+                    OR: [
+                        { status: { in: ["waiting", "running"] }, resumeAt: { lte: now } },
+                        {
+                            status: "running",
+                            resumeAt: null,
+                            startedAt: { lte: new Date(now.getTime() - 30 * 60_000) }
+                        }
+                    ]
+                }
             })
         );
         expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
@@ -634,40 +649,90 @@ describe("delays and the run log", () => {
         expect(db.records.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({ data: expect.objectContaining({ city: "after" }) })
         );
-        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
-            where: { id: RUN },
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "running" },
             data: expect.objectContaining({ status: "done", error: null })
         });
         expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
     });
 
-    it("picks up again a resumed run cut short once its lease is up", async () => {
-        db.records.findFirst.mockResolvedValue(record);
-        db.records.findMany.mockResolvedValue([record]);
+    it("fails a run cut short once its lease is up instead of running it again", async () => {
         const lapsed = new Date(Date.now() - 1_000);
+        const now = new Date();
         db.crmWorkflowRun.findMany.mockResolvedValueOnce([
             {
                 id: RUN,
                 status: "running",
                 resumeAt: lapsed,
                 recordId: RECORD,
-                step: 2,
+                step: 0,
                 body: null,
-                actions: JSON.stringify(flow),
+                actions: null,
                 workflow: stored({ kind: "created" }, { actions: JSON.stringify(flow) })
             }
         ]);
-        expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
-        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { id: RUN, status: "running", resumeAt: lapsed } })
-        );
-        expect(db.records.updateMany).toHaveBeenCalledWith(
-            expect.objectContaining({ data: expect.objectContaining({ city: "after" }) })
-        );
-        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
-            where: { id: RUN },
-            data: expect.objectContaining({ status: "done", resumeAt: null })
+        expect(await workflows.resumeWaitingRuns(now)).toBe(0);
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "running", resumeAt: lapsed },
+            data: expect.objectContaining({ status: "failed", finishedAt: now, resumeAt: null })
         });
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+        expect(db.crmWorkflow.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({ lastError: expect.any(String), lastRunAt: now })
+            })
+        );
+    });
+
+    it("fails a run left running with no lease once it is older than the lease", async () => {
+        const now = new Date();
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([
+            {
+                id: RUN,
+                status: "running",
+                resumeAt: null,
+                recordId: RECORD,
+                step: 0,
+                body: null,
+                actions: null,
+                workflow: stored({ kind: "created" }, { actions: JSON.stringify(flow) })
+            }
+        ]);
+        expect(await workflows.resumeWaitingRuns(now)).toBe(0);
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "running", resumeAt: null },
+            data: expect.objectContaining({ status: "failed", finishedAt: now })
+        });
+        expect(db.crmWorkflow.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a run failed as cut short as it is when it ends after all", async () => {
+        db.crmWorkflowRun.updateMany.mockResolvedValueOnce({ count: 0 });
+        await workflows.runWorkflow(stored({ kind: "manual" }, { runAsId: null }), {
+            object: "companies",
+            recordId: null,
+            event: null
+        });
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: RUN, status: "running" } })
+        );
+        expect(db.crmWorkflowRun.update).not.toHaveBeenCalled();
+        expect(db.crmWorkflow.update).not.toHaveBeenCalled();
+        expect(db.crmWorkflowRun.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("gives a run started directly the same lease", async () => {
+        const before = Date.now();
+        await workflows.runWorkflow(stored({ kind: "manual" }, { runAsId: null }), {
+            object: "companies",
+            recordId: null,
+            event: null
+        });
+        const [[created]] = db.crmWorkflowRun.create.mock.calls as unknown as [
+            [{ data: { status: string; resumeAt: Date } }]
+        ];
+        expect(created.data.status).toBe("running");
+        expect(created.data.resumeAt.getTime()).toBeGreaterThanOrEqual(before + 30 * 60_000);
     });
 
     it("goes on with the actions it started with when the workflow is edited while it waits", async () => {
@@ -693,8 +758,8 @@ describe("delays and the run log", () => {
         expect(db.records.updateMany).toHaveBeenCalledWith(
             expect.objectContaining({ data: expect.objectContaining({ city: "after" }) })
         );
-        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
-            where: { id: RUN },
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "running" },
             data: expect.objectContaining({ status: "done", actions: null })
         });
     });
@@ -718,8 +783,8 @@ describe("delays and the run log", () => {
             }
         ]);
         expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
-        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
-            where: { id: RUN },
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "running" },
             data: expect.objectContaining({
                 status: "waiting",
                 step: 4,
@@ -759,8 +824,8 @@ describe("delays and the run log", () => {
                 event: null
             })
         ).not.toBeNull();
-        expect(db.crmWorkflowRun.update).toHaveBeenCalledWith({
-            where: { id: RUN },
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "running" },
             data: expect.objectContaining({ status: "failed", error: expect.any(String) })
         });
         expect(db.crmWorkflowRun.deleteMany).toHaveBeenCalledWith({

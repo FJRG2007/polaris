@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { CURRENCIES } from "@polaris/core";
 import { CUSTOM_KINDS, slotFamily, slotOf, type CustomKind, type FieldDef } from "./objects";
 
 /** The longest name a field or one of its choices may have. */
@@ -25,9 +26,12 @@ const label = z
     .transform(normalizeLabel)
     .pipe(z.string().min(1, "required").max(FIELD_LABEL_MAX, "tooLong"));
 
+const CURRENCY_CODES: readonly string[] = CURRENCIES.map((entry) => entry.code);
+
 /**
  * A field as it is typed: a name, a kind, and for a select its choices - each
- * named, none twice. Choices of any other kind are dropped.
+ * named, none twice; for an amount, the one currency it is counted in. Choices
+ * of any other kind are dropped.
  */
 export const fieldInputSchema = z
     .object({
@@ -37,9 +41,16 @@ export const fieldInputSchema = z
     })
     .transform((input) => ({
         ...input,
-        options: hasOptions(input.kind) ? input.options : []
+        options: hasOptions(input.kind) || input.kind === "money" ? input.options : []
     }))
     .superRefine((input, context) => {
+        if (input.kind === "money") {
+            if (input.options.length !== 1 || !CURRENCY_CODES.includes(input.options[0]!)) {
+                // i18n-ignore a code the form reads as customFields.invalid.currency
+                context.addIssue({ code: "custom", path: ["options"], message: "currency" });
+            }
+            return;
+        }
         if (!hasOptions(input.kind)) return;
         if (input.options.length === 0) {
             // i18n-ignore a code the form reads as customFields.invalid.noOptions
@@ -120,7 +131,7 @@ export function customDef(field: CustomField): FieldDef {
         label: field.label,
         custom: true,
         width: CUSTOM_WIDTH,
-        ...(hasOptions(field.kind) ? { options: field.options } : {})
+        ...(hasOptions(field.kind) || field.kind === "money" ? { options: field.options } : {})
     };
 }
 

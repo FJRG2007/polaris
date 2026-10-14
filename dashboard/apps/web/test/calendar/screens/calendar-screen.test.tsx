@@ -12,7 +12,7 @@
 import "@/components/app-host/client";
 import { MessagesWrapper } from "../../setup/i18n";
 import { addDays } from "@polaris-app/calendar/src/screens/time";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { CalendarSummary } from "@polaris-app/calendar/src/lib/wire";
 import { shortcutFor } from "@polaris-app/calendar/src/screens/shortcuts";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -303,7 +303,11 @@ describe("the calendar screen", () => {
 
         press("?");
         // The shared sheet, on the calendar's own actions.
-        const sheet = await screen.findByRole("dialog", { name: "Keyboard shortcuts" }, { timeout: 5000 });
+        const sheet = await screen.findByRole(
+            "dialog",
+            { name: "Keyboard shortcuts" },
+            { timeout: 5000 }
+        );
         expect(await within(sheet).findByText("Go to the next period")).toBeDefined();
     });
 
@@ -332,6 +336,11 @@ describe("the calendar screen", () => {
     });
 
     it("holds Today while today is on screen, and lets it bring the reader back", async () => {
+        // Late on a UTC day, when most zones east of UTC are already on the next
+        // one: the screen must use the calendar's zone, not the machine's.
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-10-14T23:30:00Z"));
+        onTestFinished(() => vi.useRealTimers());
         render(<CalendarScreen path={[]} />, { wrapper: MessagesWrapper });
         await settle();
         await screen.findByTestId("grid");
@@ -339,6 +348,7 @@ describe("the calendar screen", () => {
         expect(today.getAttribute("aria-disabled")).toBe("true");
         expect(today.getAttribute("title")).toBe("Today is already in view");
         const start = grid().getAttribute("data-anchor");
+        expect(start).toBe("2026-10-14");
 
         press("j");
         expect(today.getAttribute("aria-disabled")).toBeNull();

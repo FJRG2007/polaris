@@ -67,7 +67,7 @@ function settle(
         raw = draft.ref?.id ?? null;
     } else if (field.kind === "member" || field.kind === "select") {
         raw = draft.text === NONE ? null : draft.text;
-    } else if (field.kind === "number") {
+    } else if (field.kind === "number" || field.kind === "money") {
         raw = typedCount(draft.text);
     }
     const result = normalizeInput(field, raw);
@@ -244,6 +244,8 @@ export function BulkEditDialog({
                 return textInput("date");
             case "number":
                 return textInput("text", "numeric");
+            case "money":
+                return textInput("text", "decimal");
             case "email":
                 return textInput("email", "email");
             case "phone":

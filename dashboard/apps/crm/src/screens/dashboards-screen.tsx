@@ -533,26 +533,29 @@ function WidgetCard({
     const measured = widget.field ? fieldOf(widget.object, widget.field, custom) : undefined;
     const split = widget.groupBy ? fieldOf(widget.object, widget.groupBy, custom) : undefined;
     const title = widget.title || autoTitle(t, widget, measured, split);
+    // An amount field counts in the one currency it was made with.
+    const currency =
+        widget.currency ?? (measured?.kind === "money" ? (measured.options?.[0] ?? null) : null);
 
     const formatValue = useMemo(() => {
         const number = new Intl.NumberFormat(format.preferences.language, {
             maximumFractionDigits: 2
         });
-        if (widget.currency) {
+        if (currency) {
             try {
                 const money = new Intl.NumberFormat(format.preferences.language, {
                     style: "currency",
-                    currency: widget.currency,
+                    currency,
                     maximumFractionDigits: 2
                 });
                 return (value: number) => money.format(value);
             } catch {
                 // An unknown code: the amount with its code beside it.
-                return (value: number) => `${number.format(value)} ${widget.currency}`;
+                return (value: number) => `${number.format(value)} ${currency}`;
             }
         }
         return (value: number) => number.format(value);
-    }, [format.preferences.language, widget.currency]);
+    }, [format.preferences.language, currency]);
 
     const formatPeriod = useMemo(() => {
         const options: Intl.DateTimeFormatOptions =

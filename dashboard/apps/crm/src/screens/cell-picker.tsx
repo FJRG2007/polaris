@@ -121,7 +121,7 @@ function RelationOptions({
  * The menu, anchored to the cell it is drawn in. Mounted open; closing it, by
  * a choice or by pressing elsewhere, is the caller's cue to drop it.
  */
-export function CellPicker({ object, field, value, people, onPick, onClose }: PickerProps) {
+export function CellPicker({ object, field, value, people, onPick: pick, onClose }: PickerProps) {
     const t = useCrmT();
     const [search, setSearch] = useState("");
     const selected =
@@ -138,6 +138,9 @@ export function CellPicker({ object, field, value, people, onPick, onClose }: Pi
         menuSearchMatches(optionLabel(t, object, field, option), search)
     );
     const clearable = field.kind !== "select" && selected !== null;
+    // Picking what the cell already holds closes the menu without a write.
+    const onPick = (stored: string | null, shown: FieldValue) =>
+        stored === selected ? onClose() : pick(stored, shown);
 
     return (
         <DropdownMenu open onOpenChange={(open) => !open && onClose()}>
