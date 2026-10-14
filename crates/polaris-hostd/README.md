@@ -58,7 +58,9 @@ All paths are prefixed `/v1`.
 | `POST` | `/v1/mounts` | Body `{ id, kind: "smb"\|"nfs", source, target, options? }`. Mounts under the mount root. `201` with `{ id, mountpoint }`. |
 | `DELETE` | `/v1/mounts/<id>` | Unmount the target created for `<id>`. |
 | `POST` | `/v1/update` | Run the operator-configured update command (`POLARIS_HOSTD_UPDATE_CMD`) detached. `202` `{ status: "started" }`. `403` if auto-update is disabled; `501` if no command is configured. No request input reaches the command. |
-| `POST` | `/v1/docker` | Allowlisted Docker Engine API proxy. Body `{ method, path }`; only ping/info/version, `containers/json`, `containers/<id>/stats`, and `containers/<id>/{start,stop,restart}` are permitted. Returns `200` `{ status, body }` (the Docker status and raw response); `403` if not allowlisted; `502` if the socket is unreachable. |
+| `POST` | `/v1/docker` | Allowlisted Docker Engine API proxy. Body `{ method, path }`; permitted calls are read-only inspection (`_ping`, `info`, `version`, `containers/json`, `containers/<id>/json`, `containers/<id>/stats`, `system/df`, `volumes`, `networks`), container lifecycle (`start`/`stop`/`restart`/`DELETE` on one container), reclaiming regenerable disk (`build/prune`, `images/prune`), and removing one named volume, one Polaris-private network (`polaris-net-*`), or one kept release image. Returns `200` `{ status, body }` (the Docker status and raw response); `403` if not allowlisted; `502` if the socket is unreachable. |
+| `POST` | `/v1/deploy/dirs` | List the application compose directories under the deploy root (`polaris-<8 hex>[-marker]`) that `compose down` left behind. `200` `{ projects: string[] }`. |
+| `POST` | `/v1/deploy/dirs/remove` | Body `{ project }`. Remove one compose directory, refused (`409`) while any container still carries that project's label. `200` `{ removed: boolean }`. |
 | `*` | `/v1/k8s/*`, `/v1/systemd/*` | Future control planes. **Stubs -> `501`**. |
 
 Unknown route -> `404`. Malformed JSON or failed validation -> `400` with a

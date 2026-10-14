@@ -24,9 +24,11 @@
  * to a 22 GB row, and the useful half is which container has it and what is
  * inside it, which is a link into Drive through the app that mounts it. And what
  * Polaris itself left behind: a service removed, a stack recreated under another
- * name, a release that outlived its record, each leaving a container on the disk
- * that nothing in Polaris mentions again. Finding those in `docker ps` is the
- * one thing this product promises nobody has to do.
+ * name, a release that outlived its record, or an application uninstalled before
+ * Polaris cleaned up after itself - each leaving a container, a private network,
+ * a compose directory or an edge route that nothing in Polaris mentions again.
+ * Finding those in `docker ps` is the one thing this product promises nobody has
+ * to do.
  */
 
 import Link from "next/link";
