@@ -2095,6 +2095,7 @@ function PasswordCard({
     const [shown, setShown] = useState<{
         joinPassword: string | null;
         adminPassword: string | null;
+        adminReplaced: boolean;
     } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -2109,7 +2110,8 @@ function PasswordCard({
             }
             setShown({
                 joinPassword: result.joinPassword ?? null,
-                adminPassword: result.adminPassword ?? null
+                adminPassword: result.adminPassword ?? null,
+                adminReplaced: result.adminReplaced ?? false
             });
         });
     }
@@ -2148,6 +2150,11 @@ function PasswordCard({
                                 )}
                             </dd>
                         </div>
+                        {shown.adminReplaced && (
+                            <p className="text-xs text-muted-foreground">
+                                {t("panel.adminPasswordReplaced")}
+                            </p>
+                        )}
                     </dl>
                 ) : (
                     <Button

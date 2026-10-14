@@ -633,7 +633,7 @@ export function mintJoinPassword(): string {
 export async function revealArkPasswords(
     ownerId: string,
     installedAppId: string
-): Promise<{ joinPassword: string | null; adminPassword: string | null }> {
+): Promise<{ joinPassword: string | null; adminPassword: string | null; adminReplaced: boolean }> {
     const applicationId = await requireApplication(ownerId, installedAppId);
     const rows = await prisma.envVar.findMany({
         where: {
@@ -654,7 +654,16 @@ export async function revealArkPasswords(
         read("SERVER_PASSWORD"),
         read("ADMIN_PASSWORD")
     ]);
-    return { joinPassword, adminPassword };
+    // Servers created before the create flow minted its own admin password got the
+    // install's 48 hex characters, which `enablecheats` refuses - nobody could
+    // administer them from inside the game. Replaced the first time the owner looks,
+    // so every one of those servers is repaired without anybody having to notice.
+    if (adminPassword && !arkAccess.isJoinPassword(adminPassword)) {
+        const fresh = mintJoinPassword();
+        await setAdminPassword(ownerId, installedAppId, fresh);
+        return { joinPassword, adminPassword: fresh, adminReplaced: true };
+    }
+    return { joinPassword, adminPassword, adminReplaced: false };
 }
 
 /** Write the world to disk now, for before a stop or a settings change. */

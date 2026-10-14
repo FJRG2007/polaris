@@ -101,6 +101,7 @@
         "theChatAndTheAdmin": "The chat, and the admin commands somebody ran. ARK keeps none of it otherwise, so a command the server declined leaves nothing to read. Under Files, in server/ShooterGame/Saved/Logs.",
         "passwords": "Passwords",
         "theJoinPasswordIsWhat": "The join password is what players type to get in. The admin password is what you type after enablecheats in game, and Polaris minted it when the server was created - it is not a default anybody else knows. ARK takes neither of them longer than 32 characters.",
+        "adminPasswordReplaced": "The old admin password was too long for ARK, so Polaris made this one. It works from the next start.",
         "joinPassword": "Join password",
         "theJoinPassword": "the join password",
         "adminPassword": "Admin password",

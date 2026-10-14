@@ -101,6 +101,7 @@
         "theChatAndTheAdmin": "El chat y los comandos de administración que alguien ejecutó. ARK no guarda nada de eso si no, así que un comando que el servidor rechazó no deja nada que leer. En Archivos, en server/ShooterGame/Saved/Logs.",
         "passwords": "Contraseñas",
         "theJoinPasswordIsWhat": "La contraseña de entrada es lo que escriben los jugadores para entrar. La de administración es lo que escribes tras enablecheats en el juego, y Polaris la generó al crear el servidor - no es una por defecto que conozca nadie más. ARK no acepta ninguna de más de 32 caracteres.",
+        "adminPasswordReplaced": "La contraseña de administración anterior era demasiado larga para ARK, así que Polaris ha creado esta. Funciona desde el próximo arranque.",
         "joinPassword": "De entrada",
         "theJoinPassword": "la contraseña",
         "adminPassword": "De administración",
