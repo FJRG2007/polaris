@@ -98,6 +98,15 @@ pub fn validate<'a>(method: &'a str, path: &'a str) -> Result<AllowedRequest<'a>
         // No query string: `?force=` is the only thing that could be passed
         // here, and forcing is exactly the judgement this route refuses to make.
         ("DELETE", ["volumes", name]) => valid_volume_name(name) && !path.contains('?'),
+        // Which networks exist. Read-only, so a network a removed application
+        // left behind can be named on screen rather than found by hand.
+        ("GET", ["networks"]) => true,
+        // One private network, named in full. Only Polaris's own prefix, so no
+        // network an operator made is reachable, and no query string. The daemon
+        // refuses while a container is still on it, which is the backstop.
+        ("DELETE", ["networks", name]) => {
+            crate::networks::is_private_network(name) && !path.contains('?')
+        }
         // One kept release image, once it has fallen out of the window a service
         // can be rolled back through. Only under the release repository Polaris
         // pins its own releases into, so nothing an operator pulled or built by
@@ -308,6 +317,17 @@ mod tests {
         assert!(validate("GET", "/system/df").is_ok());
         assert!(validate("POST", "/build/prune").is_ok());
         assert!(validate("POST", "/images/prune?filters=%7B%7D").is_ok());
+    }
+
+    #[test]
+    fn only_a_private_network_can_be_removed() {
+        assert!(validate("GET", "/networks").is_ok());
+        assert!(validate("DELETE", "/networks/polaris-net-e0123456789").is_ok());
+        assert!(validate("DELETE", "/networks/polaris-net-e0123456789?force=1").is_err());
+        assert!(validate("DELETE", "/networks/polaris-proxy").is_err());
+        assert!(validate("DELETE", "/networks/bridge").is_err());
+        assert!(validate("POST", "/networks/prune").is_err());
+        assert!(validate("POST", "/networks/create").is_err());
     }
 
     #[test]

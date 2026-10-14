@@ -178,7 +178,8 @@
             "volume": "Volumen",
             "size": "Tamaño",
             "created": "Creado",
-            "container": "Contenedor"
+            "container": "Contenedor",
+            "leftover": "Resto"
         },
         "safe": "Se puede eliminar",
         "checkFirst": "Revísalo antes",
@@ -205,7 +206,22 @@
         "removeIt": "Quitarlo",
         "leftBehind": "Restos",
         "leftBehindIntro": "Polaris puso {count, plural, one {este contenedor} other {estos # contenedores}} en esta máquina y ya no tiene constancia de {count, plural, one {él} other {ellos}}: un servicio quitado o un stack recreado con otro nombre. No se toca nada más de la máquina.",
-        "stillRunning": "Sigue en marcha"
+        "stillRunning": "Sigue en marcha",
+        "removedApp": "De una app eliminada",
+        "leftovers": {
+            "intro": "Apps eliminadas dejaron esto. Nada de ello guarda datos; los volúmenes aparecen arriba y se quitan de uno en uno.",
+            "kind": {
+                "container": "Contenedor",
+                "network": "Red",
+                "dir": "Carpeta",
+                "route": "Ruta del edge"
+            },
+            "cleanUp": "Limpiar",
+            "confirmTitle": "¿Limpiar {count, plural, one {# resto} other {# restos}}?",
+            "confirmBody": "Se paran y quitan los contenedores, y después sus redes, carpetas de despliegue y rutas del edge. Los volúmenes no se tocan.",
+            "cleaned": "{count, plural, one {Se ha limpiado # resto} other {Se han limpiado # restos}}.",
+            "partly": "Algunos restos no se han podido quitar. Vuelve a intentarlo en un momento."
+        }
     },
     "reach": {
         "local": "Ejecuta Polaris, así que está activo por definición.",

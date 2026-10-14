@@ -262,6 +262,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
         ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
         ("POST", "/v1/deploy/networks/cut") => deploy_networks_cut(state, req, body),
+        ("POST", "/v1/deploy/dirs") => deploy_dirs_list(state),
+        ("POST", "/v1/deploy/dirs/remove") => deploy_dirs_remove(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
         }
@@ -482,6 +484,57 @@ fn deploy_networks_cut<R: Read>(state: &AppState, req: &Request, body: &mut R) -
             "OK",
             &serde_json::json!({ "disconnected": disconnected }),
         ),
+        Err(msg) => Response::text(502, "Bad Gateway", &msg),
+    }
+}
+
+/// The application compose directories under the deploy root (see `deploy_dirs`).
+fn deploy_dirs_list(state: &AppState) -> Response {
+    match crate::deploy_dirs::list(&state.config.deploy_root) {
+        Ok(projects) => Response::json(200, "OK", &serde_json::json!({ "projects": projects })),
+        // No deploy root yet is no directories, not a failure.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            Response::json(200, "OK", &serde_json::json!({ "projects": [] }))
+        }
+        Err(_) => Response::text(502, "Bad Gateway", "could not read the deploy directory"),
+    }
+}
+
+/// One application compose directory to remove.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DirRemoveRequest {
+    project: String,
+}
+
+/// Remove one application compose directory the dashboard named.
+fn deploy_dirs_remove<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: DirRemoveRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid remove request"),
+    };
+    if !crate::deploy_dirs::is_app_project(&request.project) {
+        return Response::bad_request("invalid project name");
+    }
+    // A directory a container still belongs to is a live install's, not a
+    // leftover; and an engine that will not say is not permission either.
+    match crate::deploy_dirs::project_in_use(&request.project) {
+        Some(false) => {}
+        Some(true) => return Response::text(409, "Conflict", "project still has containers"),
+        None => {
+            return Response::text(
+                502,
+                "Bad Gateway",
+                "could not check the project's containers",
+            )
+        }
+    }
+    match crate::deploy_dirs::remove(&state.config.deploy_root, &request.project) {
+        Ok(removed) => Response::json(200, "OK", &serde_json::json!({ "removed": removed })),
         Err(msg) => Response::text(502, "Bad Gateway", &msg),
     }
 }

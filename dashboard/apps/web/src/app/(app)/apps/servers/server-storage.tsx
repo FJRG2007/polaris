@@ -24,9 +24,11 @@
  * to a 22 GB row, and the useful half is which container has it and what is
  * inside it, which is a link into Drive through the app that mounts it. And what
  * Polaris itself left behind: a service removed, a stack recreated under another
- * name, a release that outlived its record, each leaving a container on the disk
- * that nothing in Polaris mentions again. Finding those in `docker ps` is the
- * one thing this product promises nobody has to do.
+ * name, a release that outlived its record, or an application uninstalled before
+ * Polaris cleaned up after itself - each leaving a container, a private network,
+ * a compose directory or an edge route that nothing in Polaris mentions again.
+ * Finding those in `docker ps` is the one thing this product promises nobody has
+ * to do.
  */
 
 import Link from "next/link";
@@ -36,7 +38,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import type { HostVolume } from "@/lib/deploy/host-volumes";
 import type { ActiveMoveView } from "@/lib/storage-moves/service";
 import { moveOfVolume, movePhaseText, moveTarget } from "@/components/storage-move-words";
-import type { StrayContainer } from "@/lib/deploy/host-containers";
+import type { LeftoverContainer, Leftovers } from "@/lib/deploy/uninstall-leftovers";
 import { useLiveRead } from "@/components/use-live-resource";
 import { Badge, Button, EmptyState, Switch } from "@polaris/ui";
 import { Boxes, HardDrive, Loader2, Trash2, FolderOpen } from "lucide-react";
@@ -48,7 +50,8 @@ import {
     removeHostVolumeAction,
     setLeftoverAutoRemoveAction,
     removeStrayContainerAction,
-    strayContainersAction,
+    cleanUninstallLeftoversAction,
+    uninstallLeftoversAction,
     volumeMovesAction
 } from "./actions";
 
@@ -345,11 +348,13 @@ export function ServerStorage() {
                                                           ? t("storage.gone", {
                                                                 what: volume.description
                                                             })
-                                                          : volume.project
-                                                            ? t("storage.createdBy", {
-                                                                  project: volume.project
-                                                              })
-                                                            : t("storage.noRecord")}
+                                                          : volume.removedApp && volume.project
+                                                            ? `${t("storage.removedApp")} (${volume.project})`
+                                                            : volume.project
+                                                              ? t("storage.createdBy", {
+                                                                    project: volume.project
+                                                                })
+                                                              : t("storage.noRecord")}
                                                     {/* A move's copier is what holds it: the
                                                     step it is on says more than its name. */}
                                                     {move
@@ -502,41 +507,84 @@ function holders(volume: HostVolume, t: Words): string {
     return t("storage.heldBy", { names: names.slice(0, 2).join(", "), rest: names.length - 2 });
 }
 
+/** One non-data leftover, as a row shows it. */
+interface LeftoverRow {
+    readonly key: string;
+    readonly kind: "container" | "network" | "dir" | "route";
+    readonly name: string;
+    readonly detail: string | null;
+    readonly container: LeftoverContainer | null;
+}
+
+function rowsOf(found: Leftovers): LeftoverRow[] {
+    return [
+        ...found.containers.map((container) => ({
+            key: `container:${container.id}`,
+            kind: "container" as const,
+            name: container.name,
+            detail: `${container.image}${container.status ? ` - ${container.status}` : ""}`,
+            container
+        })),
+        ...found.networks.map((name) => ({
+            key: `network:${name}`,
+            kind: "network" as const,
+            name,
+            detail: null,
+            container: null
+        })),
+        ...found.dirs.map((name) => ({
+            key: `dir:${name}`,
+            kind: "dir" as const,
+            name,
+            detail: null,
+            container: null
+        })),
+        ...found.routes.map((id) => ({
+            key: `route:${id}`,
+            kind: "route" as const,
+            name: `polaris-app-${id}`,
+            detail: null,
+            container: null
+        }))
+    ];
+}
+
 /**
- * What Polaris deployed here and stopped keeping track of.
+ * What Polaris deployed here for apps that are gone, and stopped keeping track
+ * of: containers, the private networks they were on, the folders the daemon
+ * deployed them from, and edge routes for their domains.
  *
- * Its own section rather than a line in the volumes table, because it is a
- * different admission: a volume nothing uses may have been left by anything on
- * the machine, and these were left by Polaris. They are named, dated, and
- * removed one at a time - and never with their volumes, which are listed above
- * with their sizes and go on their own.
+ * Its own section rather than a line in the volumes table, because none of it is
+ * data: it all goes together from one button. A container can still go on its
+ * own from its row. Volumes are never part of it - they are listed above with
+ * their sizes and go one at a time.
  *
- * Draws nothing at all when there is nothing to say, which is almost always: a
- * heading reading "Left behind: none" is a worry offered to somebody who did not
- * have one.
+ * Draws nothing at all when there is nothing to say, which is almost always.
  */
 function StrayContainers() {
     const t = useTranslations("servers");
     const [confirm, confirmElement] = useConfirm();
     const [removing, setRemoving] = useState<string | null>(null);
+    const [cleaning, setCleaning] = useState(false);
+    const [cleaned, setCleaned] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const load = useCallback(async (): Promise<StrayContainer[]> => {
-        const strays = await strayContainersAction();
+    const load = useCallback(async (): Promise<Leftovers> => {
+        const found = await uninstallLeftoversAction();
         // Thrown rather than resolved empty, for the reason the volumes list does
         // it: "nothing was left behind" and "this machine would not say" are
         // different answers.
-        if (!strays) throw new Error("unavailable");
-        return strays;
+        if (!found) throw new Error("unavailable");
+        return found;
     }, []);
 
-    const { data: strays, refresh } = useLiveRead<StrayContainer[]>({
+    const { data: found, refresh } = useLiveRead<Leftovers>({
         load,
-        cacheKey: "servers.stray-containers",
+        cacheKey: "servers.uninstall-leftovers",
         intervalMs: REFRESH_MS
     });
 
-    const remove = async (stray: StrayContainer) => {
+    const remove = async (stray: LeftoverContainer) => {
         const ok = await confirm({
             title: t("storage.removeTitle", { name: stray.name }),
             description: t("storage.removeBody", { running: stray.running ? "yes" : "no" }),
@@ -546,6 +594,7 @@ function StrayContainers() {
         if (!ok) return;
         setRemoving(stray.id);
         setError(null);
+        setCleaned(null);
         const result = await removeStrayContainerAction(stray.id);
         setRemoving(null);
         if (result.error) {
@@ -555,18 +604,65 @@ function StrayContainers() {
         await refresh();
     };
 
-    if (!strays || strays.length === 0) return null;
+    const rows = found ? rowsOf(found) : [];
+
+    const cleanUp = async () => {
+        const ok = await confirm({
+            title: t("storage.leftovers.confirmTitle", { count: rows.length }),
+            description: t("storage.leftovers.confirmBody"),
+            confirmLabel: t("storage.leftovers.cleanUp"),
+            danger: true
+        });
+        if (!ok) return;
+        setCleaning(true);
+        setError(null);
+        setCleaned(null);
+        const result = await cleanUninstallLeftoversAction().catch(() => ({
+            error: t("errors.wouldNotAnswer"),
+            removed: undefined
+        }));
+        setCleaning(false);
+        if (result.removed) {
+            const { containers, networks, dirs, routes } = result.removed;
+            setCleaned(containers + networks + dirs + routes);
+        }
+        if (result.error) setError(result.error);
+        await refresh();
+    };
+
+    if (rows.length === 0) {
+        return cleaned ? (
+            <p className="text-success text-xs">
+                {t("storage.leftovers.cleaned", { count: cleaned })}
+            </p>
+        ) : null;
+    }
+
+    const containers = rows.filter((row) => row.kind === "container").length;
 
     return (
         <section className="flex flex-col gap-2">
-            <div>
-                <h2 className="flex items-center gap-1.5 text-sm font-medium">
-                    <Boxes className="size-4 shrink-0 text-muted-foreground" />
-                    {t("storage.leftBehind")}
-                </h2>
-                <p className="text-muted-foreground text-xs">
-                    {t("storage.leftBehindIntro", { count: strays.length })}
-                </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h2 className="flex items-center gap-1.5 text-sm font-medium">
+                        <Boxes className="size-4 shrink-0 text-muted-foreground" />
+                        {t("storage.leftBehind")}
+                    </h2>
+                    <p className="text-muted-foreground text-xs">
+                        {containers > 0 && containers === rows.length
+                            ? t("storage.leftBehindIntro", { count: containers })
+                            : t("storage.leftovers.intro")}
+                    </p>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={cleaning || removing !== null}
+                    onClick={() => void cleanUp()}
+                >
+                    {cleaning ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                    {t("storage.leftovers.cleanUp")}
+                </Button>
             </div>
 
             <div className="overflow-x-auto rounded-lg border border-border">
@@ -574,7 +670,7 @@ function StrayContainers() {
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">
-                                {t("storage.columns.container")}
+                                {t("storage.columns.leftover")}
                             </th>
                             <th className="hidden whitespace-nowrap px-3 py-2 font-medium md:table-cell">
                                 {t("storage.columns.created")}
@@ -583,45 +679,56 @@ function StrayContainers() {
                         </tr>
                     </thead>
                     <tbody>
-                        {strays.map((stray) => (
-                            <tr key={stray.id} className="border-t border-border">
+                        {rows.map((row) => (
+                            <tr key={row.key} className="border-t border-border">
                                 <td className="w-full max-w-0 px-3 py-2">
                                     <span className="flex min-w-0 items-center gap-2">
+                                        <Badge variant="neutral" className="shrink-0">
+                                            {t(`storage.leftovers.kind.${row.kind}`)}
+                                        </Badge>
                                         <span
                                             className="min-w-0 truncate font-medium"
-                                            title={stray.name}
+                                            title={row.name}
                                         >
-                                            {stray.name}
+                                            {row.name}
                                         </span>
-                                        {stray.running ? (
+                                        {row.container?.running ? (
                                             <Badge variant="warning" className="shrink-0">
                                                 {t("storage.stillRunning")}
                                             </Badge>
                                         ) : null}
                                     </span>
-                                    <span className="text-muted-foreground block truncate text-xs">
-                                        {stray.image}
-                                        {stray.status ? ` - ${stray.status}` : ""}
-                                    </span>
+                                    {row.detail ? (
+                                        <span
+                                            className="text-muted-foreground block truncate text-xs"
+                                            title={row.detail}
+                                        >
+                                            {row.detail}
+                                        </span>
+                                    ) : null}
                                 </td>
                                 <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
-                                    {age(stray.createdAt, t) ?? t("storage.unknown")}
+                                    {row.container
+                                        ? (age(row.container.createdAt, t) ?? t("storage.unknown"))
+                                        : null}
                                 </td>
                                 <td className="px-3 py-2 text-right">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        disabled={removing !== null}
-                                        onClick={() => void remove(stray)}
-                                        aria-label={t("list.removeNamed", { name: stray.name })}
-                                        title={t("list.remove")}
-                                    >
-                                        {removing === stray.id ? (
-                                            <Loader2 className="size-4 shrink-0 animate-spin" />
-                                        ) : (
-                                            <Trash2 className="size-4 shrink-0" />
-                                        )}
-                                    </Button>
+                                    {row.container ? (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            disabled={removing !== null || cleaning}
+                                            onClick={() => void remove(row.container!)}
+                                            aria-label={t("list.removeNamed", { name: row.name })}
+                                            title={t("list.remove")}
+                                        >
+                                            {removing === row.container.id ? (
+                                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="size-4 shrink-0" />
+                                            )}
+                                        </Button>
+                                    ) : null}
                                 </td>
                             </tr>
                         ))}
@@ -629,6 +736,11 @@ function StrayContainers() {
                 </table>
             </div>
 
+            {cleaned ? (
+                <p className="text-success text-xs">
+                    {t("storage.leftovers.cleaned", { count: cleaned })}
+                </p>
+            ) : null}
             {error ? <p className="text-danger text-xs">{error}</p> : null}
             {confirmElement}
         </section>

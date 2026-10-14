@@ -89,6 +89,10 @@ export interface HostVolume {
     /** Whether it may be offered for removal: nothing references it, Polaris has
      *  no record of it, and it is old enough to have settled. */
     readonly spare: boolean;
+    /** Whether it was created by an application Polaris no longer holds - left by
+     *  an uninstall that predates Polaris cleaning up after itself. False where
+     *  the applications could not be read. */
+    readonly removedApp: boolean;
     /** What it was, from Polaris's own notes - kept after its owner is gone, so
      *  a leftover can say it was an app's data rather than a hash. */
     readonly description: string | null;
@@ -200,6 +204,19 @@ export function baseProject(project: string | null): string | null {
     return match?.[1] ?? project;
 }
 
+/** Whether a compose project is an application's and that application is not
+ *  among `known` (keyed by `polaris-<hash>`). Pure. */
+export function leftByRemovedApp(
+    project: string | null,
+    known: { has(project: string): boolean }
+): boolean {
+    const base = baseProject(project);
+    return base !== null && APP_PROJECT.test(project ?? "") && !known.has(base);
+}
+
+/** The shape Polaris gives an application's compose project (`releases.ts`). */
+export const APP_PROJECT = /^polaris-[0-9a-f]{8}(?:-[a-z0-9]{1,8})?$/;
+
 /** What the daemon lists, or an empty list when it will not. */
 async function containers(daemon: HostdClient): Promise<DockerContainer[]> {
     const listing = await read(daemon, "/containers/json?all=1");
@@ -233,7 +250,7 @@ export async function hostVolumes(
         read(daemon, "/volumes"),
         read(daemon, "/system/df"),
         known(claimed, new Map()),
-        known(projectOwners, new Map()),
+        known<Awaited<ReturnType<typeof projectOwners>> | null>(projectOwners, null),
         containers(daemon),
         known(databaseVolumes, new Map()),
         known(() => volumeNotes(), new Map())
@@ -293,7 +310,7 @@ export async function hostVolumes(
         // records, or by a stack it recreated under a new name - and it is why a
         // row called `polaris-dad2fc8a_data` can say the app's name instead of
         // "Polaris has no record of this one".
-        const app = owners.get(baseProject(project) ?? "") ?? null;
+        const app = owners?.get(baseProject(project) ?? "") ?? null;
         const database = databases.get(name) ?? null;
         const belongsTo = owner ?? app?.name ?? (database ? `the ${database.name} database` : null);
         // Noted as it is now, so that when its owner goes, what it was stays.
@@ -328,7 +345,7 @@ export async function hostVolumes(
             now: new Date(now)
         });
         const way = mounted.get(name);
-        const through = way ? (owners.get(way.project ?? "") ?? app) : null;
+        const through = way ? (owners?.get(way.project ?? "") ?? app) : null;
         return {
             name,
             bytes: bytes(measured?.UsageData?.Size),
@@ -342,6 +359,7 @@ export async function hostVolumes(
                     ? `/drive?c=container:${through.id}&p=${encodeURIComponent(way.destination.replace(/^\/+|\/+$/g, ""))}`
                     : null,
             spare: !inUse && belongsTo === null && Number.isFinite(age) && age > SETTLING_MS,
+            removedApp: owners !== null && belongsTo === null && leftByRemovedApp(project, owners),
             description: app?.description ?? note?.description ?? null,
             lastUsedAt: used
                 ? new Date(now).toISOString()

@@ -84,8 +84,8 @@ import {
     PinOff,
     ListFilter,
     Printer,
-    CornerUpLeft,
-    CornerUpRight,
+    Reply,
+    ReplyAll,
     Download,
     Forward,
     Mail,
@@ -348,7 +348,7 @@ export function ThreadView({
                         disabled={answering}
                         onClick={() => answer("reply")}
                     >
-                        <CornerUpLeft className="size-4 shrink-0" aria-hidden />
+                        <Reply className="size-4 shrink-0" aria-hidden />
                     </Button>
                     {newest.to.length + newest.cc.length > 1 ? (
                         <Button
@@ -359,7 +359,7 @@ export function ThreadView({
                             disabled={answering}
                             onClick={() => answer("reply-all")}
                         >
-                            <CornerUpRight className="size-4 shrink-0" aria-hidden />
+                            <ReplyAll className="size-4 shrink-0" aria-hidden />
                         </Button>
                     ) : null}
                     <Button
@@ -502,7 +502,7 @@ export function ThreadView({
                         disabled={answering}
                         onClick={() => answer("reply")}
                     >
-                        <CornerUpLeft className="size-4 shrink-0" aria-hidden />
+                        <Reply className="size-4 shrink-0" aria-hidden />
                         {t("thread.reply")}
                     </Button>
                     {newest.to.length + newest.cc.length > 1 ? (
@@ -511,7 +511,7 @@ export function ThreadView({
                             disabled={answering}
                             onClick={() => answer("reply-all")}
                         >
-                            <CornerUpRight className="size-4 shrink-0" aria-hidden />
+                            <ReplyAll className="size-4 shrink-0" aria-hidden />
                             {t("view.replyAll")}
                         </Button>
                     ) : null}

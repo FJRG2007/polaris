@@ -243,6 +243,34 @@ export class HostdClient {
         }
     }
 
+    /**
+     * The application compose directories under the daemon's deploy root
+     * (`polaris-<8 hex>[-marker]`). Null from a daemon that predates the call, so
+     * "none" and "would not say" stay different answers.
+     */
+    public async deployDirs(): Promise<string[] | null> {
+        const response = await this.call("POST", "/v1/deploy/dirs");
+        if (response.status !== 200) return null;
+        const parsed = JSON.parse(response.body) as { projects?: unknown };
+        if (!Array.isArray(parsed.projects)) return null;
+        return parsed.projects.filter((name): name is string => typeof name === "string");
+    }
+
+    /** Remove one application compose directory under the deploy root. Throws
+     *  unless the daemon says it is gone. */
+    public async removeDeployDir(project: string): Promise<void> {
+        const response = await this.call(
+            "POST",
+            "/v1/deploy/dirs/remove",
+            JSON.stringify({ project })
+        );
+        if (response.status !== 200) {
+            throw new Error(
+                `hostd directory removal failed (${response.status}): ${response.body}`
+            );
+        }
+    }
+
     /** Authenticate to a private registry (`docker login`). Resolves on success and
      *  throws on failure; the password rides in the JSON body, never in argv. */
     public async deployLogin(registry: string, username: string, password: string): Promise<void> {
