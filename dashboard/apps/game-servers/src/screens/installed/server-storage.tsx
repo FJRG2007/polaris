@@ -309,7 +309,9 @@ export function ServerStorage({
                         {view.move.error ? (
                             <p className="text-danger-ink">
                                 {view.move.error.code === "mismatch" && view.move.error.file
-                                    ? t("storage.errors.mismatchFile", { file: view.move.error.file })
+                                    ? t("storage.errors.mismatchFile", {
+                                          file: view.move.error.file
+                                      })
                                     : t(`storage.errors.${view.move.error.code}`, {
                                           file: view.move.error.file ?? ""
                                       })}
@@ -326,7 +328,10 @@ export function ServerStorage({
                     <Button
                         size="sm"
                         disabled={
-                            disabledReason !== null || (unchanged && !retrying) || needsNas || pending
+                            disabledReason !== null ||
+                            (unchanged && !retrying) ||
+                            needsNas ||
+                            pending
                         }
                         onClick={() => (stopsIt ? setConfirming(true) : apply())}
                     >

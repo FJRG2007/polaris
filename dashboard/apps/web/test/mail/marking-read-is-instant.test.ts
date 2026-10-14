@@ -38,7 +38,15 @@ describe("what an action aimed at a row is aimed at", () => {
         // Every message of it in the folder the row is listed in, and nothing in
         // any other: the newest alone left the rest behind, and the row came
         // back on the next list.
-        for (const action of ["archive", "trash", "delete", "junk", "not-junk", "inbox", "restore"] as const) {
+        for (const action of [
+            "archive",
+            "trash",
+            "delete",
+            "junk",
+            "not-junk",
+            "inbox",
+            "restore"
+        ] as const) {
             expect(scopeOf(action), action).toBe("folder");
         }
     });

@@ -317,9 +317,7 @@ export async function setArkAdminPasswordAction(
  * moderate a server was not handed its admin password, and a value that is only
  * sent when it is asked for is one a screenshot of the page does not carry.
  */
-export async function revealArkPasswordsAction(
-    installedAppId: string
-): Promise<{
+export async function revealArkPasswordsAction(installedAppId: string): Promise<{
     joinPassword?: string | null;
     adminPassword?: string | null;
     adminReplaced?: boolean;

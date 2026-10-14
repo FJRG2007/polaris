@@ -1855,9 +1855,7 @@ export function MailView({
                         // Opening a message marks it read on the server, which
                         // takes a round trip. The row stops being bold now.
                         onRead={() => {
-                            const counts = nudgeUnread(unreadNudges([openThread]), [
-                                openThread.id
-                            ]);
+                            const counts = nudgeUnread(unreadNudges([openThread]), [openThread.id]);
                             const pending = patchUntilAnswered([openThread.id], {
                                 unreadCount: 0
                             });

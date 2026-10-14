@@ -22,7 +22,16 @@ import type { NotificationView } from "@/lib/notification-service";
 import { notificationStreamPath } from "@/lib/notifications/stream-path";
 import { arrivedDeployResults, desktopBridge } from "@/lib/desktop-bridge";
 import { openPeerChannel, subscribeSharedStream, type PeerChannel } from "@/lib/shared-stream";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode
+} from "react";
 import {
     hasNewArrival,
     NOTIFICATION_SOUND_CHANGED,
@@ -90,18 +99,15 @@ export function useHoldConversationNotices(): (threadIds: readonly string[]) => 
     const current = useContext(FeedContext);
     const latest = useRef(current);
     latest.current = current;
-    return useCallback(
-        (threadIds) => {
-            const feed = latest.current;
-            if (!feed || threadIds.length === 0) return NO_HOLD;
-            const links = new Set(threadIds.map(conversationLink));
-            const ids = feed.items
-                .filter((row) => !row.read && row.href && links.has(row.href))
-                .map((row) => row.id);
-            return ids.length === 0 ? NO_HOLD : feed.holdRead(ids);
-        },
-        []
-    );
+    return useCallback((threadIds) => {
+        const feed = latest.current;
+        if (!feed || threadIds.length === 0) return NO_HOLD;
+        const links = new Set(threadIds.map(conversationLink));
+        const ids = feed.items
+            .filter((row) => !row.read && row.href && links.has(row.href))
+            .map((row) => row.id);
+        return ids.length === 0 ? NO_HOLD : feed.holdRead(ids);
+    }, []);
 }
 
 /** The shared feed. Only valid under NotificationsProvider. */
@@ -111,7 +117,13 @@ export function useNotificationFeed(): NotificationFeed {
     return feed;
 }
 
-export function NotificationsProvider({ initial, children }: { initial: NotificationView[]; children: ReactNode }) {
+export function NotificationsProvider({
+    initial,
+    children
+}: {
+    initial: NotificationView[];
+    children: ReactNode;
+}) {
     const scope = useSessionScope();
     // The feed is the open shelf's: an alert about a company's work is on that
     // company's shelf and nowhere else, and one about the account is on all of
@@ -139,17 +151,21 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
     useEffect(() => {
         // Per shelf, like the feed: "read them all" in a tab on one shelf is
         // not a write to the rows another tab is showing for a different one.
-        const channel = openPeerChannel<FeedMessage>(`${FEED_CHANNEL}:${shelf}`, scope, (message) => {
-            const parsed = feedMessageSchema.safeParse(message);
-            if (!parsed.success) return;
-            if (parsed.data.kind === "end") {
-                peerWriteUntil.current = 0;
-                return;
+        const channel = openPeerChannel<FeedMessage>(
+            `${FEED_CHANNEL}:${shelf}`,
+            scope,
+            (message) => {
+                const parsed = feedMessageSchema.safeParse(message);
+                if (!parsed.success) return;
+                if (parsed.data.kind === "end") {
+                    peerWriteUntil.current = 0;
+                    return;
+                }
+                const { mutation } = parsed.data;
+                peerWriteUntil.current = Date.now() + PEER_WRITE_MS;
+                setItems((rows) => applyFeedMutation(rows, mutation));
             }
-            const { mutation } = parsed.data;
-            peerWriteUntil.current = Date.now() + PEER_WRITE_MS;
-            setItems((rows) => applyFeedMutation(rows, mutation));
-        });
+        );
         peers.current = channel;
         return () => {
             peers.current = null;
@@ -190,15 +206,17 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                     // Taken before the rows below are marked as seen.
                     if (desktopBridge() && noticeAllowed("alerts")) {
                         for (const row of arrivedDeployResults(seen.current, payload.items)) {
-                            void claimForDevice(`${scope}:deploy-notice:${row.id}`, 60_000).then((mine) => {
-                                if (!mine || document.hasFocus()) return;
-                                void notifyDesktop({
-                                    title: row.title,
-                                    body: row.body ?? undefined,
-                                    tag: `notification:${row.id}`,
-                                    href: row.href ?? undefined
-                                });
-                            });
+                            void claimForDevice(`${scope}:deploy-notice:${row.id}`, 60_000).then(
+                                (mine) => {
+                                    if (!mine || document.hasFocus()) return;
+                                    void notifyDesktop({
+                                        title: row.title,
+                                        body: row.body ?? undefined,
+                                        tag: `notification:${row.id}`,
+                                        href: row.href ?? undefined
+                                    });
+                                }
+                            );
                         }
                     }
                     // Every tab records what it has seen, so the one that ends up
@@ -275,14 +293,18 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                 // Only the ones that would actually change: marking twenty rows
                 // of which two are unread is two rows of work, and a write that
                 // changes nothing still costs a round trip and a rollback path.
-                const unreadIds = items.filter((row) => !row.read && ids.includes(row.id)).map((row) => row.id);
+                const unreadIds = items
+                    .filter((row) => !row.read && ids.includes(row.id))
+                    .map((row) => row.id);
                 if (unreadIds.length === 0) return;
                 apply({ kind: "readMany", ids: unreadIds }, () =>
                     markNotificationsReadAction({ ids: unreadIds })
                 );
             },
             holdRead: (ids) => {
-                const held = items.filter((row) => !row.read && ids.includes(row.id)).map((row) => row.id);
+                const held = items
+                    .filter((row) => !row.read && ids.includes(row.id))
+                    .map((row) => row.id);
                 if (held.length === 0) return NO_HOLD;
                 setItems((rows) => applyFeedMutation(rows, { kind: "readMany", ids: held }));
                 inFlight.current += 1;
@@ -304,14 +326,19 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                     settle: () => {
                         if (!open) return;
                         close();
-                        peers.current?.post({ kind: "begin", mutation: { kind: "readMany", ids: held } });
+                        peers.current?.post({
+                            kind: "begin",
+                            mutation: { kind: "readMany", ids: held }
+                        });
                         peers.current?.post({ kind: "end" });
                     },
                     abandon: () => {
                         if (!open) return;
                         close();
                         setItems((rows) =>
-                            rows.map((row) => (held.includes(row.id) ? { ...row, read: false } : row))
+                            rows.map((row) =>
+                                held.includes(row.id) ? { ...row, read: false } : row
+                            )
                         );
                     }
                 };

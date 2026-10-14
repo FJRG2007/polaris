@@ -53,7 +53,12 @@ export type RowMenuEntry =
     /** A place to go rather than something to do - somebody's profile on the
      *  service the game signs them in with. It opens in its own tab, and carries
      *  the same two words every outward link here does. */
-    | { readonly kind: "link"; readonly text: string; readonly icon?: ReactNode; readonly href: string };
+    | {
+          readonly kind: "link";
+          readonly text: string;
+          readonly icon?: ReactNode;
+          readonly href: string;
+      };
 
 /**
  * The link, drawn inside whichever menu item wraps it.
@@ -75,7 +80,13 @@ const OutwardLink = forwardRef<
 OutwardLink.displayName = "OutwardLink";
 
 /** The `...` at the end of a row. */
-export function RowMenuButton({ entries, label }: { entries: readonly RowMenuEntry[]; label: string }) {
+export function RowMenuButton({
+    entries,
+    label
+}: {
+    entries: readonly RowMenuEntry[];
+    label: string;
+}) {
     const t = useGameText("games");
     return (
         <DropdownMenu>
@@ -91,7 +102,11 @@ export function RowMenuButton({ entries, label }: { entries: readonly RowMenuEnt
                     ) : entry.kind === "label" ? (
                         <DropdownMenuLabel
                             key={index}
-                            className={entry.muted ? "text-xs font-normal text-muted-foreground" : undefined}
+                            className={
+                                entry.muted
+                                    ? "text-xs font-normal text-muted-foreground"
+                                    : undefined
+                            }
                         >
                             {entry.text}
                         </DropdownMenuLabel>
@@ -139,7 +154,11 @@ export function RowContextMenu({
                     ) : entry.kind === "label" ? (
                         <ContextMenuLabel
                             key={index}
-                            className={entry.muted ? "text-xs font-normal text-muted-foreground" : undefined}
+                            className={
+                                entry.muted
+                                    ? "text-xs font-normal text-muted-foreground"
+                                    : undefined
+                            }
                         >
                             {entry.text}
                         </ContextMenuLabel>

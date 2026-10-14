@@ -426,13 +426,7 @@ function printedPath<K extends "differ" | "noLinks">(
     return path ? ({ [key]: path } as Partial<Record<K, string>>) : {};
 }
 
-export type CopyFailure =
-    | "mismatch"
-    | "noSpace"
-    | "noLinks"
-    | "unreadable"
-    | "unwritable"
-    | "copy";
+export type CopyFailure = "mismatch" | "noSpace" | "noLinks" | "unreadable" | "unwritable" | "copy";
 
 /**
  * Whether the copy can be trusted, from its exit code and what it printed. Both

@@ -44,7 +44,8 @@ vi.mock("@polaris/app-host", () => {
     // actually uses reads as an empty, harmless service.
     const unused = new Proxy({}, { get: () => undefined });
     const envVarService = {
-        revealEnvVar: async (id: string) => (id === "row-admin" ? fake.adminPassword : fake.joinPassword),
+        revealEnvVar: async (id: string) =>
+            id === "row-admin" ? fake.adminPassword : fake.joinPassword,
         setEnvVars: async (
             _scope: string,
             _scopeId: string,
@@ -57,7 +58,10 @@ vi.mock("@polaris/app-host", () => {
     };
     const host = new Proxy(
         { envVarService },
-        { get: (target, prop) => (prop in target ? (target as Record<string, unknown>)[prop as string] : unused) }
+        {
+            get: (target, prop) =>
+                prop in target ? (target as Record<string, unknown>)[prop as string] : unused
+        }
     );
     return { host };
 });
@@ -89,6 +93,8 @@ describe("opening an ARK server's passwords", () => {
         expect(result.adminPassword).not.toBe(fake.adminPassword);
         expect(result.adminPassword).toBeTruthy();
         expect(isLegacyAdminPassword(result.adminPassword as string)).toBe(false);
-        expect(fake.writes).toEqual([{ key: "ADMIN_PASSWORD", value: result.adminPassword, isSecret: true }]);
+        expect(fake.writes).toEqual([
+            { key: "ADMIN_PASSWORD", value: result.adminPassword, isSecret: true }
+        ]);
     });
 });
