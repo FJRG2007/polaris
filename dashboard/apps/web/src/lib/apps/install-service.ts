@@ -728,3 +728,17 @@ export async function uninstallApp(
     // awaited: the scheduled reconcile does the same, this only does it now.
     if (application) void reconcilePrivateNetworks().catch(() => undefined);
 }
+
+/**
+ * Clear the credential on every removed install that still holds one. An
+ * uninstall clears it now, but one from before that, or an app deleted from
+ * Deploy before its release did the same, left the secret on a row nothing will
+ * ever dial again. One write, and a no-op once they are clean.
+ */
+export async function forgetRemovedInstallSecrets(): Promise<{ cleared: number }> {
+    const { count } = await prisma.installedApp.updateMany({
+        where: { status: "removed", NOT: { encryptedSecret: null } },
+        data: { encryptedSecret: null, secretNonce: null, secretKeyId: null }
+    });
+    return { cleared: count };
+}

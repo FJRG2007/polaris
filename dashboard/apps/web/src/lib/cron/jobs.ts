@@ -561,6 +561,14 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: removeLeftoverVolumes
     },
     {
+        key: "removed-install-secrets",
+        // Daily: it only catches rows left before an uninstall cleared them itself.
+        everyMs: 24 * 60 * MINUTE,
+        // Unleased: clearing what is already clear changes nothing.
+        leaseMs: null,
+        run: async () => (await import("@/lib/apps/install-service")).forgetRemovedInstallSecrets()
+    },
+    {
         key: "domain-health",
         // A minute, which is what it was as a timer of its own.
         everyMs: Number(process.env.POLARIS_HEALTH_POLL_MS) || MINUTE,

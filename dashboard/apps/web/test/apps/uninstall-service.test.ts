@@ -59,7 +59,7 @@ vi.mock("@/lib/app-extensions/registry", async (importOriginal) => ({
     purgeInstallFiles
 }));
 
-const { uninstallApp } = await import("@/lib/apps/install-service");
+const { forgetRemovedInstallSecrets, uninstallApp } = await import("@/lib/apps/install-service");
 const { UninstallIncompleteError } = await import("@/lib/apps/uninstall-plan");
 
 const ROW = {
@@ -194,5 +194,16 @@ describe("uninstallApp", () => {
         deleteApplication.mockClear();
         await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true });
         expect(deleteApplication).not.toHaveBeenCalled();
+    });
+});
+
+describe("removed installs from before an uninstall cleared their secret", () => {
+    it("lose the credential, and only removed ones are touched", async () => {
+        db.installedApp.updateMany.mockResolvedValueOnce({ count: 3 } as never);
+        expect(await forgetRemovedInstallSecrets()).toEqual({ cleared: 3 });
+        expect(db.installedApp.updateMany).toHaveBeenLastCalledWith({
+            where: { status: "removed", NOT: { encryptedSecret: null } },
+            data: { encryptedSecret: null, secretNonce: null, secretKeyId: null }
+        });
     });
 });
