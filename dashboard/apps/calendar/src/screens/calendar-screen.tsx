@@ -224,7 +224,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const [nowSignal, setNowSignal] = useState(0);
 
     const [view, setView] = useState<CalendarViewName>(route.view ?? DEFAULT_PREFERENCES.view);
-    const [anchor, setAnchor] = useState<string>(route.date ?? today);
+    // The day on screen; null follows today, so the first view shows today in
+    // the zone the preferences name once they load, and stays on it past midnight.
+    const [pinned, setAnchor] = useState<string | null>(route.date);
+    const anchor = pinned ?? today;
     const viewChosen = useRef(route.view !== null);
     const [selected, setSelected] = useState<Selected>(null);
     const [popover, setPopover] = useState<Popover>(null);
@@ -420,11 +423,11 @@ export function CalendarScreen({ path }: { path: string[] }) {
         void savePreferences({ view: next });
     };
     const goToday = () => {
-        setAnchor(today);
+        setAnchor(null);
         setNowSignal((value) => value + 1);
     };
     const step = (direction: 1 | -1) =>
-        setAnchor((current) => time.stepAnchor(view, current, direction, preferences.customDays));
+        setAnchor((current) => time.stepAnchor(view, current ?? today, direction, preferences.customDays));
     const swipeArea = useRef<HTMLElement>(null);
     useSwipeStep(swipeArea, step);
 
