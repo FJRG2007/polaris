@@ -463,8 +463,10 @@ export const mailMessageAction = z.enum([
  * action from that screen has to say which of the two it meant. Read and Unread
  * are the conversation; everything else is the messages themselves, because a
  * conversation lives in several folders at once and a move is about a folder.
+ * `folder` is that move aimed at a row: every message of the conversation in
+ * the same folder as the one named, and nothing in any other folder.
  */
-export const mailActionScope = z.enum(["message", "conversation"]);
+export const mailActionScope = z.enum(["message", "conversation", "folder"]);
 
 /** Anything done to a set of messages at once. The list is capped because every
  *  one of them is a round trip to somebody's mail server. */
@@ -507,7 +509,10 @@ export const mailEmptyFolderSchema = z.object({
 
 export const mailMoveSchema = z.object({
     messageIds: z.array(z.string().uuid()).min(1).max(500),
-    folderId: z.string().uuid()
+    folderId: z.string().uuid(),
+    /** `folder` when the ids name conversation rows: every message of each
+     *  conversation in the same folder moves with it. */
+    scope: z.enum(["message", "folder"]).default("message")
 });
 
 export const mailSnoozeSchema = z.object({

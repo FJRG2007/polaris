@@ -44,12 +44,15 @@ export function leavesTheView(action: MailAction): boolean {
  * conversation of four read used to mark the newest of them, and the row stayed
  * bold with three unread under it, which reads as the button not working.
  *
- * A move stays the message. A conversation lives in several folders at once and
- * archiving "the conversation" would be a promise about mail the view is not
- * showing - the reasoning above `leavesTheView`.
+ * A move is the conversation as this folder holds it: every message of it in the
+ * same folder as the one that named the row, and nothing in any other folder. It
+ * used to be the named message alone, so deleting a conversation of three moved
+ * the newest, the folder kept the other two, and the next list put the row back
+ * - "deleted, and after a reload it came back". See `lib/mailbox/folder-scope`.
  */
-export function scopeOf(action: MailAction): "message" | "conversation" {
-    return action === "read" || action === "unread" ? "conversation" : "message";
+export function scopeOf(action: MailAction): "message" | "conversation" | "folder" {
+    if (action === "read" || action === "unread") return "conversation";
+    return leavesTheView(action) ? "folder" : "message";
 }
 
 /**

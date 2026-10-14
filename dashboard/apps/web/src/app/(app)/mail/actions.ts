@@ -462,7 +462,8 @@ export async function moveAction(input: unknown) {
         const done = await messages.moveMessages(
             userId,
             parsed.data.messageIds,
-            parsed.data.folderId
+            parsed.data.folderId,
+            { scope: parsed.data.scope, strict: true }
         );
         return { done };
     } catch (caught) {
@@ -1070,7 +1071,8 @@ export async function moveToFolderAction(input: unknown) {
         const done = await messages.moveMessages(
             userId,
             parsed.data.messageIds,
-            parsed.data.folderId
+            parsed.data.folderId,
+            { scope: parsed.data.scope, strict: true }
         );
         return { done };
     } catch (caught) {

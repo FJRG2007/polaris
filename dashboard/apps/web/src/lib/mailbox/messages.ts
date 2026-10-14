@@ -33,6 +33,7 @@ import { recordSubscription } from "./subscriptions";
 import { catchUpFolder, refreshThreads } from "./sync";
 import { forgetTrashOrigins, rememberTrashOrigins, restoreFromTrash } from "./trash";
 import { withImap, type MailConnectionSource } from "./imap";
+import { sameFolderSiblings } from "./folder-scope";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import {
     ACCOUNT_COLUMNS,
@@ -249,6 +250,17 @@ function byFolder<T extends { folderId: string }>(rows: readonly T[]): Map<strin
     return out;
 }
 
+/** The messages named, and every other message of their conversations in the
+ *  same folder - see `folder-scope`. Owned by this person, like the rest. */
+async function widenToFolder(userId: string, messageIds: readonly string[]) {
+    const named = await ownedMessages(userId, messageIds);
+    if (named.length === 0) return named;
+    const siblings = await ownedThreadMessages(userId, [
+        ...new Set(named.map((message) => message.threadId))
+    ]);
+    return sameFolderSiblings(named, siblings);
+}
+
 /** What a caller can vary about an action. */
 export interface MailActionOptions {
     /**
@@ -281,8 +293,12 @@ export interface MailActionOptions {
      * conversation" would be a promise about mail the screen is not showing.
      * Read is the opposite - a conversation with one message left unread is a
      * row that stays bold after somebody read it, which is the mark not working.
+     *
+     * `folder` is a conversation row moved out of the folder it is listed in:
+     * every message of that conversation in the same folder goes, and nothing
+     * in any other folder - see `folder-scope`.
      */
-    readonly scope?: "message" | "conversation";
+    readonly scope?: "message" | "conversation" | "folder";
     /**
      * Throw when the server refused to move or delete any of them, instead of
      * answering with what was done. For somebody pressing the button, whose
@@ -310,9 +326,18 @@ export async function actOnMessages(
     // Putting something back is a move per message rather than a move per
     // folder - each one goes where it came from - so it has a function of its
     // own and this is the door to it.
-    if (action === "restore") return await restoreFromTrash(userId, messageIds);
+    if (action === "restore") {
+        const named =
+            options.scope === "folder"
+                ? (await widenToFolder(userId, messageIds)).map((message) => message.id)
+                : messageIds;
+        return await restoreFromTrash(userId, named);
+    }
 
-    const messages = await ownedMessages(userId, messageIds);
+    const messages =
+        options.scope === "folder" && !FLAG_ACTIONS[action]
+            ? await widenToFolder(userId, messageIds)
+            : await ownedMessages(userId, messageIds);
     if (messages.length === 0) return 0;
 
     // A flag is not a move, and it used to be treated as one.
@@ -693,7 +718,10 @@ async function refreshThreadsFor(accountIds: readonly string[]): Promise<void> {
 export async function moveMessages(
     userId: string,
     messageIds: readonly string[],
-    folderId: string
+    folderId: string,
+    /** `scope: "folder"` for a conversation row, `strict` for somebody pressing
+     *  the button - both as `MailActionOptions` says. */
+    options: { readonly scope?: "message" | "folder"; readonly strict?: boolean } = {}
 ): Promise<number> {
     const destination = await prisma.mailFolder.findFirst({
         where: { id: folderId, account: { userId } },
@@ -701,13 +729,19 @@ export async function moveMessages(
     });
     if (!destination) throw new MailAccessError("That folder is not yours.");
 
-    const messages = (await ownedMessages(userId, messageIds)).filter(
-        (message) => message.accountId === destination.accountId
-    );
+    const messages = (
+        options.scope === "folder"
+            ? await widenToFolder(userId, messageIds)
+            : await ownedMessages(userId, messageIds)
+    ).filter((message) => message.accountId === destination.accountId);
     if (messages.length === 0) return 0;
 
     const account = await ownedAccount(userId, destination.accountId);
     let moved = 0;
+    /** Folders whose server refused the move. Answered as an error rather than
+     *  as done: the screen has already taken the rows away, and a refusal it is
+     *  not told about is mail that comes back on the next list. */
+    const refused: string[] = [];
     /** What the move owes each folder's unread number - see `folder-counts`. */
     const deltas = new Map<string, number>();
     await withImap(account, async (client) => {
@@ -725,7 +759,10 @@ export async function moveMessages(
                     destination.path,
                     { uid: true }
                 );
-                if (!ok) continue;
+                if (!ok) {
+                    refused.push(source.path);
+                    continue;
+                }
                 await prisma.mailMessage.deleteMany({
                     where: { id: { in: rows.map((row) => row.id) } }
                 });
@@ -740,6 +777,9 @@ export async function moveMessages(
     await nudgeFolderUnread(deltas);
     await refreshThreads(destination.accountId);
     publishMail({ accountId: destination.accountId, kind: "messages", actorId: userId });
+    if (options.strict && refused.length > 0) {
+        throw new Error(`the mail server refused to move messages in ${refused.join(", ")}`);
+    }
     return moved;
 }
 

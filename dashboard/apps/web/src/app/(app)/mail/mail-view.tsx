@@ -943,7 +943,8 @@ export function MailView({
             startBusy(async () => {
                 const outcome = await moveToFolderAction({
                     folderId,
-                    messageIds: [...messageIds]
+                    messageIds: [...messageIds],
+                    scope: "folder"
                 });
                 const said = refusalOf(outcome);
                 if (said) {

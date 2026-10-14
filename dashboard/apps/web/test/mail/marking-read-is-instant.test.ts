@@ -34,10 +34,17 @@ describe("what an action aimed at a row is aimed at", () => {
         }
     });
 
-    it("means the messages themselves for everything else", () => {
-        // A conversation lives in several folders at once, so archiving "the
-        // conversation" would be a promise about mail the view is not showing.
-        for (const action of ["archive", "trash", "delete", "junk", "star", "important"] as const) {
+    it("means the conversation in this folder for a move", () => {
+        // Every message of it in the folder the row is listed in, and nothing in
+        // any other: the newest alone left the rest behind, and the row came
+        // back on the next list.
+        for (const action of ["archive", "trash", "delete", "junk", "not-junk", "inbox", "restore"] as const) {
+            expect(scopeOf(action), action).toBe("folder");
+        }
+    });
+
+    it("means the messages themselves for a flag", () => {
+        for (const action of ["star", "unstar", "important", "unimportant"] as const) {
             expect(scopeOf(action), action).toBe("message");
         }
     });

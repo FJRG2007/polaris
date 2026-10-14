@@ -573,7 +573,8 @@ export function MailShell({
             void (async () => {
                 const outcome = await moveToFolderAction({
                     folderId,
-                    messageIds: [...messageIds]
+                    messageIds: [...messageIds],
+                    scope: "folder"
                 });
                 const said = refusalOf(outcome);
                 toast.show({
