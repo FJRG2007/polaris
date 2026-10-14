@@ -13,7 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import polaris.minecraft.EventSeek;
 import polaris.minecraft.PlayerSkins;
 
-/** A hider a seeker cannot see is not tracked by them (see {@link EventSeek}). */
+/**
+ * A hider a seeker cannot see is not tracked by them (see {@link EventSeek}), and
+ * a body already sent can be sent again from scratch so a changed skin draws on
+ * it (see {@link PlayerSkins}).
+ */
 @Mixin(targets = "net.minecraft.server.level.ChunkMap$TrackedEntity")
 public abstract class TrackedEntityMixin implements EventSeek.SeekTracker, PlayerSkins.Retrack {
     @Shadow @Final Entity entity;
