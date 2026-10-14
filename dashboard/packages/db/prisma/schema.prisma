@@ -13217,12 +13217,15 @@ model CrmWorkflowRun {
     // Stringified JSON: the actions a waiting run started with, as they were
     // saved then. Null on a run that is not waiting (and on runs from before).
     actions    String?
+    // A run waiting for its record to match: when it gives up.
+    waitUntil  DateTime?
     startedAt  DateTime  @default(now())
     finishedAt DateTime?
 
     workflow CrmWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
     @@index([workflowId, startedAt])
+    @@index([recordId, status])
     @@index([status, resumeAt])
 }
 

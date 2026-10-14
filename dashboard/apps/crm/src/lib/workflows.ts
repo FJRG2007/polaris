@@ -11,7 +11,7 @@
  */
 
 import { crmT } from "./i18n";
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
 import { host } from "@polaris/app-host";
 import type { NewEvent } from "./timeline";
@@ -125,7 +125,7 @@ async function checkActions(
         if (!model.actionFits(action.kind, trigger.kind)) {
             throw new CrmRefusal(t("workflows.actionNeedsRecord"));
         }
-        if (action.kind === "filter" || action.kind === "ifElse") {
+        if (action.kind === "filter" || action.kind === "ifElse" || action.kind === "waitFor") {
             await records.requireListShown(actor, object, { filter: action.when });
         }
         if (action.kind === "ifElse") {
@@ -461,19 +461,29 @@ async function recordMatches(
 }
 
 /** Where a run got to: the end, a filter that stopped it, or a delay it now
- *  waits out before the action at `step`. */
+ *  waits out before the action at `step`. A run waiting for its record to
+ *  match waits at that action itself, until `waitUntil` at the latest. */
 type Reached =
     | { readonly kind: "done" | "stopped" }
-    | { readonly kind: "waiting"; readonly step: number; readonly resumeAt: Date };
+    | {
+          readonly kind: "waiting";
+          readonly step: number;
+          readonly resumeAt: Date;
+          readonly waitUntil?: Date;
+      };
+
+const DAY_MS = 24 * 60 * 60_000;
 
 /** Actions in turn from `from`, to the end, a filter the record does not pass,
- *  or a delay. */
+ *  a delay, or a record that does not match yet. `waitUntil` is set when the
+ *  run is picked up at a wait for its record: when that wait gives up. */
 async function runActions(
     runner: CrmActor,
     workflow: StoredWorkflow,
     list: readonly model.WorkflowAction[],
     context: RunContext,
-    from = 0
+    from = 0,
+    waitUntil: Date | null = null
 ): Promise<Reached> {
     for (let at = from; at < list.length; at += 1) {
         const action = list[at]!;
@@ -483,6 +493,20 @@ async function runActions(
                 step: at + 1,
                 resumeAt: new Date(Date.now() + action.minutes * 60_000)
             };
+        }
+        if (action.kind === "waitFor") {
+            if (await recordMatches(runner, context, action.when)) continue;
+            const until =
+                at === from && waitUntil !== null
+                    ? waitUntil
+                    : new Date(Date.now() + action.days * DAY_MS);
+            if (Date.now() < until.getTime()) {
+                // Checked again when the record changes, and once more when
+                // the wait is up.
+                return { kind: "waiting", step: at, resumeAt: until, waitUntil: until };
+            }
+            if (action.onTimeout === "stop") return { kind: "stopped" };
+            continue;
         }
         if ((await runAction(runner, workflow, action, context)) === "stop") {
             return { kind: "stopped" };
@@ -695,6 +719,8 @@ interface Resume {
     /** The actions the run started with, stored as text; null on a run from
      *  before they were kept, which goes on with the workflow as saved now. */
     readonly actions: string | null;
+    /** A run waiting for its record to match: when that wait gives up. */
+    readonly waitUntil?: Date | null;
 }
 
 /**
@@ -735,7 +761,14 @@ export async function runWorkflow(
         const runner = await runnerOf(workflow);
         if (!runner) throw new CrmRefusal((await crmT())("workflows.noRunner"));
         reached = await withinWorkflow(() =>
-            runActions(runner, workflow, model.readActions(actions), context, resume?.step ?? 0)
+            runActions(
+                runner,
+                workflow,
+                model.readActions(actions),
+                context,
+                resume?.step ?? 0,
+                resume?.waitUntil ?? null
+            )
         );
     } catch (caught) {
         lastError = await failureText(caught);
@@ -748,6 +781,7 @@ export async function runWorkflow(
                 status: "waiting",
                 step: reached.step,
                 resumeAt: reached.resumeAt,
+                waitUntil: reached.waitUntil ?? null,
                 body: context.body === undefined ? null : JSON.stringify(context.body),
                 actions
             }
@@ -761,6 +795,7 @@ export async function runWorkflow(
             error: lastError,
             finishedAt: now,
             resumeAt: null,
+            waitUntil: null,
             body: null,
             actions: null
         }
@@ -875,37 +910,73 @@ export async function resumeWaitingRuns(now: Date = new Date()): Promise<number>
             await failCutShort(run.id, run.workflow.id, run.resumeAt, now);
             continue;
         }
-        const claimed = await prisma.crmWorkflowRun.updateMany({
-            where: { id: run.id, status: run.status, resumeAt: run.resumeAt },
-            data: { status: "running", resumeAt: new Date(now.getTime() + RESUME_LEASE) }
-        });
-        if (claimed.count === 0) continue;
-        if (!run.workflow.enabled) {
-            await prisma.crmWorkflowRun.update({
-                where: { id: run.id },
-                data: {
-                    status: "cancelled",
-                    finishedAt: now,
-                    resumeAt: null,
-                    body: null,
-                    actions: null
-                }
-            });
-            continue;
-        }
-        await runWorkflow(
-            run.workflow,
-            {
-                object: run.workflow.object as CrmObject,
-                recordId: run.recordId,
-                event: null,
-                body: storedBody(run.body)
-            },
-            { runId: run.id, step: run.step, actions: run.actions }
-        );
-        ran += 1;
+        if (await resumeRun(run, now)) ran += 1;
     }
     return ran;
+}
+
+type WaitingRun = Prisma.CrmWorkflowRunGetPayload<{ include: { workflow: true } }>;
+
+/**
+ * Go on with one waiting run, claimed first by moving it out of waiting for a
+ * lease so it goes on once. A run of a workflow switched off since is
+ * cancelled instead. Returns whether it went on.
+ */
+async function resumeRun(run: WaitingRun, now: Date): Promise<boolean> {
+    const claimed = await prisma.crmWorkflowRun.updateMany({
+        where: { id: run.id, status: run.status, resumeAt: run.resumeAt },
+        data: { status: "running", resumeAt: new Date(now.getTime() + RESUME_LEASE) }
+    });
+    if (claimed.count === 0) return false;
+    if (!run.workflow.enabled) {
+        await prisma.crmWorkflowRun.update({
+            where: { id: run.id },
+            data: {
+                status: "cancelled",
+                finishedAt: now,
+                resumeAt: null,
+                waitUntil: null,
+                body: null,
+                actions: null
+            }
+        });
+        return false;
+    }
+    await runWorkflow(
+        run.workflow,
+        {
+            object: run.workflow.object as CrmObject,
+            recordId: run.recordId,
+            event: null,
+            body: storedBody(run.body)
+        },
+        { runId: run.id, step: run.step, actions: run.actions, waitUntil: run.waitUntil }
+    );
+    return true;
+}
+
+/**
+ * The runs of these workflows waiting for one of these records to match, gone
+ * on with now that it changed: each checks the record again and goes on, or
+ * waits on until its wait is up.
+ */
+async function wakeWaitingRuns(
+    workflows: readonly StoredWorkflow[],
+    recordIds: readonly string[]
+): Promise<void> {
+    const runs = await prisma.crmWorkflowRun.findMany({
+        where: {
+            workflowId: { in: workflows.map((one) => one.id) },
+            recordId: { in: [...new Set(recordIds)] },
+            status: "waiting",
+            waitUntil: { not: null }
+        },
+        orderBy: { resumeAt: "asc" },
+        take: SCHEDULE_BATCH,
+        include: { workflow: true }
+    });
+    const now = new Date();
+    for (const run of runs) await resumeRun(run, now);
 }
 
 /** End a run whose lease lapsed as failed, and note it on its workflow. */
@@ -1001,6 +1072,10 @@ export async function onRecordEvents(
             await runWorkflow(row, { object, recordId: event.recordId, event });
         }
     }
+    await wakeWaitingRuns(
+        rows,
+        events.map((event) => event.recordId)
+    );
 }
 
 /** The most scheduled runs one pass starts. The rest wait a minute. */

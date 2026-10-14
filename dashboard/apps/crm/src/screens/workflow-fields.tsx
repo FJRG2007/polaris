@@ -438,8 +438,53 @@ export function ActionFields({ object, trigger, action, options, onChange }: Act
                 />
             );
         }
+        case "waitFor": {
+            const days = WAIT_DAY_CHOICES.includes(action.days)
+                ? WAIT_DAY_CHOICES
+                : [...WAIT_DAY_CHOICES, action.days].sort((a, b) => a - b);
+            return (
+                <div className="flex min-w-0 flex-col gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <FilterButton
+                            object={object}
+                            filter={action.when}
+                            people={options.people}
+                            onChange={(when) => onChange({ ...action, when })}
+                        />
+                        <span className="text-[0.75rem] text-muted-foreground">
+                            {t("workflows.waitForHint")}
+                        </span>
+                    </div>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Select
+                            aria-label={t("workflows.waitForDays")}
+                            value={String(action.days)}
+                            onValueChange={(next) => onChange({ ...action, days: Number(next) })}
+                            options={days.map((count) => ({
+                                value: String(count),
+                                label: t("workflows.waitForUpTo", { count })
+                            }))}
+                        />
+                        <Select
+                            aria-label={t("workflows.waitForTimeout")}
+                            value={action.onTimeout}
+                            onValueChange={(next) =>
+                                onChange({ ...action, onTimeout: next as model.WaitTimeout })
+                            }
+                            options={model.WAIT_TIMEOUTS.map((one) => ({
+                                value: one,
+                                label: t(`workflows.waitTimeouts.${one}`)
+                            }))}
+                        />
+                    </div>
+                </div>
+            );
+        }
     }
 }
+
+/** The longest waits for a record to match offered, in days. */
+const WAIT_DAY_CHOICES = [1, 2, 3, 7, 14, 30];
 
 /** The waits offered, in minutes. */
 const DELAY_CHOICES = [5, 15, 30, 60, 120, 360, 720, 1440, 2880, 4320, 10080, 20160, 43200];
@@ -800,6 +845,8 @@ export function useWorkflowWords(object: CrmObject) {
                     return { kind, where: EMPTY_FILTER, limit: 10, actions: [] };
                 case "delay":
                     return { kind, minutes: 60 };
+                case "waitFor":
+                    return { kind, when: EMPTY_FILTER, days: 7, onTimeout: "stop" };
             }
         },
         /** Whether an action can run under a trigger. */

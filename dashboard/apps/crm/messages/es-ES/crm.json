@@ -557,7 +557,8 @@
             "ifElse": "Si el registro coincide",
             "forEach": "Por cada registro hallado",
             "delay": "Esperar",
-            "sendChat": "Enviar mensaje de chat"
+            "sendChat": "Enviar mensaje de chat",
+            "waitFor": "Esperar a que el registro coincida"
         },
         "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
         "createNeedsName": "Pon nombre al nuevo registro.",
@@ -647,7 +648,15 @@
         "showSteps": "Ver pasos",
         "hideSteps": "Ocultar pasos",
         "editFrom": "Editar desde esta versión",
-        "steps": "Pasos"
+        "steps": "Pasos",
+        "waitForHint": "Se comprueba cada vez que cambia el registro.",
+        "waitForDays": "Espera máxima",
+        "waitForUpTo": "{count, plural, one {Hasta # día} other {Hasta # días}}",
+        "waitForTimeout": "Si nunca coincide",
+        "waitTimeouts": {
+            "stop": "Terminar",
+            "continue": "Seguir"
+        }
     },
     "favorites": {
         "add": "Añadir a favoritos",

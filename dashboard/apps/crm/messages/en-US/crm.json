@@ -557,7 +557,8 @@
             "ifElse": "If the record matches",
             "forEach": "For each record found",
             "delay": "Wait",
-            "sendChat": "Send a chat message"
+            "sendChat": "Send a chat message",
+            "waitFor": "Wait until the record matches"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -647,7 +648,15 @@
         "showSteps": "Show steps",
         "hideSteps": "Hide steps",
         "editFrom": "Edit from this version",
-        "steps": "Steps"
+        "steps": "Steps",
+        "waitForHint": "Checked each time the record changes.",
+        "waitForDays": "Longest wait",
+        "waitForUpTo": "{count, plural, one {Up to # day} other {Up to # days}}",
+        "waitForTimeout": "If it never matches",
+        "waitTimeouts": {
+            "stop": "End the run",
+            "continue": "Go on anyway"
+        }
     },
     "favorites": {
         "add": "Add to favorites",
