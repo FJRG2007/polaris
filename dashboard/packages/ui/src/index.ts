@@ -100,6 +100,13 @@ export {
 } from "./shell/app-switcher";
 export { MobileNav } from "./shell/mobile-nav";
 export {
+    AppLogo,
+    APP_LOGO_IDS,
+    appLogoPalette,
+    hasAppLogo,
+    type AppLogoPalette
+} from "./shell/app-logo";
+export {
     AppShell,
     PolarisMark,
     PageHeader,

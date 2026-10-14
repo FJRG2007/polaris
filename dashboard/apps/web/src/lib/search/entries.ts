@@ -55,6 +55,8 @@ export interface CommandEntry {
     group: string;
     href: string;
     icon: LucideIcon;
+    /** The app this entry opens, when it is an app itself; drawn with its logo. */
+    appId?: string;
     /** Second line: what the destination is, or where the resource lives. */
     context?: string;
     /** Terms that should also match, beyond the label. */
@@ -123,6 +125,7 @@ export function navigationEntries(
                 group: app.label,
                 href: app.href,
                 icon: app.icon,
+                appId: app.id,
                 context: app.description
             });
         }

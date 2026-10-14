@@ -45,7 +45,7 @@ import { randomUUID } from "node:crypto";
 import { host } from "@polaris/app-host";
 import { readSchedule } from "../schedule";
 import { parseProperties } from "../parse";
-import type * as plan from "../events/plan";
+import * as plan from "../events/plan";
 import * as settingsModule from "./settings";
 import * as replies from "../events/replies";
 import { heldNames, readEventState } from "../events/state";
@@ -1560,21 +1560,26 @@ function creditMeasure(
             return look(cells.length, { cells });
         }
         case "together": {
-            const me = seen;
-            const active = (one: plan.Seen) =>
-                one.movedAt !== null &&
-                sweep.now - one.movedAt <= sweep.settings.antiExploit.afkMinutes * 60_000;
-            const near = [...sweep.seen.values()].some(
-                (other) =>
-                    other.name !== me.name &&
-                    active(other) &&
-                    (other.dimension ?? "") === (me.dimension ?? "") &&
-                    Math.hypot(other.x - me.x, other.z - me.z) <= 64
+            // Both playing by the events' own rule: moved lately, in survival or
+            // adventure. Somebody flying by in creative or spectator is next to
+            // nobody, and nobody is next to them.
+            const me = seen.name.toLowerCase();
+            const playing = plan.activePlayers(
+                sweep.seen,
+                sweep.settings.antiExploit.afkMinutes,
+                sweep.now
             );
+            const self = playing.find((one) => one.name.toLowerCase() === me);
+            const near =
+                self !== undefined &&
+                playing.some(
+                    (other) =>
+                        other.name.toLowerCase() !== me &&
+                        (other.dimension ?? "") === (self.dimension ?? "") &&
+                        Math.hypot(other.x - self.x, other.z - self.z) <= 64
+                );
             const minutes =
-                active(me) && near && instance.readAt !== null
-                    ? Math.min(seconds, (READ_MS * 2) / 1000) / 60
-                    : 0;
+                near && instance.readAt !== null ? Math.min(seconds, (READ_MS * 2) / 1000) / 60 : 0;
             return look(instance.raw + minutes);
         }
         case "community-share": {

@@ -53,20 +53,30 @@ const overview = {
         url: "https://example.invalid/commits",
         checkedAt: new Date().toISOString()
     },
-    addresses: [],
-    publicIp: null,
-    serverIp: null
+    addresses: [] as unknown[] | null,
+    network: { publicIp: "203.0.113.7", serverIp: null } as {
+        publicIp: string | null;
+        serverIp: string | null;
+    } | null
 };
 
 /** How many overview requests fail before one answers. */
 let failures = 0;
 let failWith = 502;
+/** Answers that come back with the network part missing, before a whole one. */
+let partial = 0;
 const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/api/admin/settings/overview")) {
         if (failures > 0) {
             failures -= 1;
             return new Response("starting", { status: failWith });
+        }
+        if (partial > 0) {
+            partial -= 1;
+            return new Response(JSON.stringify({ ...overview, network: null }), {
+                headers: { "content-type": "application/json" }
+            });
         }
         return new Response(JSON.stringify(overview), {
             headers: { "content-type": "application/json" }
@@ -81,6 +91,7 @@ beforeEach(() => {
     checkRefused = true;
     failures = 2;
     failWith = 502;
+    partial = 0;
     fetchMock.mockClear();
     checkForNewBuild.mockClear();
     checkForNewBuild.mockResolvedValue(false);
@@ -127,6 +138,44 @@ describe("the update card after an update", () => {
         ).length;
         expect(asked).toBe(3);
         expect(screen.getAllByText("running-abc").length).toBeGreaterThan(0);
+    });
+
+    it("asks again after the edge's own 404 while the new dashboard starts", async () => {
+        failWith = 404;
+        view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_000);
+        });
+        expect(screen.getAllByText("running-abc").length).toBeGreaterThan(0);
+        expect(screen.getByText("203.0.113.7")).toBeTruthy();
+    });
+
+    it("shows the parts that answered and asks again for the one that did not", async () => {
+        failures = 0;
+        partial = 1;
+        view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(500);
+        });
+        expect(screen.getAllByText("running-abc").length).toBeGreaterThan(0);
+        expect(screen.queryByText("203.0.113.7")).toBeNull();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(5_000);
+        });
+        expect(screen.getByText("203.0.113.7")).toBeTruthy();
+    });
+
+    it("stops asking once signed out", async () => {
+        failures = 5;
+        failWith = 401;
+        view();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(60_000);
+        });
+        const asked = fetchMock.mock.calls.filter(([url]) =>
+            String(url).includes("/overview")
+        ).length;
+        expect(asked).toBe(1);
     });
 
     it("takes a refused check quietly and asks whether Polaris was updated", async () => {

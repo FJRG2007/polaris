@@ -626,7 +626,7 @@ const PURCHASE_WORDS: readonly string[] = [
  *
  * The phrases above are contiguous, and a payment confirmation usually is not:
  *
- *     Tu pago con Paga en 4 en AMAZON ha sido aceptado
+ *     Tu pago con Paga en 4 en TIENDA ha sido aceptado
  *
  * "pago" and "ha sido aceptado" are eleven words apart, and no list of phrases
  * was ever going to hold that one - the middle is the shop, the card and the
@@ -656,7 +656,7 @@ const PAYMENT_SETTLED: readonly RegExp[] = [
  *
  * This is money about to move in the plainest sense - an approved application
  * is a schedule of payments that starts next month - and none of it says so in
- * the words the lists above know. "Enhorabuena SAMUEL, tu solicitud de
+ * the words the lists above know. "Enhorabuena AURORA, tu solicitud de
  * financiacion ha sido aprobada" has no renewal, no invoice and no receipt in
  * it, arrives with no List-Unsubscribe and an HTML body whose preview is empty,
  * so it fell through every question and landed in Primary.
@@ -709,7 +709,7 @@ const FINANCING: readonly RegExp[] = [
  * about the purchase it paid for, the note about the instalment plan, the
  * lender writing about the arrangement itself:
  *
- *     Financiación Cetelem en APPLE. Tu opinión es muy importante para nosotros
+ *     Financiación Ejemplobank en BAZAR. Tu opinión es muy importante para nosotros
  *
  * There is no possessive, no decision and no receipt in that, so every question
  * missed it and a mailing-list survey about somebody's own financed purchase
@@ -898,7 +898,7 @@ const PURCHASE_NOUNS =
 
 /**
  * The same nouns, said to be the reader's own: behind a possessive, with room
- * for the one word a name puts between them - "your MacBook purchase".
+ * for the one word a name puts between them - "your laptop purchase".
  *
  * What a word for credit needs beside it when nobody asked for an opinion. News
  * names credit and a purchase in one breath all day - "hipoteca para la compra
@@ -1042,8 +1042,8 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
  * than inside a word - an order number in a sentence is not one of these.
  *
  * The digit is required because an upper-case word on its own is a name far
- * more often than a code: lenders and shops write "Enhorabuena SAMUEL," and
- * "compra en AMAZON", and without it either subject counted as carrying a code -
+ * more often than a code: lenders and shops write "Enhorabuena AURORA," and
+ * "compra en TIENDA", and without it either subject counted as carrying a code -
  * which, with a sign-in phrase anywhere in the preview, filed the message under
  * the one tab that can be cleared up automatically.
  */

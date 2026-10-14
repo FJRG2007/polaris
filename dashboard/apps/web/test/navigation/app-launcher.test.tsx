@@ -14,7 +14,7 @@
  * switcher draws each app once, as an icon and a name with no description.
  */
 
-import { AppSwitcher } from "@polaris/ui";
+import { AppSwitcher, hasAppLogo } from "@polaris/ui";
 import { describe, expect, it } from "vitest";
 import { reachableApps } from "@/lib/app-access";
 import { Gamepad2, HardDrive } from "lucide-react";
@@ -331,5 +331,22 @@ describe("the switcher", () => {
         );
         expect(html).toContain("Game servers");
         expect(html).not.toContain("Files across every NAS");
+        expect(html).toContain('data-app-logo="games"');
+    });
+
+    it("has a logo for every app in the registry", () => {
+        const missing = POLARIS_APPS.filter((app) => !hasAppLogo(app.id)).map((app) => app.id);
+        expect(missing).toEqual([]);
+    });
+
+    it("keeps the icon for an app without a logo", () => {
+        const html = renderToStaticMarkup(
+            <AppSwitcher
+                apps={[{ id: "installed-x", label: "Installed", icon: HardDrive, href: "/x" }]}
+                currentAppId="installed-x"
+            />
+        );
+        expect(html).not.toContain("data-app-logo");
+        expect(html).toContain("lucide");
     });
 });

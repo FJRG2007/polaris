@@ -6,7 +6,7 @@
  * a delete dialog names. Those places had the stored Markdown put straight into
  * them, which is fine until somebody replies to a code block and the bar reads
  *
- *     Replying to Samuel ```py print("test") ```
+ *     Replying to Aurora ```py print("test") ```
  *
  * - three backticks, a language tag and a fence, none of which is what was said.
  * The same goes for a heading's hashes, a list's dashes, a link's brackets and

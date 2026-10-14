@@ -159,7 +159,7 @@ describe("nothing to send", () => {
     it.each([
         ["a word", "hello"],
         ["a picture", "![](https://example.com/a.png)"],
-        ["a mention", "[@Samuel](polaris:user/018f0000-0000-7000-8000-000000000000)"],
+        ["a mention", "[@Aurora](polaris:user/018f0000-0000-7000-8000-000000000000)"],
         ["an empty code fence", "```\n\n```"]
     ])("allows %s", (_case, source) => {
         expect(isBlankMarkdown(source)).toBe(false);

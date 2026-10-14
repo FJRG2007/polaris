@@ -21,7 +21,7 @@ import {
 
 /** What the composer is seeded with when somebody answers a message. */
 const REPLY = `\n\n${quoteForReply(
-    "Hola Samuel,\n\nLa ventana escalonada nos va bien.",
+    "Hola Aurora,\n\nLa ventana escalonada nos va bien.",
     { name: "Pat Sample", address: "albert@example.com" },
     new Date("2026-09-21T09:12:00Z")
 )}`;
@@ -56,7 +56,7 @@ describe("opening a reply", () => {
     });
 
     it("puts the writer above their own signature on a new message", () => {
-        const doc = withLeadingBlankLine(markdownToDoc("-- \nSamuel"));
+        const doc = withLeadingBlankLine(markdownToDoc("-- \nAurora"));
 
         expect(doc.content?.[0]?.content ?? []).toEqual([]);
         expect(doc.content).toHaveLength(2);

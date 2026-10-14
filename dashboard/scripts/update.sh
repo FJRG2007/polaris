@@ -354,12 +354,13 @@ retire() {
 
 # Put a deployment checkout that will not fast-forward back onto its branch.
 #
-# Only reached on a published deployment, where this checkout holds no work of its
-# own: it is a copy of the release, and the operator has never been asked to open
-# it. Left behind, it is not a cosmetic problem - the compose file, the settings
-# template and this script all live here, so a release that adds a service would
-# never create it and the dashboard would go on offering a feature that was never
-# installed.
+# Reached on a published deployment and on a source build alike: either way this
+# checkout holds no work of its own, is a copy of the release, and the operator
+# has never been asked to open it. Left behind, it is not a cosmetic problem - the
+# compose file, the settings template and this script all live here, so a release
+# that adds a service would never create it and the dashboard would go on
+# offering a feature that was never installed; on a source build it also means
+# nothing new to build.
 #
 # A tree that was edited here is what froze the checkout in the first place, so
 # refusing to touch one would decline the very case this exists for, and would say
@@ -417,10 +418,12 @@ main() {
     # live in the checkout rather than in any image, so a release that changes how
     # the deployment is wired only reaches it through here.
     #
-    # Which is why a checkout that cannot be advanced is only reported on an image
-    # update and goes on with what CI published, but is fatal on a source build:
-    # there, the checkout IS the update, and building an unchanged one would report
-    # success having installed nothing.
+    # Which is why a checkout that cannot be advanced is realigned onto upstream
+    # (`realign_checkout`) rather than left behind, on either kind of deployment.
+    # One that still cannot be realigned is only reported on an image update, which
+    # goes on with what CI published, but is fatal on a source build: there, the
+    # checkout IS the update, and building an unchanged one would report success
+    # having installed nothing.
     if git -C "$dash_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         log "syncing the deployment files"
         before=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
@@ -433,12 +436,18 @@ main() {
         # reported below as a single line; a pull that fails still explains itself on
         # stderr, which is the part an operator needs.
         if ! git -C "$dash_dir" pull --ff-only --quiet; then
-            if [ "$source" = "build" ]; then
-                err "could not fast-forward the checkout, and this deployment builds its own image"
-                err "resolve the checkout at $repo_root, or switch Settings back to the published build"
-                exit 1
+            # A source build realigns too: upstream history that was rewritten can
+            # never be fast-forwarded, and failing here would strand the deployment
+            # on a checkout nobody can repair from the dashboard. Whatever this
+            # checkout held is kept under its own ref first, as on an image update.
+            if ! realign_checkout; then
+                if [ "$source" = "build" ]; then
+                    err "could not fast-forward the checkout, and this deployment builds its own image"
+                    err "resolve the checkout at $repo_root, or switch Settings back to the published build"
+                    exit 1
+                fi
+                err "could not fast-forward the checkout; continuing with the published images"
             fi
-            realign_checkout || err "could not fast-forward the checkout; continuing with the published images"
         fi
         after=$(git -C "$dash_dir" rev-parse HEAD 2>/dev/null || true)
         if [ -n "$after" ] && [ "$before" != "$after" ]; then

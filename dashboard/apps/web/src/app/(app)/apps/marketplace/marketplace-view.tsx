@@ -594,13 +594,12 @@ export function InstallWizard({ app, onClose }: { app: AppManifest; onClose: () 
         });
     }
 
-    const Icon = app.icon;
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Icon className="size-5" /> {t("wizard.title", { name: app.name })}
+                        <AppMark app={app} size={22} /> {t("wizard.title", { name: app.name })}
                     </DialogTitle>
                     <DialogDescription>{app.description}</DialogDescription>
                 </DialogHeader>
