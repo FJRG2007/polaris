@@ -1,41 +1,33 @@
 /**
- * The segmentation model the call asks for is the one the build actually stages.
+ * The files a camera background asks for are the files the build stages.
  *
- * Same drift, same consequence as `noise-assets`: the loader is fetched by URL
- * from `/video`, never through the bundler, so `scripts/copy-video-assets.mjs`
- * is the only thing putting it there and a rename in the package breaks the
- * feature with nothing failing anywhere near it.
+ * Same drift, same consequence as `noise-assets`: the runtime and the model are
+ * fetched by URL from `/video`, never through the bundler, so
+ * `scripts/copy-video-assets.mjs` is the only thing putting them there, and a
+ * rename in the package breaks the feature with nothing failing anywhere near it.
  *
- * The staging script deliberately has no list of files to compare against - it
- * copies everything the package ships, because the loader decides in the browser
- * which wasm build it wants and appends its own names to ask for the rest. What
- * is left to assert is the other half: that the one name Polaris hard-codes is
- * a file the installed package still has, and that the script's short list of
- * things it skips has not grown to include it.
+ * The runtime is copied out of the installed package, minus a short list of
+ * builds the filter never asks for; the model is committed under
+ * `assets/video`. What is asserted is that every name the filter can ask for
+ * is one of those, and that the skip list has not grown to include it.
  *
- * Asserted against the script and the package rather than against `public/video`
- * itself: that directory only exists after a build, and a test that reads it
- * reports the absence of a build step as a defect in the product.
+ * Asserted against the script, the package and the committed model rather than
+ * against `public/video` itself: that directory only exists after a build.
  */
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
+import { MODEL_FILE, VIDEO_ASSETS } from "@/app/(app)/chat/camera-mask";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, "..", "..");
 const SCRIPT = join(APP, "scripts", "copy-video-assets.mjs");
-const FILTER = join(APP, "src", "app", "(app)", "chat", "camera-filter.ts");
-const PACKAGE = join(APP, "..", "..", "node_modules", "@mediapipe", "selfie_segmentation");
+const RUNTIME = join(APP, "..", "..", "node_modules", "@mediapipe", "tasks-vision", "wasm");
+const MODELS = join(APP, "assets", "video");
 const SCENES = join(APP, "src", "app", "(app)", "chat", "camera-background.ts");
 const PUBLIC = join(APP, "public", "backgrounds");
-
-/** Every `/video/...` file the filter names for itself. */
-function asked(): string[] {
-    const source = readFileSync(FILTER, "utf8");
-    return [...source.matchAll(/\$\{ASSETS\}\/([\w.-]+)/g)].map((match) => match[1] ?? "");
-}
 
 /** The files the staging script leaves behind, read out of the script so there
  *  is not a second copy of the list to keep in step. */
@@ -75,28 +67,30 @@ describe("the pictures the picker offers", () => {
     });
 });
 
-describe("the background model the call asks for", () => {
-    it("is not one of the files the build leaves behind", () => {
-        const wanted = asked();
-        const left = skipped();
+describe("the background runtime and model the call asks for", () => {
+    const runtime = VIDEO_ASSETS.filter((file) => file !== MODEL_FILE);
 
+    it("is not one of the files the build leaves behind", () => {
+        const left = skipped();
         // A guard on the guard: a regex that stopped matching would make this
         // whole file pass by asserting nothing.
-        expect(wanted.length).toBeGreaterThan(0);
+        expect(runtime.length).toBeGreaterThan(0);
         expect(left.length).toBeGreaterThan(0);
-
-        for (const file of wanted) expect(left).not.toContain(file);
+        for (const file of VIDEO_ASSETS) expect(left).not.toContain(file);
     });
 
-    it("comes from a file the installed package still has", () => {
+    it("has its model committed where the build copies it from", () => {
+        expect(existsSync(join(MODELS, MODEL_FILE))).toBe(true);
+        // A TFLite flatbuffer, not a pointer file or an HTML error page.
+        expect(readFileSync(join(MODELS, MODEL_FILE)).subarray(4, 8).toString("latin1")).toBe(
+            "TFL3"
+        );
+    });
+
+    it("comes from files the installed package still has", () => {
         // Skipped on a checkout that has not installed - that is a machine
         // without dependencies, not a drift in the product.
-        if (!existsSync(PACKAGE)) return;
-
-        const wanted = asked();
-        expect(wanted.length).toBeGreaterThan(0);
-        for (const file of wanted) {
-            expect(existsSync(join(PACKAGE, file))).toBe(true);
-        }
+        if (!existsSync(RUNTIME)) return;
+        for (const file of runtime) expect(existsSync(join(RUNTIME, file))).toBe(true);
     });
 });

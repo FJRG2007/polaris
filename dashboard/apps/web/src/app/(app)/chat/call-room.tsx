@@ -51,6 +51,7 @@ import {
 import { ChatPeoplePicker } from "./chat-people-picker";
 import { CameraLookMenu } from "./camera-look-menu";
 import type { CameraLook } from "./camera-look";
+import { cameraProblemText, type CameraProblem } from "./camera-problem";
 import { NoAudioNotice } from "./no-audio-notice";
 import { QuietMicNotice } from "./quiet-mic-notice";
 import { SlowConnectionNotice } from "@/components/connection-banner";
@@ -1576,7 +1577,7 @@ function Split({
     /** What is actually being drawn, which for the seconds the model takes to
      *  arrive is not yet what was asked for. */
     backgroundRunning?: CameraBackground | null;
-    backgroundProblem?: string | null;
+    backgroundProblem?: CameraProblem | null;
     /** Camera only: its light, colour and framing. */
     look?: CameraLook;
     onLook?: (patch: Partial<CameraLook>) => void;
@@ -1837,7 +1838,9 @@ function Split({
                                     )}
                                 {backgroundProblem && (
                                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                                        {t("callRoom.noBackground", { problem: backgroundProblem })}
+                                        {t("callRoom.noBackground", {
+                                            problem: cameraProblemText(backgroundProblem, t)
+                                        })}
                                     </p>
                                 )}
                                 {pickProblem && (

@@ -32,6 +32,7 @@ import { filterMic, type FilteredMic } from "@/app/(app)/chat/mic-filter";
 import { Camera, ImagePlus, Loader2, Mic, Square } from "lucide-react";
 import { useCameras } from "@/app/(app)/chat/camera-device";
 import { afterPaint, maskCamera, type MaskedCamera } from "@/app/(app)/chat/camera-filter";
+import { cameraProblemText } from "@/app/(app)/chat/camera-problem";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import {
     FRAME_CHOICES,
@@ -723,7 +724,9 @@ function CameraCard() {
                 ) : null}
                 {showing && !inCall && maskState?.problem ? (
                     <p className="text-xs text-warning">
-                        {t("devices.camera.failed", { problem: maskState.problem })}
+                        {t("devices.camera.failed", {
+                            problem: cameraProblemText(maskState.problem, tChat)
+                        })}
                     </p>
                 ) : showing && !inCall && maskState?.track ? (
                     <p className="text-xs text-success">{t("devices.camera.running")}</p>

@@ -11,3 +11,6 @@
 # Binary assets (none tracked yet, but keep git from touching them).
 *.png binary
 *.zip binary
+
+# Model weights for the camera backgrounds.
+*.tflite binary
