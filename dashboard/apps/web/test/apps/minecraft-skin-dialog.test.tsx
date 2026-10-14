@@ -166,7 +166,8 @@ describe("SkinDialog", () => {
 
     it("lets a skin be set for a player who is not on, for their next join", async () => {
         actions.readSkinAction.mockResolvedValue({
-            live: { state: "read", skin: null, offline: true }
+            live: { state: "read", skin: null, offline: true },
+            uuid: "00000000-0000-4000-8000-000000000001"
         });
         open(true, false, false);
         expect(
@@ -175,6 +176,8 @@ describe("SkinDialog", () => {
             )
         ).toBeTruthy();
         expect(screen.getByRole("button", { name: "Load" })).toBeTruthy();
+        expect(screen.getByText("Their account's own skin")).toBeTruthy();
+        expect(screen.queryByText(/Minecraft's default skin/)).toBeNull();
     });
 
     it("puts a refusal from the server into a sentence", async () => {

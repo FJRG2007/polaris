@@ -182,9 +182,11 @@ export function SkinDialog({
         setLive(next);
     }
     // No skin of their own: the game draws one of its defaults, picked from the
-    // UUID the same way on every machine, so that one is drawn here too.
-    const fallback =
-        live?.state === "read" && !live.skin && uuid !== null ? defaultSkin(uuid) : null;
+    // UUID the same way on every machine, so that one is drawn here too. Nothing
+    // kept for a player who is away says nothing of what they wear: on an online
+    // server that is their account's own skin.
+    const bare = live?.state === "read" && !live.skin && !live.offline;
+    const fallback = bare && uuid !== null ? defaultSkin(uuid) : null;
     const shown: Shown | null = preview
         ? { png: preview.png, url: null, model }
         : (current ?? (fallback ? { png: null, url: fallback.path, model: fallback.model } : null));
@@ -378,11 +380,7 @@ export function SkinDialog({
                                 <SkinView
                                     shown={shown}
                                     label={t("skins.viewer")}
-                                    empty={
-                                        !offline && live?.state === "read" && !live.skin
-                                            ? t("skins.noSkinSet")
-                                            : null
-                                    }
+                                    empty={!offline && bare ? t("skins.noSkinSet") : null}
                                 />
                             )}
                             <p className="text-center text-xs text-muted-foreground">

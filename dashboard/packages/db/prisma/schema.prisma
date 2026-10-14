@@ -13276,6 +13276,8 @@ model StorageMove {
     finishedAt    DateTime?
     // When the copy a failed move left was emptied, or given up on.
     copySettledAt DateTime?
+    // When the sweep first tried to empty that copy; its retries run a week from here.
+    copyTriedAt   DateTime?
 
     @@index([state])
     @@index([volumeId])

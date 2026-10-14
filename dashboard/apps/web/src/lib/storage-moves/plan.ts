@@ -199,21 +199,23 @@ export const MOVE_HISTORY_MS = 90 * 24 * 60 * 60_000;
  * the volume never pointed at, so it is emptied - unless it reaches the files of
  * the move's own original or of where the volume is now, which a later move may
  * have reused. A named volume is not a folder this can empty; it is left alone.
- * Past `LEFT_COPY_RETRY_MS` it is given up on, so a share that went away is not
- * tried forever.
+ * Past `LEFT_COPY_RETRY_MS` from the first time it was tried it is given up on,
+ * so a share that went away is not tried forever; one never tried is always tried.
  */
 export function leftCopyAction(input: {
     readonly copy: Placement;
     readonly origin: Placement;
     /** Where the volume is now; null once the volume is gone. */
     readonly current: Placement | null;
-    readonly failedAt: Date;
+    /** When emptying it was first tried; null until then. */
+    readonly firstTriedAt: Date | null;
     readonly now: Date;
 }): "clear" | "keep" | "give-up" {
     if (input.copy.kind === "volume") return "keep";
     if (placementsOverlap(input.copy, input.origin)) return "keep";
     if (input.current && placementsOverlap(input.copy, input.current)) return "keep";
-    if (input.now.getTime() - input.failedAt.getTime() > LEFT_COPY_RETRY_MS) return "give-up";
+    const tried = input.firstTriedAt;
+    if (tried && input.now.getTime() - tried.getTime() > LEFT_COPY_RETRY_MS) return "give-up";
     return "clear";
 }
 

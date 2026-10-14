@@ -535,7 +535,7 @@ describe("leftCopyAction", () => {
         source: "polaris/deploy/app/data",
         connectionId: null
     };
-    const base = { copy, origin, current: origin, failedAt: new Date(now.getTime() - 60_000), now };
+    const base = { copy, origin, current: origin, firstTriedAt: null, now };
 
     it("empties a copy nothing points at", () => {
         expect(plan.leftCopyAction(base)).toBe("clear");
@@ -559,8 +559,10 @@ describe("leftCopyAction", () => {
     });
 
     it("gives up on a copy it has tried for a week", () => {
-        const failedAt = new Date(now.getTime() - plan.LEFT_COPY_RETRY_MS - 1);
-        expect(plan.leftCopyAction({ ...base, failedAt })).toBe("give-up");
+        const firstTriedAt = new Date(now.getTime() - plan.LEFT_COPY_RETRY_MS - 1);
+        expect(plan.leftCopyAction({ ...base, firstTriedAt })).toBe("give-up");
+        const recent = new Date(now.getTime() - 60_000);
+        expect(plan.leftCopyAction({ ...base, firstTriedAt: recent })).toBe("clear");
     });
 });
 

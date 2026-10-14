@@ -1143,7 +1143,7 @@ export async function sweepLeftCopies(now: Date = new Date()): Promise<{ cleared
             copySettledAt: null,
             OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }]
         },
-        orderBy: { finishedAt: "asc" },
+        orderBy: { updatedAt: "asc" },
         select: LEFT_COPY_FIELDS,
         take: 5
     });
@@ -1174,8 +1174,7 @@ const LEFT_COPY_FIELDS = {
     ownerId: true,
     origin: true,
     destination: true,
-    finishedAt: true,
-    updatedAt: true
+    copyTriedAt: true
 } as const;
 
 /** This machine, for work that belongs to no app any more. */
@@ -1196,8 +1195,7 @@ async function clearLeftCopy(
         ownerId: string;
         origin: string;
         destination: string;
-        finishedAt: Date | null;
-        updatedAt: Date;
+        copyTriedAt: Date | null;
     },
     lease: string,
     now: Date
@@ -1225,7 +1223,7 @@ async function clearLeftCopy(
         copy,
         origin: plan.parsePlacement(row.origin),
         current: volume ? plan.placementOf(volume) : null,
-        failedAt: row.finishedAt ?? row.updatedAt,
+        firstTriedAt: row.copyTriedAt,
         now
     });
     if (action === "keep" || (await originShared(row.volumeId, copy))) {
@@ -1244,6 +1242,9 @@ async function clearLeftCopy(
         console.error(`polaris: storage move ${row.id} left a copy that cannot be emptied`);
         await settle();
         return false;
+    }
+    if (!row.copyTriedAt) {
+        await prisma.storageMove.update({ where: { id: row.id }, data: { copyTriedAt: now } });
     }
     const ports = await getPorts(target, row.ownerId);
     try {
