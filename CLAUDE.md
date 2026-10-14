@@ -41,6 +41,17 @@ or disconnects their own account through what the administrator set up.
   explained on the admin screen with what the administrator can do about it,
   never answered by handing users a way to bring their own credentials.
 
+## One way to build a rule
+
+**Every "when this happens, do that" screen is the same screen.** Places
+automations are the reference, and Mail filters follow them; CRM workflows and
+any rule builder added later (chat, drive, deploy, tasks) use the same
+pieces - the list of rules with their on/off switch and last run, the editor
+that reads as a sentence (when -> if -> then), the condition and action rows,
+the test/preview and the run history - from shared components, never a
+lookalike drawn again inside one app. Someone who has written one rule in
+Polaris has learnt to write all of them.
+
 ## How a deployment actually gets your change
 
 **An installed Polaris is only ever updated from the Update button in Settings.**
