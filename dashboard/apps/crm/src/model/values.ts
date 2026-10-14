@@ -259,6 +259,13 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             }
             return ok(value);
         }
+        case "money": {
+            // An amount in the field's own currency, kept to the cent.
+            if (raw === null || raw === "") return ok(null);
+            const value = typeof raw === "string" ? Number(raw.trim()) : raw;
+            if (typeof value !== "number" || !Number.isFinite(value)) return no("number");
+            return Math.abs(value) < MAX_AMOUNT ? ok(Math.round(value * 100) / 100) : no("number");
+        }
         case "currency": {
             const money = z
                 .object({ amount: z.number().nullable(), currency: z.string() })

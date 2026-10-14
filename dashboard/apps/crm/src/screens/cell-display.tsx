@@ -224,6 +224,7 @@ export function CellDisplay({
         case "relation":
             return <RefChip target={field.target!} value={value as Ref} />;
         case "number":
+        case "money":
         case "currency":
             return (
                 <span className="ml-auto truncate tabular-nums">

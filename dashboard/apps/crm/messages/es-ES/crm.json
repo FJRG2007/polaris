@@ -347,6 +347,7 @@
         "kinds": {
             "text": "Texto",
             "number": "Número",
+            "money": "Importe",
             "date": "Fecha",
             "boolean": "Sí / no",
             "select": "Opción",
@@ -363,6 +364,8 @@
         "addOption": "Añadir opción",
         "removeOption": "Quitar opción",
         "kindFixed": "El tipo no se puede cambiar una vez creado el campo.",
+        "currency": "Moneda",
+        "currencyFixed": "La moneda no se puede cambiar una vez creado el campo.",
         "save": "Guardar",
         "create": "Añadir campo",
         "delete": "Eliminar campo",
@@ -377,6 +380,7 @@
             "required": "Ponle un nombre.",
             "tooLong": "Usa hasta {length} caracteres.",
             "noOptions": "Añade al menos una opción.",
+            "currency": "Elige una moneda.",
             "duplicate": "Esta opción ya está.",
             "tooMany": "Usa hasta {max} opciones."
         }

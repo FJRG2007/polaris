@@ -347,6 +347,7 @@
         "kinds": {
             "text": "Text",
             "number": "Number",
+            "money": "Amount",
             "date": "Date",
             "boolean": "Yes / no",
             "select": "Choice",
@@ -363,6 +364,8 @@
         "addOption": "Add choice",
         "removeOption": "Remove choice",
         "kindFixed": "The type cannot change once the field exists.",
+        "currency": "Currency",
+        "currencyFixed": "The currency cannot change once the field exists.",
         "save": "Save",
         "create": "Add field",
         "delete": "Delete field",
@@ -377,6 +380,7 @@
             "required": "Give it a name.",
             "tooLong": "Use up to {length} characters.",
             "noOptions": "Add at least one choice.",
+            "currency": "Choose a currency.",
             "duplicate": "This choice is already there.",
             "tooMany": "Use up to {max} choices."
         }

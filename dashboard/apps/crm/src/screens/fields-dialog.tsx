@@ -5,6 +5,8 @@
  */
 
 import { useCrmT } from "./i18n";
+import { currencyName } from "./format";
+import { CURRENCIES } from "@polaris/core";
 import { messageOf, unwrap } from "./call";
 import * as actions from "../actions/records";
 import { useState, type FormEvent } from "react";
@@ -192,8 +194,17 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const [label, setLabel] = useState(field?.label ?? "");
     const [kind, setKind] = useState<CustomKind>(field?.kind ?? "text");
+    const locale = hostUi.i18nProvider.useLocale();
+    const format = hostUi.displayFormat.useDisplayFormat();
+    const [currency, setCurrency] = useState(
+        field?.kind === "money"
+            ? (field.options[0] ?? "")
+            : CURRENCIES.some((entry) => entry.code === format.preferences.currency)
+              ? format.preferences.currency
+              : "EUR"
+    );
     const [rows, setRows] = useState<ChoiceRow[]>(
-        field && field.options.length > 0
+        field && hasOptions(field.kind) && field.options.length > 0
             ? field.options.map((option) => ({ text: option, from: option }))
             : [{ text: "", from: null }]
     );
@@ -203,7 +214,10 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
     const parsed = fieldInputSchema.safeParse({
         label,
         kind,
-        options: rows.map((row) => row.text).filter((one) => one.trim() !== "")
+        options:
+            kind === "money"
+                ? [currency]
+                : rows.map((row) => row.text).filter((one) => one.trim() !== "")
     });
     const issue = (path: string): string | null =>
         parsed.success
@@ -221,7 +235,7 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
         parsed.data.label === field.label &&
         JSON.stringify(parsed.data.options) === JSON.stringify(field.options);
     const renames = rows.flatMap((row) =>
-        row.from !== null && row.text.trim() !== ""
+        hasOptions(kind) && row.from !== null && row.text.trim() !== ""
             ? [{ from: row.from, to: normalizeLabel(row.text) }]
             : []
     );
@@ -309,6 +323,29 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
                     />
                 )}
             </div>
+            {kind === "money" ? (
+                <div className="flex flex-col gap-1.5 text-[0.8125rem]">
+                    <span className="font-medium">{t("customFields.currency")}</span>
+                    {field !== null ? (
+                        <span
+                            className="text-muted-foreground"
+                            title={t("customFields.currencyFixed")}
+                        >
+                            {`${currency} - ${currencyName(currency, locale)}`}
+                        </span>
+                    ) : (
+                        <Select
+                            value={currency}
+                            aria-label={t("customFields.currency")}
+                            options={CURRENCIES.map((entry) => ({
+                                value: entry.code,
+                                label: `${entry.code} - ${currencyName(entry.code, locale)}`
+                            }))}
+                            onValueChange={setCurrency}
+                        />
+                    )}
+                </div>
+            ) : null}
             {hasOptions(kind) ? (
                 <div className="flex flex-col gap-1.5 text-[0.8125rem]">
                     <span className="font-medium">

@@ -42,9 +42,13 @@ export function totalText(
     if (total.aggregate === "percentEmpty" || total.aggregate === "percentNotEmpty") {
         return `${format.number(Math.round(total.value * 10) / 10)}%`;
     }
-    const shown = format.number(
-        total.aggregate === "avg" ? Math.round(total.value * 100) / 100 : total.value
-    );
+    const value = total.aggregate === "avg" ? Math.round(total.value * 100) / 100 : total.value;
+    // A sum or an average of an amount reads in its currency; a count does not.
+    const counted = total.aggregate.startsWith("count");
+    const shown =
+        field.kind === "money" && !counted
+            ? formatMoney({ amount: value, currency: field.options?.[0] ?? "" }, locale)
+            : format.number(value);
     return total.capped ? `${shown}+` : shown;
 }
 

@@ -151,6 +151,15 @@ export function cellInput(field: FieldDef, cell: string): unknown {
             return text === "" ? null : (parseAmount(text) ?? text);
         case "rating":
             return text === "" ? null : (parseAmount(text) ?? text);
+        case "money": {
+            // "1200.50", "1200.50 EUR" or "EUR 1200.50"; another currency is
+            // refused rather than read as the field's own.
+            if (text === "") return null;
+            const match = /^([A-Za-z]{3})?\s*([^A-Za-z]*?)\s*([A-Za-z]{3})?$/.exec(text);
+            const code = (match?.[3] ?? match?.[1] ?? "").toUpperCase();
+            if (!match || (code !== "" && code !== field.options?.[0])) return text;
+            return parseAmount(match[2] ?? "") ?? text;
+        }
         case "multiSelect":
             // "Red, Blue" or "Red; Blue", each matched like a single choice.
             return text

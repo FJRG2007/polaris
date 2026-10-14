@@ -139,7 +139,8 @@ export function TextEditor({ field, value, onCommit, onCancel }: EditorProps) {
     const check = useCheck(field);
     const [text, setText] = useState(value === null || value === undefined ? "" : String(value));
     const [touched, setTouched] = useState(false);
-    const result = check(field.kind === "number" ? typedCount(text) : text);
+    const counted = field.kind === "number" || field.kind === "money";
+    const result = check(counted ? typedCount(text) : text);
     const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
     const placeholder =
         field.kind === "domain"
@@ -156,7 +157,13 @@ export function TextEditor({ field, value, onCommit, onCancel }: EditorProps) {
                 className={FIELD_INPUT}
                 value={text}
                 inputMode={
-                    field.kind === "number" ? "numeric" : field.kind === "phone" ? "tel" : undefined
+                    field.kind === "number"
+                        ? "numeric"
+                        : field.kind === "money"
+                          ? "decimal"
+                          : field.kind === "phone"
+                            ? "tel"
+                            : undefined
                 }
                 type={field.kind === "email" ? "email" : "text"}
                 placeholder={placeholder}
@@ -523,6 +530,7 @@ function typedEditor(field: FieldDef): Editor | null {
         case "url":
         case "domain":
         case "number":
+        case "money":
             return TextEditor;
         case "fullName":
             return NameEditor;

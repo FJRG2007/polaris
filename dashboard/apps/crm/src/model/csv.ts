@@ -26,6 +26,11 @@ export function csvValue(field: FieldDef, value: FieldValue | undefined): string
             if (money.amount === null) return "";
             return money.currency ? `${money.amount} ${money.currency}` : String(money.amount);
         }
+        // "1200.5 EUR", the form an import reads back into the same field.
+        case "money": {
+            const code = field.options?.[0];
+            return code ? `${value} ${code}` : String(value);
+        }
         case "member":
         case "relation":
             return (value as { name: string }).name;
