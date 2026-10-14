@@ -17,6 +17,9 @@ interface Player {
     z: number;
     yaw: number;
     online: boolean;
+    /** `playerGameType`: 0 survival, 1 creative, 2 adventure, 3 spectator. */
+    mode: number;
+    dimension: string;
 }
 
 class FakeServer {
@@ -29,7 +32,16 @@ class FakeServer {
     displays = new Map<string, string>();
 
     join(name: string, x = 0, z = 0): Player {
-        const player = this.players.get(name) ?? { name, x, y: 64, z, yaw: 0, online: true };
+        const player = this.players.get(name) ?? {
+            name,
+            x,
+            y: 64,
+            z,
+            yaw: 0,
+            online: true,
+            mode: 0,
+            dimension: "minecraft:overworld"
+        };
         player.online = true;
         this.players.set(name, player);
         return player;
@@ -132,7 +144,11 @@ class FakeServer {
                 .join("");
         if (command === "execute as @a run data get entity @s Dimension")
             return this.online
-                .map((one) => `${one.name} has the following entity data: "minecraft:overworld"`)
+                .map((one) => `${one.name} has the following entity data: "${one.dimension}"`)
+                .join("");
+        if (command === "execute as @a run data get entity @s playerGameType")
+            return this.online
+                .map((one) => `${one.name} has the following entity data: ${one.mode}`)
                 .join("");
         if ((match = /^give (\S+) (\S+) (\d+)$/.exec(command)))
             return `Gave ${match[3]} [${match[2]}] to ${match[1]}`;
@@ -302,6 +318,28 @@ const settingsOf = () => service.settingsOf(config);
 const PUMPKIN = "minecraft.mined:minecraft.pumpkin";
 const PLACED = "minecraft.used:minecraft.pumpkin";
 const ZOMBIE = "minecraft.killed:minecraft.zombie";
+
+/** Only Play 15 minutes next to someone for today, with the two players side by side. */
+function togetherPool(): void {
+    const current = state();
+    config = {
+        ...config,
+        challengeState: {
+            ...current,
+            daily: {
+                ...current.daily!,
+                pool: [{ template: "S4", variant: null, tier: "easy", target: 15 }],
+                applied: false
+            }
+        }
+    };
+    players.clear();
+    fake.players.get("Bruno")!.x = 10;
+}
+
+/** Minutes counted next to someone so far. */
+const together = (name: string) =>
+    record(name).daily!.instances.find((one) => one.template === "S4")!.progress;
 
 /** Time moves on, the players move (or not), and the loop reads. */
 async function step(seconds: number, moving: readonly string[] = []): Promise<void> {
@@ -835,5 +873,70 @@ describe("challenges on a server", () => {
         config = { ...config, challenges: { ...(config.challenges as object), enabled: false } };
         await service.runTick("srv", Date.now(), true);
         expect([...fake.objectives.keys()].filter((name) => name.startsWith("pc_"))).toEqual([]);
+    });
+
+    describe("Play minutes next to someone", () => {
+        /** Dealt, read once to start counting, then three reads with both moving. */
+        async function playTogether(
+            moving: readonly string[] = ["Alba", "Bruno"],
+            arrange: () => void = () => undefined
+        ): Promise<number> {
+            togetherPool();
+            arrange();
+            await step(1);
+            await step(20, moving);
+            const start = together("Alba");
+            for (let read = 0; read < 3; read += 1) await step(20, moving);
+            return together("Alba") - start;
+        }
+
+        it("counts a third of a minute a read while both move side by side", async () => {
+            togetherPool();
+            await step(1);
+            await step(20, ["Alba", "Bruno"]);
+            const counted: number[] = [together("Alba")];
+            for (let read = 0; read < 3; read += 1) {
+                await step(20, ["Alba", "Bruno"]);
+                counted.push(together("Alba"));
+            }
+            for (let read = 1; read < counted.length; read += 1)
+                expect(counted[read]! - counted[read - 1]!).toBeCloseTo(1 / 3, 5);
+            expect(together("Bruno")).toBeGreaterThan(0.9);
+        });
+
+        it("counts nothing while the other one stands still", async () => {
+            expect(await playTogether(["Alba"])).toBe(0);
+        });
+
+        it("counts nothing from another world", async () => {
+            fake.players.get("Bruno")!.dimension = "minecraft:the_nether";
+            expect(await playTogether()).toBe(0);
+        });
+
+        it("counts nothing from further than 64 blocks", async () => {
+            const away = () => void (fake.players.get("Bruno")!.x = 100);
+            expect(await playTogether(undefined, away)).toBe(0);
+        });
+
+        it("counts nothing next to a spectator", async () => {
+            fake.players.get("Bruno")!.mode = 3;
+            expect(await playTogether()).toBe(0);
+        });
+
+        it("counts nothing next to somebody in creative", async () => {
+            fake.players.get("Bruno")!.mode = 1;
+            expect(await playTogether()).toBe(0);
+        });
+
+        it("counts nothing for somebody in creative next to a player", async () => {
+            fake.players.get("Alba")!.mode = 1;
+            expect(await playTogether()).toBe(0);
+            expect(together("Bruno")).toBe(0);
+        });
+
+        it("counts survival next to adventure", async () => {
+            fake.players.get("Bruno")!.mode = 2;
+            expect(await playTogether()).toBeCloseTo(1, 5);
+        });
     });
 });
