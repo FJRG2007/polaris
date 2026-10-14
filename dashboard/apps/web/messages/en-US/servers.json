@@ -178,7 +178,8 @@
             "volume": "Volume",
             "size": "Size",
             "created": "Created",
-            "container": "Container"
+            "container": "Container",
+            "leftover": "Leftover"
         },
         "safe": "Safe to delete",
         "checkFirst": "Check first",
@@ -205,7 +206,22 @@
         "removeIt": "Remove it",
         "leftBehind": "Left behind",
         "leftBehindIntro": "Polaris put {count, plural, one {this container} other {these # containers}} on this machine and has no record of {count, plural, one {it} other {them}} any more - a service removed, or a stack recreated under another name. Nothing else on the machine is touched.",
-        "stillRunning": "Still running"
+        "stillRunning": "Still running",
+        "removedApp": "Left by a removed app",
+        "leftovers": {
+            "intro": "Removed apps left these behind. None of it holds data; volumes are listed above and go one at a time.",
+            "kind": {
+                "container": "Container",
+                "network": "Network",
+                "dir": "Deploy folder",
+                "route": "Edge route"
+            },
+            "cleanUp": "Clean up",
+            "confirmTitle": "Clean up {count, plural, one {# leftover} other {# leftovers}}?",
+            "confirmBody": "Containers are stopped and removed, then their networks, deploy folders and edge routes. Volumes are not touched.",
+            "cleaned": "Cleaned up {count, plural, one {# leftover} other {# leftovers}}.",
+            "partly": "Some leftovers could not be removed. Try again in a moment."
+        }
     },
     "reach": {
         "local": "Running Polaris, so it is up by definition.",

@@ -35,6 +35,12 @@ import {
     strayContainers,
     type StrayContainer
 } from "@/lib/deploy/host-containers";
+import {
+    cleanLeftovers,
+    hostLeftovers,
+    type LeftoverCleanup,
+    type Leftovers
+} from "@/lib/deploy/uninstall-leftovers";
 import { getLocalHostId, setLocalHostId, setLocalServerName } from "@/lib/local-server";
 import {
     createHost,
@@ -654,6 +660,10 @@ export async function volumeMovesAction(): Promise<{
     return moves ? { moves, canAnswer: user.isAdmin } : null;
 }
 
+/** A volume as the engine names it, and a container by its full id. */
+const volumeNameSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$/);
+const containerIdSchema = z.string().regex(/^[0-9a-f]{64}$/);
+
 /**
  * Remove one volume, named in full by whoever is looking at it.
  *
@@ -664,6 +674,8 @@ export async function volumeMovesAction(): Promise<{
  */
 export async function removeHostVolumeAction(name: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
+    if (!volumeNameSchema.safeParse(name).success)
+        return { error: await say("errors.invalidRemoval") };
     const volumes = await hostVolumes().catch(() => null);
     const before = volumes?.find((volume) => volume.name === name) ?? null;
 
@@ -754,6 +766,8 @@ export async function strayContainersAction(): Promise<StrayContainer[] | null> 
  */
 export async function removeStrayContainerAction(id: string): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
+    if (!containerIdSchema.safeParse(id).success)
+        return { error: await say("errors.invalidRemoval") };
     const strays = await strayContainers().catch(() => null);
     const before = strays?.find((entry) => entry.id === id) ?? null;
 
@@ -774,6 +788,38 @@ export async function removeStrayContainerAction(id: string): Promise<{ error?: 
     });
     revalidatePath(SERVERS_PATH);
     return {};
+}
+
+/** What removed applications left on this machine besides their data. Null when
+ *  the machine or Polaris would not say. */
+export async function uninstallLeftoversAction(): Promise<Leftovers | null> {
+    await requirePermission("system.manage");
+    return hostLeftovers().catch(() => null);
+}
+
+/**
+ * Remove every non-data leftover of removed applications on this machine, freshly
+ * detected rather than taken from the screen. Volumes are never part of it.
+ */
+export async function cleanUninstallLeftoversAction(): Promise<{
+    error?: string;
+    removed?: LeftoverCleanup["removed"];
+}> {
+    const user = await requirePermission("system.manage");
+    const result = await cleanLeftovers().catch(() => null);
+    if (!result) return { error: await say("errors.wouldNotAnswer") };
+    await recordAudit({
+        actorId: user.id,
+        action: "server.leftovers.cleaned",
+        targetType: "system",
+        targetId: "local",
+        metadata: { ...result.removed, failed: result.failed }
+    });
+    revalidatePath(SERVERS_PATH);
+    if (result.failed > 0) {
+        return { error: await say("storage.leftovers.partly"), removed: result.removed };
+    }
+    return { removed: result.removed };
 }
 
 /* -------------------------------------------------------------------------- */
