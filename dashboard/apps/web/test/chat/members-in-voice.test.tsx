@@ -15,7 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
     inRoom: {} as Record<string, unknown[]>,
     asked: [] as string[][],
-    onFrame: null as ((frame: unknown) => void) | null
+    onFrame: null as ((frame: unknown) => void) | null,
+    plated: null as string | null
 }));
 
 const seat = (userId: string) => ({
@@ -54,6 +55,13 @@ vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
     useChatStream: (handler: (frame: unknown) => void) => {
         state.onFrame = handler;
     }
+}));
+vi.mock("@/components/person-name", async (original) => ({
+    ...(await original<typeof import("@/components/person-name")>()),
+    usePersonNameplate: (id: string | null | undefined) =>
+        id && id === state.plated
+            ? { id: "dusk", label: "Dusk", from: "#4c1d95", to: "#1e3a8a", angle: 90 }
+            : null
 }));
 vi.mock("@/app/(app)/chat/use-wide-screen", () => ({
     WIDE_ENOUGH: "(min-width: 1024px)",
@@ -122,6 +130,7 @@ const rowOf = (name: string) =>
 beforeEach(() => {
     state.asked = [];
     state.onFrame = null;
+    state.plated = null;
     state.inRoom = { v1: [seat("member-a")], secret: [seat("member-b")] };
     Object.defineProperty(window, "localStorage", {
         configurable: true,
@@ -179,6 +188,17 @@ describe("a member in voice", () => {
         });
         expect(screen.queryByRole("link", { name: /Lounge/ })).toBeNull();
         expect(rowOf("Member A").textContent).toContain("Out for a walk");
+    });
+
+    it("writes the line in the plate's ink on a plated row", async () => {
+        state.plated = "member-a";
+        panel();
+        const link = await screen.findByRole("link", { name: "In voice: Lounge" });
+        const holder = link.parentElement as HTMLElement;
+        expect(holder.style.getPropertyValue("--plate-ink-soft")).not.toBe("");
+        expect(holder.style.getPropertyValue("background")).toBe("");
+        expect(link.className).toContain("text-muted-foreground");
+        expect(link.className).not.toContain("hover:text-foreground");
     });
 
     it("reads short in Spanish", async () => {

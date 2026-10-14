@@ -35,7 +35,13 @@ import Link from "next/link";
 import { Crown, Headphones, Users, X } from "lucide-react";
 import { useOpenDirect } from "./use-open-direct";
 import { useChatStream } from "./use-chat-stream";
-import { spaceVoiceIds, useVoiceRooms, voiceSeats, type VoiceSeat } from "./voice-rooms";
+import {
+    spaceVoiceIds,
+    useVoiceRooms,
+    voiceSeats,
+    VOICE_POLL_MS,
+    type VoiceSeat
+} from "./voice-rooms";
 import { NicknameDialog } from "./nickname-dialog";
 import { nameplateCss } from "@/lib/profile-style-css";
 import { useKnownPresence, usePresence } from "@/components/presence-store";
@@ -214,12 +220,14 @@ function MemberRows({
     const direct = useOpenDirect(setError);
     // Who is in a voice room of this space, from the same answer the rail draws
     // its rooms from and only for rooms this reader can reach. Live off the
-    // stream; a direct message or a group has no rooms and asks nothing.
+    // stream, and asked again on the rail's interval so a missed frame does not
+    // leave a line wrong; a direct message or a group has no rooms and asks
+    // nothing.
     const voiceIds = useMemo(
         () => spaceVoiceIds(channels, channel.spaceId),
         [channels, channel.spaceId]
     );
-    const { inRoom } = useVoiceRooms(voiceIds);
+    const { inRoom } = useVoiceRooms(voiceIds, VOICE_POLL_MS);
     const seats = useMemo(
         () => voiceSeats(channels, channel.spaceId, inRoom),
         [channels, channel.spaceId, inRoom]
@@ -317,6 +325,15 @@ function MemberRows({
     );
 }
 
+/** The plate's ink alone, for what sits on a plated row outside its button. */
+function plateInk(plate: Parameters<typeof nameplateCss>[0]): CSSProperties {
+    const css = nameplateCss(plate) as Record<string, unknown>;
+    return {
+        ["--plate-ink" as string]: css["--plate-ink"],
+        ["--plate-ink-soft" as string]: css["--plate-ink-soft"]
+    } as CSSProperties;
+}
+
 /**
  * One person in the roster.
  *
@@ -385,7 +402,7 @@ export function MemberRow({
             onChanged={onChanged}
             onError={onError}
         >
-            <div className="relative">
+            <div className="relative" style={plate && voice ? plateInk(plate) : undefined}>
                 <button
                     type="button"
                     disabled={press ? false : you || busy}
@@ -468,7 +485,8 @@ export function MemberRow({
                         title={inVoice}
                         aria-label={inVoice}
                         className={cn(
-                            "absolute bottom-1 left-11 flex max-w-[calc(100%-3.25rem)] min-w-0 items-center gap-1 rounded-sm text-[0.6875rem] text-muted-foreground transition-colors hover:text-foreground hover:underline",
+                            "absolute bottom-1 left-11 flex max-w-[calc(100%-3.25rem)] min-w-0 items-center gap-1 rounded-sm text-[0.6875rem] text-muted-foreground transition-colors hover:underline",
+                            plate ? "hover:text-[var(--plate-ink)]" : "hover:text-foreground",
                             away && "opacity-50"
                         )}
                     >

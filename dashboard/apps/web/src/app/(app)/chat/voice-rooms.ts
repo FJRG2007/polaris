@@ -20,13 +20,18 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 
 export type VoiceRooms = Record<string, VoicePresence[]>;
 
+/** How often who is sitting in the voice rooms is asked again. Often enough that
+ *  somebody walking in appears while you are looking at it, rarely enough that a
+ *  screen left open all day is not a request every second. */
+export const VOICE_POLL_MS = 8000;
+
 /**
  * Who is in each of these voice rooms, kept in step with the stream.
  *
  * @param voiceIds - The rooms to ask about. Ids the reader cannot reach come
  *   back empty, whatever the browser asked for.
- * @param pollMs - Also ask on this interval. Only the rail does: it has a count
- *   beside every room that a missed frame would leave wrong all afternoon.
+ * @param pollMs - Also ask on this interval, for anything that a missed frame
+ *   would leave wrong all afternoon.
  */
 export function useVoiceRooms(
     voiceIds: readonly string[],
