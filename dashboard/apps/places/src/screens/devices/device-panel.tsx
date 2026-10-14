@@ -18,6 +18,7 @@
  * itself is the moment a lock somewhere grows an "On".
  */
 
+import { ruleToneClass } from "@polaris/ui/automation-rules";
 import * as actions from "../actions";
 import * as kinds from "../../lib/device-kinds";
 import { usePlacesT } from "../use-places-t";
@@ -113,28 +114,19 @@ export function DeviceIcon({ kind, className }: { kind: string; className?: stri
     return <Icon className={className} />;
 }
 
-/** The one place a state becomes a colour. Written once because the row, the
- *  panel and anything later that shows a state must not disagree about what
- *  jammed looks like. */
-const TONE_CLASSES: Record<kinds.DeviceTone, string> = {
-    success: "border-success-edge bg-success-soft text-success-ink",
-    active: "border-accent/30 bg-accent/10 text-accent",
-    warning: "border-warning-edge bg-warning-soft text-warning-ink",
-    danger: "border-danger-edge bg-danger-soft text-danger-ink",
-    muted: "border-border bg-muted text-muted-foreground"
-};
-
 /** A tone as a chip's colours, for anything else that reads in the same tones -
- *  an automation's last run. */
+ *  an automation's last run. The colours themselves live with the rule pieces,
+ *  so a device state and a run outcome never disagree about what jammed looks
+ *  like. */
 export function toneClass(tone: kinds.DeviceTone): string {
-    return TONE_CLASSES[tone];
+    return ruleToneClass(tone);
 }
 
 /** A device nobody can reach has no state worth colouring: whatever it was doing
  *  when it last answered is not what it is doing now. */
 export function stateClass(device: DeviceView): string {
-    if (!device.online) return TONE_CLASSES.muted;
-    return TONE_CLASSES[kinds.DEVICE_STATE_TONES[device.state]];
+    if (!device.online) return toneClass("muted");
+    return toneClass(kinds.DEVICE_STATE_TONES[device.state]);
 }
 
 /** How the state reads on the badge. Deliberately not a colour on its own: a

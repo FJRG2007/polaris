@@ -110,6 +110,7 @@
         "duplicate": "A record like this is already here.",
         "rating": "Choose from 1 to 5 stars.",
         "tooMany": "Keep it to 10 links or fewer.",
+        "tooManyRecords": "Keep it to 50 records or fewer.",
         "address": "Enter the address in its boxes."
     },
     "list": {
@@ -357,7 +358,8 @@
             "links": "Links",
             "address": "Address",
             "email": "Email",
-            "phone": "Phone"
+            "phone": "Phone",
+            "relation": "Linked records"
         },
         "options": "Choices",
         "optionPlaceholder": "New choice",
@@ -366,6 +368,14 @@
         "kindFixed": "The type cannot change once the field exists.",
         "currency": "Currency",
         "currencyFixed": "The currency cannot change once the field exists.",
+        "target": "Links to",
+        "targetFixed": "What it links to cannot change once the field exists.",
+        "cardinality": "Holds",
+        "cardinalityFixed": "How many it holds cannot change once the field exists.",
+        "cardinalities": {
+            "one": "One record",
+            "many": "Several records"
+        },
         "save": "Save",
         "create": "Add field",
         "delete": "Delete field",
@@ -381,6 +391,7 @@
             "tooLong": "Use up to {length} characters.",
             "noOptions": "Add at least one choice.",
             "currency": "Choose a currency.",
+            "relation": "Choose what it links to.",
             "duplicate": "This choice is already there.",
             "tooMany": "Use up to {max} choices."
         }
@@ -521,6 +532,23 @@
         "deleteBody": "It stops running. What it already did stays done.",
         "enabled": "Enabled",
         "runs": "{count, plural, =0 {Never run} one {Ran once} other {Ran # times}}",
+        "turnOn": "Turn on {name}",
+        "turnOff": "Turn off {name}",
+        "neverRan": "Never run",
+        "whenHint": "What starts it",
+        "if": "If",
+        "ifHint": "Only records that match go on",
+        "ifNoRecord": "This trigger has no record to check",
+        "thenHint": "The steps, in order",
+        "addCondition": "Add condition",
+        "removeCondition": "Remove condition",
+        "layout": "Show as",
+        "layoutForm": "Steps",
+        "layoutVisual": "Diagram",
+        "moveAction": "Drag to reorder",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "actionKind": "Kind of action",
         "lastRun": "Last run {when}",
         "failed": "Last run failed: {error}",
         "tooMany": "A kind of record can have up to {max} workflows.",
@@ -546,7 +574,8 @@
             "ifElse": "If the record matches",
             "forEach": "For each record found",
             "delay": "Wait",
-            "sendChat": "Send a chat message"
+            "sendChat": "Send a chat message",
+            "waitFor": "Wait until the record matches"
         },
         "actionNeedsRecord": "That action changes the record the workflow is about, and this trigger is not about one.",
         "createNeedsName": "Give the new record a name.",
@@ -636,7 +665,15 @@
         "showSteps": "Show steps",
         "hideSteps": "Hide steps",
         "editFrom": "Edit from this version",
-        "steps": "Steps"
+        "steps": "Steps",
+        "waitForHint": "Checked each time the record changes.",
+        "waitForDays": "Longest wait",
+        "waitForUpTo": "{count, plural, one {Up to # day} other {Up to # days}}",
+        "waitForTimeout": "If it never matches",
+        "waitTimeouts": {
+            "stop": "End the run",
+            "continue": "Go on anyway"
+        }
     },
     "favorites": {
         "add": "Add to favorites",
@@ -693,7 +730,8 @@
             "sum": "Sum",
             "avg": "Average",
             "min": "Smallest",
-            "max": "Largest"
+            "max": "Largest",
+            "weighted": "Weighted sum"
         },
         "granularities": {
             "day": "Day",
@@ -717,6 +755,7 @@
             "groupBy": "Split by",
             "granularity": "Per",
             "wide": "Full width",
+            "weightedHint": "Each deal counts at its stage's odds from the forecast: won in full, lost not at all.",
             "noNumbers": "These records have no number or amount to add up. Count them instead.",
             "noSplits": "These records have no field this chart can split by. Pick another chart.",
             "incomplete": "Fill in every choice above.",

@@ -13,8 +13,12 @@ import { z } from "zod";
 import { CURRENCIES } from "@polaris/core";
 import type { FieldDef, FullName, Money } from "./objects";
 
-/** A value as it is written: a reference is just the id it points at. */
-export type InputValue = string | number | boolean | null | Money | FullName;
+/** A value as it is written: a reference is just the id it points at, and a
+ *  relation somebody added is the list of ids it holds. */
+export type InputValue = string | number | boolean | null | Money | FullName | readonly string[];
+
+/** The most records one relation somebody added holds. */
+export const MAX_LINKED = 50;
 
 /** Why a value was refused, as a key under `crm.invalid`. */
 export type InvalidReason =
@@ -31,6 +35,7 @@ export type InvalidReason =
     | "option"
     | "rating"
     | "tooMany"
+    | "tooManyRecords"
     | "address";
 
 export type Normalized =
@@ -324,11 +329,31 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             return typeof raw === "boolean" ? ok(raw) : no("option");
         case "member":
         case "relation":
+            if (field.kind === "relation" && field.custom) return linkIds(field, raw);
             if (raw === null || raw === "") return ok(null);
             return typeof raw === "string" && uuid.safeParse(raw).success ? ok(raw) : no("option");
         case "dateTime":
             return no("option");
     }
+}
+
+/**
+ * The ids a relation somebody added holds, each once, in the order given: one
+ * id, a list of ids, or a list of records named by id. Nothing is none; more
+ * than the field may hold is refused, not cut.
+ */
+function linkIds(field: FieldDef, raw: unknown): Normalized {
+    if (raw === null || raw === "" || raw === undefined) return ok([]);
+    const list = Array.isArray(raw) ? raw : [raw];
+    const ids: string[] = [];
+    for (const one of list) {
+        const id =
+            one && typeof one === "object" && "id" in one ? (one as { id: unknown }).id : one;
+        if (typeof id !== "string" || !uuid.safeParse(id).success) return no("option");
+        const lower = id.toLowerCase();
+        if (!ids.includes(lower)) ids.push(lower);
+    }
+    return ids.length > (field.many ? MAX_LINKED : 1) ? no("tooManyRecords") : ok(ids);
 }
 
 /** A web address as it is kept: http or https, with a real host. */

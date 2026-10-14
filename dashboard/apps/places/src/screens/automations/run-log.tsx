@@ -14,10 +14,10 @@ import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
 import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
-import { toneClass } from "../devices/device-panel";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import * as rules from "@polaris/ui/automation-rules";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, EmptyState, Skeleton, cn } from "@polaris/ui";
+import { Button, EmptyState, Skeleton, cn } from "@polaris/ui";
 
 const { runAction } = hostUi.runAction;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -25,7 +25,7 @@ const { RelativeTime } = hostUi.relativeTime;
 
 const LIVE_MS = 5000;
 
-const OUTCOME_TONES: Readonly<Record<auto.StepOutcome, Parameters<typeof toneClass>[0]>> = {
+const OUTCOME_TONES: Readonly<Record<auto.StepOutcome, rules.RuleTone>> = {
     ok: "success",
     failed: "danger",
     refused: "danger",
@@ -120,121 +120,92 @@ export function RunLog({
                     description={t("automations.log.emptyBody")}
                 />
             ) : (
-                <ul className="divide-y divide-border rounded-lg border border-border">
+                <rules.RunList>
                     {runs.map((run) => {
                         const expanded = open === run.id;
                         const reason = words.reasonText(run.reason, t);
                         return (
-                            <li key={run.id} className="flex flex-col">
-                                <button
-                                    type="button"
-                                    aria-expanded={expanded}
-                                    onClick={() => setOpen(expanded ? null : run.id)}
-                                    className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left"
-                                >
-                                    <Badge
-                                        className={cn(
-                                            "shrink-0",
-                                            toneClass(words.RUN_TONES[run.status])
-                                        )}
-                                    >
-                                        {words.runStatusText(run.status, t)}
-                                    </Badge>
-                                    <span className="min-w-0 flex-1 truncate text-sm">
-                                        {words.describeCause(run.cause, lookup, t)}
-                                    </span>
-                                    <span
-                                        className="shrink-0 text-xs tabular-nums text-foreground-subtle"
-                                        title={format.dateTime(run.startedAt)}
-                                    >
-                                        <RelativeTime iso={run.startedAt} />
-                                    </span>
-                                    <ChevronDown
-                                        className={cn(
-                                            "size-4 shrink-0 text-muted-foreground transition-transform",
-                                            expanded && "rotate-180"
-                                        )}
-                                    />
-                                </button>
-                                {expanded && (
-                                    <div className="flex flex-col gap-2 border-t border-border bg-surface px-3 py-2">
-                                        {reason && (
-                                            <p className="text-xs text-muted-foreground">
-                                                {reason}
-                                            </p>
-                                        )}
-                                        {run.status === "waiting" && run.dueAt && (
-                                            <p className="text-xs text-muted-foreground">
-                                                {t("automations.log.resumes", {
-                                                    time: format.dateTime(run.dueAt)
-                                                })}
-                                            </p>
-                                        )}
-                                        {run.steps.length === 0 ? (
-                                            !reason && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    {t("automations.log.noSteps")}
-                                                </p>
-                                            )
-                                        ) : (
-                                            <ol className="flex flex-col gap-1.5">
-                                                {run.steps.map((log, index) => {
-                                                    const step = stepById.get(log.stepId);
-                                                    const note = words.stepNoteText(log, t);
-                                                    return (
-                                                        <li
-                                                            key={`${log.stepId}-${index}`}
-                                                            className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
-                                                        >
-                                                            <Badge
+                            <rules.RunRow
+                                key={run.id}
+                                expanded={expanded}
+                                onToggle={() => setOpen(expanded ? null : run.id)}
+                                outcome={{
+                                    text: words.runStatusText(run.status, t),
+                                    tone: words.RUN_TONES[run.status]
+                                }}
+                                cause={words.describeCause(run.cause, lookup, t)}
+                                at={<RelativeTime iso={run.startedAt} />}
+                                atTitle={format.dateTime(run.startedAt)}
+                            >
+                                {reason && (
+                                    <p className="text-xs text-muted-foreground">{reason}</p>
+                                )}
+                                {run.status === "waiting" && run.dueAt && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("automations.log.resumes", {
+                                            time: format.dateTime(run.dueAt)
+                                        })}
+                                    </p>
+                                )}
+                                {run.steps.length === 0 ? (
+                                    !reason && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {t("automations.log.noSteps")}
+                                        </p>
+                                    )
+                                ) : (
+                                    <ol className="flex flex-col gap-1.5">
+                                        {run.steps.map((log, index) => {
+                                            const step = stepById.get(log.stepId);
+                                            const note = words.stepNoteText(log, t);
+                                            return (
+                                                <li
+                                                    key={`${log.stepId}-${index}`}
+                                                    className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"
+                                                >
+                                                    <rules.OutcomeBadge
+                                                        outcome={{
+                                                            text: words.stepOutcomeText(
+                                                                log.outcome,
+                                                                t
+                                                            ),
+                                                            tone: OUTCOME_TONES[log.outcome]
+                                                        }}
+                                                    />
+                                                    <span className="min-w-0 flex-1 text-sm">
+                                                        {step
+                                                            ? words.describeStep(
+                                                                  step,
+                                                                  lookup,
+                                                                  automationName,
+                                                                  t
+                                                              )
+                                                            : t("automations.log.stepGone")}
+                                                        {note && (
+                                                            <span
                                                                 className={cn(
-                                                                    "shrink-0",
-                                                                    toneClass(
-                                                                        OUTCOME_TONES[log.outcome]
-                                                                    )
+                                                                    "block text-xs",
+                                                                    log.outcome === "ok"
+                                                                        ? "text-muted-foreground"
+                                                                        : "text-danger"
                                                                 )}
                                                             >
-                                                                {words.stepOutcomeText(
-                                                                    log.outcome,
-                                                                    t
-                                                                )}
-                                                            </Badge>
-                                                            <span className="min-w-0 flex-1 text-sm">
-                                                                {step
-                                                                    ? words.describeStep(
-                                                                          step,
-                                                                          lookup,
-                                                                          automationName,
-                                                                          t
-                                                                      )
-                                                                    : t("automations.log.stepGone")}
-                                                                {note && (
-                                                                    <span
-                                                                        className={cn(
-                                                                            "block text-xs",
-                                                                            log.outcome === "ok"
-                                                                                ? "text-muted-foreground"
-                                                                                : "text-danger"
-                                                                        )}
-                                                                    >
-                                                                        {note}
-                                                                    </span>
-                                                                )}
+                                                                {note}
                                                             </span>
-                                                            <span className="shrink-0 text-xs tabular-nums text-foreground-subtle">
-                                                                {format.time(log.at)}
-                                                            </span>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ol>
-                                        )}
-                                    </div>
+                                                        )}
+                                                    </span>
+                                                    <span className="shrink-0 text-xs tabular-nums text-foreground-subtle">
+                                                        {format.time(log.at)}
+                                                    </span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ol>
                                 )}
-                            </li>
+                            </rules.RunRow>
                         );
                     })}
-                </ul>
+                </rules.RunList>
             )}
         </section>
     );

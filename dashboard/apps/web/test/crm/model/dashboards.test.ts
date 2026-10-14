@@ -66,6 +66,41 @@ describe("a widget's shape", () => {
     });
 });
 
+describe("a weighted amount", () => {
+    const weighted = { ...base, measure: "weighted" as const, field: "amount", currency: "EUR" };
+
+    it("is offered on deals only, over an amount", () => {
+        expect(model.measuresOf("opportunities")).toContain("weighted");
+        expect(model.measuresOf("companies")).not.toContain("weighted");
+        expect(model.readWidget(weighted, [])).not.toBeNull();
+        expect(
+            model.readWidget(
+                { ...base, object: "companies", measure: "weighted", field: "employees" },
+                []
+            )
+        ).toBeNull();
+        const score = {
+            key: "cNum1",
+            kind: "rating" as const,
+            width: 120,
+            custom: true,
+            label: "Score"
+        };
+        expect(
+            model.readWidget({ ...base, measure: "weighted", field: "cNum1" }, [score])
+        ).toBeNull();
+        expect(model.measureFields("opportunities", [score], "weighted").map((f) => f.key)).toEqual(
+            ["amount"]
+        );
+    });
+
+    it("reads the sum it was handed, which was weighed where it was counted", () => {
+        const tally = { count: 3, counted: 2, sum: 1200.004, min: null, max: null };
+        expect(model.measureOf(tally, "weighted")).toBe(1200);
+        expect(model.measureOf({ ...tally, counted: 0, sum: 0 }, "weighted")).toBeNull();
+    });
+});
+
 describe("periods", () => {
     const day = new Date("2026-05-14T22:30:00Z");
 

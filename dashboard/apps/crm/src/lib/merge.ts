@@ -13,6 +13,7 @@ import { shown } from "./records";
 import { prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
+import { nameLinks, relinkRecords } from "./linked";
 import { logEvents } from "./timeline";
 import { changesBetween } from "../model/timeline";
 import { columnOf, recordSelect, table, toRecord } from "./columns";
@@ -22,7 +23,11 @@ import { recordWhere, requireCan, requireChangeable, shelfWhere, type CrmActor }
 
 export { MAX_MERGE };
 
-const empty = (value: unknown): boolean => value === null || value === undefined || value === "";
+const empty = (value: unknown): boolean =>
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    (Array.isArray(value) && value.length === 0);
 
 /** The columns a field is stored in, filled together or not at all. */
 function columnsOf(object: CrmObject, key: string): string[] {
@@ -88,7 +93,8 @@ export async function mergeRecords(
     }
     await requireRepointable(actor, object, others);
     const rule = actor.rules?.[object];
-    const fields = fieldsOf(object, await loadFields(actor.shelf, object)).filter(
+    const custom = await loadFields(actor.shelf, object);
+    const fields = fieldsOf(object, custom).filter(
         (field) =>
             !field.readOnly &&
             !rule?.hidden.includes(field.key) &&
@@ -145,6 +151,9 @@ export async function mergeRecords(
                 data: { [column]: keepId }
             });
         }
+        // A relation somebody added that held a merged-away record holds the
+        // kept one instead.
+        await relinkRecords(tx, actor, others, keepId);
         // A note, task or file linked to both stays linked once.
         const links = await tx.crmLink.findMany({
             where: { ...shelf, object, recordId: keepId },
@@ -183,5 +192,6 @@ export async function mergeRecords(
             : []),
         ...others.map((id) => ({ recordId: id, kind: "trashed" as const }))
     ]);
-    return shown(actor, object, after);
+    const [named] = await nameLinks(actor, [shown(actor, object, after)], custom);
+    return named!;
 }

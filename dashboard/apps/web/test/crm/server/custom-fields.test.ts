@@ -56,7 +56,8 @@ describe("slots", () => {
         expect(slotFamily("date")).toBe("cDate");
         expect(slotFamily("boolean")).toBe("cBool");
         expect(slotFamily("select")).toBe("cText");
-        expect(SLOTS).toHaveLength(25);
+        expect(slotFamily("relation")).toBe("cRel");
+        expect(SLOTS).toHaveLength(28);
     });
 
     it("knows a slot key and nothing past the last one", () => {

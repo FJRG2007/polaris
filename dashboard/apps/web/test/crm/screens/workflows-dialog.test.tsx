@@ -127,6 +127,9 @@ beforeEach(() => {
     state.saved = [];
     state.toggled = [];
     state.refuseToggle = false;
+    // The layout the reader picks is remembered, where there is storage to
+    // remember it in: each test starts on the sentence.
+    window.localStorage?.removeItem("crm.workflows.layout");
 });
 
 afterEach(cleanup);
@@ -138,12 +141,51 @@ describe("the workflows dialog", () => {
         expect(screen.getByText(/A record is created/)).toBeTruthy();
         expect(screen.getByText(/Ran 3 times/)).toBeTruthy();
         expect(screen.getByText("Last run failed: City: Enter a number.")).toBeTruthy();
+        expect(screen.getByText("Failed")).toBeTruthy();
+    });
+
+    it("opens a workflow from its name as a sentence: when, if, then", async () => {
+        state.rows = [
+            {
+                ...(state.rows[0] as object),
+                actions: [
+                    { kind: "filter", when: { conjunction: "and", rules: [] } },
+                    { kind: "delay", minutes: 60 }
+                ]
+            }
+        ];
+        open();
+        fireEvent.click(await screen.findByRole("button", { name: /^Welcome/ }));
+        expect(await screen.findByText("Edit workflow")).toBeTruthy();
+        expect(screen.getByRole("heading", { name: "When" })).toBeTruthy();
+        expect(screen.getByRole("heading", { name: "If" })).toBeTruthy();
+        expect(screen.getByRole("heading", { name: "Then" })).toBeTruthy();
+        // The leading filter is the IF; removing it leaves the delay alone.
+        fireEvent.click(screen.getByRole("button", { name: "Remove condition" }));
+        expect(screen.getByRole("button", { name: "Add condition" })).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        });
+        await waitFor(() => expect(state.saved).toHaveLength(1));
+        expect(state.saved[0]).toMatchObject({
+            workflow: { actions: [{ kind: "filter" }, { kind: "delay", minutes: 60 }] }
+        });
+    });
+
+    it("previews the workflow as a diagram", async () => {
+        open();
+        await screen.findByText("Welcome");
+        fireEvent.click(screen.getByRole("button", { name: "New workflow" }));
+        fireEvent.click(screen.getByRole("radio", { name: "Diagram" }));
+        expect(screen.queryByRole("heading", { name: "If" })).toBeNull();
+        expect(screen.getAllByText("A record is created").length).toBeGreaterThan(0);
     });
 
     it("switches one off at once, and back on when the server refuses", async () => {
         state.refuseToggle = true;
         open();
-        const toggle = await screen.findByRole("switch", { name: "Enabled" });
+        const toggle = await screen.findByRole("switch", { name: "Turn off Welcome" });
         await act(async () => {
             fireEvent.click(toggle);
         });
@@ -152,7 +194,9 @@ describe("the workflows dialog", () => {
         );
         await waitFor(() =>
             expect(
-                screen.getByRole("switch", { name: "Enabled" }).getAttribute("aria-checked")
+                screen
+                    .getByRole("switch", { name: "Turn off Welcome" })
+                    .getAttribute("aria-checked")
             ).toBe("true")
         );
     });
@@ -243,6 +287,9 @@ describe("the workflows dialog", () => {
         expect(await screen.findByText("Runs of Welcome")).toBeTruthy();
         expect(await screen.findByText("Failed")).toBeTruthy();
         expect(screen.getByText("Waiting")).toBeTruthy();
+        expect(screen.queryByRole("link", { name: "Open record" })).toBeNull();
+        fireEvent.click(screen.getByText("Failed").closest("button")!);
+        expect(screen.getByText("City: Enter a number.")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Open record" }).getAttribute("href")).toContain(
             "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
         );

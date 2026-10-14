@@ -9,7 +9,7 @@
 import { useCrmT } from "./i18n";
 import { useCustomFields, fieldLabel as labelOf, optionLabel } from "./custom-fields";
 import { currencyName } from "./format";
-import { RefChip } from "./cell-display";
+import { RefChip, RefChips } from "./cell-display";
 import { CellPicker } from "./cell-picker";
 import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
@@ -17,6 +17,8 @@ import { useMemo, useState, type FormEvent } from "react";
 import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
 import {
     fieldsOf,
+    isLinkList,
+    linksOf,
     type CrmObject,
     type FieldDef,
     type FieldValue,
@@ -41,6 +43,8 @@ interface Draft {
     readonly text: string;
     readonly currency: string;
     readonly ref: Ref | null;
+    /** The records a relation somebody added is given. */
+    readonly refs: readonly Ref[];
 }
 
 /** What a field's value starts as in the dialog: its first choice, or nothing. */
@@ -63,6 +67,8 @@ function settle(
         raw = { amount, currency: draft.currency };
     } else if (field.kind === "boolean") {
         raw = draft.text === "yes";
+    } else if (isLinkList(field)) {
+        raw = draft.refs.map((ref) => ref.id);
     } else if (field.kind === "relation") {
         raw = draft.ref?.id ?? null;
     } else if (field.kind === "member" || field.kind === "select") {
@@ -72,12 +78,13 @@ function settle(
     }
     const result = normalizeInput(field, raw);
     if (!result.ok) return { error: result.reason };
-    const shown: FieldValue =
-        field.kind === "relation"
-            ? draft.ref
-            : field.kind === "member"
-              ? null
-              : (result.value as FieldValue);
+    const shown: FieldValue = isLinkList(field)
+        ? draft.refs
+        : field.kind === "relation"
+          ? draft.ref
+          : field.kind === "member"
+            ? null
+            : (result.value as FieldValue);
     return { stored: result.value, shown };
 }
 
@@ -110,7 +117,8 @@ export function BulkEditDialog({
     const [draft, setDraft] = useState<Draft>(() => ({
         text: startText(editable[0]),
         currency: defaultCurrency,
-        ref: null
+        ref: null,
+        refs: []
     }));
     const [touched, setTouched] = useState(false);
     const [picking, setPicking] = useState(false);
@@ -124,7 +132,8 @@ export function BulkEditDialog({
         setDraft({
             text: startText(editable.find((one) => one.key === next)),
             currency: defaultCurrency,
-            ref: null
+            ref: null,
+            refs: []
         });
         setTouched(false);
     };
@@ -203,7 +212,9 @@ export function BulkEditDialog({
                             className="w-full justify-start"
                             onClick={() => setPicking(true)}
                         >
-                            {draft.ref && field.target ? (
+                            {isLinkList(field) && draft.refs.length > 0 ? (
+                                <RefChips target={field.target!} value={draft.refs} />
+                            ) : draft.ref && field.target ? (
                                 <RefChip target={field.target} value={draft.ref} />
                             ) : (
                                 <span className="text-muted-foreground">{t("picker.none")}</span>
@@ -213,12 +224,16 @@ export function BulkEditDialog({
                             <CellPicker
                                 object={object}
                                 field={field}
-                                value={draft.ref}
+                                value={isLinkList(field) ? draft.refs : draft.ref}
                                 people={people}
                                 onClose={() => setPicking(false)}
                                 onPick={(_, shown) => {
                                     setPicking(false);
-                                    setDraft({ ...draft, ref: (shown as Ref | null) ?? null });
+                                    setDraft(
+                                        isLinkList(field)
+                                            ? { ...draft, refs: linksOf(shown) }
+                                            : { ...draft, ref: (shown as Ref | null) ?? null }
+                                    );
                                 }}
                             />
                         ) : null}

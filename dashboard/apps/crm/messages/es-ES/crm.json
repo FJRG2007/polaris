@@ -110,6 +110,7 @@
         "duplicate": "Ya hay un registro como este.",
         "rating": "Elige de 1 a 5 estrellas.",
         "tooMany": "Pon 10 enlaces como máximo.",
+        "tooManyRecords": "Pon 50 registros como máximo.",
         "address": "Escribe la dirección en sus casillas."
     },
     "list": {
@@ -357,7 +358,8 @@
             "links": "Enlaces",
             "address": "Dirección",
             "email": "Correo",
-            "phone": "Teléfono"
+            "phone": "Teléfono",
+            "relation": "Relación"
         },
         "options": "Opciones",
         "optionPlaceholder": "Nueva opción",
@@ -366,6 +368,14 @@
         "kindFixed": "El tipo no se puede cambiar una vez creado el campo.",
         "currency": "Moneda",
         "currencyFixed": "La moneda no se puede cambiar una vez creado el campo.",
+        "target": "Vincula con",
+        "targetFixed": "Con qué vincula no se puede cambiar una vez creado el campo.",
+        "cardinality": "Contiene",
+        "cardinalityFixed": "Cuántos contiene no se puede cambiar una vez creado el campo.",
+        "cardinalities": {
+            "one": "Un registro",
+            "many": "Varios registros"
+        },
         "save": "Guardar",
         "create": "Añadir campo",
         "delete": "Eliminar campo",
@@ -381,6 +391,7 @@
             "tooLong": "Usa hasta {length} caracteres.",
             "noOptions": "Añade al menos una opción.",
             "currency": "Elige una moneda.",
+            "relation": "Elige con qué vincula.",
             "duplicate": "Esta opción ya está.",
             "tooMany": "Usa hasta {max} opciones."
         }
@@ -521,6 +532,23 @@
         "deleteBody": "Deja de ejecutarse. Lo que ya hizo se queda hecho.",
         "enabled": "Activo",
         "runs": "{count, plural, =0 {Nunca se ejecutó} one {Se ejecutó una vez} other {Se ejecutó # veces}}",
+        "turnOn": "Activar {name}",
+        "turnOff": "Desactivar {name}",
+        "neverRan": "Sin ejecutar",
+        "whenHint": "Qué lo inicia",
+        "if": "Si",
+        "ifHint": "Solo siguen los que coinciden",
+        "ifNoRecord": "Este disparador no tiene registro que comprobar",
+        "thenHint": "Los pasos, en orden",
+        "addCondition": "Añadir condición",
+        "removeCondition": "Quitar condición",
+        "layout": "Ver como",
+        "layoutForm": "Pasos",
+        "layoutVisual": "Diagrama",
+        "moveAction": "Arrastra y ordena",
+        "moveUp": "Subir",
+        "moveDown": "Bajar",
+        "actionKind": "Tipo de acción",
         "lastRun": "Última ejecución {when}",
         "failed": "La última ejecución falló: {error}",
         "tooMany": "Un tipo de registro puede tener hasta {max} flujos.",
@@ -546,7 +574,8 @@
             "ifElse": "Si el registro coincide",
             "forEach": "Por cada registro hallado",
             "delay": "Esperar",
-            "sendChat": "Enviar mensaje de chat"
+            "sendChat": "Enviar mensaje de chat",
+            "waitFor": "Esperar a que el registro coincida"
         },
         "actionNeedsRecord": "Esa acción cambia el registro del flujo, y este disparador no trata de ninguno.",
         "createNeedsName": "Pon nombre al nuevo registro.",
@@ -636,7 +665,15 @@
         "showSteps": "Ver pasos",
         "hideSteps": "Ocultar pasos",
         "editFrom": "Editar desde esta versión",
-        "steps": "Pasos"
+        "steps": "Pasos",
+        "waitForHint": "Se comprueba cada vez que cambia el registro.",
+        "waitForDays": "Espera máxima",
+        "waitForUpTo": "{count, plural, one {Hasta # día} other {Hasta # días}}",
+        "waitForTimeout": "Si nunca coincide",
+        "waitTimeouts": {
+            "stop": "Terminar",
+            "continue": "Seguir"
+        }
     },
     "favorites": {
         "add": "Añadir a favoritos",
@@ -693,7 +730,8 @@
             "sum": "Suma",
             "avg": "Media",
             "min": "Mínimo",
-            "max": "Máximo"
+            "max": "Máximo",
+            "weighted": "Suma ponderada"
         },
         "granularities": {
             "day": "Día",
@@ -717,6 +755,7 @@
             "groupBy": "Agrupar por",
             "granularity": "Por",
             "wide": "Ancho total",
+            "weightedHint": "Cada trato cuenta según la probabilidad de su etapa en la previsión: los ganados enteros, los perdidos nada.",
             "noNumbers": "Estos registros no tienen números ni importes que sumar. Cuéntalos en su lugar.",
             "noSplits": "Estos registros no tienen un campo por el que dividir este gráfico. Elige otro gráfico.",
             "incomplete": "Completa todas las opciones de arriba.",

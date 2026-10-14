@@ -19,6 +19,7 @@ import * as nextLink from "next/link";
 import * as nextImage from "next/image";
 import * as zoom from "@polaris/ui/zoom";
 import * as automation from "@polaris/ui/automation";
+import * as automationRules from "@polaris/ui/automation-rules";
 import * as automationGraph from "@polaris/ui/automation-graph";
 import * as automationCanvas from "@polaris/ui/automation-canvas";
 import * as jsxRuntime from "react/jsx-runtime";
@@ -38,6 +39,7 @@ const MODULES: Record<string, object> = {
     // The automation editor Places draws its automations with, and the
     // dashboard draws Mail's filters with: one copy, the page's.
     "@polaris/ui/automation": automation,
+    "@polaris/ui/automation-rules": automationRules,
     "@polaris/ui/automation-graph": automationGraph,
     "@polaris/ui/automation-canvas": automationCanvas,
     "next/image": nextImage,

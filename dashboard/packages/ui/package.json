@@ -19,6 +19,10 @@
             "types": "./src/automation/parts.tsx",
             "import": "./src/automation/parts.tsx"
         },
+        "./automation-rules": {
+            "types": "./src/automation/rules.tsx",
+            "import": "./src/automation/rules.tsx"
+        },
         "./automation-graph": {
             "types": "./src/automation/graph.ts",
             "import": "./src/automation/graph.ts"

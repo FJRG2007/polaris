@@ -160,6 +160,13 @@ export const MAX_TOTAL_ACTIONS = 30;
 /** The longest a workflow may wait, in minutes: thirty days. */
 export const MAX_DELAY_MINUTES = 30 * 24 * 60;
 
+/** The longest a workflow waits for its record to match, in days. */
+export const MAX_WAIT_DAYS = 30;
+
+/** What a run that waited for its record in vain does then. */
+export const WAIT_TIMEOUTS = ["stop", "continue"] as const;
+export type WaitTimeout = (typeof WAIT_TIMEOUTS)[number];
+
 /** The actions that do one thing, each on its own. */
 const LEAF_ACTIONS = [
     z.object({ kind: z.literal("updateRecord"), values: valuesSchema }),
@@ -237,6 +244,14 @@ export const workflowActionSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("delay"),
         minutes: z.number().int().min(1).max(MAX_DELAY_MINUTES)
+    }),
+    /** Wait until the record matches - checked again every time it changes -
+     *  for up to `days`; then end the run or go on anyway. */
+    z.object({
+        kind: z.literal("waitFor"),
+        when: filterSchema,
+        days: z.number().int().min(1).max(MAX_WAIT_DAYS),
+        onTimeout: z.enum(WAIT_TIMEOUTS)
     })
 ]);
 export type WorkflowAction = z.infer<typeof workflowActionSchema>;
@@ -259,7 +274,8 @@ export const ACTION_KINDS: readonly ActionKind[] = [
     "filter",
     "ifElse",
     "forEach",
-    "delay"
+    "delay",
+    "waitFor"
 ];
 
 /** The actions a workflow's list holds, with the ones inside branches. */
@@ -285,7 +301,7 @@ export const LIVE_RECORD_TRIGGERS: readonly TriggerKind[] = [
 /** Whether an action can run under a kind of trigger: one that changes "the
  *  record" needs a trigger that is about one still there. */
 export function actionFits(kind: ActionKind, trigger: TriggerKind): boolean {
-    if (kind === "updateRecord" || kind === "filter" || kind === "ifElse") {
+    if (kind === "updateRecord" || kind === "filter" || kind === "ifElse" || kind === "waitFor") {
         return LIVE_RECORD_TRIGGERS.includes(trigger);
     }
     return true;

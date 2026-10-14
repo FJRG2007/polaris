@@ -47,6 +47,9 @@ export interface FieldDef {
     readonly options?: readonly string[];
     /** The record kind a `relation` points at. */
     readonly target?: CrmObject;
+    /** For a `relation` somebody added: whether it holds a list of records
+     *  rather than one. Its value is a `Ref[]` either way. */
+    readonly many?: boolean;
     /** Its width in a new table, in pixels. */
     readonly width: number;
     /** Left out of a new table's columns until somebody adds it. */
@@ -71,13 +74,14 @@ export const CUSTOM_KINDS = [
     "links",
     "address",
     "email",
-    "phone"
+    "phone",
+    "relation"
 ] as const;
 
 export type CustomKind = (typeof CUSTOM_KINDS)[number];
 
 /** The slot columns of each record table, per family, and how many there are. */
-export const SLOT_FAMILIES = { cText: 10, cNum: 5, cDate: 5, cBool: 5 } as const;
+export const SLOT_FAMILIES = { cText: 10, cNum: 5, cDate: 5, cBool: 5, cRel: 3 } as const;
 
 export type SlotFamily = keyof typeof SLOT_FAMILIES;
 
@@ -86,17 +90,18 @@ export function slotFamily(kind: CustomKind): SlotFamily {
     if (kind === "number" || kind === "money" || kind === "rating") return "cNum";
     if (kind === "date") return "cDate";
     if (kind === "boolean") return "cBool";
+    if (kind === "relation") return "cRel";
     return "cText";
 }
 
-/** Every slot column, "cText1" to "cBool5". */
+/** Every slot column, "cText1" to "cRel3". */
 export const SLOTS: readonly string[] = Object.entries(SLOT_FAMILIES).flatMap(([family, count]) =>
     Array.from({ length: count }, (_, index) => `${family}${index + 1}`)
 );
 
 /** The family of a slot key, or null for a key that is not one. */
 export function slotOf(key: string): SlotFamily | null {
-    const match = /^(cText|cNum|cDate|cBool)([1-9][0-9]?)$/.exec(key);
+    const match = /^(cText|cNum|cDate|cBool|cRel)([1-9][0-9]?)$/.exec(key);
     if (!match) return null;
     const family = match[1] as SlotFamily;
     return Number(match[2]) <= SLOT_FAMILIES[family] ? family : null;
@@ -235,7 +240,18 @@ export interface FullName {
  * A field's value as it travels. Text-like fields hold "" for empty, never
  * null; a number, a date or a reference holds null.
  */
-export type FieldValue = string | number | boolean | null | Ref | Money | FullName;
+export type FieldValue = string | number | boolean | null | Ref | Money | FullName | readonly Ref[];
+
+/** Whether a field is a relation somebody added: it holds a list of records
+ *  (`Ref[]`, at most one unless `many`) kept in a `cRel` slot. */
+export function isLinkList(field: FieldDef): boolean {
+    return field.kind === "relation" && field.custom === true;
+}
+
+/** The records a link-list value holds; none for anything else. */
+export function linksOf(value: FieldValue | undefined): readonly Ref[] {
+    return Array.isArray(value) ? value : [];
+}
 
 /** One record as every screen receives it. */
 export interface CrmRecord {
@@ -258,6 +274,7 @@ export function recordName(object: CrmObject, record: CrmRecord): string {
  *  "empty" totals read it. */
 export function isEmptyValue(value: FieldValue | undefined): boolean {
     if (value === null || value === undefined || value === "") return true;
+    if (Array.isArray(value)) return value.length === 0;
     if (typeof value === "object") {
         if ("first" in value) return !value.first && !value.last;
         if ("amount" in value) return value.amount === null;

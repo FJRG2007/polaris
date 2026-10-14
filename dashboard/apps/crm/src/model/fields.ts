@@ -7,7 +7,15 @@
 
 import { z } from "zod";
 import { CURRENCIES } from "@polaris/core";
-import { CUSTOM_KINDS, slotFamily, slotOf, type CustomKind, type FieldDef } from "./objects";
+import {
+    CRM_OBJECTS,
+    CUSTOM_KINDS,
+    slotFamily,
+    slotOf,
+    type CrmObject,
+    type CustomKind,
+    type FieldDef
+} from "./objects";
 
 /** The longest name a field or one of its choices may have. */
 export const FIELD_LABEL_MAX = 60;
@@ -28,10 +36,20 @@ const label = z
 
 const CURRENCY_CODES: readonly string[] = CURRENCIES.map((entry) => entry.code);
 
+/** How many records a relation somebody adds may hold: one, or a list. */
+export const RELATION_CARDINALITIES = ["one", "many"] as const;
+
+/** Whether a kind of field keeps options fixed when it is made: an amount's
+ *  currency, a relation's target and whether it holds one record or many. */
+export function fixedOptions(kind: CustomKind): boolean {
+    return kind === "money" || kind === "relation";
+}
+
 /**
  * A field as it is typed: a name, a kind, and for a select its choices - each
- * named, none twice; for an amount, the one currency it is counted in. Choices
- * of any other kind are dropped.
+ * named, none twice; for an amount, the one currency it is counted in; for a
+ * relation, the kind of record it links to and "one" or "many". Choices of any
+ * other kind are dropped.
  */
 export const fieldInputSchema = z
     .object({
@@ -41,9 +59,21 @@ export const fieldInputSchema = z
     })
     .transform((input) => ({
         ...input,
-        options: hasOptions(input.kind) || input.kind === "money" ? input.options : []
+        options: hasOptions(input.kind) || fixedOptions(input.kind) ? input.options : []
     }))
     .superRefine((input, context) => {
+        if (input.kind === "relation") {
+            const [target, cardinality] = input.options;
+            if (
+                input.options.length !== 2 ||
+                !(CRM_OBJECTS as readonly string[]).includes(target!) ||
+                !(RELATION_CARDINALITIES as readonly string[]).includes(cardinality!)
+            ) {
+                // i18n-ignore a code the form reads as customFields.invalid.relation
+                context.addIssue({ code: "custom", path: ["options"], message: "relation" });
+            }
+            return;
+        }
         if (input.kind === "money") {
             if (input.options.length !== 1 || !CURRENCY_CODES.includes(input.options[0]!)) {
                 // i18n-ignore a code the form reads as customFields.invalid.currency
@@ -125,6 +155,17 @@ export interface CustomField {
 
 /** An added field as every screen draws it: a field like the built-in ones. */
 export function customDef(field: CustomField): FieldDef {
+    if (field.kind === "relation") {
+        return {
+            key: field.slot,
+            kind: "relation",
+            label: field.label,
+            custom: true,
+            width: CUSTOM_WIDTH,
+            target: relationTarget(field.options),
+            many: field.options[1] === "many"
+        };
+    }
     return {
         key: field.slot,
         kind: field.kind,
@@ -133,6 +174,15 @@ export function customDef(field: CustomField): FieldDef {
         width: CUSTOM_WIDTH,
         ...(hasOptions(field.kind) || field.kind === "money" ? { options: field.options } : {})
     };
+}
+
+/** The kind of record a relation's stored options link to; people when the
+ *  options were never readable, so a damaged row still draws. */
+function relationTarget(options: readonly string[]): CrmObject {
+    const target = options[0];
+    return (CRM_OBJECTS as readonly string[]).includes(target ?? "")
+        ? (target as CrmObject)
+        : "people";
 }
 
 /** Whether a stored row still describes a field: a known kind in the slot

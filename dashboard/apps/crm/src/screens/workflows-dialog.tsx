@@ -1,10 +1,15 @@
 "use client";
 
 /**
- * A kind of record's workflows: the list, each one switched on or off where it
- * stands, and the editor for its trigger and actions. What a trigger or action
- * asks for is drawn by `workflow-fields`, so a new kind of either only adds
- * its own fields there.
+ * A kind of record's workflows, drawn with the pieces every rule builder in
+ * Polaris uses: the list of rules with their switch and last run, the editor
+ * that reads as a sentence (when -> if -> then) or as a diagram, and the run
+ * log. What a trigger or action asks for is drawn by `workflow-fields`, so a
+ * new kind of either only adds its own fields there.
+ *
+ * The IF of the sentence is the workflow's first step when that step is a
+ * filter: the saved shape stays a plain list of actions, and a filter anywhere
+ * else is still one of the THEN steps.
  */
 
 import { useCrmT } from "./i18n";
@@ -15,8 +20,10 @@ import type { CrmObject } from "../model/objects";
 import { useCallback, useEffect, useState } from "react";
 import { recordHref } from "../model/related";
 import { WorkflowDiagram } from "./workflow-diagram";
-import { History, Layers, Pencil, Plus, Trash2, Workflow } from "lucide-react";
-import { ActionList, TriggerFields, useWorkflowWords } from "./workflow-fields";
+import * as flow from "@polaris/ui/automation";
+import * as rules from "@polaris/ui/automation-rules";
+import { Filter, History, Layers, Pencil, Play, Plus, Trash2, Workflow, Zap } from "lucide-react";
+import { ActionFields, ActionList, TriggerFields, useWorkflowWords } from "./workflow-fields";
 import {
     Button,
     Checkbox,
@@ -29,8 +36,8 @@ import {
     DialogTitle,
     EmptyState,
     Input,
+    SegmentedControl,
     Select,
-    Switch,
     useToast
 } from "@polaris/ui";
 import * as model from "../model/workflows";
@@ -57,6 +64,25 @@ interface Draft {
     readonly newHookSecret?: boolean;
 }
 
+/** How a run reads at a glance. */
+const RUN_TONES: Readonly<Record<model.RunStatus, rules.RuleTone>> = {
+    running: "active",
+    waiting: "active",
+    done: "success",
+    stopped: "muted",
+    failed: "danger",
+    cancelled: "muted"
+};
+
+/** Where the reader's choice between the sentence and the diagram is kept. */
+const LAYOUT_KEY = "crm.workflows.layout";
+
+/** The step the IF of the sentence stands for: a filter put first. */
+function leadingFilter(actions: readonly model.WorkflowAction[]): model.WorkflowAction | null {
+    const first = actions[0];
+    return first && first.kind === "filter" ? first : null;
+}
+
 const blank = (): Draft => ({ name: "", trigger: { kind: "created" }, actions: [], enabled: true });
 
 export function WorkflowsDialog(props: WorkflowsDialogProps) {
@@ -78,6 +104,9 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     const [versionsOf, setVersionsOf] = useState<model.WorkflowView | null>(null);
     const [versions, setVersions] = useState<model.WorkflowVersionView[] | null>(null);
     const [openVersion, setOpenVersion] = useState<string | null>(null);
+    /** The run whose detail is unfolded. */
+    const [openRun, setOpenRun] = useState<string | null>(null);
+    const [layout, chooseLayout] = flow.useFlowLayout(LAYOUT_KEY);
 
     const showVersions = (row: model.WorkflowView) => {
         setNotice(null);
@@ -103,6 +132,7 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
         setNotice(null);
         setRunsOf(row);
         setRuns(null);
+        setOpenRun(null);
         unwrap(() => actions.listWorkflowRunsAction({ object, id: row.id }), t("errors.loadFailed"))
             .then((answer) => setRuns(answer.runs))
             .catch((caught) => {
@@ -195,70 +225,163 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
         }
     };
 
+    const edit = (row: model.WorkflowView) => {
+        setNotice(null);
+        setDraft({
+            id: row.id,
+            name: row.name,
+            trigger: row.trigger,
+            actions: row.actions,
+            enabled: row.enabled
+        });
+    };
+
     const valid = draft !== null && model.workflowInputSchema.safeParse(draft).success;
 
     let body: React.ReactNode;
     if (draft) {
+        const lead = leadingFilter(draft.actions);
+        const rest = lead ? draft.actions.slice(1) : draft.actions;
+        const withLead = (next: model.WorkflowAction | null, list: model.WorkflowAction[]) =>
+            setDraft({ ...draft, actions: next ? [next, ...list] : list });
         body = (
-            <div className="flex min-w-0 flex-col gap-4">
-                <label className="flex flex-col gap-1.5 text-[0.8125rem] font-medium">
-                    {t("workflows.name")}
-                    <Input
-                        value={draft.name}
-                        maxLength={model.WORKFLOW_NAME_MAX}
-                        onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+            <div className="flex max-h-[60vh] min-h-0 min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain">
+                <div className="flex min-w-0 flex-wrap items-end gap-3">
+                    <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-[0.8125rem] font-medium">
+                        {t("workflows.name")}
+                        <Input
+                            value={draft.name}
+                            maxLength={model.WORKFLOW_NAME_MAX}
+                            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                        />
+                    </label>
+                    <SegmentedControl<flow.FlowLayout>
+                        size="sm"
+                        value={layout}
+                        onValueChange={chooseLayout}
+                        aria-label={t("workflows.layout")}
+                        options={[
+                            { value: "form", label: t("workflows.layoutForm") },
+                            { value: "visual", label: t("workflows.layoutVisual") }
+                        ]}
                     />
-                </label>
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-[0.8125rem] font-medium">{t("workflows.trigger")}</span>
-                    <Select
-                        aria-label={t("workflows.trigger")}
-                        value={draft.trigger.kind}
-                        onValueChange={(kind) =>
-                            setDraft({
-                                ...draft,
-                                trigger: words.newTrigger(kind as model.TriggerKind),
-                                actions: draft.actions.filter((action) =>
-                                    words.actionFits(
-                                        action.kind,
-                                        words.newTrigger(kind as model.TriggerKind)
-                                    )
-                                )
-                            })
-                        }
-                        options={model.TRIGGER_KINDS.map((kind) => ({
-                            value: kind,
-                            label: t(`workflows.triggers.${kind}`)
-                        }))}
-                    />
-                    <TriggerFields
-                        object={object}
-                        trigger={draft.trigger}
-                        onChange={(trigger) => setDraft({ ...draft, trigger })}
-                    />
-                    {draft.id && draft.trigger.kind === "webhook" ? (
-                        <label className="flex items-center gap-2 text-[0.8125rem]">
-                            <Checkbox
-                                checked={Boolean(draft.newHookSecret)}
-                                onChange={() =>
-                                    setDraft({ ...draft, newHookSecret: !draft.newHookSecret })
-                                }
-                            />
-                            {t("workflows.newAddress")}
-                        </label>
-                    ) : null}
                 </div>
-                <div className="flex flex-col gap-2">
-                    <span className="text-[0.8125rem] font-medium">{t("workflows.actions")}</span>
-                    <ActionList
+                {layout === "visual" ? (
+                    <WorkflowDiagram
                         object={object}
                         trigger={draft.trigger}
                         actions={draft.actions}
-                        kinds={model.ACTION_KINDS}
-                        options={options}
-                        onChange={(list) => setDraft({ ...draft, actions: list })}
                     />
-                </div>
+                ) : (
+                    <ol className="flex min-w-0 flex-col">
+                        <flow.Stage
+                            icon={<Zap className="size-4" />}
+                            title={t("workflows.trigger")}
+                            hint={t("workflows.whenHint")}
+                        >
+                            <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-3">
+                                <Select
+                                    aria-label={t("workflows.trigger")}
+                                    value={draft.trigger.kind}
+                                    onValueChange={(kind) => {
+                                        const trigger = words.newTrigger(kind as model.TriggerKind);
+                                        setDraft({
+                                            ...draft,
+                                            trigger,
+                                            actions: draft.actions.filter((action) =>
+                                                words.actionFits(action.kind, trigger)
+                                            )
+                                        });
+                                    }}
+                                    options={model.TRIGGER_KINDS.map((kind) => ({
+                                        value: kind,
+                                        label: t(`workflows.triggers.${kind}`)
+                                    }))}
+                                />
+                                <TriggerFields
+                                    object={object}
+                                    trigger={draft.trigger}
+                                    onChange={(trigger) => setDraft({ ...draft, trigger })}
+                                />
+                                {draft.id && draft.trigger.kind === "webhook" ? (
+                                    <label className="flex items-center gap-2 text-[0.8125rem]">
+                                        <Checkbox
+                                            checked={Boolean(draft.newHookSecret)}
+                                            onChange={() =>
+                                                setDraft({
+                                                    ...draft,
+                                                    newHookSecret: !draft.newHookSecret
+                                                })
+                                            }
+                                        />
+                                        {t("workflows.newAddress")}
+                                    </label>
+                                ) : null}
+                            </div>
+                        </flow.Stage>
+                        <flow.Stage
+                            icon={<Filter className="size-4" />}
+                            title={t("workflows.if")}
+                            hint={
+                                words.actionFits("filter", draft.trigger)
+                                    ? t("workflows.ifHint")
+                                    : t("workflows.ifNoRecord")
+                            }
+                        >
+                            {lead ? (
+                                <flow.NodeCard
+                                    kind={
+                                        <span className="truncate text-[0.8125rem] font-medium">
+                                            {t("workflows.actionKinds.filter")}
+                                        </span>
+                                    }
+                                    removeLabel={t("workflows.removeCondition")}
+                                    upLabel={t("workflows.moveUp")}
+                                    downLabel={t("workflows.moveDown")}
+                                    onRemove={() => withLead(null, rest)}
+                                >
+                                    <div className="min-w-0 sm:col-span-2">
+                                        <ActionFields
+                                            object={object}
+                                            trigger={draft.trigger}
+                                            action={lead}
+                                            options={options}
+                                            onChange={(next) => withLead(next, rest)}
+                                        />
+                                    </div>
+                                </flow.NodeCard>
+                            ) : words.actionFits("filter", draft.trigger) &&
+                              draft.actions.length < model.MAX_WORKFLOW_ACTIONS ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="self-start border-dashed"
+                                    onClick={() =>
+                                        withLead(words.newAction("filter", options), rest)
+                                    }
+                                >
+                                    <Plus className="size-4 shrink-0" />
+                                    {t("workflows.addCondition")}
+                                </Button>
+                            ) : null}
+                        </flow.Stage>
+                        <flow.Stage
+                            icon={<Play className="size-4" />}
+                            title={t("workflows.actions")}
+                            hint={t("workflows.thenHint")}
+                            last
+                        >
+                            <ActionList
+                                object={object}
+                                trigger={draft.trigger}
+                                actions={rest}
+                                kinds={model.ACTION_KINDS}
+                                options={options}
+                                onChange={(list) => withLead(lead, list)}
+                            />
+                        </flow.Stage>
+                    </ol>
+                )}
             </div>
         );
     } else if (runsOf) {
@@ -268,50 +391,54 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
             ) : runs.length === 0 ? (
                 <EmptyState icon={<History />} title={t("workflows.noRuns")} />
             ) : (
-                <ul className="flex max-h-[60vh] min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain">
-                    {runs.map((run) => (
-                        <li
-                            key={run.id}
-                            className="flex min-w-0 flex-col gap-0.5 rounded-lg px-2 py-2"
-                        >
-                            <span className="flex min-w-0 items-center gap-2 text-[0.8125rem]">
-                                <span
-                                    className={
-                                        run.status === "failed"
-                                            ? "font-medium text-destructive"
-                                            : "font-medium"
-                                    }
+                <div className="max-h-[60vh] min-h-0 overflow-y-auto overscroll-contain">
+                    <rules.RunList label={t("workflows.runsOf", { name: runsOf.name })}>
+                        {runs.map((run) => {
+                            const expanded = openRun === run.id;
+                            return (
+                                <rules.RunRow
+                                    key={run.id}
+                                    expanded={expanded}
+                                    onToggle={() => setOpenRun(expanded ? null : run.id)}
+                                    outcome={{
+                                        text: t(`workflows.runStatus.${run.status}`),
+                                        tone: RUN_TONES[run.status]
+                                    }}
+                                    cause={t(`workflows.triggers.${model.causeKind(run.cause)}`)}
+                                    at={<hostUi.relativeTime.RelativeTime iso={run.startedAt} />}
+                                    atTitle={format.dateTime(run.startedAt)}
                                 >
-                                    {t(`workflows.runStatus.${run.status}`)}
-                                </span>
-                                <span className="truncate text-muted-foreground">
-                                    {format.dateTime(run.startedAt)} -{" "}
-                                    {t(`workflows.triggers.${model.causeKind(run.cause)}`)}
-                                </span>
-                                {run.recordId ? (
-                                    <a
-                                        className="ml-auto shrink-0 text-primary hover:underline"
-                                        href={recordHref(object, run.recordId)}
-                                    >
-                                        {t("workflows.openRecord")}
-                                    </a>
-                                ) : null}
-                            </span>
-                            {run.status === "waiting" && run.resumeAt ? (
-                                <span className="text-[0.75rem] text-muted-foreground">
-                                    {t("workflows.resumesAt", {
-                                        when: format.dateTime(run.resumeAt)
-                                    })}
-                                </span>
-                            ) : null}
-                            {run.error ? (
-                                <span className="break-words text-[0.75rem] text-destructive">
-                                    {run.error}
-                                </span>
-                            ) : null}
-                        </li>
-                    ))}
-                </ul>
+                                    <span className="text-xs text-muted-foreground">
+                                        {format.dateTime(run.startedAt)}
+                                        {run.finishedAt
+                                            ? ` - ${format.dateTime(run.finishedAt)}`
+                                            : ""}
+                                    </span>
+                                    {run.status === "waiting" && run.resumeAt ? (
+                                        <span className="text-xs text-muted-foreground">
+                                            {t("workflows.resumesAt", {
+                                                when: format.dateTime(run.resumeAt)
+                                            })}
+                                        </span>
+                                    ) : null}
+                                    {run.error ? (
+                                        <span className="break-words text-xs text-destructive [overflow-wrap:anywhere]">
+                                            {run.error}
+                                        </span>
+                                    ) : null}
+                                    {run.recordId ? (
+                                        <a
+                                            className="self-start text-xs text-primary hover:underline"
+                                            href={recordHref(object, run.recordId)}
+                                        >
+                                            {t("workflows.openRecord")}
+                                        </a>
+                                    ) : null}
+                                </rules.RunRow>
+                            );
+                        })}
+                    </rules.RunList>
+                </div>
             );
     } else if (versionsOf) {
         body = (
@@ -420,100 +547,93 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
         body = <EmptyState icon={<Workflow />} title={t("workflows.empty")} />;
     } else {
         body = (
-            <ul className="flex max-h-[60vh] min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain">
-                {rows.map((row) => (
-                    <li
-                        key={row.id}
-                        className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/50"
-                    >
-                        <Switch
-                            checked={row.enabled}
-                            onChange={(enabled) => toggle(row, enabled)}
-                            aria-label={t("workflows.enabled")}
-                        />
-                        <div className="flex min-w-0 flex-1 flex-col">
-                            <span className="truncate text-sm font-medium" title={row.name}>
-                                {row.name}
-                            </span>
-                            <span className="truncate text-[0.75rem] text-muted-foreground">
-                                {words.triggerSummary(row.trigger)} -{" "}
-                                {t("workflows.runs", { count: row.runCount })}
-                                {row.enabled && row.nextRunAt ? (
-                                    <>
-                                        {" - "}
+            <div className="max-h-[60vh] min-h-0 overflow-y-auto overscroll-contain">
+                <rules.RuleList
+                    label={t("workflows.title", { objects: t(`objects.${object}.plural`) })}
+                >
+                    {rows.map((row) => (
+                        <rules.RuleRow
+                            key={row.id}
+                            name={row.name}
+                            enabled={row.enabled}
+                            onToggle={(enabled) => toggle(row, enabled)}
+                            toggleLabel={
+                                row.enabled
+                                    ? t("workflows.turnOff", { name: row.name })
+                                    : t("workflows.turnOn", { name: row.name })
+                            }
+                            open={({ className, children }) => (
+                                <button
+                                    type="button"
+                                    className={className}
+                                    title={t("workflows.edit")}
+                                    onClick={() => edit(row)}
+                                >
+                                    {children}
+                                </button>
+                            )}
+                            summary={
+                                <>
+                                    {words.triggerSummary(row.trigger)} -{" "}
+                                    {t("workflows.runs", { count: row.runCount })}
+                                </>
+                            }
+                            last={
+                                row.lastError
+                                    ? { text: t("workflows.runStatus.failed"), tone: "danger" }
+                                    : row.lastRunAt
+                                      ? { text: t("workflows.runStatus.done"), tone: "success" }
+                                      : null
+                            }
+                            lastRun={
+                                row.lastRunAt ? (
+                                    <span title={format.dateTime(row.lastRunAt)}>
+                                        <hostUi.relativeTime.RelativeTime iso={row.lastRunAt} />
+                                    </span>
+                                ) : null
+                            }
+                            neverRan={t("workflows.neverRan")}
+                            detail={
+                                row.lastError ? (
+                                    <span className="text-destructive">
+                                        {t("workflows.failed", { error: row.lastError })}
+                                    </span>
+                                ) : row.enabled && row.nextRunAt ? (
+                                    <span className="text-muted-foreground">
                                         {t("workflows.nextRun", {
                                             when: format.dateTime(row.nextRunAt)
                                         })}
-                                    </>
-                                ) : null}
-                                {row.lastRunAt ? (
-                                    <>
-                                        {" - "}
-                                        <hostUi.relativeTime.RelativeTime iso={row.lastRunAt} />
-                                    </>
-                                ) : null}
-                            </span>
-                            {row.lastError ? (
-                                <span className="break-words text-[0.75rem] text-destructive">
-                                    {t("workflows.failed", { error: row.lastError })}
-                                </span>
-                            ) : null}
-                        </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 shrink-0 p-0"
-                            aria-label={t("workflows.showRuns")}
-                            title={t("workflows.showRuns")}
-                            onClick={() => showRuns(row)}
-                        >
-                            <History className="size-4" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 shrink-0 p-0"
-                            aria-label={t("workflows.showVersions")}
-                            title={t("workflows.showVersions")}
-                            onClick={() => showVersions(row)}
-                        >
-                            <Layers className="size-4" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 shrink-0 p-0"
-                            aria-label={t("workflows.edit")}
-                            title={t("workflows.edit")}
-                            onClick={() => {
-                                setNotice(null);
-                                setDraft({
-                                    id: row.id,
-                                    name: row.name,
-                                    trigger: row.trigger,
-                                    actions: row.actions,
-                                    enabled: row.enabled
-                                });
-                            }}
-                        >
-                            <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 shrink-0 p-0"
-                            aria-label={t("workflows.delete")}
-                            title={t("workflows.delete")}
-                            onClick={() => void remove(row)}
-                        >
-                            <Trash2 className="size-4" />
-                        </Button>
-                    </li>
-                ))}
-            </ul>
+                                    </span>
+                                ) : null
+                            }
+                            actions={
+                                <>
+                                    <rules.RuleAction
+                                        label={t("workflows.showRuns")}
+                                        onClick={() => showRuns(row)}
+                                    >
+                                        <History className="size-4" />
+                                    </rules.RuleAction>
+                                    <rules.RuleAction
+                                        label={t("workflows.showVersions")}
+                                        onClick={() => showVersions(row)}
+                                    >
+                                        <Layers className="size-4" />
+                                    </rules.RuleAction>
+                                    <rules.RuleAction
+                                        label={t("workflows.delete")}
+                                        onClick={() => void remove(row)}
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </rules.RuleAction>
+                                </>
+                            }
+                        />
+                    ))}
+                </rules.RuleList>
+            </div>
         );
     }
-
     return (
         <Dialog open={open} onOpenChange={(next) => !next && props.onClose()}>
             <DialogContent className="sm:max-w-2xl">

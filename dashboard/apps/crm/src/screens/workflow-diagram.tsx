@@ -141,6 +141,8 @@ function leafDetail(t: ReturnType<typeof useCrmT>, action: model.WorkflowAction)
             return t(`objects.${action.object}.plural`);
         case "delay":
             return delayLabel(t, action.minutes);
+        case "waitFor":
+            return t("workflows.waitForUpTo", { count: action.days });
         case "filter":
             return t("workflows.filterHint");
         default:

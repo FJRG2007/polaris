@@ -15,7 +15,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { History, Loader2, Play, Plus, Trash2, Workflow } from "lucide-react";
 import {
-    Badge,
     Button,
     ConfirmDeleteDialog,
     DropdownMenu,
@@ -23,11 +22,9 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     EmptyState,
-    Skeleton,
-    Switch,
-    cn
+    Skeleton
 } from "@polaris/ui";
-import { toneClass } from "../devices/device-panel";
+import * as rules from "@polaris/ui/automation-rules";
 import { automationsCacheKey, dropAutomationsCache } from "./cache";
 import * as actions from "./actions";
 import { usePlacesT } from "../use-places-t";
@@ -246,141 +243,117 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                     action={newMenu ?? undefined}
                 />
             ) : (
-                <ul className="flex flex-col gap-2">
+                <rules.RuleList>
                     {shown.map((automation) => {
                         const busy = pending[automation.id];
                         const firstTrigger = automation.definition.triggers[0];
                         return (
-                            <li
+                            <rules.RuleRow
                                 key={automation.id}
-                                className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3"
-                            >
-                                <Switch
-                                    checked={automation.enabled}
-                                    disabled={!canManage || busy === "toggle"}
-                                    onChange={(next) => void toggle(automation, next)}
-                                    aria-label={
-                                        automation.enabled
-                                            ? t("automations.list.turnOffName", {
-                                                  name: automation.name
-                                              })
-                                            : t("automations.list.turnOnName", {
-                                                  name: automation.name
-                                              })
-                                    }
-                                />
-                                <Link
-                                    href={`/places/devices/automations/${automation.id}`}
-                                    className="flex min-w-0 flex-1 flex-col gap-0.5"
-                                >
-                                    <span
-                                        className={cn(
-                                            "truncate text-sm font-medium",
-                                            !automation.enabled && "text-muted-foreground"
+                                name={automation.name}
+                                enabled={automation.enabled}
+                                toggleDisabled={!canManage || busy === "toggle"}
+                                onToggle={(next) => void toggle(automation, next)}
+                                toggleLabel={
+                                    automation.enabled
+                                        ? t("automations.list.turnOffName", {
+                                              name: automation.name
+                                          })
+                                        : t("automations.list.turnOnName", {
+                                              name: automation.name
+                                          })
+                                }
+                                open={({ className, children }) => (
+                                    <Link
+                                        href={`/places/devices/automations/${automation.id}`}
+                                        className={className}
+                                    >
+                                        {children}
+                                    </Link>
+                                )}
+                                summary={
+                                    firstTrigger
+                                        ? t("automations.list.summary", {
+                                              when: words.describeTrigger(firstTrigger, lookup, t),
+                                              more: automation.definition.triggers.length - 1,
+                                              steps: automation.definition.actions.length
+                                          })
+                                        : ""
+                                }
+                                last={
+                                    automation.lastStatus
+                                        ? {
+                                              text: words.runStatusText(automation.lastStatus, t),
+                                              tone: words.RUN_TONES[automation.lastStatus]
+                                          }
+                                        : null
+                                }
+                                lastRun={
+                                    automation.lastRunAt && (
+                                        <RelativeTime iso={automation.lastRunAt} />
+                                    )
+                                }
+                                neverRan={t("automations.list.neverRan")}
+                                actions={
+                                    <>
+                                        {ran === automation.id && (
+                                            <span
+                                                className="text-xs text-muted-foreground"
+                                                role="status"
+                                            >
+                                                {t("automations.list.started")}
+                                            </span>
                                         )}
-                                        title={automation.name}
-                                    >
-                                        {automation.name}
-                                    </span>
-                                    <span className="truncate text-[0.6875rem] text-foreground-subtle">
-                                        {firstTrigger
-                                            ? t("automations.list.summary", {
-                                                  when: words.describeTrigger(
-                                                      firstTrigger,
-                                                      lookup,
-                                                      t
-                                                  ),
-                                                  more: automation.definition.triggers.length - 1,
-                                                  steps: automation.definition.actions.length
-                                              })
-                                            : ""}
-                                    </span>
-                                </Link>
-                                <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                                    {automation.lastStatus ? (
-                                        <>
-                                            <Badge
-                                                className={toneClass(
-                                                    words.RUN_TONES[automation.lastStatus]
-                                                )}
-                                            >
-                                                {words.runStatusText(automation.lastStatus, t)}
-                                            </Badge>
-                                            {automation.lastRunAt && (
-                                                <RelativeTime iso={automation.lastRunAt} />
-                                            )}
-                                        </>
-                                    ) : (
-                                        t("automations.list.neverRan")
-                                    )}
-                                </span>
-                                <span className="flex shrink-0 items-center gap-1">
-                                    {ran === automation.id && (
-                                        <span
-                                            className="text-xs text-muted-foreground"
-                                            role="status"
+                                        <rules.RuleAction
+                                            asChild
+                                            label={t("automations.list.logName", {
+                                                name: automation.name
+                                            })}
+                                            title={t("automations.list.log")}
                                         >
-                                            {t("automations.list.started")}
-                                        </span>
-                                    )}
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="ghost"
-                                        className="size-8 p-0"
-                                        aria-label={t("automations.list.logName", {
-                                            name: automation.name
-                                        })}
-                                        title={t("automations.list.log")}
-                                    >
-                                        <Link
-                                            href={`/places/devices/automations/${automation.id}?tab=runs`}
-                                        >
-                                            <History className="size-4" />
-                                        </Link>
-                                    </Button>
-                                    {canManage && (
-                                        <>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="size-8 p-0"
-                                                disabled={busy === "run" || !automation.enabled}
-                                                aria-label={t("automations.list.runName", {
-                                                    name: automation.name
-                                                })}
-                                                title={
-                                                    automation.enabled
-                                                        ? t("automations.list.run")
-                                                        : t("automations.list.runOff")
-                                                }
-                                                onClick={() => void runNow(automation)}
+                                            <Link
+                                                href={`/places/devices/automations/${automation.id}?tab=runs`}
                                             >
-                                                {busy === "run" ? (
-                                                    <Loader2 className="size-4 animate-spin" />
-                                                ) : (
-                                                    <Play className="size-4" />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="size-8 p-0"
-                                                aria-label={t("automations.list.removeName", {
-                                                    name: automation.name
-                                                })}
-                                                title={t("automations.list.remove")}
-                                                onClick={() => setRemoving(automation)}
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </Button>
-                                        </>
-                                    )}
-                                </span>
-                            </li>
+                                                <History className="size-4" />
+                                            </Link>
+                                        </rules.RuleAction>
+                                        {canManage && (
+                                            <>
+                                                <rules.RuleAction
+                                                    disabled={busy === "run" || !automation.enabled}
+                                                    label={t("automations.list.runName", {
+                                                        name: automation.name
+                                                    })}
+                                                    title={
+                                                        automation.enabled
+                                                            ? t("automations.list.run")
+                                                            : t("automations.list.runOff")
+                                                    }
+                                                    onClick={() => void runNow(automation)}
+                                                >
+                                                    {busy === "run" ? (
+                                                        <Loader2 className="size-4 animate-spin" />
+                                                    ) : (
+                                                        <Play className="size-4" />
+                                                    )}
+                                                </rules.RuleAction>
+                                                <rules.RuleAction
+                                                    label={t("automations.list.removeName", {
+                                                        name: automation.name
+                                                    })}
+                                                    title={t("automations.list.remove")}
+                                                    onClick={() => setRemoving(automation)}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </rules.RuleAction>
+                                            </>
+                                        )}
+                                    </>
+                                }
+                            />
                         );
                     })}
-                </ul>
+                </rules.RuleList>
             )}
 
             <ConfirmDeleteDialog

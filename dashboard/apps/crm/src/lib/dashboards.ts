@@ -23,7 +23,9 @@ import { listWhere } from "./query";
 import { prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
+import { loadOdds } from "./forecast";
 import { shelfPeople } from "./records";
+import { WON_STAGE } from "../model/forecast";
 import { readConfig } from "../model/views";
 import * as model from "../model/dashboards";
 import { recordSelect, table, toRecord, columnOf } from "./columns";
@@ -264,9 +266,32 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
           }
         : { _count: { _all: true } };
 
+    // A weighted amount is counted per stage as well, and each stage's sum
+    // weighed by its odds: won in full, lost and unknown stages not at all.
+    let weigh: ((stage: unknown) => number) | null = null;
+    if (checked.measure === "weighted") {
+        const odds: Readonly<Record<string, number>> = await loadOdds(actor);
+        weigh = (stage) => (stage === WON_STAGE ? 1 : (odds[String(stage)] ?? 0) / 100);
+    }
+    const tally = (row: GroupRow): model.Tally => {
+        const plain = tallyOf(row, column);
+        return weigh
+            ? { ...plain, sum: plain.sum * weigh(row.stage), min: null, max: null }
+            : plain;
+    };
+
     if (!checked.groupBy) {
-        const row = (await table(object).aggregate({ where, ...measures })) as GroupRow;
-        return { kind: "number", value: model.measureOf(tallyOf(row, column), checked.measure) };
+        if (!weigh) {
+            const row = (await table(object).aggregate({ where, ...measures })) as GroupRow;
+            return { kind: "number", value: model.measureOf(tally(row), checked.measure) };
+        }
+        const rows = (await table(object).groupBy({
+            by: ["stage"],
+            where,
+            ...measures
+        })) as GroupRow[];
+        const total = rows.reduce((sum, row) => model.addTally(sum, tally(row)), model.EMPTY_TALLY);
+        return { kind: "number", value: model.measureOf(total, checked.measure) };
     }
 
     const field = fieldOf(object, checked.groupBy, custom)!;
@@ -276,24 +301,60 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
     }
     const by = spec.column;
 
+    // The groups shown, at most `cap` of them. A weighted figure is the sum of
+    // its stages, so the groups are picked first and then every stage of each
+    // is counted: a cap never leaves one of them short.
+    const groups = async (
+        scope: Record<string, unknown>,
+        orderBy: Record<string, unknown>,
+        cap: number,
+        among: (keys: unknown[]) => Record<string, unknown>
+    ): Promise<{ rows: GroupRow[]; capped: boolean }> => {
+        if (!weigh || by === "stage") {
+            const rows = (await table(object).groupBy({
+                by: [by],
+                where: scope,
+                ...measures,
+                orderBy,
+                take: cap + 1
+            })) as GroupRow[];
+            return { rows: rows.slice(0, cap), capped: rows.length > cap };
+        }
+        const picked = (await table(object).groupBy({
+            by: [by],
+            where: scope,
+            _count: { _all: true },
+            orderBy,
+            take: cap + 1
+        })) as GroupRow[];
+        const keys = picked.slice(0, cap).map((row) => row[by]);
+        const rows =
+            keys.length === 0
+                ? []
+                : ((await table(object).groupBy({
+                      by: [by, "stage"],
+                      where: { AND: [scope, among(keys)] },
+                      ...measures
+                  })) as GroupRow[]);
+        return { rows, capped: picked.length > cap };
+    };
+
     if (checked.granularity) {
         const granularity = checked.granularity;
-        const rows = (await table(object).groupBy({
-            by: [by],
-            where: { AND: [where, { NOT: { [by]: null } }] },
-            ...measures,
-            orderBy: { [by]: "asc" },
-            take: DATE_CAP + 1
-        })) as GroupRow[];
-        const capped = rows.length > DATE_CAP;
+        const { rows, capped } = await groups(
+            { AND: [where, { NOT: { [by]: null } }] },
+            { [by]: "asc" },
+            DATE_CAP,
+            (keys) => ({ [by]: { gte: keys[0], lte: keys[keys.length - 1] } })
+        );
         const periods = new Map<string, model.Tally>();
-        for (const row of rows.slice(0, DATE_CAP)) {
+        for (const row of rows) {
             const at = row[by];
             if (!(at instanceof Date)) continue;
             const bucket = model.bucketOf(at, granularity);
             periods.set(
                 bucket,
-                model.addTally(periods.get(bucket) ?? model.EMPTY_TALLY, tallyOf(row, column))
+                model.addTally(periods.get(bucket) ?? model.EMPTY_TALLY, tally(row))
             );
         }
         const present = [...periods.keys()].sort();
@@ -315,22 +376,22 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
         };
     }
 
-    const rows = (await table(object).groupBy({
-        by: [by],
+    const { rows, capped } = await groups(
         where,
-        ...measures,
-        orderBy: { _count: { [by]: "desc" } },
-        take: CATEGORY_CAP + 1
-    })) as GroupRow[];
-    const capped = rows.length > CATEGORY_CAP;
+        { _count: { [by]: "desc" } },
+        CATEGORY_CAP,
+        (keys) => ({
+            OR: [
+                { [by]: { in: keys.filter((key) => key !== null) } },
+                ...(keys.includes(null) ? [{ [by]: null }] : [])
+            ]
+        })
+    );
     const tallies = new Map<string, model.Tally>();
-    for (const row of rows.slice(0, CATEGORY_CAP)) {
+    for (const row of rows) {
         const raw = row[by];
         const key = raw === null || raw === undefined ? "" : String(raw);
-        tallies.set(
-            key,
-            model.addTally(tallies.get(key) ?? model.EMPTY_TALLY, tallyOf(row, column))
-        );
+        tallies.set(key, model.addTally(tallies.get(key) ?? model.EMPTY_TALLY, tally(row)));
     }
 
     // A choice keeps its own order - a pipeline reads left to right - and

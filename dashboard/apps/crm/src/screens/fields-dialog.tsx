@@ -12,7 +12,13 @@ import * as actions from "../actions/records";
 import { useState, type FormEvent } from "react";
 import { hostUi } from "@polaris/app-host/client";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { CUSTOM_KINDS, type CrmObject, type CustomKind } from "../model/objects";
+import {
+    CRM_OBJECTS,
+    CUSTOM_KINDS,
+    isCrmObject,
+    type CrmObject,
+    type CustomKind
+} from "../model/objects";
 import {
     choiceChanges,
     FIELD_LABEL_MAX,
@@ -20,6 +26,7 @@ import {
     hasOptions,
     MAX_OPTIONS,
     normalizeLabel,
+    RELATION_CARDINALITIES,
     type CustomField
 } from "../model/fields";
 import {
@@ -203,6 +210,14 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
               ? format.preferences.currency
               : "EUR"
     );
+    const [target, setTarget] = useState<CrmObject>(
+        field?.kind === "relation" && isCrmObject(field.options[0] ?? "")
+            ? (field.options[0] as CrmObject)
+            : object
+    );
+    const [cardinality, setCardinality] = useState<"one" | "many">(
+        field?.kind === "relation" && field.options[1] === "many" ? "many" : "one"
+    );
     const [rows, setRows] = useState<ChoiceRow[]>(
         field && hasOptions(field.kind) && field.options.length > 0
             ? field.options.map((option) => ({ text: option, from: option }))
@@ -217,7 +232,9 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
         options:
             kind === "money"
                 ? [currency]
-                : rows.map((row) => row.text).filter((one) => one.trim() !== "")
+                : kind === "relation"
+                  ? [target, cardinality]
+                  : rows.map((row) => row.text).filter((one) => one.trim() !== "")
     });
     const issue = (path: string): string | null =>
         parsed.success
@@ -345,6 +362,52 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
                         />
                     )}
                 </div>
+            ) : null}
+            {kind === "relation" ? (
+                <>
+                    <div className="flex flex-col gap-1.5 text-[0.8125rem]">
+                        <span className="font-medium">{t("customFields.target")}</span>
+                        {field !== null ? (
+                            <span
+                                className="text-muted-foreground"
+                                title={t("customFields.targetFixed")}
+                            >
+                                {t(`objects.${target}.plural`)}
+                            </span>
+                        ) : (
+                            <Select
+                                value={target}
+                                aria-label={t("customFields.target")}
+                                options={CRM_OBJECTS.map((one) => ({
+                                    value: one,
+                                    label: t(`objects.${one}.plural`)
+                                }))}
+                                onValueChange={(next) => setTarget(next as CrmObject)}
+                            />
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-1.5 text-[0.8125rem]">
+                        <span className="font-medium">{t("customFields.cardinality")}</span>
+                        {field !== null ? (
+                            <span
+                                className="text-muted-foreground"
+                                title={t("customFields.cardinalityFixed")}
+                            >
+                                {t(`customFields.cardinalities.${cardinality}`)}
+                            </span>
+                        ) : (
+                            <Select
+                                value={cardinality}
+                                aria-label={t("customFields.cardinality")}
+                                options={RELATION_CARDINALITIES.map((one) => ({
+                                    value: one,
+                                    label: t(`customFields.cardinalities.${one}`)
+                                }))}
+                                onValueChange={(next) => setCardinality(next as "one" | "many")}
+                            />
+                        )}
+                    </div>
+                </>
             ) : null}
             {hasOptions(kind) ? (
                 <div className="flex flex-col gap-1.5 text-[0.8125rem]">

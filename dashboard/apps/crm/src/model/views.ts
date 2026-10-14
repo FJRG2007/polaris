@@ -56,8 +56,9 @@ export function aggregatesFor(kind: FieldKind): readonly Aggregate[] {
 }
 
 /** Whether rows can be ordered by a kind of field. */
-export function sortable(kind: FieldKind): boolean {
-    return kind !== "member";
+export function sortable(kind: FieldKind, field?: FieldDef): boolean {
+    // A relation somebody added holds a list, which has no one name to sort by.
+    return kind !== "member" && !(field?.kind === "relation" && field.custom);
 }
 
 export const COLUMN_WIDTH = { min: 80, max: 640 } as const;
@@ -183,7 +184,7 @@ export function readConfig(
     for (const entry of parsed.data.sorts ?? []) {
         const sort = sortSchema.safeParse(entry);
         const field = sort.success ? fieldOf(object, sort.data.key, custom) : undefined;
-        if (!sort.success || !field || !sortable(field.kind)) continue;
+        if (!sort.success || !field || !sortable(field.kind, field)) continue;
         if (sorts.some((existing) => existing.key === sort.data.key)) continue;
         if (sorts.length < MAX_SORTS) sorts.push(sort.data);
     }

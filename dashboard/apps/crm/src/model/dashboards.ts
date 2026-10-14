@@ -26,8 +26,17 @@ export const MAX_BUCKETS = 400;
 export const CHART_KINDS = ["number", "bar", "line", "donut"] as const;
 export type ChartKind = (typeof CHART_KINDS)[number];
 
-export const MEASURES = ["count", "sum", "avg", "min", "max"] as const;
+/** "weighted" is an opportunity amount times its stage's odds (`model/forecast`):
+ *  won in full, lost not at all. */
+export const MEASURES = ["count", "sum", "avg", "min", "max", "weighted"] as const;
 export type Measure = (typeof MEASURES)[number];
+
+/** The measures a kind of record offers: only a deal has stage odds to weigh by. */
+export function measuresOf(object: CrmObject): readonly Measure[] {
+    return object === "opportunities"
+        ? MEASURES
+        : MEASURES.filter((measure) => measure !== "weighted");
+}
 
 export const GRANULARITIES = ["day", "week", "month", "quarter", "year"] as const;
 export type Granularity = (typeof GRANULARITIES)[number];
@@ -81,7 +90,8 @@ export function categorical(field: FieldDef): boolean {
         (field.kind === "select" && (field.options?.length ?? 0) > 0) ||
         field.kind === "boolean" ||
         field.kind === "member" ||
-        field.kind === "relation"
+        // A relation somebody added holds a list, not one group.
+        (field.kind === "relation" && !field.custom)
     );
 }
 
@@ -89,8 +99,20 @@ export function dated(field: FieldDef): boolean {
     return field.kind === "date" || field.kind === "dateTime";
 }
 
-export function measureFields(object: CrmObject, custom: readonly FieldDef[] = []): FieldDef[] {
-    return fieldsOf(object, custom).filter(measurable);
+/** Whether a field is an amount of money: odds weigh an amount, not a head
+ *  count or a score. */
+export function isAmount(field: FieldDef): boolean {
+    return field.kind === "money" || field.kind === "currency";
+}
+
+export function measureFields(
+    object: CrmObject,
+    custom: readonly FieldDef[] = [],
+    measure?: Measure
+): FieldDef[] {
+    return fieldsOf(object, custom).filter((field) =>
+        measure === "weighted" ? isAmount(field) : measurable(field)
+    );
 }
 
 export function splitFields(
@@ -135,6 +157,8 @@ export function readWidget(widget: Widget, custom: readonly FieldDef[]): Widget 
     if (widget.field !== null) {
         const field = all.find((one) => one.key === widget.field);
         if (!field || !measurable(field)) return null;
+        if (!measuresOf(widget.object).includes(widget.measure)) return null;
+        if (widget.measure === "weighted" && !isAmount(field)) return null;
         // An amount is counted in one currency: adding euros to dollars is no figure.
         if ((field.kind === "currency") !== (widget.currency !== null)) return null;
     }
@@ -269,5 +293,8 @@ export function measureOf(tally: Tally, measure: Measure): number | null {
             return tally.min;
         case "max":
             return tally.max;
+        case "weighted":
+            // The sum was already weighed row by row where it was counted.
+            return tally.counted === 0 ? null : round(tally.sum);
     }
 }

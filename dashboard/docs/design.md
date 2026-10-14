@@ -162,8 +162,10 @@ packages/ui/src/tailwind-preset.ts  the tokens as Tailwind scales
 packages/ui/src/components/         the primitives built on them
 packages/ui/src/shell/              the application chrome
 packages/ui/src/automation/         the automation editor every app shares: the WHEN / IF /
-                                     THEN form, the diagram, and the graph model under both
-                                     (Places' automations, Mail's filters)
+                                     THEN form, the diagram, the graph model under both, and
+                                     the rule list / run log pieces (`rules.tsx`) a screen
+                                     draws its rules and their run history with (Places'
+                                     automations, Mail's filters, CRM's workflows)
 apps/web/src/app/globals.css        the webfonts, the Overview grid, syntax highlighting,
                                      React Flow's base styles for apps that draw diagrams
 apps/web/src/fonts/                 the typeface, and its licence

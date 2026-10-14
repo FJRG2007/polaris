@@ -24,6 +24,7 @@ import { SLOT_FAMILIES, slotFamily, type CrmObject, type FieldDef } from "../mod
 import {
     choiceChanges,
     customDef,
+    fixedOptions,
     validStored,
     type ChoiceRename,
     type CustomField,
@@ -82,10 +83,11 @@ function sameLabel(fields: readonly CustomField[], label: string, except?: strin
 }
 
 /** The value a slot holds when nothing is set. */
-function emptySlot(slot: string): string | boolean | null {
+function emptySlot(slot: string): string | boolean | null | [] {
     const family = slot.replace(/\d+$/, "");
     if (family === "cText") return "";
     if (family === "cBool") return false;
+    if (family === "cRel") return [];
     return null;
 }
 
@@ -218,8 +220,9 @@ export async function updateField(
     const field = existing.find((one) => one.id === id);
     if (!field || field.kind !== input.kind) return refuse("fieldMissing");
     if (sameLabel(existing, input.label, id)) await refuse("fieldNameTaken");
-    // An amount keeps the currency it was made with: its figures were typed in it.
-    if (field.kind === "money") input = { ...input, options: [...field.options] };
+    // An amount keeps the currency it was made with: its figures were typed in
+    // it. A relation keeps what it links to and how many: its ids name those.
+    if (fixedOptions(field.kind)) input = { ...input, options: [...field.options] };
     const { renamed, removed } = choiceChanges(field.options, input.options, renames);
     if (removed.length > 0) await requireCan(actor, object, "delete");
     const before = existing.map(customDef);

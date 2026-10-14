@@ -7,7 +7,7 @@
  */
 
 import { readChoices, readLinks } from "./values";
-import type { FieldDef, FieldValue, FullName, Money } from "./objects";
+import type { FieldDef, FieldValue, FullName, Money, Ref } from "./objects";
 
 /** Where a cell begins a formula in a spreadsheet: such a cell is written as
  *  text, so a value somebody typed never runs as one when the file is opened. */
@@ -33,6 +33,9 @@ export function csvValue(field: FieldDef, value: FieldValue | undefined): string
         }
         case "member":
         case "relation":
+            // A relation somebody added: its records' names, "; " between them,
+            // the form an import reads back.
+            if (Array.isArray(value)) return value.map((ref: Ref) => ref.name).join("; ");
             return (value as { name: string }).name;
         case "boolean":
             return value ? "true" : "false";

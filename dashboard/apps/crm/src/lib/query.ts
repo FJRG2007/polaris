@@ -151,6 +151,9 @@ function sortOrder(spec: ColumnSpec, direction: "asc" | "desc"): Record<string, 
             return [order(spec.amount, direction)];
         case "ref":
             return [{ [spec.relation]: { [REF_ORDER[spec.target]!]: direction } }];
+        // A list of linked records has no one name to order by.
+        case "refs":
+            return [];
     }
 }
 

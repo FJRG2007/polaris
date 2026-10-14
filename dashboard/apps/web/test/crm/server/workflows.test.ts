@@ -124,6 +124,7 @@ vi.mock("@polaris/app-host", () => ({
 vi.mock("@polaris-app/crm/src/lib/fields", () => ({ loadFields: async () => [] }));
 
 import * as workflows from "@polaris-app/crm/src/lib/workflows";
+import * as model from "@polaris-app/crm/src/model/workflows";
 import type { ViewFilter } from "@polaris-app/crm/src/model/filters";
 import { createHash } from "node:crypto";
 import { POST as hook } from "@polaris-app/crm/src/routes/api/crm/hooks/[secret]/route";
@@ -340,17 +341,27 @@ describe("running on record changes", () => {
         expect(call.data.lastError).toMatch(/.+/);
     });
 
-    it("reads nothing for a change no trigger can match, and nothing from inside a run", async () => {
+    it("reads nothing for a change no trigger can match", async () => {
         await workflows.onRecordEvents(actorWith(allowed), "companies", [
             { recordId: RECORD, kind: "restored" }
         ]);
         expect(db.crmWorkflow.findMany).not.toHaveBeenCalled();
+    });
+
+    it("sets nothing off from inside a run, but wakes the runs waiting for the record", async () => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([stored({ kind: "created" })]);
         await workflows.withinWorkflow(() =>
             workflows.onRecordEvents(actorWith(allowed), "companies", [
                 { recordId: RECORD, kind: "created", changes: [] }
             ])
         );
-        expect(db.crmWorkflow.findMany).not.toHaveBeenCalled();
+        expect(crmHost.crmRunner).not.toHaveBeenCalled();
+        expect(db.crmWorkflowRun.create).not.toHaveBeenCalled();
+        expect(db.crmWorkflowRun.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ recordId: { in: [RECORD] }, status: "waiting" })
+            })
+        );
     });
 });
 
@@ -1336,5 +1347,140 @@ describe("a call out", () => {
         db.crmWorkflow.update.mockClear();
         crmHost.crmPostJson.mockResolvedValueOnce({ failed: "unreachable" });
         expect(await runOn()).toBeTruthy();
+    });
+});
+
+describe("waiting for the record to match", () => {
+    const RUN = "77777777-7777-4777-8777-777777777777";
+    const record = { id: RECORD, name: "Acme", city: "", position: 0, deletedAt: null, ...stamp };
+    const when = {
+        conjunction: "and",
+        rules: [{ id: "r1", key: "city", operator: "is", value: "Madrid" }]
+    };
+    const cityChange = { key: "city", before: "", after: "Madrid" };
+    const flow = (onTimeout: "stop" | "continue" = "stop") => [
+        { kind: "waitFor", when, days: 7, onTimeout },
+        { kind: "updateRecord", values: { city: "after" } }
+    ];
+    const waitingRun = (waitUntil: Date, onTimeout: "stop" | "continue" = "stop") => ({
+        id: RUN,
+        status: "waiting",
+        resumeAt: waitUntil,
+        waitUntil,
+        recordId: RECORD,
+        step: 0,
+        body: null,
+        actions: JSON.stringify(flow(onTimeout)),
+        workflow: stored({ kind: "updated" }, { actions: JSON.stringify(flow(onTimeout)) })
+    });
+    const ended = () =>
+        (
+            db.crmWorkflowRun.updateMany.mock.calls as unknown as [
+                { where: { status: string }; data: Record<string, unknown> }
+            ][]
+        )
+            .map(([call]) => call)
+            .filter((call) => call.where.status === "running");
+
+    beforeEach(() => {
+        db.records.findFirst.mockResolvedValue(record);
+        db.records.findMany.mockResolvedValue([record]);
+    });
+
+    it("waits at that action, for up to its days, when the record does not match yet", async () => {
+        db.records.count.mockResolvedValue(0);
+        const before = Date.now();
+        await workflows.runWorkflow(
+            stored({ kind: "updated" }, { actions: JSON.stringify(flow()) }),
+            {
+                object: "companies",
+                recordId: RECORD,
+                event: null
+            }
+        );
+        const [waiting] = ended();
+        expect(waiting!.data).toMatchObject({ status: "waiting", step: 0 });
+        const until = (waiting!.data.waitUntil as Date).getTime();
+        expect(until).toBeGreaterThanOrEqual(before + 7 * 86_400_000);
+        expect((waiting!.data.resumeAt as Date).getTime()).toBe(until);
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("goes straight on when the record already matches", async () => {
+        db.records.count.mockResolvedValue(1);
+        await workflows.runWorkflow(
+            stored({ kind: "updated" }, { actions: JSON.stringify(flow()) }),
+            {
+                object: "companies",
+                recordId: RECORD,
+                event: null
+            }
+        );
+        expect(ended()[0]!.data).toMatchObject({ status: "done", waitUntil: null });
+        expect(db.records.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes on as soon as a change makes the record match", async () => {
+        db.records.count.mockResolvedValue(1);
+        const until = new Date(Date.now() + 86_400_000);
+        db.crmWorkflow.findMany.mockResolvedValueOnce([stored({ kind: "deleted" })]);
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([waitingRun(until)]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            { recordId: RECORD, kind: "updated", changes: [cityChange] }
+        ]);
+        expect(db.crmWorkflowRun.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    workflowId: { in: [FLOW] },
+                    recordId: { in: [RECORD] },
+                    status: "waiting",
+                    waitUntil: { not: null }
+                }
+            })
+        );
+        expect(db.crmWorkflowRun.updateMany).toHaveBeenCalledWith({
+            where: { id: RUN, status: "waiting", resumeAt: until },
+            data: expect.objectContaining({ status: "running" })
+        });
+        expect(db.records.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ data: expect.objectContaining({ city: "after" }) })
+        );
+        expect(ended().at(-1)!.data).toMatchObject({ status: "done" });
+    });
+
+    it("waits on until the same time when a change leaves it not matching", async () => {
+        db.records.count.mockResolvedValue(0);
+        const until = new Date(Date.now() + 86_400_000);
+        db.crmWorkflow.findMany.mockResolvedValueOnce([stored({ kind: "deleted" })]);
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([waitingRun(until)]);
+        await workflows.onRecordEvents(actorWith(allowed), "companies", [
+            { recordId: RECORD, kind: "updated", changes: [cityChange] }
+        ]);
+        expect(ended().at(-1)!.data).toMatchObject({
+            status: "waiting",
+            step: 0,
+            resumeAt: until,
+            waitUntil: until
+        });
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("ends the run once the wait is up, or goes on when told to", async () => {
+        db.records.count.mockResolvedValue(0);
+        const lapsed = new Date(Date.now() - 1_000);
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([waitingRun(lapsed)]);
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
+        expect(ended().at(-1)!.data).toMatchObject({ status: "stopped" });
+        expect(db.records.updateMany).not.toHaveBeenCalled();
+
+        db.crmWorkflowRun.findMany.mockResolvedValueOnce([waitingRun(lapsed, "continue")]);
+        expect(await workflows.resumeWaitingRuns(new Date())).toBe(1);
+        expect(ended().at(-1)!.data).toMatchObject({ status: "done" });
+        expect(db.records.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("is offered only under a trigger about one record", () => {
+        expect(model.actionFits("waitFor", "updated")).toBe(true);
+        expect(model.actionFits("waitFor", "schedule")).toBe(false);
     });
 });
