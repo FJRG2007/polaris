@@ -1384,5 +1384,32 @@
         "unreachable": "Polaris no pudo conectar con ese servidor. Comprueba que está encendido y vuelve a intentarlo.",
         "move": "Mover datos",
         "moveHint": "Mueve los datos de un servicio a un NAS u otra ubicación."
+    },
+    "storageMove": {
+        "moving": "Moviendo a {target}",
+        "movedTo": "Movido a {target}",
+        "thisServer": "este servidor",
+        "phase": {
+            "queued": "en cola",
+            "stopping": "parando la app",
+            "counting": "midiendo los datos",
+            "copying": "copiando {copied} de {total}",
+            "copyingUnknown": "copiando",
+            "verifying": "comprobando la copia",
+            "switching": "cambiando la app",
+            "starting": "arrancando la app",
+            "waiting": "movido, el original sigue aquí",
+            "cleaning": "borrando el original",
+            "rolling-back": "deshaciendo"
+        },
+        "banner": {
+            "inProgress": "{volume} se está moviendo a {target}: {phase}.",
+            "freesAfter": "El espacio vuelve al terminar.",
+            "freesAfterAnswer": "El espacio vuelve al borrar el original tras el movimiento.",
+            "waiting": "{volume} se movió a {target}, pero el original aún ocupa {size} aquí.",
+            "waitingNoSize": "{volume} se movió a {target}, pero el original sigue aquí.",
+            "removeOriginal": "Borrar original",
+            "askAdmin": "Un administrador puede borrarlo en Almacenamiento."
+        }
     }
 }

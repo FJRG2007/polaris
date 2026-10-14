@@ -110,7 +110,8 @@ export function AppShell({
  * written in the attribute - they resolve by stylesheet order, so the override
  * silently loses and a two-column screen comes out stacked.
  */
-export const PAGE_FILL = "h-[calc(100dvh-var(--header-height)-var(--page-inset))] overflow-hidden";
+export const PAGE_FILL =
+    "h-[calc(100dvh-var(--header-height)-var(--notice-height)-var(--page-inset))] overflow-hidden";
 
 /**
  * A screen that fills what is left of the window edge to edge, with no margin
@@ -135,7 +136,21 @@ export const PAGE_FILL = "h-[calc(100dvh-var(--header-height)-var(--page-inset))
  * scrollbar in it and a second one on the window moves all of its panes at once.
  */
 export const PAGE_BLEED =
-    "page-bleed -m-3 h-[calc(100dvh-var(--header-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
+    "page-bleed -m-3 h-[calc(100dvh-var(--header-height)-var(--notice-height))] overflow-hidden sm:-m-4 md:-mx-6 md:-my-5";
+
+/**
+ * The strip above a page for the shell's own notices - a disk warning, a refused
+ * link. It sits in main's top padding and gives that padding back below itself,
+ * so a page under it starts where it would have and a PAGE_BLEED screen's
+ * negative margin stops at the notices instead of sliding under them.
+ *
+ * Whoever renders it publishes its height as `--notice-height` on the root, and
+ * PAGE_FILL and PAGE_BLEED subtract it: a screen that fills the window is that
+ * much shorter while a notice is up, rather than pushed off the bottom of a
+ * window that does not scroll. Empty, it is not drawn and takes no room.
+ */
+export const PAGE_NOTICES =
+    "flex flex-col gap-2 empty:hidden -mx-3 -mt-3 mb-3 px-3 pb-2 pt-3 sm:-mx-4 sm:-mt-4 sm:mb-4 sm:px-4 md:-mx-6 md:-mt-5 md:mb-5 md:px-6";
 
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.

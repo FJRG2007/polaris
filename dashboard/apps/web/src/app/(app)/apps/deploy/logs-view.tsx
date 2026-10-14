@@ -101,7 +101,7 @@ export function LogsView({
                     serviceIds={serviceIds}
                     historyIds={historyIds}
                     name={`${environmentName}-logs`}
-                    className="h-[calc(100dvh-21rem)] min-h-[24rem]"
+                    className="h-[calc(100dvh-21rem-var(--notice-height))] min-h-[24rem]"
                     followNote={
                         watched.length > followed.length
                             ? t("logs.capped", { count: MAX_FOLLOWED })

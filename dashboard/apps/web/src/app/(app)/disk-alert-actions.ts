@@ -14,6 +14,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { runScheduledJob } from "@/lib/cron/scheduler";
 import { requireUser, sessionCan, type SessionUser } from "@/lib/session";
+import { activeMoves, type ActiveMoveView } from "@/lib/storage-moves/service";
 import {
     freeDiskSpace,
     keepDiskReading,
@@ -42,6 +43,18 @@ export async function diskAlertsAction(): Promise<DiskReading[]> {
         if (Array.isArray(watched)) readings = watched as DiskReading[];
     }
     return readings.filter((one) => one.level !== "ok");
+}
+
+/**
+ * The data moves still under way, so a warning about a disk can say that room is
+ * on its way back - or that it is not, until somebody removes the original.
+ * Whether the reader may answer that is the storage screen's rule (admins).
+ */
+export async function diskMovesAction(): Promise<{ moves: ActiveMoveView[]; canAnswer: boolean }> {
+    const user = await manager();
+    if (!user) return { moves: [], canAnswer: false };
+    const moves = await activeMoves().catch(() => []);
+    return { moves, canAnswer: user.isAdmin };
 }
 
 /** Free what Polaris can on one machine, and read its disk again. */

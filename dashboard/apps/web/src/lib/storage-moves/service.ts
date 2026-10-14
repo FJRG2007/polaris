@@ -465,6 +465,97 @@ export async function listMoves(): Promise<MoveView[]> {
     });
 }
 
+/** A move still under way, or waiting for somebody to say what happens to the
+ *  original, as the servers screen and the disk warning show it. */
+export interface ActiveMoveView {
+    readonly id: string;
+    readonly phase: plan.MovePhase;
+    readonly volumeName: string;
+    readonly appName: string;
+    readonly targetLabel: string;
+    readonly totalBytes: number | null;
+    readonly copiedBytes: number | null;
+    readonly percent: number | null;
+    /** The machine whose disk the original is on, or null for one on a NAS. */
+    readonly machine: string | null;
+    /** The containers a move runs, as the volumes list names their holders. */
+    readonly containers: readonly string[];
+    /** The docker name of the original, once the copy found it. */
+    readonly dockerName: string | null;
+    /** Polaris started it, and empties the original itself once the app runs on
+     *  the copy; otherwise the original waits for a person. */
+    readonly auto: boolean;
+}
+
+/**
+ * Every move that is not over, newest first. A move that reached `moved` is here
+ * too: its original still holds every byte until somebody answers, so the disk
+ * it is on gets nothing back until then.
+ */
+export async function activeMoves(): Promise<ActiveMoveView[]> {
+    const rows = await prisma.storageMove.findMany({
+        where: { state: { in: [...plan.BLOCKING_STATES] } },
+        select: {
+            id: true,
+            state: true,
+            volumeId: true,
+            applicationId: true,
+            origin: true,
+            targetLabel: true,
+            auto: true,
+            totalBytes: true,
+            copiedBytes: true
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20
+    });
+    if (rows.length === 0) return [];
+    const [apps, volumes] = await Promise.all([
+        prisma.application.findMany({
+            where: { id: { in: [...new Set(rows.map((row) => row.applicationId))] } },
+            select: { id: true, name: true, target: { select: { kind: true, hostId: true } } }
+        }),
+        prisma.volume.findMany({
+            where: { id: { in: [...new Set(rows.map((row) => row.volumeId))] } },
+            select: { id: true, name: true }
+        })
+    ]);
+    const appOf = new Map(apps.map((app) => [app.id, app]));
+    const volumeName = new Map(volumes.map((volume) => [volume.id, volume.name]));
+    return rows.flatMap((row) => {
+        const state = plan.isMoveState(row.state) ? row.state : null;
+        const total = row.totalBytes === null ? null : Number(row.totalBytes);
+        const copied = row.copiedBytes === null ? null : Number(row.copiedBytes);
+        const phase = state ? plan.movePhase(state, total, copied) : null;
+        if (!phase) return [];
+        let origin: plan.Placement | null = null;
+        try {
+            origin = plan.parsePlacement(row.origin);
+        } catch {
+            origin = null;
+        }
+        const app = appOf.get(row.applicationId);
+        const copier = plan.copierName(row.id);
+        return [
+            {
+                id: row.id,
+                phase,
+                volumeName: volumeName.get(row.volumeId) ?? "",
+                appName: app?.name ?? "",
+                targetLabel: row.targetLabel,
+                totalBytes: total,
+                copiedBytes: copied,
+                percent: phase === "copying" ? plan.progressPercent(copied, total) : null,
+                machine:
+                    origin && origin.kind !== "nas" && app?.target ? machineOf(app.target) : null,
+                containers: [copier, `${copier}-clean`],
+                dockerName: recordedDockerName(row.origin) ?? null,
+                auto: row.auto
+            }
+        ];
+    });
+}
+
 /** The app a volume belongs to, or null. */
 export async function volumeApplication(volumeId: string): Promise<string | null> {
     const row = await prisma.volume.findUnique({
@@ -987,7 +1078,11 @@ async function copy(context: MoveContext): Promise<void> {
         const spec = plan.copySpec(context.row.id, context.origin, context.destination, dockerName);
         const { exitCode, log } = await runOneShot(context, ports, spec, async (name) => {
             const report = plan.parseCopyLog(await logsOf(ports, name));
-            const copied = await ports.diskUsage(name, "/to");
+            // Once the copy printed its own figures there is nothing left to measure.
+            const copied = plan.copiedSoFar(
+                report.copiedBytes === undefined ? await ports.diskUsage(name, "/to") : null,
+                report
+            );
             await prisma.storageMove.update({
                 where: { id: context.row.id },
                 data: {

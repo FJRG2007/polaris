@@ -28,6 +28,7 @@ import {
 } from "@/lib/deploy/host-space";
 import { ImageStoreBusy } from "@/lib/deploy/image-store-lock";
 import { autoRemoveOn, setAutoRemove } from "@/lib/deploy/leftover-volumes";
+import { activeMoves, type ActiveMoveView } from "@/lib/storage-moves/service";
 import { hostVolumes, removeHostVolume, type HostVolume } from "@/lib/deploy/host-volumes";
 import {
     removeStrayContainer,
@@ -640,6 +641,17 @@ export async function reclaimBuildCacheAction(): Promise<{ freed?: number; error
 export async function hostVolumesAction(): Promise<HostVolume[] | null> {
     await requirePermission("system.manage");
     return hostVolumes().catch(() => null);
+}
+
+/** The data moves still under way, so a volume a copier holds reads as moving. */
+export async function volumeMovesAction(): Promise<{
+    moves: ActiveMoveView[];
+    canAnswer: boolean;
+} | null> {
+    const user = await requirePermission("system.manage");
+    const moves = await activeMoves().catch(() => null);
+    // Removing an original is the storage screen's call, and that screen is admins'.
+    return moves ? { moves, canAnswer: user.isAdmin } : null;
 }
 
 /**

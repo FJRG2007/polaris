@@ -100,7 +100,7 @@ export function InboxView({
     );
 
     return (
-        <div className="flex h-[calc(100dvh-8rem)] flex-col gap-3">
+        <div className="flex h-[calc(100dvh-8rem-var(--notice-height))] flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("inbox.view.title")}

@@ -37,6 +37,7 @@ import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { ownStatus, presenceChoiceOf } from "@/lib/presence-service";
 import { ViewAsBanner } from "@/components/view-as-banner";
 import { DiskAlertBanner } from "@/components/disk-alert-banner";
+import { PageNotices } from "@/components/page-notices";
 import { AppNavDrawer } from "@/components/app-nav-drawer";
 import { GuidedTours } from "@/components/tours/guided-tours";
 import { ScopeSwitcher } from "@/components/scope-switcher";
@@ -501,11 +502,13 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                         </>
                                                                                     }
                                                                                 >
-                                                                                    <DeniedNotice />
-                                                                                    {user.isAdmin &&
-                                                                                    !user.viewingAs ? (
-                                                                                        <DiskAlertBanner />
-                                                                                    ) : null}
+                                                                                    <PageNotices>
+                                                                                        <DeniedNotice />
+                                                                                        {user.isAdmin &&
+                                                                                        !user.viewingAs ? (
+                                                                                            <DiskAlertBanner />
+                                                                                        ) : null}
+                                                                                    </PageNotices>
                                                                                     <RouteSkeletonCapture>
                                                                                         {children}
                                                                                     </RouteSkeletonCapture>

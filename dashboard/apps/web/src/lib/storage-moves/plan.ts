@@ -266,26 +266,34 @@ export const COPY_EXIT = {
  * and compares a manifest of every path and its size on both sides. `cp`'s own
  * status is not trusted either way: a share that cannot keep an owner reports a
  * failure for a copy that is complete, and the manifest is the real answer.
+ *
+ * Every byte figure is printed with `%.0f`, never `%d`: busybox awk's `%d` is a
+ * 32-bit int and printed -2147483648 for anything past 2 GiB, which made the room
+ * check meaningless. The room check is made in awk too, whose numbers are doubles
+ * (exact to 2^53), not with `[ -lt ]`, whose width depends on how the shell was
+ * built; a free figure `df` would not give refuses nothing, as before. The copy's
+ * own figures are printed as soon as `cp` ends, before the manifests, so the
+ * screen can tell copying from checking.
  */
 export function copyScript(): string {
     const manifest =
         "find . ! -type d -exec stat -c '%s %n' {} + | LC_ALL=C sort | md5sum | cut -d' ' -f1";
-    const bytes = "find . -type f -exec stat -c %s {} + | awk '{s+=$1} END {printf \"%d\", s}'";
+    const bytes = "find . -type f -exec stat -c %s {} + | awk '{s+=$1} END {printf \"%.0f\", s}'";
     return [
         "cd /from || exit 10",
         "files=$(find . ! -type d | wc -l)",
         `total=$(${bytes})`,
         'echo "POLARIS_SOURCE files=$files bytes=$total"',
-        "free=$(df -Pk /to | awk 'NR==2 {printf \"%d\", $4*1024}')",
+        "free=$(df -Pk /to | awk 'NR==2 {printf \"%.0f\", $4*1024}')",
         'echo "POLARIS_FREE bytes=$free"',
-        'if [ "$free" -lt "$total" ]; then exit 4; fi',
+        `if awk -v f="$free" -v t="$total" 'BEGIN {exit !(f != "" && f+0 < t+0)}'; then exit 4; fi`,
         "find /to -mindepth 1 -delete || exit 11",
         "cp -a /from/. /to/ 2>/tmp/copy.err",
-        `a=$(cd /from && ${manifest})`,
-        `b=$(cd /to && ${manifest})`,
         "tofiles=$(cd /to && find . ! -type d | wc -l)",
         `tobytes=$(cd /to && ${bytes})`,
         'echo "POLARIS_COPY files=$tofiles bytes=$tobytes"',
+        `a=$(cd /from && ${manifest})`,
+        `b=$(cd /to && ${manifest})`,
         'if [ "$a" != "$b" ]; then echo "POLARIS_MISMATCH"; head -c 600 /tmp/copy.err; exit 3; fi',
         'echo "POLARIS_VERIFIED"',
         "exit 0"
@@ -401,4 +409,52 @@ export function progressPercent(
         return null;
     if (total <= 0) return 100;
     return Math.max(0, Math.min(99, Math.floor((copied / total) * 100)));
+}
+
+/**
+ * What the copied figure should read while the copier is still going. Until `cp`
+ * ends, `du` of the destination is the only measure, and it counts blocks, so it
+ * can pass the original's byte total before the copy is done; it is held one byte
+ * under the total, so "all of it is copied" is only ever said by the copy itself
+ * once it printed its own figures. Null when there is nothing to record, or when
+ * the original is empty and no figure can sit under its total.
+ */
+export function copiedSoFar(du: number | null, report: CopyReport): number | null {
+    if (report.copiedBytes !== undefined) return report.copiedBytes;
+    if (du === null) return null;
+    if (report.sourceBytes === undefined) return du;
+    if (report.sourceBytes <= 0) return null;
+    return Math.max(0, Math.min(du, report.sourceBytes - 1));
+}
+
+/** The step of a move a person is told about. `copying` splits in three:
+ *  measuring the original, copying it, and checking the copy against it. */
+export type MovePhase =
+    | "queued"
+    | "stopping"
+    | "counting"
+    | "copying"
+    | "verifying"
+    | "switching"
+    | "starting"
+    | "waiting"
+    | "cleaning"
+    | "rolling-back";
+
+/**
+ * The phase of a move still under way, or null for one that ended. The copy is
+ * being checked once the copied figure reached the total, which only the copy's
+ * own report can make it do (see `copiedSoFar`).
+ */
+export function movePhase(
+    state: MoveState,
+    total: number | null | undefined,
+    copied: number | null | undefined
+): MovePhase | null {
+    if (state === "finished" || state === "failed") return null;
+    if (state === "moved") return "waiting";
+    if (state !== "copying") return state;
+    if (total === null || total === undefined) return "counting";
+    if (copied !== null && copied !== undefined && copied >= total) return "verifying";
+    return "copying";
 }

@@ -1384,5 +1384,32 @@
         "unreachable": "Polaris could not reach that server. Check that it is on and try again.",
         "move": "Move data",
         "moveHint": "Move a service's data to a NAS or another location."
+    },
+    "storageMove": {
+        "moving": "Moving to {target}",
+        "movedTo": "Moved to {target}",
+        "thisServer": "this server",
+        "phase": {
+            "queued": "waiting to start",
+            "stopping": "stopping the app",
+            "counting": "measuring the data",
+            "copying": "copying {copied} of {total}",
+            "copyingUnknown": "copying",
+            "verifying": "checking the copy",
+            "switching": "switching the app over",
+            "starting": "starting the app",
+            "waiting": "moved, original still here",
+            "cleaning": "removing the original",
+            "rolling-back": "putting it back"
+        },
+        "banner": {
+            "inProgress": "{volume} is moving to {target}: {phase}.",
+            "freesAfter": "Its space here comes back when the move finishes.",
+            "freesAfterAnswer": "Its space here comes back once the original is removed after the move.",
+            "waiting": "{volume} moved to {target}, but its original still uses {size} here.",
+            "waitingNoSize": "{volume} moved to {target}, but its original is still here.",
+            "removeOriginal": "Remove original",
+            "askAdmin": "An administrator can remove it in Storage."
+        }
     }
 }

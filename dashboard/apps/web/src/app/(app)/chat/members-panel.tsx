@@ -491,7 +491,9 @@ export function MemberRow({
                         )}
                     >
                         <Headphones aria-hidden="true" className="size-3 shrink-0" />
-                        <span className="min-w-0 truncate">{t("members.inVoice")}</span>
+                        <span className="min-w-0 truncate" title={inVoice}>
+                            {t("members.inVoice")}
+                        </span>
                     </Link>
                 )}
             </div>
