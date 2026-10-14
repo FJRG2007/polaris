@@ -102,6 +102,10 @@ vi.mock("@polaris/db", () => {
                 applicationsCreated += 1;
                 return { id: "never" };
             }
+        },
+        // An uninstall takes the access people were given to the app with it.
+        resourceGrant: {
+            deleteMany: async () => ({ count: 0 })
         }
     };
     return { prisma };
