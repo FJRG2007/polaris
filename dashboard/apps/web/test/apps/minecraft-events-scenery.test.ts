@@ -67,8 +67,7 @@ const KINDS: readonly { kind: catalog.EventKind; options?: Record<string, unknow
     { kind: "downhill-race" },
     { kind: "elytra-race" },
     { kind: "spleef" },
-    { kind: "tnt-run" },
-    { kind: "nether-maze" }
+    { kind: "tnt-run" }
 ];
 
 interface Case {
@@ -107,7 +106,7 @@ function cellMap(boxes: readonly stage.Box[]): Map<string, { block: string; inde
 }
 
 describe("the biome scenery round an event in the sky", () => {
-    it("is drawn round every kind built in the sky but acid rain and the dropper", () => {
+    it("is drawn round every open-air kind built in the sky, never an enclosed one", () => {
         for (const one of cases) expect(one.outer, one.name).not.toBeNull();
         // A dropper's shaft is too tall to prove a ring round it cheaply: bare.
         const dropper = run("dropper");
@@ -116,6 +115,12 @@ describe("the biome scenery round an event in the sky", () => {
         const acid = run("acid-rain");
         expect(stageService.stageSceneryVolume(acid, SITE)).toBeNull();
         expect(stageService.stageScenery(acid, SITE, ERAS[2]!)).toEqual([]);
+        // A nether maze is roofed and walled: nobody inside would see a ring.
+        for (let seed = 0; seed < SEEDS; seed++) {
+            const maze = run("nether-maze", undefined, `run-${seed}`);
+            expect(stageService.stageSceneryVolume(maze, SITE)).toBeNull();
+            expect(stageService.stageScenery(maze, SITE, ERAS[2]!)).toEqual([]);
+        }
     });
 
     it("lists every block it can be among those a stage's state keeps", () => {
@@ -227,11 +232,6 @@ describe("the biome scenery round an event in the sky", () => {
             ).every((boxes) => boxes.some((box) => box.block === block) || boxes.length === 0);
         expect(has("jungle", "minecraft:jungle_leaves[persistent=true]")).toBe(true);
         expect(has("nether", "minecraft:netherrack")).toBe(true);
-        expect(
-            stageService
-                .stageScenery(run("nether-maze"), SITE, ERAS[2]!)
-                .every((box) => !box.block.includes("jungle") && !box.block.includes("purpur"))
-        ).toBe(true);
     });
 
     it("never shares a block with the season's dressing", () => {

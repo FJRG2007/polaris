@@ -123,15 +123,17 @@ export function RunCommandDialog({
         uses.custom.map((declared) => {
             const raw = values[declared.name] ?? "";
             if (raw.trim().length === 0) return [declared.name, null];
-            const checked = vars.valueSchema(declared.type).safeParse(raw);
+            const checked = vars.runValueSchema(declared).safeParse(raw);
             return [
                 declared.name,
                 checked.success ? null : (checked.error.issues[0]?.message ?? null)
             ];
         })
     );
+    // Left empty, a value with a default is sent with the default.
     const missing = uses.custom.some(
-        (declared) => (values[declared.name] ?? "").trim().length === 0
+        (declared) =>
+            declared.initial.length === 0 && (values[declared.name] ?? "").trim().length === 0
     );
     const playerProblem =
         uses.perPlayer && !every && player.trim().length > 0
@@ -277,7 +279,9 @@ export function RunCommandDialog({
                         const caption = (
                             <span className="text-sm font-medium">
                                 {declared.label}
-                                <span aria-hidden="true"> *</span>
+                                {declared.initial.length === 0 && (
+                                    <span aria-hidden="true"> *</span>
+                                )}
                                 <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
                                     {`{${declared.name}}`}
                                 </span>
@@ -312,7 +316,8 @@ export function RunCommandDialog({
                                     inputMode={declared.type === "number" ? "decimal" : undefined}
                                     maxLength={vars.MAX_VARIABLE_VALUE}
                                     className={declared.type === "item" ? "font-mono" : undefined}
-                                    aria-required="true"
+                                    placeholder={declared.initial || undefined}
+                                    aria-required={declared.initial.length === 0 ? true : undefined}
                                     aria-invalid={problems[declared.name] ? true : undefined}
                                     onChange={(event) => set(event.target.value)}
                                 />

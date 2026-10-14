@@ -28,6 +28,7 @@ import { revalidatePath } from "next/cache";
 import { schemaRefusal, vaultRefusal } from "./vault-refusal";
 import { getTranslations } from "@/lib/i18n/request";
 import * as vaultOrgs from "@/lib/vault/orgs";
+import { collectionsFor } from "@/lib/vault/sync";
 import * as ciphers from "@/lib/vault/ciphers";
 import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
@@ -169,7 +170,9 @@ export async function createOrganizationVaultAction(input: unknown): Promise<{ e
     const user = await requirePermission("vault.use");
     const parsed = core.vaultOrganizationSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable")
+        };
     }
     const access = await resolveOrgAccess(
         { id: user.id, isAdmin: user.isAdmin },
@@ -206,7 +209,9 @@ export async function createPersonalVaultAction(
     const user = await requirePermission("vault.use");
     const parsed = core.personalVaultSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.keysUnusable")
+        };
     }
     const result = await vaultOrgs.createPersonalVault({
         name: parsed.data.name,
@@ -275,7 +280,8 @@ export async function renameVaultAction(
     const gate = await administered(vaultId);
     if (!gate.ok) return { error: gate.error };
     const parsed = core.vaultNameField.safeParse(name);
-    if (!parsed.success) return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.giveItName") };
+    if (!parsed.success)
+        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.giveItName") };
     if (!(await vaultOrgs.renameVault(vaultId, parsed.data))) {
         return { error: await vaultRefusal("errors.orgVaultName") };
     }
@@ -497,14 +503,25 @@ export async function vaultCollectionsAction(
     vaultId: string
 ): Promise<{ collections?: Record<string, unknown>[]; error?: string }> {
     const user = await requirePermission("vault.use");
-    // Reading the list is for anybody who holds the key, not only for whoever
-    // administers the vault: it is how a member picks where to file.
+    // An administrator reads every collection. A member who holds the key reads
+    // the ones they were put in - it is how they pick where to file - and not the
+    // names of the rest, which is what the client API answers them too.
+    const gate = await administered(vaultId);
+    if (gate.ok) return { collections: await vaultOrgs.listOrgCollections(vaultId) };
     const standing = await vaultOrgs.standingIn(user.id, vaultId);
-    if (!standing?.confirmed) {
-        const gate = await administered(vaultId);
-        if (!gate.ok) return { error: await vaultRefusal("errors.notInVault") };
-    }
-    return { collections: await vaultOrgs.listOrgCollections(vaultId) };
+    if (!standing?.confirmed) return { error: await vaultRefusal("errors.notInVault") };
+    const mine = await collectionsFor(user.id);
+    return {
+        collections: mine
+            .filter((collection) => collection.organizationId === vaultId)
+            .map((collection) => ({
+                object: "collection",
+                id: collection.id,
+                organizationId: collection.organizationId,
+                name: collection.name,
+                externalId: collection.externalId
+            }))
+    };
 }
 
 /** Make or rename a collection. The name is encrypted under the vault's key. */
@@ -518,7 +535,8 @@ export async function saveVaultCollectionAction(
     if (collectionId !== null && !idSchema.safeParse(collectionId).success) {
         return { error: await vaultRefusal("errors.collectionMissing") };
     }
-    if (!core.isEncString(name)) return { error: await vaultRefusal("errors.collectionNameEncrypted") };
+    if (!core.isEncString(name))
+        return { error: await vaultRefusal("errors.collectionNameEncrypted") };
     const collection = collectionId
         ? await vaultOrgs.updateCollection(gate.vaultId, collectionId, name)
         : await vaultOrgs.createCollection(gate.vaultId, name);
@@ -559,7 +577,9 @@ export async function moveItemAction(
     const user = await requirePermission("vault.use");
     const parsed = core.cipherSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted") };
+        return {
+            error: await schemaRefusal(parsed.error.issues[0]?.message, "errors.itemNotEncrypted")
+        };
     }
     if (parsed.data.organizationId && collectionIds.length === 0) {
         return { error: await vaultRefusal("errors.pickCollectionMove") };

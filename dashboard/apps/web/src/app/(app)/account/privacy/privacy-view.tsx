@@ -48,20 +48,51 @@ export function PrivacyView({
     const t = useTranslations("accountPrivacy");
     const tc = useTranslations("common");
     const [draft, setDraft] = useState(settings);
+    // What the server last accepted. The profile row saves the moment it is
+    // changed, so this moves without the Save button and is what "dirty" means.
+    const [saved, setSaved] = useState(settings);
     const [saving, setSaving] = useState(false);
+    const [savingProfile, setSavingProfile] = useState(false);
     const [error, setError] = useState("");
     const [editing, setEditing] = useState<core.PrivacyField | null>(null);
     // Grows as people are picked, so a chip has a name the moment it appears
     // rather than after the page has been through the server again.
     const [named, setNamed] = useState<readonly NamedPerson[]>(people);
 
-    const dirty = JSON.stringify(draft) !== JSON.stringify(settings);
+    const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
     const save = async () => {
         setSaving(true);
         setError("");
-        await runAction(() => savePrivacyAction(draft), setError);
+        const result = await runAction(() => savePrivacyAction(draft), setError);
+        if (result && !result.error) setSaved(draft);
+        else if (result?.error) setError(result.error);
         setSaving(false);
+    };
+
+    /**
+     * Who can see the profile saves on its own, the moment it is picked: shown
+     * at once, sent on top of what the server last accepted (never the other
+     * rows' unsaved edits), and put back if the server refuses it.
+     */
+    const saveProfile = async (audience: core.PrivacyAudience) => {
+        const previous = saved.profile;
+        const rule = { ...previous, audience };
+        if (rule.audience === previous.audience || savingProfile) return;
+        setSavingProfile(true);
+        setError("");
+        setDraft((current) => ({ ...current, profile: rule }));
+        setSaved((current) => ({ ...current, profile: rule }));
+        const result = await runAction(
+            () => savePrivacyAction({ ...saved, profile: rule }),
+            setError
+        );
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            setDraft((current) => ({ ...current, profile: previous }));
+            setSaved((current) => ({ ...current, profile: previous }));
+        }
+        setSavingProfile(false);
     };
 
     const nameOf = (id: string) => named.find((person) => person.id === id)?.name ?? t("somebody");
@@ -90,21 +121,32 @@ export function PrivacyView({
                                             </span>
                                         </span>
                                         <Select
-                                            className="h-8 w-40 shrink-0 text-xs"
+                                            className="h-8 w-full shrink-0 text-xs sm:w-64"
                                             aria-label={t(`fields.${field}.label` as const)}
                                             value={draft[field].audience}
-                                            options={core.PRIVACY_AUDIENCES.map((audience) => ({
+                                            disabled={
+                                                field === "profile" && (savingProfile || saving)
+                                            }
+                                            options={(field === "profile"
+                                                ? core.PROFILE_AUDIENCES
+                                                : core.PRIVACY_AUDIENCES
+                                            ).map((audience) => ({
                                                 value: audience,
                                                 label: t(`audiences.${audience}` as const)
                                             }))}
                                             onValueChange={(value) =>
-                                                setDraft((current) => ({
-                                                    ...current,
-                                                    [field]: {
-                                                        ...current[field],
-                                                        audience: value as core.PrivacyAudience
-                                                    }
-                                                }))
+                                                field === "profile"
+                                                    ? void saveProfile(
+                                                          value as core.PrivacyAudience
+                                                      )
+                                                    : setDraft((current) => ({
+                                                          ...current,
+                                                          [field]: {
+                                                              ...current[field],
+                                                              audience:
+                                                                  value as core.PrivacyAudience
+                                                          }
+                                                      }))
                                             }
                                         />
                                         {core.audienceNeedsList(draft[field].audience) && (
@@ -142,11 +184,17 @@ export function PrivacyView({
                     )}
 
                     <div className="flex items-center gap-3">
-                        <Button size="sm" onClick={() => void save()} disabled={!dirty || saving}>
+                        <Button
+                            size="sm"
+                            onClick={() => void save()}
+                            disabled={!dirty || saving || savingProfile}
+                        >
                             {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
                             {tc("actions.save")}
                         </Button>
-                        {!dirty && <span className="text-xs text-muted-foreground">{t("saved")}</span>}
+                        {!dirty && (
+                            <span className="text-xs text-muted-foreground">{t("saved")}</span>
+                        )}
                     </div>
                 </CardBody>
             </Card>
@@ -210,7 +258,9 @@ function Who({
             ) : (
                 <>
                     {list && (
-                        <span className="text-[0.6875rem] text-muted-foreground">{t("who.listName", { name: list.name })}</span>
+                        <span className="text-[0.6875rem] text-muted-foreground">
+                            {t("who.listName", { name: list.name })}
+                        </span>
                     )}
                     {first.map((person) => (
                         <span
@@ -221,7 +271,9 @@ function Who({
                         </span>
                     ))}
                     {rest > 0 && (
-                        <span className="text-[0.6875rem] text-muted-foreground">{t("who.more", { count: rest })}</span>
+                        <span className="text-[0.6875rem] text-muted-foreground">
+                            {t("who.more", { count: rest })}
+                        </span>
                     )}
                 </>
             )}

@@ -382,10 +382,12 @@ const OLDEST_SCENERY: scenery.Era = { nether: false, caves: false };
 
 /**
  * The biome a structure's scenery is drawn in and how, or null for a kind
- * with none: an acid rain's weather and lightning reach round its arena, and a
- * dropper's shaft is too tall to prove a ring round it cheaply.
- * Nothing that burns round a TNT floor, and no lava near one either; a parkour
- * course is surrounded by its own theme's world, a nether maze by the Nether.
+ * with none: an acid rain's weather and lightning reach round its arena, a
+ * dropper's shaft is too tall to prove a ring round it cheaply, and a nether
+ * maze is roofed and walled on every side, so nobody inside would ever see it.
+ * Scenery is only for a structure played in the open air. Nothing that burns
+ * round a TNT floor, and no lava near one either; a parkour course is
+ * surrounded by its own theme's world.
  */
 function sceneryOf(
     layout: Layout
@@ -406,7 +408,8 @@ function sceneryOf(
                 options: { ...options, lava: false }
             };
         case "nether-maze":
-            return { allowed: ["nether"], options };
+            // Enclosed: a ring round it would be blocks nobody sees.
+            return null;
         case "acid-rain":
             return null;
         case "boat-race":

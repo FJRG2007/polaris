@@ -65,7 +65,7 @@ async function failure(
 async function manage(databaseId: string) {
     const user = await requirePermission("deploy.manage");
     const access = await requireDatabaseAccess(databaseId, user.id, "databases.manage");
-    return { userId: user.id, ownerId: access.ownerId };
+    return { userId: user.id, ownerId: access.ownerId, environmentIds: access.environmentIds };
 }
 
 async function audit(
@@ -126,9 +126,9 @@ export async function copySourcesAction(databaseId: string): Promise<
     const parsed = z.string().uuid().safeParse(databaseId);
     if (!parsed.success) return invalid(parsed.error);
     try {
-        const { userId, ownerId } = await manage(parsed.data);
+        const { userId, ownerId, environmentIds } = await manage(parsed.data);
         const [sources, connections] = await Promise.all([
-            copySources(parsed.data, ownerId),
+            copySources(parsed.data, ownerId, environmentIds),
             copyConnections(parsed.data, ownerId, userId)
         ]);
         return { sources, connections };
@@ -510,8 +510,10 @@ export async function replicationCandidatesAction(
     const parsed = z.string().uuid().safeParse(bucketId);
     if (!parsed.success) return invalid(parsed.error);
     try {
-        const { ownerId } = await manageBucket(parsed.data);
-        return { candidates: await store.replicationCandidates(parsed.data, ownerId) };
+        const { ownerId, environmentIds } = await manageBucket(parsed.data);
+        return {
+            candidates: await store.replicationCandidates(parsed.data, ownerId, environmentIds)
+        };
     } catch (caught) {
         return failure(caught, "buckets.replicaTargetsFailed");
     }

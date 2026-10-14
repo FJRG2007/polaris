@@ -4,7 +4,10 @@
  * Two sources, one syntax. The catalogue the announcements and the side panel
  * use (`text-vars`) - `{player}`, `{server.online}` - and the person's own,
  * declared on the command with a label, a type and a default, and asked for when
- * it is run. Read by the one parser in `text-vars`, and only names that are
+ * it is run. A variable may also be declared in the command itself: `{x}` asks
+ * for a value, `{x=100}` asks with 100 filled in, and either is used as text
+ * (or a number, when its default is one) unless the list declares it otherwise.
+ * A run that leaves a value with a default empty is sent with the default. Read by the one parser in `text-vars`, and only names that are
  * known here are ever replaced: `summon minecraft:skeleton_horse ~ ~ ~
  * {SkeletonTrap:1b}` keeps its braces because `SkeletonTrap:1b` is not a name
  * either list holds.
@@ -87,6 +90,59 @@ function consoleSpec(name: string, edition: MinecraftEdition | null): VariableSp
         : null;
 }
 
+/** `{name=default}`: a variable declared where it is used, with its default.
+ *  The default holds no quote, backslash or bracket, so a brace of NBT data -
+ *  `{CustomName:"x"}` - is never read as one. */
+const INLINE = /\{\s*([a-z][a-z0-9_]{0,23})\s*=([^{}"'\\[\]\u0000-\u001f\u007f]{0,200})\}/g;
+
+/** A command with every variable declared in it, read once. */
+export interface CommandVariables {
+    /** The command with `{name=default}` written back as `{name}`: what is
+     *  filled in and sent. */
+    readonly command: string;
+    /** The declared list, then every variable the command declares itself, in
+     *  the order it first appears. A listed variable keeps its label and type,
+     *  and takes the command's default when it has none of its own. */
+    readonly custom: readonly CustomVariable[];
+}
+
+/**
+ * The variables a command asks for: the ones declared on it, and the ones it
+ * declares itself (`{x}`, `{x=100}`). A name of the catalogue's is never taken
+ * over - `{player=x}` is left as written - and only a lowercase name is, so a
+ * brace of game data stays the game's.
+ */
+export function commandVariables(
+    command: string,
+    declared: readonly CustomVariable[]
+): CommandVariables {
+    const defaults = new Map<string, string>();
+    const canonical = command.replace(INLINE, (raw, name: string, fallback: string) => {
+        if (variable(name)) return raw;
+        if (!defaults.has(name)) defaults.set(name, fallback.trim());
+        return `{${name}}`;
+    });
+    const custom: CustomVariable[] = declared.map((one) => {
+        const fallback = defaults.get(one.name);
+        return one.initial.length === 0 && fallback
+            ? { ...one, initial: normalizeValue(one.type, fallback) }
+            : one;
+    });
+    for (const use of variablesIn(canonical)) {
+        const name = use.name;
+        if (use.fallback !== null || !CUSTOM_NAME.test(name) || variable(name)) continue;
+        if (custom.some((one) => one.name === name)) continue;
+        const fallback = defaults.get(name) ?? "";
+        custom.push({
+            name,
+            label: name,
+            type: NUMBER.test(fallback) ? "number" : "text",
+            initial: fallback
+        });
+    }
+    return { command: canonical, custom };
+}
+
 function customOf(name: string, custom: readonly CustomVariable[]): CustomVariable | null {
     const key = name.toLowerCase();
     return custom.find((declared) => declared.name === key) ?? null;
@@ -107,7 +163,9 @@ export function commandUses(
     edition: MinecraftEdition | null,
     custom: readonly CustomVariable[]
 ): CommandUses {
-    const uses = variablesIn(command);
+    const read = commandVariables(command, custom);
+    custom = read.custom;
+    const uses = variablesIn(read.command);
     const specs = uses.flatMap((use) => {
         if (customOf(use.name, custom)) return [];
         const spec = consoleSpec(use.name, edition);
@@ -189,15 +247,28 @@ export function valueSchema(type: CustomVariableType): z.ZodType<string, z.ZodTy
         });
 }
 
-/** Every declared value a command needs, keyed by name. Nothing else is taken. */
+/** One value as a run reads it: left empty or out, a variable with a default
+ *  takes the default; one without still has to be filled in. */
+export function runValueSchema(declared: CustomVariable): z.ZodType<string, z.ZodTypeDef, unknown> {
+    if (declared.initial.length === 0) return valueSchema(declared.type);
+    return z.preprocess(
+        (value) =>
+            value === undefined || (typeof value === "string" && value.trim().length === 0)
+                ? declared.initial
+                : value,
+        valueSchema(declared.type)
+    ) as z.ZodType<string, z.ZodTypeDef, unknown>;
+}
+
+/** Every declared value a command needs, keyed by name. Nothing else is taken.
+ *  Pass the list `commandVariables` reads, so the ones the command declares
+ *  itself are asked for too. */
 export function valuesSchema(
     custom: readonly CustomVariable[]
 ): z.ZodType<Record<string, string>, z.ZodTypeDef, unknown> {
     return z
         .object(
-            Object.fromEntries(
-                custom.map((declared) => [declared.name, valueSchema(declared.type)])
-            )
+            Object.fromEntries(custom.map((declared) => [declared.name, runValueSchema(declared)]))
         )
         .strict() as unknown as z.ZodType<Record<string, string>, z.ZodTypeDef, unknown>;
 }
@@ -221,12 +292,13 @@ export function customVariablesProblem(
     command: string,
     custom: readonly CustomVariable[]
 ): string | null {
-    if (custom.length > MAX_CUSTOM_VARIABLES) {
+    const read = commandVariables(command, custom);
+    if (read.custom.length > MAX_CUSTOM_VARIABLES) {
         return gameMessage("games", "consoleVars.errors.tooMany", { count: MAX_CUSTOM_VARIABLES });
     }
-    const used = new Set(variablesIn(command).map((use) => use.name.toLowerCase()));
+    const used = new Set(variablesIn(read.command).map((use) => use.name.toLowerCase()));
     const seen = new Set<string>();
-    for (const declared of custom) {
+    for (const declared of read.custom) {
         if (!CUSTOM_NAME.test(declared.name)) {
             return gameMessage("games", "consoleVars.errors.name");
         }
@@ -320,11 +392,13 @@ export function fillCommand(
     fill: FillValues,
     player: { readonly name: string; readonly values: VariableValues } | null
 ): string {
-    return replaceVariables(command, (use) => {
-        const declared = customOf(use.name, fill.custom);
+    const read = commandVariables(command, fill.custom);
+    return replaceVariables(read.command, (use) => {
+        const declared = customOf(use.name, read.custom);
         if (declared) {
-            const value = fill.values[declared.name];
-            if (value === undefined) return null;
+            const typed = fill.values[declared.name];
+            const value = typed === undefined || typed.length === 0 ? declared.initial : typed;
+            if (value.length === 0) return null;
             return declared.type === "player" ? (playerSelector(value) ?? null) : value;
         }
         const spec = consoleSpec(use.name, fill.edition);

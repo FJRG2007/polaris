@@ -16,7 +16,11 @@ import { findApp } from "@/lib/apps/catalog";
 import { uninstallAccess } from "@/lib/apps/install-access";
 import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
 import { AppDetail, AppInstallPanel, AppInstallPanelSkeleton } from "./app-detail";
-import { instanceWideInstallIds, listInstalledApps } from "@/lib/apps/install-service";
+import {
+    installForReader,
+    instanceWideInstallIds,
+    listInstalledApps
+} from "@/lib/apps/install-service";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +52,11 @@ async function InstallState({ appId, user }: { appId: string; user: SessionUser 
     const installs = await Promise.all(
         installed
             .filter((item) => item.catalogId === appId)
-            .map(async (item) => ({
-                ...item,
-                canUninstall: (await uninstallAccess(user, item.id).catch(() => null)) !== null
-            }))
+            .map(async (item) => {
+                const canUninstall =
+                    (await uninstallAccess(user, item.id).catch(() => null)) !== null;
+                return { ...installForReader(item, user.id, canUninstall), canUninstall };
+            })
     );
     return <AppInstallPanel appId={appId} canInstall={canInstall} installs={installs} />;
 }

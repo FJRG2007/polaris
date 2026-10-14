@@ -16,6 +16,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { NoteActor } from "./access";
+import { contactLines } from "@/lib/privacy-service";
 
 /** A folder as the sidebar draws it. */
 export interface FolderSummary {
@@ -48,6 +49,8 @@ export interface ShelfView {
 export interface ShelfPerson {
     readonly userId: string;
     readonly name: string;
+    /** Their contact line as this viewer may see it: the address, an @handle,
+     *  or empty. Named for the address it used to always be. */
     readonly email: string;
     readonly role: core.SpaceRole;
     /** True for the person who made it: shown, and never editable. */
@@ -72,7 +75,10 @@ export interface ShelfTeam {
  * it is where a new note goes, so a sidebar that hid it would hide the only
  * place somebody can write without being invited anywhere.
  */
-export async function listShelves(actor: NoteActor, spaceIds: readonly string[]): Promise<ShelfView[]> {
+export async function listShelves(
+    actor: NoteActor,
+    spaceIds: readonly string[]
+): Promise<ShelfView[]> {
     const [ownFolders, spaces] = await Promise.all([
         prisma.noteFolder.findMany({
             where: { ownerId: actor.id, spaceId: null, archived: false },
@@ -139,7 +145,8 @@ function roleFrom(
     space: { ownerId: string; members: { role: string }[]; teamGrants: { role: string }[] }
 ): core.SpaceRole | "owner" {
     if (space.ownerId === actor.id || actor.isAdmin) return "owner";
-    let role: core.SpaceRole | null = (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
+    let role: core.SpaceRole | null =
+        (space.members[0]?.role as core.SpaceRole | undefined) ?? null;
     for (const grant of space.teamGrants) {
         const granted = grant.role as core.SpaceRole;
         role = role ? core.strongerRole(role, granted) : granted;
@@ -155,7 +162,9 @@ export async function writableShelves(
 ): Promise<{ id: string | null; name: string }[]> {
     const shelves = await listShelves(actor, spaceIds);
     return shelves
-        .filter((shelf) => !shelf.space || core.spaceRoleAtLeast(asRole(shelf.space.role), "member"))
+        .filter(
+            (shelf) => !shelf.space || core.spaceRoleAtLeast(asRole(shelf.space.role), "member")
+        )
         .map((shelf) => ({ id: shelf.space?.id ?? null, name: shelf.space?.name ?? "My notes" }));
 }
 
@@ -167,7 +176,10 @@ function asRole(role: core.SpaceRole | "owner"): core.SpaceRole {
 // Spaces
 // ---------------------------------------------------------------------------
 
-export async function createSpace(actor: NoteActor, input: core.NoteSpaceCreateInput): Promise<string> {
+export async function createSpace(
+    actor: NoteActor,
+    input: core.NoteSpaceCreateInput
+): Promise<string> {
     const last = await prisma.noteSpace.aggregate({
         where: { ownerId: actor.id },
         _max: { order: true }
@@ -220,30 +232,40 @@ export async function deleteSpace(spaceId: string): Promise<void> {
 // People and teams on a space
 // ---------------------------------------------------------------------------
 
-export async function spacePeople(spaceId: string): Promise<ShelfPerson[]> {
+/**
+ * Everybody on a shelf, for the people dialog.
+ *
+ * The contact line under each name is whatever that person lets this viewer see
+ * - their address, their handle, or nothing - by the same rule every other
+ * roster uses. Running a shelf is not a reason to read addresses its members
+ * chose to keep to themselves.
+ */
+export async function spacePeople(spaceId: string, viewer: NoteActor): Promise<ShelfPerson[]> {
+    const person = { select: { id: true, name: true, email: true, username: true } };
     const space = await prisma.noteSpace.findUnique({
         where: { id: spaceId },
         select: {
-            owner: { select: { id: true, name: true, email: true } },
-            members: {
-                orderBy: { createdAt: "asc" },
-                select: { role: true, user: { select: { id: true, name: true, email: true } } }
-            }
+            owner: person,
+            members: { orderBy: { createdAt: "asc" }, select: { role: true, user: person } }
         }
     });
     if (!space) return [];
+    const contacts = await contactLines(viewer, [
+        space.owner,
+        ...space.members.map((member) => member.user)
+    ]);
     return [
         {
             userId: space.owner.id,
             name: space.owner.name,
-            email: space.owner.email,
+            email: contacts.get(space.owner.id) ?? "",
             role: "admin",
             owner: true
         },
         ...space.members.map((member) => ({
             userId: member.user.id,
             name: member.user.name,
-            email: member.user.email,
+            email: contacts.get(member.user.id) ?? "",
             role: member.role as core.SpaceRole,
             owner: false
         }))
@@ -266,7 +288,10 @@ export async function spaceTeams(spaceId: string): Promise<ShelfTeam[]> {
 /** The teams that may be given this space: its organization's, and no others.
  *  A personal shelf has none, which is what hides the section. */
 export async function teamsForSpace(spaceId: string): Promise<{ id: string; name: string }[]> {
-    const space = await prisma.noteSpace.findUnique({ where: { id: spaceId }, select: { orgId: true } });
+    const space = await prisma.noteSpace.findUnique({
+        where: { id: spaceId },
+        select: { orgId: true }
+    });
     if (!space?.orgId) return [];
     return prisma.team.findMany({
         where: { orgId: space.orgId },
@@ -275,7 +300,11 @@ export async function teamsForSpace(spaceId: string): Promise<{ id: string; name
     });
 }
 
-export async function grantPerson(spaceId: string, userId: string, role: core.SpaceRole): Promise<void> {
+export async function grantPerson(
+    spaceId: string,
+    userId: string,
+    role: core.SpaceRole
+): Promise<void> {
     await prisma.noteSpaceMember.upsert({
         where: { spaceId_userId: { spaceId, userId } },
         create: { spaceId, userId, role },
@@ -287,7 +316,11 @@ export async function revokePerson(spaceId: string, userId: string): Promise<voi
     await prisma.noteSpaceMember.deleteMany({ where: { spaceId, userId } });
 }
 
-export async function grantTeam(spaceId: string, teamId: string, role: core.SpaceRole): Promise<void> {
+export async function grantTeam(
+    spaceId: string,
+    teamId: string,
+    role: core.SpaceRole
+): Promise<void> {
     await prisma.noteSpaceTeam.upsert({
         where: { spaceId_teamId: { spaceId, teamId } },
         create: { spaceId, teamId, role },
@@ -409,7 +442,9 @@ export async function moveFolder(
 }
 
 /** What a folder holds directly, so a delete can say so before it lifts it. */
-export async function folderContents(folderId: string): Promise<{ notes: number; folders: number }> {
+export async function folderContents(
+    folderId: string
+): Promise<{ notes: number; folders: number }> {
     const [notes, folders] = await Promise.all([
         prisma.note.count({ where: { folderId } }),
         prisma.noteFolder.count({ where: { parentId: folderId } })
@@ -432,7 +467,10 @@ export async function deleteFolder(folderId: string): Promise<void> {
     });
     if (!folder) return;
     await prisma.$transaction([
-        prisma.noteFolder.updateMany({ where: { parentId: folderId }, data: { parentId: folder.parentId } }),
+        prisma.noteFolder.updateMany({
+            where: { parentId: folderId },
+            data: { parentId: folder.parentId }
+        }),
         prisma.note.updateMany({ where: { folderId }, data: { folderId: folder.parentId } }),
         prisma.noteFolder.delete({ where: { id: folderId } })
     ]);
@@ -441,9 +479,7 @@ export async function deleteFolder(folderId: string): Promise<void> {
 /** Where a new sibling belongs, which differs by shelf: a space's folders are
  *  the space's, and a private one's are the account's own. */
 function shelfWhere(actor: NoteActor, spaceId: string | null, parentId: string | null) {
-    return spaceId
-        ? { spaceId, parentId }
-        : { spaceId: null, ownerId: actor.id, parentId };
+    return spaceId ? { spaceId, parentId } : { spaceId: null, ownerId: actor.id, parentId };
 }
 
 function shelfFolderWhere(actor: NoteActor, spaceId: string | null) {

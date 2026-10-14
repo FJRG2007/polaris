@@ -47,7 +47,10 @@ export async function GET(
           : null;
     if (!viewer) return new Response("Unauthorized", { status: 401 });
 
-    const visible = await maySee(userId, "avatar", viewer);
+    // The banner is part of the profile, not of the face beside a name, so a
+    // reader outside the profile audience gets none whatever the photo allows.
+    const visible =
+        (await maySee(userId, "avatar", viewer)) && (await maySee(userId, "profile", viewer));
     if (!visible) return blankAvatarResponse(CACHE);
 
     const picture = await resolveBanner(userId);
@@ -64,7 +67,10 @@ export async function GET(
     // Answered before the bytes are fetched: most requests for a picture are a
     // browser checking the one it already has.
     if (request.headers.get("if-none-match") === picture.etag) {
-        return new Response(null, { status: 304, headers: { ETag: picture.etag, "Cache-Control": CACHE } });
+        return new Response(null, {
+            status: 304,
+            headers: { ETag: picture.etag, "Cache-Control": CACHE }
+        });
     }
 
     const bytes = await picture.load();

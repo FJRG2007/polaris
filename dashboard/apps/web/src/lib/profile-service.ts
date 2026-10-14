@@ -171,9 +171,17 @@ export interface PublicProfile {
      * list - that is the follower setting's business.
      */
     readonly mutual: {
-        readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
+        readonly friends: {
+            people: { id: string; name: string; username: string }[];
+            total: number;
+        };
         readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
     } | null;
+    /**
+     * True when this reader is outside the profile audience and is being shown
+     * only the name and the photo. Everything else above is empty.
+     */
+    readonly restricted: boolean;
 }
 
 /** A stored JSON list of strings, out of its own column. Anything unparseable
@@ -182,7 +190,9 @@ function storedList(raw: string | null): string[] {
     if (!raw) return [];
     try {
         const parsed: unknown = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
@@ -197,7 +207,10 @@ function storedList(raw: string | null): string[] {
  * second, so it stands in - which is what keeps a name typed a year ago on the
  * page it was typed for.
  */
-export function typedCompanies(row: { profileCompanies: string | null; company: string | null }): string[] {
+export function typedCompanies(row: {
+    profileCompanies: string | null;
+    company: string | null;
+}): string[] {
     const list = storedList(row.profileCompanies);
     if (list.length > 0) return list;
     const single = (row.company ?? "").trim();
@@ -206,7 +219,10 @@ export function typedCompanies(row: { profileCompanies: string | null; company: 
 
 /** Store the marks, keeping only ids the account is actually on a roster for -
  *  the list arrives from a browser like any other. */
-export async function setProfileOrganizations(userId: string, ids: readonly string[]): Promise<void> {
+export async function setProfileOrganizations(
+    userId: string,
+    ids: readonly string[]
+): Promise<void> {
     const mine = await organizationsOf(userId);
     const kept = mine.filter((org) => ids.includes(org.id)).map((org) => org.id);
     await prisma.user.update({
@@ -295,14 +311,24 @@ export interface OrgProfile {
     readonly manageable: boolean;
 }
 
-export async function orgProfile(slug: string, viewer: PrivacyViewer | null): Promise<OrgProfile | null> {
+export async function orgProfile(
+    slug: string,
+    viewer: PrivacyViewer | null
+): Promise<OrgProfile | null> {
     const handle = slug.trim().toLowerCase();
     if (!handle) return null;
     if (!viewer && !(await profilesArePublic())) return null;
 
     const org = await prisma.organization.findUnique({
         where: { slug: handle },
-        select: { id: true, slug: true, name: true, description: true, createdAt: true, ownerId: true }
+        select: {
+            id: true,
+            slug: true,
+            name: true,
+            description: true,
+            createdAt: true,
+            ownerId: true
+        }
     });
     if (!org) return null;
 
@@ -417,6 +443,7 @@ export async function publicProfile(
 
     const allowed = await visible(user.id, viewer, [
         "discoverable",
+        "profile",
         "avatar",
         "fullName",
         "email",
@@ -434,7 +461,7 @@ export async function publicProfile(
 }
 
 type Fields = Record<
-    "discoverable" | "avatar" | "fullName" | "email" | "companies" | "followers",
+    "discoverable" | "profile" | "avatar" | "fullName" | "email" | "companies" | "followers",
     boolean
 >;
 
@@ -453,7 +480,10 @@ async function visible(
 ): Promise<Fields> {
     if (viewer) {
         const answers = await Promise.all(
-            fields.map(async (field) => [field, (await allowedBy(viewer, field, [userId])).has(userId)] as const)
+            fields.map(
+                async (field) =>
+                    [field, (await allowedBy(viewer, field, [userId])).has(userId)] as const
+            )
         );
         return Object.fromEntries(answers) as Fields;
     }
@@ -461,6 +491,7 @@ async function visible(
         where: { userId },
         select: {
             discoverable: true,
+            profile: true,
             avatar: true,
             fullName: true,
             email: true,
@@ -471,13 +502,13 @@ async function visible(
     // `storedAudience` is the one way to read one off a row: a column holds a
     // string written years ago, a row may not exist at all, and neither may be
     // allowed to resolve to something more open than the field's own default.
-    const open = (field: keyof Fields) =>
-        core.storedAudience(field, row?.[field]) === "everyone";
+    const open = (field: keyof Fields) => core.storedAudience(field, row?.[field]) === "everyone";
     // The follower lists are the one field whose unset answer is the operator's
     // rather than the schema's, so it is filled in before it is read.
     const followers = row?.followers ?? (await defaultFollowerAudience());
     return {
         discoverable: open("discoverable"),
+        profile: open("profile"),
         avatar: open("avatar"),
         fullName: open("fullName"),
         email: open("email"),
@@ -510,6 +541,10 @@ async function draw(
     viewer: PrivacyViewer | null,
     own: boolean
 ): Promise<PublicProfile> {
+    // Outside the profile audience: the card a name needs and nothing else.
+    // Your own page is always the whole page.
+    if (!own && !allowed.profile) return restrictedProfile(user, allowed, viewer);
+
     const marked = storedList(user.profileOrgIds);
     const organizations =
         allowed.companies && marked.length > 0
@@ -552,7 +587,45 @@ async function draw(
         links: profileLinks(user.links),
         follows: { ...counts, showsNames: allowed.followers },
         standing,
-        mutual
+        mutual,
+        restricted: false
+    };
+}
+
+/**
+ * The profile somebody outside its audience is shown.
+ *
+ * The name, the handle and the photo as the photo setting allows - what every
+ * list already draws beside a message, so withholding them would hide nothing -
+ * and what this reader may do about them, since a friend request is how somebody
+ * gets into a "friends" audience at all. Nothing they wrote, nothing they link
+ * to, no banner, no counts, no date and nothing in common: the same card the
+ * messengers with this setting draw for a private profile.
+ */
+async function restrictedProfile(
+    user: { id: string; name: string; username: string | null },
+    allowed: Fields,
+    viewer: PrivacyViewer | null
+): Promise<PublicProfile> {
+    return {
+        id: user.id,
+        name: user.name,
+        username: user.username ?? "",
+        fullName: "",
+        description: "",
+        showsAvatar: allowed.avatar,
+        style: core.NO_PROFILE_STYLE,
+        organizations: [],
+        companies: [],
+        email: "",
+        joinedAt: "",
+        headline: "",
+        pronouns: "",
+        links: [],
+        follows: { followers: 0, following: 0, showsNames: false },
+        standing: await standingOf(user.id, viewer, false),
+        mutual: null,
+        restricted: true
     };
 }
 

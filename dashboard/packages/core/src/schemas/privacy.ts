@@ -44,6 +44,8 @@ import { z } from "zod";
 export const PRIVACY_AUDIENCES = [
     "everyone",
     "everyoneExcept",
+    "spaces",
+    "smallSpaces",
     "friends",
     "friendsExcept",
     "friendsOfFriends",
@@ -58,6 +60,8 @@ export type PrivacyAudience = (typeof PRIVACY_AUDIENCES)[number];
 export const PRIVACY_AUDIENCE_LABELS: Record<PrivacyAudience, string> = {
     everyone: "Everybody",
     everyoneExcept: "Everybody except",
+    spaces: "Friends and server members",
+    smallSpaces: "Friends and small server members",
     friends: "Friends",
     friendsExcept: "Friends except",
     friendsOfFriends: "Friends of my friends",
@@ -82,6 +86,39 @@ export function audienceNeedsReach(audience: PrivacyAudience): boolean {
     return (REACH_AUDIENCES as readonly string[]).includes(audience);
 }
 
+/**
+ * How many people a chat space holds before it stops counting as small.
+ *
+ * "Small" is fewer than this, counting the owner, who is never a member row. A
+ * room of a few friends and a public community of thousands are both "a server
+ * I am in", and only the first is people somebody would show their profile to.
+ */
+export const SMALL_SPACE_MEMBERS = 200;
+
+/** Whether a space with this many people in it, owner included, is small. */
+export function isSmallSpace(people: number): boolean {
+    return people < SMALL_SPACE_MEMBERS;
+}
+
+/** The two audiences answered by sharing a chat space, so the service only asks
+ *  who shares a space when somebody's answer turns on it. */
+export const SPACE_AUDIENCES = ["spaces", "smallSpaces"] as const;
+
+/** What "who can see your profile" offers: the circles people actually draw
+ *  around a profile, widest first. */
+export const PROFILE_AUDIENCES = [
+    "everyone",
+    "spaces",
+    "smallSpaces",
+    "friends",
+    "nobody"
+] as const satisfies readonly PrivacyAudience[];
+
+/** Whether an audience is answered by the chat spaces two people share. */
+export function audienceNeedsSpaces(audience: PrivacyAudience): boolean {
+    return (SPACE_AUDIENCES as readonly string[]).includes(audience);
+}
+
 /** Whether an audience is incomplete until a set of people is chosen for it. */
 export function audienceNeedsList(audience: PrivacyAudience): boolean {
     return audience === "everyoneExcept" || audience === "friendsExcept" || audience === "only";
@@ -89,6 +126,7 @@ export function audienceNeedsList(audience: PrivacyAudience): boolean {
 
 /** What each setting is, said once, so the screen and this file cannot drift. */
 export const PRIVACY_FIELD_LABELS = {
+    profile: "Who can see your profile",
     discoverable: "Whether people can find you",
     lastSeen: "When you were last here",
     activity: "What you are playing or listening to",
@@ -107,6 +145,8 @@ export const PRIVACY_FIELD_LABELS = {
 } as const;
 
 export const PRIVACY_FIELD_NOTES = {
+    profile:
+        "Your bio, links, pronouns and banner. Anybody else sees only your name and photo. Small servers are those with fewer than 200 members.",
     discoverable:
         "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
     lastSeen: "Whether other people can see that you are here now, or when you last were.",
@@ -137,6 +177,7 @@ export const PRIVACY_FIELD_NOTES = {
 /** The order the settings are read in, so the screen does not have its own. */
 export const PRIVACY_FIELDS = [
     "discoverable",
+    "profile",
     "avatar",
     "photoFullSize",
     "fullName",
@@ -172,7 +213,16 @@ export const PRIVACY_SECTIONS = [
     {
         id: "details",
         label: "Your details",
-        fields: ["avatar", "photoFullSize", "fullName", "email", "phone", "companies", "followers"]
+        fields: [
+            "profile",
+            "avatar",
+            "photoFullSize",
+            "fullName",
+            "email",
+            "phone",
+            "companies",
+            "followers"
+        ]
     },
     {
         id: "reaching",
@@ -260,6 +310,18 @@ export const privacySettingsSchema = z.object({
      * hands out deliberately, one at a time.
      */
     discoverable: open,
+    /**
+     * Who may read somebody's profile: what they wrote about themselves, their
+     * links, pronouns, banner, who they follow and what they share with you.
+     *
+     * Open by default, which is what every account was on before this existed,
+     * so nothing changes until somebody chooses. Anybody outside the audience
+     * still gets the card a name needs - the display name, the handle and the
+     * photo as the photo setting allows - because a name nobody can put a face
+     * to is a broken screen rather than a private one. That is also what the
+     * messengers with this setting draw.
+     */
+    profile: open,
     lastSeen: open,
     /**
      * Who sees what somebody is doing: the game, the song, the server.
@@ -490,6 +552,11 @@ export function audienceAllows(
          *  absent reads as no - an audience answered by a fact nobody looked up
          *  must close rather than open. */
         readonly sharesAFriend?: boolean;
+        /** Whether the two are both in some chat space. Absent reads as no. */
+        readonly sharesSpace?: boolean;
+        /** Whether one of the spaces they share is small (`isSmallSpace`).
+         *  Absent reads as no. */
+        readonly sharesSmallSpace?: boolean;
     }
 ): boolean {
     // Your own screen always shows you your own. A setting that hid your photo
@@ -503,6 +570,12 @@ export function audienceAllows(
             return true;
         case "everyoneExcept":
             return !listed;
+        case "spaces":
+            // Friends first, then anybody in a room with them: the circle the
+            // label names, not a different one.
+            return context.friends || (context.sharesSpace ?? false);
+        case "smallSpaces":
+            return context.friends || (context.sharesSmallSpace ?? false);
         case "friends":
             return context.friends;
         case "friendsExcept":

@@ -47,7 +47,10 @@ vi.mock("@/lib/chat/notices", () => ({
 }));
 vi.mock("@/lib/chat/attachments", () => ({ discardChannelFiles: async () => undefined }));
 vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => undefined }));
-vi.mock("@/lib/access/grants", () => ({ dropGrantsFor: async () => undefined }));
+vi.mock("@/lib/access/grants", () => ({
+    dropGrantsFor: async () => undefined,
+    grantedSubjects: async () => new Map()
+}));
 vi.mock("@/lib/orgs/org-service", () => ({
     readsOrgWhere: () => ({}),
     memberOrgIds: async () => []

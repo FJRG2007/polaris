@@ -62,7 +62,10 @@ export interface ChatProfile {
      * friends with, and a space in common is a room both are standing in.
      */
     readonly mutual: {
-        readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
+        readonly friends: {
+            people: { id: string; name: string; username: string }[];
+            total: number;
+        };
         readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
     };
     /**
@@ -73,6 +76,12 @@ export interface ChatProfile {
      * disclosure: the roster beside the same conversation already draws it.
      */
     readonly role: ChatRole | null;
+    /**
+     * True when the reader is outside this person's profile audience: the panel
+     * gets the name, the handle and the role the roster already draws, and
+     * nothing they wrote or share with anybody.
+     */
+    readonly restricted: boolean;
 }
 
 /** What somebody can be in a place, beyond being in it. */
@@ -110,7 +119,8 @@ export async function chatProfile(
     const access = await channelAccess(actor, channelId);
     if (!access) return null;
 
-    const [person, together, blocked, mayReadName] = await Promise.all([
+    const reader = { id: actor.id, isAdmin: false };
+    const [person, together, blocked, mayReadName, mayReadProfile] = await Promise.all([
         prisma.user.findFirst({
             where: { id: userId, ...VISIBLE_USER },
             select: {
@@ -134,7 +144,8 @@ export async function chatProfile(
         // the instance can read the database, and that is a different and
         // visible act from a screen Polaris drew for them. Your own name is
         // yours to read.
-        self || maySee(userId, "fullName", { id: actor.id, isAdmin: false })
+        self || maySee(userId, "fullName", reader),
+        self || maySee(userId, "profile", reader)
     ]);
     if (!person || !together || blocked.has(person.id)) return null;
 
@@ -142,9 +153,25 @@ export async function chatProfile(
     // working out what two people have in common before it is settled that this
     // one may be shown the other at all.
     const [mutual, role] = await Promise.all([
-        self ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
+        self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
         roleIn(together, person.id)
     ]);
+
+    // Outside the profile audience: what the roster beside this conversation
+    // already draws, and nothing else.
+    if (!mayReadProfile) {
+        return {
+            name: person.name,
+            fullName: "",
+            username: person.username ?? "",
+            description: "",
+            headline: "",
+            pronouns: "",
+            mutual,
+            role,
+            restricted: true
+        };
+    }
 
     return {
         name: person.name,
@@ -156,7 +183,8 @@ export async function chatProfile(
         headline: person.headline?.trim() ?? "",
         pronouns: person.pronouns?.trim() ?? "",
         mutual,
-        role
+        role,
+        restricted: false
     };
 }
 

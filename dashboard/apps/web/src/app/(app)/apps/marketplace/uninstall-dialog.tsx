@@ -15,7 +15,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { InstalledAppView } from "@/lib/apps/install-service";
+import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { uninstallInstalledAppAction } from "@/app/(app)/apps/installed/[id]/actions";
 import {
     Button,
@@ -54,7 +54,7 @@ function deletingDescription(t: Words, catalogId: string, name: string): string 
  */
 function keptDescription(
     t: Words,
-    install: Pick<InstalledAppView, "name" | "catalogId" | "applicationId">
+    install: Pick<InstalledAppReaderView, "name" | "catalogId" | "applicationId">
 ): string {
     const description = uninstallDescription(t, install.catalogId, install.name);
     return install.applicationId ? `${description} ${t("uninstall.keptListed")}` : description;
@@ -65,7 +65,7 @@ export function UninstallDialog({
     onClose,
     onDone
 }: {
-    install: Pick<InstalledAppView, "id" | "name" | "catalogId" | "applicationId">;
+    install: Pick<InstalledAppReaderView, "id" | "name" | "catalogId" | "applicationId">;
     onClose: () => void;
     /** After a finished uninstall; refreshes the page when not given. */
     onDone?: () => void;

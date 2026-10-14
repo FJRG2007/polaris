@@ -26,7 +26,7 @@ function stateWith(overrides: Partial<im.ImpostorState>): im.ImpostorState {
 }
 
 describe("the station", () => {
-    for (const design of [1, im.DESIGN])
+    for (const design of [1, im.FURNISHED_SINCE, im.DESIGN])
         for (const players of [4, 8, 9, 15]) {
             it(`is built only into its own box, every block once, for ${players} on design ${design}`, () => {
                 const box = im.stationBox(SITE, Y, players, design);
@@ -73,7 +73,7 @@ describe("the station", () => {
     });
 
     it("joins every room, the meeting room in the middle, every seat and station inside", () => {
-        for (const design of [1, im.DESIGN])
+        for (const design of [1, im.FURNISHED_SINCE, im.DESIGN])
             for (const players of [4, 12])
                 for (let seed = 0; seed < SEEDS; seed += 1) {
                     const layout = im.layoutFor(
@@ -109,8 +109,10 @@ describe("the station", () => {
                         if (typeof cell === "number") rooms.add(cell);
                     }
                     expect(rooms.size).toBe(layout.rooms.length);
-                    expect(layout.meeting.col).toBe(1);
-                    expect(layout.meeting.row).toBe(1);
+                    if (design < im.SHIP_SINCE) {
+                        expect(layout.meeting.col).toBe(1);
+                        expect(layout.meeting.row).toBe(1);
+                    } else expect(layout.meeting.name).toBe("cafeteria");
                     for (let seat = 0; seat < players; seat += 1) {
                         const spot = im.seatSpot(layout, seat, players);
                         expect(im.inside(layout, spot, plan)).toBe(true);
@@ -144,10 +146,11 @@ describe("the station", () => {
     });
 
     it("has a bridge looking out on space, one dark room, and every other room furnished", () => {
+        const design = im.FURNISHED_SINCE;
         for (const players of [4, 12])
             for (let seed = 0; seed < SEEDS; seed += 1) {
-                const box = im.stationBox(SITE, Y, players);
-                const layout = im.layoutFor(`run-${seed}`, box);
+                const box = im.stationBox(SITE, Y, players, design);
+                const layout = im.layoutFor(`run-${seed}`, box, design);
                 const plan = im.planOf(layout);
                 const bridge = layout.rooms.find((room) => room.name === "bridge")!;
                 expect([bridge.col, bridge.row]).toEqual([1, 0]);
@@ -250,6 +253,220 @@ describe("the station", () => {
             })
         );
         expect(seats.size).toBe(15);
+    });
+});
+
+/** A string's FNV-1a hash: a station's blocks pinned without a page of them. */
+function digest(text: string): string {
+    let hash = 0x811c9dc5;
+    for (let at = 0; at < text.length; at += 1)
+        hash = Math.imul(hash ^ text.charCodeAt(at), 0x01000193) >>> 0;
+    return hash.toString(16);
+}
+
+/** Every block a station puts down, by `x,y,z`. */
+function blocksOf(layout: im.Layout): Map<string, string> {
+    const at = new Map<string, string>();
+    for (const fill of im.stationFills(layout))
+        for (let x = fill.box.x1; x <= fill.box.x2; x += 1)
+            for (let y = fill.box.y1; y <= fill.box.y2; y += 1)
+                for (let z = fill.box.z1; z <= fill.box.z2; z += 1)
+                    at.set(`${x},${y},${z}`, fill.block);
+    return at;
+}
+
+describe("the ship", () => {
+    const SHIP = ["cafeteria", "medbay", "electrical", "admin", "storage", "weapons", "o2"];
+    const WING = ["reactor", "upperEngine", "lowerEngine", "security"];
+
+    it("keeps a run built on an older design block for block as it was", () => {
+        const pinned: Record<string, string> = {
+            "1,6": "df49eb8a",
+            "1,12": "cd0624cd",
+            "2,6": "56a0965d",
+            "2,12": "235ba457"
+        };
+        for (const [key, hash] of Object.entries(pinned)) {
+            const [design, players] = key.split(",").map(Number) as [number, number];
+            const layout = im.layoutFor(
+                "run-7",
+                im.stationBox({ x: 300, z: -120 }, 100, players, design),
+                design
+            );
+            expect(digest(JSON.stringify(im.stationFills(layout))), key).toBe(hash);
+            expect(layout.pieces).toEqual([]);
+        }
+        const box = im.stationBox(SITE, Y, 8, im.FURNISHED_SINCE);
+        expect(box.x2 - box.x1 + 1).toBe(55);
+        expect(im.rowsOf(box, im.FURNISHED_SINCE)).toBe(3);
+    });
+
+    it("is bigger than the grid, with the engine wing past eight players", () => {
+        const small = im.stationBox(SITE, Y, 8);
+        const full = im.stationBox(SITE, Y, 9);
+        expect([small.x2 - small.x1 + 1, small.z2 - small.z1 + 1]).toEqual([100, 60]);
+        expect([full.x2 - full.x1 + 1, full.z2 - full.z1 + 1]).toEqual([140, 60]);
+        expect(im.rowsOf(small)).toBe(3);
+        expect(im.rowsOf(full)).toBe(4);
+        expect(im.reachOf(9)).toBeGreaterThan(im.reachOf(9, im.FURNISHED_SINCE));
+        const names = (box: typeof small) =>
+            im.layoutFor("run", box).rooms.map((room) => room.name);
+        expect(names(small)).toEqual(
+            expect.arrayContaining([...SHIP, "navigation", "shields", "communications"])
+        );
+        expect(names(small)).not.toEqual(expect.arrayContaining(WING.slice(0, 1)));
+        expect(names(full)).toEqual(expect.arrayContaining([...SHIP, ...WING]));
+        expect(names(full)).toHaveLength(14);
+    });
+
+    it("lays out the same ship for the same run", () => {
+        const box = im.stationBox(SITE, Y, 12);
+        expect(digest(JSON.stringify(im.stationFills(im.layoutFor("again", box))))).toBe(
+            digest(JSON.stringify(im.stationFills(im.layoutFor("again", box))))
+        );
+    });
+
+    it("meets in the cafeteria, gives every room its tasks, furnishing and a way round it", () => {
+        for (const players of [4, 8, 9, 15])
+            for (let seed = 0; seed < SEEDS; seed += 1) {
+                const box = im.stationBox(SITE, Y, players);
+                const layout = im.layoutFor(`run-${seed}`, box);
+                const plan = im.planOf(layout);
+                const cafeteria = layout.meeting;
+                expect(cafeteria.name).toBe("cafeteria");
+                expect(im.tableAt(layout)).toEqual({
+                    x: cafeteria.x + (cafeteria.w! - 1) / 2,
+                    z: cafeteria.z + (cafeteria.d! - 1) / 2
+                });
+                // Vents: three pairs on the small ship, four on the full one,
+                // never in the cafeteria.
+                expect(layout.vents).toHaveLength(players <= 8 ? 6 : 8);
+                // Never in the cafeteria, and never beside a console a switch
+                // or button powers, which would open it.
+                for (const vent of layout.vents) {
+                    expect(layout.rooms[vent.room]!.name).not.toBe("cafeteria");
+                    for (const station of layout.stations)
+                        if (station.kind !== "scan")
+                            expect(
+                                Math.max(Math.abs(station.x - vent.x), Math.abs(station.z - vent.z))
+                            ).toBeGreaterThan(1);
+                }
+                const at = blocksOf(layout);
+                const cellOf = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
+                for (const room of layout.rooms) {
+                    const stations = layout.stations.filter((one) => one.room === room.index);
+                    if (room.name === "cafeteria") expect(stations).toEqual([]);
+                    else expect(stations.length, room.name).toBeGreaterThanOrEqual(2);
+                    const pieces = layout.pieces.filter(
+                        (piece) => cellOf(piece.box.x1, piece.box.z1) === room.index
+                    );
+                    expect(pieces.length, room.name).toBeGreaterThan(2);
+                }
+                // Navigation looks out on space through a window.
+                const navigation = layout.rooms.find((room) => room.name === "navigation")!;
+                const window = navigation.x + navigation.w! - 4;
+                for (let z = navigation.z + 1; z < navigation.z + navigation.d! - 1; z += 1) {
+                    expect(at.get(`${window},${Y + 2},${z}`)).toBe("minecraft:glass");
+                    expect(at.get(`${window + 1},${Y + 2},${z}`)).toBeUndefined();
+                    expect(at.get(`${window + 2},${Y + 2},${z}`)).toMatch(
+                        /black_concrete|sea_lantern/
+                    );
+                }
+                // Nothing in the way where somebody stands or sits.
+                const kept = [
+                    ...layout.stations,
+                    ...layout.vents,
+                    ...layout.vents.map((vent) => ({ x: vent.outX, z: vent.outZ })),
+                    ...Array.from({ length: players }, (_, n) => im.seatSpot(layout, n, players))
+                ];
+                for (const spot of kept) {
+                    const y = Y + 2;
+                    const here = at.get(`${spot.x},${y},${spot.z}`);
+                    if (here !== undefined) expect(here).toMatch(/lever|button/);
+                }
+                // Walked round everything that stands on the floor.
+                const blocked = (x: number, z: number) => {
+                    const low = at.get(`${x},${Y + 1},${z}`);
+                    const high = at.get(`${x},${Y + 2},${z}`);
+                    const solid = (block: string | undefined) =>
+                        block !== undefined &&
+                        !/carpet|pressure_plate|iron_trapdoor|_slab\[type=bottom\]/.test(block);
+                    return solid(low) || solid(high);
+                };
+                const table = im.tableAt(layout);
+                const start = `${table.x + 3},${table.z}`;
+                const reached = new Set([start]);
+                const queue = [start];
+                const steps = [
+                    [1, 0],
+                    [-1, 0],
+                    [0, 1],
+                    [0, -1]
+                ] as const;
+                while (queue.length > 0) {
+                    const [x, z] = queue.pop()!.split(",").map(Number) as [number, number];
+                    for (const [dx, dz] of steps) {
+                        const next = `${x + dx},${z + dz}`;
+                        if (reached.has(next) || blocked(x + dx, z + dz)) continue;
+                        if (!im.walkable(cellOf(x + dx, z + dz))) continue;
+                        reached.add(next);
+                        queue.push(next);
+                    }
+                }
+                const rooms = new Set<number>();
+                for (const key of reached) {
+                    const [x, z] = key.split(",").map(Number) as [number, number];
+                    const cell = cellOf(x, z);
+                    if (typeof cell === "number") rooms.add(cell);
+                }
+                expect(rooms.size, `${seed}`).toBe(layout.rooms.length);
+                const near = (x: number, z: number) =>
+                    reached.has(`${x},${z}`) ||
+                    steps.some(([dx, dz]) => reached.has(`${x + dx},${z + dz}`));
+                for (const station of layout.stations)
+                    expect(near(station.x, station.z), `${seed} station ${station.id}`).toBe(true);
+                for (const vent of layout.vents) {
+                    expect(reached.has(`${vent.x},${vent.z}`), `${seed} vent`).toBe(true);
+                    expect(reached.has(`${vent.outX},${vent.outZ}`), `${seed} out`).toBe(true);
+                }
+                for (let seat = 0; seat < players; seat += 1) {
+                    const spot = im.seatSpot(layout, seat, players);
+                    expect(reached.has(`${spot.x},${spot.z}`)).toBe(true);
+                }
+            }
+    });
+
+    it("comes down completely, what stands or hangs on something before it", () => {
+        const order = im.stationBlocks();
+        const STANDS =
+            /carpet|fern|lever|button|pressure_plate|minecraft:lantern\[hanging=false|brewing_stand/;
+        for (const players of [4, 15])
+            for (let seed = 0; seed < 5; seed += 1) {
+                const at = blocksOf(im.layoutFor(`run-${seed}`, im.stationBox(SITE, Y, players)));
+                const left = new Map(at);
+                for (const id of order)
+                    for (const [key, block] of left) if (bare(block) === id) left.delete(key);
+                expect(left.size).toBe(0);
+                for (const [key, block] of at) {
+                    const [x, y, z] = key.split(",").map(Number) as [number, number, number];
+                    const hanging = block.includes("hanging=true");
+                    if (!hanging && !STANDS.test(block)) continue;
+                    const holder = at.get(`${x},${hanging ? y + 1 : y - 1},${z}`);
+                    expect(holder, `${block} at ${key}`).toBeDefined();
+                    if (holder === undefined) continue;
+                    expect(order.indexOf(bare(block)), `${block} on ${holder}`).toBeLessThan(
+                        order.indexOf(bare(holder))
+                    );
+                }
+            }
+    });
+
+    it("names every room of the ship in both languages", () => {
+        for (const room of [...SHIP, ...WING, "navigation", "shields", "communications"] as const) {
+            expect(said.roomName(room, "en")).toMatch(/\w/);
+            expect(said.roomName(room, "es")).toMatch(/\w/);
+        }
+        expect(said.roomName("cafeteria", "es")).toBe("Cafetería");
     });
 });
 
@@ -454,7 +671,8 @@ describe("votes", () => {
     it("takes a press only from beside what it names", () => {
         const layout = im.layoutFor("reach", im.stationBox(SITE, Y, 8));
         const y = layout.box.y1 + 1;
-        const far = { x: layout.meeting.x + 5, y, z: layout.meeting.z + 5 };
+        const table = im.tableAt(layout);
+        const far = { x: table.x - 2, y, z: table.z - 2 };
         const lever = layout.stations.find((one) => one.kind !== "scan")!;
         const plate = layout.stations.find((one) => one.kind === "scan")!;
         const task = { kind: "task", station: lever.id } as const;

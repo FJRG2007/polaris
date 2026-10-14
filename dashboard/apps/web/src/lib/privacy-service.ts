@@ -58,6 +58,7 @@ export class PrivacyError extends Error {
 
 /** The columns holding one row's audiences, which is every field there is. */
 const AUDIENCE_COLUMNS = {
+    profile: true,
     avatar: true,
     photoFullSize: true,
     fullName: true,
@@ -250,25 +251,37 @@ export async function allowedBy(
         return (
             audience === "friends" ||
             audience === "friendsExcept" ||
-            audience === "friendsOfFriends"
+            audience === "friendsOfFriends" ||
+            core.audienceNeedsSpaces(audience)
         );
     });
+    const needsSpaces = wanted.filter((userId) => core.audienceNeedsSpaces(audiences.get(userId)!));
 
-    const [listed, friends, reach, shared] = await Promise.all([
+    const anonymous = viewer.id === "";
+    const [listed, friends, reach, shared, rooms] = await Promise.all([
         listingViewer(
             viewer.id,
             field,
-            wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
+            anonymous
+                ? []
+                : wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
         ),
-        needsFriends.length > 0 ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
+        !anonymous && needsFriends.length > 0
+            ? friendIds(viewer.id)
+            : Promise.resolve(new Set<string>()),
         reachBetween(
             viewer.id,
-            needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
+            anonymous
+                ? []
+                : needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
         ),
         sharingAFriend(
             viewer.id,
-            needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
-        )
+            anonymous
+                ? []
+                : needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
+        ),
+        sharingASpace(viewer.id, anonymous ? [] : needsSpaces)
     ]);
 
     return new Set(
@@ -280,7 +293,9 @@ export async function allowedBy(
                 inList: listed.has(userId),
                 subjectFollowsViewer: reach.subjectFollows.has(userId),
                 viewerFollowsSubject: reach.viewerFollows.has(userId),
-                sharesAFriend: shared.has(userId)
+                sharesAFriend: shared.has(userId),
+                sharesSpace: rooms.any.has(userId),
+                sharesSmallSpace: rooms.small.has(userId)
             })
         )
     );
@@ -365,6 +380,79 @@ async function sharingAFriend(
         if (wanted.has(row.addresseeId)) shared.add(row.addresseeId);
     }
     return shared;
+}
+
+/**
+ * Which of these subjects share a chat space with the viewer, and which share a
+ * small one (`core.isSmallSpace`).
+ *
+ * Owning a space counts as being in it - the owner is never a member row, the
+ * same arrangement `mutualSpaces` reads - and archived spaces are left out for
+ * the same reason they are there: a room nobody uses is not one the two of them
+ * are in today.
+ *
+ * Four reads whatever the number of subjects, and never one per subject: the
+ * viewer's spaces, the subjects' places in those, and - only when somebody's
+ * answer turns on size - one grouped count over the spaces they share, served by
+ * the `(spaceId, userId)` index. The count only covers shared spaces, so a viewer
+ * in one huge space costs one indexed count, not a scan of the instance.
+ */
+export async function sharingASpace(
+    viewerId: string,
+    subjectIds: readonly string[]
+): Promise<{ any: Set<string>; small: Set<string> }> {
+    const none = { any: new Set<string>(), small: new Set<string>() };
+    if (subjectIds.length === 0) return none;
+
+    const mine = await prisma.chatSpace.findMany({
+        where: {
+            archived: false,
+            OR: [{ ownerId: viewerId }, { members: { some: { userId: viewerId } } }]
+        },
+        select: { id: true, ownerId: true }
+    });
+    if (mine.length === 0) return none;
+
+    const ids = [...subjectIds];
+    const spaceIds = mine.map((space) => space.id);
+    const memberships = await prisma.chatSpaceMember.findMany({
+        where: { spaceId: { in: spaceIds }, userId: { in: ids } },
+        select: { spaceId: true, userId: true }
+    });
+
+    // Which spaces each subject shares with the viewer, owners included.
+    const wanted = new Set(ids);
+    const sharedBy = new Map<string, Set<string>>();
+    const note = (userId: string, spaceId: string) => {
+        if (!wanted.has(userId)) return;
+        const spaces = sharedBy.get(userId) ?? new Set<string>();
+        spaces.add(spaceId);
+        sharedBy.set(userId, spaces);
+    };
+    for (const row of memberships) note(row.userId, row.spaceId);
+    for (const space of mine) note(space.ownerId, space.id);
+    if (sharedBy.size === 0) return none;
+
+    const counted = [...new Set([...sharedBy.values()].flatMap((spaces) => [...spaces]))];
+    const counts = await prisma.chatSpaceMember.groupBy({
+        by: ["spaceId"],
+        where: { spaceId: { in: counted } },
+        _count: { _all: true }
+    });
+    const rows = new Map(counts.map((row) => [row.spaceId, row._count._all]));
+    // The owner is the one person a space holds who is not a row.
+    const small = new Set(
+        counted.filter((spaceId) => core.isSmallSpace((rows.get(spaceId) ?? 0) + 1))
+    );
+
+    return {
+        any: new Set(sharedBy.keys()),
+        small: new Set(
+            [...sharedBy]
+                .filter(([, spaces]) => [...spaces].some((id) => small.has(id)))
+                .map(([userId]) => userId)
+        )
+    };
 }
 
 /**

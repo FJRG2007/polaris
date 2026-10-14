@@ -2,8 +2,10 @@
 
 /**
  * Actions behind the clickable actor in the activity feed: look up a user's
- * profile, and (for admins) ban or unban them. Email and ban details are only
- * returned to admins; banning itself belongs to the user-administration service,
+ * profile, and (for admins) ban or unban them. Email, the admin flag and the
+ * ban state are only returned to admins (the admin flag also to the person
+ * themselves): anyone signed in can open this for any id, and who administers
+ * the instance or who was banned is not theirs to enumerate; banning itself belongs to the user-administration service,
  * so a ban means the same thing here as it does in the people directory.
  */
 
@@ -17,7 +19,9 @@ export interface UserProfile {
     name: string;
     /** Only populated for admin viewers. */
     email: string | null;
+    /** Only true for admin viewers, or for the viewer's own account. */
     isAdmin: boolean;
+    /** Only true for admin viewers. */
     banned: boolean;
     /** Only populated for admin viewers. */
     banReason: string | null;
@@ -27,23 +31,33 @@ export interface UserProfile {
     viewerIsAdmin: boolean;
 }
 
-export async function getUserProfileAction(userId: string): Promise<{ profile?: UserProfile; error?: string }> {
+export async function getUserProfileAction(
+    userId: string
+): Promise<{ profile?: UserProfile; error?: string }> {
     const viewer = await requireUser();
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, name: true, email: true, isAdmin: true, bannedAt: true, banReason: true }
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            isAdmin: true,
+            bannedAt: true,
+            banReason: true
+        }
     });
     if (!user) return { error: (await getTranslations("drive"))("errors.userNotFound") };
     const admin = viewer.isAdmin;
+    const self = user.id === viewer.id;
     return {
         profile: {
             id: user.id,
             name: user.name,
             email: admin ? user.email : null,
-            isAdmin: user.isAdmin,
-            banned: user.bannedAt !== null,
+            isAdmin: admin || self ? user.isAdmin : false,
+            banned: admin ? user.bannedAt !== null : false,
             banReason: admin ? user.banReason : null,
-            self: user.id === viewer.id,
+            self,
             viewerIsAdmin: admin
         }
     };

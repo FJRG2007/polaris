@@ -42,7 +42,16 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, cn } from "@polaris/ui";
 import { effectOf, linkLabel, nameLookOf } from "@polaris/core";
-import { AtSign, BadgeCheck, Building2, CalendarDays, LinkIcon, Mail, Pencil } from "lucide-react";
+import {
+    AtSign,
+    BadgeCheck,
+    Building2,
+    CalendarDays,
+    LinkIcon,
+    Lock,
+    Mail,
+    Pencil
+} from "lucide-react";
 import {
     frameCss,
     nameStyleClass,
@@ -200,13 +209,20 @@ export function ProfileCard({
                     <MutualPanel friends={profile.mutual.friends} spaces={profile.mutual.spaces} />
                 ) : null}
 
-                <FollowLists
-                    personId={profile.id}
-                    name={profile.name}
-                    followers={profile.follows.followers}
-                    following={profile.follows.following}
-                    showsNames={profile.follows.showsNames}
-                />
+                {profile.restricted ? (
+                    <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                        <Lock className="size-3.5 shrink-0" />
+                        {t("profile.restricted")}
+                    </p>
+                ) : (
+                    <FollowLists
+                        personId={profile.id}
+                        name={profile.name}
+                        followers={profile.follows.followers}
+                        following={profile.follows.following}
+                        showsNames={profile.follows.showsNames}
+                    />
+                )}
 
                 {profile.description ? (
                     <p className="text-sm leading-relaxed text-foreground/90">
@@ -278,21 +294,25 @@ export function ProfileCard({
                     </div>
                 ) : null}
 
-                <div className="text-muted-foreground flex flex-col gap-1.5 border-t border-border pt-4 text-sm">
-                    {profile.email ? (
-                        <a
-                            href={`mailto:${profile.email}`}
-                            className="flex items-center gap-1.5 hover:text-foreground"
-                        >
-                            <Mail className="size-3.5 shrink-0" />
-                            {profile.email}
-                        </a>
-                    ) : null}
-                    <p className="flex items-center gap-1.5">
-                        <CalendarDays className="size-3.5 shrink-0" />
-                        {t("profile.hereSince", { date: format.date(profile.joinedAt) })}
-                    </p>
-                </div>
+                {profile.email || profile.joinedAt ? (
+                    <div className="text-muted-foreground flex flex-col gap-1.5 border-t border-border pt-4 text-sm">
+                        {profile.email ? (
+                            <a
+                                href={`mailto:${profile.email}`}
+                                className="flex items-center gap-1.5 hover:text-foreground"
+                            >
+                                <Mail className="size-3.5 shrink-0" />
+                                {profile.email}
+                            </a>
+                        ) : null}
+                        {profile.joinedAt ? (
+                            <p className="flex items-center gap-1.5">
+                                <CalendarDays className="size-3.5 shrink-0" />
+                                {t("profile.hereSince", { date: format.date(profile.joinedAt) })}
+                            </p>
+                        ) : null}
+                    </div>
+                ) : null}
             </CardBody>
         </Card>
     );

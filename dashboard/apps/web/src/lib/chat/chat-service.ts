@@ -15,7 +15,7 @@ import { publishChatChange } from "./live";
 import { groupOwnerId } from "./ownership";
 import { prisma, type Prisma } from "@polaris/db";
 import { nicknamesFor } from "@/lib/contact-names";
-import { dropGrantsFor } from "@/lib/access/grants";
+import { dropGrantsFor, grantedSubjects } from "@/lib/access/grants";
 import { discardChannelFiles } from "./attachments";
 import { discardAvatars } from "@/lib/avatar-service";
 import { readsOrgWhere } from "@/lib/orgs/org-service";
@@ -34,6 +34,7 @@ import {
     pinsAllowed,
     invitesAllowed,
     roomMentionsAllowed,
+    membershipReach,
     reachableSpaceIds,
     requireChannel,
     requireSpace,
@@ -693,7 +694,7 @@ export async function listChannels(
     // Three independent reads, asked together: the spaces decide which public
     // channels are listed, and neither the memberships nor the administered
     // spaces depend on them.
-    const [spaces, memberships, administered] = await Promise.all([
+    const [spaces, memberships, administered, granted] = await Promise.all([
         reachableSpaceIds(actor),
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id },
@@ -708,7 +709,8 @@ export async function listChannels(
                 timeoutUntil: true
             }
         }),
-        administeredSpaceIds(actor)
+        administeredSpaceIds(actor),
+        grantedSubjects(actor.id, "chat.channel")
     ]);
     const mine = new Map(memberships.map((row) => [row.channelId, row]));
 
@@ -716,7 +718,11 @@ export async function listChannels(
         where: {
             ...(typeof only === "string" ? { id: only } : only ? { id: { in: [...only] } } : {}),
             OR: [
-                { id: { in: memberships.map((row) => row.channelId) } },
+                membershipReach(
+                    memberships.map((row) => row.channelId),
+                    spaces,
+                    granted.keys()
+                ),
                 ...(spaces.size ? [{ spaceId: { in: [...spaces] }, private: false }] : [])
             ]
         },
@@ -2130,13 +2136,26 @@ export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadC
     // with an end that has passed is not a mute, and nothing runs to clear it.
     const heard = memberships.filter((row) => !core.muteInForce(row));
     if (heard.length === 0) return [];
+    const [spaces, granted] = await Promise.all([
+        reachableSpaceIds(actor),
+        grantedSubjects(actor.id, "chat.channel")
+    ]);
 
     // The open shelf's chat only, as the rail lists it: an organization keeping
     // its own chat is a count on its shelf, not on every shelf the reader has.
     const live = await onOpenShelf(
         actor,
         await prisma.chatChannel.findMany({
-            where: { id: { in: heard.map((row) => row.channelId) }, archived: false },
+            // Only rooms the badge's reader can still open: a row left in a space
+            // they no longer reach must not light a number for it.
+            where: {
+                ...membershipReach(
+                    heard.map((row) => row.channelId),
+                    spaces,
+                    granted.keys()
+                ),
+                archived: false
+            },
             select: { id: true, spaceId: true, orgId: true, lastMessageAt: true }
         })
     );

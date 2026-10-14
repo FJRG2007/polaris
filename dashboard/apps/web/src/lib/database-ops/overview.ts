@@ -107,7 +107,11 @@ export type DatabaseOverview = Awaited<ReturnType<typeof databaseOverview>>;
 
 /** The managed databases whose data could be copied into this one: the same
  *  engine (MySQL and MariaDB load each other's dumps), deployed, not itself. */
-export async function copySources(databaseId: string, ownerId: string) {
+export async function copySources(
+    databaseId: string,
+    ownerId: string,
+    environmentIds: readonly string[] | null = null
+) {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         select: { engine: true, environment: { select: { projectId: true } } }
@@ -115,10 +119,12 @@ export async function copySources(databaseId: string, ownerId: string) {
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     const engines =
         row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
-    // The same project: access was checked for it, and for nothing wider.
+    // The same project, and only the environments the reader can reach in it:
+    // access was checked for those, and for nothing wider.
     const rows = await prisma.managedDatabase.findMany({
         where: {
             id: { not: databaseId },
+            ...(environmentIds ? { environmentId: { in: [...environmentIds] } } : {}),
             engine: { in: engines },
             // A cluster cannot be dumped as one database (see `copyInto`).
             clusterMasters: null,

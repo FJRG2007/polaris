@@ -9550,6 +9550,10 @@ model UserPrivacy {
     // account, and the one setting here that decides whether two people who
     // share an instance can find each other at all.
     discoverable String   @default("everyone")
+    // Who may read the profile itself - what they wrote, their links, their
+    // banner. Everybody else gets the name and the photo. Open by default, which
+    // is what every account had before this existed.
+    profile      String   @default("everyone")
     lastSeen     String   @default("everyone")
     readReceipts String   @default("everyone")
     avatar       String   @default("everyone")

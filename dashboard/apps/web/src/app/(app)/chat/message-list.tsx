@@ -1249,7 +1249,7 @@ function Message({
                     </div>
 
                     {canPost && !message.deleted && (
-                        <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex">
+                        <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex has-[[aria-expanded=true]]:flex">
                             {quick.map((choice) => {
                                 const ref = core.parseCustomEmojiToken(choice);
                                 const named = ref ? core.customEmojiFallback(ref) : choice;

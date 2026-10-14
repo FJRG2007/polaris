@@ -84,6 +84,15 @@ export function KeepCommandDialog({
                 : null,
         [draft.command, normalized]
     );
+    // The ones the command declares itself, `{x}` or `{x=100}`: asked for when
+    // it runs, without a row of their own.
+    const inline = useMemo(
+        () =>
+            vars
+                .commandVariables(draft.command.trim(), normalized)
+                .custom.filter((one) => !normalized.some((declared) => declared.name === one.name)),
+        [draft.command, normalized]
+    );
     const ready = draft.command.trim().length > 0 && !problem && !unnamed && !pending;
 
     /** Put a `{name}` where the caret is, and leave the caret after it. */
@@ -137,6 +146,19 @@ export function KeepCommandDialog({
                             <span className="text-xs text-muted-foreground">
                                 {t("consoleVars.commandHint")}
                             </span>
+                            {inline.length > 0 && (
+                                <span className="text-xs break-words text-muted-foreground">
+                                    {t("consoleVars.fromCommand", {
+                                        names: inline
+                                            .map((one) =>
+                                                one.initial
+                                                    ? `${one.name} = ${one.initial}`
+                                                    : one.name
+                                            )
+                                            .join(", ")
+                                    })}
+                                </span>
+                            )}
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-sm font-medium">{t("console.name")}</span>

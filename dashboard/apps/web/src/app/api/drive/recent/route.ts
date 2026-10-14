@@ -63,12 +63,19 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
+    if (!connectionId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.missingConnection") },
+            { status: 400 }
+        );
     const byParam = url.searchParams.get("by");
     const by: RecentSort =
         byParam === "created" ? "created" : byParam === "opened" ? "opened" : "modified";
@@ -84,7 +91,10 @@ export async function GET(request: Request): Promise<Response> {
             });
         }
         if (caught instanceof DriveAccessError)
-            return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+            return Response.json(
+                { error: (await readerWords("api"))("errors.forbidden") },
+                { status: 403 }
+            );
         throw caught;
     }
 
@@ -109,15 +119,11 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         let entries: RecentEntry[];
+        const mayRead = await drivePathFilter(user.id, connectionId, "read");
         if (by === "opened") {
-            entries = await recentlyOpened(driver, user.id, connectionId, underLockedRoot);
+            entries = await recentlyOpened(driver, user.id, connectionId, underLockedRoot, mayRead);
         } else {
-            entries = await recentlyTouched(
-                driver,
-                by,
-                lockedRoots,
-                await drivePathFilter(user.id, connectionId, "read")
-            );
+            entries = await recentlyTouched(driver, by, lockedRoots, mayRead);
         }
 
         const meta = await getMetaMap(
@@ -182,12 +188,15 @@ async function recentlyTouched(
     return files.slice(0, RESULT_LIMIT);
 }
 
-/** The caller's recent open/download/upload events, de-duplicated and confirmed to exist. */
+/** The caller's recent open/download/upload events, de-duplicated and confirmed to
+ *  exist. Each path is re-checked: a folder the reader opened last week may be
+ *  denied to them today, and their own history must not keep naming its files. */
 async function recentlyOpened(
     driver: Awaited<ReturnType<typeof getDriverForConnection>>,
     userId: string,
     connectionId: string,
-    underLockedRoot: (path: string) => boolean
+    underLockedRoot: (path: string) => boolean,
+    mayRead: (path: string) => Promise<boolean>
 ): Promise<RecentEntry[]> {
     const rows = await prisma.auditLog.findMany({
         where: {
@@ -219,6 +228,7 @@ async function recentlyOpened(
     const results: RecentEntry[] = [];
     for (const [path, openedAt] of seen) {
         if (results.length >= RESULT_LIMIT) break;
+        if (!(await mayRead(path))) continue;
         try {
             const stat = await driver.stat(path);
             if (stat.kind !== "file") continue;

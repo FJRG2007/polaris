@@ -78,6 +78,29 @@ export interface InstalledAppView {
     ownerId: string;
 }
 
+/**
+ * An install as one reader is sent it. Their own is the whole row. Somebody
+ * else's - an instance-wide app another person installed - leaves out who owns
+ * it and where it runs, which no screen shows, and carries the service id only
+ * to a reader who may uninstall it: the uninstall dialog is the one place that
+ * reads it, and only to say whether data is left behind.
+ */
+export interface InstalledAppReaderView extends Omit<InstalledAppView, "ownerId" | "targetId"> {
+    ownerId?: string;
+    targetId?: string | null;
+}
+
+/** One install, cut to what `readerId` may be sent (see `InstalledAppReaderView`). */
+export function installForReader(
+    item: InstalledAppView,
+    readerId: string,
+    canUninstall: boolean
+): InstalledAppReaderView {
+    if (item.ownerId === readerId) return item;
+    const { ownerId: _ownerId, targetId: _targetId, ...shared } = item;
+    return { ...shared, applicationId: canUninstall ? item.applicationId : null };
+}
+
 /** A name no service in this environment is using yet, numbering repeats the way
  *  a file manager does ("Minecraft server 2"). */
 async function availableInstanceName(environmentId: string, wanted: string): Promise<string> {

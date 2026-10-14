@@ -12,6 +12,12 @@
  * the vent it is paired with (`layoutFor`). Laid out from the run's id and the
  * number of rows, so a restart lays out the same.
  *
+ * From design 3 (`SHIP_SINCE`) the station is a ship instead
+ * (`impostor-ship.ts`): a cafeteria with the emergency table, themed rooms
+ * of their own sizes joined by long corridors and halls, each furnished by
+ * hand for what it is, with its tasks where they make sense and a vent where
+ * one can go. A run built on an older design keeps its own.
+ *
  * Who is an impostor is drawn from the run's id among who was brought in, never
  * more than a third of them (`impostorsFor`); each crew member is given tasks
  * drawn the same way (`tasksFor`), an impostor a list of the same shape to
@@ -31,11 +37,12 @@
 import { z } from "zod";
 import * as hits from "./hits";
 import type { Box } from "../state";
-import type { Spot } from "./arena";
+import { slices, type Spot } from "./arena";
 import type { Fill } from "./arena-game";
 import { asciiJson, customNameValue, text } from "../commands";
 import { seeded, shuffled } from "../trivia-bank";
 import * as decor from "./arena-decor";
+import * as ship from "./impostor-ship";
 
 /** How many can play: a seat each at the table. */
 export const MOST = 15;
@@ -49,8 +56,11 @@ export const PER_IMPOSTOR = 3;
 /** The station's layout version, written into the run as it is built: from 2
  *  (`FURNISHED_SINCE`) bigger rooms, a bridge looking out on space, a dark
  *  room, and every room furnished for what it is. */
-export const DESIGN = 2;
+export const DESIGN = 3;
 export const FURNISHED_SINCE = 2;
+/** From 3: the ship (`impostor-ship.ts`), past eight players with its engine
+ *  wing. */
+export const SHIP_SINCE = 3;
 
 // ------------------------------------------------------------------ the station
 
@@ -134,14 +144,20 @@ export function rowsFor(players: number): number {
     return players <= 8 ? 3 : 4;
 }
 
-function sizeOf(rows: number, g: Geometry): { width: number; depth: number } {
+function sizeOf(rows: number, design: number): { width: number; depth: number } {
+    if (design >= SHIP_SINCE)
+        return {
+            width: shipCols(rows) * ship.PITCH,
+            depth: ship.ROWS_FULL * ship.PITCH
+        };
+    const g = geometryOf(design);
     const pitch = g.room + g.gap;
     return { width: COLS * pitch - g.gap, depth: rows * pitch - g.gap };
 }
 
 /** How far from its center the ground under it is judged. */
 export function reachOf(players: number, design = DESIGN): number {
-    const { width, depth } = sizeOf(rowsFor(players), geometryOf(design));
+    const { width, depth } = sizeOf(rowsFor(players), design);
     return Math.ceil(Math.max(width, depth) / 2) + 2;
 }
 
@@ -153,7 +169,7 @@ export function stationBox(
     design = DESIGN
 ): Box {
     const g = geometryOf(design);
-    const { width, depth } = sizeOf(rowsFor(players), g);
+    const { width, depth } = sizeOf(rowsFor(players), design);
     const x1 = Math.round(center.x) - Math.floor(width / 2);
     const z1 = Math.round(center.z) - Math.floor(depth / 2);
     return { x1, y1: floorY, z1, x2: x1 + width - 1, y2: floorY + g.wall + 1, z2: z1 + depth - 1 };
@@ -161,6 +177,7 @@ export function stationBox(
 
 /** The rows a built station has, from its box. */
 export function rowsOf(box: Box, design = DESIGN): number {
+    if (design >= SHIP_SINCE) return box.x2 - box.x1 + 1 >= ship.COLS_FULL * ship.PITCH ? 4 : 3;
     const g = geometryOf(design);
     return Math.round((box.z2 - box.z1 + 1 + g.gap) / (g.room + g.gap));
 }
@@ -184,8 +201,9 @@ export const ROOM_NAMES = [
     "radio"
 ] as const;
 export type RoomName = (typeof ROOM_NAMES)[number];
-/** What any room is called: a working room's name, the meeting room or the bridge. */
-export type PlaceName = RoomName | "meeting" | "bridge";
+/** What any room is called: a working room's name, the meeting room or the
+ *  bridge, or one of the ship's (`SHIP_SINCE`). */
+export type PlaceName = RoomName | "meeting" | "bridge" | ship.ShipRoom;
 
 export interface Room {
     readonly index: number;
@@ -198,6 +216,9 @@ export interface Room {
     readonly floor: string;
     /** Left unlit, its floor dark glass (`FURNISHED_SINCE`). */
     readonly dark?: boolean;
+    /** Its size, walls included, where rooms differ (`SHIP_SINCE`). */
+    readonly w?: number;
+    readonly d?: number;
 }
 
 export interface Station {
@@ -241,6 +262,8 @@ export interface Layout {
     readonly props: readonly Prop[];
     /** Where the bridge's sky has a star, by `dx,dy` along its backdrop. */
     readonly stars: ReadonlySet<string>;
+    /** What furnishes the ship's rooms, as it is built (`SHIP_SINCE`). */
+    readonly pieces: readonly Fill[];
 }
 
 const WALL_BLOCK = "minecraft:light_gray_concrete";
@@ -418,6 +441,7 @@ export const STATION_BLOCKS: readonly string[] = [
     PLATE,
     VENT,
     ...STANDING,
+    ...ship.SHIP_STANDING.map(bareId),
     CONSOLE,
     TABLE,
     TABLE_MIDDLE,
@@ -432,6 +456,7 @@ export const STATION_BLOCKS: readonly string[] = [
                     ![CONSOLE, WINDOW, DARK_FLOOR].includes(id)
             )
     ),
+    ...ship.SHIP_BLOCKS,
     LIGHT,
     ROOF,
     WALL_BLOCK,
@@ -457,6 +482,7 @@ function roomCorner(box: Box, col: number, row: number, g: Geometry): { x: numbe
  * room but the meeting room is furnished (`furnishing`).
  */
 export function layoutFor(seed: string, box: Box, design = DESIGN): Layout {
+    if (design >= SHIP_SINCE) return shipLayout(seed, box, design);
     const g = geometryOf(design);
     const furnished = design >= FURNISHED_SINCE;
     const rows = rowsOf(box, design);
@@ -529,7 +555,8 @@ export function layoutFor(seed: string, box: Box, design = DESIGN): Layout {
         stations,
         vents,
         props: [],
-        stars: new Set()
+        stars: new Set(),
+        pieces: []
     };
     if (!furnished) return bare;
     const stars = new Set<string>();
@@ -557,7 +584,7 @@ function furnishing(layout: Layout, random: () => number): Prop[] {
     const props: Prop[] = [];
     for (const room of layout.rooms) {
         if (room.name === "meeting") continue;
-        const kind = room.dark ? FURNISHING.dark : FURNISHING[room.name];
+        const kind = room.dark ? FURNISHING.dark : FURNISHING[room.name as RoomName | "bridge"];
         const spots: { x: number; z: number }[] = [];
         for (let dx = 1; dx < g.room - 1; dx += 1)
             for (let dz = 1; dz < g.room - 1; dz += 1) {
@@ -588,6 +615,7 @@ export type Cell = "void" | "wall" | "corridor" | "space" | "window" | number;
  *  (its index), the bridge's space or window, or nothing, with `x1`, `z1` at
  *  [0][0]. */
 export function planOf(layout: Layout): Cell[][] {
+    if (layout.design >= SHIP_SINCE) return shipPlan(layout);
     const { box, rooms } = layout;
     const g = geometryOf(layout.design);
     const side = g.room;
@@ -670,6 +698,9 @@ function rectangles(
 
 /** The middle of the meeting room's floor. */
 export function tableAt(layout: Layout): { x: number; z: number } {
+    const { meeting } = layout;
+    if (meeting.w !== undefined && meeting.d !== undefined)
+        return { x: meeting.x + (meeting.w - 1) / 2, z: meeting.z + (meeting.d - 1) / 2 };
     const middle = geometryOf(layout.design).table;
     return { x: layout.meeting.x + middle, z: layout.meeting.z + middle };
 }
@@ -695,6 +726,7 @@ function lit(g: Geometry, room: Room, dx: number, dz: number): boolean {
  * it would drop as an item.
  */
 export function stationFills(layout: Layout): Fill[] {
+    if (layout.design >= SHIP_SINCE) return shipFills(layout);
     const { box } = layout;
     const g = geometryOf(layout.design);
     const wall = g.wall;
@@ -792,12 +824,25 @@ export function stationFills(layout: Layout): Fill[] {
                     )
                 );
         }
-    // The table, the button on it.
+    fills.push(...furniture(layout));
+    for (const prop of layout.props)
+        for (let dy = 1; dy <= prop.high; dy += 1)
+            fills.push(one(prop.x, y0 + dy, prop.z, prop.block));
+    if (proof) fills.push(flat(proof, CORRIDOR_FLOOR, y0));
+    return fills;
+}
+
+/** One block. */
+function one(x: number, y: number, z: number, block: string): Fill {
+    return { box: { x1: x, y1: y, z1: z, x2: x, y2: y, z2: z }, block };
+}
+
+/** The table with the emergency button on it, the stations - a console with a
+ *  switch or a button on it, or a plate - and the vents, shut. */
+function furniture(layout: Layout): Fill[] {
+    const y0 = layout.box.y1;
+    const fills: Fill[] = [];
     const table = tableAt(layout);
-    const one = (x: number, y: number, z: number, block: string): Fill => ({
-        box: { x1: x, y1: y, z1: z, x2: x, y2: y, z2: z },
-        block
-    });
     const edge = (z: number): Fill => ({
         box: { x1: table.x - 1, z1: z, x2: table.x + 1, z2: z, y1: y0 + 1, y2: y0 + 1 },
         block: TABLE
@@ -823,13 +868,405 @@ export function stationFills(layout: Layout): Fill[] {
         );
     }
     for (const vent of layout.vents) fills.push(one(vent.x, y0 + 1, vent.z, VENT_SHUT));
-    for (const prop of layout.props)
-        for (let dy = 1; dy <= prop.high; dy += 1)
-            fills.push(one(prop.x, y0 + dy, prop.z, prop.block));
-    if (proof) fills.push(flat(proof, CORRIDOR_FLOOR, y0));
     return fills;
 }
 
+// ------------------------------------------------------------------ the ship
+
+/** The ship's columns of cells: the engine wing only on four rows. */
+function shipCols(rows: number): number {
+    return rows >= 4 ? ship.COLS_FULL : ship.COLS_FULL - ship.WING_COLS;
+}
+
+/** The first column of cells a ship of this many rows has. */
+function shipFirst(rows: number): number {
+    return rows >= 4 ? 0 : ship.WING_COLS;
+}
+
+/** The middle of a span of cells, by the ship's own columns. */
+function cellMiddle(
+    box: Box,
+    first: number,
+    cols: readonly [number, number],
+    rows: readonly [number, number]
+): { x: number; z: number } {
+    return {
+        x: box.x1 + ((cols[0] + cols[1] - 2 * first + 1) * ship.PITCH) / 2,
+        z: box.z1 + ((rows[0] + rows[1] + 1) * ship.PITCH) / 2
+    };
+}
+
+/** Vent pairs on the small ship and the full one. */
+const SHIP_PAIRS = { small: 3, full: 4 } as const;
+/** How near a doorway nothing in the way of walking is put. */
+const DOOR_CLEAR = 2;
+
+/**
+ * The ship's rooms, from the run's id: every room where `impostor-ship`
+ * places it, drawn by its template; the stations each template asks for; the
+ * vents drawn among the rooms that have a place for one, paired both ways; and
+ * the furnishing, kept off the stations, the vents and where they let out, the
+ * seats round the table and the doorways, merged into as few fills as cover it.
+ */
+function shipLayout(seed: string, box: Box, design: number): Layout {
+    const rows = rowsOf(box, design);
+    const first = shipFirst(rows);
+    const random = seeded(`${seed}-impostor-${design}`);
+    const rooms: Room[] = ship.PLOTS.filter((plot) => rows >= 4 || !plot.wing).map(
+        (plot, index) => {
+            const middle = cellMiddle(box, first, plot.cols, plot.rows);
+            return {
+                index,
+                col: plot.cols[0] - first,
+                row: plot.rows[0],
+                x: middle.x - (plot.w - 1) / 2,
+                z: middle.z - (plot.d - 1) / 2,
+                w: plot.w,
+                d: plot.d,
+                name: plot.name,
+                floor: ship.FLOORS[plot.name]
+            };
+        }
+    );
+    const meeting = rooms.find((one) => one.name === "cafeteria")!;
+    const stations: Station[] = [];
+    const spots: Omit<Vent, "to">[] = [];
+    const drawn = new Map<string, string>();
+    for (const room of rooms) {
+        const w = room.w! - 2;
+        const d = room.d! - 2;
+        const at = (u: number, l: number, v: number) => `${room.x + 1 + u},${l},${room.z + 1 + v}`;
+        ship.TEMPLATES[room.name as ship.ShipRoom]({
+            w,
+            d,
+            random,
+            put(block, u1, l1, v1, u2 = u1, l2 = l1, v2 = v1) {
+                for (let u = Math.max(0, u1); u <= Math.min(w - 1, u2); u += 1)
+                    for (let l = Math.max(1, l1); l <= Math.min(ship.WALL, l2); l += 1)
+                        for (let v = Math.max(0, v1); v <= Math.min(d - 1, v2); v += 1)
+                            if (!drawn.has(at(u, l, v))) drawn.set(at(u, l, v), block);
+            },
+            station(kind, u, v) {
+                stations.push({
+                    id: stations.length,
+                    room: room.index,
+                    kind,
+                    x: room.x + 1 + u,
+                    z: room.z + 1 + v
+                });
+            },
+            vent(u, v, outU, outV) {
+                spots.push({
+                    room: room.index,
+                    x: room.x + 1 + u,
+                    z: room.z + 1 + v,
+                    outX: room.x + 1 + outU,
+                    outZ: room.z + 1 + outV
+                });
+            }
+        });
+    }
+    const pairs = rows >= 4 ? SHIP_PAIRS.full : SHIP_PAIRS.small;
+    const vents: Vent[] = shuffled(spots, random)
+        .slice(0, pairs * 2)
+        .map((spot, index) => ({ ...spot, to: index % 2 === 0 ? index + 1 : index - 1 }));
+    const stars = new Set<string>();
+    const navigation = rooms.find((one) => one.name === "navigation")!;
+    for (let dz = 1; dz < navigation.d! - 1; dz += 1)
+        for (let dy = 1; dy <= ship.WALL; dy += 1) if (random() < 0.22) stars.add(`${dz},${dy}`);
+    const bare: Layout = {
+        box,
+        design,
+        rows,
+        rooms,
+        meeting,
+        stations,
+        vents,
+        props: [],
+        stars,
+        pieces: []
+    };
+    return { ...bare, pieces: shipPieces(bare, drawn) };
+}
+
+/** What the templates drew, kept where it is in nobody's way. */
+function shipPieces(layout: Layout, drawn: ReadonlyMap<string, string>): Fill[] {
+    const { box } = layout;
+    const plan = planOf(layout);
+    const cell = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
+    const clear = new Set<string>();
+    for (const spot of [
+        ...layout.stations,
+        ...layout.vents,
+        ...layout.vents.map((vent) => ({ x: vent.outX, z: vent.outZ }))
+    ])
+        clear.add(`${spot.x},${spot.z}`);
+    const table = tableAt(layout);
+    const seats = geometryOf(layout.design).seats + 1;
+    const byDoor = (x: number, z: number) => {
+        for (let ax = -DOOR_CLEAR; ax <= DOOR_CLEAR; ax += 1)
+            for (let az = -DOOR_CLEAR; az <= DOOR_CLEAR; az += 1)
+                if (cell(x + ax, z + az) === "corridor") return true;
+        return false;
+    };
+    const stays = new Map<string, string>();
+    for (const [key, block] of drawn) {
+        const [x, level, z] = key.split(",").map(Number) as [number, number, number];
+        if (typeof cell(x, z) !== "number") continue;
+        if (level <= 2) {
+            if (clear.has(`${x},${z}`) || byDoor(x, z)) continue;
+            if (Math.max(Math.abs(x - table.x), Math.abs(z - table.z)) <= seats) continue;
+        }
+        stays.set(key, block);
+    }
+    // Nothing left standing on what was kept out, nor hanging from it.
+    const held = (key: string, block: string) => {
+        const [x, level, z] = key.split(",").map(Number) as [number, number, number];
+        if (block.includes("hanging=true"))
+            return level === ship.WALL || stays.has(`${x},${level + 1},${z}`);
+        if (!(ship.SHIP_STANDING as readonly string[]).includes(bareId(block))) return true;
+        return level === 1 || stays.has(`${x},${level - 1},${z}`);
+    };
+    for (let changed = true; changed; ) {
+        changed = false;
+        for (const [key, block] of stays)
+            if (!held(key, block)) {
+                stays.delete(key);
+                changed = true;
+            }
+    }
+    const kept = new Map<string, Map<number, Set<string>>>();
+    for (const [key, block] of stays) {
+        const [x, level, z] = key.split(",").map(Number) as [number, number, number];
+        const levels = kept.get(block) ?? new Map<number, Set<string>>();
+        const columns = levels.get(level) ?? new Set<string>();
+        columns.add(`${x},${z}`);
+        levels.set(level, columns);
+        kept.set(block, levels);
+    }
+    const pieces: { fill: Fill; level: number; hanging: boolean }[] = [];
+    for (const [block, levels] of kept)
+        for (const [level, columns] of levels)
+            for (const rect of merged(columns))
+                pieces.push({
+                    fill: { box: { ...rect, y1: box.y1 + level, y2: box.y1 + level }, block },
+                    level,
+                    hanging: block.includes("hanging=true")
+                });
+    // What stands on something after it; what hangs from something last, the
+    // highest first.
+    pieces.sort((a, b) => {
+        if (a.hanging !== b.hanging) return a.hanging ? 1 : -1;
+        return a.hanging ? b.level - a.level : a.level - b.level;
+    });
+    return pieces.map((piece) => piece.fill);
+}
+
+/** Columns, by `x,z`, merged into as few rectangles as cover them exactly. */
+function merged(
+    columns: ReadonlySet<string>
+): { x1: number; z1: number; x2: number; z2: number }[] {
+    const order = [...columns]
+        .map((key) => key.split(",").map(Number) as [number, number])
+        .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+    const used = new Set<string>();
+    const free = (x: number, z: number) => columns.has(`${x},${z}`) && !used.has(`${x},${z}`);
+    const found: { x1: number; z1: number; x2: number; z2: number }[] = [];
+    for (const [x, z] of order) {
+        if (!free(x, z)) continue;
+        let x2 = x;
+        while (free(x2 + 1, z)) x2 += 1;
+        let z2 = z;
+        const rowFree = (row: number) => {
+            for (let each = x; each <= x2; each += 1) if (!free(each, row)) return false;
+            return true;
+        };
+        while (rowFree(z2 + 1)) z2 += 1;
+        for (let each = x; each <= x2; each += 1)
+            for (let row = z; row <= z2; row += 1) used.add(`${each},${row}`);
+        found.push({ x1: x, z1: z, x2, z2 });
+    }
+    return found;
+}
+
+/** The ship from above: its rooms, navigation's space and window, the halls
+ *  and the corridors between cells, walled where they cross nothing. */
+function shipPlan(layout: Layout): Cell[][] {
+    const { box, rooms } = layout;
+    const first = shipFirst(layout.rows);
+    const cols = shipCols(layout.rows);
+    const width = box.x2 - box.x1 + 1;
+    const depth = box.z2 - box.z1 + 1;
+    const plan: Cell[][] = Array.from({ length: width }, () =>
+        Array.from({ length: depth }, (): Cell => "void")
+    );
+    const at = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
+    const set = (x: number, z: number, cell: Cell) => {
+        if (at(x, z) !== undefined) plan[x - box.x1]![z - box.z1] = cell;
+    };
+    for (const room of rooms)
+        for (let dx = 0; dx < room.w!; dx += 1)
+            for (let dz = 0; dz < room.d!; dz += 1) {
+                const edge = dx === 0 || dz === 0 || dx === room.w! - 1 || dz === room.d! - 1;
+                set(room.x + dx, room.z + dz, edge ? "wall" : room.index);
+            }
+    // Navigation's east: space, behind a window the depth of the room.
+    const navigation = rooms.find((one) => one.name === "navigation")!;
+    const inner = navigation.w! - 2;
+    for (let dz = 1; dz < navigation.d! - 1; dz += 1)
+        for (let u = inner - ship.SPACE_COLS - 1; u < inner; u += 1)
+            set(
+                navigation.x + 1 + u,
+                navigation.z + dz,
+                u >= inner - ship.SPACE_COLS ? "space" : "window"
+            );
+    const middle = (col: number, row: number) => cellMiddle(box, first, [col, col], [row, row]);
+    const has = (col: number) => col >= first && col - first < cols;
+    const walls: { x: number; z: number }[] = [];
+    const corridor = (x: number, z: number) => {
+        const here = at(x, z);
+        if (here === "void" || here === "wall") set(x, z, "corridor");
+    };
+    for (const [col, row] of ship.HALLS) {
+        if (!has(col)) continue;
+        const hall = middle(col, row);
+        for (let dx = -2; dx <= 2; dx += 1)
+            for (let dz = -2; dz <= 2; dz += 1)
+                if (Math.abs(dx) === 2 || Math.abs(dz) === 2)
+                    walls.push({ x: hall.x + dx, z: hall.z + dz });
+                else corridor(hall.x + dx, hall.z + dz);
+    }
+    for (const [c1, r1, c2, r2] of ship.EDGES) {
+        if (!has(c1) || !has(c2)) continue;
+        const from = middle(c1, r1);
+        const to = middle(c2, r2);
+        const across = r1 === r2;
+        const start = across ? Math.min(from.x, to.x) : Math.min(from.z, to.z);
+        const end = across ? Math.max(from.x, to.x) : Math.max(from.z, to.z);
+        for (let along = start; along <= end; along += 1)
+            for (let side = -2; side <= 2; side += 1) {
+                const x = across ? along : from.x + side;
+                const z = across ? from.z + side : along;
+                if (Math.abs(side) === 2) walls.push({ x, z });
+                else corridor(x, z);
+            }
+    }
+    for (const spot of walls) if (at(spot.x, spot.z) === "void") set(spot.x, spot.z, "wall");
+    return plan;
+}
+
+/** Where the ship's roof has a light, by `x,z`: a grid of them over every
+ *  room, and every fourth block along the middle of a corridor. */
+function shipLights(layout: Layout, plan: readonly (readonly Cell[])[]): Set<string> {
+    const { box } = layout;
+    const cell = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
+    const lights = new Set<string>();
+    for (const room of layout.rooms)
+        for (let u = 2; u < room.w! - 2; u += 4)
+            for (let v = 2; v < room.d! - 2; v += 4) {
+                const x = room.x + 1 + u;
+                const z = room.z + 1 + v;
+                if (cell(x, z) === room.index) lights.add(`${x},${z}`);
+            }
+    for (let x = box.x1; x <= box.x2; x += 1)
+        for (let z = box.z1; z <= box.z2; z += 1)
+            if (
+                cell(x, z) === "corridor" &&
+                (x - box.x1 + z - box.z1) % 4 === 0 &&
+                [cell(x + 1, z), cell(x - 1, z), cell(x, z + 1), cell(x, z - 1)].every(walkable)
+            )
+                lights.add(`${x},${z}`);
+    return lights;
+}
+
+/**
+ * The ship, each block only into air: floors, walls, the corridors but one
+ * stretch, the lights and the roof, navigation's window and space; then the
+ * table, the stations and the vents; then the rooms' furnishing, what stands
+ * on something after what holds it; and last the corridor stretch kept back,
+ * its first corner the proof that the blocks stayed.
+ */
+function shipFills(layout: Layout): Fill[] {
+    const { box } = layout;
+    const wall = ship.WALL;
+    const plan = planOf(layout);
+    const y0 = box.y1;
+    const roof = y0 + wall + 1;
+    const fills: Fill[] = [];
+    const flat = (
+        rect: { x1: number; z1: number; x2: number; z2: number },
+        block: string,
+        y1: number,
+        y2 = y1
+    ): Fill => ({
+        box: {
+            x1: box.x1 + rect.x1,
+            z1: box.z1 + rect.z1,
+            x2: box.x1 + rect.x2,
+            z2: box.z1 + rect.z2,
+            y1,
+            y2
+        },
+        block
+    });
+    const corridors = rectangles(plan, (cell) => cell === "corridor");
+    const proof = corridors.shift();
+    for (const room of layout.rooms)
+        for (const rect of rectangles(plan, (cell) => cell === room.index))
+            fills.push(flat(rect, room.floor, y0));
+    for (const rect of rectangles(plan, (cell) => cell === "wall"))
+        fills.push(flat(rect, WALL_BLOCK, y0, y0 + wall));
+    for (const rect of corridors) fills.push(flat(rect, CORRIDOR_FLOOR, y0));
+    const lights = shipLights(layout, plan);
+    for (const key of lights) {
+        const [x, z] = key.split(",").map(Number) as [number, number];
+        fills.push(one(x, roof, z, LIGHT));
+    }
+    const spaceTop = (cell: Cell) => cell === "space" || cell === "window";
+    for (const rect of rectangles(
+        plan,
+        (cell, x, z) =>
+            cell !== "void" && !spaceTop(cell) && !lights.has(`${box.x1 + x},${box.z1 + z}`)
+    ))
+        fills.push(flat(rect, ROOF, roof));
+    // Navigation's view: a black sky with its stars against the ship's edge,
+    // dark glass under the space in front of it, the window the whole height
+    // of the room, and black over all three.
+    for (const rect of rectangles(plan, (cell) => cell === "window"))
+        fills.push(flat(rect, WINDOW, y0, y0 + wall));
+    for (const rect of rectangles(plan, spaceTop)) fills.push(flat(rect, SPACE, roof));
+    const navigation = layout.rooms.find((room) => room.name === "navigation")!;
+    const backdrop = navigation.x + navigation.w! - 2;
+    for (let dz = 1; dz < navigation.d! - 1; dz += 1) {
+        const z = navigation.z + dz;
+        fills.push(one(backdrop, y0, z, SPACE));
+        for (let dy = 1; dy <= wall; dy += 1)
+            fills.push(one(backdrop, y0 + dy, z, layout.stars.has(`${dz},${dy}`) ? LIGHT : SPACE));
+        for (let x = backdrop - ship.SPACE_COLS + 1; x < backdrop; x += 1)
+            fills.push(one(x, y0, z, DARK_FLOOR));
+    }
+    fills.push(...furniture(layout), ...layout.pieces);
+    if (proof) fills.push(flat(proof, CORRIDOR_FLOOR, y0));
+    // The ship is bigger than one fill, so it comes down a slice at a time
+    // (`arena.teardown`): each fill cut along the same slices, so every block
+    // put down is in one of them whole.
+    const pieces = slices(box);
+    return fills.flatMap((fill) =>
+        pieces.flatMap((piece): Fill[] => {
+            const cut = {
+                x1: Math.max(fill.box.x1, piece.x1),
+                y1: Math.max(fill.box.y1, piece.y1),
+                z1: Math.max(fill.box.z1, piece.z1),
+                x2: Math.min(fill.box.x2, piece.x2),
+                y2: Math.min(fill.box.y2, piece.y2),
+                z2: Math.min(fill.box.z2, piece.z2)
+            };
+            return cut.x1 <= cut.x2 && cut.y1 <= cut.y2 && cut.z1 <= cut.z2
+                ? [{ box: cut, block: fill.block }]
+                : [];
+        })
+    );
+}
 /** Every kind of block the station can hold while it stands: what it is built of. */
 export function stationBlocks(): string[] {
     return [...STATION_BLOCKS];

@@ -18,7 +18,7 @@ import { findApp } from "@/lib/apps/catalog";
 import { notFound, redirect } from "next/navigation";
 import { requireUser, userHasManage } from "@/lib/session";
 import { installedPanelSlot } from "@/lib/app-extensions/registry";
-import { canOpenGameTab, isGameTab } from "../tabs";
+import { canOpenGameTab, isGameTab, settingsForViewer } from "../tabs";
 import { gameOfServer } from "@/lib/apps/games-catalog";
 import { heldOn, resourceAccess } from "@/lib/resource-access";
 import { Messages } from "@/components/i18n/messages";
@@ -112,7 +112,9 @@ export default async function InstalledAppPage({
         <Messages namespaces={["installed", "catalog"]}>
             <InstalledAppDashboard
                 app={app}
-                settings={settings}
+                // The full list is the Settings screen's; a reader who may not
+                // manage the server is sent only what the screens they open show.
+                settings={settingsForViewer(settings, canManage)}
                 slot={slot}
                 held={held}
                 canManage={canManage}

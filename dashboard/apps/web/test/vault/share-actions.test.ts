@@ -93,6 +93,11 @@ vi.mock("@/lib/vault/orgs", () => ({
     deleteCollection: vi.fn(async () => true)
 }));
 
+const collectionsFor = vi.fn(async () => [] as Record<string, unknown>[]);
+vi.mock("@/lib/vault/sync", () => ({
+    collectionsFor: (...args: unknown[]) => collectionsFor(...(args as []))
+}));
+
 const moveCipher = vi.fn(async () => ({ ok: true }) as { ok: boolean });
 // The screen lists the account's own vault first, so the actions read it. Mocked
 // rather than imported: the real module pulls in the audit log and therefore the
@@ -530,5 +535,30 @@ describe("moveItemAction", () => {
         moveCipher.mockResolvedValue({ ok: false });
         const result = await actions.moveItemAction("item-1", validCipher, []);
         expect(result.error).toBe("That item could not be moved there.");
+    });
+});
+
+describe("vaultCollectionsAction", () => {
+    it("shows a member who does not administer the vault only the collections they were put in", async () => {
+        vaultById.mockResolvedValue(orgVault);
+        standingIn.mockResolvedValue({
+            memberId: MEMBER_ID,
+            type: 2,
+            accessAll: false,
+            confirmed: true
+        });
+        collectionsFor.mockResolvedValue([
+            { id: "col-mine", organizationId: VAULT_ID, name: ENC, externalId: null },
+            { id: "col-elsewhere", organizationId: "vorg-other", name: ENC, externalId: null }
+        ]);
+        const result = await actions.vaultCollectionsAction(VAULT_ID);
+        expect(result.collections?.map((row) => row.id)).toEqual(["col-mine"]);
+    });
+
+    it("refuses somebody who is neither a confirmed member nor an administrator", async () => {
+        vaultById.mockResolvedValue(orgVault);
+        const result = await actions.vaultCollectionsAction(VAULT_ID);
+        expect(result.error).toBeTruthy();
+        expect(collectionsFor).not.toHaveBeenCalled();
     });
 });

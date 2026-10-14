@@ -91,6 +91,42 @@ export const GAME_TABS: readonly GameTab[] = [
     { slug: "settings", label: "Settings", permission: "games.manage", games: EVERY_GAME } // i18n-ignore
 ];
 
+/**
+ * The settings a viewer who may not manage the server is sent: what the
+ * screens they can open read, and nothing else. The whole list is the
+ * Settings and Security tabs' (games.manage); the overview and the connect
+ * card above every tab show these, and no other screen a reader reaches is
+ * handed the settings at all - their own data comes from their own actions.
+ *
+ * Minecraft: the software and version (connect card, login build check) and
+ * the overview's difficulty, mode, slots, memory and message of the day.
+ * ARK: the map and session (connect card) and the overview's slots, mods and
+ * crossplay. FiveM and Hytale take none.
+ */
+export const OVERVIEW_SETTING_KEYS: ReadonlySet<string> = new Set([
+    "TYPE",
+    "VERSION",
+    "DIFFICULTY",
+    "MODE",
+    "MAX_PLAYERS",
+    "MEMORY",
+    "MOTD",
+    "SERVER_MAP",
+    "SESSION_NAME",
+    "GAME_MOD_IDS",
+    "ENABLE_CROSSPLAY"
+]);
+
+/** The settings this viewer is sent: all of them to a manager, the overview's otherwise. */
+export function settingsForViewer<Setting extends { readonly key: string }>(
+    settings: readonly Setting[],
+    canManage: boolean
+): Setting[] {
+    return canManage
+        ? [...settings]
+        : settings.filter((setting) => OVERVIEW_SETTING_KEYS.has(setting.key));
+}
+
 /** What this game calls one screen. */
 export function gameTabLabel(tab: GameTab, game: GameId | null): string {
     return (game && tab.labelByGame?.[game]) || tab.label;
