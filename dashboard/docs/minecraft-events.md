@@ -847,17 +847,29 @@ left out.
   hidden while on the server, counted only once the seekers are out
   (`hs.scoresOf`: the time to hide is everybody's); finds only break a tie
   (`hs.tiebreakOf`). The chat's results and the podium are the same ranking.
-- **Impostor** (`impostor`) is a station of rooms built in the sky: three
-  columns of rooms, 15 by 15 inside and five blocks high, three rows up to
-  eight players and four past, joined by corridors, round a meeting room in the
-  middle of the second row with a table and a stone button on it
-  (`impostor.layoutFor`, `planOf`; the room names, which room is which and which
-  console is where are drawn from the run's id). The top middle room is the
-  bridge, its far wall one window of glass on black space and stars; one other
-  room is dark, with no light in its roof; every room but the meeting room is
+- **Impostor** (`impostor`) is a ship built in the sky, laid out the way the
+  game it is modelled on lays out its own (`DESIGN` 3, `SHIP_SINCE`,
+  `impostor-ship.ts`): a cafeteria at the top with the emergency table, long
+  corridors and halls off it, and themed rooms round it drawn by hand for what
+  each is - reactor, both engines, security, medbay, electrical, admin,
+  storage, weapons, O2, navigation (its far wall one window of glass on black
+  space and stars), shields and communications. Up to eight players it is the
+  five columns to the east; past eight the engine wing (reactor, both engines,
+  security) is added to the west. Each room is floored in its own block and
+  furnished for what it is, with its tasks where they make sense and a vent, an
+  iron trapdoor that takes an impostor to the vent it is paired with, where one
+  can go (`impostor.layoutFor`). Laid out from the run's id, so a restart lays
+  out the same. A run built on an older design keeps its own, block for block:
+  design 2 (`FURNISHED_SINCE`) is a grid of rooms three wide, 15 by 15 inside
+  and five blocks high, three rows up to eight players and four past, joined by
+  corridors, round a meeting room in the middle of the second row with a table
+  and a stone button on it (`planOf`; the room names, which room is which and
+  which console is where are drawn from the run's id); the top middle room is
+  the bridge, its far wall one window of glass on black space and stars, one
+  other room dark with no light in its roof, every room but the meeting room
   furnished for what it is (`FURNISHING`), never in front of a console, a vent
-  or a way through. A station built before this (`DESIGN` 1: rooms 11 across,
-  four high, nothing in them) keeps its layout for a run that was already going. At least four play (`IMPOSTOR_FLOOR`,
+  or a way through; design 1 is rooms 11 across, four high, with nothing in
+  them. At least four play (`IMPOSTOR_FLOOR`,
   `catalog.playersFloor`): the editor refuses fewer, the preset schema too,
   and fewer joined by the end of the countdown calls it off. The impostors
   (`impostors`, 1 by default, never more than three and never more than one
@@ -1353,7 +1365,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                                                                                                                                                                                 |
 | Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams; from design 5 a hall of stone brick posts up to spruce nests, a slime block pad under a spruce ledge, levers on the walls                                                                              |
 | Glass bridge     | plain glass panels, a light gray start with a cyan rim, a finish in black and white squares, quartz arches over both ends with hanging lanterns, quartz posts with lanterns at the outer corners, a spruce gallery behind white glass under a barrier roof, a prismarine pool lit by sea lanterns                                                                                                                                       |
-| Impostor         | each room floored in its own drawn stone, wood or concrete and furnished for what it is, a bridge with a window on black space and stars, one dark room, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents |
+| Impostor         | from design 3 a ship of its own themed rooms - cafeteria, reactor, both engines, security, medbay, electrical, admin, storage, weapons, O2, navigation (a window on black space and stars), shields, communications - each floored and furnished by hand for what it is, with an engine wing added past eight players; a run on an older design keeps each room floored in its own drawn stone, wood or concrete and furnished for what it is, a bridge with a window on black space and stars, one dark room, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents |
 | Tug of war       | a smooth stone field with a white middle line and a red and a blue line, an oak fence rope with a yellow wool marker, red and blue stained glass pens floored in spruce over pools of water, chiseled pillars topped with sea lanterns                                                                                                                                                                                                  |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                                                                                                                                                                                                                                       |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                                                                                               |
@@ -1376,11 +1388,12 @@ as if it is played inside a biome. Each run draws one theme from its id:
 Which kinds get it (`stage-service.sceneryOf`): parkour (its course's own theme
 for jungle, nether and frost; end or mesa round a classic course), spleef, TNT
 run (no jungle, no lava), boat race, downhill race, elytra race (both races
-beside the track only, nothing under it) and the nether maze (always the
-Nether). Not acid rain (its weather and lightning reach round the arena), not
-the dropper (its shaft is too tall to prove a ring round it cheaply), and not
-the arena kinds (`arena-service`: sky wars, glass bridge and the rest prove a
-single box, which is also the play box).
+beside the track only, nothing under it). Not acid rain (its weather and
+lightning reach round the arena), not the dropper (its shaft is too tall to
+prove a ring round it cheaply), not the nether maze (roofed and walled on
+every side, so a ring round it would be blocks nobody inside would ever see),
+and not the arena kinds (`arena-service`: sky wars, glass bridge and the rest
+prove a single box, which is also the play box).
 
 Rules it keeps, all asserted in `test/apps/minecraft-events-scenery.test.ts`:
 
