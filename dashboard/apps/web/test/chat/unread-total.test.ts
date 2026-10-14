@@ -64,6 +64,16 @@ vi.mock("@/lib/chat/isolation", () => ({
     orgChatPeople: async () => new Set()
 }));
 
+// Every space here is reachable; a row left in one that is not has its own test.
+vi.mock("@/lib/chat/access", async (original) => ({
+    ...(await original<typeof import("@/lib/chat/access")>()),
+    reachableSpaceIds: async () => new Set(spaces.map((space) => space.id))
+}));
+vi.mock("@/lib/access/grants", async (original) => ({
+    ...(await original<typeof import("@/lib/access/grants")>()),
+    grantedSubjects: async () => new Map()
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         // Nobody has blocked anybody here; blocking has its own test.

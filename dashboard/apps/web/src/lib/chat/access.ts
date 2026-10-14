@@ -28,7 +28,7 @@
  */
 
 import { can } from "@polaris/auth";
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
@@ -475,6 +475,32 @@ export async function reachableChannelIds(actor: ChatActor): Promise<Set<string>
         ...open.map((row) => row.id),
         ...granted.keys()
     ]);
+}
+
+/**
+ * The channels a membership row still opens, as a where clause.
+ *
+ * A row on its own is the whole answer only for a direct message or a group.
+ * In a space it is not: reading a public channel leaves one behind, and it
+ * outlives the space turning private or its organization being left - so a row
+ * in a space counts only while the space is reachable or the room itself was
+ * granted, the same two ways `channelAccess` lets it through. Asked in the
+ * query, so a room that refuses to open is never read, listed or counted.
+ */
+export function membershipReach(
+    channelIds: readonly string[],
+    spaces: ReadonlySet<string>,
+    granted: Iterable<string>
+): Prisma.ChatChannelWhereInput {
+    const rooms = [...granted];
+    return {
+        id: { in: [...channelIds] },
+        OR: [
+            { spaceId: null },
+            ...(spaces.size ? [{ spaceId: { in: [...spaces] } }] : []),
+            ...(rooms.length ? [{ id: { in: rooms } }] : [])
+        ]
+    };
 }
 
 /**
