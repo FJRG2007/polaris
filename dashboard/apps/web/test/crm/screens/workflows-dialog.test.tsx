@@ -127,6 +127,9 @@ beforeEach(() => {
     state.saved = [];
     state.toggled = [];
     state.refuseToggle = false;
+    // The layout the reader picks is remembered, where there is storage to
+    // remember it in: each test starts on the sentence.
+    window.localStorage?.removeItem("crm.workflows.layout");
 });
 
 afterEach(cleanup);
