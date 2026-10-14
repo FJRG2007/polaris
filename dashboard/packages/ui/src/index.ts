@@ -99,7 +99,14 @@ export {
     type PolarisApp
 } from "./shell/app-switcher";
 export { MobileNav } from "./shell/mobile-nav";
-export { AppShell, PolarisMark, PageHeader, PAGE_FILL, PAGE_BLEED, PAGE_NOTICES } from "./shell/app-shell";
+export {
+    AppShell,
+    PolarisMark,
+    PageHeader,
+    PAGE_FILL,
+    PAGE_BLEED,
+    PAGE_NOTICES
+} from "./shell/app-shell";
 export {
     fitBoard,
     useBoardGestures,

@@ -175,7 +175,12 @@ export function DiskAlertBanner() {
                                     {t("diskAlert.move")}
                                 </Link>
                             </Button>
-                            <Button size="sm" variant="ghost" className="hidden sm:inline-flex" asChild>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="hidden sm:inline-flex"
+                                asChild
+                            >
                                 <Link href="/apps/servers">{t("diskAlert.details")}</Link>
                             </Button>
                             <button
@@ -213,7 +218,11 @@ function MoveLine({ move, canAnswer }: { move: ActiveMoveView; canAnswer: boolea
                     target,
                     phase: movePhaseText(move, t)
                 })}{" "}
-                {t(move.auto ? "storageMove.banner.freesAfter" : "storageMove.banner.freesAfterAnswer")}
+                {t(
+                    move.auto
+                        ? "storageMove.banner.freesAfter"
+                        : "storageMove.banner.freesAfterAnswer"
+                )}
             </p>
         );
     return (

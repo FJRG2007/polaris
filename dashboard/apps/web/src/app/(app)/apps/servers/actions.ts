@@ -644,7 +644,10 @@ export async function hostVolumesAction(): Promise<HostVolume[] | null> {
 }
 
 /** The data moves still under way, so a volume a copier holds reads as moving. */
-export async function volumeMovesAction(): Promise<{ moves: ActiveMoveView[]; canAnswer: boolean } | null> {
+export async function volumeMovesAction(): Promise<{
+    moves: ActiveMoveView[];
+    canAnswer: boolean;
+} | null> {
     const user = await requirePermission("system.manage");
     const moves = await activeMoves().catch(() => null);
     // Removing an original is the storage screen's call, and that screen is admins'.

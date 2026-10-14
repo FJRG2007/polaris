@@ -547,9 +547,7 @@ export async function activeMoves(): Promise<ActiveMoveView[]> {
                 copiedBytes: copied,
                 percent: phase === "copying" ? plan.progressPercent(copied, total) : null,
                 machine:
-                    origin && origin.kind !== "nas" && app?.target
-                        ? machineOf(app.target)
-                        : null,
+                    origin && origin.kind !== "nas" && app?.target ? machineOf(app.target) : null,
                 containers: [copier, `${copier}-clean`],
                 dockerName: recordedDockerName(row.origin) ?? null,
                 auto: row.auto

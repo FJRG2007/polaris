@@ -205,9 +205,7 @@ export function ServerStorage() {
                             <HardDrive className="size-4 shrink-0 text-muted-foreground" />
                             {t("storage.volumes")}
                         </h2>
-                        <p className="text-muted-foreground text-xs">
-                            {t("storage.volumesIntro")}
-                        </p>
+                        <p className="text-muted-foreground text-xs">{t("storage.volumesIntro")}</p>
                     </div>
                     <label className="flex max-w-sm items-start gap-2 text-xs">
                         <Switch
@@ -270,159 +268,183 @@ export function ServerStorage() {
                                 {[...used, ...spare].map((volume) => {
                                     const move = moveOfVolume(volume, local);
                                     return (
-                                    <tr key={volume.name} className="border-t border-border">
-                                        <td className="w-full max-w-0 px-3 py-2">
-                                            <span className="flex min-w-0 items-center gap-2">
-                                                <span
-                                                    className="min-w-0 truncate font-medium"
-                                                    title={volume.name}
-                                                >
-                                                    {volume.name}
-                                                </span>
-                                                {/* The verdict first, because it is the
+                                        <tr key={volume.name} className="border-t border-border">
+                                            <td className="w-full max-w-0 px-3 py-2">
+                                                <span className="flex min-w-0 items-center gap-2">
+                                                    <span
+                                                        className="min-w-0 truncate font-medium"
+                                                        title={volume.name}
+                                                    >
+                                                        {volume.name}
+                                                    </span>
+                                                    {/* The verdict first, because it is the
                                                     question: can this go. The reason is
                                                     in the title for anybody who wants it. */}
-                                                {move ? (
-                                                    <Badge
-                                                        variant={move.phase === "waiting" ? "warning" : "neutral"}
-                                                        className="min-w-0 shrink"
-                                                        title={moveTarget(move, tmove)}
-                                                    >
-                                                        {move.phase === "waiting" ? null : (
-                                                            <Loader2
-                                                                className="mr-1 size-3 shrink-0 animate-spin"
-                                                                aria-hidden
-                                                            />
-                                                        )}
-                                                        <span className="truncate">
-                                                            {tmove(
+                                                    {move ? (
+                                                        <Badge
+                                                            variant={
                                                                 move.phase === "waiting"
-                                                                    ? "storageMove.movedTo"
-                                                                    : "storageMove.moving",
-                                                                { target: moveTarget(move, tmove) }
+                                                                    ? "warning"
+                                                                    : "neutral"
+                                                            }
+                                                            className="min-w-0 shrink"
+                                                            title={moveTarget(move, tmove)}
+                                                        >
+                                                            {move.phase === "waiting" ? null : (
+                                                                <Loader2
+                                                                    className="mr-1 size-3 shrink-0 animate-spin"
+                                                                    aria-hidden
+                                                                />
                                                             )}
-                                                        </span>
-                                                    </Badge>
-                                                ) : volume.verdict === "safe" ? (
-                                                    <Badge
-                                                        variant="success"
-                                                        className="shrink-0"
-                                                        title={volume.reason}
-                                                    >
-                                                        {t("storage.safe")}
-                                                    </Badge>
-                                                ) : volume.spare ? (
-                                                    <Badge
-                                                        variant="warning"
-                                                        className="shrink-0"
-                                                        title={volume.reason}
-                                                    >
-                                                        {t("storage.checkFirst")}
-                                                    </Badge>
-                                                ) : volume.inUse ? null : (
-                                                    <Badge
-                                                        variant="neutral"
-                                                        className="shrink-0"
-                                                        title={volume.reason}
-                                                    >
-                                                        {t("storage.idle")}
-                                                    </Badge>
-                                                )}
-                                            </span>
-                                            <span className="text-muted-foreground block truncate text-xs">
-                                                {volume.owner
-                                                    ? t("storage.belongsTo", { owner: volume.owner })
-                                                    : volume.description
-                                                      ? t("storage.gone", { what: volume.description })
-                                                      : volume.project
-                                                        ? t("storage.createdBy", { project: volume.project })
-                                                        : t("storage.noRecord")}
-                                                {/* A move's copier is what holds it: the
+                                                            <span className="truncate">
+                                                                {tmove(
+                                                                    move.phase === "waiting"
+                                                                        ? "storageMove.movedTo"
+                                                                        : "storageMove.moving",
+                                                                    {
+                                                                        target: moveTarget(
+                                                                            move,
+                                                                            tmove
+                                                                        )
+                                                                    }
+                                                                )}
+                                                            </span>
+                                                        </Badge>
+                                                    ) : volume.verdict === "safe" ? (
+                                                        <Badge
+                                                            variant="success"
+                                                            className="shrink-0"
+                                                            title={volume.reason}
+                                                        >
+                                                            {t("storage.safe")}
+                                                        </Badge>
+                                                    ) : volume.spare ? (
+                                                        <Badge
+                                                            variant="warning"
+                                                            className="shrink-0"
+                                                            title={volume.reason}
+                                                        >
+                                                            {t("storage.checkFirst")}
+                                                        </Badge>
+                                                    ) : volume.inUse ? null : (
+                                                        <Badge
+                                                            variant="neutral"
+                                                            className="shrink-0"
+                                                            title={volume.reason}
+                                                        >
+                                                            {t("storage.idle")}
+                                                        </Badge>
+                                                    )}
+                                                </span>
+                                                <span className="text-muted-foreground block truncate text-xs">
+                                                    {volume.owner
+                                                        ? t("storage.belongsTo", {
+                                                              owner: volume.owner
+                                                          })
+                                                        : volume.description
+                                                          ? t("storage.gone", {
+                                                                what: volume.description
+                                                            })
+                                                          : volume.project
+                                                            ? t("storage.createdBy", {
+                                                                  project: volume.project
+                                                              })
+                                                            : t("storage.noRecord")}
+                                                    {/* A move's copier is what holds it: the
                                                     step it is on says more than its name. */}
-                                                {move
-                                                    ? ` - ${movePhaseText(move, tmove)}`
-                                                    : volume.heldBy.length > 0
-                                                      ? ` - ${holders(volume, t)}`
-                                                      : ""}
-                                                {unusedFor(volume, t) ? ` - ${unusedFor(volume, t)}` : ""}
-                                            </span>
-                                            {move?.percent !== null && move?.percent !== undefined ? (
-                                                <span
-                                                    role="progressbar"
-                                                    aria-valuemin={0}
-                                                    aria-valuemax={100}
-                                                    aria-valuenow={move.percent}
-                                                    aria-label={movePhaseText(move, tmove)}
-                                                    className="mt-1 block h-1 overflow-hidden rounded-full bg-muted"
-                                                >
+                                                    {move
+                                                        ? ` - ${movePhaseText(move, tmove)}`
+                                                        : volume.heldBy.length > 0
+                                                          ? ` - ${holders(volume, t)}`
+                                                          : ""}
+                                                    {unusedFor(volume, t)
+                                                        ? ` - ${unusedFor(volume, t)}`
+                                                        : ""}
+                                                </span>
+                                                {move?.percent !== null &&
+                                                move?.percent !== undefined ? (
                                                     <span
-                                                        className="block h-full rounded-full bg-primary transition-[width]"
-                                                        style={{ width: `${move.percent}%` }}
-                                                    />
-                                                </span>
-                                            ) : null}
-                                            {!volume.inUse && !volume.owner ? (
-                                                <span className="text-muted-foreground block text-xs">
-                                                    {volume.reason}
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="whitespace-nowrap px-3 py-2 tabular-nums">
-                                            {size(volume.bytes, t)}
-                                        </td>
-                                        <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
-                                            {age(volume.createdAt, t) ?? t("storage.unknown")}
-                                        </td>
-                                        <td className="px-3 py-2 text-right">
-                                            <span className="flex items-center justify-end gap-0.5">
-                                                {/* The way in is the app that mounts
+                                                        role="progressbar"
+                                                        aria-valuemin={0}
+                                                        aria-valuemax={100}
+                                                        aria-valuenow={move.percent}
+                                                        aria-label={movePhaseText(move, tmove)}
+                                                        className="mt-1 block h-1 overflow-hidden rounded-full bg-muted"
+                                                    >
+                                                        <span
+                                                            className="block h-full rounded-full bg-primary transition-[width]"
+                                                            style={{ width: `${move.percent}%` }}
+                                                        />
+                                                    </span>
+                                                ) : null}
+                                                {!volume.inUse && !volume.owner ? (
+                                                    <span className="text-muted-foreground block text-xs">
+                                                        {volume.reason}
+                                                    </span>
+                                                ) : null}
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                                                {size(volume.bytes, t)}
+                                            </td>
+                                            <td className="text-muted-foreground hidden whitespace-nowrap px-3 py-2 md:table-cell">
+                                                {age(volume.createdAt, t) ?? t("storage.unknown")}
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <span className="flex items-center justify-end gap-0.5">
+                                                    {/* The way in is the app that mounts
                                                     it, at the path it mounts it on:
                                                     a volume is a directory under the
                                                     daemon's own root, and nothing
                                                     else on this machine is allowed
                                                     in there. */}
-                                                {volume.browseHref ? (
-                                                    <Button
-                                                        asChild
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        aria-label={t("storage.openInDrive", { name: volume.name })}
-                                                        title={t("storage.seeInside")}
-                                                    >
-                                                        <Link href={volume.browseHref}>
-                                                            <FolderOpen className="size-4 shrink-0" />
-                                                        </Link>
-                                                    </Button>
-                                                ) : null}
-                                                {/* An original a move left behind goes the
+                                                    {volume.browseHref ? (
+                                                        <Button
+                                                            asChild
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            aria-label={t("storage.openInDrive", {
+                                                                name: volume.name
+                                                            })}
+                                                            title={t("storage.seeInside")}
+                                                        >
+                                                            <Link href={volume.browseHref}>
+                                                                <FolderOpen className="size-4 shrink-0" />
+                                                            </Link>
+                                                        </Button>
+                                                    ) : null}
+                                                    {/* An original a move left behind goes the
                                                     way the move was checked, not as a loose
                                                     volume: the storage screen removes it. */}
-                                                {move?.phase === "waiting" && canAnswer ? (
-                                                    <Button asChild variant="outline" size="sm">
-                                                        <Link href="/admin/storage">
-                                                            {tmove("storageMove.banner.removeOriginal")}
-                                                        </Link>
-                                                    </Button>
-                                                ) : null}
-                                                {volume.spare && !move ? (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        disabled={removing !== null}
-                                                        onClick={() => void remove(volume)}
-                                                        aria-label={t("storage.deleteNamed", { name: volume.name })}
-                                                        title={t("storage.delete")}
-                                                    >
-                                                        {removing === volume.name ? (
-                                                            <Loader2 className="size-4 shrink-0 animate-spin" />
-                                                        ) : (
-                                                            <Trash2 className="size-4 shrink-0" />
-                                                        )}
-                                                    </Button>
-                                                ) : null}
-                                            </span>
-                                        </td>
-                                    </tr>
+                                                    {move?.phase === "waiting" && canAnswer ? (
+                                                        <Button asChild variant="outline" size="sm">
+                                                            <Link href="/admin/storage">
+                                                                {tmove(
+                                                                    "storageMove.banner.removeOriginal"
+                                                                )}
+                                                            </Link>
+                                                        </Button>
+                                                    ) : null}
+                                                    {volume.spare && !move ? (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            disabled={removing !== null}
+                                                            onClick={() => void remove(volume)}
+                                                            aria-label={t("storage.deleteNamed", {
+                                                                name: volume.name
+                                                            })}
+                                                            title={t("storage.delete")}
+                                                        >
+                                                            {removing === volume.name ? (
+                                                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                                                            ) : (
+                                                                <Trash2 className="size-4 shrink-0" />
+                                                            )}
+                                                        </Button>
+                                                    ) : null}
+                                                </span>
+                                            </td>
+                                        </tr>
                                     );
                                 })}
                             </tbody>
@@ -439,7 +461,10 @@ export function ServerStorage() {
                 {freed ? (
                     <p className="text-success text-xs">
                         {freed.bytes
-                            ? t("storage.freedBack", { name: freed.name, size: size(freed.bytes, t) })
+                            ? t("storage.freedBack", {
+                                  name: freed.name,
+                                  size: size(freed.bytes, t)
+                              })
                             : t("storage.freed", { name: freed.name })}
                     </p>
                 ) : null}
@@ -454,9 +479,7 @@ export function ServerStorage() {
                         <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
                         {t("storage.files")}
                     </h2>
-                    <p className="text-muted-foreground text-xs">
-                        {t("storage.filesIntro")}
-                    </p>
+                    <p className="text-muted-foreground text-xs">{t("storage.filesIntro")}</p>
                 </div>
                 <Link href="/drive/insights" className="text-primary w-fit text-sm hover:underline">
                     {t("storage.driveRoom")}

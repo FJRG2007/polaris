@@ -45,7 +45,10 @@ describe("the notices above a page", () => {
 
     it("hold the disk warning and the refused-link note", async () => {
         const chrome = await source("../../src/components/app-chrome.tsx");
-        const strip = chrome.slice(chrome.indexOf("<PageNotices>"), chrome.indexOf("</PageNotices>"));
+        const strip = chrome.slice(
+            chrome.indexOf("<PageNotices>"),
+            chrome.indexOf("</PageNotices>")
+        );
         expect(strip).toContain("<DeniedNotice />");
         expect(strip).toContain("<DiskAlertBanner />");
     });
