@@ -262,16 +262,24 @@ export async function allowedBy(
         listingViewer(
             viewer.id,
             field,
-            anonymous ? [] : wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
+            anonymous
+                ? []
+                : wanted.filter((userId) => core.audienceNeedsList(audiences.get(userId)!))
         ),
-        !anonymous && needsFriends.length > 0 ? friendIds(viewer.id) : Promise.resolve(new Set<string>()),
+        !anonymous && needsFriends.length > 0
+            ? friendIds(viewer.id)
+            : Promise.resolve(new Set<string>()),
         reachBetween(
             viewer.id,
-            anonymous ? [] : needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
+            anonymous
+                ? []
+                : needsReach.filter((userId) => audiences.get(userId) !== "friendsOfFriends")
         ),
         sharingAFriend(
             viewer.id,
-            anonymous ? [] : needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
+            anonymous
+                ? []
+                : needsReach.filter((userId) => audiences.get(userId) === "friendsOfFriends")
         ),
         sharingASpace(viewer.id, anonymous ? [] : needsSpaces)
     ]);
@@ -433,12 +441,16 @@ export async function sharingASpace(
     });
     const rows = new Map(counts.map((row) => [row.spaceId, row._count._all]));
     // The owner is the one person a space holds who is not a row.
-    const small = new Set(counted.filter((spaceId) => core.isSmallSpace((rows.get(spaceId) ?? 0) + 1)));
+    const small = new Set(
+        counted.filter((spaceId) => core.isSmallSpace((rows.get(spaceId) ?? 0) + 1))
+    );
 
     return {
         any: new Set(sharedBy.keys()),
         small: new Set(
-            [...sharedBy].filter(([, spaces]) => [...spaces].some((id) => small.has(id))).map(([userId]) => userId)
+            [...sharedBy]
+                .filter(([, spaces]) => [...spaces].some((id) => small.has(id)))
+                .map(([userId]) => userId)
         )
     };
 }

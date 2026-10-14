@@ -249,9 +249,7 @@ export function valueSchema(type: CustomVariableType): z.ZodType<string, z.ZodTy
 
 /** One value as a run reads it: left empty or out, a variable with a default
  *  takes the default; one without still has to be filled in. */
-export function runValueSchema(
-    declared: CustomVariable
-): z.ZodType<string, z.ZodTypeDef, unknown> {
+export function runValueSchema(declared: CustomVariable): z.ZodType<string, z.ZodTypeDef, unknown> {
     if (declared.initial.length === 0) return valueSchema(declared.type);
     return z.preprocess(
         (value) =>

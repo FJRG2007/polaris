@@ -62,7 +62,10 @@ export interface ChatProfile {
      * friends with, and a space in common is a room both are standing in.
      */
     readonly mutual: {
-        readonly friends: { people: { id: string; name: string; username: string }[]; total: number };
+        readonly friends: {
+            people: { id: string; name: string; username: string }[];
+            total: number;
+        };
         readonly spaces: { spaces: { id: string; name: string; color: string }[]; total: number };
     };
     /**

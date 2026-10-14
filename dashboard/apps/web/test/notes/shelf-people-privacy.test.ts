@@ -35,7 +35,12 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         noteSpace: {
             findUnique: async () => ({
-                owner: { id: "owner-1", name: "Owner", email: "owner@example.test", username: "owner" },
+                owner: {
+                    id: "owner-1",
+                    name: "Owner",
+                    email: "owner@example.test",
+                    username: "owner"
+                },
                 members: [
                     {
                         role: "editor",
@@ -83,7 +88,13 @@ describe("the people on a shelf", () => {
     it("keeps names, roles and the owner mark as they were", async () => {
         const people = await spacePeople("space-1", { id: "owner-1", isAdmin: true });
         expect(people).toEqual([
-            { userId: "owner-1", name: "Owner", email: "owner@example.test", role: "admin", owner: true },
+            {
+                userId: "owner-1",
+                name: "Owner",
+                email: "owner@example.test",
+                role: "admin",
+                owner: true
+            },
             {
                 userId: "member-1",
                 name: "Member One",

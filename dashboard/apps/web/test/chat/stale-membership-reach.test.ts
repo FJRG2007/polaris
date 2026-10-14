@@ -170,7 +170,9 @@ describe("a membership in a space the reader no longer reaches", () => {
     });
 
     it("is not counted on the unread badge", async () => {
-        const counted = (await unreadConversations({ id: "user-1" })).map((entry) => entry.id).sort();
+        const counted = (await unreadConversations({ id: "user-1" }))
+            .map((entry) => entry.id)
+            .sort();
         expect(counted).toEqual(["backroom", "dm-1", "handed", "lobby"]);
     });
 

@@ -31,7 +31,8 @@ const personSchema = z.object({ personId: z.string().uuid() });
 type ProfileFailure = "profile.errors.couldNotDo" | "profile.errors.requestNotSent";
 
 async function refusal(caught: unknown, key: ProfileFailure): Promise<{ error: string }> {
-    if (caught instanceof FollowError || caught instanceof FriendError) return { error: caught.message };
+    if (caught instanceof FollowError || caught instanceof FriendError)
+        return { error: caught.message };
     console.error("polaris: a profile action failed:", caught);
     return { error: (await getTranslations("publicPages"))(key) };
 }
@@ -39,7 +40,8 @@ async function refusal(caught: unknown, key: ProfileFailure): Promise<{ error: s
 export async function followAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = personSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("publicPages"))("profile.errors.nobodyToFollow") };
+    if (!parsed.success)
+        return { error: (await getTranslations("publicPages"))("profile.errors.nobodyToFollow") };
     try {
         await followPerson(user.id, parsed.data.personId);
         return {};
@@ -61,7 +63,8 @@ export async function unfollowAction(input: unknown): Promise<{ error?: string }
 export async function askToBeFriendsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = personSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("publicPages"))("profile.errors.requestNotSent") };
+    if (!parsed.success)
+        return { error: (await getTranslations("publicPages"))("profile.errors.requestNotSent") };
     try {
         await requestFriend(user.id, parsed.data.personId);
         revalidatePath("/account/friends");
@@ -100,12 +103,15 @@ const listSchema = z.object({
  * and the check is here rather than only on the screen because the screen is not
  * what enforces anything.
  */
-export async function loadFollowListAction(
-    input: unknown
-): Promise<{ items?: { id: string; name: string; username: string }[]; cursor?: string | null; error?: string }> {
+export async function loadFollowListAction(input: unknown): Promise<{
+    items?: { id: string; name: string; username: string }[];
+    cursor?: string | null;
+    error?: string;
+}> {
     const user = await requireUser();
     const parsed = listSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("publicPages"))("profile.errors.listUnreadable") };
+    if (!parsed.success)
+        return { error: (await getTranslations("publicPages"))("profile.errors.listUnreadable") };
 
     const { maySee } = await import("@/lib/privacy-service");
     // Never as an administrator, exactly as the page itself is drawn: running
@@ -118,7 +124,8 @@ export async function loadFollowListAction(
     const allowed =
         (await maySee(parsed.data.personId, "profile", reader)) &&
         (await maySee(parsed.data.personId, "followers", reader));
-    if (!allowed) return { error: (await getTranslations("publicPages"))("profile.errors.listHidden") };
+    if (!allowed)
+        return { error: (await getTranslations("publicPages"))("profile.errors.listHidden") };
 
     const page = await listFollow(parsed.data.personId, parsed.data.which, {
         before: parsed.data.before ?? null,

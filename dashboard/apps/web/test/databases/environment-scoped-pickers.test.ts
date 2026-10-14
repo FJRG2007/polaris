@@ -37,9 +37,15 @@ const { replicationCandidates } = await import("../../src/lib/object-storage/sto
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mocks.databaseFindFirst.mockResolvedValue({ engine: "postgres", environment: { projectId: "project-1" } });
+    mocks.databaseFindFirst.mockResolvedValue({
+        engine: "postgres",
+        environment: { projectId: "project-1" }
+    });
     mocks.databaseFindMany.mockResolvedValue([]);
-    mocks.databaseFindUnique.mockResolvedValue({ targetId: "target-1", environment: { projectId: "project-1" } });
+    mocks.databaseFindUnique.mockResolvedValue({
+        targetId: "target-1",
+        environment: { projectId: "project-1" }
+    });
     mocks.bucketFindFirst.mockResolvedValue({ id: "bucket-1", storeId: "store-1" });
     mocks.bucketFindMany.mockResolvedValue([]);
 });
@@ -47,7 +53,9 @@ beforeEach(() => {
 describe("copySources", () => {
     it("asks only for the environments the reader holds", async () => {
         await copySources("db-1", "owner-1", ["env-a"]);
-        expect(mocks.databaseFindMany.mock.calls[0]![0].where.environmentId).toEqual({ in: ["env-a"] });
+        expect(mocks.databaseFindMany.mock.calls[0]![0].where.environmentId).toEqual({
+            in: ["env-a"]
+        });
     });
 
     it("leaves an unrestricted reader's list as it was", async () => {
@@ -59,11 +67,15 @@ describe("copySources", () => {
 describe("replicationCandidates", () => {
     it("asks only for stores in the environments the reader holds", async () => {
         await replicationCandidates("bucket-1", "owner-1", ["env-a"]);
-        expect(mocks.bucketFindMany.mock.calls[0]![0].where.store.environmentId).toEqual({ in: ["env-a"] });
+        expect(mocks.bucketFindMany.mock.calls[0]![0].where.store.environmentId).toEqual({
+            in: ["env-a"]
+        });
     });
 
     it("leaves an unrestricted reader's list as it was", async () => {
         await replicationCandidates("bucket-1", "owner-1", null);
-        expect(mocks.bucketFindMany.mock.calls[0]![0].where.store).not.toHaveProperty("environmentId");
+        expect(mocks.bucketFindMany.mock.calls[0]![0].where.store).not.toHaveProperty(
+            "environmentId"
+        );
     });
 });

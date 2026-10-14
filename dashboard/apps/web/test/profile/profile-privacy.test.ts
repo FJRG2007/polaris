@@ -58,7 +58,10 @@ vi.mock("@/lib/blocks", () => ({
     blockersOf: async () => new Set(),
     blockedBetween: async () => new Set()
 }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => {} }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => {}
+}));
 vi.mock("@/lib/profile-style-service", () => ({ getProfileStyle: async () => ({}) }));
 vi.mock("@/lib/people-follow", () => ({
     followCounts: async () => ({ followers: 3, following: 4 }),

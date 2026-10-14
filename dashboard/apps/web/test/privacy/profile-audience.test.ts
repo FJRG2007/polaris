@@ -37,12 +37,18 @@ vi.mock("@polaris/db", () => ({
                 const viewerId = where.OR[0].ownerId;
                 return spaces
                     .filter((space) => !space.archived)
-                    .filter((space) => space.ownerId === viewerId || space.members.includes(viewerId))
+                    .filter(
+                        (space) => space.ownerId === viewerId || space.members.includes(viewerId)
+                    )
                     .map((space) => ({ id: space.id, ownerId: space.ownerId }));
             }
         },
         chatSpaceMember: {
-            findMany: async ({ where }: { where: { spaceId: { in: string[] }; userId: { in: string[] } } }) =>
+            findMany: async ({
+                where
+            }: {
+                where: { spaceId: { in: string[] }; userId: { in: string[] } };
+            }) =>
                 spaces
                     .filter((space) => where.spaceId.in.includes(space.id))
                     .flatMap((space) =>
@@ -54,7 +60,10 @@ vi.mock("@polaris/db", () => ({
                 counts += 1;
                 return spaces
                     .filter((space) => where.spaceId.in.includes(space.id))
-                    .map((space) => ({ spaceId: space.id, _count: { _all: space.members.length } }));
+                    .map((space) => ({
+                        spaceId: space.id,
+                        _count: { _all: space.members.length }
+                    }));
             }
         }
     }
@@ -67,7 +76,10 @@ vi.mock("@/lib/friends-service", () => ({
     }
 }));
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => {} }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => {}
+}));
 
 const core = await import("@polaris/core");
 const { allowedBy } = await import("@/lib/privacy-service");
@@ -116,8 +128,22 @@ describe("the rule, for every answer and every relation", () => {
     } as const;
 
     const expected: Record<string, Record<keyof typeof relations, boolean>> = {
-        everyone: { self: true, admin: true, friend: true, smallSpaceMate: true, largeSpaceMate: true, stranger: true },
-        spaces: { self: true, admin: true, friend: true, smallSpaceMate: true, largeSpaceMate: true, stranger: false },
+        everyone: {
+            self: true,
+            admin: true,
+            friend: true,
+            smallSpaceMate: true,
+            largeSpaceMate: true,
+            stranger: true
+        },
+        spaces: {
+            self: true,
+            admin: true,
+            friend: true,
+            smallSpaceMate: true,
+            largeSpaceMate: true,
+            stranger: false
+        },
         smallSpaces: {
             self: true,
             admin: true,
@@ -126,8 +152,22 @@ describe("the rule, for every answer and every relation", () => {
             largeSpaceMate: false,
             stranger: false
         },
-        friends: { self: true, admin: true, friend: true, smallSpaceMate: false, largeSpaceMate: false, stranger: false },
-        nobody: { self: true, admin: true, friend: false, smallSpaceMate: false, largeSpaceMate: false, stranger: false }
+        friends: {
+            self: true,
+            admin: true,
+            friend: true,
+            smallSpaceMate: false,
+            largeSpaceMate: false,
+            stranger: false
+        },
+        nobody: {
+            self: true,
+            admin: true,
+            friend: false,
+            smallSpaceMate: false,
+            largeSpaceMate: false,
+            stranger: false
+        }
     };
 
     for (const [audience, answers] of Object.entries(expected)) {
@@ -160,7 +200,13 @@ describe("an account that never chose", () => {
 
 describe("what counts as small", () => {
     it("offers exactly the five profile answers", () => {
-        expect([...core.PROFILE_AUDIENCES]).toEqual(["everyone", "spaces", "smallSpaces", "friends", "nobody"]);
+        expect([...core.PROFILE_AUDIENCES]).toEqual([
+            "everyone",
+            "spaces",
+            "smallSpaces",
+            "friends",
+            "nobody"
+        ]);
     });
 
     it("is fewer than 200 people", () => {
@@ -181,7 +227,10 @@ describe("what counts as small", () => {
     });
 
     it("answers yes when any one shared space is small", async () => {
-        spaces = [space("big", 500, ["viewer", "subject"]), space("small", 5, ["viewer", "subject"])];
+        spaces = [
+            space("big", 500, ["viewer", "subject"]),
+            space("small", 5, ["viewer", "subject"])
+        ];
         expect(await sees("subject", "smallSpaces")).toBe(true);
     });
 
@@ -229,8 +278,15 @@ describe("a reader with no account", () => {
 
     it("is shown only what is shown to everybody, without looking up who they know", async () => {
         stored.set("open", "everyone");
-        for (const audience of ["spaces", "smallSpaces", "friends", "nobody"]) stored.set(audience, audience);
-        const allowed = await allowedBy(anonymous, "profile", ["open", "spaces", "smallSpaces", "friends", "nobody"]);
+        for (const audience of ["spaces", "smallSpaces", "friends", "nobody"])
+            stored.set(audience, audience);
+        const allowed = await allowedBy(anonymous, "profile", [
+            "open",
+            "spaces",
+            "smallSpaces",
+            "friends",
+            "nobody"
+        ]);
         expect(allowed).toEqual(new Set(["open"]));
         expect(lookups).toBe(0);
     });

@@ -31,11 +31,20 @@ export interface UserProfile {
     viewerIsAdmin: boolean;
 }
 
-export async function getUserProfileAction(userId: string): Promise<{ profile?: UserProfile; error?: string }> {
+export async function getUserProfileAction(
+    userId: string
+): Promise<{ profile?: UserProfile; error?: string }> {
     const viewer = await requireUser();
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, name: true, email: true, isAdmin: true, bannedAt: true, banReason: true }
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            isAdmin: true,
+            bannedAt: true,
+            banReason: true
+        }
     });
     if (!user) return { error: (await getTranslations("drive"))("errors.userNotFound") };
     const admin = viewer.isAdmin;

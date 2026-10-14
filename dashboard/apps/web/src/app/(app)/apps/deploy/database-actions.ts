@@ -511,7 +511,9 @@ export async function replicationCandidatesAction(
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { ownerId, environmentIds } = await manageBucket(parsed.data);
-        return { candidates: await store.replicationCandidates(parsed.data, ownerId, environmentIds) };
+        return {
+            candidates: await store.replicationCandidates(parsed.data, ownerId, environmentIds)
+        };
     } catch (caught) {
         return failure(caught, "buckets.replicaTargetsFailed");
     }

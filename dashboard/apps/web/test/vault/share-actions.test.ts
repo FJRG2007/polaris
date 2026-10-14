@@ -541,7 +541,12 @@ describe("moveItemAction", () => {
 describe("vaultCollectionsAction", () => {
     it("shows a member who does not administer the vault only the collections they were put in", async () => {
         vaultById.mockResolvedValue(orgVault);
-        standingIn.mockResolvedValue({ memberId: MEMBER_ID, type: 2, accessAll: false, confirmed: true });
+        standingIn.mockResolvedValue({
+            memberId: MEMBER_ID,
+            type: 2,
+            accessAll: false,
+            confirmed: true
+        });
         collectionsFor.mockResolvedValue([
             { id: "col-mine", organizationId: VAULT_ID, name: ENC, externalId: null },
             { id: "col-elsewhere", organizationId: "vorg-other", name: ENC, externalId: null }

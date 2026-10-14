@@ -60,14 +60,18 @@ const S3_PORT = 8333;
 /** A store the owner holds, resolved with its container. */
 async function storeContext(storeId: string, ownerId: string): Promise<InstanceContext> {
     const context = await instanceContext(storeId, ownerId);
-    if (context.engine !== "seaweedfs") throw new DatabaseOperationError("That is not an object store.");
+    if (context.engine !== "seaweedfs")
+        throw new DatabaseOperationError("That is not an object store.");
     return context;
 }
 
 /** The store a bucket belongs to, for the caller to check access against
  *  before anything else is read. */
 export async function bucketStore(bucketId: string): Promise<{ storeId: string }> {
-    const row = await prisma.objectBucket.findUnique({ where: { id: bucketId }, select: { storeId: true } });
+    const row = await prisma.objectBucket.findUnique({
+        where: { id: bucketId },
+        select: { storeId: true }
+    });
     if (!row) throw new DatabaseOperationError("That bucket is not there any more.");
     return row;
 }
@@ -98,15 +102,24 @@ async function shell(
     if (result.code !== 0 || failure) {
         const said = failure ?? lastLine(result.output);
         let masked = said;
-        for (const secret of [...secrets, context.own.password]) if (secret) masked = masked.split(secret).join("********");
+        for (const secret of [...secrets, context.own.password])
+            if (secret) masked = masked.split(secret).join("********");
         throw new DatabaseOperationError(`${describe} failed${masked ? `: ${masked}` : ""}`);
     }
     return result.output;
 }
 
-function decryptSecret(row: { encryptedSecret: Uint8Array; secretNonce: Uint8Array; secretKeyId: string }): string {
+function decryptSecret(row: {
+    encryptedSecret: Uint8Array;
+    secretNonce: Uint8Array;
+    secretKeyId: string;
+}): string {
     return decryptCredentials<{ secret: string }>(
-        { ciphertext: Buffer.from(row.encryptedSecret), nonce: Buffer.from(row.secretNonce), keyId: row.secretKeyId },
+        {
+            ciphertext: Buffer.from(row.encryptedSecret),
+            nonce: Buffer.from(row.secretNonce),
+            keyId: row.secretKeyId
+        },
         loadEnv().POLARIS_MASTER_KEY
     ).secret;
 }
@@ -146,13 +159,24 @@ export async function ensureStoreIdentities(storeId: string, ownerId: string): P
     ];
     await withPorts(context, async (ports) => {
         await waitReady(ports, context);
-        await shell(ports, context, lines, "Writing the store's keys", secrets.map(({ secret }) => secret));
+        await shell(
+            ports,
+            context,
+            lines,
+            "Writing the store's keys",
+            secrets.map(({ secret }) => secret)
+        );
         // Expiry rules live in the filer's configuration, which a store keeps on
         // its volume; they are written again anyway, so a store moved onto a new
         // volume ends up with the rules its buckets say it has.
-        const buckets = await prisma.objectBucket.findMany({ where: { storeId }, select: { name: true, lifecycle: true } });
+        const buckets = await prisma.objectBucket.findMany({
+            where: { storeId },
+            select: { name: true, lifecycle: true }
+        });
         const rules = buckets.flatMap((bucket) =>
-            parseLifecycleRules(bucket.lifecycle).map((rule) => lifecycleRuleLine(bucket.name, rule.prefix, rule.days))
+            parseLifecycleRules(bucket.lifecycle).map((rule) =>
+                lifecycleRuleLine(bucket.name, rule.prefix, rule.days)
+            )
         );
         if (rules.length > 0) await shell(ports, context, rules, "Writing the expiry rules");
     });
@@ -166,7 +190,13 @@ export interface BucketView {
     readonly replicateTo: { id: string; name: string; storeName: string } | null;
     readonly replicationState: string;
     readonly replicationError: string | null;
-    readonly keys: { id: string; name: string; access: string; accessKey: string; createdAt: string }[];
+    readonly keys: {
+        id: string;
+        name: string;
+        access: string;
+        accessKey: string;
+        createdAt: string;
+    }[];
 }
 
 /** A store's buckets as the screen shows them, with any bucket the engine has
@@ -181,7 +211,9 @@ export async function listBuckets(
         orderBy: { name: "asc" },
         include: { keys: { orderBy: { createdAt: "asc" } } }
     });
-    const targetIds = rows.map((row) => row.replicateToId).filter((id): id is string => Boolean(id));
+    const targetIds = rows
+        .map((row) => row.replicateToId)
+        .filter((id): id is string => Boolean(id));
     const targets = targetIds.length
         ? await prisma.objectBucket.findMany({
               where: { id: { in: targetIds } },
@@ -191,7 +223,9 @@ export async function listBuckets(
     const byId = new Map(targets.map((target) => [target.id, target]));
     let unmanaged: string[] = [];
     try {
-        const output = await withPorts(context, (ports) => shell(ports, context, [BUCKET_LIST_LINE], "Listing buckets"));
+        const output = await withPorts(context, (ports) =>
+            shell(ports, context, [BUCKET_LIST_LINE], "Listing buckets")
+        );
         const known = new Set(rows.map((row) => row.name));
         unmanaged = parseBucketList(output).filter((name) => !known.has(name));
     } catch {
@@ -207,7 +241,9 @@ export async function listBuckets(
                 name: row.name,
                 createdAt: row.createdAt.toISOString(),
                 lifecycle: parseLifecycleRules(row.lifecycle),
-                replicateTo: target ? { id: target.id, name: target.name, storeName: target.store.name } : null,
+                replicateTo: target
+                    ? { id: target.id, name: target.name, storeName: target.store.name }
+                    : null,
                 replicationState: row.replicationState,
                 replicationError: row.replicationError,
                 keys: row.keys.map((key) => ({
@@ -222,11 +258,20 @@ export async function listBuckets(
     };
 }
 
-export async function createBucket(storeId: string, ownerId: string, name: string): Promise<{ id: string }> {
+export async function createBucket(
+    storeId: string,
+    ownerId: string,
+    name: string
+): Promise<{ id: string }> {
     const context = await storeContext(storeId, ownerId);
-    const clash = await prisma.objectBucket.findFirst({ where: { storeId, name }, select: { id: true } });
+    const clash = await prisma.objectBucket.findFirst({
+        where: { storeId, name },
+        select: { id: true }
+    });
     if (clash) throw new DatabaseOperationError(`This store already has a bucket called ${name}.`);
-    await withPorts(context, (ports) => shell(ports, context, [bucketCreateLine(name)], `Creating ${name}`));
+    await withPorts(context, (ports) =>
+        shell(ports, context, [bucketCreateLine(name)], `Creating ${name}`)
+    );
     return prisma.objectBucket.create({ data: { storeId, name }, select: { id: true } });
 }
 
@@ -238,18 +283,30 @@ export async function createBucket(storeId: string, ownerId: string, name: strin
 export async function deleteBucket(bucketId: string, ownerId: string): Promise<void> {
     const bucket = await ownedBucket(bucketId, ownerId);
     const context = await storeContext(bucket.storeId, ownerId);
-    const keys = await prisma.objectBucketKey.findMany({ where: { bucketId }, select: { accessKey: true } });
+    const keys = await prisma.objectBucketKey.findMany({
+        where: { bucketId },
+        select: { accessKey: true }
+    });
     await withPorts(context, async (ports) => {
-        if (bucket.replicateToId) await ports.runIn(context.container, replicationStopCommand(bucket.id).argv).catch(() => undefined);
+        if (bucket.replicateToId)
+            await ports
+                .runIn(context.container, replicationStopCommand(bucket.id).argv)
+                .catch(() => undefined);
         const lines = [
             ...keys.map((key) => storeIdentityDeleteLine(bucketKeyIdentity(key.accessKey))),
-            ...parseLifecycleRules(bucket.lifecycle).map((rule) => lifecycleRuleDeleteLine(bucket.name, rule.prefix)),
+            ...parseLifecycleRules(bucket.lifecycle).map((rule) =>
+                lifecycleRuleDeleteLine(bucket.name, rule.prefix)
+            ),
             bucketDeleteLine(bucket.name)
         ];
         await shell(ports, context, lines, `Removing ${bucket.name}`);
     });
-    const feeding = await prisma.objectBucket.findMany({ where: { replicateToId: bucketId }, select: { id: true } });
-    for (const source of feeding) await setReplication(source.id, ownerId, null).catch(() => undefined);
+    const feeding = await prisma.objectBucket.findMany({
+        where: { replicateToId: bucketId },
+        select: { id: true }
+    });
+    for (const source of feeding)
+        await setReplication(source.id, ownerId, null).catch(() => undefined);
     await prisma.objectBucket.delete({ where: { id: bucketId } });
 }
 
@@ -263,8 +320,12 @@ export async function createBucketKey(
     input: { name: string; access: BucketAccess }
 ): Promise<{ id: string; accessKey: string; secretKey: string }> {
     const bucket = await ownedBucket(bucketId, ownerId);
-    const clash = await prisma.objectBucketKey.findFirst({ where: { bucketId, name: input.name }, select: { id: true } });
-    if (clash) throw new DatabaseOperationError(`This bucket already has a key called ${input.name}.`);
+    const clash = await prisma.objectBucketKey.findFirst({
+        where: { bucketId, name: input.name },
+        select: { id: true }
+    });
+    if (clash)
+        throw new DatabaseOperationError(`This bucket already has a key called ${input.name}.`);
     const context = await storeContext(bucket.storeId, ownerId);
     const accessKey = generateAccessKey();
     const secretKey = generateSecretKey();
@@ -301,15 +362,28 @@ export async function createBucketKey(
     return { id: row.id, accessKey, secretKey };
 }
 
-export async function deleteBucketKey(bucketId: string, keyId: string, ownerId: string): Promise<void> {
+export async function deleteBucketKey(
+    bucketId: string,
+    keyId: string,
+    ownerId: string
+): Promise<void> {
     const key = await prisma.objectBucketKey.findFirst({
-        where: { id: keyId, bucketId, bucket: { store: { environment: { project: { ownerId } } } } },
+        where: {
+            id: keyId,
+            bucketId,
+            bucket: { store: { environment: { project: { ownerId } } } }
+        },
         include: { bucket: { select: { storeId: true } } }
     });
     if (!key) throw new DatabaseOperationError("That key is not there any more.");
     const context = await storeContext(key.bucket.storeId, ownerId);
     await withPorts(context, (ports) =>
-        shell(ports, context, [storeIdentityDeleteLine(bucketKeyIdentity(key.accessKey))], "Revoking the key")
+        shell(
+            ports,
+            context,
+            [storeIdentityDeleteLine(bucketKeyIdentity(key.accessKey))],
+            "Revoking the key"
+        )
     );
     await prisma.objectBucketKey.delete({ where: { id: keyId } });
 }
@@ -323,23 +397,44 @@ export async function setLifecycleRule(
     const bucket = await ownedBucket(bucketId, ownerId);
     const context = await storeContext(bucket.storeId, ownerId);
     await withPorts(context, (ports) =>
-        shell(ports, context, [lifecycleRuleLine(bucket.name, rule.prefix, rule.days)], "Setting the expiry rule")
+        shell(
+            ports,
+            context,
+            [lifecycleRuleLine(bucket.name, rule.prefix, rule.days)],
+            "Setting the expiry rule"
+        )
     );
-    const rules = [...parseLifecycleRules(bucket.lifecycle).filter((entry) => entry.prefix !== rule.prefix), rule].sort(
-        (a, b) => a.prefix.localeCompare(b.prefix)
-    );
-    await prisma.objectBucket.update({ where: { id: bucketId }, data: { lifecycle: JSON.stringify(rules) } });
+    const rules = [
+        ...parseLifecycleRules(bucket.lifecycle).filter((entry) => entry.prefix !== rule.prefix),
+        rule
+    ].sort((a, b) => a.prefix.localeCompare(b.prefix));
+    await prisma.objectBucket.update({
+        where: { id: bucketId },
+        data: { lifecycle: JSON.stringify(rules) }
+    });
     return rules;
 }
 
-export async function removeLifecycleRule(bucketId: string, ownerId: string, prefix: string): Promise<LifecycleRule[]> {
+export async function removeLifecycleRule(
+    bucketId: string,
+    ownerId: string,
+    prefix: string
+): Promise<LifecycleRule[]> {
     const bucket = await ownedBucket(bucketId, ownerId);
     const context = await storeContext(bucket.storeId, ownerId);
     await withPorts(context, (ports) =>
-        shell(ports, context, [lifecycleRuleDeleteLine(bucket.name, prefix)], "Removing the expiry rule")
+        shell(
+            ports,
+            context,
+            [lifecycleRuleDeleteLine(bucket.name, prefix)],
+            "Removing the expiry rule"
+        )
     );
     const rules = parseLifecycleRules(bucket.lifecycle).filter((entry) => entry.prefix !== prefix);
-    await prisma.objectBucket.update({ where: { id: bucketId }, data: { lifecycle: JSON.stringify(rules) } });
+    await prisma.objectBucket.update({
+        where: { id: bucketId },
+        data: { lifecycle: JSON.stringify(rules) }
+    });
     return rules;
 }
 
@@ -360,7 +455,8 @@ export async function presignObject(
     const bucket = await ownedBucket(bucketId, ownerId);
     const context = await storeContext(bucket.storeId, ownerId);
     const base = input.baseUrl ? parseStoreBaseUrl(input.baseUrl) : null;
-    if (input.baseUrl && !base) throw new DatabaseOperationError("That address is not one a URL can be signed for.");
+    if (input.baseUrl && !base)
+        throw new DatabaseOperationError("That address is not one a URL can be signed for.");
     const now = new Date();
     const url = presignAwsUrl({
         credentials: {
@@ -385,15 +481,19 @@ export async function presignObject(
  * store's container and reaches the destination by its name on that server's
  * network, and nothing here opens a path between two servers.
  */
-export async function setReplication(bucketId: string, ownerId: string, toBucketId: string | null): Promise<void> {
+export async function setReplication(
+    bucketId: string,
+    ownerId: string,
+    toBucketId: string | null
+): Promise<void> {
     const bucket = await ownedBucket(bucketId, ownerId);
     const context = await storeContext(bucket.storeId, ownerId);
     if (toBucketId === null) {
         // A store that is down has no process to stop; the row still stops
         // saying it replicates, so the sweep does not start one again.
-        await withPorts(context, (ports) => ports.runIn(context.container, replicationStopCommand(bucket.id).argv)).catch(
-            () => undefined
-        );
+        await withPorts(context, (ports) =>
+            ports.runIn(context.container, replicationStopCommand(bucket.id).argv)
+        ).catch(() => undefined);
         await prisma.objectBucket.update({
             where: { id: bucketId },
             data: { replicateToId: null, replicationState: "", replicationError: null }
@@ -402,20 +502,33 @@ export async function setReplication(bucketId: string, ownerId: string, toBucket
     }
     const target = await ownedBucket(toBucketId, ownerId);
     if (target.storeId === bucket.storeId) {
-        throw new DatabaseOperationError("Replicate into a bucket of another store - a copy inside the same store protects nothing.");
+        throw new DatabaseOperationError(
+            "Replicate into a bucket of another store - a copy inside the same store protects nothing."
+        );
     }
     const targetContext = await storeContext(target.storeId, ownerId);
     if (targetContext.target.id !== context.target.id) {
-        throw new DatabaseOperationError("Both stores have to run on the same server to replicate between them.");
-    }
-    const loop = await prisma.objectBucket.findFirst({ where: { id: toBucketId, replicateToId: bucketId }, select: { id: true } });
-    if (loop) throw new DatabaseOperationError(`${target.name} already replicates into ${bucket.name}; one direction only.`);
-    if (bucket.replicateToId && bucket.replicateToId !== toBucketId) {
-        await withPorts(context, (ports) => ports.runIn(context.container, replicationStopCommand(bucket.id).argv)).catch(
-            () => undefined
+        throw new DatabaseOperationError(
+            "Both stores have to run on the same server to replicate between them."
         );
     }
-    await prisma.objectBucket.update({ where: { id: bucketId }, data: { replicateToId: toBucketId } });
+    const loop = await prisma.objectBucket.findFirst({
+        where: { id: toBucketId, replicateToId: bucketId },
+        select: { id: true }
+    });
+    if (loop)
+        throw new DatabaseOperationError(
+            `${target.name} already replicates into ${bucket.name}; one direction only.`
+        );
+    if (bucket.replicateToId && bucket.replicateToId !== toBucketId) {
+        await withPorts(context, (ports) =>
+            ports.runIn(context.container, replicationStopCommand(bucket.id).argv)
+        ).catch(() => undefined);
+    }
+    await prisma.objectBucket.update({
+        where: { id: bucketId },
+        data: { replicateToId: toBucketId }
+    });
     await ensureReplication(bucketId);
 }
 
@@ -426,7 +539,11 @@ export async function setReplication(bucketId: string, ownerId: string, toBucket
 async function ensureReplication(bucketId: string): Promise<"running" | "started" | "failed"> {
     const bucket = await prisma.objectBucket.findUnique({
         where: { id: bucketId },
-        include: { store: { include: { environment: { select: { project: { select: { ownerId: true } } } } } } }
+        include: {
+            store: {
+                include: { environment: { select: { project: { select: { ownerId: true } } } } }
+            }
+        }
     });
     if (!bucket?.replicateToId) return "running";
     const ownerId = bucket.store.environment.project.ownerId;
@@ -451,7 +568,10 @@ async function ensureReplication(bucketId: string): Promise<"running" | "started
         });
         state = await withPorts(context, async (ports) => {
             const result = await ports.runIn(context.container, command.argv);
-            if (result.code !== 0) throw new DatabaseOperationError(`Starting the replication failed: ${lastLine(result.output)}`);
+            if (result.code !== 0)
+                throw new DatabaseOperationError(
+                    `Starting the replication failed: ${lastLine(result.output)}`
+                );
             const answer = result.output.includes("started") ? "started" : "running";
             if (answer === "started") {
                 // A process that dies at once (an address it cannot reach) is
@@ -459,15 +579,24 @@ async function ensureReplication(bucketId: string): Promise<"running" | "started
                 await new Promise((resolve) => setTimeout(resolve, 5000));
                 const again = await ports.runIn(context.container, command.argv);
                 if (again.output.includes("started")) {
-                    const log = await ports.runIn(context.container, replicationLogCommand(bucket.id).argv);
-                    throw new DatabaseOperationError(`The replication stopped as soon as it started: ${lastLine(log.output)}`);
+                    const log = await ports.runIn(
+                        context.container,
+                        replicationLogCommand(bucket.id).argv
+                    );
+                    throw new DatabaseOperationError(
+                        `The replication stopped as soon as it started: ${lastLine(log.output)}`
+                    );
                 }
             }
             return answer;
         });
     } catch (caught) {
-        error = caught instanceof DatabaseOperationError ? caught.message : "The replication could not be started.";
-        if (!(caught instanceof DatabaseOperationError)) console.error(`object storage: replication of ${bucket.id} failed:`, caught);
+        error =
+            caught instanceof DatabaseOperationError
+                ? caught.message
+                : "The replication could not be started.";
+        if (!(caught instanceof DatabaseOperationError))
+            console.error(`object storage: replication of ${bucket.id} failed:`, caught);
     }
     await prisma.objectBucket.update({
         where: { id: bucketId },
@@ -477,8 +606,15 @@ async function ensureReplication(bucketId: string): Promise<"running" | "started
 }
 
 /** Keep every replication running - the scheduled job. */
-export async function sweepReplications(): Promise<{ checked: number; restarted: number; failed: number }> {
-    const rows = await prisma.objectBucket.findMany({ where: { replicateToId: { not: null } }, select: { id: true } });
+export async function sweepReplications(): Promise<{
+    checked: number;
+    restarted: number;
+    failed: number;
+}> {
+    const rows = await prisma.objectBucket.findMany({
+        where: { replicateToId: { not: null } },
+        select: { id: true }
+    });
     let restarted = 0;
     let failed = 0;
     for (const row of rows) {

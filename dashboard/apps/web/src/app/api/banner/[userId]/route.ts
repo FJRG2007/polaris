@@ -67,7 +67,10 @@ export async function GET(
     // Answered before the bytes are fetched: most requests for a picture are a
     // browser checking the one it already has.
     if (request.headers.get("if-none-match") === picture.etag) {
-        return new Response(null, { status: 304, headers: { ETag: picture.etag, "Cache-Control": CACHE } });
+        return new Response(null, {
+            status: 304,
+            headers: { ETag: picture.etag, "Cache-Control": CACHE }
+        });
     }
 
     const bytes = await picture.load();

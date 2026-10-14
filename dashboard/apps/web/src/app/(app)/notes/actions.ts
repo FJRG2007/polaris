@@ -64,7 +64,11 @@ export async function createNoteAction(input: unknown): Promise<{ id?: string; e
     const caller = await actor();
     const parsed = core.noteCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.noteSave") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.noteSave")
+        };
 
     try {
         await access.requirePlacement(caller, {
@@ -83,11 +87,16 @@ export async function updateNoteAction(input: unknown): Promise<{ error?: string
     const caller = await actor();
     const parsed = core.noteUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.noteSave") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.noteSave")
+        };
 
     try {
         await access.requireNote(caller, parsed.data.noteId, "member");
-        if (!(await notes.updateNote(parsed.data))) return { error: (await getTranslations("notes"))("errors.noteGone") };
+        if (!(await notes.updateNote(parsed.data)))
+            return { error: (await getTranslations("notes"))("errors.noteGone") };
         refresh();
         return {};
     } catch (caught) {
@@ -99,7 +108,11 @@ export async function moveNoteAction(input: unknown): Promise<{ error?: string }
     const caller = await actor();
     const parsed = core.noteMoveSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.noteMove") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.noteMove")
+        };
 
     try {
         // Both ends: the note as it is now, and the shelf it is going to.
@@ -121,7 +134,8 @@ export async function deleteNoteAction(noteId: string): Promise<{ error?: string
     const caller = await actor();
     try {
         await access.requireNote(caller, noteId, "member");
-        if (!(await notes.deleteNote(noteId))) return { error: (await getTranslations("notes"))("errors.noteGone") };
+        if (!(await notes.deleteNote(noteId)))
+            return { error: (await getTranslations("notes"))("errors.noteGone") };
         refresh();
         return {};
     } catch (caught) {
@@ -144,7 +158,11 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
     const caller = await actor();
     const parsed = core.noteSpaceCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.notebookMake") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.notebookMake")
+        };
 
     try {
         if (parsed.data.orgId) {
@@ -167,7 +185,11 @@ export async function updateSpaceAction(input: unknown): Promise<{ error?: strin
     const caller = await actor();
     const parsed = core.noteSpaceUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.notebookChange") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.notebookChange")
+        };
 
     try {
         await access.requireSpace(caller, parsed.data.spaceId, "admin");
@@ -189,7 +211,11 @@ export async function spaceContentsAction(
         await access.requireSpace(caller, spaceId, "admin");
         return { ...(await shelves.spaceContents(spaceId)) };
     } catch (caught) {
-        return { notes: 0, folders: 0, ...failure(caught, (await getTranslations("notes"))("errors.notebookRead")) };
+        return {
+            notes: 0,
+            folders: 0,
+            ...failure(caught, (await getTranslations("notes"))("errors.notebookRead"))
+        };
     }
 }
 
@@ -199,7 +225,8 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
         // Deleting takes the writing with it, so it is the owner's alone - an
         // admin of a shelf may run it without being able to end it.
         const role = await access.requireSpace(caller, spaceId, "admin");
-        if (role !== "owner") return { error: (await getTranslations("notes"))("errors.notebookOwner") };
+        if (role !== "owner")
+            return { error: (await getTranslations("notes"))("errors.notebookOwner") };
         await shelves.deleteSpace(spaceId);
         refresh();
         return {};
@@ -287,7 +314,11 @@ export async function createFolderAction(input: unknown): Promise<{ id?: string;
     const caller = await actor();
     const parsed = core.noteFolderCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.folderMake") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.folderMake")
+        };
 
     try {
         await access.requirePlacement(caller, {
@@ -306,7 +337,11 @@ export async function updateFolderAction(input: unknown): Promise<{ error?: stri
     const caller = await actor();
     const parsed = core.noteFolderUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.folderChange") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.folderChange")
+        };
 
     try {
         await access.requireFolder(caller, parsed.data.folderId, "member");
@@ -346,7 +381,11 @@ export async function folderContentsAction(
         await access.requireFolder(caller, folderId, "member");
         return { ...(await shelves.folderContents(folderId)) };
     } catch (caught) {
-        return { notes: 0, folders: 0, ...failure(caught, (await getTranslations("notes"))("errors.folderRead")) };
+        return {
+            notes: 0,
+            folders: 0,
+            ...failure(caught, (await getTranslations("notes"))("errors.folderRead"))
+        };
     }
 }
 
@@ -395,7 +434,8 @@ export async function importNotesAction(form: FormData): Promise<{
     if (!parsed.success) return { error: (await getTranslations("notes"))("errors.importRead") };
 
     const uploaded = form.getAll("files").filter((entry): entry is File => entry instanceof File);
-    if (uploaded.length === 0) return { error: (await getTranslations("notes"))("errors.importChoose") };
+    if (uploaded.length === 0)
+        return { error: (await getTranslations("notes"))("errors.importChoose") };
     const weight = uploaded.reduce((total, file) => total + file.size, 0);
     if (weight > IMPORT_MAX_BYTES) {
         return { error: (await getTranslations("notes"))("errors.importTooBig") };
@@ -407,7 +447,8 @@ export async function importNotesAction(form: FormData): Promise<{
             folderId: parsed.data.folderId
         });
         const files = await readUploads(uploaded);
-        if (files.length === 0) return { error: (await getTranslations("notes"))("errors.importEmpty") };
+        if (files.length === 0)
+            return { error: (await getTranslations("notes"))("errors.importEmpty") };
         const result = await importVault(caller.id, parsed.data, files);
         refresh();
         return result;
@@ -488,7 +529,11 @@ export async function publishNoteAction(
     const caller = await actor();
     const parsed = core.noteShareSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("notes"))("errors.settingsRead") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("notes"))("errors.settingsRead")
+        };
     }
     try {
         const published = await share.publishNote(caller, noteId, parsed.data);
@@ -538,7 +583,8 @@ export async function unlockNoteShareAction(
 ): Promise<{ error?: string }> {
     const link = await share.resolveNoteShareByToken(token);
     if (!link) return { error: (await getTranslations("notes"))("errors.linkUnavailable") };
-    if (!share.noteShareUsability(link).ok) return { error: (await getTranslations("notes"))("errors.linkGone") };
+    if (!share.noteShareUsability(link).ok)
+        return { error: (await getTranslations("notes"))("errors.linkGone") };
 
     const limitKey = `note-unlock:${link.id}:${hashForLog(await clientIp()) ?? "unknown"}`;
     if (!(await rateLimit(limitKey, UNLOCK_LIMIT, UNLOCK_WINDOW_MS)).ok) {

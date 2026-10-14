@@ -151,7 +151,9 @@ export function KeepCommandDialog({
                                     {t("consoleVars.fromCommand", {
                                         names: inline
                                             .map((one) =>
-                                                one.initial ? `${one.name} = ${one.initial}` : one.name
+                                                one.initial
+                                                    ? `${one.name} = ${one.initial}`
+                                                    : one.name
                                             )
                                             .join(", ")
                                     })}

@@ -184,7 +184,11 @@ export function PrivacyView({
                     )}
 
                     <div className="flex items-center gap-3">
-                        <Button size="sm" onClick={() => void save()} disabled={!dirty || saving || savingProfile}>
+                        <Button
+                            size="sm"
+                            onClick={() => void save()}
+                            disabled={!dirty || saving || savingProfile}
+                        >
                             {saving && <Loader2 className="size-4 shrink-0 animate-spin" />}
                             {tc("actions.save")}
                         </Button>

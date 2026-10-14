@@ -40,7 +40,9 @@ const route = await import("../../src/app/api/drive/recent/route");
 
 describe("recently opened files", () => {
     it("leaves out a file in a folder the reader can no longer open", async () => {
-        const answer = await route.GET(new Request("http://localhost/api/drive/recent?c=c1&by=opened"));
+        const answer = await route.GET(
+            new Request("http://localhost/api/drive/recent?c=c1&by=opened")
+        );
         const body = (await answer.json()) as { entries: Array<{ path: string }> };
         expect(body.entries.map((entry) => entry.path)).toEqual(["team/notes.txt"]);
     });

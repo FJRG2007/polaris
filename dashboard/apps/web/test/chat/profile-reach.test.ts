@@ -104,7 +104,8 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         user: {
             findFirst: async ({ where }: { where: { id: string; bannedAt: null } }) =>
-                ACCOUNTS.find((person) => person.id === where.id && person.bannedAt === null) ?? null
+                ACCOUNTS.find((person) => person.id === where.id && person.bannedAt === null) ??
+                null
         },
         chatSpace: {
             findUnique: async () => ({ ownerId: spaceOwner })
