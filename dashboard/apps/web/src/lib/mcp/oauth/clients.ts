@@ -54,7 +54,7 @@ export const MAX_REDIRECT_URIS = 10;
 /** How long a name is kept. Shown on a consent screen, so it has to fit one. */
 export const MAX_CLIENT_NAME = 100;
 /** A registration that was never used for an approval is removed after this. */
-const UNUSED_CLIENT_TTL_MS = 24 * 60 * 60 * 1000;
+export const UNUSED_CLIENT_TTL_MS = 24 * 60 * 60 * 1000;
 /** A metadata document is read again once it is older than this. */
 const METADATA_TTL_MS = 24 * 60 * 60 * 1000;
 /** The most of a metadata document that is read. */

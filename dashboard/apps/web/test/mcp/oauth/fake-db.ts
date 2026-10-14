@@ -1,6 +1,6 @@
 /**
- * An in-memory stand-in for the four OAuth tables and the user rows they point
- * at, implementing exactly the Prisma calls `lib/mcp/oauth` makes. Enough to run
+ * An in-memory stand-in for the four OAuth tables, the rate-limit counters and
+ * the user rows they point at, implementing exactly the Prisma calls `lib/mcp/oauth` makes. Enough to run
  * the whole flow - register, approve, exchange, call, refresh, replay, revoke -
  * without a database, and strict enough that a query this does not understand
  * throws rather than quietly matching everything.
@@ -60,6 +60,9 @@ function matches(row: Row, where: Row | undefined, relations: (row: Row) => Row)
                         !(value.getTime() > (operand as Date).getTime())
                     )
                         return false;
+                } else if (op === "startsWith") {
+                    if (typeof value !== "string" || !value.startsWith(operand as string))
+                        return false;
                 } else if (op === "in") {
                     if (!(operand as unknown[]).includes(value)) return false;
                 } else {
@@ -83,6 +86,7 @@ export function createFakeDb(users: FakeUser[]) {
         oAuthGrant: [],
         oAuthCode: [],
         oAuthToken: [],
+        rateLimitCounter: [],
         session: []
     };
 
@@ -206,6 +210,7 @@ export function createFakeDb(users: FakeUser[]) {
         oAuthGrant: delegate("oAuthGrant"),
         oAuthCode: delegate("oAuthCode"),
         oAuthToken: delegate("oAuthToken"),
+        rateLimitCounter: delegate("rateLimitCounter"),
         session: delegate("session"),
         user: {
             async findUnique({ where }: { where: { id: string } }) {

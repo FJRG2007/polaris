@@ -41,6 +41,8 @@ const LIFETIME_MS = 12 * 60 * 60 * 1000;
 interface Session {
     owner: string;
     transport: SSEServerTransport;
+    /** Ends the stream and forgets the session. */
+    close: () => void;
 }
 
 const sessions = new Map<string, Session>();
@@ -134,7 +136,7 @@ export async function openSession(
         async start(controller) {
             const sink = streamSink(controller, closers);
             transport = new SSEServerTransport(SSE_PATH, sink);
-            sessions.set(transport.sessionId, { owner, transport });
+            sessions.set(transport.sessionId, { owner, transport, close: finish });
             await transport.start();
             // The transport registered its own close listener on the sink; this
             // one is ours, and both run when the stream ends.
@@ -185,6 +187,22 @@ export async function deliver(sessionId: string, messages: JSONRPCMessage[]): Pr
         sessions.delete(sessionId);
         return false;
     }
+}
+
+/**
+ * End every stream `owner` holds. Called when a connection is disconnected: its
+ * POSTs are already refused, and this is what stops its streams holding a slot
+ * and a timer until their lifetime runs out.
+ */
+export function closeSessionsOf(owner: string): number {
+    let closed = 0;
+    for (const [id, session] of [...sessions]) {
+        if (session.owner !== owner) continue;
+        sessions.delete(id);
+        session.close();
+        closed++;
+    }
+    return closed;
 }
 
 /** How many streams are open; for tests. */

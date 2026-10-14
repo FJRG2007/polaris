@@ -22,6 +22,7 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { sameResource } from "./urls";
+import { closeSessionsOf, ownerKey } from "@/lib/mcp/sse-sessions";
 import { scopeString } from "./scopes";
 import { verifierMatches } from "./pkce";
 import { clientBrand, type ClientBrand } from "./client-brand";
@@ -48,7 +49,7 @@ export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const CODE_TTL_MS = 5 * 60 * 1000;
 /** How long a rotated refresh token is remembered, so a replay of it is still
  *  recognised as one rather than as an unknown token. */
-const ROTATED_MEMORY_MS = 7 * 24 * 60 * 60 * 1000;
+export const ROTATED_MEMORY_MS = 7 * 24 * 60 * 60 * 1000;
 /** A grant's last-used stamp is written at most this often. */
 const TOUCH_INTERVAL_MS = 60 * 1000;
 
@@ -97,17 +98,35 @@ async function endReplayedGrant(grantId: string, what: "code" | "refresh-token")
     });
 }
 
-/** End a grant: every token and code under it is deleted and the grant is
- *  marked revoked, which is what the connected-apps list shows. */
+/**
+ * The rate-limit counters a grant's calls write, as `/api/mcp` and its SSE
+ * route name them. Nothing else ever reads them once the grant has ended.
+ */
+export function grantRateLimitKeys(grantId: string): string[] {
+    return [
+        `mcp-call:${grantId}`,
+        `mcp-change:${grantId}`,
+        `mcp-sse-open:${ownerKey("", grantId)}`
+    ];
+}
+
+/**
+ * End a grant: every token, code and rate-limit counter under it is deleted
+ * together, the grant is marked revoked (which takes it off the connected-apps
+ * list), and any stream it holds open on this process is closed. The revoked
+ * row itself is removed later by the OAuth sweep.
+ */
 async function endGrant(grantId: string): Promise<void> {
     await prisma.$transaction([
         prisma.oAuthToken.deleteMany({ where: { grantId } }),
         prisma.oAuthCode.deleteMany({ where: { grantId } }),
+        prisma.rateLimitCounter.deleteMany({ where: { key: { in: grantRateLimitKeys(grantId) } } }),
         prisma.oAuthGrant.updateMany({
             where: { id: grantId, revokedAt: null },
             data: { revokedAt: new Date() }
         })
     ]);
+    closeSessionsOf(ownerKey("", grantId));
 }
 
 /**

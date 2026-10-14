@@ -116,7 +116,7 @@ const resourceMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { STREAMS_PER_CREDENTIAL, openSessionCount } = await import("@/lib/mcp/sse-sessions");
-const { listConnectedApps } = await import("@/lib/mcp/oauth/grants");
+const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
 const { setAppIpPolicyAction } = await import(
     "@/app/(app)/account/assistants/connected-app-actions"
 );
@@ -305,6 +305,19 @@ describe("opening the stream", () => {
         controller.abort();
         expect(openSessionCount()).toBe(0);
         expect((await post(endpoint, credential, whoami)).status).toBe(404);
+    });
+
+    it("closes a connection's streams when it is disconnected, and only its own", async () => {
+        const credential = String((await connect()).tokens.body.access_token);
+        const [app] = await listConnectedApps(ADA.id);
+        const { endpoint } = await session(credential);
+        const other = String((await connect()).tokens.body.access_token);
+        const kept = await session(other);
+        expect(openSessionCount()).toBe(2);
+        expect(await revokeConnectedApp(ADA.id, app!.id)).toBe(true);
+        expect(openSessionCount()).toBe(1);
+        expect((await post(endpoint, credential, whoami)).status).toBe(401);
+        expect((await post(kept.endpoint, other, whoami)).status).toBe(202);
     });
 
     it("caps the streams one credential holds open", async () => {

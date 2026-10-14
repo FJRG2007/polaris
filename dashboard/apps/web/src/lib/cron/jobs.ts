@@ -19,6 +19,7 @@ import { sweepTrash } from "@/lib/mailbox/trash";
 import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepBounces } from "@/lib/mailbox/bounces";
 import { sweepExpiredSends } from "@/lib/vault/sends";
+import { sweepOAuth } from "@/lib/mcp/oauth/sweep";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { pruneTelemetry } from "@/lib/telemetry/store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
@@ -528,6 +529,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // only when somebody opens the link would mean a Send nobody opened
         // sitting there forever, which is the case it was set for.
         run: () => sweepExpiredSends()
+    },
+    {
+        key: "oauth-sweep",
+        // Hourly. What it removes is an expired code or token, a disconnected
+        // connection past its grace, an app registration nobody approved, and a
+        // rate-limit window that has run out - none of it can be presented or
+        // shown, so an hour late removes the same rows.
+        everyMs: HOUR,
+        // No lease: each batch names its rows by id, so two runners delete the
+        // same rows and one of them counts zero.
+        leaseMs: null,
+        run: () => sweepOAuth()
     },
     {
         key: "host-space",
