@@ -88,7 +88,17 @@ vi.stubGlobal("window", {
         setItem: (key: string, value: string) => void store.set(key, value),
         removeItem: (key: string) => void store.delete(key)
     },
-    dispatchEvent: () => true
+    dispatchEvent: () => true,
+    // A browser that can send a canvas as video, and nothing newer.
+    HTMLCanvasElement: class {
+        public captureStream(): void {}
+    }
+});
+/** How many times the model was fetched. It is not on this pretend server. */
+let fetches = 0;
+vi.stubGlobal("fetch", async () => {
+    fetches += 1;
+    return { ok: false };
 });
 vi.stubGlobal("document", {
     createElement: element,
@@ -125,6 +135,7 @@ beforeEach(() => {
     contexts.length = 0;
     appended.length = 0;
     workers.length = 0;
+    fetches = 0;
 });
 
 describe("what a browser remembers about the look", () => {
@@ -251,7 +262,7 @@ describe("the camera pipeline", () => {
         });
         expect(built?.track).toBe(sentTrack);
         expect(built?.using).toBe("off");
-        expect(appended).toHaveLength(0);
+        expect(fetches).toBe(0);
 
         workers[0]?.onmessage?.();
         await vi.waitFor(() => expect(contexts[0]?.draws.length).toBeGreaterThan(0));
@@ -282,7 +293,7 @@ describe("the camera pipeline", () => {
             style: "none",
             frame: "auto"
         });
-        expect(appended).toHaveLength(1);
+        expect(fetches).toBe(1);
         expect(built?.track).toBeNull();
         expect(built?.problem).toMatch(/background model is not on this server/);
     });

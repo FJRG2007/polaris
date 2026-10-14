@@ -77,7 +77,6 @@ updates:
         update-types: [patch]
         patterns:
           - "@enigmax/primitives"
-          - "@mediapipe/selfie_segmentation"
           - "@sapphi-red/web-noise-suppressor"
           - "@univerjs/*"
           - "@xterm/addon-*"
@@ -123,7 +122,6 @@ updates:
           - "@types/react"
           - "@types/react-dom"
           - "@enigmax/primitives"
-          - "@mediapipe/selfie_segmentation"
           - "@sapphi-red/web-noise-suppressor"
           - "@univerjs/*"
           - "@xterm/addon-*"

@@ -1,37 +1,70 @@
 /**
- * The canvas between a camera and the call, when it cannot be built.
+ * The pipeline between a camera and the call, when it cannot be built and when
+ * the model stops answering.
  *
  * The same reasoning as `mic-filter.test`, pointed at the picture instead of the
  * sound, and with the stakes the other way round. A microphone filter that fails
  * silently costs somebody their voice; a camera background that fails silently
- * costs them the thing they turned it on to hide. Both are invisible from the
- * screen of the person it is happening to - a call carries on, the setting still
- * says "Blur my background", and the only evidence is in the room behind them.
+ * costs them the thing they turned it on to hide.
  *
- * So what is asserted is that a model which will not load comes back saying so
- * rather than as a bare null, and that a background nobody asked for never costs
- * a single element, download or frame.
+ * So what is asserted is that a model which will not load, or a browser without
+ * WebGL 2, comes back saying so rather than as a bare null; that a background
+ * nobody asked for never costs a single element, download or frame; that the
+ * first frame - the one that holds the main thread while the model compiles -
+ * is taken inside the call the screen is already waiting on; and that a model
+ * that stops answering blurs the room rather than handing it back.
  *
- * And one case about *when* a cost is paid rather than whether it works.
- * Starting this model holds the main thread for about a second the first time in
- * a tab, and it does that work on its first frame rather than in `initialize` -
- * so a build that returned before running one handed back a track that was not
- * ready and dropped the freeze on whatever the page did next. It is taken inside
- * the call the screen is already waiting on.
+ * The model and the GPU compositor are replaced: what is under test is the
+ * orchestration around them. Their own numbers are `camera-mask.test`'s.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-/** Everything the module asked the document to make, so a test can assert that
- *  it asked for nothing at all. */
+/** Everything the module asked the document to make. */
 const made: string[] = [];
+
+/** Whether the model file is on the server. Off unless a case says so. */
+let modelServed = false;
+let fetches = 0;
+/** Whether a canvas will hand over a WebGL 2 context. */
+let webgl = true;
+/** Whether the model throws instead of answering. */
+let modelBroken = false;
+
+let segments = 0;
+const renders: { blind: boolean }[] = [];
+const tracked: number[] = [];
+
+vi.mock("@mediapipe/tasks-vision", () => ({
+    FilesetResolver: { isSimdSupported: async () => true },
+    ImageSegmenter: {
+        createFromOptions: async () => ({
+            segmentForVideo: () => {
+                segments += 1;
+                if (modelBroken) throw new Error("lost context");
+                const answer = { width: 256, height: 256, getAsWebGLTexture: () => ({}) };
+                // Background first, person last - the order the runtime uses.
+                return { confidenceMasks: [{ ...answer, width: 1 }, answer], close: () => undefined };
+            },
+            close: () => undefined
+        })
+    }
+}));
+
+vi.mock("@/app/(app)/chat/camera-compositor", () => ({
+    createCompositor: () => ({
+        track: (_texture: unknown, width: number) => tracked.push(width),
+        render: (frame: { blind: boolean }) => renders.push({ blind: frame.blind }),
+        readMask: () => null,
+        dispose: () => undefined
+    })
+}));
 
 class FakeVideo {
     autoplay = false;
     playsInline = false;
+    muted = false;
     srcObject: unknown = null;
-    /** Already past `HAVE_CURRENT_DATA` with a frame in it: the camera is not
-     *  what is being tested here. */
     readyState = 4;
     videoWidth = 640;
     videoHeight = 360;
@@ -39,99 +72,68 @@ class FakeVideo {
     async play(): Promise<void> {}
 }
 
-const context = {
-    globalCompositeOperation: "source-over",
-    filter: "none",
-    drawImage: () => undefined
-};
-
 class FakeCanvas {
     width = 0;
     height = 0;
-    getContext(): typeof context {
-        return context;
+    getContext(kind: string): unknown {
+        if (kind === "webgl2") return webgl ? {} : null;
+        return { globalCompositeOperation: "source-over", filter: "none", drawImage: () => undefined };
     }
     captureStream(): { getVideoTracks: () => unknown[] } {
         return { getVideoTracks: () => [{ id: "masked", stop: () => undefined }] };
     }
 }
 
-/** Whether the loader script arrives. Off for most of this file: the failure
- *  is what the cases below are about. */
-let scriptArrives = false;
-
-/** How many frames the model was asked to segment, and whether the frame driver
- *  had been started when it was. */
-let sends = 0;
 let workers = 0;
-
-class FakeSegmenter {
-    setOptions(): void {}
-    onResults(): void {}
-    async initialize(): Promise<void> {}
-    async send(): Promise<void> {
-        sends += 1;
-    }
-    async close(): Promise<void> {}
-}
-
-/** The loader script. It fails to arrive unless a case says otherwise - a
- *  deployment whose assets were never staged, or a tab with no connection. */
-class FakeScript {
-    src = "";
-    async = false;
-    onload: (() => void) | null = null;
-    onerror: (() => void) | null = null;
-}
+let tick: (() => void) | null = null;
 
 vi.stubGlobal("MediaStream", class {});
-vi.stubGlobal("Image", class {});
+vi.stubGlobal(
+    "Image",
+    class {
+        src = "";
+        naturalWidth = 1280;
+        naturalHeight = 720;
+        async decode(): Promise<void> {}
+    }
+);
+vi.stubGlobal("HTMLCanvasElement", FakeCanvas);
 vi.stubGlobal("document", {
     createElement: (tag: string) => {
         made.push(tag);
-        if (tag === "video") return new FakeVideo();
-        if (tag === "canvas") return new FakeCanvas();
-        return new FakeScript();
-    },
-    head: {
-        append: (node: FakeScript) => {
-            queueMicrotask(() => {
-                if (!scriptArrives) {
-                    node.onerror?.();
-                    return;
-                }
-                (window as unknown as { SelfieSegmentation?: unknown }).SelfieSegmentation =
-                    FakeSegmenter;
-                node.onload?.();
-            });
-        }
+        return tag === "video" ? new FakeVideo() : new FakeCanvas();
     }
+});
+vi.stubGlobal("fetch", async () => {
+    fetches += 1;
+    return modelServed
+        ? { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }
+        : { ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
 });
 vi.stubGlobal(
     "Worker",
     class {
-        onmessage: ((event: unknown) => void) | null = null;
+        onmessage: (() => void) | null = null;
         constructor() {
             workers += 1;
+            // eslint-disable-next-line @typescript-eslint/no-this-alias
+            const self = this;
+            tick = () => self.onmessage?.();
         }
         postMessage(): void {}
         terminate(): void {}
     }
 );
-// Only the one method, never the constructor: the loader that brings this file
-// in builds URLs of its own, and a stub in its place fails the import.
 (globalThis.URL as unknown as { createObjectURL: () => string }).createObjectURL = () =>
     "blob:ticker";
-vi.stubGlobal("window", {
-    localStorage: {
-        getItem: () => null,
-        setItem: () => undefined,
-        removeItem: () => undefined
-    },
-    dispatchEvent: () => true
-});
+const scope: Record<string, unknown> = {
+    localStorage: { getItem: () => null, setItem: () => undefined, removeItem: () => undefined },
+    dispatchEvent: () => true,
+    HTMLCanvasElement: FakeCanvas
+};
+vi.stubGlobal("window", scope);
 
-const { coverRect, maskCamera } = await import("@/app/(app)/chat/camera-filter");
+const { maskCamera } = await import("@/app/(app)/chat/camera-filter");
 
 const track = {
     readyState: "live",
@@ -139,19 +141,29 @@ const track = {
     getSettings: () => ({ frameRate: 30 })
 } as unknown as MediaStreamTrack;
 
-describe("a background nobody asked for", () => {
-    it("costs nothing at all", async () => {
-        made.length = 0;
-        expect(await maskCamera(track, "off")).toBeNull();
-        // Not an element, not a script tag, and above all not six megabytes of
-        // model: "off" is the default, so this is every call in the deployment.
-        expect(made).toHaveLength(0);
-    });
+beforeEach(() => {
+    made.length = 0;
+    renders.length = 0;
+    tracked.length = 0;
+    segments = 0;
+    workers = 0;
+    fetches = 0;
+    modelServed = false;
+    modelBroken = false;
+    webgl = true;
+    tick = null;
 });
 
-describe("a picture that was never chosen", () => {
-    it("is not a background, and nothing is built for it", async () => {
-        made.length = 0;
+describe("a background nobody asked for", () => {
+    it("costs nothing at all", async () => {
+        expect(await maskCamera(track, "off")).toBeNull();
+        // Not an element and not a download: "off" is the default, so this is
+        // every call in the deployment.
+        expect(made).toHaveLength(0);
+        expect(fetches).toBe(0);
+    });
+
+    it("is not built for a picture that was never chosen", async () => {
         expect(await maskCamera(track, "image", null)).toBeNull();
         expect(made).toHaveLength(0);
     });
@@ -160,73 +172,123 @@ describe("a picture that was never chosen", () => {
 describe("a model that will not load", () => {
     it("says so instead of coming back as a bare null", async () => {
         const built = await maskCamera(track, "blur");
-        // Not null: null means "nothing was asked for", and something was. The
-        // difference is the whole of what a screen can tell somebody.
+        // Not null: null means "nothing was asked for", and something was.
         expect(built).not.toBeNull();
         expect(built?.track).toBeNull();
         expect(built?.using).toBe("blur");
-        expect(built?.problem).toBeTruthy();
+        expect(built?.problem).toMatch(/not on this server/);
     });
 
     it("is tried again next time rather than remembered as broken", async () => {
-        made.length = 0;
-        const again = await maskCamera(track, "strong");
-        expect(again?.problem).toBeTruthy();
-        // A second script tag is the evidence: a cached failure would have
-        // answered from the first one, and a deployment that staged its assets
-        // a minute later would stay broken until the tab was reloaded.
-        expect(made).toContain("script");
+        await maskCamera(track, "strong");
+        await maskCamera(track, "strong");
+        // A cached failure would have answered from the first attempt, and a
+        // deployment that staged its assets a minute later would stay broken
+        // until the tab was reloaded.
+        expect(fetches).toBe(2);
     });
 });
 
-/**
- * Last on purpose.
- *
- * A loader that succeeds is remembered for the life of the page - that is what
- * stops a second background re-fetching six megabytes - so a case that lets it
- * succeed makes every case after it succeed too. The failures above have to run
- * against a loader that has never worked.
- */
+describe("a browser without WebGL 2", () => {
+    it("keeps the plain camera and says why", async () => {
+        webgl = false;
+        modelServed = true;
+        const built = await maskCamera(track, "blur");
+        expect(built?.track).toBeNull();
+        expect(built?.problem).toMatch(/WebGL 2/);
+        // Refused before anything was downloaded.
+        expect(fetches).toBe(0);
+    });
+});
+
 describe("starting the model", () => {
     it("has already segmented a frame by the time it hands the track back", async () => {
-        scriptArrives = true;
-        sends = 0;
-        workers = 0;
-        try {
-            const built = await maskCamera(track, "blur");
-            expect(built?.track).not.toBeNull();
-            // Exactly one, and it happened before this resolved. The frame
-            // driver is a fake that never ticks, so a second one could only
-            // have come from the loop - which means this one did not.
-            expect(sends).toBe(1);
-            expect(workers).toBe(1);
-        } finally {
-            scriptArrives = false;
-            delete (window as unknown as { SelfieSegmentation?: unknown }).SelfieSegmentation;
-        }
+        modelServed = true;
+        const built = await maskCamera(track, "blur");
+        expect(built?.track).not.toBeNull();
+        // Exactly one, and before this resolved: the worker is a fake that
+        // never ticks on its own.
+        expect(segments).toBe(1);
+        expect(tracked).toEqual([256]);
+        expect(renders).toEqual([{ blind: false }]);
+        expect(workers).toBe(1);
+        await built?.stop();
+    });
+
+    it("takes the person's mask, which the runtime hands back last", async () => {
+        modelServed = true;
+        const built = await maskCamera(track, "image", "/backgrounds/desk.webp");
+        // The background mask in the fake is 1 wide; the person's is 256.
+        expect(tracked).toEqual([256]);
+        await built?.stop();
     });
 });
 
-describe("a background picture behind a camera of another shape", () => {
-    // The stored picture is 16:9. Drawn over the frame's own size it was
-    // squashed behind a 4:3 webcam and an upright phone.
-    it("keeps the picture's shape and covers the frame", () => {
-        for (const [width, height] of [
-            [640, 480],
-            [1280, 720],
-            [720, 1280]
-        ] as const) {
-            const at = coverRect(1280, 720, width, height);
-            expect(at.width / at.height).toBeCloseTo(1280 / 720, 6);
-            expect(at.width).toBeGreaterThanOrEqual(width - 1e-6);
-            expect(at.height).toBeGreaterThanOrEqual(height - 1e-6);
-            // Centred, so the excess falls off both edges equally.
-            expect(at.x * 2 + at.width).toBeCloseTo(width, 6);
-            expect(at.y * 2 + at.height).toBeCloseTo(height, 6);
-        }
+describe("a model that stops answering", () => {
+    it("blurs the whole room rather than handing it back", async () => {
+        modelServed = true;
+        const built = await maskCamera(track, "image", "/backgrounds/desk.webp");
+        modelBroken = true;
+        for (let frame = 0; frame < 12; frame += 1) tick?.();
+        const last = renders.slice(-3);
+        // Every frame after it gave up is drawn blind: all background, blurred.
+        expect(last.every((frame) => frame.blind)).toBe(true);
+        // And it stops being asked once it has given up.
+        const asked = segments;
+        tick?.();
+        expect(segments).toBe(asked);
+        await built?.stop();
     });
+});
 
-    it("draws over the frame while the picture has no size yet", () => {
-        expect(coverRect(0, 0, 640, 480)).toEqual({ x: 0, y: 0, width: 640, height: 480 });
+describe("insertable streams", () => {
+    it("sends the generator's track, with the first frame already through", async () => {
+        modelServed = true;
+        const written: unknown[] = [];
+        let reads = 0;
+        class Frame {
+            timestamp = 0;
+            displayWidth = 1280;
+            displayHeight = 720;
+            close(): void {}
+        }
+        scope.VideoFrame = class {
+            constructor(readonly from: unknown) {}
+        };
+        scope.MediaStreamTrackProcessor = class {
+            readable = {
+                getReader: () => ({
+                    // One frame, then a camera that has ended.
+                    read: async () =>
+                        (reads += 1) === 1 ? { done: false, value: new Frame() } : { done: true },
+                    cancel: async () => undefined
+                })
+            };
+        };
+        scope.MediaStreamTrackGenerator = class {
+            id = "generated";
+            stop(): void {}
+            writable = {
+                getWriter: () => ({
+                    write: async (frame: unknown) => written.push(frame),
+                    close: async () => undefined
+                })
+            };
+        };
+        vi.stubGlobal("VideoFrame", scope.VideoFrame);
+        try {
+            const built = await maskCamera(track, "blur");
+            expect((built?.track as unknown as { id: string }).id).toBe("generated");
+            expect(written).toHaveLength(1);
+            expect(segments).toBe(1);
+            // No video element and no worker: the camera's own frames drive it.
+            expect(made).not.toContain("video");
+            expect(workers).toBe(0);
+            await built?.stop();
+        } finally {
+            delete scope.VideoFrame;
+            delete scope.MediaStreamTrackProcessor;
+            delete scope.MediaStreamTrackGenerator;
+        }
     });
 });

@@ -10,40 +10,51 @@
  * so does a picture of their own, and both need the same thing underneath: a
  * model that looks at every frame and answers which pixels are the person.
  *
- * **MediaPipe's selfie segmentation** (Apache-2.0, Google) is that model, and it
- * is the same one Jitsi and Nextcloud Talk run for the same feature. It is an
- * Emscripten build - a loader, a wasm binary and a set of weights - served from
- * this origin out of `public/video`, so nothing about a call reaches anybody
- * else and there is no account, key or quota anywhere in it. It is not small:
- * about six megabytes, fetched at the moment somebody turns a background on and
- * never before.
+ * **MediaPipe's image segmenter** (`@mediapipe/tasks-vision`, Apache-2.0,
+ * Google) with its selfie segmenter model is that model - the pairing LiveKit's
+ * own `@livekit/track-processors` runs. It runs on the GPU, and so does every
+ * step after it (`camera-compositor`): the mask is smoothed over time, its edge
+ * refined against the picture, and the person composited over a blur that
+ * leaves them out of it - Google's published recipe for Meet. The runtime and
+ * the model are served from this origin out of `public/video`, so nothing about
+ * a call reaches anybody else. About twelve megabytes, fetched the moment
+ * somebody turns a background on and never before.
  *
- * A masked camera is a *different* track: the frames are composited onto a
- * canvas and what the call sends is the canvas's own stream. Everything the raw
- * camera track was for - the device it came from, retuning it when the quality
- * bar moves, stopping it at the end - still refers to the raw one, so both are
- * handed back and both have to be let go of.
+ * A masked camera is a *different* track. Everything the raw camera track was
+ * for - the device it came from, retuning it when the quality bar moves,
+ * stopping it at the end - still refers to the raw one, so both are handed back
+ * and both have to be let go of.
  *
  * Three things here are worth knowing before changing any of it:
  *
- * - **The frames are driven by a worker, not by `requestAnimationFrame`.** A
- *   call spends most of its life in a tab nobody is looking at, and a hidden tab
- *   gets no animation frames at all and has its timers throttled to about one a
- *   second. Either of those is a camera that freezes the moment somebody reads
- *   their mail - visible to the whole room and to nobody more than the person it
- *   is happening to, who cannot see their own tile. A worker's timers are not
- *   throttled, which is the only reason this one exists. Jitsi carries the same
- *   worker for the same reason.
- * - **The canvas follows the camera's size, every frame.** Moving the quality
+ * - **Nothing waits on an animation frame.** A call spends most of its life in a
+ *   tab nobody is looking at, and a hidden tab gets no animation frames and has
+ *   its timers throttled to about one a second - a camera that freezes the
+ *   moment somebody reads their mail. Where the browser has insertable streams,
+ *   each camera frame is handed over as it arrives and handed back as a track,
+ *   with no timer at all. Elsewhere a worker's timer drives the frames, because
+ *   a worker's timers are not throttled.
+ * - **The output follows the camera's size, every frame.** Moving the quality
  *   bar retunes the device track in place (see `call-quality`), so the picture
- *   arriving here changes shape without anything being republished. A canvas
- *   left at the old size would quietly scale it.
+ *   arriving here changes shape without anything being republished.
  * - **A model that stops answering blurs everything rather than nothing.**
  *   Somebody who turned this on did so to keep a room out of a call, and the
  *   failure that hands the raw room back is the one failure this must not have.
  */
 
+import type { ImageSegmenter } from "@mediapipe/tasks-vision";
+import { createCompositor, type Compositor } from "./camera-compositor";
 import { backgroundImage, BLUR_PIXELS, type CameraBackground } from "./camera-background";
+import {
+    compositeParams,
+    dropFrame,
+    framePath,
+    frameSupport,
+    MODEL_FILE,
+    targetFps,
+    VIDEO_ASSETS_PATH,
+    wasmFiles
+} from "./camera-mask";
 import {
     autoGain,
     cameraLook,
@@ -58,52 +69,43 @@ import {
     type FrameBox
 } from "./camera-look";
 
-/** Where the staged model and its loader are served from. */
-const ASSETS = "/video";
-
-/** What the loader exports on the window once the script has run. Its own
- *  types, so the contract is the package's rather than one written here. */
-type Segmenter = import("@mediapipe/selfie_segmentation").SelfieSegmentation;
-type SegmenterResults = import("@mediapipe/selfie_segmentation").Results;
-type SegmenterClass = new (config: { locateFile: (file: string) => string }) => Segmenter;
+const ASSETS = VIDEO_ASSETS_PATH;
 
 /**
  * How long any one step of starting up is given.
  *
- * Generous, because the step that takes the time is a six-megabyte download on
- * whatever line the reader is on. It is a ceiling on waiting forever rather than
- * a performance target: what it stops is a call sitting on an unmasked camera
- * with no explanation because a file never arrived.
+ * Generous, because the step that takes the time is a download of several
+ * megabytes on whatever line the reader is on. It is a ceiling on waiting
+ * forever rather than a performance target.
  */
 const START_TIMEOUT = 45_000;
-
-/**
- * How much the edge of the cut-out is softened, in pixels.
- *
- * The mask has a hard edge and a person does not. Blurring the mask before the
- * frame is drawn through it is what stops a head looking cut out with scissors;
- * a picture behind needs more of it than a blur does, because a blurred
- * background hides its own seam.
- */
-const EDGE_OVER_IMAGE = 4;
-const EDGE_OVER_BLUR = 8;
 
 /** How many frames in a row may fail before the model is treated as gone. */
 const GIVE_UP = 10;
 
 /** The copy of a frame the look measures - brightness, and where the person
- *  is. Small on purpose: reading pixels back is the one slow thing a canvas
- *  does, and a crop is aimed, not drawn, from this. */
+ *  is. Small on purpose: reading pixels back is the one slow thing here. */
 const SAMPLE_WIDTH = 48;
 const SAMPLE_HEIGHT = 27;
 /** How often, in frames, the look measures. A few times a second at 30 fps. */
 const MEASURE_EVERY = 6;
 
+/** The insertable-streams classes, which TypeScript's DOM library does not
+ *  describe yet. Only what is used here. */
+interface TrackProcessor {
+    readonly readable: ReadableStream<VideoFrame>;
+}
+interface TrackGenerator extends MediaStreamTrack {
+    readonly writable: WritableStream<VideoFrame>;
+}
+type TrackProcessorClass = new (init: { track: MediaStreamTrack }) => TrackProcessor;
+type TrackGeneratorClass = new (init: { kind: "video" }) => TrackGenerator;
+
 /** A camera with something between it and the call. */
 export interface MaskedCamera {
     /** What to send, or null when it could not be built - see `problem`. */
     readonly track: MediaStreamTrack | null;
-    /** Let go of the canvas, the model and the loop. The camera itself is the
+    /** Let go of the model, the canvases and the loop. The camera itself is the
      *  caller's to stop: this only undoes what it built. */
     readonly stop: () => Promise<void>;
     /** Which background is running - "off" when only the look is. */
@@ -112,9 +114,7 @@ export interface MaskedCamera {
      * Why there is no masked track, or null when nothing went wrong.
      *
      * Kept for the same reason the microphone's is: a filter that has never once
-     * started in a deployment looks exactly like one that works - the setting
-     * says "Blur my background", the room is still in the call, and there is
-     * nothing anywhere to read.
+     * started in a deployment looks exactly like one that works.
      */
     readonly problem: string | null;
 }
@@ -126,11 +126,9 @@ export interface MaskedCamera {
  * or this is not a browser. Anything else comes back as a `MaskedCamera`, whose
  * `track` is null when it could not be built and whose `problem` then says why.
  *
- * Two passes, each only when it is wanted. The background is composited onto a
- * stage exactly as it always was; the look - light, colour, framing - is then
- * one more draw of that stage onto what is sent, through a canvas filter and a
- * crop. With no look the stage is what is sent and the second pass does not
- * exist, so a background alone costs what it cost before.
+ * Two passes, each only when it is wanted. The background is composited on the
+ * GPU; the look - light, colour, framing - is then one more draw of that onto
+ * what is sent, through a canvas filter and a crop.
  */
 export async function maskCamera(
     track: MediaStreamTrack,
@@ -149,28 +147,15 @@ export async function maskCamera(
     // cut them out, framing to follow them. Light and colour need nothing.
     const segmenting = background !== "off" || look.frame === "auto";
 
-    const video = document.createElement("video");
-    video.autoplay = true;
-    video.playsInline = true;
-    // Its own copy of the camera, never the caller's stream object: pointing a
-    // video element at a stream the call is also using is how one of them ends
-    // up restarting the other.
-    video.srcObject = new MediaStream([track]);
-    // autoplay is unreliable for an element that is not in the document.
-    await video.play().catch(() => undefined);
+    const path = framePath(frameSupport(window as unknown as Record<string, unknown>));
+    if (!path) return refusal(background, "This browser would not let a canvas be sent as video.");
 
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) return refusal(background, "This browser has no canvas to draw on.");
-    // Where the background is composited. The canvas that is sent when there is
-    // no look to apply after it.
-    const stage = finishing ? document.createElement("canvas") : canvas;
-    const staging = finishing ? stage.getContext("2d") : context;
-    // A few dozen pixels, read back for the two measurements the look makes:
-    // how bright the picture is, and where the person is in it.
+    // What is sent when there is a look to apply; the GPU canvas otherwise.
+    const canvas = finishing ? document.createElement("canvas") : null;
+    const context = canvas?.getContext("2d") ?? null;
     const sample = finishing ? document.createElement("canvas") : null;
     const sampling = sample?.getContext("2d", { willReadFrequently: true }) ?? null;
-    if (!staging || (finishing && !sampling)) {
+    if (finishing && (!context || !sampling)) {
         return refusal(background, "This browser has no canvas to draw on.");
     }
     if (sample) {
@@ -178,12 +163,37 @@ export async function maskCamera(
         sample.height = SAMPLE_HEIGHT;
     }
 
-    let picture: HTMLImageElement | null = null;
-    let segmenter: Segmenter | null = null;
+    // The GPU canvas: the model runs on its context and the compositor draws
+    // on it, so the mask never leaves the graphics card.
+    const surface = segmenting ? document.createElement("canvas") : null;
+    const gl = surface
+        ? (surface.getContext("webgl2", {
+              alpha: false,
+              antialias: false,
+              depth: false,
+              stencil: false,
+              premultipliedAlpha: false,
+              preserveDrawingBuffer: false
+          }) as WebGL2RenderingContext | null)
+        : null;
+    if (segmenting && !gl) {
+        return refusal(
+            background,
+            "This browser cannot draw a background: WebGL 2 is turned off or not supported."
+        );
+    }
+
+    let video: HTMLVideoElement | null = null;
+    let segmenter: ImageSegmenter | null = null;
+    let compositor: Compositor | null = null;
     let ticker: Worker | null = null;
+    let reader: ReadableStreamDefaultReader<VideoFrame> | null = null;
+    let writer: WritableStreamDefaultWriter<VideoFrame> | null = null;
     let stopped = false;
     let failures = 0;
+    let answered = false;
     let frames = 0;
+    let clock = 0;
     let gain = 1;
     let crop: FrameBox = WHOLE_FRAME;
     let aim: FrameBox = WHOLE_FRAME;
@@ -193,143 +203,92 @@ export async function maskCamera(
         stopped = true;
         ticker?.terminate();
         ticker = null;
-        await segmenter?.close().catch(() => undefined);
+        await reader?.cancel().catch(() => undefined);
+        reader = null;
+        await writer?.close().catch(() => undefined);
+        writer = null;
+        compositor?.dispose();
+        compositor = null;
+        try {
+            segmenter?.close();
+        } catch {
+            // Already gone with its context; nothing left to free.
+        }
         segmenter = null;
-        video.srcObject = null;
-        picture = null;
+        if (video) video.srcObject = null;
     };
 
     try {
+        let picture: HTMLImageElement | null = null;
         if (background === "image" && image) {
             picture = new Image();
             picture.src = image;
             await within(START_TIMEOUT, picture.decode());
         }
-        await within(START_TIMEOUT, firstFrame(video));
-
-        if (segmenting) {
-            const Segmentation = await within(START_TIMEOUT, loader());
-            segmenter = new Segmentation({ locateFile: (file) => `${ASSETS}/${file}` });
-            // The landscape model - the wider, cheaper of the two, and the one a
-            // call is shaped like.
-            segmenter.setOptions({ modelSelection: 1, selfieMode: false });
-            segmenter.onResults(draw);
-            await within(START_TIMEOUT, segmenter.initialize());
-            // The first frame, before this returns, and it is not a formality.
-            //
-            // `initialize` resolves in about a tenth of a second and leaves the
-            // real work - instantiating the wasm, building the graph, compiling
-            // the shaders - to the first frame that goes through it. Measured in
-            // Chrome on this model: one task of 1.1 to 1.4 seconds that holds
-            // the main thread, and 69ms for every switch-on after it in the same
-            // tab. Held here, that second is inside the caller's `await`, where a
-            // screen has already said it is starting; left where it was, it
-            // landed on whatever the page was doing and read as the picture
-            // freezing.
-            await within(START_TIMEOUT, segmenter.send({ image: video }));
+        if (segmenting && gl && surface) {
+            const loaded = await within(START_TIMEOUT, loader());
+            segmenter = await within(START_TIMEOUT, createSegmenter(loaded, surface));
+            compositor = createCompositor(gl, {
+                params:
+                    background === "off"
+                        ? null
+                        : compositeParams(
+                              background,
+                              BLUR_PIXELS[background === "strong" ? "strong" : "blur"]
+                          ),
+                blindParams: compositeParams("strong", BLUR_PIXELS.strong),
+                image: picture
+            });
         }
     } catch (caught) {
         await teardown();
         return refusal(background, reasonOf(caught));
     }
 
-    /** Size a canvas to the camera, which can change shape mid-call. */
-    function fit(target: HTMLCanvasElement, width: number, height: number): void {
-        if (target.width !== width || target.height !== height) {
-            target.width = width;
-            target.height = height;
-        }
-    }
-
     /**
-     * One frame, composited.
+     * One frame through the model and the compositor. Answers what to send.
      *
-     * The order is the whole trick and it is Jitsi's: the mask is laid down
-     * first and softened, the frame is drawn *into* it so only the person
-     * survives, and the background is then slid underneath. Three composite
-     * operations and no pixel is ever read back into JavaScript.
+     * The model is asked synchronously: its answer is a texture on the shared
+     * context, folded into the smoothed mask before the result is let go of.
      */
-    function draw(results: SegmenterResults): void {
-        if (stopped || !staging) return;
-        const width = video.videoWidth;
-        const height = video.videoHeight;
-        if (!width || !height) return;
+    function render(
+        source: HTMLVideoElement | VideoFrame,
+        width: number,
+        height: number
+    ): CanvasImageSource {
+        if (!segmenter || !compositor || !surface) return finish(source, width, height);
+        if (failures < GIVE_UP) {
+            // The model wants strictly increasing timestamps, and two frames
+            // can arrive inside the same millisecond.
+            clock = Math.max(performance.now(), clock + 1);
+            try {
+                const result = segmenter.segmentForVideo(source, clock);
+                try {
+                    // Background first and the person last: the selfie model has
+                    // one output, which the runtime hands back as both.
+                    const masks = result.confidenceMasks ?? [];
+                    const answer = masks[masks.length - 1];
+                    if (answer) {
+                        compositor.track(answer.getAsWebGLTexture(), answer.width, answer.height);
+                        answered = true;
+                    }
+                } finally {
+                    result.close();
+                }
+                failures = 0;
+            } catch {
+                failures += 1;
+            }
+        }
+        const blind = failures >= GIVE_UP || !answered;
 
         if (look.frame === "auto" && frames % MEASURE_EVERY === 0) {
-            aim = frameFor(measurePerson(results.segmentationMask));
+            const pixels = blind ? null : compositor.readMask(SAMPLE_WIDTH, SAMPLE_HEIGHT);
+            aim = pixels ? frameFor(personBox(pixels, SAMPLE_WIDTH, SAMPLE_HEIGHT)) : WHOLE_FRAME;
         }
-        if (background === "off") {
-            finish(results.image, width, height);
-            return;
-        }
-
-        fit(stage, width, height);
-        const blur = BLUR_PIXELS[background === "strong" ? "strong" : "blur"];
-
-        staging.globalCompositeOperation = "copy";
-        staging.filter = `blur(${picture ? EDGE_OVER_IMAGE : EDGE_OVER_BLUR}px)`;
-        staging.drawImage(results.segmentationMask, 0, 0, width, height);
-
-        staging.globalCompositeOperation = "source-in";
-        staging.filter = "none";
-        staging.drawImage(results.image, 0, 0, width, height);
-
-        staging.globalCompositeOperation = "destination-over";
-        if (picture) {
-            // Covering the frame, never stretched to it: the stored picture is
-            // wide, and a 4:3 webcam or an upright phone squashed it.
-            const at = coverRect(picture.naturalWidth, picture.naturalHeight, width, height);
-            staging.drawImage(picture, at.x, at.y, at.width, at.height);
-        } else {
-            staging.filter = `blur(${blur}px)`;
-            // Drawn larger than the canvas by the width of the blur, which is
-            // the difference between a blurred room and a blurred room inside a
-            // dark frame: a blur samples past the edge of what it is given, and
-            // past the edge of the canvas there is nothing to sample. Pushing
-            // the faded border outside the picture costs one multiplication.
-            staging.drawImage(
-                results.image,
-                -blur * 2,
-                -blur * 2,
-                width + blur * 4,
-                height + blur * 4
-            );
-        }
-
-        staging.filter = "none";
-        staging.globalCompositeOperation = "source-over";
-        finish(stage, width, height);
-    }
-
-    /**
-     * The room, with nobody cut out of it.
-     *
-     * What is drawn when the model has stopped answering. Everything is blurred
-     * rather than nothing: somebody who turned a background on did so to keep a
-     * room out of a call, and quietly handing that room back because an inference
-     * failed is the one outcome here that is worse than a worse picture.
-     *
-     * With no background - the model was only there for framing - the picture
-     * goes out uncropped instead, which is what it would be with framing off.
-     */
-    function drawBlind(): void {
-        if (!staging) return;
-        const width = video.videoWidth;
-        const height = video.videoHeight;
-        if (!width || !height) return;
-        aim = WHOLE_FRAME;
-        if (background === "off") {
-            finish(video, width, height);
-            return;
-        }
-        fit(stage, width, height);
-        const blur = BLUR_PIXELS.strong;
-        staging.globalCompositeOperation = "copy";
-        staging.filter = `blur(${blur}px)`;
-        staging.drawImage(video, -blur * 2, -blur * 2, width + blur * 4, height + blur * 4);
-        staging.filter = "none";
-        staging.globalCompositeOperation = "source-over";
-        finish(stage, width, height);
+        if (background === "off") return finish(source, width, height);
+        compositor.render({ source, width, height, blind });
+        return finish(surface, width, height);
     }
 
     /**
@@ -339,10 +298,13 @@ export async function maskCamera(
      * and eased towards rather than jumped to, so a lamp switched on is a
      * picture that settles rather than one that flashes.
      */
-    function finish(source: CanvasImageSource, width: number, height: number): void {
+    function finish(source: CanvasImageSource, width: number, height: number): CanvasImageSource {
         frames += 1;
-        if (!finishing || !context) return;
-        fit(canvas, width, height);
+        if (!finishing || !canvas || !context) return source;
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
         if (look.light === "auto" && sampling && frames % MEASURE_EVERY === 1) {
             sampling.globalCompositeOperation = "copy";
             sampling.drawImage(source, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
@@ -367,117 +329,146 @@ export async function maskCamera(
         );
         context.filter = "none";
         context.globalCompositeOperation = "source-over";
+        return canvas;
     }
 
-    /** Where the person is, from the model's mask, read at a size that costs
-     *  nothing. */
-    function measurePerson(mask: CanvasImageSource): FrameBox | null {
-        if (!sampling) return null;
-        sampling.globalCompositeOperation = "copy";
-        sampling.drawImage(mask, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
-        return personBox(
-            sampling.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT).data,
-            SAMPLE_WIDTH,
-            SAMPLE_HEIGHT
-        );
-    }
+    const fps = targetFps(track.getSettings().frameRate);
+    let out: MediaStreamTrack | null = null;
 
-    const settings = track.getSettings();
-    // The camera's own rate where it reports one. Held to something a model can
-    // keep up with: a 60 fps webcam asked for 60 segmentations a second is a
-    // fan at full speed for a picture nobody can tell apart from 30.
-    const fps = Math.min(30, Math.max(15, Math.round(settings.frameRate ?? 30)));
+    try {
+        if (path === "insertable") {
+            const scope = window as unknown as {
+                MediaStreamTrackProcessor: TrackProcessorClass;
+                MediaStreamTrackGenerator: TrackGeneratorClass;
+            };
+            const generator = new scope.MediaStreamTrackGenerator({ kind: "video" });
+            reader = new scope.MediaStreamTrackProcessor({ track }).readable.getReader();
+            writer = generator.writable.getWriter();
+            out = generator;
+            let last = -Infinity;
 
-    ticker = new Worker(tickerScript(), { name: "Call background" });
-    ticker.onmessage = () => {
-        void (async () => {
-            if (stopped) return;
-            // A camera that is off is unpublished rather than sent black, so
-            // there is nothing here worth a model's time. A camera that has
-            // ended - a lid, a cable, another application - is the same.
-            if (track.readyState !== "live" || !track.enabled) {
-                ticker?.postMessage(Math.round(1000 / fps));
-                return;
-            }
-            if (!segmenter) {
-                // Light and colour only: no model, one draw.
-                const width = video.videoWidth;
-                const height = video.videoHeight;
-                if (width && height) finish(video, width, height);
-                ticker?.postMessage(Math.round(1000 / fps));
-                return;
-            }
-            try {
-                if (failures < GIVE_UP) {
-                    await segmenter.send({ image: video });
-                    failures = 0;
-                } else {
-                    drawBlind();
+            /** One camera frame in, one out. False once the camera has ended. */
+            const step = async (): Promise<boolean> => {
+                const read = await reader?.read();
+                if (!read || read.done || !read.value) return false;
+                const frame = read.value;
+                try {
+                    const at = frame.timestamp / 1000;
+                    // A camera that is off is unpublished rather than sent
+                    // black, so there is nothing here worth a model's time.
+                    if (stopped || !track.enabled || dropFrame(at - last, fps)) return true;
+                    last = at;
+                    const sent = render(frame, frame.displayWidth, frame.displayHeight);
+                    // The generator takes the frame and closes it.
+                    await writer?.write(new VideoFrame(sent, { timestamp: frame.timestamp }));
+                } finally {
+                    frame.close();
                 }
-            } catch {
-                failures += 1;
-                if (failures >= GIVE_UP) drawBlind();
-            }
-            ticker?.postMessage(Math.round(1000 / fps));
-        })();
-    };
-    ticker.postMessage(0);
+                return true;
+            };
 
-    const out = canvas.captureStream(fps).getVideoTracks()[0] ?? null;
-    if (!out) {
+            // The first frame, before this returns, and it is not a formality:
+            // the model compiles its shaders and builds its graph on the first
+            // frame it sees, a task of about a second that holds the main
+            // thread. Held here, that second is inside the caller's `await`,
+            // where a screen has already said it is starting.
+            await within(START_TIMEOUT, step());
+            void (async () => {
+                while (!stopped) {
+                    const going = await step().catch(() => !stopped);
+                    if (!going) break;
+                }
+            })();
+        } else {
+            const playing = document.createElement("video");
+            video = playing;
+            playing.autoplay = true;
+            playing.playsInline = true;
+            playing.muted = true;
+            // Its own copy of the camera, never the caller's stream object:
+            // pointing a video element at a stream the call is also using is how
+            // one of them ends up restarting the other.
+            playing.srcObject = new MediaStream([track]);
+            // autoplay is unreliable for an element that is not in the document.
+            await playing.play().catch(() => undefined);
+            await within(START_TIMEOUT, firstFrame(playing));
+
+            const tick = (): void => {
+                if (stopped) return;
+                const width = playing.videoWidth;
+                const height = playing.videoHeight;
+                if (track.readyState === "live" && track.enabled && width && height) {
+                    render(playing, width, height);
+                }
+            };
+            // The first frame before this returns - see the insertable path.
+            tick();
+            const sent = (canvas ?? surface) as HTMLCanvasElement;
+            out = sent.captureStream(fps).getVideoTracks()[0] ?? null;
+            if (!out) throw new Error("This browser would not let a canvas be sent as video.");
+
+            ticker = new Worker(tickerScript(), { name: "Call background" });
+            ticker.onmessage = () => {
+                tick();
+                ticker?.postMessage(Math.round(1000 / fps));
+            };
+            ticker.postMessage(0);
+        }
+    } catch (caught) {
         await teardown();
-        return refusal(background, "This browser would not let a canvas be sent as video.");
+        out?.stop();
+        return refusal(background, reasonOf(caught));
     }
 
+    const sending = out;
     return {
-        track: out,
+        track: sending,
         using: background,
         problem: null,
         stop: async () => {
             await teardown();
-            out.stop();
+            sending.stop();
         }
     };
 }
+
 /** A background that was asked for and could not be built. */
 function refusal(background: CameraBackground, problem: string): MaskedCamera {
     return { track: null, using: background, problem, stop: async () => undefined };
 }
 
+type Vision = typeof import("@mediapipe/tasks-vision");
+
+interface Loaded {
+    readonly vision: Vision;
+    readonly model: Uint8Array;
+    readonly simd: boolean;
+}
+
 /**
- * The loader, fetched once per page.
+ * The runtime and the model, fetched once per page.
  *
- * A classic script rather than an import, because that is what the package is:
- * an Emscripten build that exports itself onto the window and then fetches its
- * own wasm by name, relative to wherever it was served from. Bundling it would
- * put six megabytes into every page that can reach a call and still leave the
- * wasm to be fetched by URL.
+ * The model is fetched here rather than by the runtime, so that a deployment
+ * that never staged it says so in words instead of in a wasm abort.
  *
  * A failure is not remembered. The next attempt tries again, because the reasons
  * this fails - a tab that was offline, a deployment whose assets arrived a
  * moment later - are all reasons it might work now.
  */
-let loading: Promise<SegmenterClass> | null = null;
+let loading: Promise<Loaded> | null = null;
 
-function loader(): Promise<SegmenterClass> {
+function loader(): Promise<Loaded> {
     if (loading) return loading;
-    loading = new Promise<SegmenterClass>((resolve, reject) => {
-        const here = window as unknown as { SelfieSegmentation?: SegmenterClass };
-        if (here.SelfieSegmentation) {
-            resolve(here.SelfieSegmentation);
-            return;
+    loading = (async () => {
+        const response = await fetch(`${ASSETS}/${MODEL_FILE}`).catch(() => null);
+        if (!response?.ok) {
+            throw new Error("The background model is not on this server. An update adds it.");
         }
-        const script = document.createElement("script");
-        script.src = `${ASSETS}/selfie_segmentation.js`;
-        script.async = true;
-        script.onload = () => {
-            if (here.SelfieSegmentation) resolve(here.SelfieSegmentation);
-            else reject(new Error("The background model loaded but is not what Polaris expects."));
-        };
-        script.onerror = () =>
-            reject(new Error("The background model is not on this server. An update adds it."));
-        document.head.append(script);
-    });
+        const model = new Uint8Array(await response.arrayBuffer());
+        const vision = await import("@mediapipe/tasks-vision");
+        const simd = await vision.FilesetResolver.isSimdSupported();
+        return { vision, model, simd };
+    })();
     loading.catch(() => {
         loading = null;
     });
@@ -485,12 +476,41 @@ function loader(): Promise<SegmenterClass> {
 }
 
 /**
- * The worker that drives the frames.
+ * The segmenter, on the GPU where it will run and on the CPU where it will not
+ * - a machine with WebGL 2 but a blocklisted driver still gets a background,
+ * only a slower one. Both share the canvas, so the mask is a texture either way.
+ */
+async function createSegmenter(
+    loaded: Loaded,
+    canvas: HTMLCanvasElement
+): Promise<ImageSegmenter> {
+    const files = wasmFiles(loaded.simd);
+    const fileset = {
+        wasmLoaderPath: `${ASSETS}/${files.loader}`,
+        wasmBinaryPath: `${ASSETS}/${files.binary}`
+    };
+    const build = (delegate: "GPU" | "CPU") =>
+        loaded.vision.ImageSegmenter.createFromOptions(fileset, {
+            // A copy each time: the runtime may take ownership of the buffer.
+            baseOptions: { modelAssetBuffer: loaded.model.slice(), delegate },
+            canvas,
+            runningMode: "VIDEO",
+            outputConfidenceMasks: true,
+            outputCategoryMask: false
+        });
+    try {
+        return await build("GPU");
+    } catch {
+        return await build("CPU");
+    }
+}
+
+/**
+ * The worker that drives the frames where insertable streams are missing.
  *
- * A blob rather than a file of its own: it is one line, and a file would be a
- * fourth thing to stage and a fourth thing to be missing. What matters is only
- * that it is a worker at all - see the note at the top of this file about hidden
- * tabs.
+ * A blob rather than a file of its own: it is one line, and a file would be one
+ * more thing to stage and to be missing. What matters is only that it is a
+ * worker at all - see the note at the top of this file about hidden tabs.
  */
 let tickerUrl: string | null = null;
 
@@ -517,29 +537,6 @@ function tickerScript(): string {
  * glass - the freeze arrives first and what stays on screen is the frame
  * before. Two frames, because one only means the next paint was scheduled.
  */
-/**
- * Where to draw a picture so it covers a frame of another shape without being
- * stretched: scaled by the larger of the two ratios and centred, so the excess
- * falls off the edges. A picture with no size yet is drawn over the frame.
- */
-export function coverRect(
-    sourceWidth: number,
-    sourceHeight: number,
-    width: number,
-    height: number
-): { x: number; y: number; width: number; height: number } {
-    if (sourceWidth <= 0 || sourceHeight <= 0) return { x: 0, y: 0, width, height };
-    const scale = Math.max(width / sourceWidth, height / sourceHeight);
-    const drawnWidth = sourceWidth * scale;
-    const drawnHeight = sourceHeight * scale;
-    return {
-        x: (width - drawnWidth) / 2,
-        y: (height - drawnHeight) / 2,
-        width: drawnWidth,
-        height: drawnHeight
-    };
-}
-
 export function afterPaint(): Promise<void> {
     if (typeof requestAnimationFrame !== "function") return Promise.resolve();
     return new Promise((resolve) => {
@@ -558,18 +555,19 @@ function firstFrame(video: HTMLVideoElement): Promise<void> {
 
 /** A promise with a ceiling on how long it may take. */
 function within<T>(ms: number, promise: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     return Promise.race([
         promise,
-        new Promise<T>((_, reject) =>
-            setTimeout(() => reject(new Error("It took too long to start.")), ms)
-        )
-    ]);
+        new Promise<T>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("It took too long to start.")), ms);
+        })
+    ]).finally(() => clearTimeout(timer));
 }
 
 /**
  * A failure in words, and deliberately the browser's own.
  *
- * The same reasoning as `mic-filter`'s: "the script could not be loaded" and
+ * The same reasoning as `mic-filter`'s: "the model is not on this server" and
  * "out of memory" send somebody to two different places, and the line under the
  * setting is the only place either of them appears.
  */
