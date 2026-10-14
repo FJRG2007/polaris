@@ -64,10 +64,26 @@ export const BACKGROUNDS: readonly {
     label: NamespaceKey<"chat">;
     help: NamespaceKey<"chat">;
 }[] = [
-    { value: "blur", label: "callSettings.backgrounds.blur.label", help: "callSettings.backgrounds.blur.help" },
-    { value: "strong", label: "callSettings.backgrounds.strong.label", help: "callSettings.backgrounds.strong.help" },
-    { value: "image", label: "callSettings.backgrounds.image.label", help: "callSettings.backgrounds.image.help" },
-    { value: "off", label: "callSettings.backgrounds.off.label", help: "callSettings.backgrounds.off.help" }
+    {
+        value: "blur",
+        label: "callSettings.backgrounds.blur.label",
+        help: "callSettings.backgrounds.blur.help"
+    },
+    {
+        value: "strong",
+        label: "callSettings.backgrounds.strong.label",
+        help: "callSettings.backgrounds.strong.help"
+    },
+    {
+        value: "image",
+        label: "callSettings.backgrounds.image.label",
+        help: "callSettings.backgrounds.image.help"
+    },
+    {
+        value: "off",
+        label: "callSettings.backgrounds.off.label",
+        help: "callSettings.backgrounds.off.help"
+    }
 ];
 
 /** Where the pictures Polaris ships are served from. */

@@ -40,7 +40,9 @@ function draw(after?: string): void {
     render(
         <ToastProvider>
             <AddressChip entry={ENTRY} {...(after === undefined ? {} : { after })} />
-        </ToastProvider>, { wrapper: MessagesWrapper });
+        </ToastProvider>,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 describe("the comma between two recipients", () => {

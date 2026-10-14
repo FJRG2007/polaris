@@ -31,7 +31,17 @@ const DEFAULT_SKIN_BASE = "/api/app-bundles/game-servers/current/assets/default-
 /** The folder each arm model's textures live in, in the jar and in the bundle. */
 const FOLDER: Record<SkinModel, string> = { classic: "wide", slim: "slim" };
 
-const CHARACTERS = ["alex", "ari", "efe", "kai", "makena", "noor", "steve", "sunny", "zuri"] as const;
+const CHARACTERS = [
+    "alex",
+    "ari",
+    "efe",
+    "kai",
+    "makena",
+    "noor",
+    "steve",
+    "sunny",
+    "zuri"
+] as const;
 
 /** The client's `DEFAULT_SKINS`, in its order. The order is the whole contract. */
 const DEFAULT_SKINS: readonly { name: string; model: SkinModel }[] = [

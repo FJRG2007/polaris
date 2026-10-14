@@ -17,10 +17,24 @@ const BASE = "/api/app-bundles/game-servers/current/assets/default-skins";
 
 /** `DEFAULT_SKINS` as the client fills it: slim first, then wide. */
 const ORDER = [
-    "slim/alex", "slim/ari", "slim/efe", "slim/kai", "slim/makena",
-    "slim/noor", "slim/steve", "slim/sunny", "slim/zuri",
-    "wide/alex", "wide/ari", "wide/efe", "wide/kai", "wide/makena",
-    "wide/noor", "wide/steve", "wide/sunny", "wide/zuri"
+    "slim/alex",
+    "slim/ari",
+    "slim/efe",
+    "slim/kai",
+    "slim/makena",
+    "slim/noor",
+    "slim/steve",
+    "slim/sunny",
+    "slim/zuri",
+    "wide/alex",
+    "wide/ari",
+    "wide/efe",
+    "wide/kai",
+    "wide/makena",
+    "wide/noor",
+    "wide/steve",
+    "wide/sunny",
+    "wide/zuri"
 ];
 
 /** One fixture UUID per index, each checked in Java. */

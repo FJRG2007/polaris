@@ -45,10 +45,14 @@ describe("markdown round trip", () => {
 
     it("does not turn text that looks like formatting into formatting", () => {
         const doc = markdownToDoc("");
-        doc.content = [{ type: "paragraph", content: [{ type: "text", text: "2 * 3 * 4 [not a link]" }] }];
+        doc.content = [
+            { type: "paragraph", content: [{ type: "text", text: "2 * 3 * 4 [not a link]" }] }
+        ];
         const written = docToMarkdown(doc);
         expect(roundTrip(written)).toBe(written);
-        const reread = (markdownToDoc(written).content?.[0]?.content ?? []).map((node) => node.text ?? "").join("");
+        const reread = (markdownToDoc(written).content?.[0]?.content ?? [])
+            .map((node) => node.text ?? "")
+            .join("");
         expect(reread).toBe("2 * 3 * 4 [not a link]");
     });
 
@@ -117,7 +121,11 @@ describe("nothing to send", () => {
     it("writes no trailing break for a line with nothing after it", () => {
         expect(
             docToMarkdown(
-                doc([{ type: "text", text: "   " }, { type: "hardBreak" }, { type: "text", text: "  " }])
+                doc([
+                    { type: "text", text: "   " },
+                    { type: "hardBreak" },
+                    { type: "text", text: "  " }
+                ])
             )
         ).toBe("");
     });
@@ -125,7 +133,11 @@ describe("nothing to send", () => {
     it("keeps a break that has something after it", () => {
         expect(
             docToMarkdown(
-                doc([{ type: "text", text: "one" }, { type: "hardBreak" }, { type: "text", text: "two" }])
+                doc([
+                    { type: "text", text: "one" },
+                    { type: "hardBreak" },
+                    { type: "text", text: "two" }
+                ])
             )
         ).toBe("one\\\ntwo");
     });
