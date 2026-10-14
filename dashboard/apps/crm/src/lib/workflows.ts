@@ -742,8 +742,8 @@ export async function runWorkflow(
     }
     const now = new Date();
     if (lastError === null && reached.kind === "waiting") {
-        await prisma.crmWorkflowRun.update({
-            where: { id: runId },
+        await prisma.crmWorkflowRun.updateMany({
+            where: { id: runId, status: "running" },
             data: {
                 status: "waiting",
                 step: reached.step,
@@ -754,8 +754,8 @@ export async function runWorkflow(
         });
         return null;
     }
-    await prisma.crmWorkflowRun.update({
-        where: { id: runId },
+    const ended = await prisma.crmWorkflowRun.updateMany({
+        where: { id: runId, status: "running" },
         data: {
             status: lastError !== null ? "failed" : reached.kind,
             error: lastError,
@@ -765,6 +765,7 @@ export async function runWorkflow(
             actions: null
         }
     });
+    if (ended.count === 0) return lastError;
     await prisma.crmWorkflow.update({
         where: { id: workflow.id },
         data: { runCount: { increment: 1 }, lastRunAt: now, lastError }
@@ -854,7 +855,16 @@ const RESUME_LEASE = 30 * 60_000;
  */
 export async function resumeWaitingRuns(now: Date = new Date()): Promise<number> {
     const due = await prisma.crmWorkflowRun.findMany({
-        where: { status: { in: ["waiting", "running"] }, resumeAt: { lte: now } },
+        where: {
+            OR: [
+                { status: { in: ["waiting", "running"] }, resumeAt: { lte: now } },
+                {
+                    status: "running",
+                    resumeAt: null,
+                    startedAt: { lte: new Date(now.getTime() - RESUME_LEASE) }
+                }
+            ]
+        },
         orderBy: { resumeAt: "asc" },
         take: SCHEDULE_BATCH,
         include: { workflow: true }
@@ -908,7 +918,14 @@ async function failCutShort(
     const error = (await crmT())("workflows.cutShort");
     const claimed = await prisma.crmWorkflowRun.updateMany({
         where: { id: runId, status: "running", resumeAt: lease },
-        data: { status: "failed", error, finishedAt: now, resumeAt: null, body: null, actions: null }
+        data: {
+            status: "failed",
+            error,
+            finishedAt: now,
+            resumeAt: null,
+            body: null,
+            actions: null
+        }
     });
     if (claimed.count === 0) return;
     await prisma.crmWorkflow.update({

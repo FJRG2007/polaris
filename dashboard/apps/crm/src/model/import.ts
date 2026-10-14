@@ -137,6 +137,28 @@ export function splitName(text: string): { first: string; last: string } {
         : { first: trimmed.slice(0, space), last: trimmed.slice(space + 1) };
 }
 
+/** An amount's text with its currency's own symbol taken out: "€1200" in euros
+ *  is "1200", while "$1200" in euros keeps its "$" for the import to refuse. */
+function withoutSymbol(text: string, currency: string): string {
+    let rest = text;
+    for (const display of ["narrowSymbol", "symbol"] as const) {
+        let symbol: string | undefined;
+        try {
+            symbol = new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency,
+                currencyDisplay: display
+            })
+                .formatToParts(0)
+                .find((part) => part.type === "currency")?.value;
+        } catch {
+            symbol = undefined;
+        }
+        if (symbol && !/[A-Za-z]/.test(symbol)) rest = rest.split(symbol).join("");
+    }
+    return rest;
+}
+
 /**
  * A cell's text as the value an editor would send for the field: "1200.5 EUR"
  * an amount and its currency, "yes" a yes, "1.234,5" a number. What does not
@@ -157,8 +179,11 @@ export function cellInput(field: FieldDef, cell: string): unknown {
             if (text === "") return null;
             const match = /^([A-Za-z]{3})?\s*([^A-Za-z]*?)\s*([A-Za-z]{3})?$/.exec(text);
             const code = (match?.[3] ?? match?.[1] ?? "").toUpperCase();
-            if (!match || (code !== "" && code !== field.options?.[0])) return text;
-            return parseAmount(match[2] ?? "") ?? text;
+            const currency = field.options?.[0] ?? "";
+            if (!match || (code !== "" && code !== currency)) return text;
+            const amount = withoutSymbol(match[2] ?? "", currency);
+            if (!/^[\d\s.,'_+-]*$/.test(amount)) return text;
+            return parseAmount(amount) ?? text;
         }
         case "multiSelect":
             // "Red, Blue" or "Red; Blue", each matched like a single choice.

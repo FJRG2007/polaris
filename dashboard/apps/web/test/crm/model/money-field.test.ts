@@ -106,5 +106,14 @@ describe("an amount field", () => {
         expect(cellInput(budget, "")).toBeNull();
         expect(cellInput(budget, "1200.5 EUR")).toBe("1200.5 EUR");
         expect(normalizeInput(budget, cellInput(budget, "1200.5 EUR")).ok).toBe(false);
+        expect(cellInput(budget, "$1,200.50")).toBe(1200.5);
+        expect(cellInput(budget, "-$3")).toBe(-3);
+        for (const other of ["£1200", "1200 €", "¥1200", "US$1200"]) {
+            expect(cellInput(budget, other)).toBe(other);
+            expect(normalizeInput(budget, cellInput(budget, other)).ok).toBe(false);
+        }
+        const euros: FieldDef = { ...budget, options: ["EUR"] };
+        expect(cellInput(euros, "1.200,50 €")).toBe(1200.5);
+        expect(cellInput(euros, "$1200")).toBe("$1200");
     });
 });
