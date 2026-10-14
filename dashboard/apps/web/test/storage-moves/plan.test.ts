@@ -271,7 +271,9 @@ function runIn(root: string, script: string): { code: number; out: string } {
         .replaceAll("/from", `${root}/from`)
         .replaceAll("/to", `${root}/to`)
         .replaceAll("@TMP@", `${root}/tmp-`);
-    const result = spawnSync("sh", ["-c", local], { encoding: "utf8" });
+    // Without a closed stdin, a Cygwin/MSYS `sh` on Windows blocks forever instead
+    // of running the script, so the child times out rather than exiting.
+    const result = spawnSync("sh", ["-c", local], { encoding: "utf8", input: "" });
     return { code: result.status ?? -1, out: `${result.stdout}${result.stderr}` };
 }
 

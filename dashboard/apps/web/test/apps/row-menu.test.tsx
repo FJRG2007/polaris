@@ -123,4 +123,24 @@ describe("the menu on a player row", () => {
         expect(screen.getByText("Kill")).toBeTruthy();
         expect(screen.getByText("Open their Steam profile")).toBeTruthy();
     });
+
+    it("styles the outward link like every other item in the menu", async () => {
+        render(<RowMenuButton entries={ENTRIES} label="More for Jeb_04" />);
+
+        fireEvent.pointerDown(screen.getByLabelText("More for Jeb_04"), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
+
+        const link = await screen.findByText("Open their Steam profile");
+        const item = screen.getByText("Kick them");
+
+        // The item draws the link `asChild`, which only reaches the <a> if the
+        // link forwards the ref and spreads the item's own class onto it -
+        // dropped, the link drew as bare text at the page's size beside items
+        // drawn at the menu's.
+        expect(link.tagName).toBe("A");
+        expect(link.className).toBe(item.className);
+    });
 });
