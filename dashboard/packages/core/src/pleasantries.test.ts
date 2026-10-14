@@ -56,7 +56,7 @@ describe("a message somebody may report", () => {
     });
 
     it("lets anything with an unfamiliar word through", () => {
-        for (const text of ["hola samuel", "thanks Ada", "ok pero no", "buenas noches cabron"]) {
+        for (const text of ["hola aurora", "thanks Ada", "ok pero no", "buenas noches cabron"]) {
             expect(isPleasantry(text), text).toBe(false);
         }
     });

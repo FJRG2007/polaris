@@ -40,9 +40,9 @@ const welcome = await import("@polaris-app/game-servers/src/lib/minecraft/login-
 const SERVER = { installedAppId: "server-1", ownerId: "owner-1" };
 
 beforeEach(() => {
-    db.link = { userId: "user-1", player: "Sammy", followSignIns: false };
-    db.user = { firstName: "Samuel", name: "Samuel Ortega" };
-    db.connected = [{ userId: "user-1", label: "Sammy" }];
+    db.link = { userId: "user-1", player: "Rory", followSignIns: false };
+    db.user = { firstName: "Aurora", name: "Aurora Vance" };
+    db.connected = [{ userId: "user-1", label: "Rory" }];
     db.fail = false;
     db.config = {};
     locale.value = "en-US";
@@ -50,17 +50,17 @@ beforeEach(() => {
 
 describe("the name a player is greeted by", () => {
     it("is the first name, or the account's name when there is none", () => {
-        expect(welcome.greetingName({ firstName: "Samuel", name: "Samuel Ortega" })).toBe("Samuel");
-        expect(welcome.greetingName({ firstName: null, name: "Sammy R." })).toBe("Sammy R.");
+        expect(welcome.greetingName({ firstName: "Aurora", name: "Aurora Vance" })).toBe("Aurora");
+        expect(welcome.greetingName({ firstName: null, name: "Rory R." })).toBe("Rory R.");
         expect(welcome.greetingName({ firstName: "  ", name: "Ana" })).toBe("Ana");
     });
 
     it("carries no formatting codes, control characters or more than its share of letters", () => {
-        expect(welcome.cleanName("§cSa§lmuel")).toBe("Samuel");
+        expect(welcome.cleanName("§cAu§lrora")).toBe("Aurora");
         const nul = String.fromCharCode(0);
         const zwsp = String.fromCharCode(0x200b);
-        expect(welcome.cleanName(`Sa${nul}mu${String.fromCharCode(10)}el${zwsp}`)).toBe("Samuel");
-        expect(welcome.cleanName("  Sammy   Ortega ")).toBe("Sammy Ortega");
+        expect(welcome.cleanName(`Au${nul}ro${String.fromCharCode(10)}ra${zwsp}`)).toBe("Aurora");
+        expect(welcome.cleanName("  Rory   Vance ")).toBe("Rory Vance");
         expect(welcome.cleanName('Ana"}],{"text":"x')).toBe('Ana"}],{"text":"x');
         expect(welcome.cleanName("x".repeat(80))).toHaveLength(welcome.NAME_MAX);
         expect(welcome.cleanName("§§§")).toBeNull();
@@ -69,47 +69,47 @@ describe("the name a player is greeted by", () => {
 
 describe("the greeting", () => {
     it("says welcome back by name in English, and in Spanish for a Spanish account", async () => {
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).toBe(
-            "Logged in. Welcome back, Samuel!"
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).toBe(
+            "Logged in. Welcome back, Aurora!"
         );
         locale.value = "es-ES";
-        expect(await welcome.welcomeFor(SERVER, "sammy", "login")).toBe(
-            "Sesión iniciada. ¡Hola de nuevo, Samuel!"
+        expect(await welcome.welcomeFor(SERVER, "rory", "login")).toBe(
+            "Sesión iniciada. ¡Hola de nuevo, Aurora!"
         );
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "register")).toBe(
-            "Contraseña guardada. ¡Hola, Samuel!"
+        expect(await welcome.welcomeFor(SERVER, "Rory", "register")).toBe(
+            "Contraseña guardada. ¡Hola, Aurora!"
         );
     });
 
     it("is in the server's language for an account that has none of its own", async () => {
         locale.value = null;
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).toBe(
-            "Logged in. Welcome back, Samuel!"
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).toBe(
+            "Logged in. Welcome back, Aurora!"
         );
         db.config = { events: { settings: { language: "es" } } };
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).toBe(
-            "Sesión iniciada. ¡Hola de nuevo, Samuel!"
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).toBe(
+            "Sesión iniciada. ¡Hola de nuevo, Aurora!"
         );
     });
 
     it("is nothing for a player nobody is linked to, and the mod keeps its own line", async () => {
         db.link = null;
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).toBeNull();
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).toBeNull();
     });
 
     it("is nothing for a link the account does not agree with", async () => {
         db.connected = [];
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).toBeNull();
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).toBeNull();
         // Its own server, or a link that follows its sign-ins, agrees.
-        expect(await welcome.welcomeFor({ ...SERVER, ownerId: "user-1" }, "Sammy", "login")).toBe(
-            "Logged in. Welcome back, Samuel!"
+        expect(await welcome.welcomeFor({ ...SERVER, ownerId: "user-1" }, "Rory", "login")).toBe(
+            "Logged in. Welcome back, Aurora!"
         );
-        db.link = { userId: "user-1", player: "Sammy", followSignIns: true };
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).not.toBeNull();
+        db.link = { userId: "user-1", player: "Rory", followSignIns: true };
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).not.toBeNull();
     });
 
     it("never stands in the way of the login when something could not be read", async () => {
         db.fail = true;
-        expect(await welcome.welcomeFor(SERVER, "Sammy", "login")).toBeNull();
+        expect(await welcome.welcomeFor(SERVER, "Rory", "login")).toBeNull();
     });
 });

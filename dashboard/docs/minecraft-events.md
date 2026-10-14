@@ -1759,7 +1759,7 @@ A new kind follows all of them. A change to an old kind must not undo one.
   allowed, spectating and a riptide are exempt - and the kick comes after 80
   of them, scaled only by the `gravity` attribute. Slow Falling lowers the
   fall, not that attribute, so a player let down slowly from a stage, a roof
-  or a finish line was kicked for flying on the way (lirio-0, 1.21.4,
+  or a finish line was kicked for flying on the way (seen on 1.21.4 with
   `allow-flight=false`). A teleport does not start the count over either.
   Resistance V (`stage.fallProof`) keeps a player unhurt by a fall instead -
   fall damage does not bypass resistance - and Slow Falling is kept for

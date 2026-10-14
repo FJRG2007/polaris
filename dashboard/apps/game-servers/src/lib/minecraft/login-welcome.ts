@@ -1,7 +1,7 @@
 /**
  * What Polaris login says to a player it has just let in: by the name of the
  * Polaris account the player is linked to, in that account's language - "Welcome
- * back, Samuel" - and nothing of the kind for a player no account agrees with,
+ * back, Aurora" - and nothing of the kind for a player no account agrees with,
  * who keeps the mod's own line.
  *
  * The link is the operator's word, so it counts here only where the account

@@ -19,10 +19,10 @@ describe("mail that came out unreadable", () => {
     it("reads a part that is base64 from end to end", () => {
         // What a bank's mail looked like in the list: one run of base64.
         const encoded = Buffer.from(
-            "<html><head></head><body><p>SAMUEL, recuerda las fechas de los proximos pagos.</p></body></html>",
+            "<html><head></head><body><p>AURORA, recuerda las fechas de los proximos pagos.</p></body></html>",
             "utf8"
         ).toString("base64");
-        expect(snippetFrom(encoded)).toBe("SAMUEL, recuerda las fechas de los proximos pagos.");
+        expect(snippetFrom(encoded)).toBe("AURORA, recuerda las fechas de los proximos pagos.");
     });
 
     it("reads a run of base64 the preview cut mid-group", () => {
@@ -60,9 +60,9 @@ describe("mail that came out unreadable", () => {
         expect(snippetFrom("=20 =20 =20 Paquete en aduanas")).toBe("Paquete en aduanas");
         expect(
             snippetFrom(
-                "Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=3Dfed_yo_default"
+                "Mis pedidos https://shop.example/gp/css/order-history?ref_=3Dfed_yo_default"
             )
-        ).toBe("Mis pedidos https://www.amazon.es/gp/css/order-history?ref_=fed_yo_default");
+        ).toBe("Mis pedidos https://shop.example/gp/css/order-history?ref_=fed_yo_default");
     });
 
     it("still leaves prose with one equals sign in it alone", () => {
@@ -72,15 +72,15 @@ describe("mail that came out unreadable", () => {
     });
 
     it("drops a stylesheet the preview begins in the middle of", () => {
-        const cut = `/* Mobile Styles */ @media only screen and (max-device-width: 480px) { body{ min-height:620px!important;} table[class~=apple_container_full] * {-webkit-text-size-adjust:none; } } Decision on refund request`;
+        const cut = `/* Mobile Styles */ @media only screen and (max-device-width: 480px) { body{ min-height:620px!important;} table[class~=mail_container_full] * {-webkit-text-size-adjust:none; } } Decision on refund request`;
         expect(snippetFrom(cut)).toBe("Decision on refund request");
     });
 
     it("comes back empty when the stylesheet is all there was room for", () => {
         // Which is what this message actually looked like: four kilobytes of
-        // Apple's stylesheet and not one word of the message. An empty line is
+        // the sender's stylesheet and not one word of the message. An empty line is
         // the honest answer, and it is what every other client shows.
-        const all = `/* Mobile Styles */ @media only screen and (max-device-width: 480px) { body{ min-height:620px!important;} table[class~=apple_container_full] * {-webkit-text-size-adjust:none;`;
+        const all = `/* Mobile Styles */ @media only screen and (max-device-width: 480px) { body{ min-height:620px!important;} table[class~=mail_container_full] * {-webkit-text-size-adjust:none;`;
         expect(snippetFrom(all)).toBe("");
     });
 
@@ -93,8 +93,8 @@ describe("mail that came out unreadable", () => {
         expect(snippetFrom("Informacion sobre tu proxima cuota <meta http-")).toBe(
             "Informacion sobre tu proxima cuota"
         );
-        expect(snippetFrom("Cofidis, cuenta con nosotros <div sty")).toBe(
-            "Cofidis, cuenta con nosotros"
+        expect(snippetFrom("Financiera, cuenta con nosotros <div sty")).toBe(
+            "Financiera, cuenta con nosotros"
         );
     });
 
@@ -106,7 +106,7 @@ describe("mail that came out unreadable", () => {
 
     it("leaves a plain sentence exactly as it is", () => {
         const plain =
-            "Tal y como nos comenta Albert, reenviamos el email de nuevo reajustando el hilo.";
+            "Tal y como nos comenta Ada, reenviamos el email de nuevo reajustando el hilo.";
         expect(snippetFrom(plain)).toBe(plain);
     });
 
@@ -120,9 +120,9 @@ describe("mail that came out unreadable", () => {
         // wrong guess has to leave the line alone.
         for (const line of [
             "Your Epic Games Receipt",
-            "Osintly Your free trial ends on September 9, 2026",
-            "PIN: 584460989",
-            "0082800082808877483071001"
+            "Acme Your free trial ends on January 9, 2027",
+            "PIN: 123456789",
+            "0012300012301234567890001"
         ]) {
             expect(snippetFrom(line), line).toBe(line);
         }
@@ -140,7 +140,7 @@ describe("a preview stored before any of this existed", () => {
      *  message is one base64 part, and what the list stored was a slice of it. */
     const html =
         '<html><head><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN">' +
-        "<body><p>Tu pago con Paga en 4 en AMAZON ha sido aceptado.</p></body></html>";
+        "<body><p>Tu pago con Paga en 4 en TIENDA ha sido aceptado.</p></body></html>";
     const wrapped = Buffer.from(html, "utf8")
         .toString("base64")
         .replace(/(.{72})/g, "$1 ");

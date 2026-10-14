@@ -44,7 +44,7 @@ describe("codes and sign-ins", () => {
             "Ihr Anmeldelink",
             "Il tuo link di accesso",
             "Seu link de acesso",
-            "Password change request in PromoBox",
+            "Password change request in Example App",
             "Forgot your password?",
             "Account recovery for your profile",
             "Solicitud de cambio de contraseña",
@@ -79,8 +79,8 @@ describe("codes and sign-ins", () => {
         expect(
             categoriseMail(
                 message({
-                    subject: "Tu pedido 402-8837462 ha sido enviado",
-                    fromAddress: "envio@amazon.es"
+                    subject: "Tu pedido 123-4567890 ha sido enviado",
+                    fromAddress: "envio@shop.example"
                 })
             )
         ).toBe("updates");
@@ -146,9 +146,9 @@ describe("the other three", () => {
         expect(
             categoriseMail(
                 message({
-                    subject: "Entregado: Nuki Door Sensor",
-                    fromAddress: "envio@amazon.es",
-                    headers: { "list-unsubscribe": "<https://amazon.es/out>" }
+                    subject: "Entregado: Sensor de puerta",
+                    fromAddress: "envio@shop.example",
+                    headers: { "list-unsubscribe": "<https://shop.example/out>" }
                 })
             )
         ).toBe("updates");
@@ -176,8 +176,8 @@ describe("money that is about to move", () => {
         expect(
             categoriseMail(
                 message({
-                    subject: "SAMUEL, recuerda las fechas de los próximos pagos de tu compra",
-                    snippet: "08/26/2026 · 08/27/2026 · 09/03/2026",
+                    subject: "AURORA, recuerda las fechas de los próximos pagos de tu compra",
+                    snippet: "01/05/2027 · 02/05/2027 · 03/05/2027",
                     fromAddress: "noreply@pagos.example"
                 })
             )
@@ -279,10 +279,10 @@ describe("money that is about to move", () => {
         expect(
             categoriseMail(
                 message({
-                    subject: "Your Osintly trial ends soon",
+                    subject: "Your Acme trial ends soon",
                     snippet:
-                        "Your free trial for Pro with Osintly will end soon. You have an upcoming payment on September 9, 2026.",
-                    fromAddress: "trial-ending+acct_1tevifdlwma5blqj@stripe.com",
+                        "Your free trial for Pro with Acme will end soon. You have an upcoming payment on January 9, 2027.",
+                    fromAddress: "trial-ending+acct_000000000test@stripe.com",
                     headers: { "list-unsubscribe": "<https://example.invalid/u>" }
                 })
             )
@@ -295,10 +295,10 @@ describe("what is left", () => {
         expect(
             categoriseMail(
                 message({
-                    subject: "Mi Huella",
-                    snippet: "Tal y como nos comenta Albert, reenviamos el email de nuevo",
+                    subject: "El proyecto",
+                    snippet: "Tal y como nos comenta Ada, reenviamos el email de nuevo",
                     fromAddress: "maria@example.com",
-                    fromName: "María Aperador"
+                    fromName: "María García"
                 })
             )
         ).toBe("primary");
@@ -349,7 +349,7 @@ describe("mail about the safety of an account", () => {
         // whole subject, and if it was not you, it is the most urgent mail of the
         // year.
         for (const subject of [
-            "Rockstar Games Password Changed",
+            "Example Games Password Changed",
             "Your password has been updated",
             "We have changed your password",
             "Your recovery email was changed",
@@ -368,7 +368,7 @@ describe("mail about the safety of an account", () => {
     it("never sweeps one of those, because it is the record", () => {
         // A code expires; the notice that somebody changed your password is the
         // evidence, and it has to still be there in a month.
-        expect(isDisposableSecurityMail(message("Rockstar Games Password Changed"))).toBe(false);
+        expect(isDisposableSecurityMail(message("Example Games Password Changed"))).toBe(false);
         expect(isDisposableSecurityMail(message("Your password has been updated"))).toBe(false);
     });
 
@@ -520,9 +520,9 @@ describe("a lender's payment confirmation", () => {
         // what already cost something.
         expect(
             categoriseMail({
-                subject: "Tu pago con Paga en 4 en AMAZON ha sido aceptado",
-                snippet: "Tu pago con Paga en 4 en AMAZON ha sido aceptado. Importe 39,99 EUR",
-                fromAddress: "noreply@cofidis.es",
+                subject: "Tu pago con Paga en 4 en TIENDA ha sido aceptado",
+                snippet: "Tu pago con Paga en 4 en TIENDA ha sido aceptado. Importe 39,99 EUR",
+                fromAddress: "noreply@pagos.example",
                 fromName: "noreply",
                 headers: {}
             })
@@ -532,18 +532,18 @@ describe("a lender's payment confirmation", () => {
 
 describe("credit being arranged", () => {
     const lender = (subject: string, snippet = "") =>
-        categoriseMail(message({ subject, snippet, fromAddress: "noreply@cetelem.es" }));
+        categoriseMail(message({ subject, snippet, fromAddress: "noreply@lender.example" }));
 
     it("files the lender's mail from a real inbox, with the empty preview it arrived with", () => {
         // Every one of these sat under Primary: no List-Unsubscribe, an HTML body
         // whose preview came out empty, and none of the billing words in the
         // subject. An approved application is the first of a schedule of payments.
         for (const subject of [
-            "Enhorabuena SAMUEL, tu solicitud de financiación ha sido aprobada",
-            "SAMUEL, estás a un paso de obtener tu financiación",
+            "Enhorabuena AURORA, tu solicitud de financiación ha sido aprobada",
+            "AURORA, estás a un paso de obtener tu financiación",
             "Información previa a tu solicitud de financiación",
-            "Información precontractual de Banco Cetelem enviada mediante Logalty (003001-0001-000000010786389.par)",
-            "Certificado Logalty, Documentación pre-contractual transacción: 003001-0001-000000010786389.par."
+            "Información precontractual de Ejemplobank enviada mediante Firmacert (000001-0001-000000000000042.par)",
+            "Certificado Firmacert, Documentación pre-contractual transacción: 000001-0001-000000000000042.par."
         ]) {
             expect(lender(subject), subject).toBe("billing");
         }
@@ -583,13 +583,13 @@ describe("credit being arranged", () => {
     });
 
     it("does not read a name in capitals as a code", () => {
-        // "SAMUEL" is six upper-case letters standing on their own, which is the
+        // "AURORA" is six upper-case letters standing on their own, which is the
         // shape of a code. With a sign-in phrase in the preview it put a lender's
         // approval under Security - the one tab that can be cleared up on its own.
         const approval = message({
-            subject: "Enhorabuena SAMUEL, tu solicitud de financiación ha sido aprobada",
+            subject: "Enhorabuena AURORA, tu solicitud de financiación ha sido aprobada",
             snippet: "Inicia sesión en tu área de cliente para firmar el contrato",
-            fromAddress: "noreply@cetelem.es"
+            fromAddress: "noreply@lender.example"
         });
         expect(categoriseMail(approval)).toBe("billing");
         expect(isDisposableSecurityMail(approval)).toBe(false);
@@ -608,9 +608,9 @@ describe("mail about a purchase somebody financed", () => {
     const survey = (over: Partial<CategorisableMessage> = {}) =>
         categoriseMail(
             message({
-                fromAddress: "experienciacliente@cetelem.es",
-                fromName: "Cetelem",
-                headers: { "list-unsubscribe": "<https://cetelem.es/baja>" },
+                fromAddress: "experiencia@lender.example",
+                fromName: "Ejemplobank",
+                headers: { "list-unsubscribe": "<https://lender.example/baja>" },
                 ...over
             })
         );
@@ -621,7 +621,7 @@ describe("mail about a purchase somebody financed", () => {
         expect(
             survey({
                 subject:
-                    "Financiación Cetelem en APPLE. Tu opinión es muy importante para nosotros - Sólo serán 3 minutos",
+                    "Financiación Ejemplobank en BAZAR. Tu opinión es muy importante para nosotros - Sólo serán 3 minutos",
                 snippet: "Cuéntanos qué te ha parecido el proceso. Sólo serán 3 minutos."
             })
         ).toBe("billing");
@@ -629,11 +629,11 @@ describe("mail about a purchase somebody financed", () => {
 
     it("knows credit named without a possessive, in the languages it arrives in", () => {
         for (const subject of [
-            "Financiación Cetelem de tu compra en APPLE",
-            "Compra financiada en APPLE",
+            "Financiación Ejemplobank de tu compra en BAZAR",
+            "Compra financiada en BAZAR",
             "Detalle del pago aplazado de tu compra",
-            "Financing summary for your MacBook purchase",
-            "Your Pay in 3 balance at Apple",
+            "Financing summary for your laptop purchase",
+            "Your Pay in 3 balance at Bazar",
             "Financiamento da sua compra",
             "Paiement en 3 fois de votre achat",
             "Ratenzahlung für Ihren Einkauf",
@@ -736,7 +736,7 @@ describe("mail about a purchase somebody financed", () => {
         // rate, a term or an application is still an advert.
         for (const [subject, snippet] of [
             ["Financiación al 0% TAE en tu próxima compra", "Solicítala en un minuto"],
-            ["Descubre la financiación Cetelem", "Hasta 24 meses sin intereses"],
+            ["Descubre la financiación Ejemplobank", "Hasta 24 meses sin intereses"],
             ["Financing available on every laptop", "Apply now, as low as 0% APR"]
         ]) {
             expect(survey({ subject: subject!, snippet: snippet! }), subject).not.toBe("billing");

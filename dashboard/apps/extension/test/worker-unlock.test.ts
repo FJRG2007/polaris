@@ -23,7 +23,7 @@ import type { Reply, Request } from "../src/lib/messages";
 import { KDF_PBKDF2, type KdfSettings } from "@polaris/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const EMAIL = "samuel@example.com";
+const EMAIL = "aurora@example.com";
 const PASSWORD = "the master password";
 const ORIGIN = "https://polaris.example";
 

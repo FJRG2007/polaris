@@ -91,8 +91,8 @@ export function encodeDiscordPeer(target: DiscordTarget, id: string): string {
     return target === "user" ? `user:${trimmed}` : trimmed;
 }
 
-/** A stored handle in human form for display: a WhatsApp JID (34657580303@c.us)
- *  reads as the phone number (+34657580303); a Discord DM reads as "DM <id>" and a
+/** A stored handle in human form for display: a WhatsApp JID (34600000000@c.us)
+ *  reads as the phone number (+34600000000); a Discord DM reads as "DM <id>" and a
  *  channel as "#<id>"; other platforms show the id unchanged. */
 export function humanPeerId(platform: string, peerId: string): string {
     if (platform === "whatsapp" && peerId.endsWith("@c.us")) {
