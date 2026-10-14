@@ -1486,7 +1486,9 @@
         "headingCount": "Members - {count}",
         "onlineCount": "Online - {count}",
         "offlineCount": "Offline - {count}",
-        "you": "(you)"
+        "you": "(you)",
+        "inVoice": "In voice",
+        "inVoiceIn": "In voice: {channel}"
     },
     "typing": {
         "typingOne": "{name} is typing",

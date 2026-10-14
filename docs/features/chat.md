@@ -19,10 +19,11 @@ follows your light or dark setting. Phone-sized versions are in
 
 A space groups its channels into categories. The sidebar shows who is in each
 voice channel, who is muted or deafened, who is sharing a screen (LIVE), and
-how full the room is against its limit. Messages take reactions with standard
-or the space's own emoji, quote the message they reply to, and render Markdown,
-including code blocks with a copy button. Voice messages play in place with
-their waveform and a speed control.
+how full the room is against its limit. The member list marks the same people
+with an "In voice" line and a link straight to the room they're in. Messages
+take reactions with standard or the space's own emoji, quote the message they
+reply to, and render Markdown, including code blocks with a copy button. Voice
+messages play in place with their waveform and a speed control.
 
 Profile decorations, name colors and nameplates show wherever a name does.
 

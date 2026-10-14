@@ -1486,7 +1486,9 @@
         "headingCount": "Miembros - {count}",
         "onlineCount": "En línea - {count}",
         "offlineCount": "Desconectados - {count}",
-        "you": "(tú)"
+        "you": "(tú)",
+        "inVoice": "En voz",
+        "inVoiceIn": "En voz: {channel}"
     },
     "typing": {
         "typingOne": "{name} está escribiendo",
