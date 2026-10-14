@@ -283,17 +283,30 @@ export async function listDocuments(
     );
 }
 
-/** The names behind "last edited by", in one query however long the list. */
-async function nameEditors(rows: readonly ListRow[]): Promise<Map<string, string>> {
+/**
+ * The names behind "last edited by", in one query however long the list.
+ *
+ * Never the address: everybody a document is shared with reads this line, and
+ * an editor's email is theirs to show or not. A nameless account falls back to
+ * its handle, then to nothing.
+ */
+export async function nameEditors(
+    rows: readonly { editedById: string | null }[]
+): Promise<Map<string, string>> {
     const ids = [
         ...new Set(rows.map((row) => row.editedById).filter((id): id is string => Boolean(id)))
     ];
     if (ids.length === 0) return new Map();
     const people = await prisma.user.findMany({
         where: { id: { in: ids } },
-        select: { id: true, name: true, email: true }
+        select: { id: true, name: true, username: true }
     });
-    return new Map(people.map((person) => [person.id, person.name || person.email]));
+    return new Map(
+        people.map((person) => [
+            person.id,
+            person.name || (person.username ? `@${person.username}` : "")
+        ])
+    );
 }
 
 function viewOf(
