@@ -114,8 +114,10 @@ describe("game servers", () => {
             for (const action of exported(readFileSync(path, "utf8"))) {
                 if (ASKS_ELSEWHERE.has(action.name)) continue;
                 // `requireDuplicate` asks `requireGameServer` for games.manage on
-                // the server named before it checks who may copy it.
-                if (!/\brequire(GameServer|GameServerOwner|Permission|PermissionAny|Duplicate)\(/.test(action.body))
+                // the server named before it checks who may copy it, and
+                // `requireSkinEditor` for games.moderate, or games.read plus a
+                // link to the player named.
+                if (!/\brequire(GameServer|GameServerOwner|Permission|PermissionAny|Duplicate|SkinEditor)\(/.test(action.body))
                     open.push(`${label(path)}: ${action.name}`);
             }
         }

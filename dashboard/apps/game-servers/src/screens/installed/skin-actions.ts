@@ -35,7 +35,6 @@ const signedSchema = z.object({
     signature: z.string().max(4096)
 });
 
-/** Looks up and signings go out to other services: a few a minute per person. */
 /**
  * Who may change a player's skin: whoever moderates the server, and the person
  * that player is - a Polaris account linked to the name (`GamePlayerLink`) - who
@@ -62,6 +61,7 @@ async function isLinkedTo(installedAppId: string, player: string, userId: string
     return link !== null;
 }
 
+/** Looks up and signings go out to other services: a few a minute per person. */
 const LOOKUPS_PER_MINUTE = 20;
 const SIGNINGS_PER_MINUTE = 4;
 

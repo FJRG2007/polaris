@@ -95,6 +95,7 @@ describe("SkinDialog", () => {
         expect(await screen.findByText("Preview only. Apply to put it on.")).toBeTruthy();
         expect(actions.previewSkinAction).toHaveBeenCalledWith({
             installedAppId: INSTALLED,
+            player: "player-one",
             kind: "text",
             text: "player-two"
         });
