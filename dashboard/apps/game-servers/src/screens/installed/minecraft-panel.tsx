@@ -688,6 +688,7 @@ export function MinecraftPanel({
                         passwords={loginOn ? (login.state?.players ?? []) : null}
                         canResetPasswords={canManage}
                         canManage={canManage}
+                        canModerate={held.includes("games.moderate")}
                         onPasswordsChanged={() => void login.reload()}
                         onChanged={() => void load()}
                     />

@@ -3072,6 +3072,14 @@
             "signingBusyFor": "El servicio de skins está ocupado. Prueba de nuevo en {seconds} segundos.",
             "signingFailed": "El servicio de skins no aceptó esa imagen. Prueba de nuevo o usa otra.",
             "tooMany": "Demasiados intentos. Espera un minuto y prueba de nuevo."
-        }
+        },
+        "previewing": "Solo vista previa. Pulsa Aplicar para ponérsela.",
+        "discard": "Descartar",
+        "resetConfirm": "{name} vuelve a la skin de su cuenta.",
+        "updateTitle": "Las skins necesitan el mod de Polaris nuevo",
+        "updateReason": "Actualización del mod de Polaris para skins",
+        "unanswered": "El servidor no respondió. Prueba de nuevo en un momento.",
+        "viewer": "Vista 3D de la skin. Arrastra para girarla.",
+        "retry": "Reintentar"
     }
 }

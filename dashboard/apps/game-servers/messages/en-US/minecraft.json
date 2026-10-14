@@ -3072,6 +3072,14 @@
             "signingBusyFor": "The skin service is busy. Try again in {seconds} seconds.",
             "signingFailed": "The skin service could not take that image. Try again or use another one.",
             "tooMany": "Too many tries. Wait a minute and try again."
-        }
+        },
+        "previewing": "Preview only. Apply to put it on.",
+        "discard": "Discard",
+        "resetConfirm": "{name} goes back to their account's skin.",
+        "updateTitle": "Skins need the newer Polaris mod",
+        "updateReason": "Polaris mod update for skins",
+        "unanswered": "The server did not answer. Try again in a moment.",
+        "viewer": "3D view of the skin. Drag to turn it.",
+        "retry": "Try again"
     }
 }
