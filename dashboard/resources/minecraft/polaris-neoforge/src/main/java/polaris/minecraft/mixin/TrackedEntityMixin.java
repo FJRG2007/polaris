@@ -11,10 +11,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import polaris.minecraft.EventSeek;
+import polaris.minecraft.PlayerSkins;
 
 /** A hider a seeker cannot see is not tracked by them (see {@link EventSeek}). */
 @Mixin(targets = "net.minecraft.server.level.ChunkMap$TrackedEntity")
-public abstract class TrackedEntityMixin implements EventSeek.SeekTracker {
+public abstract class TrackedEntityMixin implements EventSeek.SeekTracker, PlayerSkins.Retrack {
     @Shadow @Final Entity entity;
     @Shadow @Final private Set<ServerPlayerConnection> seenBy;
 
@@ -39,6 +40,14 @@ public abstract class TrackedEntityMixin implements EventSeek.SeekTracker {
 
     @Override
     public void polaris$refresh(ServerPlayer viewer) {
+        updatePlayer(viewer);
+    }
+
+    @Override
+    public void polaris$retrack(ServerPlayer viewer) {
+        // Sent again from scratch, so a changed skin is drawn on a new body.
+        if (!seenBy.contains(viewer.connection)) return;
+        removePlayer(viewer);
         updatePlayer(viewer);
     }
 }
