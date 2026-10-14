@@ -56,6 +56,7 @@ import { useCalendarT } from "./i18n";
 import * as model from "./editor-model";
 import { calendarSlots } from "./slots";
 import { MiniMonth } from "./mini-month";
+import { useSwipeStep } from "./swipe-step";
 import { ViewPicker } from "./view-picker";
 import type { PartStat } from "../engine";
 import { TodoEditor } from "./todo-editor";
@@ -424,6 +425,8 @@ export function CalendarScreen({ path }: { path: string[] }) {
     };
     const step = (direction: 1 | -1) =>
         setAnchor((current) => time.stepAnchor(view, current, direction, preferences.customDays));
+    const swipeArea = useRef<HTMLElement>(null);
+    useSwipeStep(swipeArea, step);
 
     // --- Calendars -----------------------------------------------------------
 
@@ -1671,7 +1674,10 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 >
                     {sidebar}
                 </aside>
-                <main className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-card">
+                <main
+                    ref={swipeArea}
+                    className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-card"
+                >
                     {rangeRead.error ? (
                         <div
                             role="alert"

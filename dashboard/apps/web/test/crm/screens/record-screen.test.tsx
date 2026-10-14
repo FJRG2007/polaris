@@ -25,7 +25,22 @@ const state = vi.hoisted(() => ({
     tasks: [] as { id: string; name: string; done: boolean }[],
     refuseTick: false,
     madeNotes: [] as unknown[],
-    ticks: [] as unknown[]
+    ticks: [] as unknown[],
+    favorite: false,
+    pins: [] as unknown[],
+    refusePin: false,
+    mail: null as unknown[] | null,
+    events: null as unknown[] | null
+}));
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+
+vi.mock("@polaris-app/crm/src/actions/favorites", () => ({
+    setFavoriteAction: async (input: { pinned: boolean }) => {
+        state.pins.push(input);
+        if (state.refusePin) return { ok: false, error: "You already have 50 favorites here." };
+        return { ok: true, pinned: input.pinned };
+    }
 }));
 
 vi.mock("@polaris-app/crm/src/actions/activities", () => ({
@@ -42,7 +57,9 @@ vi.mock("@polaris-app/crm/src/actions/activities", () => ({
             })),
             taskLists: [
                 { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", name: "Sales", spaceName: "Team" }
-            ]
+            ],
+            mail: state.mail,
+            events: state.events
         }
     }),
     createRecordNoteAction: async (input: { note: { title: string } }) => {
@@ -74,7 +91,8 @@ vi.mock("@polaris-app/crm/src/actions/records", () => ({
         can: { companies: state.can, people: state.can, opportunities: state.can },
         people: [],
         related: [],
-        timeline: { events: [], next: null }
+        timeline: { events: [], next: null },
+        favorite: state.favorite
     }),
     restoreRecordsAction: async (input: unknown) => {
         state.restores.push(input);
@@ -104,6 +122,11 @@ beforeEach(() => {
     state.refuseTick = false;
     state.madeNotes = [];
     state.ticks = [];
+    state.favorite = false;
+    state.pins = [];
+    state.refusePin = false;
+    state.mail = null;
+    state.events = null;
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
     if (typeof localStorage !== "undefined") localStorage.clear();
 });
@@ -143,9 +166,70 @@ describe("a record in the trash", () => {
     });
 });
 
+describe("pinning a record", () => {
+    beforeEach(() => {
+        state.record = { ...state.record!, deletedAt: null };
+    });
+
+    it("pins it to the rail with the star, and unpins it the same way", async () => {
+        state.favorite = true;
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const star = await screen.findByRole("button", { name: "Remove from favorites" });
+        expect(star.getAttribute("aria-pressed")).toBe("true");
+        await act(async () => {
+            fireEvent.click(star);
+        });
+        await waitFor(() =>
+            expect(state.pins).toEqual([
+                { kind: "record", object: "companies", targetId: ACME, pinned: false }
+            ])
+        );
+        expect(screen.getByRole("button", { name: "Add to favorites" })).toBeTruthy();
+    });
+
+    it("puts the star back when the pin is refused", async () => {
+        state.refusePin = true;
+        state.favorite = true;
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const star = await screen.findByRole("button", { name: "Remove from favorites" });
+        await act(async () => {
+            fireEvent.click(star);
+        });
+        await waitFor(() => expect(state.pins).toHaveLength(1));
+        expect(await screen.findByRole("button", { name: "Remove from favorites" })).toBeTruthy();
+    });
+});
+
 describe("notes and tasks on a record", () => {
     beforeEach(() => {
         state.record = { ...state.record!, deletedAt: null };
+    });
+
+    it("lists the reader's mail and meetings with the record's people, linked to them", async () => {
+        state.mail = [
+            {
+                id: "t1",
+                subject: "Renewal terms",
+                snippet: "",
+                participants: [{ name: "Fixture Contact", address: "contact@example.test" }],
+                messageCount: 3,
+                lastMessageAt: "2026-10-01T10:00:00.000Z",
+                href: "/mail/t/t1"
+            }
+        ];
+        state.events = [];
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        const link = await screen.findByRole("link", { name: /Renewal terms/ });
+        expect(link.getAttribute("href")).toBe("/mail/t/t1");
+        expect(link.textContent).toContain("3 messages - Fixture Contact");
+        expect(screen.getByText("No meetings with them in your calendars")).toBeTruthy();
+    });
+
+    it("leaves mail and meetings out for a reader without them", async () => {
+        render(<RecordScreen object="companies" id={ACME} />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("No notes yet")).toBeTruthy();
+        expect(screen.queryByRole("region", { name: "Emails" })).toBeNull();
+        expect(screen.queryByRole("region", { name: "Meetings" })).toBeNull();
     });
 
     it("writes a note from the record and lists it", async () => {

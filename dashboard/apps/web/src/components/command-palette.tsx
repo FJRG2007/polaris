@@ -43,6 +43,7 @@ import {
 } from "@polaris/ui";
 import {
     CHAT_SCOPE_FILTERS,
+    scopeOffered,
     scopeWords,
     searchScope,
     type SearchScopeDefinition
@@ -315,7 +316,7 @@ export function CommandPalette({
     function onFieldChange(value: string): void {
         if (!scope) {
             const command = detectCommand(value);
-            if (command) {
+            if (command && scopeOffered(command.scope, appIds)) {
                 setScope(command.scope);
                 setQuery(command.term);
                 setActive(0);
@@ -431,7 +432,13 @@ export function CommandPalette({
         );
     }, [scope, navigation, tours, resources]);
 
-    const suggestions = useMemo(() => (scope ? [] : commandSuggestions(query)), [scope, query]);
+    const suggestions = useMemo(
+        () =>
+            scope
+                ? []
+                : commandSuggestions(query).filter((command) => scopeOffered(command, appIds)),
+        [scope, query, appIds]
+    );
 
     // "timer 10m", "alarm 7:30", "stopwatch": Calendar's Time area, for whoever
     // has Calendar. Read here to offer the row; the route reads it again.

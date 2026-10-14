@@ -8,11 +8,66 @@
 
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
+import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { CrmObject } from "../model/objects";
-import { requireCan, type CrmActor } from "./access";
+import { table } from "./columns";
+import { recordWhere, requireCan, type CrmActor } from "./access";
 import { addLink, isLinked, linkedIds, requireLiveRecord } from "./links";
-import { dueAt, type LinkedNote, type LinkedTask, type RecordActivities } from "../model/links";
+import {
+    dueAt,
+    type LinkedFile,
+    type LinkedNote,
+    type LinkedTask,
+    type EventWith,
+    type MailWith,
+    type RecordActivities
+} from "../model/links";
+
+/** How many conversations and events a record shows. */
+const ACTIVITY_LIMIT = 20;
+/** How many of a company's people its mail and events are looked up for. */
+const PEOPLE_LIMIT = 50;
+
+/**
+ * The addresses a record's mail and events are found by: a person's own, and
+ * for a company or an opportunity, those of its people (and the opportunity's
+ * point of contact). Only people the reader may read, and nothing when their
+ * role hides people's email, since the conversations would name it.
+ */
+async function recordAddresses(
+    actor: CrmActor,
+    object: CrmObject,
+    recordId: string
+): Promise<string[]> {
+    if (actor.rules?.people.hidden.includes("email")) return [];
+    const people = recordWhere(actor, "people");
+    let match: Record<string, unknown>;
+    if (object === "people") {
+        match = { id: recordId };
+    } else if (object === "companies") {
+        match = { companyId: recordId };
+    } else {
+        const deal = await prisma.crmOpportunity.findFirst({
+            where: { id: recordId, ...recordWhere(actor, "opportunities") },
+            select: { companyId: true, pointOfContactId: true }
+        });
+        if (!deal) return [];
+        const or = [
+            ...(deal.pointOfContactId ? [{ id: deal.pointOfContactId }] : []),
+            ...(deal.companyId ? [{ companyId: deal.companyId }] : [])
+        ];
+        if (or.length === 0) return [];
+        match = { OR: or };
+    }
+    const rows = await prisma.crmPerson.findMany({
+        where: { AND: [people, match, { deletedAt: null, NOT: { email: "" } }] },
+        select: { email: true },
+        orderBy: { updatedAt: "desc" },
+        take: PEOPLE_LIMIT
+    });
+    return rows.map((row) => row.email);
+}
 
 const who = (actor: CrmActor) => ({ id: actor.user.id, isAdmin: actor.user.isAdmin });
 
@@ -41,17 +96,26 @@ export async function openActivities(
     recordId: string
 ): Promise<RecordActivities> {
     await requireCan(actor, object, "read");
+    const reached = await table(object).count({
+        where: { id: recordId, ...recordWhere(actor, object) }
+    });
+    if (reached === 0) throw new CrmRefusal((await crmT())("errors.notFound"));
     const editing = actor.can[object].edit;
-    const [noteIds, taskIds, reach, shelves, lists] = await Promise.all([
+    const [noteIds, taskIds, fileIds, reach, shelves, lists, found] = await Promise.all([
         linkedIds(actor, object, recordId, "note"),
         linkedIds(actor, object, recordId, "task"),
+        linkedIds(actor, object, recordId, "file"),
         host.crmHost.crmReach(who(actor)),
         editing ? host.crmHost.crmNoteShelves(who(actor)) : Promise.resolve(null),
-        editing ? host.crmHost.taskListsFor(who(actor)) : Promise.resolve(null)
+        editing ? host.crmHost.taskListsFor(who(actor)) : Promise.resolve(null),
+        recordAddresses(actor, object, recordId)
     ]);
-    const [notes, tasks] = await Promise.all([
+    const [notes, tasks, files, mail, events] = await Promise.all([
         reach.notes ? host.crmHost.crmNotesByIds(who(actor), noteIds) : Promise.resolve(null),
-        reach.tasks ? host.crmHost.tasksByIds(who(actor), taskIds) : Promise.resolve(null)
+        reach.tasks ? host.crmHost.tasksByIds(who(actor), taskIds) : Promise.resolve(null),
+        host.crmHost.crmDriveFiles(who(actor), fileIds),
+        host.crmHost.crmMailWith(who(actor), found, ACTIVITY_LIMIT) as Promise<MailWith[] | null>,
+        host.crmHost.crmEventsWith(who(actor), found, ACTIVITY_LIMIT) as Promise<EventWith[] | null>
     ]);
     return {
         notes: notes ? notes.map((note: LinkedNote) => ({ ...note })) : null,
@@ -61,8 +125,30 @@ export async function openActivities(
             id: list.id,
             name: list.name,
             spaceName: list.spaceName
-        }))
+        })),
+        files: files.map((file: LinkedFile) => ({ id: file.id, name: file.name, href: file.href })),
+        mail: mail ? mail.map((one) => ({ ...one, participants: [...one.participants] })) : null,
+        events: events ? events.map((one) => ({ ...one })) : null
     };
+}
+
+/** Link a file already in Drive to a record. Nothing is copied: the record
+ *  points at the file where it is, for whoever may open it there. */
+export async function attachRecordFile(
+    actor: CrmActor,
+    object: CrmObject,
+    recordId: string,
+    input: { connectionId: string; path: string }
+): Promise<LinkedFile> {
+    await requireCan(actor, object, "edit");
+    await requireLiveRecord(actor, object, recordId);
+    const t = await crmT();
+    const ref = await host.crmHost.crmDriveFileRef(who(actor), input.connectionId, input.path);
+    if ("refused" in ref) throw new CrmRefusal(t("activities.fileRefused"));
+    await addLink(actor, object, recordId, "file", ref.id);
+    const [file] = await host.crmHost.crmDriveFiles(who(actor), [ref.id]);
+    if (!file) throw new CrmRefusal(t("errors.generic"));
+    return { id: file.id, name: file.name, href: file.href };
 }
 
 /** Write a note in Notes and link it to the record. */

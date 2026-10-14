@@ -13,6 +13,7 @@ import type { ViewSort } from "../model/views";
 import { requireCan, type CrmActor } from "./access";
 import { recordSelect, table, toRecord } from "./columns";
 import { listOrder, listWhere, type ListScope } from "./query";
+import { requireListShown } from "./records";
 import {
     fieldOf,
     primaryField,
@@ -49,11 +50,15 @@ export async function exportRecords(
     await requireCan(actor, object, "read");
     const custom = await loadFields(actor.shelf, object);
     const primary = primaryField(object);
-    const keys = new Set([primary.key, ...options.columns]);
+    await requireListShown(actor, object, options);
+    // A column the reader's role hides is left out of the file, not refused:
+    // the view it comes from may be shared with roles that see it.
+    const hidden = actor.rules?.[object].hidden ?? [];
+    const keys = new Set([primary.key, ...options.columns.filter((key) => !hidden.includes(key))]);
     const fields = [...keys]
         .map((key) => fieldOf(object, key, custom))
         .filter((field): field is FieldDef => Boolean(field));
-    const where = listWhere(object, actor.shelf, { ...options, custom });
+    const where = listWhere(object, actor, { ...options, custom });
     const orderBy = listOrder(object, options.sorts ?? []);
     const records: CrmRecord[] = [];
     // Batches by offset over a total order (it ends in the id), so no row is

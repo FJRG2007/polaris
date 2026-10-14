@@ -28,13 +28,74 @@ export type InvalidReason =
     | "wholeNumber"
     | "currency"
     | "date"
-    | "option";
+    | "option"
+    | "rating"
+    | "tooMany"
+    | "address";
 
 export type Normalized =
     | { readonly ok: true; readonly value: InputValue }
     | { readonly ok: false; readonly reason: InvalidReason };
 
 const CURRENCY_CODES: readonly string[] = CURRENCIES.map((entry) => entry.code);
+
+/** The most stars a rating has. */
+export const MAX_RATING = 5;
+
+/** The choices of a multi-select as stored: a JSON list in option order, or
+ *  "" for none. Anything unreadable is none. */
+export function readChoices(value: unknown): string[] {
+    if (typeof value !== "string" || value === "") return [];
+    try {
+        const list: unknown = JSON.parse(value);
+        return Array.isArray(list) ? list.filter((one) => typeof one === "string") : [];
+    } catch {
+        return [];
+    }
+}
+
+/** The most web addresses one links field keeps. */
+export const MAX_LINKS = 10;
+
+/** The web addresses of a links field as stored: a JSON list, or "" for none.
+ *  Anything unreadable is none. */
+export function readLinks(value: unknown): string[] {
+    return readChoices(value);
+}
+
+/** The lines of an address, in the order they are written on an envelope. */
+export const ADDRESS_PARTS = ["street", "city", "state", "postcode", "country"] as const;
+
+export type AddressPart = (typeof ADDRESS_PARTS)[number];
+export type Address = Record<AddressPart, string>;
+
+/** An address as stored: its parts one per line, in `ADDRESS_PARTS` order, or
+ *  "" for none. Text with no line breaks - typed or imported on one line - is
+ *  all street, and the lines past the last part's are the street's too. */
+export function readAddress(value: unknown): Address {
+    const lines = typeof value === "string" && value !== "" ? value.split(/\r?\n/) : [];
+    const extra = Math.max(0, lines.length - ADDRESS_PARTS.length);
+    const street = lines
+        .slice(0, extra + 1)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(", ");
+    const rest = lines.slice(extra + 1);
+    return Object.fromEntries(
+        ADDRESS_PARTS.map((part, index) => [
+            part,
+            index === 0 ? street : (rest[index - 1]?.trim() ?? "")
+        ])
+    ) as Address;
+}
+
+/** An address on one line, its empty parts left out: "Main St 1, Springfield". */
+export function addressLine(value: unknown): string {
+    const address = readAddress(value);
+    return ADDRESS_PARTS.map((part) => address[part])
+        .filter(Boolean)
+        .join(", ");
+}
 
 /** The longest text any field keeps. */
 export const MAX_TEXT = 500;
@@ -133,15 +194,48 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
         case "url": {
             const value = text(raw);
             if (value === null) return no("url");
-            if (!value) return ok("");
-            try {
-                const url = new URL(withScheme(value));
-                if (url.protocol !== "https:" && url.protocol !== "http:") return no("url");
-                if (!HOST.test(url.hostname.toLowerCase())) return no("url");
-                return url.href.length > MAX_TEXT ? no("tooLong") : ok(url.href);
-            } catch {
-                return no("url");
+            return value ? webAddress(value) : ok("");
+        }
+        case "links": {
+            if (raw === null || raw === "") return ok("");
+            // A list, as it is stored, or typed with spaces or line breaks
+            // between them; a comma or semicolon left at either end is a
+            // separator, one inside an address is kept.
+            const list =
+                typeof raw !== "string"
+                    ? raw
+                    : raw.trim().startsWith("[")
+                      ? readLinks(raw)
+                      : raw.split(/\s+/).map((one) => one.replace(/^[,;]+|[,;]+$/g, ""));
+            if (!Array.isArray(list)) return no("url");
+            const kept: string[] = [];
+            for (const one of list) {
+                const value = text(one);
+                if (value === null) return no("url");
+                if (value === "") continue;
+                const link = webAddress(value);
+                if (!link.ok) return link;
+                if (!kept.includes(link.value as string)) kept.push(link.value as string);
             }
+            if (kept.length > MAX_LINKS) return no("tooMany");
+            return ok(kept.length === 0 ? "" : JSON.stringify(kept));
+        }
+        case "address": {
+            if (raw === null || raw === "") return ok("");
+            const parts =
+                typeof raw === "string"
+                    ? readAddress(raw)
+                    : z.record(z.string(), z.unknown()).safeParse(raw).data;
+            if (!parts) return no("address");
+            const lines: string[] = [];
+            for (const part of ADDRESS_PARTS) {
+                const value = parts[part] === undefined ? "" : text(parts[part]);
+                if (value === null) return no("address");
+                const line = value.replace(/\s+/g, " ");
+                if (line.length > 200) return no("tooLong");
+                lines.push(line);
+            }
+            return ok(lines.some(Boolean) ? lines.join("\n") : "");
         }
         case "domain": {
             const value = text(raw);
@@ -187,6 +281,38 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             if (value === "" && field.custom) return ok("");
             return value !== null && field.options?.includes(value) ? ok(value) : no("option");
         }
+        case "multiSelect": {
+            if (raw === null || raw === "") return ok("");
+            // A list, as it is stored, or typed as "Red, Blue".
+            const list =
+                typeof raw !== "string"
+                    ? raw
+                    : raw.trim().startsWith("[")
+                      ? readChoices(raw)
+                      : raw.split(",");
+            if (!Array.isArray(list)) return no("option");
+            const chosen = new Set<string>();
+            for (const one of list) {
+                const value = text(one)?.toLowerCase();
+                if (value === undefined) return no("option");
+                if (value === "") continue;
+                const option = field.options?.find((each) => each.toLowerCase() === value);
+                if (option === undefined) return no("option");
+                chosen.add(option);
+            }
+            const ordered = (field.options ?? []).filter((option) => chosen.has(option));
+            return ok(ordered.length === 0 ? "" : JSON.stringify(ordered));
+        }
+        case "rating": {
+            if (raw === null || raw === "" || raw === 0) return ok(null);
+            const value = typeof raw === "string" ? Number(raw.trim()) : raw;
+            return typeof value === "number" &&
+                Number.isInteger(value) &&
+                value >= 1 &&
+                value <= MAX_RATING
+                ? ok(value)
+                : no("rating");
+        }
         case "boolean":
             return typeof raw === "boolean" ? ok(raw) : no("option");
         case "member":
@@ -195,6 +321,18 @@ export function normalizeInput(field: FieldDef, raw: unknown): Normalized {
             return typeof raw === "string" && uuid.safeParse(raw).success ? ok(raw) : no("option");
         case "dateTime":
             return no("option");
+    }
+}
+
+/** A web address as it is kept: http or https, with a real host. */
+function webAddress(value: string): Normalized {
+    try {
+        const url = new URL(withScheme(value));
+        if (url.protocol !== "https:" && url.protocol !== "http:") return no("url");
+        if (!HOST.test(url.hostname.toLowerCase())) return no("url");
+        return url.href.length > MAX_TEXT ? no("tooLong") : ok(url.href);
+    } catch {
+        return no("url");
     }
 }
 

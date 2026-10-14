@@ -12,16 +12,27 @@
 import type { ViewSort } from "../model/views";
 import { contains, filterWhere } from "./filters";
 import { readFilter, type ViewFilter } from "../model/filters";
-import { shelfWhere, type Shelf } from "./access";
+import { ownClause, shelfWhere, type CrmActor, type Shelf } from "./access";
 import { slotOf, type CrmObject, type FieldDef } from "../model/objects";
 import { columnOf, type ColumnSpec } from "./columns";
 
-/** The text columns the search box looks in, per kind of record. */
+/** The text fields the search box looks in, per kind of record. */
 const SEARCHED: Readonly<Record<CrmObject, readonly string[]>> = {
     companies: ["name", "domain"],
-    people: ["firstName", "lastName", "email", "jobTitle"],
+    people: ["name", "email", "jobTitle"],
     opportunities: ["name"]
 };
+
+/** The columns the search looks in, leaving out the fields kept hidden. */
+function searchedColumns(object: CrmObject, hidden: readonly string[]): string[] {
+    return SEARCHED[object]
+        .filter((key) => !hidden.includes(key))
+        .flatMap((key) => {
+            const spec = columnOf(object, key);
+            if (spec.type === "name") return [spec.first, spec.last];
+            return spec.type === "scalar" ? [spec.column] : [];
+        });
+}
 
 /** The longest search worth sending to the database. */
 export const MAX_SEARCH = 200;
@@ -30,12 +41,18 @@ export const MAX_SEARCH = 200;
  * Every word of the search found in one of the searched columns: "ana garcia"
  * finds Ana García's first and last names, wherever each word landed.
  */
-export function searchWhere(object: CrmObject, search: string): Record<string, unknown> {
+export function searchWhere(
+    object: CrmObject,
+    search: string,
+    hidden: readonly string[] = []
+): Record<string, unknown> {
     const words = search.trim().slice(0, MAX_SEARCH).split(/\s+/).filter(Boolean).slice(0, 8);
     if (words.length === 0) return {};
+    const columns = searchedColumns(object, hidden);
+    if (columns.length === 0) return { id: { in: [] } };
     return {
         AND: words.map((word) => ({
-            OR: SEARCHED[object].map((column) => ({ [column]: contains(word) }))
+            OR: columns.map((column) => ({ [column]: contains(word) }))
         }))
     };
 }
@@ -57,14 +74,18 @@ export interface ListScope {
 }
 
 /** The rows a list reads: this shelf, in or out of the trash, matching the
- *  search and the filter, in one group when it is grouped. */
+ *  search and the filter, in one group when it is grouped - and, read for a
+ *  reader whose role is held to their own records, only those. */
 export function listWhere(
     object: CrmObject,
-    shelf: Shelf,
+    scope: Shelf | CrmActor,
     options: ListScope
 ): Record<string, unknown> {
+    const actor = "user" in scope ? scope : null;
+    const shelf = actor ? actor.shelf : (scope as Shelf);
     const narrowed = [
-        searchWhere(object, options.search ?? ""),
+        (actor && ownClause(actor, object)) ?? {},
+        searchWhere(object, options.search ?? "", actor?.rules?.[object].hidden ?? []),
         options.filter
             ? filterWhere(
                   object,

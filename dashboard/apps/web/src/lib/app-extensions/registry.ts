@@ -17,9 +17,11 @@ import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 import type {
     AppExtension,
+    AppFavorite,
     AppJob,
     AppMcpTool,
     AppMcpSearchProvider,
+    AppRecordHit,
     AppSlot,
     AppWidgetDefinition,
     ChatCommandSpec,
@@ -38,6 +40,7 @@ export type {
     AppJob,
     AppMcpTool,
     AppMcpSearchProvider,
+    AppRecordHit,
     AppSlot,
     ChatCommandSpec,
     ChatGameLink,
@@ -219,6 +222,39 @@ export async function upcomingEventsFor(
         return [...(await extension.upcomingEvents!(userId, limit))];
     }
     return null;
+}
+
+/** What this account pinned inside one installed app, or none. An app that
+ *  fails to say leaves the rail without them, never broken. */
+export async function appFavorites(appId: string, userId: string): Promise<AppFavorite[]> {
+    const extension = (await installedWith("favorites")).find((one) => one.id === appId);
+    if (!extension) return [];
+    try {
+        return [...(await extension.favorites!(userId))];
+    } catch (caught) {
+        console.error(`polaris: ${appId} could not list its favorites:`, caught);
+        return [];
+    }
+}
+
+/** The records the installed apps found for this account, at most `limit`. One
+ *  app failing leaves the others' answers standing. */
+export async function appRecordHits(
+    userId: string,
+    query: string,
+    limit: number
+): Promise<AppRecordHit[]> {
+    const lists = await Promise.all(
+        (await installedWith("searchRecords")).map(async (extension) => {
+            try {
+                return [...(await extension.searchRecords!(userId, query, limit))];
+            } catch (caught) {
+                console.error(`polaris: ${extension.id} could not search its records:`, caught);
+                return [];
+            }
+        })
+    );
+    return lists.flat().slice(0, limit);
 }
 
 /** Every game server this account can see, for the overview. */

@@ -12,12 +12,14 @@
 
 import Link from "next/link";
 import { useCrmT } from "./i18n";
+import { useDuplicateWarning } from "./use-duplicate-warning";
 import { Timeline } from "./timeline";
 import { RecordActivities } from "./record-activities";
 import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
 import { messageOf, unwrap } from "./call";
 import { fieldLabel } from "./custom-fields";
+import { RunWorkflowMenu } from "./run-workflow-menu";
 import * as actions from "../actions/records";
 import { recordHref } from "../model/related";
 import { useCallback, useState } from "react";
@@ -25,7 +27,8 @@ import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { CellDisplay, RefChip } from "./cell-display";
 import type { RecordOpening } from "../lib/record-page";
-import { ArrowLeft, Link2, Maximize2, RotateCcw, ShieldOff } from "lucide-react";
+import { useFavorite } from "./use-favorite";
+import { ArrowLeft, Link2, Maximize2, RotateCcw, ShieldOff, Star } from "lucide-react";
 import { Button, cn, DialogTitle, EmptyState, useToast } from "@polaris/ui";
 import {
     fieldsOf,
@@ -35,6 +38,7 @@ import {
     type FieldDef,
     type FieldValue
 } from "../model/objects";
+import { ruleFields } from "../model/roles";
 
 function Block({ className }: { className?: string }) {
     return <span aria-hidden className={cn("block animate-pulse rounded bg-muted", className)} />;
@@ -52,6 +56,7 @@ export interface RecordScreenProps {
 export function RecordScreen({ object, id, panel = false, onSaved }: RecordScreenProps) {
     const t = useCrmT();
     const toast = useToast();
+    const warnDuplicates = useDuplicateWarning(object);
     const format = hostUi.displayFormat.useDisplayFormat();
     const load = useCallback(
         () => unwrap(() => actions.openRecordAction({ object, id }), t("errors.loadFailed")),
@@ -66,7 +71,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
     const record = data?.record ?? null;
     const canEdit = Boolean(data?.can[object].edit) && !record?.deletedAt;
     const canRestore = Boolean(data?.can[object].delete) && Boolean(record?.deletedAt);
-    const fields = fieldsOf(object, data?.fields ?? []);
+    const fields = ruleFields(fieldsOf(object, data?.fields ?? []), data?.rule);
     const plural = t(`objects.${object}.plural`);
 
     const save = (field: FieldDef, stored: InputValue, shown: FieldValue) => {
@@ -78,8 +83,9 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             () => actions.updateRecordAction({ object, id, values: { [field.key]: stored } }),
             t("errors.generic")
         )
-            .then(({ record: saved }) => {
+            .then(({ record: saved, duplicates }) => {
                 put(saved);
+                warnDuplicates(duplicates);
                 onSaved?.(saved);
                 // The change is on the timeline now.
                 opening.refresh();
@@ -117,6 +123,13 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         }
         setEditing(field.key);
     };
+
+    const favorite = useFavorite(
+        "record",
+        object,
+        record ? id : null,
+        Boolean(opening.data?.favorite)
+    );
 
     const copyLink = () => {
         void navigator.clipboard
@@ -160,6 +173,23 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
                     >
                         <Maximize2 className="size-4" />
                     </Link>
+                </Button>
+            ) : null}
+            {record && canEdit ? (
+                <RunWorkflowMenu object={object} id={id} onRan={opening.refresh} />
+            ) : null}
+            {record && !record.deletedAt ? (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={favorite.toggle}
+                    aria-pressed={favorite.pinned}
+                    aria-label={t(favorite.pinned ? "favorites.remove" : "favorites.add")}
+                    title={t(favorite.pinned ? "favorites.remove" : "favorites.add")}
+                >
+                    <Star
+                        className={cn("size-4", favorite.pinned && "fill-current text-warning")}
+                    />
                 </Button>
             ) : null}
             {record ? (
@@ -283,7 +313,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
             ) : null}
             <div
                 className={cn(
-                    "grid min-h-0 flex-1 content-start gap-3 overflow-y-auto",
+                    "grid min-h-0 flex-1 content-start gap-3 overflow-y-auto overscroll-contain",
                     !panel && "lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]"
                 )}
             >

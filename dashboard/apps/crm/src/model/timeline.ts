@@ -10,7 +10,7 @@
 import { z } from "zod";
 import type { CrmRecord, FieldValue, Ref } from "./objects";
 
-export const EVENT_KINDS = ["created", "updated", "trashed", "restored"] as const;
+export const EVENT_KINDS = ["created", "updated", "trashed", "restored", "imported"] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
 /** The most events one page of a timeline holds. */

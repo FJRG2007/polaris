@@ -1,32 +1,23 @@
 "use client";
 
 /**
- * A record's notes and tasks, kept in Polaris's Notes and Tasks and linked
- * here. Each opens in its own app; a note or task written here is an ordinary
- * one there. The lists paint from the last answer kept for this record and
+ * A record's notes, tasks and files, kept in Polaris's Notes, Tasks and Drive
+ * and linked here. Each opens in its own app; a note or task written here is an
+ * ordinary one there, and a file stays where it is in Drive. The lists paint from the last answer kept for this record and
  * refresh behind it; a change shows at once and goes back if it is refused.
  */
 
 import Link from "next/link";
 import { useCrmT } from "./i18n";
 import { messageOf, unwrap } from "./call";
-import { Plus, Unlink } from "lucide-react";
+import { formatDay } from "./format";
+import { CalendarDays, File as FileIcon, Mail, Plus, Unlink } from "lucide-react";
 import * as actions from "../actions/activities";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject } from "../model/objects";
 import { useCallback, useId, useState } from "react";
 import { Button, Checkbox, cn, Input, Select, Textarea, useToast } from "@polaris/ui";
-import {
-    newNoteSchema,
-    newTaskSchema,
-    NOTE_BODY_MAX,
-    NOTE_TITLE_MAX,
-    TASK_NAME_MAX,
-    type LinkKind,
-    type LinkedNote,
-    type LinkedTask,
-    type RecordActivities as Activities
-} from "../model/links";
+import * as links from "../model/links";
 
 function Block({ className }: { className?: string }) {
     return <span aria-hidden className={cn("block animate-pulse rounded bg-muted", className)} />;
@@ -50,14 +41,14 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
             ).then((answer) => answer.activities),
         [object, id, t]
     );
-    const live = hostUi.liveRead.useLiveRead<Activities>({
+    const live = hostUi.liveRead.useLiveRead<links.RecordActivities>({
         cacheKey: `crm:activities:${object}:${id}`,
         load
     });
     const data = live.data;
 
     /** Show a change at once; put the kept answer back if the server refuses. */
-    const change = (next: Activities, work: () => Promise<unknown>) => {
+    const change = (next: links.RecordActivities, work: () => Promise<unknown>) => {
         if (!data) return;
         const kept = data;
         live.replace(next);
@@ -69,13 +60,14 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
             });
     };
 
-    const unlink = (kind: LinkKind, targetId: string) => {
+    const unlink = (kind: links.LinkKind, targetId: string) => {
         if (!data) return;
         change(
             {
                 ...data,
                 notes: data.notes?.filter((note) => note.id !== targetId) ?? null,
-                tasks: data.tasks?.filter((task) => task.id !== targetId) ?? null
+                tasks: data.tasks?.filter((task) => task.id !== targetId) ?? null,
+                files: (data.files ?? []).filter((file) => file.id !== targetId)
             },
             () =>
                 unwrap(
@@ -85,7 +77,7 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
         );
     };
 
-    const tick = (task: LinkedTask) => {
+    const tick = (task: links.LinkedTask) => {
         if (!data?.tasks) return;
         change(
             {
@@ -108,8 +100,34 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
         );
     };
 
-    const added = (patch: Partial<Activities>) => {
+    const added = (patch: Partial<links.RecordActivities>) => {
         if (data) live.replace({ ...data, ...patch });
+    };
+
+    const [picking, setPicking] = useState(false);
+    const attach = async (
+        picked: readonly { kind: string; connectionId?: string; path?: string }[]
+    ) => {
+        setPicking(false);
+        const made: links.LinkedFile[] = [];
+        for (const one of picked) {
+            if (one.kind !== "drive" || !one.connectionId || !one.path) continue;
+            try {
+                const answer = await unwrap(
+                    () =>
+                        actions.attachRecordFileAction({
+                            object,
+                            id,
+                            file: { connectionId: one.connectionId, path: one.path }
+                        }),
+                    t("errors.generic")
+                );
+                made.push(answer.file);
+            } catch (caught) {
+                toast.show({ title: t("errors.notSaved"), body: messageOf(caught) });
+            }
+        }
+        if (made.length > 0) live.refresh();
     };
 
     return (
@@ -179,7 +197,154 @@ export function RecordActivities({ object, id, canEdit }: RecordActivitiesProps)
                     )}
                 </Section>
             )}
+            <Section
+                title={t("activities.files")}
+                count={data ? (data.files ?? []).length : null}
+                adding={
+                    canEdit && data ? (
+                        <AddToggle
+                            label={t("activities.attachFile")}
+                            onClick={() => setPicking(true)}
+                        />
+                    ) : null
+                }
+            >
+                {!data ? (
+                    <Block className="mx-3 my-3 h-3 w-40" />
+                ) : (data.files ?? []).length === 0 ? (
+                    <Empty text={t("activities.noFiles")} />
+                ) : (
+                    <ul className="flex flex-col gap-1 p-2">
+                        {(data.files ?? []).map((file) => (
+                            <FileRow
+                                key={file.id}
+                                file={file}
+                                onUnlink={canEdit ? () => unlink("file", file.id) : null}
+                            />
+                        ))}
+                    </ul>
+                )}
+            </Section>
+            {data?.mail === null ? null : (
+                <Section
+                    title={t("activities.mail")}
+                    count={data?.mail ? data.mail.length : null}
+                    adding={null}
+                >
+                    {!data?.mail ? (
+                        <Block className="mx-3 my-3 h-3 w-40" />
+                    ) : data.mail.length === 0 ? (
+                        <Empty text={t("activities.noMail")} />
+                    ) : (
+                        <ul className="flex flex-col gap-1 p-2">
+                            {data.mail.map((thread) => (
+                                <MailRow key={thread.id} thread={thread} />
+                            ))}
+                        </ul>
+                    )}
+                </Section>
+            )}
+            {data?.events === null ? null : (
+                <Section
+                    title={t("activities.events")}
+                    count={data?.events ? data.events.length : null}
+                    adding={null}
+                >
+                    {!data?.events ? (
+                        <Block className="mx-3 my-3 h-3 w-40" />
+                    ) : data.events.length === 0 ? (
+                        <Empty text={t("activities.noEvents")} />
+                    ) : (
+                        <ul className="flex flex-col gap-1 p-2">
+                            {data.events.map((event) => (
+                                <EventRow key={event.id} event={event} />
+                            ))}
+                        </ul>
+                    )}
+                </Section>
+            )}
+            {picking ? (
+                <hostUi.filePicker.FilePickerDialog
+                    storageOnly
+                    title={t("activities.attachFile")}
+                    onPick={(
+                        picked: readonly { kind: string; connectionId?: string; path?: string }[]
+                    ) => void attach(picked)}
+                    onClose={() => setPicking(false)}
+                />
+            ) : null}
         </>
+    );
+}
+
+function FileRow({ file, onUnlink }: { file: links.LinkedFile; onUnlink: (() => void) | null }) {
+    return (
+        <li className="flex min-w-0 items-center gap-2 px-1">
+            <FileIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+            <a
+                href={file.href}
+                className="min-w-0 flex-1 truncate rounded py-0.5 text-[0.8125rem] hover:underline"
+                title={file.name}
+            >
+                {file.name}
+            </a>
+            {onUnlink ? <UnlinkButton onClick={onUnlink} /> : null}
+        </li>
+    );
+}
+
+function MailRow({ thread }: { thread: links.MailWith }) {
+    const t = useCrmT();
+    const format = hostUi.displayFormat.useDisplayFormat();
+    const subject = thread.subject.trim() || t("activities.noSubject");
+    const people = thread.participants.map((one) => one.name.trim() || one.address).join(", ");
+    return (
+        <li className="flex min-w-0 items-start gap-2 px-1">
+            <Mail aria-hidden className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+            <a
+                href={thread.href}
+                className="flex min-w-0 flex-1 flex-col rounded py-0.5 hover:underline"
+                title={subject}
+            >
+                <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{subject}</span>
+                    <span className="shrink-0 text-[0.75rem] tabular-nums text-muted-foreground">
+                        {format.date(thread.lastMessageAt)}
+                    </span>
+                </span>
+                <span className="truncate text-[0.75rem] text-muted-foreground" title={people}>
+                    {thread.messageCount > 1
+                        ? t("activities.mailCount", { count: thread.messageCount, people })
+                        : people}
+                </span>
+            </a>
+        </li>
+    );
+}
+
+function EventRow({ event }: { event: links.EventWith }) {
+    const t = useCrmT();
+    const format = hostUi.displayFormat.useDisplayFormat();
+    const summary = event.summary.trim() || t("activities.noSummary");
+    const when = !event.startsAt
+        ? ""
+        : event.allDay
+          ? formatDay(event.startsAt.slice(0, 10), format)
+          : format.dateTime(event.startsAt);
+    return (
+        <li className="flex min-w-0 items-start gap-2 px-1">
+            <CalendarDays aria-hidden className="mt-1 size-3.5 shrink-0 text-muted-foreground" />
+            <a
+                href={event.href}
+                className="flex min-w-0 flex-1 flex-col rounded py-0.5 hover:underline"
+                title={summary}
+            >
+                <span className="truncate text-[0.8125rem]">{summary}</span>
+                <span className="truncate text-[0.75rem] text-muted-foreground">
+                    {[when, event.location.trim()].filter(Boolean).join(" - ")}
+                </span>
+            </a>
+        </li>
     );
 }
 
@@ -228,7 +393,7 @@ function UnlinkButton({ onClick }: { onClick: () => void }) {
     );
 }
 
-function NoteRow({ note, onUnlink }: { note: LinkedNote; onUnlink: (() => void) | null }) {
+function NoteRow({ note, onUnlink }: { note: links.LinkedNote; onUnlink: (() => void) | null }) {
     return (
         <li className="flex min-w-0 items-start gap-2">
             <Link
@@ -254,7 +419,7 @@ function TaskRow({
     onTick,
     onUnlink
 }: {
-    task: LinkedTask;
+    task: links.LinkedTask;
     onTick: () => void;
     onUnlink: (() => void) | null;
 }) {
@@ -321,8 +486,8 @@ function NoteForm({
 }: {
     object: CrmObject;
     id: string;
-    shelves: Activities["noteShelves"];
-    onAdded: (note: LinkedNote) => void;
+    shelves: links.RecordActivities["noteShelves"];
+    onAdded: (note: links.LinkedNote) => void;
 }) {
     const t = useCrmT();
     const field = useId();
@@ -331,7 +496,7 @@ function NoteForm({
     const [body, setBody] = useState("");
     const [shelf, setShelf] = useState<string>(shelves[0]?.id ?? "");
     const note = { title, body, spaceId: shelf || null };
-    const valid = newNoteSchema.safeParse(note).success;
+    const valid = links.newNoteSchema.safeParse(note).success;
     const { busy, submit } = useSubmit(
         () =>
             unwrap(() => actions.createRecordNoteAction({ object, id, note }), t("errors.generic")),
@@ -355,7 +520,7 @@ function NoteForm({
                 aria-label={`${t("activities.noteTitle")} *`}
                 placeholder={t("activities.noteTitle")}
                 value={title}
-                maxLength={NOTE_TITLE_MAX}
+                maxLength={links.NOTE_TITLE_MAX}
                 autoFocus
                 onChange={(event) => setTitle(event.target.value)}
             />
@@ -363,7 +528,7 @@ function NoteForm({
                 aria-label={t("activities.noteBody")}
                 placeholder={t("activities.noteBody")}
                 value={body}
-                maxLength={NOTE_BODY_MAX}
+                maxLength={links.NOTE_BODY_MAX}
                 rows={3}
                 onChange={(event) => setBody(event.target.value)}
             />
@@ -392,8 +557,8 @@ function TaskForm({
 }: {
     object: CrmObject;
     id: string;
-    lists: Activities["taskLists"];
-    onAdded: (task: LinkedTask) => void;
+    lists: links.RecordActivities["taskLists"];
+    onAdded: (task: links.LinkedTask) => void;
 }) {
     const t = useCrmT();
     const field = useId();
@@ -402,7 +567,7 @@ function TaskForm({
     const [due, setDue] = useState("");
     const [listId, setListId] = useState(lists[0]?.id ?? "");
     const task = { name, listId, due: due || null };
-    const valid = newTaskSchema.safeParse(task).success;
+    const valid = links.newTaskSchema.safeParse(task).success;
     const { busy, submit } = useSubmit(
         () =>
             unwrap(() => actions.createRecordTaskAction({ object, id, task }), t("errors.generic")),
@@ -426,7 +591,7 @@ function TaskForm({
                 aria-label={`${t("activities.taskName")} *`}
                 placeholder={t("activities.taskName")}
                 value={name}
-                maxLength={TASK_NAME_MAX}
+                maxLength={links.TASK_NAME_MAX}
                 autoFocus
                 onChange={(event) => setName(event.target.value)}
             />

@@ -6,6 +6,7 @@
  */
 
 import { listWhere, type ListScope } from "./query";
+import { requireListShown } from "./records";
 import { requireCan, type CrmActor } from "./access";
 import { aggregatesFor, type Aggregate } from "../model/views";
 import { columnOf, dayText, table, type ColumnSpec } from "./columns";
@@ -183,14 +184,17 @@ export async function computeTotals(
     options: Omit<ListScope, "group">
 ): Promise<Total[]> {
     await requireCan(actor, object, "read");
+    await requireListShown(actor, object, options);
     const custom = await loadFields(actor.shelf, object);
-    const where = listWhere(object, actor.shelf, { ...options, custom });
+    const where = listWhere(object, actor, { ...options, custom });
+    const hidden = actor.rules?.[object].hidden ?? [];
     let counted: Promise<number> | null = null;
     const all = () => (counted ??= table(object).count({ where }) as Promise<number>);
     const totals: Total[] = [];
     for (const { key, aggregate } of asked.slice(0, 64)) {
         const field = fieldOf(object, key, custom);
-        if (!field || !aggregatesFor(field.kind).includes(aggregate)) continue;
+        if (!field || hidden.includes(key) || !aggregatesFor(field.kind).includes(aggregate))
+            continue;
         totals.push(await one(object, where, all, key, aggregate));
     }
     return totals;

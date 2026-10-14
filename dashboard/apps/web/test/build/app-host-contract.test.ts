@@ -178,6 +178,9 @@ const EAGER_UI = [
     // How loud Polaris' sounds are: a number the frame's own chime and toasts
     // already read, so its module is in the shell's chunk anyway.
     "notificationSound.soundGain",
+    // Telling the rail an app's favorites changed: a function in the module
+    // the rail itself (in the shell) already loads.
+    "appFavorites.refreshAppFavorites",
     // The kept-reading hooks and the merge under them: hooks cannot be drawn
     // later, and the shell's own screens load the module anyway.
     "liveRead.useKeptSnapshot",

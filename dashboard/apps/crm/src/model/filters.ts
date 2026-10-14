@@ -57,7 +57,10 @@ export function operatorsFor(kind: FieldKind): readonly FilterOperator[] {
     switch (kind) {
         case "number":
         case "currency":
+        case "rating":
             return ["is", "greaterThan", "lessThan", "isEmpty", "isNotEmpty"];
+        case "multiSelect":
+            return ["isAnyOf", "isNoneOf", "isEmpty", "isNotEmpty"];
         case "date":
             return ["is", "before", "after", "isEmpty", "isNotEmpty"];
         // Never empty: a moment Polaris wrote.

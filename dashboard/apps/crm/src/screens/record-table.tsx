@@ -90,6 +90,8 @@ export interface TableProps {
     ) => void;
     readonly onSort: (key: string, direction: "asc" | "desc" | null) => void;
     readonly onColumns: (columns: ViewColumn[]) => void;
+    /** Fields the reader's role may see but not change. */
+    readonly locked?: readonly string[];
     readonly onAggregate: (key: string, aggregate: Aggregate | null) => void;
     /** A new record's name, typed into the row at the top; null when there is
      *  no such row open. */
@@ -140,9 +142,18 @@ export function RecordTable(props: TableProps) {
     const fields = useMemo(
         () =>
             columns
-                .map((column) => ({ column, field: fieldOf(object, column.key, custom)! }))
+                .map((column) => {
+                    const field = fieldOf(object, column.key, custom)!;
+                    return {
+                        column,
+                        field:
+                            field && props.locked?.includes(field.key)
+                                ? { ...field, readOnly: true }
+                                : field
+                    };
+                })
                 .filter((one) => one.field),
-        [columns, object]
+        [columns, object, props.locked]
     );
     const primary = primaryField(object);
     const allChosen =

@@ -15,11 +15,14 @@
  */
 
 import { Board } from "./board";
+import { useFavorite } from "./use-favorite";
+import { useSearchParams } from "next/navigation";
 import { csvFileName } from "../model/csv";
 import { customDef } from "../model/fields";
 import { FieldsDialog } from "./fields-dialog";
 import { CustomFieldsProvider, fieldLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
+import { useDuplicateWarning } from "./use-duplicate-warning";
 import * as views from "../model/views";
 import { useGroups } from "./use-groups";
 import { messageOf, unwrap } from "./call";
@@ -27,11 +30,15 @@ import * as filters from "../model/filters";
 import { RecordTable } from "./record-table";
 import { RecordScreen } from "./record-screen";
 import { TrashDialog } from "./trash-dialog";
+import { ImportDialog } from "./import-dialog";
+import { WorkflowsDialog } from "./workflows-dialog";
 import * as actions from "../actions/records";
 import { FilterButton } from "./filter-panel";
 import { hostUi } from "@polaris/app-host/client";
 import type { InputValue } from "../model/values";
 import { BulkEditDialog } from "./bulk-edit-dialog";
+import { MergeDialog } from "./merge-dialog";
+import { MAX_MERGE } from "../model/duplicates";
 import { GroupMenu, SortMenu } from "./arrange-menus";
 import { useViewName, ViewPicker } from "./view-picker";
 import { useRecords, type RowStore } from "./use-records";
@@ -40,6 +47,8 @@ import {
     Building2,
     Columns3,
     Download,
+    Upload,
+    Workflow,
     Kanban,
     Pencil,
     Plus,
@@ -49,6 +58,7 @@ import {
     ShieldOff,
     Table2,
     Target,
+    Merge,
     Trash2,
     User,
     X
@@ -189,6 +199,7 @@ interface Layout {
 export function ListScreen({ object }: { object: CrmObject }) {
     const t = useCrmT();
     const toast = useToast();
+    const warnDuplicates = useDuplicateWarning(object);
     const format = hostUi.displayFormat.useDisplayFormat();
     const [confirm, confirmElement] = hostUi.confirmDialog.useConfirm();
     const viewName = useViewName();
@@ -208,6 +219,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     openingRef.current = opening;
     const can = opening.data?.can[object] ?? null;
     const people = opening.data?.people ?? [];
+    const rule = opening.data?.rule ?? null;
     // An answer kept from before fields could be added carries none.
     const addedFields = opening.data?.fields;
     const custom = useMemo(() => (addedFields ?? []).map(customDef), [addedFields]);
@@ -225,6 +237,26 @@ export function ListScreen({ object }: { object: CrmObject }) {
 
     const [chosenId, setChosenId] = useState<string | null>(() => rememberedView(object));
     const view = allViews.find((one) => one.id === chosenId) ?? allViews[0] ?? null;
+    const favorite = useFavorite(
+        "view",
+        object,
+        view?.id ?? null,
+        Boolean(view && opening.data?.favoriteViews?.includes(view.id))
+    );
+
+    // Opened from a pinned view (`?view=<id>`): that view, once the views are
+    // read, and the address goes back to the list's own.
+    const askedView = useSearchParams()?.get("view") ?? null;
+    useEffect(() => {
+        if (!askedView || !opening.data) return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("view");
+        window.history.replaceState(window.history.state, "", url);
+        if (allViews.some((one) => one.id === askedView)) {
+            setChosenId(askedView);
+            rememberView(object, askedView);
+        }
+    }, [askedView, opening.data, allViews, object]);
 
     // How the view is drawn on screen. Changed here first and kept on the
     // server a moment later; a read of the views that lands while a change is
@@ -382,8 +414,11 @@ export function ListScreen({ object }: { object: CrmObject }) {
     /** The record open in the side panel. */
     const [peek, setPeek] = useState<string | null>(null);
     const [trashOpen, setTrashOpen] = useState(false);
+    const [importOpen, setImportOpen] = useState(false);
+    const [workflowsOpen, setWorkflowsOpen] = useState(false);
     const [drafting, setDrafting] = useState(false);
     const [bulkOpen, setBulkOpen] = useState(false);
+    const [mergeOpen, setMergeOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
     // no longer chosen.
     const rowIds = useMemo(() => new Set((store.rows ?? []).map((row) => row.id)), [store.rows]);
@@ -404,7 +439,9 @@ export function ListScreen({ object }: { object: CrmObject }) {
         if (!config) return;
         setExporting(true);
         try {
-            const columns = config.columns.filter((column) => !column.hidden);
+            const columns = config.columns.filter(
+                (column) => !column.hidden && !rule?.hidden.includes(column.key)
+            );
             const file = await unwrap(
                 () =>
                     actions.exportRecordsAction({
@@ -432,7 +469,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
         } finally {
             setExporting(false);
         }
-    }, [config, object, search, sorts, filter, t, toast, failed]);
+    }, [config, object, search, sorts, filter, t, toast, failed, rule]);
 
     // The newest edit of each cell: an older answer arriving late is not
     // allowed to overwrite a newer value.
@@ -453,8 +490,9 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     }),
                 t("errors.generic")
             )
-                .then(({ record: saved }) => {
+                .then(({ record: saved, duplicates }) => {
                     if (latest.current.get(slot) !== turn) return;
+                    warnDuplicates(duplicates);
                     store.patch([
                         {
                             id: saved.id,
@@ -472,7 +510,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     failed(t("errors.notSaved"), caught);
                 });
         },
-        [object, store, refreshTotals, failed, t]
+        [object, store, refreshTotals, failed, t, warnDuplicates]
     );
 
     const bulkEdit = useCallback(
@@ -549,17 +587,18 @@ export function ListScreen({ object }: { object: CrmObject }) {
             };
             store.prepend(temporary);
             unwrap(() => actions.createRecordAction({ object, values }), t("errors.generic"))
-                .then(({ record }) => {
+                .then(({ record, duplicates }) => {
                     store.drop([temporary.id]);
                     store.prepend(record);
                     refreshTotals();
+                    warnDuplicates(duplicates);
                 })
                 .catch((caught) => {
                     store.drop([temporary.id]);
                     failed(t("errors.notCreated"), caught);
                 });
         },
-        [object, primary.key, groupField, store, refreshTotals, failed, t]
+        [object, primary.key, groupField, store, refreshTotals, failed, t, warnDuplicates]
     );
 
     const moveCard = useCallback(
@@ -677,8 +716,11 @@ export function ListScreen({ object }: { object: CrmObject }) {
     );
 
     const columns = useMemo(
-        () => (config?.columns ?? []).filter((column) => !column.hidden),
-        [config]
+        () =>
+            (config?.columns ?? []).filter(
+                (column) => !column.hidden && !rule?.hidden.includes(column.key)
+            ),
+        [config, rule]
     );
     const setConfig = (next: Partial<views.ViewConfig>) => {
         if (!config) return;
@@ -728,6 +770,60 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const canEdit = Boolean(can?.edit);
     const canDelete = Boolean(can?.delete);
     const rows = store.rows;
+
+    // Arrived to add one (search's "New company"): the address says so once,
+    // and the new row opens as soon as the list can take it.
+    const [wantsNew, setWantsNew] = useState(false);
+    const [boardDraft, setBoardDraft] = useState<string | null>(null);
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("new") !== "1") return;
+        url.searchParams.delete("new");
+        window.history.replaceState(window.history.state, "", url);
+        setWantsNew(true);
+    }, []);
+    useEffect(() => {
+        if (!wantsNew || !can || !config || !rows) return;
+        if (kind === "kanban" && !grouped.groups) return;
+        setWantsNew(false);
+        if (!canEdit) {
+            toast.show({
+                title: t("errors.notCreated"),
+                body: t("errors.forbidden", { verb: "edit", object })
+            });
+        } else if (kind === "kanban") {
+            // A new card is made in a column, so with the board's field (and
+            // the name) it needs both to be changeable.
+            const lockedKey = [boardBy?.key, primary.key].find(
+                (key) => key && rule?.readOnly.includes(key)
+            );
+            if (lockedKey) {
+                toast.show({
+                    title: t("errors.notCreated"),
+                    body: t("errors.fieldLocked", { field: fieldName(lockedKey) })
+                });
+            } else {
+                setBoardDraft(grouped.groups?.[0]?.value ?? null);
+            }
+        } else {
+            setDrafting(true);
+        }
+    }, [
+        wantsNew,
+        can,
+        config,
+        rows,
+        canEdit,
+        kind,
+        grouped.groups,
+        toast,
+        t,
+        object,
+        boardBy,
+        rule,
+        primary,
+        fieldName
+    ]);
     const boardable = views.groupFields(object, custom).length > 0;
     const narrowed = Boolean(search) || activeFilters > 0;
     const failure = (!opening.data && opening.error) || (readable && !rows && store.error) || null;
@@ -775,6 +871,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 groups={grouped.groups}
                 columns={columns}
                 canEdit={canEdit}
+                locked={rule?.readOnly}
                 people={people}
                 defaultCurrency={format.preferences.currency}
                 sorted={config.sorts.length > 0}
@@ -784,6 +881,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 onCreate={(value, name) => create(name, { key: boardBy.key, value })}
                 onEdit={edit}
                 onOpen={setPeek}
+                draftIn={boardDraft}
             />
         );
     } else if (rows.length === 0 && !drafting && narrowed) {
@@ -823,6 +921,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     } else {
         body = (
             <RecordTable
+                locked={rule?.readOnly}
                 object={object}
                 columns={columns}
                 sorts={config.sorts}
@@ -923,6 +1022,8 @@ export function ListScreen({ object }: { object: CrmObject }) {
                             onCreate={createView}
                             onRename={renameView}
                             onDelete={(target) => void deleteView(target)}
+                            pinned={favorite.pinned}
+                            onTogglePin={favorite.toggle}
                         />
                     </div>
                     <SegmentedControl
@@ -1036,6 +1137,28 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         <Download className="size-4" />
                         {t("export.button")}
                     </Button>
+                    {canEdit ? (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setImportOpen(true)}
+                            title={t("import.hint")}
+                        >
+                            <Upload className="size-4" />
+                            {t("import.button")}
+                        </Button>
+                    ) : null}
+                    {canEdit ? (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setWorkflowsOpen(true)}
+                            aria-label={t("workflows.button")}
+                            title={t("workflows.hint")}
+                        >
+                            <Workflow className="size-4" />
+                        </Button>
+                    ) : null}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -1065,6 +1188,15 @@ export function ListScreen({ object }: { object: CrmObject }) {
                                 {t("selection.edit")}
                             </Button>
                         ) : null}
+                        {canEdit &&
+                        canDelete &&
+                        selected.length >= 2 &&
+                        selected.length <= MAX_MERGE ? (
+                            <Button size="sm" variant="ghost" onClick={() => setMergeOpen(true)}>
+                                <Merge className="size-4" />
+                                {t("merge.button")}
+                            </Button>
+                        ) : null}
                         {canDelete ? (
                             <Button
                                 size="sm"
@@ -1088,6 +1220,20 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     </div>
                 ) : null}
 
+                {mergeOpen ? (
+                    <MergeDialog
+                        object={object}
+                        records={(store.rows ?? []).filter((row) => selected.includes(row.id))}
+                        onMerged={(record, trashed) => {
+                            setMergeOpen(false);
+                            setSelected([]);
+                            store.drop(trashed);
+                            store.patch([{ id: record.id, values: record.values }]);
+                            refreshTotals();
+                        }}
+                        onClose={() => setMergeOpen(false)}
+                    />
+                ) : null}
                 {bulkOpen ? (
                     <BulkEditDialog
                         object={object}
@@ -1126,6 +1272,21 @@ export function ListScreen({ object }: { object: CrmObject }) {
                     />
                 ) : null}
                 {confirmElement}
+                <WorkflowsDialog
+                    object={object}
+                    open={workflowsOpen}
+                    confirm={confirm}
+                    onClose={() => setWorkflowsOpen(false)}
+                />
+                <ImportDialog
+                    object={object}
+                    open={importOpen}
+                    onClose={() => setImportOpen(false)}
+                    onImported={() => {
+                        store.refresh();
+                        refreshTotals();
+                    }}
+                />
                 <TrashDialog
                     object={object}
                     open={trashOpen}

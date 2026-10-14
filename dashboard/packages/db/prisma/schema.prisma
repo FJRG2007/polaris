@@ -377,10 +377,17 @@ model User {
     crmOpportunities        CrmOpportunity[] @relation("CrmOpportunityShelf")
     crmOpportunitiesOwned   CrmOpportunity[] @relation("CrmOpportunityOwner")
     crmOpportunitiesCreated CrmOpportunity[] @relation("CrmOpportunityCreatedBy")
+    crmCompaniesUpdated     CrmCompany[]     @relation("CrmCompanyUpdatedBy")
+    crmPeopleUpdated        CrmPerson[]      @relation("CrmPersonUpdatedBy")
+    crmOpportunitiesUpdated CrmOpportunity[] @relation("CrmOpportunityUpdatedBy")
     crmViews                CrmView[]        @relation("CrmViewShelf")
     crmFields               CrmField[]       @relation("CrmFieldShelf")
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
     crmLinks                CrmLink[]        @relation("CrmLinkShelf")
+    crmWorkflows            CrmWorkflow[]    @relation("CrmWorkflowShelf")
+    crmFavorites            CrmFavorite[]    @relation("CrmFavoriteOwner")
+    crmDashboards           CrmDashboard[]   @relation("CrmDashboardShelf")
+    crmForecasts            CrmForecast[]    @relation("CrmForecastShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5877,6 +5884,11 @@ model Organization {
     crmFields        CrmField[]
     crmEvents        CrmEvent[]
     crmLinks         CrmLink[]
+    crmWorkflows     CrmWorkflow[]
+    crmFavorites     CrmFavorite[]
+    crmDashboards    CrmDashboard[]
+    crmForecasts     CrmForecast[]
+    crmRoleRules     CrmRoleRule[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -12802,6 +12814,8 @@ model CrmCompany {
     cBool4                Boolean   @default(false)
     cBool5                Boolean   @default(false)
     createdById           String?   @db.Uuid
+    // Who last changed it; null until somebody does.
+    updatedById String? @db.Uuid
     position              Float     @default(0)
     deletedAt             DateTime?
     createdAt             DateTime  @default(now())
@@ -12811,6 +12825,7 @@ model CrmCompany {
     user          User?            @relation("CrmCompanyShelf", fields: [userId], references: [id], onDelete: Cascade)
     accountOwner  User?            @relation("CrmCompanyAccountOwner", fields: [accountOwnerId], references: [id], onDelete: SetNull)
     createdBy     User?            @relation("CrmCompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy User? @relation("CrmCompanyUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
     people        CrmPerson[]
     opportunities CrmOpportunity[]
 
@@ -12862,6 +12877,8 @@ model CrmPerson {
     cBool4      Boolean   @default(false)
     cBool5      Boolean   @default(false)
     createdById String?   @db.Uuid
+    // Who last changed it; null until somebody does.
+    updatedById String? @db.Uuid
     position    Float     @default(0)
     deletedAt   DateTime?
     createdAt   DateTime  @default(now())
@@ -12871,6 +12888,7 @@ model CrmPerson {
     user          User?            @relation("CrmPersonShelf", fields: [userId], references: [id], onDelete: Cascade)
     company       CrmCompany?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
     createdBy     User?            @relation("CrmPersonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy User? @relation("CrmPersonUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
     opportunities CrmOpportunity[]
 
     @@index([orgId, deletedAt])
@@ -12890,8 +12908,10 @@ model CrmOpportunity {
     amountCurrency   String    @default("")
     // A calendar day, stored at midnight UTC.
     closeDate        DateTime?
-    // new | screening | meeting | proposal | customer (apps/crm model/objects).
+    // new | screening | meeting | proposal | customer | lost (apps/crm model/objects).
     stage            String    @default("new")
+    // Why it was won or lost, as somebody wrote it.
+    closeReason      String    @default("")
     companyId        String?   @db.Uuid
     pointOfContactId String?   @db.Uuid
     ownerId          String?   @db.Uuid
@@ -12923,6 +12943,8 @@ model CrmOpportunity {
     cBool4           Boolean   @default(false)
     cBool5           Boolean   @default(false)
     createdById      String?   @db.Uuid
+    // Who last changed it; null until somebody does.
+    updatedById String? @db.Uuid
     position         Float     @default(0)
     deletedAt        DateTime?
     createdAt        DateTime  @default(now())
@@ -12934,6 +12956,7 @@ model CrmOpportunity {
     pointOfContact CrmPerson?    @relation(fields: [pointOfContactId], references: [id], onDelete: SetNull)
     owner          User?         @relation("CrmOpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
     createdBy      User?         @relation("CrmOpportunityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    updatedBy User? @relation("CrmOpportunityUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 
     @@index([orgId, deletedAt, stage])
     @@index([userId, deletedAt, stage])
@@ -13021,6 +13044,9 @@ model CrmEvent {
     user User?         @relation("CrmEventShelf", fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([recordId, id])
+    // The audit log: a shelf's events, newest first.
+    @@index([orgId, id])
+    @@index([userId, id])
 }
 
 // A CRM record linked to something another app keeps: a note, a task, a Drive
@@ -13043,6 +13069,152 @@ model CrmLink {
 
     @@unique([recordId, kind, targetId])
     @@index([recordId, kind, id])
+}
+
+// A page of charts over one shelf's CRM records, shared like its views.
+// `widgets` is a JSON array checked against `widgetsSchema` (apps/crm
+// model/dashboards.ts) on the way in and on the way out.
+model CrmDashboard {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String?  @db.Uuid
+    userId      String?  @db.Uuid
+    // "org:<id>" or "user:<id>".
+    shelf       String
+    name        String
+    widgets     String   @default("[]")
+    position    Float    @default(0)
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmDashboardShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([shelf, name])
+}
+
+// How likely a deal at each open stage is to be won, per shelf, for the CRM
+// forecast (apps/crm model/forecast). A JSON object of stage -> percent; a
+// stage left out takes the default.
+model CrmForecast {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    orgId     String?  @db.Uuid
+    userId    String?  @db.Uuid
+    // "org:<id>" or "user:<id>".
+    shelf     String   @unique
+    odds      String   @default("{}")
+    updatedAt DateTime @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmForecastShelf", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// A CRM record or view somebody pinned to the CRM's rail. Their own: nobody
+// else sees it. Kept per shelf (`orgId` null for their own CRM), so an
+// organization's favorites show while working in it and nowhere else.
+model CrmFavorite {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    orgId     String?  @db.Uuid
+    // record | view
+    kind      String
+    // companies | people | opportunities
+    object    String
+    targetId  String   @db.Uuid
+    position  Float    @default(0)
+    createdAt DateTime @default(now())
+
+    user User          @relation("CrmFavoriteOwner", fields: [userId], references: [id], onDelete: Cascade)
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, kind, targetId])
+    @@index([userId, orgId, position])
+    @@index([targetId])
+}
+
+// A CRM workflow: when something happens to a kind of record (or on a
+// schedule, by hand, or from an outside call), do these things. It runs as the
+// person who last saved it, with what their role lets them do on its shelf now.
+model CrmWorkflow {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    orgId       String?   @db.Uuid
+    userId      String?   @db.Uuid
+    // companies | people | opportunities
+    object      String
+    name        String
+    // Stringified JSON: workflowTriggerSchema and an array of workflowActionSchema.
+    trigger     String
+    actions     String    @default("[]")
+    enabled     Boolean   @default(true)
+    // SHA-256 of the secret in a webhook trigger's address; the secret itself
+    // is shown once and never stored.
+    hookHash    String?   @unique
+    // When a schedule trigger next fires.
+    nextRunAt   DateTime?
+    runCount    Int       @default(0)
+    lastRunAt   DateTime?
+    lastError   String?
+    // Whoever saved it last: it runs as them. No FK - it outlives them, and
+    // stops running then.
+    runAsId     String?   @db.Uuid
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmWorkflowShelf", fields: [userId], references: [id], onDelete: Cascade)
+    runs     CrmWorkflowRun[]
+    versions CrmWorkflowVersion[]
+
+    @@index([orgId, object])
+    @@index([userId, object])
+    @@index([enabled, nextRunAt])
+}
+
+// One run of a CRM workflow: what set it off, how it ended, and - for a run
+// waiting out a delay - where it picks up again and when. Only the latest runs
+// of each workflow are kept.
+// A CRM workflow as somebody saved it: the editor lists the newest and can
+// open one to save it again.
+model CrmWorkflowVersion {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    workflowId String   @db.Uuid
+    name       String
+    // Stringified JSON, as on CrmWorkflow.
+    trigger    String
+    actions    String   @default("[]")
+    // Who saved it. No FK - it outlives them.
+    savedById  String?  @db.Uuid
+    createdAt  DateTime @default(now())
+
+    workflow CrmWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+    @@index([workflowId, createdAt])
+}
+
+model CrmWorkflowRun {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    workflowId String    @db.Uuid
+    // running | waiting | done | stopped | failed | cancelled
+    status     String
+    // The kind of trigger that started it.
+    cause      String
+    recordId   String?   @db.Uuid
+    error      String?
+    // A waiting run: the action it picks up at, and when.
+    step       Int       @default(0)
+    resumeAt   DateTime?
+    // Stringified JSON: the body of the outside call a waiting run carries on with.
+    body       String?
+    // Stringified JSON: the actions a waiting run started with, as they were
+    // saved then. Null on a run that is not waiting (and on runs from before).
+    actions    String?
+    startedAt  DateTime  @default(now())
+    finishedAt DateTime?
+
+    workflow CrmWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+    @@index([workflowId, startedAt])
+    @@index([status, resumeAt])
 }
 
 // A service volume being moved from one storage location to another (this
@@ -13090,4 +13262,25 @@ model StorageMove {
 
     @@index([state])
     @@index([volumeId])
+}
+
+// What one role of an organization is held to in its CRM for one kind of
+// record, beyond the permissions the role carries (apps/crm model/roles).
+model CrmRoleRule {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    orgId     String   @db.Uuid
+    // The role's slug in the organization.
+    role      String
+    // companies | people | opportunities
+    object    String
+    // all | own
+    rows      String   @default("all")
+    // JSON arrays of field keys.
+    hidden    String   @default("[]")
+    readOnly  String   @default("[]")
+    updatedAt DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@unique([orgId, role, object])
 }

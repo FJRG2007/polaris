@@ -6,6 +6,7 @@
  * Pure and client-safe, so the file a reader downloads is the one a test reads.
  */
 
+import { readChoices, readLinks } from "./values";
 import type { FieldDef, FieldValue, FullName, Money } from "./objects";
 
 /** Where a cell begins a formula in a spreadsheet: such a cell is written as
@@ -30,6 +31,11 @@ export function csvValue(field: FieldDef, value: FieldValue | undefined): string
             return (value as { name: string }).name;
         case "boolean":
             return value ? "true" : "false";
+        case "multiSelect":
+            return readChoices(value).join(", ");
+        // One per line in the cell, as an address is: an import reads it back.
+        case "links":
+            return readLinks(value).join("\n");
         default:
             return String(value);
     }

@@ -103,6 +103,7 @@ import {
     PanelRight,
     Keyboard,
     Music,
+    TrendingUp,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -166,6 +167,9 @@ export interface AppEntry {
      * (see reachableApps) - an entry with none is always offered.
      */
     requiresApp?: string;
+    /** Whether the app keeps favorites of its own, listed under its rail
+     *  (see the `favorites` extension hook). */
+    favorites?: boolean;
     /** Extra path prefixes this app owns beyond `href`. Only for an app that
      *  lands on one of its own sections rather than on its root - Apps opens on
      *  Deploy and still owns the whole `/apps` subtree. A screen of an app
@@ -356,7 +360,8 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: Handshake,
         href: "/crm",
         permission: "crm.use",
-        requiresApp: "crm"
+        requiresApp: "crm",
+        favorites: true
     },
     {
         id: "notes",
@@ -1212,6 +1217,51 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             href: "/crm/opportunities",
             icon: Target,
             keywords: ["deals", "pipeline", "stages", "sales", "amount", "close date"]
+        },
+        {
+            label: "Dashboards", // i18n-ignore
+            href: "/crm/dashboards",
+            icon: ChartColumn,
+            keywords: ["charts", "reports", "analytics", "pipeline value", "kpi"]
+        },
+        {
+            label: "Forecast", // i18n-ignore
+            href: "/crm/forecast",
+            icon: TrendingUp,
+            keywords: ["sales forecast", "pipeline", "weighted", "quota", "close date", "revenue"]
+        },
+        {
+            label: "Roles", // i18n-ignore
+            href: "/crm/roles",
+            icon: ShieldCheck,
+            keywords: ["permissions", "field access", "hidden fields", "read-only", "own records"]
+        },
+        {
+            label: "Audit log", // i18n-ignore
+            href: "/crm/audit",
+            icon: History,
+            keywords: ["activity", "history", "who changed", "changes", "events", "export"]
+        },
+        {
+            label: "New company", // i18n-ignore
+            href: "/crm/companies?new=1",
+            icon: Building2,
+            keywords: ["create", "add", "account", "customer", "client"],
+            hidden: true
+        },
+        {
+            label: "New person", // i18n-ignore
+            href: "/crm/people?new=1",
+            icon: Contact,
+            keywords: ["create", "add", "contact", "lead"],
+            hidden: true
+        },
+        {
+            label: "New opportunity", // i18n-ignore
+            href: "/crm/opportunities?new=1",
+            icon: Target,
+            keywords: ["create", "add", "deal"],
+            hidden: true
         }
     ],
     notes: [

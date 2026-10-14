@@ -64,7 +64,10 @@ interface Source {
 
 /** The kinds worth filtering by. Named for what somebody is looking for rather
  *  than for a MIME type, which is not a thing anybody thinks in. */
-const KINDS: readonly { id: "image" | "document" | "sheet" | "media" | "archive"; matches: RegExp }[] = [
+const KINDS: readonly {
+    id: "image" | "document" | "sheet" | "media" | "archive";
+    matches: RegExp;
+}[] = [
     { id: "image", matches: /\.(?:png|jpe?g|gif|webp|avif|bmp|svg|heic)$/i },
     { id: "document", matches: /\.(?:pdf|docx?|odt|rtf|txt|md|pages)$/i },
     { id: "sheet", matches: /\.(?:xlsx?|ods|csv|numbers)$/i },
@@ -77,7 +80,8 @@ export function FilePickerDialog({
     onClose,
     accept,
     multiple = true,
-    title
+    title,
+    storageOnly = false
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
@@ -87,6 +91,9 @@ export function FilePickerDialog({
     accept?: string;
     multiple?: boolean;
     title?: string;
+    /** Offer only files already on a storage, for a screen that points at a
+     *  file where it is and so has nowhere to put an upload. */
+    storageOnly?: boolean;
 }) {
     const t = useTranslations("components");
     const heading = title ?? t("files.title");
@@ -157,8 +164,7 @@ export function FilePickerDialog({
                         }
                         setEntries(body.entries ?? []);
                     } catch {
-                        if (wanted.current === asked)
-                            setProblem(t("files.folderFailed"));
+                        if (wanted.current === asked) setProblem(t("files.folderFailed"));
                     } finally {
                         if (wanted.current === asked) setLoading(false);
                     }
@@ -238,7 +244,10 @@ export function FilePickerDialog({
 
                     <div className="flex min-h-0 flex-1 gap-3">
                         <nav className="w-40 shrink-0 space-y-0.5" aria-label={t("files.where")}>
-                            {TABS.map((entry) => (
+                            {TABS.filter(
+                                (entry) =>
+                                    !storageOnly || (entry.id !== "upload" && entry.id !== "url")
+                            ).map((entry) => (
                                 <button
                                     key={entry.id}
                                     type="button"
@@ -257,7 +266,10 @@ export function FilePickerDialog({
                                     }}
                                 >
                                     <entry.icon className="size-4 shrink-0" aria-hidden />
-                                    <span className="min-w-0 truncate" title={t(`files.tabs.${entry.id}`)}>
+                                    <span
+                                        className="min-w-0 truncate"
+                                        title={t(`files.tabs.${entry.id}`)}
+                                    >
                                         {t(`files.tabs.${entry.id}`)}
                                     </span>
                                 </button>

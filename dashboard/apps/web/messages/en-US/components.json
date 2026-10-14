@@ -231,6 +231,10 @@
             "messages": {
                 "label": "Messages",
                 "placeholder": "Find something that was said"
+            },
+            "records": {
+                "label": "Records",
+                "placeholder": "Search companies, people and opportunities"
             }
         },
         "hits": {

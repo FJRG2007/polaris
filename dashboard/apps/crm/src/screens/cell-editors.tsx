@@ -11,13 +11,24 @@
  */
 
 import { useCrmT } from "./i18n";
-import { X } from "lucide-react";
+import { Star, X } from "lucide-react";
+import { OptionChip } from "./cell-display";
 import { currencyName } from "./format";
 import { cn, Select } from "@polaris/ui";
 import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import type { FieldDef, FieldValue, FullName, Money } from "../model/objects";
-import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
+import {
+    MAX_RATING,
+    ADDRESS_PARTS,
+    normalizeInput,
+    parseAmount,
+    readChoices,
+    readLinks,
+    readAddress,
+    typedCount,
+    type InputValue
+} from "../model/values";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export interface EditorProps {
@@ -30,10 +41,22 @@ export interface EditorProps {
     readonly defaultCurrency?: string;
 }
 
+/** Whether Tab moves the focus to another control inside the box. */
+function tabStaysIn(box: HTMLElement, back: boolean): boolean {
+    const controls = [
+        ...box.querySelectorAll<HTMLElement>(
+            "input, button, select, textarea, [tabindex]:not([tabindex='-1'])"
+        )
+    ].filter((one) => !one.hasAttribute("disabled"));
+    const at = controls.indexOf(document.activeElement as HTMLElement);
+    const next = at + (back ? -1 : 1);
+    return at !== -1 && next >= 0 && next < controls.length;
+}
+
 /**
- * The box over the cell. A press outside it keeps what was typed (or drops it
- * when it is not valid); a press inside a menu it opened - the currency list -
- * is still inside.
+ * The box over the cell. A press outside it, or Tab out of its last box, keeps
+ * what was typed (or drops it when it is not valid); a press inside a menu it
+ * opened - the currency list - is still inside.
  */
 function Overlay({
     onOutside,
@@ -67,6 +90,11 @@ function Overlay({
                 className
             )}
             onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+                const inside = box.current?.contains(event.target as Node);
+                if (event.key !== "Tab" || !inside || event.defaultPrevented) return;
+                if (!tabStaysIn(box.current!, event.shiftKey)) outside.current();
+            }}
         >
             {children}
             {error ? (
@@ -79,18 +107,21 @@ function Overlay({
 const FIELD_INPUT =
     "h-7 w-full min-w-0 rounded bg-transparent px-1.5 text-[0.8125rem] text-foreground outline-none placeholder:text-foreground-subtle";
 
-/** Enter keeps, Escape drops; Tab keeps and lets the focus move on. */
+/** Enter keeps, Escape drops. Tab is the box's: see `Overlay`. */
 function keys(event: KeyboardEvent, keep: () => void, drop: () => void) {
     if (event.key === "Enter") {
         event.preventDefault();
         keep();
     } else if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        drop();
-    } else if (event.key === "Tab") {
-        keep();
+        cancel(event, drop);
     }
+}
+
+/** Escape: drop the edit, and only this box's. */
+function cancel(event: KeyboardEvent, drop: () => void) {
+    event.preventDefault();
+    event.stopPropagation();
+    drop();
 }
 
 function useCheck(field: FieldDef) {
@@ -179,6 +210,66 @@ export function NameEditor({ field, value, onCommit, onCancel }: EditorProps) {
     );
 }
 
+/** Several web addresses, typed with spaces between them. */
+export function LinksEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const check = useCheck(field);
+    const [text, setText] = useState(readLinks(value).join(" "));
+    const [touched, setTouched] = useState(false);
+    const result = check(text);
+    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
+    return (
+        <Overlay onOutside={keep} error={touched ? result.error : null} className="w-[22rem]">
+            <input
+                autoFocus
+                className={FIELD_INPUT}
+                value={text}
+                inputMode="url"
+                placeholder={t("placeholders.links")}
+                aria-invalid={Boolean(touched && result.error)}
+                onChange={(event) => {
+                    setText(event.target.value);
+                    setTouched(true);
+                }}
+                onKeyDown={(event) => keys(event, keep, onCancel)}
+            />
+        </Overlay>
+    );
+}
+
+/** An address, one box per line of it. */
+export function AddressEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const check = useCheck(field);
+    const [address, setAddress] = useState(() => readAddress(value));
+    const [touched, setTouched] = useState(false);
+    const result = check(address);
+    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
+    return (
+        <Overlay onOutside={keep} error={touched ? result.error : null} className="w-[20rem]">
+            <div className="grid grid-cols-2 gap-px">
+                {ADDRESS_PARTS.map((part, index) => (
+                    <input
+                        key={part}
+                        autoFocus={index === 0}
+                        className={cn(FIELD_INPUT, index === 0 && "col-span-2")}
+                        value={address[part]}
+                        placeholder={t(`placeholders.${part}`)}
+                        aria-label={t(`placeholders.${part}`)}
+                        autoComplete="off"
+                        onChange={(event) => {
+                            const typed = event.target.value;
+                            setAddress((current) => ({ ...current, [part]: typed }));
+                            setTouched(true);
+                        }}
+                        onKeyDown={(event) => keys(event, keep, onCancel)}
+                    />
+                ))}
+            </div>
+        </Overlay>
+    );
+}
+
 /** An amount and its currency. */
 export function MoneyEditor({ field, value, onCommit, onCancel, defaultCurrency }: EditorProps) {
     const t = useCrmT();
@@ -262,6 +353,100 @@ export function DateEditor({ field, value, onCommit, onCancel }: EditorProps) {
     );
 }
 
+/** A rating: a star clicked, or a digit typed (0 clears it). Clicking the
+ *  stars it already has clears it too. */
+export function RatingEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const current = typeof value === "number" ? value : 0;
+    const [hover, setHover] = useState(0);
+    const shown = hover || current;
+    return (
+        <Overlay onOutside={onCancel} error={null}>
+            <div
+                role="radiogroup"
+                aria-label={field.label ?? t("fields.valueOf")}
+                className="flex items-center gap-0.5 p-1"
+                onKeyDown={(event) => {
+                    const digit = Number(event.key);
+                    if (/^[0-9]$/.test(event.key) && digit <= MAX_RATING) {
+                        event.preventDefault();
+                        onCommit(digit === 0 ? null : digit);
+                    } else if (event.key === "Escape") {
+                        cancel(event, onCancel);
+                    }
+                }}
+            >
+                {Array.from({ length: MAX_RATING }, (_, index) => index + 1).map((stars) => (
+                    <button
+                        key={stars}
+                        type="button"
+                        role="radio"
+                        aria-checked={stars === current}
+                        autoFocus={stars === Math.max(current, 1)}
+                        aria-label={t("values.stars", { count: stars })}
+                        title={t("values.stars", { count: stars })}
+                        className="grid size-7 place-items-center rounded hover:bg-card-hover"
+                        onMouseEnter={() => setHover(stars)}
+                        onMouseLeave={() => setHover(0)}
+                        onClick={() => onCommit(stars === current ? null : stars)}
+                    >
+                        <Star
+                            className={cn(
+                                "size-4",
+                                stars <= shown
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-muted-foreground"
+                            )}
+                        />
+                    </button>
+                ))}
+            </div>
+        </Overlay>
+    );
+}
+
+/** Several choices, ticked; kept when the editor is left or Enter is pressed. */
+export function ChoicesEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const check = useCheck(field);
+    const [chosen, setChosen] = useState(() =>
+        readChoices(value).filter((option) => (field.options ?? []).includes(option))
+    );
+    const result = check(chosen);
+    const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
+    return (
+        <Overlay onOutside={keep} error={result.error}>
+            <div
+                role="group"
+                aria-label={field.label ?? t("fields.valueOf")}
+                className="flex max-h-64 min-w-48 flex-col overflow-y-auto p-1"
+                onKeyDown={(event) => keys(event, keep, onCancel)}
+            >
+                {(field.options ?? []).map((option, index) => (
+                    <label
+                        key={option}
+                        className="flex min-w-0 cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-card-hover"
+                    >
+                        <input
+                            type="checkbox"
+                            autoFocus={index === 0}
+                            checked={chosen.includes(option)}
+                            onChange={(event) =>
+                                setChosen(
+                                    event.target.checked
+                                        ? [...chosen, option]
+                                        : chosen.filter((one) => one !== option)
+                                )
+                            }
+                        />
+                        <OptionChip field={field} option={option} label={option} />
+                    </label>
+                ))}
+            </div>
+        </Overlay>
+    );
+}
+
 /** The editor a kind of field is typed into, or null for one that is picked
  *  from a menu or toggled. */
 export function editorFor(field: FieldDef): ((props: EditorProps) => ReactNode) | null {
@@ -279,6 +464,14 @@ export function editorFor(field: FieldDef): ((props: EditorProps) => ReactNode) 
             return MoneyEditor;
         case "date":
             return DateEditor;
+        case "rating":
+            return RatingEditor;
+        case "multiSelect":
+            return ChoicesEditor;
+        case "links":
+            return LinksEditor;
+        case "address":
+            return AddressEditor;
         default:
             return null;
     }

@@ -6,6 +6,7 @@
  */
 
 import type { DisplayFormat } from "@polaris/core";
+import { addressLine, readChoices, readLinks } from "../model/values";
 import type { FieldDef, FieldValue, Money } from "../model/objects";
 
 /** An amount in its own currency: "1.200,00 EUR" reads "1.200,00 €" in Spanish. */
@@ -65,6 +66,14 @@ export function plainText(
             return formatMoney(value as Money, locale);
         case "number":
             return format.number(value as number);
+        case "rating":
+            return `${value as number}/5`;
+        case "multiSelect":
+            return readChoices(value).join(", ");
+        case "links":
+            return readLinks(value).join(" ");
+        case "address":
+            return addressLine(value);
         case "date":
             return formatDay(value as string, format);
         case "dateTime":

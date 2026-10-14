@@ -16,6 +16,7 @@
 import * as core from "@polaris/core";
 import * as mentions from "@/lib/rich-text/mention-service";
 import { chatLookup } from "@/lib/search/chat-lookup";
+import { appRecordHits } from "@/lib/app-extensions/registry";
 import { userHasManage, type SessionUser } from "@/lib/session";
 import { referenceHref, type ReferenceKind } from "@/components/rich-text/references";
 
@@ -40,7 +41,7 @@ const PER_SCOPE = 12;
 
 /** The scopes answered from what somebody can mention; the Chat ones are
  *  answered by `chat-lookup`. */
-type MentionScope = Exclude<core.RemoteSearchScope, core.ChatSearchScope>;
+type MentionScope = Exclude<core.RemoteSearchScope, core.ChatSearchScope | "records">;
 
 const SCOPE_KINDS: Record<MentionScope, ReferenceKind> = {
     tasks: "task",
@@ -80,6 +81,11 @@ export async function lookup(
 ): Promise<SearchHit[]> {
     if (!(await canSearchScope(user, input.scope))) return [];
     if (core.isChatSearchScope(input.scope)) return chatLookup(user, input.scope, input.query);
+    if (input.scope === "records") {
+        // Each app checks its own grant and what this account may open in it.
+        const hits = await appRecordHits(user.id, input.query, PER_SCOPE);
+        return hits.map((hit) => ({ ...hit, scope: "records" }));
+    }
     const scope = input.scope;
     const candidates = await mentions.searchMentions(
         { id: user.id, isAdmin: user.isAdmin },

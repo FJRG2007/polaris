@@ -497,7 +497,7 @@ function useChoices(
         };
     }, [target, search, open]);
     return useMemo(() => {
-        if (field.kind === "select") {
+        if (field.kind === "select" || field.kind === "multiSelect") {
             return (field.options ?? []).map((option) => ({
                 ...filters.optionChoice(option),
                 name: optionLabel(option)
@@ -530,7 +530,10 @@ function ChoicePicker({
         [t, object, field]
     );
     const choices = useChoices(field, people, search, open, optionLabel);
-    const named = (choice: Ref) => (field.kind === "select" ? optionLabel(choice.id) : choice.name);
+    const named = (choice: Ref) =>
+        field.kind === "select" || field.kind === "multiSelect"
+            ? optionLabel(choice.id)
+            : choice.name;
     const isChosen = (id: string) => chosen.some((one) => one.id === id);
     const toggle = (choice: Ref) =>
         onChange(
@@ -538,14 +541,20 @@ function ChoicePicker({
                 ? chosen.filter((one) => one.id !== choice.id)
                 : [
                       ...chosen,
-                      { id: choice.id, name: field.kind === "select" ? "" : choice.name }
+                      {
+                          id: choice.id,
+                          name:
+                              field.kind === "select" || field.kind === "multiSelect"
+                                  ? ""
+                                  : choice.name
+                      }
                   ].slice(0, filters.MAX_CHOICES)
         );
     const summary = chosen.map(named).join(", ");
-    const searchable = field.kind !== "select";
+    const searchable = !(field.kind === "select" || field.kind === "multiSelect");
 
     const line = (choice: Ref) => {
-        if (field.kind === "select") {
+        if (field.kind === "select" || field.kind === "multiSelect") {
             return <OptionChip field={field} option={choice.id} label={optionLabel(choice.id)} />;
         }
         if (field.kind === "member") return <MemberLine value={choice} />;

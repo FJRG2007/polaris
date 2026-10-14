@@ -73,6 +73,9 @@ export const CRM_VERBS = ["read", "edit", "delete"] as const;
 
 export type CrmVerb = (typeof CRM_VERBS)[number];
 
+/** The longest address a CRM workflow may call: saved and sent alike. */
+export const CRM_REQUEST_URL_MAX = 2048;
+
 /**
  * `crm.<object>.<verb>` for changing and deleting each kind of record, in the
  * order the role editor draws them.

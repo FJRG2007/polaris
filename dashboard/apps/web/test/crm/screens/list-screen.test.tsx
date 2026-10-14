@@ -46,7 +46,23 @@ const state = vi.hoisted(() => ({
     shelfName: null as string | null,
     groups: [] as { value: string; records: CrmRecord[]; total: number }[],
     trashed: [] as CrmRecord[],
-    restores: [] as unknown[]
+    restores: [] as unknown[],
+    favoriteViews: [] as string[],
+    pins: [] as unknown[],
+    merges: [] as unknown[],
+    rule: null as { rows: "all" | "own"; hidden: string[]; readOnly: string[] } | null
+}));
+
+vi.mock("next/navigation", () => ({
+    useSearchParams: () => new URLSearchParams(window.location.search),
+    useRouter: () => ({ push: vi.fn() })
+}));
+
+vi.mock("@polaris-app/crm/src/actions/favorites", () => ({
+    setFavoriteAction: async (input: { pinned: boolean }) => {
+        state.pins.push(input);
+        return { ok: true, pinned: input.pinned };
+    }
 }));
 
 vi.mock("@polaris-app/crm/src/actions/records", () => {
@@ -73,7 +89,9 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
                 views,
                 can: abilities(),
                 people: [],
-                shelfName: state.shelfName
+                shelfName: state.shelfName,
+                rule: state.rule,
+                favoriteViews: state.favoriteViews
             };
         },
         restoreRecordsAction: async (input: { ids: string[] }) => {
@@ -84,6 +102,15 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
             return { ok: true, count: back.length };
         },
         destroyRecordsAction: async () => ({ ok: true, count: 1 }),
+        mergeRecordsAction: async (input: { keepId: string; ids: string[] }) => {
+            state.merges.push(input);
+            const kept = state.rows.find((one) => one.id === input.keepId)!;
+            state.rows = state.rows.filter((one) => !input.ids.includes(one.id));
+            return {
+                ok: true,
+                record: { ...kept, values: { ...kept.values, domain: "merged.test" } }
+            };
+        },
         listRecordsAction: async (input: unknown) => {
             if ((input as { deleted?: boolean }).deleted) {
                 return { ok: true, records: state.trashed, total: state.trashed.length };
@@ -180,9 +207,14 @@ beforeEach(() => {
     state.madeViews = [];
     state.views = null;
     state.groups = [];
+    state.rule = null;
     state.shelfName = null;
     state.trashed = [];
     state.restores = [];
+    state.favoriteViews = [];
+    state.pins = [];
+    state.merges = [];
+    window.history.replaceState(null, "", "/crm/companies");
     if (typeof localStorage !== "undefined") localStorage.clear();
     // What the tab kept from the last test would paint before the read.
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
@@ -279,6 +311,76 @@ describe("a CRM list", () => {
         expect(await screen.findByText("Initech")).toBeTruthy();
     });
 
+    it("opens the new row when the address asks for one, and forgets the ask", async () => {
+        window.history.replaceState(null, "", "/crm/companies?new=1");
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        expect(await screen.findByRole("textbox", { name: "Name" })).toBeTruthy();
+        expect(window.location.search).toBe("");
+    });
+
+    it("opens the new card in the first column of a board", async () => {
+        window.history.replaceState(null, "", "/crm/opportunities?new=1");
+        state.views = [
+            { id: VIEW_ID, name: "", kind: "kanban", config: defaultConfig("opportunities") }
+        ];
+        state.groups = ["new", "screening", "meeting", "proposal", "customer"].map((value) => ({
+            value,
+            records: [],
+            total: 0
+        }));
+        render(<ListScreen object="opportunities" />, { wrapper: MessagesWrapper });
+        const column = await screen.findByRole("region", { name: "New" });
+        await waitFor(() => expect(column.querySelector("input")).toBeTruthy());
+    });
+
+    it("says why no new row opens for a reader who may not add one", async () => {
+        window.history.replaceState(null, "", "/crm/companies?new=1");
+        state.can = { read: true, edit: false, delete: false };
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        expect(screen.queryByRole("textbox", { name: "Name" })).toBeNull();
+        expect(window.location.search).toBe("");
+    });
+
+    it("opens the view a pinned link names, and the address goes back to the list's", async () => {
+        const HOT = "66666666-6666-4666-8666-666666666666";
+        state.views = [
+            { id: VIEW_ID, name: "", kind: "table", config: defaultConfig("companies") },
+            { id: HOT, name: "Hot leads", kind: "table", config: defaultConfig("companies") }
+        ];
+        state.favoriteViews = [HOT];
+        window.history.replaceState(null, "", `/crm/companies?view=${HOT}`);
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        expect(
+            await screen.findByRole("button", { name: "Choose a view" }, { timeout: 3000 })
+        ).toBeTruthy();
+        await waitFor(() =>
+            expect(screen.getByRole("button", { name: "Choose a view" }).textContent).toContain(
+                "Hot leads"
+            )
+        );
+        expect(window.location.search).toBe("");
+    });
+
+    it("pins the view on screen to the rail from the view menu", async () => {
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        fireEvent.pointerDown(screen.getByRole("button", { name: "Choose a view" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        const pin = await screen.findByRole("menuitem", { name: "Add to favorites" });
+        await act(async () => {
+            fireEvent.click(pin);
+        });
+        await waitFor(() =>
+            expect(state.pins).toEqual([
+                { kind: "view", object: "companies", targetId: VIEW_ID, pinned: true }
+            ])
+        );
+    });
+
     it("offers a reader who may not change records nothing that would", async () => {
         state.can = { read: true, edit: false, delete: false };
         render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
@@ -325,6 +427,44 @@ describe("a CRM list", () => {
         expect(state.moves[0]).toMatchObject({ id: ACME, key: "stage", value: "proposal" });
         const column = screen.getByRole("region", { name: "Proposal" });
         expect(column.textContent).toContain("Acme deal");
+    });
+
+    it("locks a board's cards where the reader's role may not change the stage", async () => {
+        window.history.replaceState(null, "", "/crm/opportunities?new=1");
+        state.rule = { rows: "all", hidden: [], readOnly: ["stage", "amount"] };
+        state.views = [
+            { id: VIEW_ID, name: "", kind: "kanban", config: defaultConfig("opportunities") }
+        ];
+        state.groups = [
+            {
+                value: "new",
+                records: [
+                    {
+                        id: ACME,
+                        position: 0,
+                        deletedAt: null,
+                        values: {
+                            name: "Acme deal",
+                            stage: "new",
+                            amount: { amount: 5, currency: "EUR" }
+                        }
+                    }
+                ],
+                total: 1
+            }
+        ];
+        render(<ListScreen object="opportunities" />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Acme deal")).toBeTruthy();
+        const card = screen.getByRole("article", { name: "Acme deal" });
+        expect(card.getAttribute("draggable")).toBe("false");
+        expect(screen.queryByRole("button", { name: "Move Acme deal" })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Add/ })).toBeNull();
+        // The name stays changeable; the locked amount does not open.
+        expect(within(card).getByLabelText("Name").getAttribute("tabindex")).toBe("0");
+        expect(within(card).getByLabelText("Amount").getAttribute("tabindex")).toBeNull();
+        // Asked for a new card, none opens (a toast says why).
+        await waitFor(() => expect(window.location.search).toBe(""));
+        expect(screen.getByRole("region", { name: "New" }).querySelector("input")).toBeNull();
     });
 
     it("saves the list as it is drawn now as a new named view", async () => {
@@ -422,6 +562,26 @@ describe("a CRM list", () => {
         expect(await screen.findByText("The trash is empty")).toBeTruthy();
         fireEvent.keyDown(dialog, { key: "Escape" });
         expect(await screen.findByText("Initech")).toBeTruthy();
+    });
+
+    it("merges the selected rows into the one chosen to keep", async () => {
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        await screen.findByText("Acme");
+        const boxes = screen.getAllByRole("checkbox", { name: "Select row" });
+        fireEvent.click(boxes[0]!);
+        fireEvent.click(boxes[1]!);
+        fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.click(within(dialog).getByRole("radio", { name: "Globex" }));
+        await act(async () => {
+            fireEvent.click(within(dialog).getByRole("button", { name: "Merge" }));
+        });
+        await waitFor(() =>
+            expect(state.merges).toEqual([{ object: "companies", keepId: GLOBEX, ids: [ACME] }])
+        );
+        await waitFor(() => expect(screen.queryByText("Acme")).toBeNull());
+        expect(screen.getByText("Globex")).toBeTruthy();
+        expect(screen.getByText("merged.test")).toBeTruthy();
     });
 
     it("says so to somebody who may not see this kind of record", async () => {

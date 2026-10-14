@@ -112,7 +112,7 @@ export function TrashDialog(props: TrashDialogProps) {
                 <DialogHeader>
                     <DialogTitle>{t("trashView.title")}</DialogTitle>
                 </DialogHeader>
-                <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     {rows === null && !error ? (
                         <div className="flex flex-col gap-2 py-2" aria-hidden>
                             {[0, 1, 2].map((at) => (

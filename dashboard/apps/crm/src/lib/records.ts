@@ -11,14 +11,17 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
-import { relatedLists } from "../model/related";
+import { recordHref, relatedLists } from "../model/related";
 import { prisma } from "@polaris/db";
 import { dropEvents, logEvents, type NewEvent } from "./timeline";
 import { changesBetween, initialValues } from "../model/timeline";
 import { host } from "@polaris/app-host";
+import { CRM_OBJECTS } from "@polaris/core";
 import { groupColumn, listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
-import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
+import { filterKeys, hideValues } from "../model/roles";
+import * as access from "./access";
+import { crmActor, recordWhere, requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import { recordSelect, table, toRecord, writable, writeData } from "./columns";
 import {
     fieldOf,
@@ -58,9 +61,10 @@ export async function listRecords(
     options: ListOptions
 ): Promise<RecordPage> {
     await requireCan(actor, object, "read");
+    await requireListShown(actor, object, options);
     const custom = options.custom ?? (await loadFields(actor.shelf, object));
     if (options.group) requireGroupable(object, options.group.key, custom);
-    const where = listWhere(object, actor.shelf, { ...options, custom });
+    const where = listWhere(object, actor, { ...options, custom });
     const [rows, total] = await Promise.all([
         table(object).findMany({
             where,
@@ -72,9 +76,28 @@ export async function listRecords(
         table(object).count({ where })
     ]);
     return {
-        records: (rows as Record<string, unknown>[]).map((row) => toRecord(object, row)),
+        records: (rows as Record<string, unknown>[]).map((row) => shown(actor, object, row)),
         total
     };
+}
+
+/** A row as the reader may see it: without the fields their role hides. */
+export function shown(actor: CrmActor, object: CrmObject, row: Record<string, unknown>): CrmRecord {
+    return hideValues(toRecord(object, row), actor.rules?.[object].hidden ?? []);
+}
+
+/** Refuse a list filtered, sorted or grouped by a field the reader may not see:
+ *  the rows it returns would tell what the field holds. */
+export async function requireListShown(
+    actor: CrmActor,
+    object: CrmObject,
+    options: Pick<ListOptions, "filter" | "sorts" | "group">
+): Promise<void> {
+    await access.requireShown(actor, object, [
+        ...filterKeys(options.filter),
+        ...(options.sorts ?? []).map((sort) => sort.key),
+        ...(options.group ? [options.group.key] : [])
+    ]);
 }
 
 function requireGroupable(object: CrmObject, key: string, custom: readonly FieldDef[]): FieldDef {
@@ -105,6 +128,7 @@ export async function listGroups(
     options: Omit<ListOptions, "group" | "offset" | "limit">
 ): Promise<RecordGroup[]> {
     await requireCan(actor, object, "read");
+    await requireListShown(actor, object, { ...options, group: { key, value: "" } });
     const custom = await loadFields(actor.shelf, object);
     const field = requireGroupable(object, key, custom);
     // A choice somebody added may be unset, so its records get a group too.
@@ -113,7 +137,7 @@ export async function listGroups(
     const counted = (await table(object).groupBy({
         by: [column],
         where: {
-            ...listWhere(object, actor.shelf, { ...options, custom }),
+            ...listWhere(object, actor, { ...options, custom }),
             [column]: { in: values }
         },
         _count: { _all: true }
@@ -159,13 +183,18 @@ export async function moveRecord(
     await requireCan(actor, object, "edit");
     const custom = await loadFields(actor.shelf, object);
     requireGroupable(object, move.key, custom);
+    await access.requireChangeable(actor, object, [move.key], async (key) => {
+        const t = await crmT();
+        const field = fieldOf(object, key, custom);
+        return field?.label ?? t(`fields.${object}.${key}` as Parameters<typeof t>[0]);
+    });
     const data = await prepare(actor, object, { [move.key]: move.value }, custom);
-    const where = { id, ...shelfWhere(actor.shelf), deletedAt: null };
+    const where = { id, ...recordWhere(actor, object), deletedAt: null };
     const position = move.last ? await pastLast(actor, object, id, move) : move.position;
     const before = await table(object).findFirst({ where, select: recordSelect(object) });
     const result = await table(object).updateMany({
         where,
-        data: { ...data, position }
+        data: { ...data, position, updatedById: actor.user.id }
     });
     const row =
         result.count > 0
@@ -182,7 +211,7 @@ export async function moveRecord(
             { recordId: id, kind: "updated", changes: changesBetween(was, record, [move.key]) }
         ]);
     }
-    return record;
+    return hideValues(record, actor.rules?.[object].hidden ?? []);
 }
 
 /** A place after every other card of the group, even the ones the board has
@@ -212,10 +241,10 @@ export async function getRecord(
 ): Promise<CrmRecord | null> {
     await requireCan(actor, object, "read");
     const row = await table(object).findFirst({
-        where: { id, ...shelfWhere(actor.shelf) },
+        where: { id, ...recordWhere(actor, object) },
         select: recordSelect(object)
     });
-    return row ? toRecord(object, row as Record<string, unknown>) : null;
+    return row ? shown(actor, object, row as Record<string, unknown>) : null;
 }
 
 /**
@@ -230,7 +259,12 @@ export async function searchRefs(
 ): Promise<Ref[]> {
     await requireCan(actor, object, "read");
     const rows = (await table(object).findMany({
-        where: { ...shelfWhere(actor.shelf), deletedAt: null, ...searchWhere(object, search) },
+        where: {
+            AND: [
+                { ...recordWhere(actor, object), deletedAt: null },
+                searchWhere(object, search, actor.rules?.[object].hidden ?? [])
+            ]
+        },
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         take: Math.min(limit, 50),
         select: recordSelect(object)
@@ -273,6 +307,11 @@ async function prepare(
     values: Readonly<Record<string, unknown>>,
     custom: readonly FieldDef[]
 ): Promise<Record<string, unknown>> {
+    await access.requireChangeable(actor, object, Object.keys(values), async (key) => {
+        const t = await crmT();
+        const field = fieldOf(object, key, custom);
+        return field?.label ?? t(`fields.${object}.${key}` as Parameters<typeof t>[0]);
+    });
     const data: Record<string, unknown> = {};
     let people: Ref[] | null = null;
     for (const [key, raw] of Object.entries(values)) {
@@ -287,7 +326,11 @@ async function prepare(
         if (value !== null && field.kind === "relation") {
             await requireCan(actor, field.target!, "read");
             const found = await table(field.target!).count({
-                where: { id: value as string, ...shelfWhere(actor.shelf), deletedAt: null }
+                where: {
+                    id: value as string,
+                    ...recordWhere(actor, field.target!),
+                    deletedAt: null
+                }
             });
             if (found === 0) await refuseValue(object, field, "missing");
         }
@@ -335,7 +378,7 @@ export async function createRecord(
             changes: initialValues(record, Object.keys(values))
         }
     ]);
-    return record;
+    return hideValues(record, actor.rules?.[object].hidden ?? []);
 }
 
 /** Change fields of one record. */
@@ -366,12 +409,12 @@ export async function updateRecords(
     await requireCan(actor, object, "edit");
     if (ids.length === 0) return [];
     const data = await prepare(actor, object, values, await loadFields(actor.shelf, object));
-    const where = { id: { in: [...new Set(ids)] }, ...shelfWhere(actor.shelf), deletedAt: null };
+    const where = { id: { in: [...new Set(ids)] }, ...recordWhere(actor, object), deletedAt: null };
     const before = (await table(object).findMany({
         where,
         select: recordSelect(object)
     })) as Record<string, unknown>[];
-    await table(object).updateMany({ where, data });
+    await table(object).updateMany({ where, data: { ...data, updatedById: actor.user.id } });
     const rows = (await table(object).findMany({ where, select: recordSelect(object) })) as Record<
         string,
         unknown
@@ -397,7 +440,7 @@ export async function updateRecords(
                 : [];
         })
     );
-    return saved;
+    return saved.map((record) => hideValues(record, actor.rules?.[object].hidden ?? []));
 }
 
 /** Move records to the trash. Returns how many moved. */
@@ -408,7 +451,7 @@ export async function trashRecords(
 ): Promise<number> {
     await requireCan(actor, object, "delete");
     if (ids.length === 0) return 0;
-    const where = { id: { in: [...new Set(ids)] }, ...shelfWhere(actor.shelf), deletedAt: null };
+    const where = { id: { in: [...new Set(ids)] }, ...recordWhere(actor, object), deletedAt: null };
     const found = (await table(object).findMany({ where, select: { id: true } })) as {
         id: string;
     }[];
@@ -435,7 +478,7 @@ export async function restoreRecords(
     if (ids.length === 0) return 0;
     const where = {
         id: { in: [...new Set(ids)] },
-        ...shelfWhere(actor.shelf),
+        ...recordWhere(actor, object),
         deletedAt: { not: null }
     };
     const found = (await table(object).findMany({ where, select: { id: true } })) as {
@@ -471,7 +514,7 @@ export async function destroyRecords(
     if (ids.length === 0) return 0;
     const where = {
         id: { in: [...new Set(ids)] },
-        ...shelfWhere(actor.shelf),
+        ...recordWhere(actor, object),
         deletedAt: { not: null }
     };
     const cleared: { object: CrmObject; events: NewEvent[] }[] = [];
@@ -499,7 +542,7 @@ export async function destroyRecords(
             cleared.push({
                 object: list.object,
                 events: rows.map((row, at) => ({
-                    recordId: row.id,
+                    recordId: row.id!,
                     kind: "updated" as const,
                     changes: [
                         {
@@ -518,8 +561,44 @@ export async function destroyRecords(
         await tx.crmLink.deleteMany({
             where: { ...shelfWhere(actor.shelf), recordId: { in: gone } }
         });
+        // Anybody's pin of it goes with it.
+        await tx.crmFavorite.deleteMany({ where: { kind: "record", targetId: { in: gone } } });
         return result.count as number;
     });
     for (const one of cleared) await logEvents(actor, one.object, one.events);
     return count;
+}
+
+/**
+ * Records of every kind the account may see, named, for search: each kind's
+ * matches, the most recently changed first, taken in turn so one kind cannot
+ * crowd out the others. Nothing for an account that may not use the CRM.
+ */
+export async function searchAllRecords(
+    userId: string,
+    search: string,
+    limit: number
+): Promise<{ id: string; label: string; detail: string; href: string }[]> {
+    const user = await host.crmHost.crmRunner(userId);
+    if (!user) return [];
+    const actor = await crmActor(user);
+    const t = await crmT();
+    const kinds = CRM_OBJECTS.filter((object) => actor.can[object].read);
+    const found = await Promise.all(
+        kinds.map(async (object) =>
+            (await searchRefs(actor, object, search, limit)).map((ref) => ({
+                id: ref.id,
+                label: ref.name,
+                detail: actor.shelf.orgName
+                    ? `${t(`objects.${object}.plural`)} - ${actor.shelf.orgName}`
+                    : t(`objects.${object}.plural`),
+                href: recordHref(object, ref.id)
+            }))
+        )
+    );
+    const hits = [];
+    for (let at = 0; hits.length < limit && found.some((list) => at < list.length); at++) {
+        for (const list of found) if (at < list.length) hits.push(list[at]!);
+    }
+    return hits.slice(0, limit);
 }

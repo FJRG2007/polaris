@@ -225,6 +225,7 @@ export async function deleteView(
     if (!found) await refuse("viewMissing");
     if (found!.name === "") await refuse("viewDefault");
     await prisma.crmView.deleteMany({ where: { ...where, NOT: { name: "" } } });
+    await prisma.crmFavorite.deleteMany({ where: { kind: "view", targetId: viewId } });
 }
 
 /** Store how a view is drawn: its columns, totals, sorts, filter and grouping,

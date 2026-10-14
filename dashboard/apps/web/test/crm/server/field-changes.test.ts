@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => {
     const records = {
+        update: vi.fn(async () => ({})),
         updateMany: vi.fn(async () => ({ count: 0 })),
         groupBy: vi.fn(async (): Promise<unknown[]> => []),
         findMany: vi.fn(async (): Promise<unknown[]> => []),
@@ -234,5 +235,56 @@ describe("a board over an added select", () => {
         expect(groups.map((group) => group.value)).toEqual([...options, ""]);
         expect(groups[2]!.total).toBe(2);
         expect(groups[0]).toEqual({ value: "Choice 1", records: [], total: 0 });
+    });
+});
+
+describe("changing a multi-select's choices", () => {
+    const tags = {
+        ...tier,
+        kind: "multiSelect",
+        options: JSON.stringify(["Enterprse", "Small", "Mid"])
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        db.crmField.findMany.mockResolvedValue([tags]);
+        db.crmField.update.mockImplementation(async (...args: unknown[]) => {
+            const { data } = args[0] as { data: { label: string; options: string } };
+            return { ...tags, ...data };
+        });
+        db.crmView.findMany.mockResolvedValue([]);
+    });
+
+    it("rewrites each list holding a changed choice, in the new order", async () => {
+        db.records.findMany.mockResolvedValueOnce([
+            { id: "r1", cText1: JSON.stringify(["Small", "Enterprse", "Mid"]) },
+            { id: "r2", cText1: JSON.stringify(["Mid"]) }
+        ]);
+        await updateField(
+            actorWith(allowed),
+            "companies",
+            "f1",
+            { label: "Tags", kind: "multiSelect", options: ["Enterprise", "Small"] },
+            [{ from: "Enterprse", to: "Enterprise" }]
+        );
+        expect(db.records.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    userId: "u1",
+                    orgId: null,
+                    OR: [{ cText1: { contains: '"Enterprse"' } }, { cText1: { contains: '"Mid"' } }]
+                }
+            })
+        );
+        expect(db.records.update).toHaveBeenCalledWith({
+            where: { id: "r1" },
+            data: { cText1: JSON.stringify(["Enterprise", "Small"]) }
+        });
+        expect(db.records.update).toHaveBeenCalledWith({
+            where: { id: "r2" },
+            data: { cText1: "" }
+        });
+        // A multi-select's whole cell is never matched as one choice.
+        expect(db.records.updateMany).not.toHaveBeenCalled();
     });
 });

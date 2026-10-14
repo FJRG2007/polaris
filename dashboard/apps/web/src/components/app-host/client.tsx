@@ -46,7 +46,16 @@ import { useRuntimeLog } from "@/app/(app)/apps/installed/[id]/use-runtime-log";
 import { CONSUMPTION_METRICS, PLAYER_METRICS } from "@/components/metrics-specs";
 import { dropSnapshots, readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { mergeUnchanged } from "@/lib/structural-merge";
+import { refreshAppFavorites } from "@/components/use-app-favorites";
 import { useKeptSnapshot, useLiveRead } from "@/components/use-live-resource";
+
+const FilePickerDialog = dynamic(
+    () =>
+        import("@/components/file-picker/file-picker-dialog").then(
+            (module) => module.FilePickerDialog
+        ),
+    { ssr: false }
+);
 
 const ShareDialog = dynamic(
     () => import("@/components/access/share-dialog").then((module) => module.ShareDialog),
@@ -133,11 +142,13 @@ export const clientHost = {
         visibleGameTabs
     },
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
+    appFavorites: { refreshAppFavorites },
     avatar: { Avatar },
     brandIcons: { TpLinkMark },
     confirmDialog: { useConfirm },
     copyButton: { CopyButton },
     displayFormat: { useDisplayFormat },
+    filePicker: { FilePickerDialog },
     gameLogo: { GameLogo },
     i18nProvider: { useLocale },
     logViewer: { LogViewer },

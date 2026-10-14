@@ -12,7 +12,8 @@ import { optionLabel } from "./custom-fields";
 import { useCrmT } from "./i18n";
 import { plainText } from "./format";
 import { hostUi } from "@polaris/app-host/client";
-import { Building2, Check, Target, User } from "lucide-react";
+import { MAX_RATING, readChoices, readLinks } from "../model/values";
+import { Building2, Check, Star, Target, User } from "lucide-react";
 import type { CrmObject, FieldDef, FieldValue, Ref } from "../model/objects";
 
 const { Avatar } = hostUi.avatar;
@@ -85,6 +86,17 @@ export function MemberLine({ value }: { value: Ref }) {
 /** Stops a link inside a cell from also opening the cell's editor. */
 const keep = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
+/** A web address without its scheme, "www." or a lone "/": "acme.com/about". */
+function shownLink(href: string): string {
+    try {
+        const url = new URL(href);
+        return `${url.hostname.replace(/^www\./, "")}${url.pathname === "/" ? "" : url.pathname}`;
+    } catch {
+        // Stored by the normalizer, so always a URL; shown as is if not.
+        return href;
+    }
+}
+
 function ExternalLink({ href, children }: { href: string; children: string }) {
     return (
         <a
@@ -144,14 +156,22 @@ export function CellDisplay({
             );
         case "url": {
             const href = value as string;
-            let shown = href;
-            try {
-                const url = new URL(href);
-                shown = `${url.hostname.replace(/^www\./, "")}${url.pathname === "/" ? "" : url.pathname}`;
-            } catch {
-                // Stored by the normalizer, so always a URL; shown as is if not.
-            }
-            return <ExternalLink href={href}>{shown}</ExternalLink>;
+            return <ExternalLink href={href}>{shownLink(href)}</ExternalLink>;
+        }
+        case "links": {
+            const links = readLinks(value);
+            return (
+                <span
+                    className="flex min-w-0 items-center gap-2 overflow-hidden"
+                    title={links.join("\n")}
+                >
+                    {links.map((href) => (
+                        <ExternalLink key={href} href={href}>
+                            {shownLink(href)}
+                        </ExternalLink>
+                    ))}
+                </span>
+            );
         }
         case "domain":
             return (
@@ -164,6 +184,40 @@ export function CellDisplay({
                     option={value as string}
                     label={optionLabel(t, object, field, value as string)}
                 />
+            );
+        case "multiSelect": {
+            const chosen = readChoices(value);
+            return (
+                <span
+                    className="flex min-w-0 items-center gap-1 overflow-hidden"
+                    title={chosen.join(", ")}
+                >
+                    {chosen.map((option) => (
+                        <OptionChip key={option} field={field} option={option} label={option} />
+                    ))}
+                </span>
+            );
+        }
+        case "rating":
+            return (
+                <span
+                    className="flex shrink-0 items-center gap-0.5"
+                    role="img"
+                    aria-label={t("values.stars", { count: value as number })}
+                    title={t("values.stars", { count: value as number })}
+                >
+                    {Array.from({ length: MAX_RATING }, (_, index) => (
+                        <Star
+                            key={index}
+                            className={cn(
+                                "size-3.5",
+                                index < (value as number)
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-border"
+                            )}
+                        />
+                    ))}
+                </span>
             );
         case "member":
             return <MemberLine value={value as Ref} />;

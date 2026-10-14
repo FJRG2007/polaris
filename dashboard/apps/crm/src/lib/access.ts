@@ -15,8 +15,10 @@
 
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
+import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { CrmObject } from "../model/objects";
+import { OPEN_RULES, ownWhere, readRules, type RoleRules } from "../model/roles";
 import type { AppHostTypes } from "@polaris/app-host";
 import { CRM_OBJECTS, CRM_VERBS, hasOrgPermission, type CrmVerb } from "@polaris/core";
 
@@ -39,6 +41,10 @@ export interface CrmActor {
     readonly user: SessionUser;
     readonly shelf: Shelf;
     readonly can: Abilities;
+    /** What the reader's role is further held to; absent is open. */
+    readonly rules?: RoleRules;
+    /** Whether the reader may change those rules for the organization's roles. */
+    readonly manageRoles?: boolean;
 }
 
 /** The signed-in person, refusing anybody without the CRM. */
@@ -66,15 +72,27 @@ function abilities(granted: (object: CrmObject, verb: CrmVerb) => boolean): Abil
  */
 export async function crmActor(user: SessionUser): Promise<CrmActor> {
     const { orgId, orgName } = await host.crmHost.crmShelf(user.id);
+    return actorOn(user, orgId, orgName);
+}
+
+/** Somebody working on a given shelf - their own when `orgId` is null - with
+ *  what their role there lets them do now. A workflow runs as this. */
+export async function actorOn(
+    user: SessionUser,
+    orgId: string | null,
+    orgName: string | null
+): Promise<CrmActor> {
     if (!orgId) {
         return {
             user,
             shelf: { orgId: null, userId: user.id, key: `user:${user.id}`, orgName: null },
-            can: abilities(() => true)
+            can: abilities(() => true),
+            rules: OPEN_RULES,
+            manageRoles: false
         };
     }
-    const granted =
-        (await host.crmHost.crmOrgPermissions({ id: user.id, isAdmin: user.isAdmin }, orgId)) ?? [];
+    const access = await host.crmHost.crmOrgAccess({ id: user.id, isAdmin: user.isAdmin }, orgId);
+    const granted = access?.permissions ?? [];
     const holds = (object: CrmObject, verb: CrmVerb) =>
         verb !== "read" && hasOrgPermission(granted, `crm.${object}.${verb}`);
     const member = hasOrgPermission(granted, "org.read");
@@ -85,8 +103,24 @@ export async function crmActor(user: SessionUser): Promise<CrmActor> {
             (object, verb) =>
                 holds(object, verb) ||
                 (verb === "read" && (member || holds(object, "edit") || holds(object, "delete")))
-        )
+        ),
+        // The owner and a full-access role are held to nothing.
+        rules:
+            access?.role && !granted.includes("*")
+                ? await loadRules(orgId, access.role)
+                : OPEN_RULES,
+        manageRoles: hasOrgPermission(granted, "roles.manage")
     };
+}
+
+/** The CRM rules stored for one role of an organization. */
+async function loadRules(orgId: string, role: string): Promise<RoleRules> {
+    return readRules(
+        await prisma.crmRoleRule.findMany({
+            where: { orgId, role },
+            select: { object: true, rows: true, hidden: true, readOnly: true }
+        })
+    );
 }
 
 /** The signed-in reader of the CRM, resolved. */
@@ -104,6 +138,54 @@ export async function requireCan(actor: CrmActor, object: CrmObject, verb: CrmVe
 /** The rows on this shelf, as a Prisma `where`. */
 export function shelfWhere(shelf: Shelf): { orgId: string } | { userId: string; orgId: null } {
     return shelf.orgId ? { orgId: shelf.orgId } : { userId: shelf.userId!, orgId: null };
+}
+
+/**
+ * The records of a kind this reader reaches, as a Prisma `where`: the shelf,
+ * narrowed to their own records when their role is held to those. Every query
+ * on a record table goes through this or `listWhere`.
+ */
+export function recordWhere(actor: CrmActor, object: CrmObject): Record<string, unknown> {
+    const own = ownClause(actor, object);
+    return own ? { ...shelfWhere(actor.shelf), AND: [own] } : shelfWhere(actor.shelf);
+}
+
+/** The clause keeping a reader to their own records, or null when they reach all. */
+export function ownClause(actor: CrmActor, object: CrmObject): Record<string, unknown> | null {
+    return actor.rules?.[object].rows === "own" ? ownWhere(object, actor.user.id) : null;
+}
+
+/** Refuse when the reader's role keeps any of these fields hidden. */
+export async function requireShown(
+    actor: CrmActor,
+    object: CrmObject,
+    keys: Iterable<string>
+): Promise<void> {
+    const hidden = actor.rules?.[object].hidden ?? [];
+    if (hidden.length === 0) return;
+    for (const key of keys) {
+        if (hidden.includes(key)) {
+            const t = await crmT();
+            throw new CrmRefusal(t("errors.fieldHidden"));
+        }
+    }
+}
+
+/** Refuse when the reader's role may not change any of these fields. */
+export async function requireChangeable(
+    actor: CrmActor,
+    object: CrmObject,
+    keys: Iterable<string>,
+    label: (key: string) => Promise<string>
+): Promise<void> {
+    const rule = actor.rules?.[object];
+    if (!rule) return;
+    for (const key of keys) {
+        if (rule.hidden.includes(key) || rule.readOnly.includes(key)) {
+            const t = await crmT();
+            throw new CrmRefusal(t("errors.fieldLocked", { field: await label(key) }));
+        }
+    }
 }
 
 /** The columns that put a new row on this shelf. */

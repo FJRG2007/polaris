@@ -319,7 +319,13 @@
         "CRM": "CRM",
         "Companies": "Empresas",
         "Opportunities": "Oportunidades",
-        "Storage locations": "Ubicaciones de datos"
+        "Storage locations": "Ubicaciones de datos",
+        "New company": "Nueva empresa",
+        "New person": "Nueva persona",
+        "New opportunity": "Nueva oportunidad",
+        "Dashboards": "Paneles",
+        "Forecast": "Previsión",
+        "Audit log": "Auditoría"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

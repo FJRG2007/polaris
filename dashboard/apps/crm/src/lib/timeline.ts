@@ -49,6 +49,11 @@ export async function logEvents(
     } catch (caught) {
         console.error("crm: could not log record events", { object, count: rows.length, caught });
     }
+    // The workflows these changes set off run behind the request that made
+    // them: what they do is not the reader's to wait for.
+    void import("./workflows")
+        .then((workflows) => workflows.onRecordEvents(actor, object, events))
+        .catch((caught) => console.error("crm: could not run workflows", { object, caught }));
 }
 
 /** Remove the log of records deleted for good. */
@@ -90,6 +95,7 @@ export async function listTimeline(
         createdAt: Date;
     }[];
     const names = new Map(people.map((person) => [person.id, person]));
+    const hidden = actor.rules?.[object].hidden ?? [];
     const shown = rows.slice(0, TIMELINE_PAGE);
     return {
         events: shown.flatMap((row) =>
@@ -100,7 +106,9 @@ export async function listTimeline(
                           kind: row.kind,
                           actor: row.actorId ? (names.get(row.actorId) ?? null) : null,
                           at: row.createdAt.toISOString(),
-                          changes: readChanges(row.changes)
+                          changes: readChanges(row.changes).filter(
+                              (change) => !hidden.includes(change.key)
+                          )
                       }
                   ]
                 : []

@@ -12,7 +12,7 @@ import { useCustomFields } from "./custom-fields";
 import { messageOf } from "./call";
 import { useState, type FormEvent } from "react";
 import type { CrmObject } from "../model/objects";
-import { Check, ChevronDown, Kanban, Pencil, Plus, Table2, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Kanban, Pencil, Plus, Star, Table2, Trash2 } from "lucide-react";
 import {
     groupFields,
     normalizeViewName,
@@ -22,6 +22,7 @@ import {
 } from "../model/views";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogFooter,
@@ -54,6 +55,8 @@ export function ViewPicker({
     onCreate,
     onRename,
     onDelete,
+    pinned,
+    onTogglePin,
     disabled
 }: {
     object: CrmObject;
@@ -65,6 +68,9 @@ export function ViewPicker({
     onCreate: (name: string, kind: ViewKind) => Promise<void>;
     onRename: (view: ViewSummary, name: string) => Promise<void>;
     onDelete: (view: ViewSummary) => void;
+    /** Whether the current view is pinned to the rail, and the toggle. */
+    pinned: boolean;
+    onTogglePin: () => void;
     disabled?: boolean;
 }) {
     const t = useCrmT();
@@ -118,6 +124,20 @@ export function ViewPicker({
                             </DropdownMenuItem>
                         );
                     })}
+                    {current ? (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={onTogglePin}>
+                                <Star
+                                    className={cn(
+                                        "size-3.5",
+                                        pinned && "fill-current text-warning"
+                                    )}
+                                />
+                                {t(pinned ? "favorites.remove" : "favorites.add")}
+                            </DropdownMenuItem>
+                        </>
+                    ) : null}
                     {canEdit ? (
                         <>
                             <DropdownMenuSeparator />

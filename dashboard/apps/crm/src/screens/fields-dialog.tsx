@@ -15,6 +15,7 @@ import {
     choiceChanges,
     FIELD_LABEL_MAX,
     fieldInputSchema,
+    hasOptions,
     MAX_OPTIONS,
     normalizeLabel,
     type CustomField
@@ -213,7 +214,7 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
     const nameIssue = label.trim() === "" ? null : issue("label");
     const nameTaken = parsed.success && taken.includes(parsed.data.label.toLowerCase());
     const optionsIssue =
-        kind === "select" && rows.some((row) => row.text.trim() !== "") ? issue("options") : null;
+        hasOptions(kind) && rows.some((row) => row.text.trim() !== "") ? issue("options") : null;
     const unchanged =
         field !== null &&
         parsed.success &&
@@ -308,7 +309,7 @@ function FieldForm({ object, field, canDelete, taken, onDone, onCancel }: FieldF
                     />
                 )}
             </div>
-            {kind === "select" ? (
+            {hasOptions(kind) ? (
                 <div className="flex flex-col gap-1.5 text-[0.8125rem]">
                     <span className="font-medium">
                         {t("customFields.options")}

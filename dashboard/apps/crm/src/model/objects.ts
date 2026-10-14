@@ -20,12 +20,16 @@ export type FieldKind =
     | "email"
     | "phone"
     | "url"
+    | "links"
+    | "address"
     | "domain"
     | "number"
     | "currency"
     | "date"
     | "dateTime"
     | "select"
+    | "multiSelect"
+    | "rating"
     | "boolean"
     | "member"
     | "relation";
@@ -37,7 +41,8 @@ export interface FieldDef {
     readonly primary?: boolean;
     /** Written by Polaris, never by a person (created, updated). */
     readonly readOnly?: boolean;
-    /** The choices of a `select`, in the order a board draws its columns. */
+    /** The choices of a `select` or `multiSelect`, in the order a board draws
+     *  its columns. */
     readonly options?: readonly string[];
     /** The record kind a `relation` points at. */
     readonly target?: CrmObject;
@@ -58,7 +63,11 @@ export const CUSTOM_KINDS = [
     "date",
     "boolean",
     "select",
+    "multiSelect",
+    "rating",
     "url",
+    "links",
+    "address",
     "email",
     "phone"
 ] as const;
@@ -72,7 +81,7 @@ export type SlotFamily = keyof typeof SLOT_FAMILIES;
 
 /** The family of slot columns a kind of custom field is stored in. */
 export function slotFamily(kind: CustomKind): SlotFamily {
-    if (kind === "number") return "cNum";
+    if (kind === "number" || kind === "rating") return "cNum";
     if (kind === "date") return "cDate";
     if (kind === "boolean") return "cBool";
     return "cText";
@@ -96,8 +105,16 @@ export function fieldsOf(object: CrmObject, custom: readonly FieldDef[] = []): r
     return custom.length === 0 ? FIELDS[object] : [...FIELDS[object], ...custom];
 }
 
-/** An opportunity's stages, first to last. A board draws one column each. */
-export const OPPORTUNITY_STAGES = ["new", "screening", "meeting", "proposal", "customer"] as const;
+/** An opportunity's stages, first to last. A board draws one column each.
+ *  "customer" is won and "lost" is lost (model/forecast, model/stage-flow). */
+export const OPPORTUNITY_STAGES = [
+    "new",
+    "screening",
+    "meeting",
+    "proposal",
+    "customer",
+    "lost"
+] as const;
 
 export type OpportunityStage = (typeof OPPORTUNITY_STAGES)[number];
 
@@ -105,6 +122,13 @@ const CREATED: FieldDef = { key: "createdAt", kind: "dateTime", readOnly: true, 
 const UPDATED: FieldDef = {
     key: "updatedAt",
     kind: "dateTime",
+    readOnly: true,
+    width: 160,
+    hiddenByDefault: true
+};
+const UPDATED_BY: FieldDef = {
+    key: "updatedBy",
+    kind: "member",
     readOnly: true,
     width: 160,
     hiddenByDefault: true
@@ -132,7 +156,8 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "xUrl", kind: "url", width: 170, hiddenByDefault: true },
         CREATED,
         UPDATED,
-        CREATED_BY
+        CREATED_BY,
+        UPDATED_BY
     ],
     people: [
         { key: "name", kind: "fullName", primary: true, width: 220 },
@@ -145,7 +170,8 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "xUrl", kind: "url", width: 170, hiddenByDefault: true },
         CREATED,
         UPDATED,
-        CREATED_BY
+        CREATED_BY,
+        UPDATED_BY
     ],
     opportunities: [
         { key: "name", kind: "text", primary: true, width: 220 },
@@ -155,9 +181,11 @@ export const FIELDS: Readonly<Record<CrmObject, readonly FieldDef[]>> = {
         { key: "company", kind: "relation", target: "companies", width: 190 },
         { key: "pointOfContact", kind: "relation", target: "people", width: 190 },
         { key: "owner", kind: "member", width: 170 },
+        { key: "closeReason", kind: "text", width: 200, hiddenByDefault: true },
         CREATED,
         UPDATED,
-        CREATED_BY
+        CREATED_BY,
+        UPDATED_BY
     ]
 };
 
