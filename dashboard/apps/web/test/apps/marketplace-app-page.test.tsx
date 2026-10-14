@@ -110,16 +110,18 @@ describe("the app page", () => {
         expect(screen.getByText(/Only the person who installed an app/)).toBeTruthy();
     });
 
-    it("keeps the data unless the reader ticks it, then says it is deleted", async () => {
+    it("deletes the data by default, and keeps it only when the reader unticks it", async () => {
         render(<AppInstallPanel appId="minecraft" canInstall installs={[install()]} />, {
             wrapper: MessagesWrapper
         });
         fireEvent.click(screen.getByRole("button", { name: /Uninstall/ }));
         let dialog = await screen.findByRole("dialog");
-        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall" }));
+        expect((within(dialog).getByRole("checkbox") as HTMLInputElement).checked).toBe(true);
+        expect(within(dialog).getByText(/cannot be undone/)).toBeTruthy();
+        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall and delete data" }));
         await waitFor(() =>
             expect(uninstallInstalledAppAction).toHaveBeenCalledWith("install-1", {
-                deleteData: false
+                deleteData: true
             })
         );
         await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -127,11 +129,11 @@ describe("the app page", () => {
         fireEvent.click(screen.getByRole("button", { name: /Uninstall/ }));
         dialog = await screen.findByRole("dialog");
         fireEvent.click(within(dialog).getByRole("checkbox"));
-        expect(within(dialog).getByText(/cannot be undone/)).toBeTruthy();
-        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall and delete data" }));
+        expect(within(dialog).getByText(/listed under Storage/)).toBeTruthy();
+        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall, keep data" }));
         await waitFor(() =>
             expect(uninstallInstalledAppAction).toHaveBeenLastCalledWith("install-1", {
-                deleteData: true
+                deleteData: false
             })
         );
     });
@@ -143,8 +145,12 @@ describe("the app page", () => {
         });
         fireEvent.click(screen.getByRole("button", { name: /Uninstall/ }));
         const dialog = await screen.findByRole("dialog");
-        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall" }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall and delete data" }));
         expect(await within(dialog).findByText("Refused here")).toBeTruthy();
         expect(refresh).not.toHaveBeenCalled();
+        // Running it again picks up where it stopped.
+        fireEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+        await waitFor(() => expect(refresh).toHaveBeenCalled());
+        expect(uninstallInstalledAppAction).toHaveBeenCalledTimes(2);
     });
 });

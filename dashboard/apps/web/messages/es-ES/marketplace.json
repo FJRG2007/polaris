@@ -37,7 +37,10 @@
         "other": "{name} sale del selector. Lo que creaste en ella se conserva para cuando vuelvas a instalarla.",
         "title": "¿Desinstalar {name}?",
         "confirm": "Desinstalar",
-        "named": "Desinstalar {name}"
+        "named": "Desinstalar {name}",
+        "keptListed": "Sus datos se quedan en el servidor y aparecen en Almacenamiento, donde puedes liberarlos más tarde.",
+        "keepData": "Desinstalar sin borrar",
+        "retry": "Reintentar"
     },
     "card": {
         "by": "De {developer}",

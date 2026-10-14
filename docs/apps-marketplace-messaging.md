@@ -47,12 +47,16 @@ document is the source of truth; keep it current as phases land.
 - Uninstall with data - DONE (2e3304724, 7de9266c4, 3c91894a6, 92d949ee8): an
   uninstall plan (`lib/apps/uninstall-plan.ts`) inventories everything an
   install creates and what uninstalling does with each piece, confirmed by a
-  schema test against the Prisma models. Ticking "also delete its data" on an
-  app's own page wipes and removes its volumes (on SSH hosts too), purges its
-  install-scoped rows in one transaction, and runs each app's
-  `purgeInstallFiles` hook first so files the rows pointed at (camera footage)
-  are deleted before the rows that found them - refused while any remain, so a
-  storage outage never half-deletes an install.
+  schema test against the Prisma models. Deleting its data wipes and removes
+  its volumes (on SSH hosts too), purges its install-scoped rows in one
+  transaction, and runs each app's `purgeInstallFiles` hook first so files the
+  rows pointed at (camera footage) are deleted before the rows that found them
+  - refused while any remain, so a storage outage never half-deletes an
+    install.
+- Uninstall ordering + retry - DONE (6dfacb9, a19a223, 8a48219): uninstalling
+  works like uninstalling a phone app - an ordered teardown, retryable after a
+  partial failure, and one shared dialog across every door to it (see
+  "Uninstall" below).
 
 To verify each channel live: Telegram bot token; WhatsApp Cloud (Meta app +
 phone-number id + MESSAGING_WA_VERIFY_TOKEN/APP_SECRET + webhook); WhatsApp Web
@@ -153,20 +157,40 @@ derived from installed capabilities.
 
 ### Uninstall
 
-By default, removing an install deletes nothing somebody made with it; ticking
-"also delete its data" on the app's own page deletes it all instead, and
-leaves nothing behind. The generic path (`uninstallApp` in
-`lib/apps/install-service.ts`) tears down the Deploy application if there is
-one and marks the row removed; two apps need more than that, handled by
+Uninstalling works like uninstalling a phone app: by default it deletes the
+app's data too, and the one dialog that confirms it says plainly where kept
+data is listed when the reader unticks that. The generic path (`uninstallApp`
+in `lib/apps/install-service.ts`) tears down the Deploy application if there
+is one and marks the row removed; two apps need more than that, handled by
 `lib/apps/app-lifecycle.ts`:
 
-- **The marketplace's Installed cards each carry a Trash icon** beside the
-  link (kept outside the `<Link>` so pressing it never also opens the app),
-  confirmed with a dialog naming what the app is about to stop doing
-  (`uninstallDescription` in `marketplace-view.tsx`). An app's own page
-  (`apps/marketplace/[appId]`) offers the same uninstall plus the "also delete
-  its data" checkbox, off by default and turning the confirm button red when
-  ticked.
+- **One `UninstallDialog` (`apps/marketplace/uninstall-dialog.tsx`) is every
+  door to it** - the marketplace card's Trash icon (kept outside the `<Link>`
+  so pressing it never also opens the app), the app's own page
+  (`apps/marketplace/[appId]`), and the installed app's dashboard. "Also delete
+  its data" is ticked by default and turns the confirm button red; unticking
+  it says the kept data stays on the server and is listed under Storage
+  (`uninstall.keptListed`). A failure is shown in the dialog itself, with a
+  "Try again" button that re-runs the same uninstall - every phase below is a
+  no-op for what an earlier attempt already removed, so retrying finishes it.
+- **The teardown runs in an explicit, dependency-ordered phase sequence**
+  (`UNINSTALL_PHASES` in `lib/apps/uninstall-plan.ts`: files, stop, unroute,
+  containers, networks, data, rows, after). `phaseOf` maps every
+  `InstallResource` the plan inventories to the phase that removes it, so
+  nothing is unrouted while it still serves, a network is only freed once its
+  containers are gone, and the install's own rows go last - an uninstall that
+  stops part-way is still listed, with its Uninstall button, until a retry
+  finishes it. A phase that throws is wrapped in `UninstallIncompleteError`
+  (phase + `leftAfterFailure`'s list of what is still there), which the
+  uninstall action turns into a phase-specific message
+  (`errors.stoppedContainers` / `errors.stoppedData`).
+- **Tearing down the Deploy application unroutes before it stops.** Its
+  domains are disabled and the edge resynced first, so a visitor sees the app
+  gone rather than a container that answers broken; `deleteApplication`'s
+  `strict` option (set for an uninstall, not for the canvas) keeps the
+  teardown retryable by re-enabling those same domains and resyncing the edge
+  if the teardown itself fails, instead of leaving the app undeletable and
+  unrouted at once.
 - **What each install leaves, and what deleting its data does with each
   piece, is one inventory** (`lib/apps/uninstall-plan.ts`): every resource the
   install path creates (rows, files, volumes, domains, edge routes, firewall
@@ -176,7 +200,20 @@ one and marks the row removed; two apps need more than that, handled by
   volumes - on a server reached over SSH too (`deploy-service.ts`,
   `lib/deploy/ports-ssh.ts`), with a quoted, never-forced `volume rm` accepted
   only for names in the app's own volume shape - and purges every
-  install-scoped row in one transaction.
+  install-scoped row in one transaction. A private network left with no
+  application or database in its environment is no longer wanted either
+  (`environmentNetworksWanted` in `lib/deploy/service-networks.ts`) and the
+  next reconcile removes it; a deploy into that environment later makes it
+  again.
+- **The access people were given to the app, and its credential, go with it
+  on every copy** - `uninstallApp` clears both itself (`clearResourceGrants`,
+  the secret fields) rather than leaving that to the caller, so every door to
+  uninstall gets it for free. An install an older version removed without
+  clearing its credential, or one whose Deploy application was deleted before
+  its release did, is caught by a daily scheduled job
+  (`forgetRemovedInstallSecrets`, `removed-install-secrets` in
+  `lib/cron/jobs.ts`) that clears the secret on any row still marked removed -
+  a no-op once they are clean.
 - **Files a `purgeInstallFiles` hook before the rows that find them.** Places'
   camera clips and event stills live on disk or a storage connection, and
   their rows cascade from the camera, so deleting the rows first would leave

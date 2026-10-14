@@ -14,7 +14,6 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
-import { clearResourceGrants } from "@polaris/auth";
 import { z } from "zod";
 import { installRef, uninstallAccess } from "@/lib/apps/install-access";
 import {
@@ -23,6 +22,7 @@ import {
     InstallFilesLeftError
 } from "@/lib/app-extensions/registry";
 import { getInstalledApp, uninstallApp } from "@/lib/apps/install-service";
+import { UninstallIncompleteError } from "@/lib/apps/uninstall-plan";
 import { deployApplication, setApplicationRunning } from "@/lib/deploy-service";
 import type { DeployStrategy } from "@/lib/deploy/releases";
 import { deployBehaviour } from "@/lib/deploy/deploy-behaviour";
@@ -112,9 +112,8 @@ export async function uninstallInstalledAppAction(
         if (!access) {
             return { error: (await getTranslations("installed"))("errors.ownerOnly") };
         }
+        // Clears the access people were given to it too, on every copy.
         await uninstallApp(access.ownerId, id, parsed.data);
-        // The app is gone, so the access people were given to it is too.
-        await clearResourceGrants(installRef(id));
         await recordAudit({
             actorId: user.id,
             action: "apps.uninstall",
@@ -127,6 +126,16 @@ export async function uninstallInstalledAppAction(
     } catch (caught) {
         if (caught instanceof InstallFilesLeftError) {
             return { error: (await getTranslations("installed"))("errors.filesLeft") };
+        }
+        // Stopped part-way: said in words, and the same button finishes it.
+        if (caught instanceof UninstallIncompleteError) {
+            const t = await getTranslations("installed");
+            return {
+                error:
+                    caught.phase === "data"
+                        ? t("errors.stoppedData")
+                        : t("errors.stoppedContainers")
+            };
         }
         return {
             error:

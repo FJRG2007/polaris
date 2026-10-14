@@ -32,12 +32,11 @@ import { useRouter } from "next/navigation";
 import { AppMark } from "@/components/app-mark";
 import { appProvenance } from "@/lib/apps/provenance";
 import { Loader2, Search, Trash2 } from "lucide-react";
-import { useConfirm } from "@/components/confirm-dialog";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
 import type { InstalledAppView } from "@/lib/apps/install-service";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { uninstallInstalledAppAction } from "../installed/[id]/actions";
+import { UninstallDialog } from "./uninstall-dialog";
 import {
     appsByCategory,
     findApp,
@@ -313,53 +312,18 @@ function ownInstalls(installed: readonly InstalledAppView[]): InstalledAppView[]
     });
 }
 
-/**
- * What uninstalling an app says it will do, before it does it.
- *
- * Nothing anybody made is deleted: the data stays for when the app comes back.
- * An app that runs things of its own says what happens to those.
- */
-export function uninstallDescription(t: Words, catalogId: string, name: string): string {
-    if (catalogId === "game-servers") return t("uninstall.games", { name });
-    if (catalogId === "home") return t("uninstall.home", { name });
-    return t("uninstall.other", { name });
-}
-
 function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
-    const router = useRouter();
-    const [confirm, confirmElement] = useConfirm();
-    const [removing, setRemoving] = useState<string | null>(null);
-    const [failure, setFailure] = useState<string | null>(null);
+    const [removing, setRemoving] = useState<InstalledAppView | null>(null);
     const own = ownInstalls(installed);
     if (own.length === 0) return null;
 
-    async function uninstall(item: InstalledAppView): Promise<void> {
-        const agreed = await confirm({
-            title: t("uninstall.title", { name: item.name }),
-            description: uninstallDescription(t, item.catalogId, item.name),
-            confirmLabel: t("uninstall.confirm"),
-            danger: true
-        });
-        if (!agreed) return;
-        setFailure(null);
-        setRemoving(item.id);
-        const result = await uninstallInstalledAppAction(item.id);
-        setRemoving(null);
-        if (result.error) {
-            setFailure(result.error);
-            return;
-        }
-        router.refresh();
-    }
-
     return (
         <section className="flex flex-col gap-3">
-            {confirmElement}
+            {removing && <UninstallDialog install={removing} onClose={() => setRemoving(null)} />}
             <h2 className="text-sm font-medium text-muted-foreground">{t("view.installed")}</h2>
-            {failure && <p className="text-sm text-danger">{failure}</p>}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {own.map((item) => {
                     const manifest = findApp(item.catalogId);
@@ -407,15 +371,10 @@ function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
                                 variant="ghost"
                                 aria-label={t("uninstall.named", { name: item.name })}
                                 title={t("uninstall.named", { name: item.name })}
-                                disabled={removing !== null}
-                                onClick={() => void uninstall(item)}
+                                onClick={() => setRemoving(item)}
                                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-danger"
                             >
-                                {removing === item.id ? (
-                                    <Loader2 className="size-4 animate-spin" />
-                                ) : (
-                                    <Trash2 className="size-4" />
-                                )}
+                                <Trash2 className="size-4" />
                             </Button>
                         </div>
                     );

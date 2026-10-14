@@ -238,3 +238,119 @@ function stepFor(resource: InstallResource, { deleteData }: UninstallOptions): U
             return { action: "keep", why: "the audit trail records the uninstall too" };
     }
 }
+
+/**
+ * The order an uninstall works in. Each phase starts once the one before it is
+ * done, because it depends on it: nothing is unrouted while it still serves, a
+ * network is only free once its containers are gone, and the data goes last so
+ * a failure anywhere before it leaves the reader's data where it was. The
+ * install's own rows go at the very end, so an uninstall that stops part-way is
+ * still listed - with its Uninstall button - and running it again finishes it.
+ */
+export const UNINSTALL_PHASES = [
+    "files",
+    "stop",
+    "unroute",
+    "containers",
+    "networks",
+    "data",
+    "rows",
+    "after"
+] as const;
+
+export type UninstallPhase = (typeof UNINSTALL_PHASES)[number];
+
+/** Which phase removes a resource. */
+export function phaseOf(resource: InstallResource): UninstallPhase {
+    switch (resource) {
+        case "install-files":
+            return "files";
+        case "quick-tunnel":
+        case "owned-services":
+            return "stop";
+        case "edge-routes":
+        case "domains":
+        case "firewall-rules":
+            return "unroute";
+        case "containers":
+        case "deployments":
+            return "containers";
+        case "network":
+            return "networks";
+        case "volume-data":
+        case "volume-rows":
+        case "analytics":
+        case "install-data":
+            return "data";
+        case "install-row":
+        case "install-secret":
+        case "grants":
+        case "application":
+        case "env-vars":
+        case "service-children":
+        case "marketplace-project":
+        case "deploy-target":
+            return "rows";
+        case "presence":
+        case "app-bundle":
+        case "bridge-cache":
+        case "audit":
+            return "after";
+    }
+}
+
+export interface OrderedStep {
+    readonly phase: UninstallPhase;
+    readonly resource: InstallResource;
+    readonly step: UninstallStep;
+}
+
+/** The plan as the ordered list an uninstall carries out, phase by phase. */
+export function uninstallSteps(app: AppManifest, options: UninstallOptions): OrderedStep[] {
+    return [...uninstallPlan(app, options)]
+        .map(([resource, step]) => ({ phase: phaseOf(resource), resource, step }))
+        .sort((a, b) => UNINSTALL_PHASES.indexOf(a.phase) - UNINSTALL_PHASES.indexOf(b.phase));
+}
+
+/**
+ * What an uninstall that failed in `failed` still has to remove: everything it
+ * removes from that phase on. What the plan keeps is not left, it is kept.
+ */
+export function leftAfterFailure(
+    steps: readonly OrderedStep[],
+    failed: UninstallPhase
+): InstallResource[] {
+    const from = UNINSTALL_PHASES.indexOf(failed);
+    return steps
+        .filter((one) => one.step.action === "remove")
+        .filter((one) => UNINSTALL_PHASES.indexOf(one.phase) >= from)
+        .map((one) => one.resource);
+}
+
+/**
+ * Which shared resources may go once `leaving` stops using them: only those
+ * nobody else uses. Pure, so "never remove a network another app is on" is held
+ * by a test rather than by care.
+ */
+export function freedShared(
+    users: ReadonlyMap<string, readonly string[]>,
+    leaving: ReadonlySet<string>
+): string[] {
+    return [...users]
+        .filter(([, by]) => by.every((user) => leaving.has(user)))
+        .map(([resource]) => resource)
+        .sort();
+}
+
+/** Thrown when an uninstall stops part-way, with what is left, so the screen can
+ *  say so and offer to try again. Running the uninstall again finishes it. */
+export class UninstallIncompleteError extends Error {
+    constructor(
+        readonly phase: UninstallPhase,
+        readonly left: readonly InstallResource[],
+        cause: unknown
+    ) {
+        super(`uninstall stopped at ${phase}`, { cause });
+        this.name = "UninstallIncompleteError";
+    }
+}

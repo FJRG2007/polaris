@@ -21,7 +21,17 @@ import { listEnvVars, setEnvVars } from "@/lib/env-var-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { localizeSetting } from "@/lib/apps/app-words";
 import type { AppInstallInput } from "@/lib/apps/install-schema";
-import { INSTALL_SCOPED_MODELS, type UninstallOptions } from "@/lib/apps/uninstall-plan";
+import {
+    INSTALL_SCOPED_MODELS,
+    leftAfterFailure,
+    UninstallIncompleteError,
+    uninstallSteps,
+    type UninstallOptions,
+    type UninstallPhase
+} from "@/lib/apps/uninstall-plan";
+import { clearResourceGrants } from "@polaris/auth";
+import { resourceRef } from "@polaris/core";
+import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import {
     appUninstallRefusal,
@@ -638,21 +648,49 @@ export async function uninstallApp(
               })
             : [];
     const ids = [...new Set([row.id, ...copies.map((copy) => copy.id)])];
+    // A phase that fails stops the uninstall there and says what is left. The
+    // install row goes last, so it is still listed with its Uninstall button and
+    // running it again picks up where this stopped: every phase is a no-op for
+    // what an earlier attempt already removed.
+    const failedAt = (phase: UninstallPhase, cause: unknown): UninstallIncompleteError =>
+        new UninstallIncompleteError(
+            phase,
+            app ? leftAfterFailure(uninstallSteps(app, options), phase) : [],
+            cause
+        );
     // Files first, while the rows that find them (clips, stills) still exist, and
     // before anything else goes: a file that stays stops the uninstall here, so
     // trying again still finds it.
-    if (options.deleteData) for (const installId of ids) await purgeInstallFiles(installId);
-    if (row.applicationId) {
+    if (options.deleteData) await Promise.all(ids.map((installId) => purgeInstallFiles(installId)));
+    // An application already deleted from Deploy has nothing left to tear down.
+    const application = row.applicationId
+        ? await prisma.application.findUnique({
+              where: { id: row.applicationId },
+              select: { id: true }
+          })
+        : null;
+    if (application) {
         try {
-            await deleteApplication(row.applicationId, ownerId, {
-                deleteData: options.deleteData
+            await deleteApplication(application.id, ownerId, {
+                deleteData: options.deleteData,
+                strict: true,
+                keepInstalls: ids
             });
-        } catch {
-            // The application may already have been removed in Deploy; proceed.
+        } catch (error) {
+            console.error(`polaris: uninstalling ${row.catalogId} stopped:`, error);
+            throw failedAt("containers", error);
         }
     }
+    // The access people were given to it goes with it, on every copy.
+    await Promise.all(
+        ids.map((installId) => clearResourceGrants(resourceRef("install", installId)))
+    );
     if (options.deleteData) {
-        for (const installId of ids) await purgeInstallData(installId);
+        try {
+            await Promise.all(ids.map((installId) => purgeInstallData(installId)));
+        } catch (error) {
+            throw failedAt("data", error);
+        }
         await prisma.installedApp.deleteMany({ where: { id: { in: ids } } });
     } else {
         // Kept so a reinstall finds what was made in it, but not the credential:
@@ -687,4 +725,21 @@ export async function uninstallApp(
     publishAccessChange();
     // Forget any cached bridge endpoint so the inbox reflects the removal at once.
     if (row.catalogId === "messaging-bridge") invalidateBridgeCache();
+    // A private network the app was the last one on is not wanted any more. Not
+    // awaited: the scheduled reconcile does the same, this only does it now.
+    if (application) void reconcilePrivateNetworks().catch(() => undefined);
+}
+
+/**
+ * Clear the credential on every removed install that still holds one. An
+ * uninstall clears it now, but one from before that, or an app deleted from
+ * Deploy before its release did the same, left the secret on a row nothing will
+ * ever dial again. One write, and a no-op once they are clean.
+ */
+export async function forgetRemovedInstallSecrets(): Promise<{ cleared: number }> {
+    const { count } = await prisma.installedApp.updateMany({
+        where: { status: "removed", NOT: { encryptedSecret: null } },
+        data: { encryptedSecret: null, secretNonce: null, secretKeyId: null }
+    });
+    return { cleared: count };
 }

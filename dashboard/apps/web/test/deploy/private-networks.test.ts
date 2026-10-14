@@ -164,10 +164,29 @@ describe("settling this machine's private networks", () => {
 
     it("asks the daemon to keep exactly those", async () => {
         environments = [
-            { id: "env-1", networkMode: "environment", applications: [], databases: [] }
+            {
+                id: "env-1",
+                networkMode: "environment",
+                applications: [{ id: "svc-a" }],
+                databases: []
+            }
         ];
         expect(await reconcilePrivateNetworks()).toEqual({ kept: 1, removed: 0 });
         expect(reconciled).toEqual([[environmentNetwork("env-1")]]);
+    });
+
+    it("lets an environment's network go once its last service is uninstalled", async () => {
+        environments = [
+            { id: "env-1", networkMode: "environment", applications: [], databases: [] },
+            { id: "env-2", networkMode: "links", applications: [], databases: [] },
+            {
+                id: "env-3",
+                networkMode: "environment",
+                applications: [],
+                databases: [{ id: "db-1" }]
+            }
+        ];
+        expect(await wantedPrivateNetworks()).toEqual([environmentNetwork("env-3")]);
     });
 
     it("leaves a daemon that cannot make them alone", async () => {
