@@ -21,7 +21,12 @@ import { MarketplaceView } from "./marketplace-view";
 import { gameForCatalogId } from "@/lib/apps/games-catalog";
 import { adoptAppInstalls } from "@/lib/app-extensions/registry";
 import { adoptMailServerApp } from "@/lib/mail-server/app-install";
-import { instanceWideInstallIds, listInstalledApps } from "@/lib/apps/install-service";
+import { uninstallAccess } from "@/lib/apps/install-access";
+import {
+    installForReader,
+    instanceWideInstallIds,
+    listInstalledApps
+} from "@/lib/apps/install-service";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +44,19 @@ export default async function MarketplacePage({
     const installed = await listInstalledApps(user.id, await instanceWideInstallIds());
     const { app } = await searchParams;
     const focus = typeof app === "string" ? findApp(app) : undefined;
-    return (
-        <MarketplaceView
-            installed={installed.filter((item) => gameForCatalogId(item.catalogId) === undefined)}
-            initialQuery={focus?.name ?? ""}
-        />
+    // Somebody else's install is cut to what this reader may be sent; whether
+    // they may uninstall it is asked only for those, since an own row is whole.
+    const shown = await Promise.all(
+        installed
+            .filter((item) => gameForCatalogId(item.catalogId) === undefined)
+            .map(async (item) =>
+                installForReader(
+                    item,
+                    user.id,
+                    item.ownerId !== user.id &&
+                        (await uninstallAccess(user, item.id).catch(() => null)) !== null
+                )
+            )
     );
+    return <MarketplaceView installed={shown} initialQuery={focus?.name ?? ""} />;
 }

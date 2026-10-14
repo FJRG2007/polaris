@@ -34,7 +34,7 @@ import { appProvenance } from "@/lib/apps/provenance";
 import { Loader2, Search, Trash2 } from "lucide-react";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
-import type { InstalledAppView } from "@/lib/apps/install-service";
+import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { UninstallDialog } from "./uninstall-dialog";
 import {
@@ -99,7 +99,7 @@ export function MarketplaceView({
     installed,
     initialQuery = ""
 }: {
-    installed: InstalledAppView[];
+    installed: InstalledAppReaderView[];
     /** What the search starts with - an app's name, when a screen sent somebody
      *  here to install that app. */
     initialQuery?: string;
@@ -305,18 +305,18 @@ function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
  * server, and hiding it because the catalog no longer describes it is how a
  * container becomes unreachable from the product that started it.
  */
-function ownInstalls(installed: readonly InstalledAppView[]): InstalledAppView[] {
+function ownInstalls(installed: readonly InstalledAppReaderView[]): InstalledAppReaderView[] {
     return installed.filter((item) => {
         const manifest = findApp(item.catalogId);
         return !manifest || !manifest.internal;
     });
 }
 
-function InstalledSection({ installed }: { installed: InstalledAppView[] }) {
+function InstalledSection({ installed }: { installed: InstalledAppReaderView[] }) {
     const t = useTranslations("marketplace");
     const words = useTranslations("catalog");
     const navLabel = useNavLabel();
-    const [removing, setRemoving] = useState<InstalledAppView | null>(null);
+    const [removing, setRemoving] = useState<InstalledAppReaderView | null>(null);
     const own = ownInstalls(installed);
     if (own.length === 0) return null;
 

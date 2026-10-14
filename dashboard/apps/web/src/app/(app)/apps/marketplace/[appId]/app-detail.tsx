@@ -15,7 +15,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { appScreenshots } from "@/lib/apps/app-screenshots";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
-import type { InstalledAppView } from "@/lib/apps/install-service";
+import type { InstalledAppReaderView } from "@/lib/apps/install-service";
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -188,7 +188,7 @@ export function AppInstallPanelSkeleton() {
     );
 }
 
-export interface DetailInstall extends InstalledAppView {
+export interface DetailInstall extends InstalledAppReaderView {
     /** From `uninstallAccess`, the check the uninstall action makes. */
     readonly canUninstall: boolean;
 }
@@ -212,7 +212,7 @@ export function AppInstallPanel({
     const manifest = findApp(appId) ?? app;
     // One install per Polaris, or per owner: a second would be refused.
     const offerInstall = isInstallable(app) && !(app.singleton && installs.length > 0);
-    const openHref = (item: InstalledAppView) => app.opensAt ?? `/apps/installed/${item.id}`;
+    const openHref = (item: InstalledAppReaderView) => app.opensAt ?? `/apps/installed/${item.id}`;
 
     return (
         <section className="flex min-w-0 flex-col gap-3">
