@@ -552,8 +552,13 @@ export interface MountSpec {
 }
 
 /** Permissive modes so a container (root or not) reads/writes the share like a
- *  normal docker volume; nobrl avoids byte-range-lock errors some apps trigger. */
-const SMB_OPTS = "vers=3.0,uid=0,gid=0,file_mode=0666,dir_mode=0777,nobrl";
+ *  normal docker volume; nobrl avoids byte-range-lock errors some apps trigger.
+ *  mfsymlinks stores a link as a small file the client reads back as a link, so
+ *  data that holds links (game servers point config files at each other) can
+ *  live on a share whose server does not create links for SMB clients; without
+ *  it every link is refused with "Not supported". It applies from the next time
+ *  the share is mounted. */
+const SMB_OPTS = "vers=3.0,uid=0,gid=0,file_mode=0666,dir_mode=0777,nobrl,mfsymlinks";
 
 function mountSpecFor(row: ConnectionRow): MountSpec | null {
     const config = JSON.parse(row.config) as StorageConfig;

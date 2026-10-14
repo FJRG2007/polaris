@@ -34,10 +34,25 @@ describe("what an action aimed at a row is aimed at", () => {
         }
     });
 
-    it("means the messages themselves for everything else", () => {
-        // A conversation lives in several folders at once, so archiving "the
-        // conversation" would be a promise about mail the view is not showing.
-        for (const action of ["archive", "trash", "delete", "junk", "star", "important"] as const) {
+    it("means the conversation in this folder for a move", () => {
+        // Every message of it in the folder the row is listed in, and nothing in
+        // any other: the newest alone left the rest behind, and the row came
+        // back on the next list.
+        for (const action of [
+            "archive",
+            "trash",
+            "delete",
+            "junk",
+            "not-junk",
+            "inbox",
+            "restore"
+        ] as const) {
+            expect(scopeOf(action), action).toBe("folder");
+        }
+    });
+
+    it("means the messages themselves for a flag", () => {
+        for (const action of ["star", "unstar", "important", "unimportant"] as const) {
             expect(scopeOf(action), action).toBe("message");
         }
     });
@@ -55,7 +70,9 @@ describe("marking it read on the way in", () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         const mark = view.slice(view.indexOf("const [readOnOpen, setReadOnOpen]"));
         const body = mark.slice(0, mark.indexOf("const act = useCallback"));
-        expect(body).toContain("nudgeUnread(unreadNudges([row]))");
+        expect(body).toContain("const counts = nudgeUnread(unreadNudges([row]), [row.id]);");
+        expect(body).toContain("counts.abandon();");
+        expect(body).toContain("counts.settle();");
         expect(body).toContain("patchUntilAnswered([row.id], { unreadCount: 0 })");
         // Nobody waits on the answer, and it is carried on past the pane closing:
         // a refusal takes the change back, and a yes is settled and the list

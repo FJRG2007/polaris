@@ -254,18 +254,43 @@ export const COPY_EXIT = {
     ok: 0,
     mismatch: 3,
     noSpace: 4,
+    noLinks: 5,
     unreadable: 10,
     unwritable: 11
 } as const;
 
 /**
+ * Empties `dir` and succeeds only once nothing is left in it. One `find -delete`
+ * is not enough on an SMB share: deleting entries while the share lists the same
+ * folder shifts the listing under it, so a pass over a large folder skips files
+ * (a 31 GB copy that was rolled back left 8.4 GB on the NAS). Each further pass
+ * only meets what the last one skipped.
+ */
+function emptyDir(dir: string): string {
+    const empty = `[ -z "$(find ${dir} -mindepth 1 | head -n 1)" ]`;
+    return `for pass in 1 2 3 4 5 6; do find ${dir} -mindepth 1 -delete 2>/dev/null; ${empty} && break; done; ${empty}`;
+}
+
+/**
+ * What a copy is checked by: one line per entry that is not a folder, its path
+ * first, then its size for a file, its target for a link, or its type for
+ * anything else. Sorted, so the first line that differs names the file.
+ */
+const MANIFEST =
+    "{ find . -type f -exec stat -c '%n|%s' {} +; find . -type l -exec stat -c '%n|%N' {} +; find . ! -type d ! -type f ! -type l -exec stat -c '%n|%F' {} +; } | LC_ALL=C sort";
+
+/**
  * The copy, then the check, in one line of busybox sh (a container's command may
  * not hold a line break). Measures the original, refuses when the destination
  * has less room than that, empties the destination folder (it is this move's own,
- * so only an earlier attempt of the same move can be in it), copies with `cp -a`,
- * and compares a manifest of every path and its size on both sides. `cp`'s own
- * status is not trusted either way: a share that cannot keep an owner reports a
- * failure for a copy that is complete, and the manifest is the real answer.
+ * so only an earlier attempt of the same move can be in it), refuses when the
+ * original holds links the destination cannot store (an SMB share mounted without
+ * link support answers "Not supported" for each, which used to fail a 31 GB copy
+ * only once all of it was written), copies with `cp -a`, and compares a manifest
+ * of every path with its size or link target on both sides. `cp`'s own status is
+ * not trusted either way: a share that cannot keep an owner reports a failure for
+ * a copy that is complete, and the manifest is the real answer. When the two
+ * differ, the first path that does is printed so the screen can name it.
  *
  * Every byte figure is printed with `%.0f`, never `%d`: busybox awk's `%d` is a
  * 32-bit int and printed -2147483648 for anything past 2 GiB, which made the room
@@ -276,8 +301,7 @@ export const COPY_EXIT = {
  * screen can tell copying from checking.
  */
 export function copyScript(): string {
-    const manifest =
-        "find . ! -type d -exec stat -c '%s %n' {} + | LC_ALL=C sort | md5sum | cut -d' ' -f1";
+    const probe = "/to/.polaris-link-probe";
     const bytes = "find . -type f -exec stat -c %s {} + | awk '{s+=$1} END {printf \"%.0f\", s}'";
     return [
         "cd /from || exit 10",
@@ -287,23 +311,26 @@ export function copyScript(): string {
         "free=$(df -Pk /to | awk 'NR==2 {printf \"%.0f\", $4*1024}')",
         'echo "POLARIS_FREE bytes=$free"',
         `if awk -v f="$free" -v t="$total" 'BEGIN {exit !(f != "" && f+0 < t+0)}'; then exit 4; fi`,
-        "find /to -mindepth 1 -delete || exit 11",
+        `${emptyDir("/to")} || exit 11`,
+        "link=$(find . -type l | head -n 1)",
+        `if [ -n "$link" ]; then ln -s polaris-probe ${probe} 2>/dev/null; if [ -L ${probe} ]; then rm -f ${probe}; else rm -f ${probe}; echo "POLARIS_NOLINKS path=$link"; exit 5; fi; fi`,
         "cp -a /from/. /to/ 2>/tmp/copy.err",
         "tofiles=$(cd /to && find . ! -type d | wc -l)",
         `tobytes=$(cd /to && ${bytes})`,
         'echo "POLARIS_COPY files=$tofiles bytes=$tobytes"',
-        `a=$(cd /from && ${manifest})`,
-        `b=$(cd /to && ${manifest})`,
-        'if [ "$a" != "$b" ]; then echo "POLARIS_MISMATCH"; head -c 600 /tmp/copy.err; exit 3; fi',
+        `(cd /from && ${MANIFEST}) > /tmp/from.list`,
+        `(cd /to && ${MANIFEST}) > /tmp/to.list`,
+        `if ! cmp -s /tmp/from.list /tmp/to.list; then differ=$(diff -u /tmp/from.list /tmp/to.list | grep -m 1 '^[-+]\\./' | cut -c4- | cut -d'|' -f1); echo "POLARIS_MISMATCH"; echo "POLARIS_DIFFER path=$differ"; head -c 600 /tmp/copy.err; exit 3; fi`,
         'echo "POLARIS_VERIFIED"',
         "exit 0"
     ].join("; ");
 }
 
-/** Empties the original once a person confirmed it. The folder itself stays: it is
- *  the mount point, and an empty folder costs nothing. */
+/** Empties a folder: the original once a person confirmed a move, or a copy that
+ *  was not used. The folder itself stays: it is the mount point, and an empty
+ *  folder costs nothing. Fails, after several passes, when something is left. */
 export function cleanupScript(): string {
-    return "find /from -mindepth 1 -delete";
+    return `${emptyDir("/from")} || { echo "POLARIS_LEFT files=$(find /from -mindepth 1 | wc -l)"; exit 1; }`;
 }
 
 function oneShot(name: string, script: string, volumes: ComposeSpecVolume[]): ComposeSpec {
@@ -362,6 +389,10 @@ export interface CopyReport {
     readonly copiedBytes?: number;
     readonly verified: boolean;
     readonly mismatch: boolean;
+    /** The first file, relative to the volume, that differed between the sides. */
+    readonly differ?: string;
+    /** A link the destination could not store, relative to the volume. */
+    readonly noLinks?: string;
 }
 
 /** What the copy script printed, read back from its log. */
@@ -377,11 +408,25 @@ export function parseCopyLog(text: string): CopyReport {
         copiedFiles: number(/POLARIS_COPY files=\s*(\d+)/),
         copiedBytes: number(/POLARIS_COPY files=\s*\d+ bytes=(\d+)/),
         verified: /POLARIS_VERIFIED/.test(text),
-        mismatch: /POLARIS_MISMATCH/.test(text)
+        mismatch: /POLARIS_MISMATCH/.test(text),
+        ...printedPath(text, "POLARIS_DIFFER", "differ"),
+        ...printedPath(text, "POLARIS_NOLINKS", "noLinks")
     };
 }
 
-export type CopyFailure = "mismatch" | "noSpace" | "unreadable" | "unwritable" | "copy";
+/** A path the script printed after `marker`, relative to the volume, without the
+ *  log's line break or a leading `./`, cut to a length a sentence can carry. */
+function printedPath<K extends "differ" | "noLinks">(
+    text: string,
+    marker: string,
+    key: K
+): Partial<Record<K, string>> {
+    const match = new RegExp(`${marker} path=(.*)$`, "m").exec(text);
+    const path = match?.[1]?.trim().replace(/^\.\//, "").slice(0, 200);
+    return path ? ({ [key]: path } as Partial<Record<K, string>>) : {};
+}
+
+export type CopyFailure = "mismatch" | "noSpace" | "noLinks" | "unreadable" | "unwritable" | "copy";
 
 /**
  * Whether the copy can be trusted, from its exit code and what it printed. Both
@@ -393,6 +438,7 @@ export function copyOutcome(
 ): { ok: true } | { ok: false; failure: CopyFailure } {
     if (exitCode === COPY_EXIT.ok && report.verified && !report.mismatch) return { ok: true };
     if (exitCode === COPY_EXIT.noSpace) return { ok: false, failure: "noSpace" };
+    if (exitCode === COPY_EXIT.noLinks) return { ok: false, failure: "noLinks" };
     if (exitCode === COPY_EXIT.unreadable) return { ok: false, failure: "unreadable" };
     if (exitCode === COPY_EXIT.unwritable) return { ok: false, failure: "unwritable" };
     if (exitCode === COPY_EXIT.mismatch || report.mismatch)

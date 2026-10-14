@@ -317,9 +317,12 @@ export async function setArkAdminPasswordAction(
  * moderate a server was not handed its admin password, and a value that is only
  * sent when it is asked for is one a screenshot of the page does not carry.
  */
-export async function revealArkPasswordsAction(
-    installedAppId: string
-): Promise<{ joinPassword?: string | null; adminPassword?: string | null; error?: string }> {
+export async function revealArkPasswordsAction(installedAppId: string): Promise<{
+    joinPassword?: string | null;
+    adminPassword?: string | null;
+    adminReplaced?: boolean;
+    error?: string;
+}> {
     try {
         const { user, access } = await requireGameServerOwner(installedAppId);
         const passwords = await ark.revealArkPasswords(access.ownerId, installedAppId);
@@ -329,6 +332,14 @@ export async function revealArkPasswordsAction(
             targetType: "installedApp",
             targetId: installedAppId
         });
+        if (passwords.adminReplaced) {
+            await recordAudit({
+                actorId: user.id,
+                action: "games.ark.admin-password",
+                targetType: "installedApp",
+                targetId: installedAppId
+            });
+        }
         return passwords;
     } catch (caught) {
         return {

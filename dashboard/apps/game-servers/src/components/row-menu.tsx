@@ -17,7 +17,8 @@
  * anybody added a verb.
  */
 
-import type { ReactNode } from "react";
+import { forwardRef } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { useGameText } from "../screens/game-text";
 import { MoreHorizontal } from "lucide-react";
 import {
@@ -52,20 +53,40 @@ export type RowMenuEntry =
     /** A place to go rather than something to do - somebody's profile on the
      *  service the game signs them in with. It opens in its own tab, and carries
      *  the same two words every outward link here does. */
-    | { readonly kind: "link"; readonly text: string; readonly icon?: ReactNode; readonly href: string };
+    | {
+          readonly kind: "link";
+          readonly text: string;
+          readonly icon?: ReactNode;
+          readonly href: string;
+      };
 
-/** The link, drawn inside whichever menu item wraps it. */
-function OutwardLink({ href, icon, text }: { href: string; icon?: ReactNode; text: string }) {
-    return (
-        <a href={href} target="_blank" rel="noreferrer noopener">
-            {icon}
-            {text}
-        </a>
-    );
-}
+/**
+ * The link, drawn inside whichever menu item wraps it.
+ *
+ * The item renders it `asChild`, which hands the item's own class, ref and
+ * keyboard handling to this element - so they have to reach the `<a>`. Dropped,
+ * the link was drawn as bare text at the page's size beside items drawn at the
+ * menu's.
+ */
+const OutwardLink = forwardRef<
+    HTMLAnchorElement,
+    AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; icon?: ReactNode; text: string }
+>(({ href, icon, text, ...props }, ref) => (
+    <a {...props} ref={ref} href={href} target="_blank" rel="noreferrer noopener">
+        {icon}
+        {text}
+    </a>
+));
+OutwardLink.displayName = "OutwardLink";
 
 /** The `...` at the end of a row. */
-export function RowMenuButton({ entries, label }: { entries: readonly RowMenuEntry[]; label: string }) {
+export function RowMenuButton({
+    entries,
+    label
+}: {
+    entries: readonly RowMenuEntry[];
+    label: string;
+}) {
     const t = useGameText("games");
     return (
         <DropdownMenu>
@@ -81,7 +102,11 @@ export function RowMenuButton({ entries, label }: { entries: readonly RowMenuEnt
                     ) : entry.kind === "label" ? (
                         <DropdownMenuLabel
                             key={index}
-                            className={entry.muted ? "text-xs font-normal text-muted-foreground" : undefined}
+                            className={
+                                entry.muted
+                                    ? "text-xs font-normal text-muted-foreground"
+                                    : undefined
+                            }
                         >
                             {entry.text}
                         </DropdownMenuLabel>
@@ -129,7 +154,11 @@ export function RowContextMenu({
                     ) : entry.kind === "label" ? (
                         <ContextMenuLabel
                             key={index}
-                            className={entry.muted ? "text-xs font-normal text-muted-foreground" : undefined}
+                            className={
+                                entry.muted
+                                    ? "text-xs font-normal text-muted-foreground"
+                                    : undefined
+                            }
                         >
                             {entry.text}
                         </ContextMenuLabel>

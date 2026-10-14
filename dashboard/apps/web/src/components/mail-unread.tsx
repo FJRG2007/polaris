@@ -30,11 +30,17 @@ import {
     useMemo,
     useRef,
     useState,
+    useSyncExternalStore,
     type ReactNode
 } from "react";
 import { useShelfSeed } from "@/components/shelf-scope";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import {
+    subscribeUnreadOverlay,
+    unreadOverlay,
+    unreadOverlayVersion
+} from "@/lib/mailbox/unread-overlay";
 
 export interface MailUnread {
     /** Unread messages across the open shelf's mailboxes - the ones Mail lists. */
@@ -48,32 +54,10 @@ const NOTHING: MailUnread = { messages: 0, mailboxes: 0 };
 
 const UnreadContext = createContext<MailUnread>(NOTHING);
 
-/**
- * Tell the badge about mail somebody has just read, before the server says so.
- *
- * This count is the server's, asked for when the live channel says a mailbox
- * moved - so reading a message moved the numbers inside Mail at once and left
- * the badge on the app switcher standing at its old figure until the mail
- * server had been told, had answered, and had announced it. Seconds, over
- * somebody else's IMAP server, with the message plainly read on the screen
- * beside it.
- *
- * Negative for mail that stopped being unread. Laid over the server's figure
- * and dropped the moment that figure moves - the same overlay the rail inside
- * Mail keeps, for the same reason and exactly as long.
- */
-const NudgeContext = createContext<(by: number) => void>(() => {});
-
 /** What is waiting in Mail. Zero outside the provider, which is the honest
  *  answer for a screen mounted without one rather than a reason to throw. */
 export function useMailUnread(): MailUnread {
     return useContext(UnreadContext);
-}
-
-/** Move the badge by what this screen has just done - see `NudgeContext`. Does
- *  nothing outside the provider. */
-export function useNudgeMailUnread(): (by: number) => void {
-    return useContext(NudgeContext);
 }
 
 const STREAM_PATH = "/api/mail/stream";
@@ -218,38 +202,57 @@ export function MailUnreadProvider({
         if (unread.messages === 0) closeDesktopNotice("mail:more");
     }, [unread.messages]);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    /** What this browser has already done that the server's count predates. */
-    const [drift, setDrift] = useState(0);
-    const nudge = useCallback((by: number) => {
-        if (by !== 0) setDrift((held) => held + by);
-    }, []);
-    // The server has spoken since. Whatever was laid over its count was either
-    // this, and is now counted twice, or was never true.
-    useEffect(() => {
-        setDrift((held) => (held === 0 ? held : 0));
-    }, [unread]);
+    /**
+     * When the count on screen was asked for: 0 for the one the server rendered
+     * into the page. What Mail has just done and the server has not counted yet
+     * is laid over it from the shared ledger - see `lib/mailbox/unread-overlay`
+     * - until a count asked for after the change was confirmed arrives, so a
+     * recount that set off before the click cannot put the old number back.
+     */
+    const [countedAt, setCountedAt] = useState(0);
+    const overlayVersion = useSyncExternalStore(
+        subscribeUnreadOverlay,
+        unreadOverlayVersion,
+        () => 0
+    );
     const shown = useMemo<MailUnread>(() => {
-        if (drift === 0) return unread;
-        const messages = Math.max(0, unread.messages + drift);
+        const by = unreadOverlay(countedAt).inbox;
+        if (by === 0) return unread;
+        const messages = Math.max(0, unread.messages + by);
         // Never a mailbox with nothing waiting in it: the second number only
         // exists to say "in two of your mailboxes", and saying that over a
         // badge that has gone is the screen arguing with itself.
         return { messages, mailboxes: messages === 0 ? 0 : unread.mailboxes };
-    }, [unread, drift]);
+        // The ledger's version is what says the overlay moved.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [unread, countedAt, overlayVersion]);
 
     const recount = useCallback(() => {
+        const asked = Date.now();
         void fetch(UNREAD_PATH, { cache: "no-store" })
             .then((response) => (response.ok ? response.json() : null))
             .then((body) => {
                 const parsed = unreadSchema.safeParse(body);
-                if (parsed.success) setUnread(parsed.data);
+                if (!parsed.success) return;
+                setUnread(parsed.data);
+                setCountedAt(asked);
             })
             .catch(() => {
                 // Left as it was. A count that could not be fetched is not a
                 // count of zero, and clearing the badge over one failed request
                 // is how somebody misses the message it was there for.
             });
-    }, []);
+    }, [setUnread]);
+
+    // A change Mail made has been confirmed: ask for the count now rather than
+    // waiting for the live channel to go round, so the badge settles on the
+    // server's figure as soon as the server has it.
+    useEffect(() => {
+        if (!enabled) return;
+        return subscribeUnreadOverlay((event) => {
+            if (event === "settled") recount();
+        });
+    }, [enabled, recount]);
 
     /**
      * Where the last ask for new mail left off, in the server's own clock.
@@ -292,9 +295,5 @@ export function MailUnreadProvider({
         };
     }, [enabled, scope, recount]);
 
-    return (
-        <NudgeContext.Provider value={nudge}>
-            <UnreadContext.Provider value={shown}>{children}</UnreadContext.Provider>
-        </NudgeContext.Provider>
-    );
+    return <UnreadContext.Provider value={shown}>{children}</UnreadContext.Provider>;
 }

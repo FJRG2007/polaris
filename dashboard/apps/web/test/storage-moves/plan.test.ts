@@ -4,7 +4,11 @@
  * decides when the original may be touched.
  */
 
-import { describe, expect, it } from "vitest";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { forCompose, renderComposeYaml } from "@polaris/deploy";
 import * as plan from "@/lib/storage-moves/plan";
 
@@ -246,8 +250,77 @@ describe("mount rendering", () => {
     it("prints the copy's figures before the manifests are compared", () => {
         const script = plan.copyScript();
         expect(script.indexOf("POLARIS_COPY")).toBeGreaterThan(script.indexOf("cp -a"));
-        expect(script.indexOf("POLARIS_COPY")).toBeLessThan(script.indexOf("md5sum"));
-        expect(script.indexOf("POLARIS_VERIFIED")).toBeGreaterThan(script.indexOf("md5sum"));
+        expect(script.indexOf("POLARIS_COPY")).toBeLessThan(script.indexOf("cmp -s"));
+        expect(script.indexOf("POLARIS_VERIFIED")).toBeGreaterThan(script.indexOf("cmp -s"));
+    });
+
+    // A share that cannot store a link answered "Not supported" for each one, and
+    // the move only found out once 31 GB were written and the check failed.
+    it("refuses a destination that cannot hold the original's links before copying", () => {
+        const script = plan.copyScript();
+        expect(script.indexOf("exit 5")).toBeGreaterThan(script.indexOf("-type l"));
+        expect(script.indexOf("exit 5")).toBeLessThan(script.indexOf("cp -a"));
+        expect(plan.cleanupScript()).not.toMatch(/[\r\n]/);
+    });
+});
+
+/** Runs a script with `/from`, `/to` and `/tmp/` pointed into a scratch folder. */
+function runIn(root: string, script: string): { code: number; out: string } {
+    const local = script
+        .replaceAll("/tmp/", "@TMP@")
+        .replaceAll("/from", `${root}/from`)
+        .replaceAll("/to", `${root}/to`)
+        .replaceAll("@TMP@", `${root}/tmp-`);
+    // Without a closed stdin, a Cygwin/MSYS `sh` on Windows blocks forever instead
+    // of running the script, so the child times out rather than exiting.
+    const result = spawnSync("sh", ["-c", local], { encoding: "utf8", input: "" });
+    return { code: result.status ?? -1, out: `${result.stdout}${result.stderr}` };
+}
+
+const hasSh = spawnSync("sh", ["-c", "true"]).status === 0;
+
+describe.skipIf(!hasSh)("the scripts, run", () => {
+    let root = "";
+    beforeEach(() => {
+        root = mkdtempSync(join(tmpdir(), "polaris-move-")).replaceAll("\\", "/");
+        mkdirSync(`${root}/from/world/region`, { recursive: true });
+        mkdirSync(`${root}/to`);
+        writeFileSync(`${root}/from/world/level.dat`, "level");
+        writeFileSync(`${root}/from/world/region/r.0.0.mca`, "x".repeat(4096));
+    });
+    afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+    it("copies and verifies a volume", () => {
+        const { code, out } = runIn(root, plan.copyScript());
+        expect(out).toContain("POLARIS_VERIFIED");
+        expect(code).toBe(0);
+        expect(plan.parseCopyLog(out)).toMatchObject({ sourceFiles: 2, copiedBytes: 4101 });
+    });
+
+    it("names the file that did not match, relative to the volume", () => {
+        const script = plan
+            .copyScript()
+            .replace("cp -a /from/. /to/", "cp -a /from/. /to/; printf y >> /to/world/level.dat");
+        const { code, out } = runIn(root, script);
+        expect(code).toBe(plan.COPY_EXIT.mismatch);
+        const report = plan.parseCopyLog(out);
+        expect(report.differ).toBe("world/level.dat");
+        expect(plan.copyOutcome(code, report)).toEqual({ ok: false, failure: "mismatch" });
+    });
+
+    it("empties what an earlier attempt left before copying", () => {
+        mkdirSync(`${root}/to/stale/deep`, { recursive: true });
+        writeFileSync(`${root}/to/stale/deep/old.bin`, "old");
+        const { code } = runIn(root, plan.copyScript());
+        expect(code).toBe(0);
+        expect(existsSync(`${root}/to/stale`)).toBe(false);
+    });
+
+    it("empties a folder and says so only when nothing is left", () => {
+        const { code } = runIn(root, plan.cleanupScript());
+        expect(code).toBe(0);
+        expect(readdirSync(`${root}/from`)).toEqual([]);
+        expect(existsSync(`${root}/from`)).toBe(true);
     });
 });
 
@@ -361,6 +434,24 @@ describe("the copy's report", () => {
         expect(
             plan.copyOutcome(plan.COPY_EXIT.mismatch, plan.parseCopyLog("POLARIS_MISMATCH"))
         ).toEqual({ ok: false, failure: "mismatch" });
+        expect(plan.copyOutcome(plan.COPY_EXIT.noLinks, plan.parseCopyLog(""))).toEqual({
+            ok: false,
+            failure: "noLinks"
+        });
+    });
+
+    it("reads the file a failed copy named, without the log's prefix", () => {
+        const log = [
+            "2026-10-14T13:32:02.489846396Z POLARIS_MISMATCH",
+            "2026-10-14T13:32:02.489846396Z POLARIS_DIFFER path=./Saved/Config/Game.ini",
+            "2026-10-14T13:32:02.489846396Z POLARIS_NOLINKS path=./Game.ini"
+        ].join("\n");
+        expect(plan.parseCopyLog(log)).toMatchObject({
+            mismatch: true,
+            differ: "Saved/Config/Game.ini",
+            noLinks: "Game.ini"
+        });
+        expect(plan.parseCopyLog("POLARIS_DIFFER path=")).not.toHaveProperty("differ");
     });
 
     it("draws progress without ever claiming done before the check", () => {

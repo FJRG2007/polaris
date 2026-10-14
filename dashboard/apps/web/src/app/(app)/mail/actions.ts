@@ -41,6 +41,7 @@ import * as accounts from "@/lib/mailbox/accounts";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
+import * as mailNotices from "@/lib/mailbox/mail-notices";
 import * as contacts from "@/lib/mailbox/contacts";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import * as templates from "@/lib/mailbox/templates";
@@ -420,17 +421,32 @@ export async function syncAllAction() {
 /* Messages                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/** Actions after which a conversation is dealt with, and a notice about it on
+ *  the bell is not something to go on counting. */
+const DEALT_WITH: ReadonlySet<z.infer<typeof core.mailMessageAction>> = new Set([
+    "read",
+    "archive",
+    "trash",
+    "delete",
+    "junk"
+]);
+
 export async function actOnAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailActionSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
+        const threads = DEALT_WITH.has(parsed.data.action)
+            ? await mailNotices.threadsOfMessages(userId, parsed.data.messageIds)
+            : [];
         const done = await messages.actOnMessages(
             userId,
             parsed.data.messageIds,
             parsed.data.action,
             { scope: parsed.data.scope, strict: true }
         );
+        // Read, filed or thrown away: the bell's notices about it go too.
+        await mailNotices.readNoticesAboutThreads(userId, threads);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -459,11 +475,14 @@ export async function moveAction(input: unknown) {
     const parsed = core.mailMoveSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.nothingSelected") };
     try {
+        const threads = await mailNotices.threadsOfMessages(userId, parsed.data.messageIds);
         const done = await messages.moveMessages(
             userId,
             parsed.data.messageIds,
-            parsed.data.folderId
+            parsed.data.folderId,
+            { scope: parsed.data.scope, strict: true }
         );
+        await mailNotices.readNoticesAboutThreads(userId, threads);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -1067,11 +1086,14 @@ export async function moveToFolderAction(input: unknown) {
     const parsed = core.mailMoveSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.nothingMoved") };
     try {
+        const threads = await mailNotices.threadsOfMessages(userId, parsed.data.messageIds);
         const done = await messages.moveMessages(
             userId,
             parsed.data.messageIds,
-            parsed.data.folderId
+            parsed.data.folderId,
+            { scope: parsed.data.scope, strict: true }
         );
+        await mailNotices.readNoticesAboutThreads(userId, threads);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.moveFailed");

@@ -119,20 +119,27 @@ describe("what a live frame does", () => {
 
     it("validates what comes back rather than blanking the rail on a shape it does not know", () => {
         expect(shell).toContain("const parsed = railSchema.safeParse(body);");
-        expect(shell).toContain("if (parsed.success) setRail(parsed.data);");
+        expect(shell).toContain("if (parsed.success) setRail({ ...parsed.data, at: asked });");
     });
 });
 
 describe("where the rail starts from", () => {
     it("is the server's own render, so the first paint is right", () => {
-        expect(shell).toContain("const [rail, setRail] = useState({");
-        expect(shell).toContain("accounts: sentAccounts, folders: sentFolders, unread: sentUnread");
+        expect(shell).toContain("const [rail, setRail] = useState(() => ({");
+        expect(shell).toMatch(
+            /useState\(\(\) => \(\{\s+accounts: sentAccounts,\s+folders: sentFolders,\s+unread: sentUnread,/
+        );
     });
 
     it("takes the server's word again whenever it renders", () => {
         // A mailbox added, a label written, a shelf switched: what the server
         // says then is the truth this was standing in for.
         expect(shell).toContain("}, [sentAccounts, sentFolders, sentUnread]);");
+    });
+
+    it("stamps the server's render with when it arrived, so a change it already counts is not taken off again", () => {
+        expect(shell).toMatch(/useEffect\(\(\) => \{\s+setRail\(\{[^}]*at: Date\.now\(\)\s*\}\);/);
+        expect(shell).not.toContain("at: 0");
     });
 });
 

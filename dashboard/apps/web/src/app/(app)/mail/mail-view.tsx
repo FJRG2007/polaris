@@ -23,6 +23,7 @@
 import Link from "next/link";
 import * as core from "@polaris/core";
 import { useMail } from "./mail-shell";
+import type { UnreadHandle } from "@/lib/mailbox/unread-overlay";
 import { ThreadView } from "./thread-view";
 import { SenderFace } from "./sender-face";
 import { MailSearch } from "./mail-search";
@@ -735,7 +736,7 @@ export function MailView({
         // told in the same breath and nobody waits on it: a refusal leaves the
         // message unread, which is the truth, and the next list brings the bold
         // row back on its own.
-        nudgeUnread(unreadNudges([row]));
+        const counts = nudgeUnread(unreadNudges([row]), [row.id]);
         const pending = patchUntilAnswered([row.id], { unreadCount: 0 });
         // Carried on past this conversation closing - leaving at once is most of
         // what triaging is - and the list read again once the server has it, so
@@ -748,12 +749,17 @@ export function MailView({
             (outcome) => {
                 if (refusalOf(outcome)) {
                     pending.abandon();
+                    counts.abandon();
                     return;
                 }
                 pending.settle();
+                counts.settle();
                 refreshMailbox();
             },
-            () => pending.abandon()
+            () => {
+                pending.abandon();
+                counts.abandon();
+            }
         );
     }, [
         nudgeUnread,
@@ -783,13 +789,16 @@ export function MailView({
                 const row = threads.find((thread) => thread.id === id);
                 return row ? [shown(row)] : [];
             });
+            // Every count outside the list moves with it, on one handle: the
+            // rail, the badges, the bell. Answered below with the rows.
+            let counts: UnreadHandle | null = null;
             if (action === "read" || leavesTheView(action)) {
                 // Read, archived, binned: dealt with, whichever it was, so the
-                // notice about it goes with the row.
+                // notice about it goes with the row - the system's and the bell's.
                 for (const id of aimed) closeDesktopNotice(`mail:${id}`);
-                nudgeUnread(unreadNudges(aimedRows));
+                counts = nudgeUnread(unreadNudges(aimedRows), aimed);
             } else if (action === "unread") {
-                nudgeUnread(
+                counts = nudgeUnread(
                     unreadNudges(
                         aimedRows.map((row) => ({
                             accountId: row.accountId,
@@ -816,6 +825,12 @@ export function MailView({
                     messageIds: [...messageIds],
                     action,
                     scope: scopeOf(action)
+                }).catch((caught: unknown) => {
+                    // Nothing answered: put every count back, then let the
+                    // busy state report it as it always has.
+                    pending?.abandon();
+                    counts?.abandon();
+                    throw caught;
                 });
                 // This mailbox has no folder for what was asked. Ask which one it
                 // is and do the action again once it is settled, so the answer
@@ -823,6 +838,7 @@ export function MailView({
                 const missing = missingFolderRole(outcome);
                 if (missing) {
                     pending?.abandon();
+                    counts?.abandon();
                     if (reopen) openAgain(reopen);
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
@@ -834,10 +850,12 @@ export function MailView({
                     // somebody's mail - and a reader taken out of a conversation
                     // that was never filed has to be put back in it.
                     pending?.abandon();
+                    counts?.abandon();
                     if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
                 }
+                counts?.settle();
                 // Done. A flag the server has now written stops being carried:
                 // what comes back next says it too, and holding it past that is
                 // the screen disagreeing with the mailbox for ever.
@@ -923,11 +941,12 @@ export function MailView({
                 const row = threads.find((thread) => thread.id === id);
                 return row ? [shown(row)] : [];
             });
+            let counts: UnreadHandle | null = null;
             if (leaves) {
                 // Filed is dealt with, whichever folder it went to, so the
-                // notice about it goes with the row.
+                // notice about it goes with the row - the system's and the bell's.
                 for (const id of aimed) closeDesktopNotice(`mail:${id}`);
-                nudgeUnread(unreadNudges(aimedRows));
+                counts = nudgeUnread(unreadNudges(aimedRows), aimed);
             }
 
             // And the conversation being read closes, for the reason `act` gives:
@@ -943,13 +962,19 @@ export function MailView({
             startBusy(async () => {
                 const outcome = await moveToFolderAction({
                     folderId,
-                    messageIds: [...messageIds]
+                    messageIds: [...messageIds],
+                    scope: "folder"
+                }).catch((caught: unknown) => {
+                    pending?.abandon();
+                    counts?.abandon();
+                    throw caught;
                 });
                 const said = refusalOf(outcome);
                 if (said) {
                     // Both halves back: the rows, and the reader who was taken
                     // out of a conversation that was never actually filed.
                     pending?.abandon();
+                    counts?.abandon();
                     if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
@@ -958,6 +983,7 @@ export function MailView({
                 // was fetched before this and still holds the row, so it is let
                 // go the first time a list comes back without it.
                 pending?.settle();
+                counts?.settle();
                 setSelected([]);
                 toast.show({
                     title: t("shell.moved", { count: messageIds.length, folder: folderName })
@@ -1829,11 +1855,19 @@ export function MailView({
                         // Opening a message marks it read on the server, which
                         // takes a round trip. The row stops being bold now.
                         onRead={() => {
-                            nudgeUnread(unreadNudges([openThread]));
+                            const counts = nudgeUnread(unreadNudges([openThread]), [openThread.id]);
                             const pending = patchUntilAnswered([openThread.id], {
                                 unreadCount: 0
                             });
-                            return (accepted) => (accepted ? pending.settle() : pending.abandon());
+                            return (accepted) => {
+                                if (accepted) {
+                                    pending.settle();
+                                    counts.settle();
+                                } else {
+                                    pending.abandon();
+                                    counts.abandon();
+                                }
+                            };
                         }}
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.

@@ -901,17 +901,22 @@ export function trackProblems(layout: Layout): string[] {
     const ice = new Set<number>();
     const coords: [number, number][] = [];
     for (const at of road.keys()) {
-        const [x, z] = at.split(",").map(Number) as [number, number];
+        const comma = at.indexOf(",");
+        const x = Number(at.slice(0, comma));
+        const z = Number(at.slice(comma + 1));
         ice.add(n(x, z));
         coords.push([x, z]);
     }
-    // A wall all round: every block beside the ice is ice or wall.
-    const walls = new Set(
-        [...wallCells(road)].map((at) => {
-            const [x, z] = at.split(",").map(Number) as [number, number];
-            return n(x, z);
-        })
-    );
+    // A wall all round: every block beside the ice is ice or wall. The same
+    // blocks as `wallCells`, kept as numbers: as strings they were most of the
+    // time a layout took to check.
+    const walls = new Set<number>();
+    for (const [x, z] of coords)
+        for (let dx = -1; dx <= 1; dx += 1)
+            for (let dz = -1; dz <= 1; dz += 1) {
+                const near = n(x + dx, z + dz);
+                if (!ice.has(near)) walls.add(near);
+            }
     for (const [x, z] of coords)
         for (let dx = -1; dx <= 1; dx += 1)
             for (let dz = -1; dz <= 1; dz += 1) {
