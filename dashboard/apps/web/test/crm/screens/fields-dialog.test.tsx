@@ -77,7 +77,7 @@ describe("fields dialog, money field", () => {
 
     it("falls back to euros when the reader's currency is not one a field can hold", async () => {
         // A preference saved before the currency list it is checked against.
-        newField("XXX" as unknown as DisplayPreferences["currency"]);
+        newField("ZZZ" as unknown as DisplayPreferences["currency"]);
         await chooseKind("Amount");
         expect((await screen.findByRole("combobox", { name: "Currency" })).textContent).toContain(
             "EUR"
