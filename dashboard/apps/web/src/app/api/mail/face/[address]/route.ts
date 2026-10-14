@@ -32,6 +32,8 @@
  */
 
 import { apiPermission } from "@/lib/api-session";
+import { setBounded } from "@/lib/bounded-map";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { resolveAvatar } from "@/lib/avatar-service";
 import { addressGravatar, visibleOwner } from "@/lib/mailbox/face-owner";
 import { markDomains } from "@/lib/mailbox/sender-domain";
@@ -123,6 +125,17 @@ interface Remembered {
 /** Held on `globalThis` for the same reason the live bus is: a dev server
  *  re-evaluates the module and a fresh map would forget every answer. */
 const FACES = Symbol.for("polaris.mail.faces");
+/** How much of that is kept. Every sender's domain is a key, spam included, and a
+ *  site decides how large its mark is; past this the oldest answers go. */
+const FACE_LIMITS = {
+    maxEntries: 2_000,
+    maxBytes: 32 * 1024 * 1024,
+    sizeOf: (held: Remembered) => held.bytes?.byteLength ?? 0
+};
+/** Sites one reader may send this server to look through, per window. A mailbox
+ *  scrolled end to end is a few hundred domains, and each one is remembered. */
+const HUNTS_PER_WINDOW = 300;
+const HUNT_WINDOW_MS = 10 * 60 * 1000;
 
 function remembered(): Map<string, Remembered> {
     const held = globalThis as { [FACES]?: Map<string, Remembered> };
@@ -187,6 +200,8 @@ export async function GET(
         return held.bytes ? image(held.bytes, held.type, MARK_CACHE) : gone();
     }
 
+    if (!(await rateLimit(`mail-face-hunt:${user.id}`, HUNTS_PER_WINDOW, HUNT_WINDOW_MS)).ok)
+        return busy();
     const hunt = deadline(BUDGET_MS, `${domain} waited too long for a hunt`, request.signal);
     try {
         const found = await sameDomain(
@@ -194,11 +209,12 @@ export async function GET(
             (abandoned) =>
                 hunts.run(async () => {
                     const mark = await fetchMark(domain);
-                    remembered().set(domain, {
-                        at: Date.now(),
-                        bytes: mark?.bytes ?? null,
-                        type: mark?.type ?? ""
-                    });
+                    setBounded(
+                        remembered(),
+                        domain,
+                        { at: Date.now(), bytes: mark?.bytes ?? null, type: mark?.type ?? "" },
+                        FACE_LIMITS
+                    );
                     return mark;
                 }, abandoned),
             hunt.signal
