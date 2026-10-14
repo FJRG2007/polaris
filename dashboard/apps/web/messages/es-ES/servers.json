@@ -207,13 +207,13 @@
         "leftBehind": "Restos",
         "leftBehindIntro": "Polaris puso {count, plural, one {este contenedor} other {estos # contenedores}} en esta máquina y ya no tiene constancia de {count, plural, one {él} other {ellos}}: un servicio quitado o un stack recreado con otro nombre. No se toca nada más de la máquina.",
         "stillRunning": "Sigue en marcha",
-        "removedApp": "Dejado por una app eliminada",
+        "removedApp": "De una app eliminada",
         "leftovers": {
             "intro": "Apps eliminadas dejaron esto. Nada de ello guarda datos; los volúmenes aparecen arriba y se quitan de uno en uno.",
             "kind": {
                 "container": "Contenedor",
                 "network": "Red",
-                "dir": "Carpeta de despliegue",
+                "dir": "Carpeta",
                 "route": "Ruta del edge"
             },
             "cleanUp": "Limpiar",
