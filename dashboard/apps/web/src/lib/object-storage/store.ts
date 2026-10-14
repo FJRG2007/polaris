@@ -499,18 +499,24 @@ export async function resumeStoreReplications(storeId: string): Promise<void> {
 }
 
 /** The buckets of other stores on the same server that one could replicate into. */
-export async function replicationCandidates(bucketId: string, ownerId: string) {
+export async function replicationCandidates(
+    bucketId: string,
+    ownerId: string,
+    environmentIds: readonly string[] | null = null
+) {
     const bucket = await ownedBucket(bucketId, ownerId);
     const store = await prisma.managedDatabase.findUnique({
         where: { id: bucket.storeId },
         select: { targetId: true, environment: { select: { projectId: true } } }
     });
     if (!store) return [];
-    // The same project: access was checked for it, and for nothing wider.
+    // The same project, and only the environments the reader can reach in it:
+    // access was checked for those, and for nothing wider.
     const rows = await prisma.objectBucket.findMany({
         where: {
             storeId: { not: bucket.storeId },
             store: {
+                ...(environmentIds ? { environmentId: { in: [...environmentIds] } } : {}),
                 targetId: store.targetId,
                 engine: "seaweedfs",
                 environment: { projectId: store.environment.projectId, project: { ownerId } }
