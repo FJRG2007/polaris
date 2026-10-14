@@ -7,8 +7,10 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import * as skin from "../../lib/minecraft/skin";
+import { gameMessage } from "../../lib/game-message";
 import { gameWords, messageText } from "../game-words";
 import * as service from "../../lib/minecraft/skin-service";
 import { withServerContainer } from "../../lib/minecraft/service";
@@ -34,6 +36,32 @@ const signedSchema = z.object({
 });
 
 /** Looks up and signings go out to other services: a few a minute per person. */
+/**
+ * Who may change a player's skin: whoever moderates the server, and the person
+ * that player is - a Polaris account linked to the name (`GamePlayerLink`) - who
+ * may only read the server otherwise. A skin is how somebody looks to everybody
+ * else, so it is theirs to pick; anyone else's stays a moderator's call.
+ */
+async function requireSkinEditor(installedAppId: string, player: string | null) {
+    try {
+        return await requireGameServer("games.moderate", installedAppId);
+    } catch {
+        const resolved = await requireGameServer("games.read", installedAppId);
+        if (!player || !(await isLinkedTo(installedAppId, player, resolved.user.id))) {
+            throw new Error(gameMessage("minecraft", "skins.onlyYourOwn"));
+        }
+        return resolved;
+    }
+}
+
+async function isLinkedTo(installedAppId: string, player: string, userId: string): Promise<boolean> {
+    const link = await prisma.gamePlayerLink.findFirst({
+        where: { installedAppId, userId, player: { equals: player, mode: "insensitive" } },
+        select: { id: true }
+    });
+    return link !== null;
+}
+
 const LOOKUPS_PER_MINUTE = 20;
 const SIGNINGS_PER_MINUTE = 4;
 
@@ -50,20 +78,23 @@ async function failureText(caught: unknown, fallback: string): Promise<string> {
 export async function readSkinAction(input: {
     installedAppId: string;
     player: string;
-}): Promise<{ live?: service.LiveSkin; error?: string }> {
+}): Promise<{ live?: service.LiveSkin; ownSkin?: boolean; error?: string }> {
     const parsed = z
         .object({ installedAppId: z.string().uuid(), player: playerName })
         .safeParse(input);
     const t = await gameWords("minecraft");
     if (!parsed.success) return { error: t("errors.checkTheDetailsAndTry") };
     try {
-        const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer("games.read", parsed.data.installedAppId);
         const live = await withServerContainer(
             access.ownerId,
             parsed.data.installedAppId,
             (server) => service.readLiveSkin(server, parsed.data.player)
         );
-        return { live };
+        return {
+            live,
+            ownSkin: await isLinkedTo(parsed.data.installedAppId, parsed.data.player, user.id)
+        };
     } catch (caught) {
         return { error: await failureText(caught, "skins.couldNotRead") };
     }
@@ -72,12 +103,14 @@ export async function readSkinAction(input: {
 const previewSchema = z.union([
     z.object({
         installedAppId: z.string().uuid(),
+        player: playerName.optional(),
         kind: z.literal("file"),
         png: pngData,
         fileName: z.string().max(255)
     }),
     z.object({
         installedAppId: z.string().uuid(),
+        player: playerName.optional(),
         kind: z.literal("text"),
         text: z.string().trim().min(1).max(2048)
     })
@@ -94,7 +127,10 @@ export async function previewSkinAction(input: z.input<typeof previewSchema>): P
     const t = await gameWords("minecraft");
     if (!parsed.success) return { error: t("errors.checkTheDetailsAndTry") };
     try {
-        const { user } = await requireGameServer("games.moderate", parsed.data.installedAppId);
+        const { user } = await requireSkinEditor(
+            parsed.data.installedAppId,
+            parsed.data.player ?? null
+        );
         if (parsed.data.kind === "text") {
             const allowed = await rateLimit(`skin-lookup:${user.id}`, LOOKUPS_PER_MINUTE, 60_000);
             if (!allowed.ok) return { error: t("skins.failures.tooMany") };
@@ -139,7 +175,7 @@ export async function applySkinAction(
     if (!parsed.success) return { error: t("errors.checkTheDetailsAndTry") };
     const { installedAppId, player, model } = parsed.data;
     try {
-        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const { user, access } = await requireSkinEditor(installedAppId, player);
         const given = parsed.data.signed ? skin.signedSkin(parsed.data.signed) : null;
         let signed = given && skin.decodeSkinValue(given.value)?.model === model ? given : null;
         if (!signed) {
@@ -179,7 +215,7 @@ export async function clearSkinAction(input: {
     if (!parsed.success) return { error: t("errors.checkTheDetailsAndTry") };
     const { installedAppId, player } = parsed.data;
     try {
-        const { user, access } = await requireGameServer("games.moderate", installedAppId);
+        const { user, access } = await requireSkinEditor(installedAppId, player);
         const live = await withServerContainer(access.ownerId, installedAppId, (server) =>
             service.clearSkin(server, player)
         );

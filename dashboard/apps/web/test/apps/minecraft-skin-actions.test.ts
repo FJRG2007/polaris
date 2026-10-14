@@ -19,6 +19,9 @@ const audits: { action: string; metadata: unknown }[] = [];
 let caps: string[] = ["skin"];
 let live: Record<string, unknown> | null = null;
 let linkResponse: Response | null = null;
+/** Whether the viewer moderates the server, and which names are linked to them. */
+let moderates = true;
+let linked: string[] = [];
 
 function packed(hash: string, model: "classic" | "slim"): string {
     const skin = {
@@ -54,15 +57,30 @@ vi.mock("@polaris/app-host", () => ({
         },
         rateLimitService: { rateLimit: async () => ({ ok: true, retryAfterMs: 0 }) },
         appsInstallAccess: {
-            requireGameServer: async () => ({
-                user: { id: "user-one" },
-                access: { ownerId: "owner-one", install: { id: INSTALL } }
-            })
+            requireGameServer: async (permission: string) => {
+                if (permission === "games.moderate" && !moderates) throw new Error("Server not found");
+                return {
+                    user: { id: "user-one" },
+                    access: { ownerId: "owner-one", install: { id: INSTALL } }
+                };
+            }
         },
         safeFetch: {
             safeUrl: async (address: string) => new URL(address),
             follow: async () => linkResponse,
             readCapped: async (response: Response) => new Uint8Array(await response.arrayBuffer())
+        }
+    }
+}));
+
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        gamePlayerLink: {
+            findFirst: async ({ where }: { where: { userId: string; player: { equals: string } } }) =>
+                where.userId === "user-one" &&
+                linked.some((name) => name.toLowerCase() === where.player.equals.toLowerCase())
+                    ? { id: "link-one" }
+                    : null
         }
     }
 }));
@@ -118,6 +136,8 @@ beforeEach(() => {
     caps = ["skin"];
     live = null;
     linkResponse = null;
+    moderates = true;
+    linked = [];
     signingReply = signed;
     vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
         fetched.push({ url, init });
@@ -284,6 +304,39 @@ describe("applying a skin", () => {
         expect(result.error).toBe("skins.needsUpdate");
         expect(said).toEqual(["polaris caps"]);
         expect(audits).toEqual([]);
+    });
+});
+
+describe("whose skin a player may change", () => {
+    const apply = () =>
+        actions.applySkinAction({
+            installedAppId: INSTALL,
+            player: "player_one",
+            png: base64(SKIN_PNG),
+            model: "slim",
+            signed: { value: packed(HASH, "slim"), signature: SIGNATURE }
+        });
+
+    it("lets the person a name is linked to change their own", async () => {
+        moderates = false;
+        linked = ["Player_One"];
+        const result = await apply();
+        expect(result.error).toBeUndefined();
+        expect(audits[0]?.action).toBe("minecraft.skin-apply");
+    });
+
+    it("refuses somebody else's to a player who does not moderate", async () => {
+        moderates = false;
+        linked = ["player_two"];
+        const result = await apply();
+        expect(result.error).toBeDefined();
+        expect(said.some((line) => line.startsWith("polaris skin stage"))).toBe(false);
+    });
+
+    it("says on the read whether the skin is the viewer's own", async () => {
+        linked = ["player_one"];
+        const result = await actions.readSkinAction({ installedAppId: INSTALL, player: "player_one" });
+        expect(result.ownSkin).toBe(true);
     });
 });
 

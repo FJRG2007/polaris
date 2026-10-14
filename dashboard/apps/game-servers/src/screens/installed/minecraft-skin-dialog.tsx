@@ -70,7 +70,8 @@ export function SkinDialog({
 }: {
     installedAppId: string;
     player: string;
-    /** Whether this viewer may change the skin (`games.moderate`). */
+    /** Whether this viewer moderates the server, and so may change anybody's
+     *  skin. The player themselves may change their own, which the read says. */
     canEdit: boolean;
     /** Whether they are on the server now. */
     online: boolean;
@@ -80,6 +81,8 @@ export function SkinDialog({
     playersOnline?: number;
     onClose: () => void;
 }) {
+    const [ownSkin, setOwnSkin] = useState(false);
+    const editable = canEdit || ownSkin;
     const t = useGameText("minecraft");
     const [confirm, confirmElement] = useConfirm();
     const [live, setLive] = useState<LiveSkin | null>(null);
@@ -97,7 +100,7 @@ export function SkinDialog({
 
     /** What the server says they wear, as something the view can draw. */
     const showLive = useCallback(
-        async (next: LiveSkin) => {
+        async (next: LiveSkin, mayEdit: boolean = editable) => {
             setLive(next);
             if (next.state !== "read" || !next.skin) {
                 setCurrent(null);
@@ -107,9 +110,9 @@ export function SkinDialog({
             const url = skin.textureUrl(hash);
             // The texture is fetched through Polaris for whoever may, so it can be
             // exported too; a reader gets the address.
-            if (canEdit) {
+            if (mayEdit) {
                 const fetched = await actions
-                    .previewSkinAction({ installedAppId, kind: "text", text: url })
+                    .previewSkinAction({ installedAppId, player, kind: "text", text: url })
                     .catch(() => null);
                 if (fetched?.png) {
                     setCurrent({ png: fetched.png, url: null, model: worn });
@@ -118,7 +121,7 @@ export function SkinDialog({
             }
             setCurrent({ png: null, url, model: worn });
         },
-        [canEdit, installedAppId]
+        [editable, installedAppId]
     );
 
     useEffect(() => {
@@ -129,7 +132,11 @@ export function SkinDialog({
             async (result) => {
                 if (!alive) return;
                 if (result.error) setReadError(result.error);
-                else if (result.live) await showLive(result.live);
+                else {
+                    const own = result.ownSkin ?? false;
+                    setOwnSkin(own);
+                    if (result.live) await showLive(result.live, canEdit || own);
+                }
                 if (alive) setReading(false);
             },
             () => {
@@ -141,7 +148,7 @@ export function SkinDialog({
         return () => {
             alive = false;
         };
-    }, [installedAppId, player, attempt, showLive, t]);
+    }, [installedAppId, player, attempt, canEdit, showLive, t]);
 
     const unsupported = live?.state === "unsupported";
     const shown: Shown | null = preview ? { png: preview.png, url: null, model } : current;
@@ -159,6 +166,7 @@ export function SkinDialog({
         const result = await actions
             .previewSkinAction({
                 installedAppId,
+                player,
                 kind: "file",
                 png: toBase64(bytes),
                 fileName: file.name
@@ -175,7 +183,7 @@ export function SkinDialog({
         setNotice(null);
         setBusy("load");
         const result = await actions
-            .previewSkinAction({ installedAppId, kind: "text", text })
+            .previewSkinAction({ installedAppId, player, kind: "text", text })
             .catch(() => ({ error: t("skins.couldNotLoad") }) as const);
         setBusy(null);
         took(result, null);
@@ -278,7 +286,7 @@ export function SkinDialog({
             <DialogContent
                 className="max-h-[88vh] max-w-2xl overflow-y-auto overscroll-contain"
                 onPaste={(event) => {
-                    if (!canEdit || unsupported) return;
+                    if (!editable || unsupported) return;
                     const file = imageFrom(event.clipboardData.items);
                     if (!file) return;
                     event.preventDefault();
@@ -346,11 +354,11 @@ export function SkinDialog({
                             {worn && !worn.signed && !preview && (
                                 <p className="text-sm text-muted-foreground">{t("skins.unsigned")}</p>
                             )}
-                            {!online && canEdit && (
+                            {!online && editable && (
                                 <p className="text-sm text-muted-foreground">{t("skins.notOnline")}</p>
                             )}
 
-                            {canEdit && (
+                            {editable && (
                                 <section className="flex min-w-0 flex-col gap-3">
                                     <h3 className="text-sm font-medium">{t("skins.import")}</h3>
                                     <div
@@ -470,7 +478,7 @@ export function SkinDialog({
                             {t("skins.export")}
                         </Button>
                     )}
-                    {canEdit && !unsupported && !readError && worn && !preview && (
+                    {editable && !unsupported && !readError && worn && !preview && (
                         <Button variant="outline" size="sm" onClick={() => void reset()} disabled={working}>
                             {busy === "reset" && <Loader2 className="size-4 animate-spin" aria-hidden />}
                             {t("skins.reset")}

@@ -3080,6 +3080,7 @@
         "updateReason": "Actualización del mod de Polaris para skins",
         "unanswered": "El servidor no respondió. Prueba de nuevo en un momento.",
         "viewer": "Vista 3D de la skin. Arrastra para girarla.",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "onlyYourOwn": "Solo puedes cambiar tu propia skin."
     }
 }

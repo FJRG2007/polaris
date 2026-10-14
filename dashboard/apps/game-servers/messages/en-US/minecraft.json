@@ -3080,6 +3080,7 @@
         "updateReason": "Polaris mod update for skins",
         "unanswered": "The server did not answer. Try again in a moment.",
         "viewer": "3D view of the skin. Drag to turn it.",
-        "retry": "Try again"
+        "retry": "Try again",
+        "onlyYourOwn": "You can only change your own skin."
     }
 }
