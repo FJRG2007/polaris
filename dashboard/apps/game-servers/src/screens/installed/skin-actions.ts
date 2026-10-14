@@ -81,10 +81,13 @@ async function failureText(caught: unknown, fallback: string): Promise<string> {
 }
 
 /** What a player wears now, as the server says. */
-export async function readSkinAction(input: {
-    installedAppId: string;
-    player: string;
-}): Promise<{ live?: service.LiveSkin; ownSkin?: boolean; error?: string }> {
+export async function readSkinAction(input: { installedAppId: string; player: string }): Promise<{
+    live?: service.LiveSkin;
+    /** The UUID the server knows them by, which picks the default skin. */
+    uuid?: string | null;
+    ownSkin?: boolean;
+    error?: string;
+}> {
     const parsed = z
         .object({ installedAppId: z.string().uuid(), player: playerName })
         .safeParse(input);
@@ -92,13 +95,17 @@ export async function readSkinAction(input: {
     if (!parsed.success) return { error: t("errors.checkTheDetailsAndTry") };
     try {
         const { user, access } = await requireGameServer("games.read", parsed.data.installedAppId);
-        const live = await withServerContainer(
+        const { live, uuid } = await withServerContainer(
             access.ownerId,
             parsed.data.installedAppId,
-            (server) => service.readLiveSkin(server, parsed.data.player)
+            async (server) => ({
+                live: await service.readLiveSkin(server, parsed.data.player),
+                uuid: await service.knownUuid(server, parsed.data.player)
+            })
         );
         return {
             live,
+            uuid,
             ownSkin: await isLinkedTo(parsed.data.installedAppId, parsed.data.player, user.id)
         };
     } catch (caught) {

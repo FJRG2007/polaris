@@ -14,6 +14,9 @@ import * as skin from "./skin";
 import { host } from "@polaris/app-host";
 import type { ServerContainer } from "./service";
 import { capabilities } from "./events/in-server";
+import { DATA_DIR } from "./world";
+import { readContainerFile } from "../container-files";
+import { latestUuid } from "./usercache";
 
 const { follow, readCapped, safeUrl } = host.safeFetch;
 
@@ -190,6 +193,15 @@ export async function readLiveSkin(server: ServerContainer, player: string): Pro
     );
     if (!reply) return { state: "unanswered" };
     return reply.ok ? { state: "read", skin: reply.skin } : { state: "refused", why: reply.why };
+}
+
+/**
+ * The UUID the server last knew a player by, from its usercache - what the game
+ * picks a default skin from - or null for a name it has never seen join.
+ */
+export async function knownUuid(server: ServerContainer, player: string): Promise<string | null> {
+    const cache = await readContainerFile(server, `${DATA_DIR}/usercache.json`).catch(() => null);
+    return cache === null ? null : latestUuid(cache, player);
 }
 
 /** Put a signed skin on a player, then read back what the server holds. */
