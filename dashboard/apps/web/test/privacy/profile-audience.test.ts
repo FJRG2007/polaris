@@ -150,6 +150,10 @@ describe("an account that never chose", () => {
 });
 
 describe("what counts as small", () => {
+    it("offers exactly the five profile answers", () => {
+        expect([...core.PROFILE_AUDIENCES]).toEqual(["everyone", "spaces", "smallSpaces", "friends", "nobody"]);
+    });
+
     it("is fewer than 200 people", () => {
         expect(core.SMALL_SPACE_MEMBERS).toBe(200);
         expect(core.isSmallSpace(199)).toBe(true);

@@ -57,6 +57,8 @@
     "audiences": {
         "everyone": "Todos",
         "everyoneExcept": "Todos excepto",
+        "spaces": "Amigos y miembros de servidores",
+        "smallSpaces": "Amigos y miembros de servidores pequeños",
         "friends": "Amigos",
         "friendsExcept": "Amigos excepto",
         "friendsOfFriends": "Amigos de mis amigos",
@@ -66,6 +68,10 @@
         "nobody": "Nadie"
     },
     "fields": {
+        "profile": {
+            "label": "Quién puede ver tu perfil",
+            "note": "Tu biografía, enlaces, pronombres y banner. El resto solo ve tu nombre y tu foto. Un servidor pequeño tiene menos de 200 miembros."
+        },
         "discoverable": {
             "label": "Si la gente puede encontrarte",
             "note": "Quién encuentra tu cuenta cuando busca a alguien. Quien no pueda tendrá que saber tu nombre de usuario exacto para pedirte que le añadas, y nunca se le dice si existe."

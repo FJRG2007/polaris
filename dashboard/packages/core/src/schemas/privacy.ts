@@ -104,6 +104,16 @@ export function isSmallSpace(people: number): boolean {
  *  who shares a space when somebody's answer turns on it. */
 export const SPACE_AUDIENCES = ["spaces", "smallSpaces"] as const;
 
+/** What "who can see your profile" offers: the circles people actually draw
+ *  around a profile, widest first. */
+export const PROFILE_AUDIENCES = [
+    "everyone",
+    "spaces",
+    "smallSpaces",
+    "friends",
+    "nobody"
+] as const satisfies readonly PrivacyAudience[];
+
 /** Whether an audience is answered by the chat spaces two people share. */
 export function audienceNeedsSpaces(audience: PrivacyAudience): boolean {
     return (SPACE_AUDIENCES as readonly string[]).includes(audience);
@@ -203,7 +213,16 @@ export const PRIVACY_SECTIONS = [
     {
         id: "details",
         label: "Your details",
-        fields: ["profile", "avatar", "photoFullSize", "fullName", "email", "phone", "companies", "followers"]
+        fields: [
+            "profile",
+            "avatar",
+            "photoFullSize",
+            "fullName",
+            "email",
+            "phone",
+            "companies",
+            "followers"
+        ]
     },
     {
         id: "reaching",
