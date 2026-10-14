@@ -1035,7 +1035,7 @@ async function logsOf(
 /** Run a one-off container to the end. Resumes one already running - a worker that
  *  died mid-copy left it going - instead of starting it over. */
 async function runOneShot(
-    context: MoveContext,
+    context: { readonly row: { readonly id: string }; readonly lease: string },
     ports: Awaited<ReturnType<typeof getPorts>>,
     spec: ReturnType<typeof plan.copySpec>,
     onTick?: (name: string) => Promise<void>
@@ -1083,7 +1083,8 @@ async function clearEarlierCopies(
             volumeId: context.row.volumeId,
             id: { not: context.row.id },
             state: "failed",
-            switched: false
+            switched: false,
+            copySettledAt: null
         },
         orderBy: { createdAt: "desc" },
         select: { id: true, destination: true },
@@ -1096,16 +1097,216 @@ async function clearEarlierCopies(
             if (plan.placementsOverlap(left, context.origin)) continue;
             if (plan.placementsOverlap(left, context.destination)) continue;
             if (await originShared(context.row.volumeId, left)) continue;
-            if (left.kind === "nas") {
-                const mount = await resolveMountTarget(left.connectionId, context.row.ownerId);
-                if (!mount) continue;
-                await ports.ensureMount(mount);
-            }
-            await runOneShot(context, ports, plan.cleanupSpec(`${move.id}-copy`, left));
+            await emptyCopy(context, ports, move.id, left, context.row.ownerId);
         } catch (caught) {
             console.error(`polaris: storage move ${move.id} still holds its copy:`, caught);
         }
     }
+}
+
+/**
+ * Empty the folder a move copied into, and record that it is gone. Throws when
+ * the share cannot be mounted or the folder could not be emptied, so the move
+ * stays on the list of copies to try again.
+ */
+async function emptyCopy(
+    held: { readonly row: { readonly id: string }; readonly lease: string },
+    ports: Awaited<ReturnType<typeof getPorts>>,
+    moveId: string,
+    copy: plan.Placement,
+    ownerId: string
+): Promise<void> {
+    if (copy.kind === "nas") {
+        const mount = await resolveMountTarget(copy.connectionId, ownerId);
+        if (!mount) throw new Error("the share is no longer set up");
+        await ports.ensureMount(mount);
+    }
+    const spec = plan.cleanupSpec(`${moveId}-copy`, copy);
+    const { exitCode, log } = await runOneShot(held, ports, spec);
+    if (exitCode !== 0) throw new Error(log.trim().slice(-300) || `exit ${exitCode}`);
+    await prisma.storageMove.update({ where: { id: moveId }, data: { copySettledAt: new Date() } });
+}
+
+/**
+ * Empty what failed moves left behind when nobody moves the same volume again,
+ * the only other time it is tried. A rollback that could not empty its copy (an
+ * SMB share skips files while a folder is deleted under it, or the share was
+ * away) would otherwise hold that space on the NAS for good, and it can be the
+ * size of the whole volume. Each move is worked under its own lease, so this
+ * never races the move itself or a second runner.
+ */
+export async function sweepLeftCopies(now: Date = new Date()): Promise<{ cleared: number }> {
+    const rows = await prisma.storageMove.findMany({
+        where: {
+            state: "failed",
+            switched: false,
+            copySettledAt: null,
+            OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }]
+        },
+        orderBy: { finishedAt: "asc" },
+        select: LEFT_COPY_FIELDS,
+        take: 5
+    });
+    let cleared = 0;
+    for (const row of rows) {
+        const lease = await takeLease(row.id);
+        if (!lease) continue;
+        try {
+            if (await clearLeftCopy(row, lease, now)) cleared += 1;
+        } catch (caught) {
+            console.error(`polaris: storage move ${row.id} still holds its copy:`, caught);
+        } finally {
+            await prisma.storageMove
+                .updateMany({
+                    where: { id: row.id, leaseToken: lease },
+                    data: { leaseUntil: null, leaseToken: null }
+                })
+                .catch(() => undefined);
+        }
+    }
+    return { cleared };
+}
+
+const LEFT_COPY_FIELDS = {
+    id: true,
+    volumeId: true,
+    applicationId: true,
+    ownerId: true,
+    origin: true,
+    destination: true,
+    finishedAt: true,
+    updatedAt: true
+} as const;
+
+/** This machine, for work that belongs to no app any more. */
+const LOCAL_TARGET: TargetRow = {
+    id: "local",
+    kind: "local",
+    hostId: null,
+    runtime: "compose",
+    proxyNetwork: ""
+};
+
+/** One failed move's copy: emptied, left, or given up on. True when emptied. */
+async function clearLeftCopy(
+    row: {
+        id: string;
+        volumeId: string;
+        applicationId: string;
+        ownerId: string;
+        origin: string;
+        destination: string;
+        finishedAt: Date | null;
+        updatedAt: Date;
+    },
+    lease: string,
+    now: Date
+): Promise<boolean> {
+    const settle = () =>
+        prisma.storageMove.update({ where: { id: row.id }, data: { copySettledAt: now } });
+    // A volume being moved right now may be copying into the same folder again.
+    const busy = await prisma.storageMove.findFirst({
+        where: { volumeId: row.volumeId, state: { in: [...plan.BLOCKING_STATES] } },
+        select: { id: true }
+    });
+    if (busy) return false;
+    const [volume, app] = await Promise.all([
+        prisma.volume.findUnique({
+            where: { id: row.volumeId },
+            select: { kind: true, source: true, name: true, connectionId: true }
+        }),
+        prisma.application.findUnique({
+            where: { id: row.applicationId },
+            select: { target: true }
+        })
+    ]);
+    const copy = plan.parsePlacement(row.destination);
+    const action = plan.leftCopyAction({
+        copy,
+        origin: plan.parsePlacement(row.origin),
+        current: volume ? plan.placementOf(volume) : null,
+        failedAt: row.finishedAt ?? row.updatedAt,
+        now
+    });
+    if (action === "keep" || (await originShared(row.volumeId, copy))) {
+        await settle();
+        return false;
+    }
+    // A folder on a server is only reachable through the app's machine, and once
+    // the app is gone nothing says which machine that was. A share can be mounted
+    // from this one.
+    const target = app?.target
+        ? (app.target as TargetRow)
+        : copy.kind === "nas"
+          ? LOCAL_TARGET
+          : null;
+    if (action === "give-up" || !target) {
+        console.error(`polaris: storage move ${row.id} left a copy that cannot be emptied`);
+        await settle();
+        return false;
+    }
+    const ports = await getPorts(target, row.ownerId);
+    try {
+        await emptyCopy({ row, lease }, ports, row.id, copy, row.ownerId);
+    } finally {
+        await ports.dispose().catch(() => undefined);
+    }
+    return true;
+}
+
+/**
+ * Forget moves that are long over. Nothing reads them past the Storage history,
+ * which shows the latest few, and the latest move of each app, which its storage
+ * card shows; without this every move ever made, including those of apps since
+ * deleted, stays a row for good.
+ */
+export async function pruneMoveHistory(now: Date = new Date()): Promise<{ forgotten: number }> {
+    const rows = await prisma.storageMove.findMany({
+        where: {
+            state: { in: ["finished", "failed"] },
+            finishedAt: { lt: new Date(now.getTime() - plan.MOVE_HISTORY_MS) }
+        },
+        orderBy: { finishedAt: "asc" },
+        select: {
+            id: true,
+            applicationId: true,
+            state: true,
+            finishedAt: true,
+            switched: true,
+            copySettledAt: true
+        },
+        take: 500
+    });
+    if (rows.length === 0) return { forgotten: 0 };
+    const appIds = [...new Set(rows.map((row) => row.applicationId))];
+    const [apps, latest] = await Promise.all([
+        prisma.application.findMany({ where: { id: { in: appIds } }, select: { id: true } }),
+        prisma.storageMove.findMany({
+            where: { applicationId: { in: appIds } },
+            orderBy: { createdAt: "desc" },
+            distinct: ["applicationId"],
+            select: { id: true }
+        })
+    ]);
+    const live = new Set(apps.map((app) => app.id));
+    const newest = new Set(latest.map((move) => move.id));
+    const ids = rows
+        .filter((row) =>
+            plan.moveForgettable({
+                state: row.state,
+                finishedAt: row.finishedAt,
+                copySettled: row.copySettledAt !== null,
+                switched: row.switched,
+                latestOfLiveApp: live.has(row.applicationId) && newest.has(row.id),
+                now
+            })
+        )
+        .map((row) => row.id);
+    if (ids.length === 0) return { forgotten: 0 };
+    const { count } = await prisma.storageMove.deleteMany({
+        where: { id: { in: ids }, state: { in: ["finished", "failed"] } }
+    });
+    return { forgotten: count };
 }
 
 async function copy(context: MoveContext): Promise<void> {
@@ -1273,6 +1474,10 @@ async function rollBack(context: MoveContext): Promise<void> {
                 }
                 const { exitCode, log } = await runOneShot(context, ports, spec);
                 if (exitCode !== 0) throw new Error(log.trim().slice(-300) || `exit ${exitCode}`);
+                await prisma.storageMove.update({
+                    where: { id: context.row.id },
+                    data: { copySettledAt: new Date() }
+                });
             }).catch((caught: unknown) =>
                 console.error(`polaris: storage move ${context.row.id} left its copy:`, caught)
             );

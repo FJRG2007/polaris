@@ -20,6 +20,7 @@ import { wakeSnoozed } from "@/lib/mailbox/messages";
 import { sweepBounces } from "@/lib/mailbox/bounces";
 import { sweepExpiredSends } from "@/lib/vault/sends";
 import { sweepOAuth } from "@/lib/mcp/oauth/sweep";
+import { sweepRateLimits } from "@/lib/rate-limit-service";
 import { sweepDueSends } from "@/lib/mailbox/compose";
 import { pruneTelemetry } from "@/lib/telemetry/store";
 import { runAutoscale } from "@/lib/deploy/autoscaler";
@@ -44,7 +45,7 @@ import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pollLastfm } from "@/lib/presence-activity/lastfm-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
-import { sweepStorageMoves } from "@/lib/storage-moves/service";
+import { pruneMoveHistory, sweepLeftCopies, sweepStorageMoves } from "@/lib/storage-moves/service";
 import { sweepAppStorage } from "@/lib/storage-moves/app-storage";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
@@ -230,6 +231,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: Number(process.env.POLARIS_STORAGE_MOVES_MS) || MINUTE,
         leaseMs: null,
         run: sweepStorageMoves
+    },
+    {
+        key: "storage-move-leftovers",
+        // Hourly. A copy a failed move could not empty waits on the NAS until
+        // this finds it, and a finished move is history for months - neither is
+        // urgent, and emptying a copy runs a container.
+        everyMs: HOUR,
+        // No lease: each failed move is worked under the move's own lease, and
+        // the history is deleted by id.
+        leaseMs: null,
+        run: async () => ({ ...(await sweepLeftCopies()), ...(await pruneMoveHistory()) })
     },
     {
         key: "app-storage",
@@ -533,14 +545,24 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
     {
         key: "oauth-sweep",
         // Hourly. What it removes is an expired code or token, a disconnected
-        // connection past its grace, an app registration nobody approved, and a
-        // rate-limit window that has run out - none of it can be presented or
-        // shown, so an hour late removes the same rows.
+        // connection past its grace, and an app registration nobody approved -
+        // none of it can be presented or shown, so an hour late removes the
+        // same rows.
         everyMs: HOUR,
         // No lease: each batch names its rows by id, so two runners delete the
         // same rows and one of them counts zero.
         leaseMs: null,
         run: () => sweepOAuth()
+    },
+    {
+        key: "rate-limit-sweep",
+        // Hourly. A counter is keyed per visitor IP, per link, per account, so
+        // a busy public page leaves a row per visitor; one whose window has run
+        // out counts nothing and goes.
+        everyMs: HOUR,
+        // No lease, for the same reason as the OAuth sweep: rows named by id.
+        leaseMs: null,
+        run: () => sweepRateLimits()
     },
     {
         key: "host-space",

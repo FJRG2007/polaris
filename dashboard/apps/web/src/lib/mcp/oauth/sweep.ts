@@ -18,18 +18,6 @@ const HOUR = 60 * 60 * 1000;
 /** A disconnected grant is kept this long, so reconnecting the same app soon
  *  after keeps the address and database rules the person set on it. */
 export const REVOKED_GRANT_TTL_MS = 30 * 24 * HOUR;
-/** The rate-limit counters the MCP and OAuth endpoints write. The longest
- *  window any of them uses is an hour (registration). */
-export const OAUTH_RATE_LIMIT_PREFIXES = [
-    "mcp-call:",
-    "mcp-change:",
-    "mcp-sse-open:",
-    "oauth-token:",
-    "oauth-revoke:",
-    "oauth-register:",
-    "oauth-authorize:"
-] as const;
-const RATE_LIMIT_WINDOW_MS = HOUR;
 /** Rows deleted per statement, and statements per table per pass. */
 const BATCH = 1000;
 const MAX_BATCHES = 20;
@@ -39,7 +27,6 @@ export interface OAuthSweepResult {
     readonly tokens: number;
     readonly grants: number;
     readonly clients: number;
-    readonly counters: number;
 }
 
 /**
@@ -96,16 +83,5 @@ export async function sweepOAuth(now: Date = new Date()): Promise<OAuthSweepResu
         (take) => prisma.oAuthClient.findMany({ where: clientWhere, select: { id: true }, take }),
         (ids) => prisma.oAuthClient.deleteMany({ where: { id: { in: ids }, grants: { none: {} } } })
     );
-    // A counter whose window has run out counts nothing; the next request
-    // starts a new one either way.
-    const counterWhere = {
-        windowStart: { lt: new Date(at - RATE_LIMIT_WINDOW_MS) },
-        OR: OAUTH_RATE_LIMIT_PREFIXES.map((prefix) => ({ key: { startsWith: prefix } }))
-    };
-    const counters = await deleteInBatches(
-        (take) =>
-            prisma.rateLimitCounter.findMany({ where: counterWhere, select: { id: true }, take }),
-        (ids) => prisma.rateLimitCounter.deleteMany({ where: { id: { in: ids } } })
-    );
-    return { codes, tokens, grants, clients, counters };
+    return { codes, tokens, grants, clients };
 }

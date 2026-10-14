@@ -1774,23 +1774,4 @@ describe("what a disconnected or abandoned connection leaves behind", () => {
         });
         expect(await listConnectedApps(ADA.id)).toHaveLength(1);
     });
-
-    it("drops the MCP and OAuth rate-limit windows that have run out, and no one else's", async () => {
-        const tables = state.db.tables;
-        const now = Date.now();
-        const stale = new Date(now - 2 * HOUR);
-        tables.rateLimitCounter!.push(
-            counter("oauth-token:203.0.113.5", stale),
-            counter("oauth-register:all", stale),
-            counter("mcp-call:some-grant", stale),
-            counter("oauth-register:198.51.100.7", new Date(now - 30 * 60 * 1000)),
-            counter("signin:203.0.113.5", stale)
-        );
-        const result = await sweepOAuth(new Date(now));
-        expect(result.counters).toBe(3);
-        expect(tables.rateLimitCounter!.map((row) => row.key).sort()).toEqual([
-            "oauth-register:198.51.100.7",
-            "signin:203.0.113.5"
-        ]);
-    });
 });

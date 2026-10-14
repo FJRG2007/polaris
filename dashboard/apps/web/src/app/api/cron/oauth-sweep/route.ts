@@ -1,7 +1,7 @@
 /**
  * Remove what the MCP sign-in flow no longer needs, on demand: expired codes and
- * tokens, disconnected connections past their grace, app registrations nobody
- * approved, and rate-limit windows that have run out.
+ * tokens, disconnected connections past their grace, and app registrations
+ * nobody approved.
  *
  * Polaris runs this on its own schedule too (see `lib/cron/scheduler`). The route
  * is for an operator who would rather drive the timing themselves.

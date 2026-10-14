@@ -189,6 +189,55 @@ export function placementsOverlap(left: Placement, right: Placement): boolean {
     return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
+/** How long a failed move's copy is tried again before it is given up on. */
+export const LEFT_COPY_RETRY_MS = 7 * 24 * 60 * 60_000;
+/** How long a move that is over is kept in the Storage history. */
+export const MOVE_HISTORY_MS = 90 * 24 * 60 * 60_000;
+
+/**
+ * What to do with the copy a failed move left, if anything. The copy is a folder
+ * the volume never pointed at, so it is emptied - unless it reaches the files of
+ * the move's own original or of where the volume is now, which a later move may
+ * have reused. A named volume is not a folder this can empty; it is left alone.
+ * Past `LEFT_COPY_RETRY_MS` it is given up on, so a share that went away is not
+ * tried forever.
+ */
+export function leftCopyAction(input: {
+    readonly copy: Placement;
+    readonly origin: Placement;
+    /** Where the volume is now; null once the volume is gone. */
+    readonly current: Placement | null;
+    readonly failedAt: Date;
+    readonly now: Date;
+}): "clear" | "keep" | "give-up" {
+    if (input.copy.kind === "volume") return "keep";
+    if (placementsOverlap(input.copy, input.origin)) return "keep";
+    if (input.current && placementsOverlap(input.copy, input.current)) return "keep";
+    if (input.now.getTime() - input.failedAt.getTime() > LEFT_COPY_RETRY_MS) return "give-up";
+    return "clear";
+}
+
+/**
+ * Whether a move that is over can leave the Storage history. Kept while it may
+ * still hold a copy, and while it is the latest move of an app that still exists:
+ * that one is what the app's storage card shows.
+ */
+export function moveForgettable(input: {
+    readonly state: string;
+    readonly finishedAt: Date | null;
+    /** Whether a failed move's copy was emptied or given up on. */
+    readonly copySettled: boolean;
+    readonly switched: boolean;
+    readonly latestOfLiveApp: boolean;
+    readonly now: Date;
+}): boolean {
+    if (input.state !== "finished" && input.state !== "failed") return false;
+    if (!input.finishedAt) return false;
+    if (input.state === "failed" && !input.switched && !input.copySettled) return false;
+    if (input.latestOfLiveApp) return false;
+    return input.now.getTime() - input.finishedAt.getTime() > MOVE_HISTORY_MS;
+}
+
 /** Where Polaris keeps the server folders of Deploy's services (see deploy-volume-service). */
 const DEPLOY_BIND_ROOT = "polaris/deploy";
 /** Where moved volumes go on a NAS share. */
