@@ -176,7 +176,7 @@ describe("money that is about to move", () => {
         expect(
             categoriseMail(
                 message({
-                    subject: "JAVIER, recuerda las fechas de los próximos pagos de tu compra",
+                    subject: "SAMUEL, recuerda las fechas de los próximos pagos de tu compra",
                     snippet: "08/26/2026 · 08/27/2026 · 09/03/2026",
                     fromAddress: "noreply@pagos.example"
                 })
@@ -539,8 +539,8 @@ describe("credit being arranged", () => {
         // whose preview came out empty, and none of the billing words in the
         // subject. An approved application is the first of a schedule of payments.
         for (const subject of [
-            "Enhorabuena JAVIER, tu solicitud de financiación ha sido aprobada",
-            "JAVIER, estás a un paso de obtener tu financiación",
+            "Enhorabuena SAMUEL, tu solicitud de financiación ha sido aprobada",
+            "SAMUEL, estás a un paso de obtener tu financiación",
             "Información previa a tu solicitud de financiación",
             "Información precontractual de Banco Cetelem enviada mediante Logalty (003001-0001-000000010786389.par)",
             "Certificado Logalty, Documentación pre-contractual transacción: 003001-0001-000000010786389.par."
@@ -583,11 +583,11 @@ describe("credit being arranged", () => {
     });
 
     it("does not read a name in capitals as a code", () => {
-        // "JAVIER" is six upper-case letters standing on their own, which is the
+        // "SAMUEL" is six upper-case letters standing on their own, which is the
         // shape of a code. With a sign-in phrase in the preview it put a lender's
         // approval under Security - the one tab that can be cleared up on its own.
         const approval = message({
-            subject: "Enhorabuena JAVIER, tu solicitud de financiación ha sido aprobada",
+            subject: "Enhorabuena SAMUEL, tu solicitud de financiación ha sido aprobada",
             snippet: "Inicia sesión en tu área de cliente para firmar el contrato",
             fromAddress: "noreply@cetelem.es"
         });

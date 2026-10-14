@@ -26,7 +26,7 @@ vi.mock("@/app/(app)/mail/mail-shell", () => ({
 
 afterEach(cleanup);
 
-const ENTRY = { name: "Albert Kampde", address: "albert@example.test" };
+const ENTRY = { name: "Pat Sample", address: "albert@example.test" };
 
 /** The chip's own element, reached from the one thing in it with a name. */
 function chipFor(address: string): { chip: HTMLElement; copy: HTMLElement } {
@@ -40,7 +40,9 @@ function draw(after?: string): void {
     render(
         <ToastProvider>
             <AddressChip entry={ENTRY} {...(after === undefined ? {} : { after })} />
-        </ToastProvider>, { wrapper: MessagesWrapper });
+        </ToastProvider>,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 describe("the comma between two recipients", () => {

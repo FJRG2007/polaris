@@ -13,7 +13,8 @@
             "mcicons": ".assets/mcicons",
             "arkicons": ".assets/arkicons",
             "minecraft-mods": ".assets/minecraft-mods",
-            "ogg-encoder": ".assets/ogg-encoder"
+            "ogg-encoder": ".assets/ogg-encoder",
+            "default-skins": ".assets/default-skins"
         }
     },
     "dependencies": {

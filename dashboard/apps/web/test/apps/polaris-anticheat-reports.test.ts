@@ -210,7 +210,7 @@ describe("a modded server", () => {
         // Simulation, another "Likely" on FastBreak mining cobblestone.
         for (let index = 0; index < 12; index += 1) {
             expect((await report({ flags: [flag()] })).status).toBe(200);
-            await report({ flags: [flag({ player: "ErMigue04", check: "FastBreak" })] });
+            await report({ flags: [flag({ player: "Player04", check: "FastBreak" })] });
         }
         expect(fake.notified).toEqual([]);
     });

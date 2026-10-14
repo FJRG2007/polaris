@@ -392,7 +392,14 @@ function fillAnswer(line: string): string | null {
 
 /** Whether a probe reaches into a scenery ring `world.ringTaken` says is not
  *  empty: outside the structure's own volume, on one of the first tries. */
-function ringTaken(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number): boolean {
+function ringTaken(
+    x1: number,
+    y1: number,
+    z1: number,
+    x2: number,
+    y2: number,
+    z2: number
+): boolean {
     const run = world.ringTaken > 0 ? state().run : null;
     const origin = run?.stage?.origin;
     if (!run || !origin || run.placeTries >= world.ringTaken) return false;
@@ -6601,15 +6608,18 @@ describe("a parkour race", () => {
             state().run!.stage!.origin!,
             state().run!.stage!.origin!.y
         ).volume;
-        const kill = world.sent.find((line) => line.includes("kill @e[type=minecraft:phantom,"));
+        const kill = world.sent.find((line) => line.includes("as @e[type=minecraft:phantom,"));
         expect(kill).toBe(
-            `execute in minecraft:overworld run kill @e[type=minecraft:phantom,x=${volume.x1},y=${volume.y1},z=${volume.z1},dx=${volume.x2 - volume.x1},dy=${volume.y2 - volume.y1 + 16},dz=${volume.z2 - volume.z1},nbt=!{PersistenceRequired:1b}]`
+            `execute in minecraft:overworld as @e[type=minecraft:phantom,x=${volume.x1},y=${volume.y1},z=${volume.z1},dx=${volume.x2 - volume.x1},dy=${volume.y2 - volume.y1 + 16},dz=${volume.z2 - volume.z1},nbt=!{PersistenceRequired:1b}] at @s run tp @s ~ -1000 ~`
         );
-        // Only its own marks are killed any other way; every kill in the air
-        // names a hostile type and spares a named mob.
-        for (const line of world.sent.filter((one) => / kill @e\[.*dx=/.test(one)))
+        // Sent under the world, never killed where it stands: a killed skeleton
+        // leaves its bones and arrows on the course. Every one names a hostile
+        // type and spares a named mob.
+        for (const line of world.sent.filter((one) =>
+            / @e\[type=minecraft:[a-z_]+,.*dx=/.test(one)
+        ))
             expect(line).toMatch(
-                /kill @e\[type=minecraft:[a-z_]+,.*,nbt=!\{PersistenceRequired:1b\}\]$/
+                /as @e\[type=minecraft:[a-z_]+,.*,nbt=!\{PersistenceRequired:1b\}\] at @s run tp @s ~ -1000 ~$/
             );
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
@@ -6792,9 +6802,7 @@ describe("an event built in the air", () => {
         expect(run?.stage?.scenery).toBe(false);
         expect(run?.stage?.boxes.some((box) => box.scenery)).toBe(false);
         // Every site before the last given up for one with room for its scenery.
-        expect(run!.placeLog.filter((one) => one.why === "occupied").length).toBe(
-            run!.placeTries
-        );
+        expect(run!.placeLog.filter((one) => one.why === "occupied").length).toBe(run!.placeTries);
         expect(run!.placeTries).toBeGreaterThan(1);
     });
 
@@ -10341,7 +10349,7 @@ describe("a build battle", () => {
         expect(world.sent).toContain("gamerule doInsomnia false");
         const platform = run.arena!.box;
         expect(world.sent).toContain(
-            `execute in minecraft:overworld run kill @e[type=minecraft:phantom,x=${platform.x1},y=${platform.y1},z=${platform.z1},dx=${platform.x2 - platform.x1},dy=${platform.y2 - platform.y1 + 16},dz=${platform.z2 - platform.z1},nbt=!{PersistenceRequired:1b}]`
+            `execute in minecraft:overworld as @e[type=minecraft:phantom,x=${platform.x1},y=${platform.y1},z=${platform.z1},dx=${platform.x2 - platform.x1},dy=${platform.y2 - platform.y1 + 16},dz=${platform.z2 - platform.z1},nbt=!{PersistenceRequired:1b}] at @s run tp @s ~ -1000 ~`
         );
 
         // Building over: the kit comes back, none of it is left lying about,

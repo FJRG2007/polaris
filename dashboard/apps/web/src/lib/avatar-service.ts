@@ -22,6 +22,7 @@
 
 import { prisma } from "@polaris/db";
 import { createHash } from "node:crypto";
+import { setBounded } from "@/lib/bounded-map";
 import { fetchImage } from "@/lib/safe-fetch";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import {
@@ -480,6 +481,13 @@ interface GravatarMemo {
 /** Remembered per address, misses included - "this address has no Gravatar" is
  *  the answer worth caching hardest, since it is the common one. */
 const gravatarCache = new Map<string, GravatarMemo>();
+/** Every address anybody's mail names is a key, so the oldest answers go past
+ *  these. A Gravatar is a 200px image, rarely more than a few dozen KB. */
+const GRAVATAR_LIMITS = {
+    maxEntries: 5_000,
+    maxBytes: 32 * 1024 * 1024,
+    sizeOf: (memo: GravatarMemo) => memo.image?.bytes.byteLength ?? 0
+};
 
 /**
  * What Gravatar has for an address, or null.
@@ -538,11 +546,16 @@ export async function gravatarImage(email: string): Promise<GravatarAnswer> {
     // one slow moment blanks a face, the browser caches the blank for five
     // minutes, and the picture appears to come and go.
     const kept = answered ? image : (cached?.image ?? null);
-    gravatarCache.set(hash, {
-        until: Date.now() + (answered ? GRAVATAR_TTL_MS : GRAVATAR_RETRY_MS),
-        image: kept,
-        failed: !answered
-    });
+    setBounded(
+        gravatarCache,
+        hash,
+        {
+            until: Date.now() + (answered ? GRAVATAR_TTL_MS : GRAVATAR_RETRY_MS),
+            image: kept,
+            failed: !answered
+        },
+        GRAVATAR_LIMITS
+    );
     return { image: kept, certain: answered };
 }
 

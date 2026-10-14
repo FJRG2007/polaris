@@ -30,6 +30,38 @@ export interface PresenceChange {
     readonly left: readonly string[];
 }
 
+/**
+ * The admitted seats worth announcing, by seat id with the name to say, or null
+ * while this browser's own seat is not in the room - there is no call to
+ * announce anything in yet, and a first roster read before it would make its
+ * own arrival news.
+ *
+ * Every seat of this account is left out, not only this browser's: the same
+ * person picking the call up in another tab or on their phone, or a seat taken
+ * back after a drop, is not somebody arriving. A guest has no account, so only
+ * their own seat is.
+ */
+export function othersInRoom(
+    participants: readonly {
+        readonly id: string;
+        readonly userId: string | null;
+        readonly name: string;
+        readonly admission: string;
+    }[],
+    self: string | null
+): Map<string, string> | null {
+    const admitted = participants.filter((person) => person.admission === "admitted");
+    const mine = admitted.find((person) => person.id === self);
+    if (!mine) return null;
+    return new Map(
+        admitted
+            .filter((person) =>
+                mine.userId === null ? person.id !== mine.id : person.userId !== mine.userId
+            )
+            .map((person) => [person.id, person.name] as const)
+    );
+}
+
 /** The first roster seen: whoever is already here is not arriving. */
 export function startPresence(roster: ReadonlyMap<string, string>): Presence {
     return { present: new Map(roster), departed: new Map() };

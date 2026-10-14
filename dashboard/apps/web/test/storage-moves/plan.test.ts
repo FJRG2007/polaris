@@ -522,3 +522,78 @@ describe("the move's states", () => {
         );
     });
 });
+
+describe("leftCopyAction", () => {
+    const now = new Date("2026-10-14T12:00:00Z");
+    const copy: plan.Placement = {
+        kind: "nas",
+        source: `polaris/volumes/a-${MOVE}`,
+        connectionId: CONN
+    };
+    const origin: plan.Placement = {
+        kind: "bind",
+        source: "polaris/deploy/app/data",
+        connectionId: null
+    };
+    const base = { copy, origin, current: origin, firstTriedAt: null, now };
+
+    it("empties a copy nothing points at", () => {
+        expect(plan.leftCopyAction(base)).toBe("clear");
+        expect(plan.leftCopyAction({ ...base, current: null })).toBe("clear");
+    });
+
+    it("leaves a copy the volume points at now, or that holds its original", () => {
+        expect(plan.leftCopyAction({ ...base, current: copy })).toBe("keep");
+        const parent: plan.Placement = {
+            kind: "nas",
+            source: "polaris/volumes",
+            connectionId: CONN
+        };
+        expect(plan.leftCopyAction({ ...base, current: parent })).toBe("keep");
+        expect(plan.leftCopyAction({ ...base, origin: copy, current: null })).toBe("keep");
+    });
+
+    it("leaves a named volume alone", () => {
+        const named: plan.Placement = { kind: "volume", source: "data", connectionId: null };
+        expect(plan.leftCopyAction({ ...base, copy: named })).toBe("keep");
+    });
+
+    it("gives up on a copy it has tried for a week", () => {
+        const firstTriedAt = new Date(now.getTime() - plan.LEFT_COPY_RETRY_MS - 1);
+        expect(plan.leftCopyAction({ ...base, firstTriedAt })).toBe("give-up");
+        const recent = new Date(now.getTime() - 60_000);
+        expect(plan.leftCopyAction({ ...base, firstTriedAt: recent })).toBe("clear");
+    });
+});
+
+describe("moveForgettable", () => {
+    const now = new Date("2026-10-14T12:00:00Z");
+    const old = new Date(now.getTime() - plan.MOVE_HISTORY_MS - 1);
+    const base = {
+        state: "finished",
+        finishedAt: old,
+        copySettled: false,
+        switched: true,
+        latestOfLiveApp: false,
+        now
+    };
+
+    it("forgets a move long over", () => {
+        expect(plan.moveForgettable(base)).toBe(true);
+    });
+
+    it("keeps a recent move, one still running, and the latest of a live app", () => {
+        expect(plan.moveForgettable({ ...base, finishedAt: new Date(now.getTime() - 1000) })).toBe(
+            false
+        );
+        expect(plan.moveForgettable({ ...base, state: "copying" })).toBe(false);
+        expect(plan.moveForgettable({ ...base, state: "moved" })).toBe(false);
+        expect(plan.moveForgettable({ ...base, latestOfLiveApp: true })).toBe(false);
+    });
+
+    it("keeps a failed move until its copy is emptied or given up on", () => {
+        const failed = { ...base, state: "failed", switched: false };
+        expect(plan.moveForgettable(failed)).toBe(false);
+        expect(plan.moveForgettable({ ...failed, copySettled: true })).toBe(true);
+    });
+});

@@ -1605,7 +1605,10 @@ describe("a horde defense", () => {
         );
         expect(lines.at(-1)).toBe("tag @e[tag=pe_wnew] remove pe_wnew");
         // Every mount is the event's, and goes with the rest at the end.
-        expect(waves.wavesCleanup("classic")[0]).toBe("kill @e[tag=pe_mob]");
+        expect(waves.wavesCleanup("classic").slice(0, 2)).toEqual([
+            "execute as @e[tag=pe_mob] at @s run tp @s ~ -1000 ~",
+            "kill @e[tag=pe_mob]"
+        ]);
     });
 
     it("grows with the defenders at the point: more monsters, more health, harder hits, capped", () => {
@@ -1738,7 +1741,10 @@ describe("a horde defense", () => {
             return match ? [match[1] as string] : [];
         });
         const cleanup = waves.wavesCleanup("mixed");
-        expect(cleanup[0]).toBe("kill @e[tag=pe_mob]");
+        expect(cleanup.slice(0, 2)).toEqual([
+            "execute as @e[tag=pe_mob] at @s run tp @s ~ -1000 ~",
+            "kill @e[tag=pe_mob]"
+        ]);
         for (const objective of made)
             expect(cleanup).toContain(`scoreboard objectives remove ${objective}`);
         expect(

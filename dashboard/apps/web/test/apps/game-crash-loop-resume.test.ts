@@ -178,7 +178,7 @@ const at = (iso: string) => new Date(iso);
 beforeEach(() => {
     install = {
         id: INSTALL,
-        name: "Offgrid",
+        name: "Survival",
         catalogId: "minecraft",
         applicationId: APP,
         config: "{}",

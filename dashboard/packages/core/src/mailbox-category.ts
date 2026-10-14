@@ -656,7 +656,7 @@ const PAYMENT_SETTLED: readonly RegExp[] = [
  *
  * This is money about to move in the plainest sense - an approved application
  * is a schedule of payments that starts next month - and none of it says so in
- * the words the lists above know. "Enhorabuena JAVIER, tu solicitud de
+ * the words the lists above know. "Enhorabuena SAMUEL, tu solicitud de
  * financiacion ha sido aprobada" has no renewal, no invoice and no receipt in
  * it, arrives with no List-Unsubscribe and an HTML body whose preview is empty,
  * so it fell through every question and landed in Primary.
@@ -1042,7 +1042,7 @@ export function categoriseMail(message: CategorisableMessage): MailCategory {
  * than inside a word - an order number in a sentence is not one of these.
  *
  * The digit is required because an upper-case word on its own is a name far
- * more often than a code: lenders and shops write "Enhorabuena JAVIER," and
+ * more often than a code: lenders and shops write "Enhorabuena SAMUEL," and
  * "compra en AMAZON", and without it either subject counted as carrying a code -
  * which, with a sign-in phrase anywhere in the preview, filed the message under
  * the one tab that can be cleared up automatically.

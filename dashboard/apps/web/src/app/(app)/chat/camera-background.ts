@@ -20,7 +20,10 @@
  *
  * Kept per browser, like the microphone cleanup and the volumes: it is a fact
  * about a room and a camera rather than about an account, and the laptop at the
- * kitchen table and the desk in the office want different answers.
+ * kitchen table and the desk in the office want different answers. A browser
+ * shared between accounts still loses it on a switch (`account-switch.ts`):
+ * the next person gets the room as it is rather than whoever logged in before
+ * them having picked their scene, or their picture, for them.
  *
  * The picture is kept here too, because there is nowhere else for it to be: it
  * never leaves this browser, it is nobody else's business, and uploading a
@@ -36,8 +39,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
-const KEY = "polaris.call.camera-background";
-const IMAGE_KEY = "polaris.call.camera-background-image";
+export const KEY = "polaris.call.camera-background";
+export const IMAGE_KEY = "polaris.call.camera-background-image";
 
 /** What somebody who has never touched it gets. */
 export const BACKGROUND_DEFAULT: CameraBackground = "off";
@@ -61,10 +64,26 @@ export const BACKGROUNDS: readonly {
     label: NamespaceKey<"chat">;
     help: NamespaceKey<"chat">;
 }[] = [
-    { value: "blur", label: "callSettings.backgrounds.blur.label", help: "callSettings.backgrounds.blur.help" },
-    { value: "strong", label: "callSettings.backgrounds.strong.label", help: "callSettings.backgrounds.strong.help" },
-    { value: "image", label: "callSettings.backgrounds.image.label", help: "callSettings.backgrounds.image.help" },
-    { value: "off", label: "callSettings.backgrounds.off.label", help: "callSettings.backgrounds.off.help" }
+    {
+        value: "blur",
+        label: "callSettings.backgrounds.blur.label",
+        help: "callSettings.backgrounds.blur.help"
+    },
+    {
+        value: "strong",
+        label: "callSettings.backgrounds.strong.label",
+        help: "callSettings.backgrounds.strong.help"
+    },
+    {
+        value: "image",
+        label: "callSettings.backgrounds.image.label",
+        help: "callSettings.backgrounds.image.help"
+    },
+    {
+        value: "off",
+        label: "callSettings.backgrounds.off.label",
+        help: "callSettings.backgrounds.off.help"
+    }
 ];
 
 /** Where the pictures Polaris ships are served from. */

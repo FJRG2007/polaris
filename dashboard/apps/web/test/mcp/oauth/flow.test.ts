@@ -10,7 +10,7 @@
  * address, the session, the rate limiter, the audit log and the origin.
  */
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { createFakeDb, type FakeUser } from "./fake-db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -170,8 +170,10 @@ const serverMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
+const { sweepOAuth, REVOKED_GRANT_TTL_MS } = await import("@/lib/mcp/oauth/sweep");
 const {
     changeAppScopesAction,
+    disconnectAppAction,
     setAppDatabasesAction,
     setAppIpPolicyAction,
     setAppNetworkExceptionAction
@@ -1646,5 +1648,130 @@ describe("the databases a connection may reach", () => {
             "connectedApps.databases.failed"
         );
         expect(state.db.tables.oAuthGrant!.at(-1)!.databaseIds ?? null).toBeNull();
+    });
+});
+
+describe("what a disconnected or abandoned connection leaves behind", () => {
+    const HOUR = 60 * 60 * 1000;
+    const counter = (key: string, windowStart: Date) => ({
+        id: randomUUID(),
+        key,
+        count: 1,
+        windowStart
+    });
+
+    it("deletes a disconnected app's codes, tokens and counters at once, and nobody else's", async () => {
+        await connect();
+        const [app] = await listConnectedApps(ADA.id);
+        await connect();
+        const tables = state.db.tables;
+        const otherGrant = tables.oAuthGrant!.find((grant) => grant.id !== app!.id)!.id;
+        for (const id of [app!.id, otherGrant]) {
+            tables.rateLimitCounter!.push(
+                counter(`mcp-call:${id}`, new Date()),
+                counter(`mcp-change:${id}`, new Date()),
+                counter(`mcp-sse-open:grant:${id}`, new Date())
+            );
+        }
+        expect(tables.oAuthCode!.some((row) => row.grantId === app!.id)).toBe(true);
+        expect(tables.oAuthToken!.some((row) => row.grantId === app!.id)).toBe(true);
+
+        expect(await disconnectAppAction(app!.id)).toEqual({});
+
+        expect(tables.oAuthCode!.filter((row) => row.grantId === app!.id)).toHaveLength(0);
+        expect(tables.oAuthToken!.filter((row) => row.grantId === app!.id)).toHaveLength(0);
+        expect(tables.rateLimitCounter!.map((row) => row.key).sort()).toEqual(
+            [
+                `mcp-call:${otherGrant}`,
+                `mcp-change:${otherGrant}`,
+                `mcp-sse-open:grant:${otherGrant}`
+            ].sort()
+        );
+        expect(tables.oAuthToken!.some((row) => row.grantId === otherGrant)).toBe(true);
+        expect(await listConnectedApps(ADA.id)).toHaveLength(1);
+    });
+
+    it("sweeps expired codes and tokens, and keeps what can still be presented", async () => {
+        const { tokens } = await connect();
+        const tables = state.db.tables;
+        // A second connection, for a second app.
+        await connect();
+        const now = Date.now();
+        const later = new Date(now + 2 * HOUR);
+        const result = await sweepOAuth(later);
+        // Both codes are past their five minutes; both access tokens past their hour.
+        expect(result.codes).toBe(2);
+        expect(tables.oAuthCode).toHaveLength(0);
+        expect(result.tokens).toBe(2);
+        expect(tables.oAuthToken!.every((row) => row.kind === "refresh")).toBe(true);
+        expect(
+            (
+                await tokenCall({
+                    grant_type: "refresh_token",
+                    refresh_token: String(tokens.body.refresh_token),
+                    client_id: tables.oAuthClient![0]!.clientId as string
+                })
+            ).status
+        ).toBe(200);
+    });
+
+    it("removes a disconnected grant after its grace, then the app nobody else approved", async () => {
+        await connect();
+        const [app] = await listConnectedApps(ADA.id);
+        await revokeConnectedApp(ADA.id, app!.id);
+        const tables = state.db.tables;
+        const now = Date.now();
+
+        // Inside the grace the row stays, so reconnecting keeps its rules.
+        await sweepOAuth(new Date(now + REVOKED_GRANT_TTL_MS - HOUR));
+        expect(tables.oAuthGrant).toHaveLength(1);
+        expect(tables.oAuthClient).toHaveLength(1);
+
+        const result = await sweepOAuth(new Date(now + REVOKED_GRANT_TTL_MS + HOUR));
+        expect(result.grants).toBe(1);
+        expect(result.clients).toBe(1);
+        expect(tables.oAuthGrant).toHaveLength(0);
+        expect(tables.oAuthClient).toHaveLength(0);
+    });
+
+    it("removes registrations nobody approved after a day, of either kind, and keeps the rest", async () => {
+        await connect();
+        const tables = state.db.tables;
+        const now = Date.now();
+        const old = new Date(now - 25 * HOUR);
+        tables.oAuthClient!.push(
+            {
+                id: randomUUID(),
+                clientId: "abandoned",
+                name: "A",
+                createdAt: old,
+                source: "registered"
+            },
+            {
+                id: randomUUID(),
+                clientId: "https://app.example.test/client.json",
+                name: "M",
+                createdAt: old,
+                source: "metadata"
+            },
+            {
+                id: randomUUID(),
+                clientId: "fresh",
+                name: "F",
+                createdAt: new Date(now),
+                source: "registered"
+            }
+        );
+        const result = await sweepOAuth(new Date(now));
+        expect(result.clients).toBe(2);
+        expect(tables.oAuthClient!.map((row) => row.clientId).sort()).toEqual(
+            [tables.oAuthClient![0]!.clientId, "fresh"].sort()
+        );
+        // The approved one is untouched, however old.
+        expect(await sweepOAuth(new Date(now + 90 * 24 * HOUR))).toMatchObject({
+            clients: 1,
+            grants: 0
+        });
+        expect(await listConnectedApps(ADA.id)).toHaveLength(1);
     });
 });

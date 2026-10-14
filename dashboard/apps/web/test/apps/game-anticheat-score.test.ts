@@ -319,26 +319,26 @@ describe("teleporting", () => {
             "[10Oct2026 20:35:56.539] [Server thread/INFO] [net.minecraft.server.MinecraftServer/]: ";
         for (const [line, name] of [
             [
-                `${neo}[Rcon: Teleported ErMigue04 to -5385.500000, 152.000000, -2545.500000]`,
-                "ErMigue04"
+                `${neo}[Rcon: Teleported Player04 to -5385.500000, 152.000000, -2545.500000]`,
+                "Player04"
             ],
             [
-                `${neo}[PICHURRINA: Teleported PICHURRINA to -5188.917219, 143.528720, -2513.849984]`,
-                "PICHURRINA"
+                `${neo}[PLAYERTWO: Teleported PLAYERTWO to -5188.917219, 143.528720, -2513.849984]`,
+                "PLAYERTWO"
             ],
-            [`${neo}[FJRG2007: Teleported Reckmy to FJRG2007]`, "Reckmy"],
-            [`${neo}[FJRG2007: Teleported ErMigue04 to -5644.5, 125.0, -2403.5]`, "ErMigue04"],
-            [`${neo}[@: Teleported Reckmy to 10.5, 70.0, 10.5]`, "Reckmy"],
+            [`${neo}[Moderator1: Teleported Builder7 to Moderator1]`, "Builder7"],
+            [`${neo}[Moderator1: Teleported Player04 to -5644.5, 125.0, -2403.5]`, "Player04"],
+            [`${neo}[@: Teleported Builder7 to 10.5, 70.0, 10.5]`, "Builder7"],
             [
                 `${neo}[Rcon: Spread 3 entity/entities around -5487.5, -2544.5 with an average distance of 25.11 block(s) apart]`,
-                "Reckmy"
+                "Builder7"
             ]
         ] as const) {
             expect(explainedByLog(line, name), line).toBe(true);
         }
-        expect(explainedByLog(`${neo}[FJRG2007: Teleported FJRG2007 to Reckmy]`, "Reckmy")).toBe(
-            false
-        );
+        expect(
+            explainedByLog(`${neo}[Moderator1: Teleported Moderator1 to Builder7]`, "Builder7")
+        ).toBe(false);
     });
 
     it("reads whether the game logs operators' commands", () => {
@@ -544,7 +544,7 @@ describe("the players list", () => {
     it("holds the engine's movement and block checks to Possible on a modded server", () => {
         const engine = [
             {
-                name: "Reckmy",
+                name: "Builder7",
                 checks: [{ check: "Simulation", alerts: 38, lastAt: NOW }]
             }
         ];

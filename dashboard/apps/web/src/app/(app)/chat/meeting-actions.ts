@@ -229,6 +229,18 @@ export async function readCallAction(meetingId: string): Promise<{
 }
 
 /**
+ * The voice this account's seat in the call was left with, read before the
+ * browser opens its microphone - see `call-voice-resume`. Null for no seat.
+ */
+export async function ownVoiceAction(
+    meetingId: string
+): Promise<{ deafened: boolean; serverDeafened: boolean } | null> {
+    const seat = await resolveSeat(meetingId);
+    if (!seat) return null;
+    return await meetings.ownVoice(seat);
+}
+
+/**
  * The ticket for the server a call runs through.
  *
  * The signing key never leaves the server. What comes back is good for one room,

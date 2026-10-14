@@ -2754,8 +2754,11 @@ model RateLimitCounter {
     key         String   @unique
     count       Int      @default(0)
     windowStart DateTime @default(now())
+    // When the window runs out. Null on counters written before it existed.
+    expiresAt   DateTime?
 
     @@index([windowStart])
+    @@index([expiresAt])
 }
 
 model FileRequestSubmission {
@@ -13271,6 +13274,10 @@ model StorageMove {
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
     finishedAt    DateTime?
+    // When the copy a failed move left was emptied, or given up on.
+    copySettledAt DateTime?
+    // When the sweep first tried to empty that copy; its retries run a week from here.
+    copyTriedAt   DateTime?
 
     @@index([state])
     @@index([volumeId])

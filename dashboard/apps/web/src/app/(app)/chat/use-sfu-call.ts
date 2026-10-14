@@ -83,7 +83,7 @@ import * as arrivals from "./call-arrivals";
 import { shareSound } from "./call-share-sound";
 import { withCameraDevice } from "./camera-device";
 import { callMuted, setCallMuted } from "./call-muted";
-import { rememberVoice, takeRememberedVoice } from "./call-voice-resume";
+import { rememberVoice, startingVoice, takeRememberedVoice } from "./call-voice-resume";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { pressDeafen, pressMic } from "./call-voice-controls";
 import { afterPaint, maskCamera, type MaskedCamera } from "./camera-filter";
@@ -1983,12 +1983,17 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
 
         async function start(): Promise<void> {
-            licensed.current = await actions.licensedFilterAction(inCall).catch(() => null);
+            const [filter, seatVoice] = await Promise.all([
+                actions.licensedFilterAction(inCall).catch(() => null),
+                actions.ownVoiceAction(inCall).catch(() => null)
+            ]);
+            licensed.current = filter;
             setLicensedFilter(licensed.current !== null);
 
-            // What this tab had asked for before it reloaded, if it did - read
-            // before anything is opened, so nothing is published live first.
-            const resumed = takeRememberedVoice(inCall);
+            // What this tab had asked for before it reloaded, or else what the
+            // seat it is taking back was left with - read before anything is
+            // opened, so nothing is published live first.
+            const resumed = startingVoice(takeRememberedVoice(inCall), seatVoice, !callMuted());
             if (resumed?.deafened && !deafenedRef.current) {
                 deafenedRef.current = true;
                 setDeafened(true);
@@ -3734,13 +3739,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const rosterOf = useRef<string | null>(null);
     useEffect(() => {
-        const inside = new Map(
-            (meeting?.participants ?? [])
-                .filter((person) => person.admission === "admitted")
-                .map((person) => [person.id, person.name] as const)
-        );
         const self = me.current;
-        if (!meeting || meeting.ended || (self !== null && !inside.has(self))) {
+        const inside = arrivals.othersInRoom(meeting?.participants ?? [], self);
+        if (!meeting || meeting.ended || !inside) {
             presence.current = null;
             rosterOf.current = null;
             return;

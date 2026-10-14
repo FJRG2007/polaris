@@ -333,7 +333,7 @@ describe("seenFor", () => {
 
     it("finds the visit by id when the row and the visit disagree on the name", () => {
         const seen = { [seenKey({ name: "Rex", id: "765" })]: visit };
-        expect(seenFor(seen, { id: "765", names: ["Er Migue"] })).toEqual(visit);
+        expect(seenFor(seen, { id: "765", names: ["Player Four"] })).toEqual(visit);
     });
 
     it("falls back to the name for a game with no id, and for the older rows", () => {

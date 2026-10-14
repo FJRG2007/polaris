@@ -16,7 +16,7 @@
  * pasting may not read, are dropped by the action.
  */
 
-const KEY = "polaris.tasks.clipboard";
+export const KEY = "polaris.tasks.clipboard";
 
 export interface TaskClipboard {
     readonly taskIds: readonly string[];

@@ -9,6 +9,7 @@
 import * as actions from "./skin-actions";
 import { useGameText } from "../game-text";
 import * as skin from "../../lib/minecraft/skin";
+import { defaultSkin } from "../../lib/minecraft/default-skin";
 import { hostUi } from "@polaris/app-host/client";
 import { RestartPlanner } from "./restart-planner";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -101,6 +102,7 @@ export function SkinDialog({
     const t = useGameText("minecraft");
     const [confirm, confirmElement] = useConfirm();
     const [live, setLive] = useState<LiveSkin | null>(null);
+    const [uuid, setUuid] = useState<string | null>(null);
     const [reading, setReading] = useState(true);
     const [readError, setReadError] = useState<string | null>(null);
     const [current, setCurrent] = useState<Shown | null>(null);
@@ -150,6 +152,7 @@ export function SkinDialog({
                 else {
                     const own = result.ownSkin ?? false;
                     setOwnSkin(own);
+                    setUuid(result.uuid ?? null);
                     if (result.live) await showLive(result.live, canEdit || own);
                 }
                 if (alive) setReading(false);
@@ -166,8 +169,8 @@ export function SkinDialog({
     }, [installedAppId, player, attempt, canEdit, showLive, t]);
 
     const unsupported = live?.state === "unsupported";
-    // The mod changes a skin only on a player who is in; the read says so when the
-    // list on screen is behind.
+    // An older mod changes a skin only on a player who is in, and refuses one who
+    // is not; a newer one reads back what is kept for them, marked offline.
     const offline =
         live?.state === "refused" ? live.why === "offline" : !online && live?.state !== "read";
     const changeable = editable && !offline;
@@ -178,7 +181,18 @@ export function SkinDialog({
         if (next.state === "unanswered") setError(t("skins.unanswered"));
         setLive(next);
     }
-    const shown: Shown | null = preview ? { png: preview.png, url: null, model } : current;
+    // No skin of their own: the game draws one of its defaults, picked from the
+    // UUID the same way on every machine, so that one is drawn here too. Nothing
+    // kept for a player who is away says nothing of what they wear: on an online
+    // server that is their account's own skin.
+    const bare = live?.state === "read" && !live.skin && !live.offline;
+    const fallback = bare && uuid !== null ? defaultSkin(uuid) : null;
+    const shown: Shown | null = preview
+        ? { png: preview.png, url: null, model }
+        : (current ?? (fallback ? { png: null, url: fallback.path, model: fallback.model } : null));
+    // A preview of exactly what they wear already - the same picture, the same
+    // arms - changes nothing, so there is nothing to apply.
+    const unchanged = preview !== null && current?.png === preview.png && current.model === model;
 
     async function importFile(file: File) {
         setError(null);
@@ -363,7 +377,11 @@ export function SkinDialog({
                                     style={{ width: VIEWER_WIDTH, height: VIEWER_HEIGHT }}
                                 />
                             ) : (
-                                <SkinView shown={shown} label={t("skins.viewer")} />
+                                <SkinView
+                                    shown={shown}
+                                    label={t("skins.viewer")}
+                                    empty={!offline && bare ? t("skins.noSkinSet") : null}
+                                />
                             )}
                             <p className="text-center text-xs text-muted-foreground">
                                 {preview
@@ -372,9 +390,11 @@ export function SkinDialog({
                                       ? " "
                                       : worn
                                         ? `${t("skins.current")} - ${t(`skins.models.${worn.model}`)}`
-                                        : offline
-                                          ? " "
-                                          : t("skins.accountSkin")}
+                                        : fallback
+                                          ? `${t("skins.noSkinSet")} - ${fallback.name.charAt(0).toUpperCase()}${fallback.name.slice(1)}`
+                                          : offline
+                                            ? " "
+                                            : t("skins.accountSkin")}
                             </p>
                         </div>
 
@@ -387,6 +407,11 @@ export function SkinDialog({
                             {offline && (
                                 <p className="text-sm text-muted-foreground">
                                     {t("skins.notOnline", { name: player })}
+                                </p>
+                            )}
+                            {live?.state === "read" && live.offline && (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("skins.nextJoin", { name: player })}
                                 </p>
                             )}
 
@@ -545,7 +570,12 @@ export function SkinDialog({
                         </Button>
                     )}
                     {preview && changeable ? (
-                        <Button size="sm" onClick={() => void apply()} disabled={working}>
+                        <Button
+                            size="sm"
+                            onClick={() => void apply()}
+                            disabled={working || unchanged}
+                            title={unchanged ? t("skins.alreadyWorn") : undefined}
+                        >
                             {busy === "apply" && (
                                 <Loader2 className="size-4 animate-spin" aria-hidden />
                             )}
@@ -566,8 +596,20 @@ export function SkinDialog({
 /**
  * The 3D view. The library is loaded only once the dialog opens, and the canvas
  * and its GPU context are released when it closes.
+ *
+ * `empty` is said over the viewer while there is nothing to draw: a profile with
+ * no skin of its own whose UUID the server does not know, so which of the
+ * game's defaults it wears cannot be told.
  */
-function SkinView({ shown, label }: { shown: Shown | null; label: string }) {
+function SkinView({
+    shown,
+    label,
+    empty
+}: {
+    shown: Shown | null;
+    label: string;
+    empty: string | null;
+}) {
     const t = useGameText("minecraft");
     const canvas = useRef<HTMLCanvasElement>(null);
     const viewer = useRef<import("skinview3d").SkinViewer | null>(null);
@@ -626,6 +668,11 @@ function SkinView({ shown, label }: { shown: Shown | null; label: string }) {
                 className="cursor-grab touch-none rounded-md bg-muted active:cursor-grabbing"
                 style={{ width: VIEWER_WIDTH, height: VIEWER_HEIGHT }}
             />
+            {!failed && !shown && empty && (
+                <p className="absolute inset-0 flex items-center justify-center rounded-md px-4 text-center text-sm text-muted-foreground">
+                    {empty}
+                </p>
+            )}
             {failed && (
                 <p className="absolute inset-0 flex items-center justify-center rounded-md bg-muted px-4 text-center text-sm text-muted-foreground">
                     {t("skins.viewerFailed")}

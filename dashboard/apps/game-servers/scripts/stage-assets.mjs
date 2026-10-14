@@ -4,7 +4,8 @@
  * and the manifests their pickers search.
  *
  * The Minecraft set is vendored in resources/mcicons and the ARK set in
- * resources/arkicons (see their READMEs). Each manifest is derived here rather
+ * resources/arkicons (see their READMEs), and the default player skins in
+ * resources/default-skins. Each manifest is derived here rather
  * than committed, so a list and the files behind it cannot drift apart. The ARK
  * one is the catalogue minus its blueprint paths: the server needs those and the
  * browser must not have them, since what a screen sends back is an item's class
@@ -73,6 +74,11 @@ writeFileSync(
 );
 
 console.log(`Staged ${minecraft.length} Minecraft and ${ark.length} ARK item icons in ${staged}`);
+
+// The game's own default player skins, which a profile with no skin of its own is
+// drawn in (src/lib/minecraft/default-skin.ts picks one by UUID).
+stage("default-skins", join(resources, "default-skins"));
+console.log(`Staged the default player skins in ${join(staged, "default-skins")}`);
 
 // The reference libvorbis encoder, as the wasm-media-encoders package builds it.
 // Only the Ogg one: the Sounds tab never encodes MP3.

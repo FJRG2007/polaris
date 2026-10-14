@@ -77,3 +77,31 @@ export function takeRememberedVoice(meetingId: string): ResumedVoice | null {
         return null;
     }
 }
+
+/** What the seat itself recorded, as `ownVoiceAction` returns it. */
+export interface SeatVoice {
+    readonly deafened: boolean;
+    readonly serverDeafened: boolean;
+}
+
+/**
+ * The voice a call opens with: this tab's own note when it has one, otherwise
+ * the seat it is taking back.
+ *
+ * The note is fresher - it was written as this tab was left - so it wins. The
+ * seat covers what the note cannot: a tab the browser discarded, a reload slower
+ * than the note's window, the call picked up on another device. A seat a
+ * moderator deafened is left alone, since its `deafened` says what the moderator
+ * did rather than what the person chose, and the moderation itself is carried
+ * separately. `micOn` is the microphone this browser would open with; the
+ * deafen silences it, and undeafening gives it back.
+ */
+export function startingVoice(
+    note: ResumedVoice | null,
+    seat: SeatVoice | null,
+    micOn: boolean
+): ResumedVoice | null {
+    if (note) return note;
+    if (!seat?.deafened || seat.serverDeafened) return null;
+    return { micOn, deafened: true, micBeforeDeafen: micOn };
+}

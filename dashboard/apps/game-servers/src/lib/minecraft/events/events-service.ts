@@ -3923,7 +3923,12 @@ async function hordeDefense(
             lines.push(
                 // What is left of a wave out of time goes, so the next one
                 // starts clean.
-                ...(cleared ? [waves.MOUNTS_GONE] : [`kill @e[tag=${commands.MOB_TAG}]`]),
+                ...(cleared
+                    ? [commands.underTheWorld(`@e[tag=${waves.MOUNT_TAG}]`), waves.MOUNTS_GONE]
+                    : [
+                          commands.underTheWorld(`@e[tag=${commands.MOB_TAG}]`),
+                          `kill @e[tag=${commands.MOB_TAG}]`
+                      ]),
                 ...commands.titleCommands(
                     cleared
                         ? messages.waveCleared(wave + 1, language)

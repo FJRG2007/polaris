@@ -7,6 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { defaultSkin } from "@polaris-app/game-servers/src/lib/minecraft/default-skin";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const confirm = vi.fn(async () => true);
@@ -87,12 +88,15 @@ describe("SkinDialog", () => {
         });
         open(true);
         expect(await screen.findByText("Their account's own skin")).toBeTruthy();
+        // Nothing to draw for a profile with no skin of its own, and it says why.
+        expect(screen.getByText("Minecraft's default skin")).toBeTruthy();
 
         fireEvent.change(screen.getByPlaceholderText("Username or link"), {
             target: { value: "player-two" }
         });
         fireEvent.click(screen.getByRole("button", { name: "Load" }));
         expect(await screen.findByText("Preview only. Apply to put it on.")).toBeTruthy();
+        expect(screen.queryByText("Minecraft's default skin")).toBeNull();
         expect(actions.previewSkinAction).toHaveBeenCalledWith({
             installedAppId: INSTALLED,
             player: "player-one",
@@ -111,6 +115,16 @@ describe("SkinDialog", () => {
             signed: null
         });
         await waitFor(() => expect(screen.getByText("Wearing now - Slim")).toBeTruthy());
+    });
+
+    it("draws the default skin the game picks from a known UUID, and names it", async () => {
+        const uuid = "00000000-0000-4000-8000-000000000001";
+        actions.readSkinAction.mockResolvedValue({ live: { state: "read", skin: null }, uuid });
+        open(true);
+        const { name } = defaultSkin(uuid);
+        const caption = `Minecraft's default skin - ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+        expect(await screen.findByText(caption)).toBeTruthy();
+        expect(screen.queryByText("Minecraft's default skin")).toBeNull();
     });
 
     it("shows an import's failure inline", async () => {
@@ -148,6 +162,22 @@ describe("SkinDialog", () => {
         expect(await screen.findByText(/player-one is not on the server/)).toBeTruthy();
         expect(screen.queryByText("Their account's own skin")).toBeNull();
         expect(screen.queryByRole("button", { name: "Load" })).toBeNull();
+    });
+
+    it("lets a skin be set for a player who is not on, for their next join", async () => {
+        actions.readSkinAction.mockResolvedValue({
+            live: { state: "read", skin: null, offline: true },
+            uuid: "00000000-0000-4000-8000-000000000001"
+        });
+        open(true, false, false);
+        expect(
+            await screen.findByText(
+                "player-one is not on the server. A change goes on when they next join."
+            )
+        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Load" })).toBeTruthy();
+        expect(screen.getByText("Their account's own skin")).toBeTruthy();
+        expect(screen.queryByText(/Minecraft's default skin/)).toBeNull();
     });
 
     it("puts a refusal from the server into a sentence", async () => {
