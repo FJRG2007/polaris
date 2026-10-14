@@ -9,7 +9,6 @@
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AppMark } from "@/components/app-mark";
 import { appProvenance } from "@/lib/apps/provenance";
 import { useMemo, useState, type ReactNode } from "react";
@@ -18,29 +17,15 @@ import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { categoryLabel, localizeApp } from "@/lib/apps/app-words";
 import type { InstalledAppView } from "@/lib/apps/install-service";
 import { ArrowLeft, ExternalLink, Loader2, Trash2 } from "lucide-react";
-import { uninstallInstalledAppAction } from "@/app/(app)/apps/installed/[id]/actions";
+import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { findApp, isInstallable, type AppManifest } from "@/lib/apps/catalog";
-import {
-    Badge,
-    Button,
-    Card,
-    CardBody,
-    Checkbox,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    Skeleton,
-    cn
-} from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
 import {
     CAPABILITY_KEYS,
     InstallWizard,
     by,
     statusLabel,
-    uninstallDescription,
     useOneClickInstall
 } from "../marketplace-view";
 import styles from "./screenshots.module.css";
@@ -319,73 +304,5 @@ export function AppInstallPanel({
             {wizard && <InstallWizard app={manifest} onClose={() => setWizard(false)} />}
             {removing && <UninstallDialog install={removing} onClose={() => setRemoving(null)} />}
         </section>
-    );
-}
-
-/**
- * Uninstalling, with the one choice that matters said plainly: keep the data for
- * a reinstall, or delete it with the app. Deleting asks for a tick and turns the
- * button red, so it is never the thing a quick Enter does.
- */
-export function UninstallDialog({
-    install,
-    onClose
-}: {
-    install: InstalledAppView;
-    onClose: () => void;
-}) {
-    const t = useTranslations("marketplace");
-    const tc = useTranslations("common");
-    const router = useRouter();
-    const [deleteData, setDeleteData] = useState(false);
-    const [pending, setPending] = useState(false);
-    const [failure, setFailure] = useState<string | null>(null);
-
-    async function confirm(): Promise<void> {
-        setPending(true);
-        setFailure(null);
-        const result = await uninstallInstalledAppAction(install.id, { deleteData }).catch(() => ({
-            error: t("detail.uninstallFailed")
-        }));
-        setPending(false);
-        if (result.error) {
-            setFailure(result.error);
-            return;
-        }
-        onClose();
-        router.refresh();
-    }
-
-    return (
-        <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>{t("uninstall.title", { name: install.name })}</DialogTitle>
-                    <DialogDescription>
-                        {deleteData
-                            ? t("detail.deleteDataWarning", { name: install.name })
-                            : uninstallDescription(t, install.catalogId, install.name)}
-                    </DialogDescription>
-                </DialogHeader>
-                <label className="flex items-start gap-2 text-sm">
-                    <Checkbox
-                        checked={deleteData}
-                        onChange={(event) => setDeleteData(event.target.checked)}
-                        disabled={pending}
-                    />
-                    <span>{t("detail.deleteData")}</span>
-                </label>
-                {failure && <p className="text-danger text-sm">{failure}</p>}
-                <div className="flex flex-wrap justify-end gap-2">
-                    <Button variant="ghost" onClick={onClose} disabled={pending}>
-                        {tc("actions.cancel")}
-                    </Button>
-                    <Button variant="danger" onClick={() => void confirm()} disabled={pending}>
-                        {pending && <Loader2 className="size-4 animate-spin" />}
-                        {deleteData ? t("detail.confirmDelete") : t("uninstall.confirm")}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
     );
 }

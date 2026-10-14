@@ -37,7 +37,10 @@
         "other": "{name} leaves the switcher. What you made in it is kept for when you install it again.",
         "title": "Uninstall {name}?",
         "confirm": "Uninstall",
-        "named": "Uninstall {name}"
+        "named": "Uninstall {name}",
+        "keptListed": "Its data stays on the server and is listed under Storage, where you can free it later.",
+        "keepData": "Uninstall, keep data",
+        "retry": "Try again"
     },
     "card": {
         "by": "By {developer}",

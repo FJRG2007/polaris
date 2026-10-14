@@ -59,10 +59,12 @@ describe("uninstalling from the marketplace grid", () => {
         const dialog = await screen.findByRole("dialog");
         expect(within(dialog).getByText(/worlds are never deleted by uninstalling/)).toBeTruthy();
 
-        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall" }));
+        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall and delete data" }));
         expect(
             await screen.findByText(/Delete your game servers first \(Ark Island\)/)
         ).toBeTruthy();
+        // Said in the dialog, and the same button tries again.
+        expect(within(dialog).getByRole("button", { name: "Try again" })).toBeTruthy();
         expect(refresh).not.toHaveBeenCalled();
     });
 
@@ -77,10 +79,17 @@ describe("uninstalling from the marketplace grid", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Uninstall Places" }));
         const dialog = await screen.findByRole("dialog");
+        // Keeping the data is the choice that says what stays.
+        fireEvent.click(within(dialog).getByRole("checkbox"));
         expect(within(dialog).getByText(/camera and recognition containers stop/)).toBeTruthy();
+        expect(within(dialog).getByText(/listed under Storage/)).toBeTruthy();
 
-        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall" }));
-        await waitFor(() => expect(uninstallInstalledAppAction).toHaveBeenCalledWith("install-2"));
+        fireEvent.click(within(dialog).getByRole("button", { name: "Uninstall, keep data" }));
+        await waitFor(() =>
+            expect(uninstallInstalledAppAction).toHaveBeenCalledWith("install-2", {
+                deleteData: false
+            })
+        );
         await waitFor(() => expect(refresh).toHaveBeenCalled());
     });
 

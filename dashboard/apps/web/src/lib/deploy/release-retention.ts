@@ -328,7 +328,8 @@ async function serverMachine(hostId: string): Promise<Machine | null> {
 /** The machine a deploy target runs its containers on: `local`, a host id, or
  *  null where that is not one machine - a swarm places its tasks across nodes,
  *  so one node's listing says nothing about whether an image is still there. */
-function machineOfTarget(
+/** The machine a service's release images live on, as a sweep names it. */
+export function machineOfTarget(
     target: { kind: string; hostId: string | null; runtime: string } | null
 ): string | null {
     if (!target || target.runtime !== "compose") return null;

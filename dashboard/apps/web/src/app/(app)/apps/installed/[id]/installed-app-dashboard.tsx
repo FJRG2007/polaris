@@ -23,7 +23,7 @@ import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { gameForCatalogId, isGameServersApp } from "@/lib/apps/games-catalog";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
-import { Badge, Button, Card, CardBody, ConfirmDeleteDialog, PageHeader, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, PageHeader, cn } from "@polaris/ui";
 import {
     ArrowLeft,
     ChevronDown,
@@ -34,11 +34,8 @@ import {
     Square,
     Trash2
 } from "lucide-react";
-import {
-    redeployInstalledAppAction,
-    setInstalledAppRunningAction,
-    uninstallInstalledAppAction
-} from "./actions";
+import { redeployInstalledAppAction, setInstalledAppRunningAction } from "./actions";
+import { UninstallDialog } from "@/app/(app)/apps/marketplace/uninstall-dialog";
 
 /** The statuses the shell has words for; anything else is shown as it came. */
 const STATUSES = new Set(["installing", "running", "stopped", "failed"]);
@@ -107,9 +104,6 @@ export function InstalledAppDashboard({
     const [pending, startTransition] = useTransition();
     const [confirmingUninstall, setConfirmingUninstall] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // Kept apart from the page's error: a refusal to uninstall belongs in the
-    // dialog that asked, not behind it on a page the reader has stopped looking at.
-    const [uninstallError, setUninstallError] = useState<string | null>(null);
     // What the app's own panel has found out, when it has one that polls. The
     // header knows only what Polaris intends, which is not the same thing and
     // read as a contradiction when the container had gone down underneath it.
@@ -297,26 +291,13 @@ export function InstalledAppDashboard({
                 </CardBody>
             </Card>
 
-            <ConfirmDeleteDialog
-                open={confirmingUninstall}
-                onOpenChange={(open) => !pending && setConfirmingUninstall(open)}
-                name={app.name}
-                kind={t("kind")}
-                confirmLabel={t("uninstall")}
-                description={t("uninstallDescription")}
-                error={uninstallError}
-                pending={pending}
-                onConfirm={() =>
-                    startTransition(async () => {
-                        const result = await uninstallInstalledAppAction(app.id);
-                        if (result.error) {
-                            setUninstallError(result.error);
-                            return;
-                        }
-                        router.push(backHref);
-                    })
-                }
-            />
+            {confirmingUninstall && (
+                <UninstallDialog
+                    install={app}
+                    onClose={() => setConfirmingUninstall(false)}
+                    onDone={() => router.push(backHref)}
+                />
+            )}
         </div>
     );
 }

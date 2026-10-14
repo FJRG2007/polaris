@@ -176,8 +176,32 @@ export async function wantedPrivateNetworks(): Promise<string[]> {
             databases: { select: { id: true } }
         }
     });
+    const wanted = new Set(environmentNetworksWanted(environments, names));
+    if (names) {
+        const links = await prisma.privateLink.findMany({ select: { id: true }, take: MAX_LINKS });
+        for (const link of links) wanted.add(deploy.crossLinkNetwork(link.id));
+    }
+    return [...wanted].sort();
+}
+
+/**
+ * The private networks a set of environments still has a use for. An
+ * environment with no service left in it - the last app in it uninstalled - has
+ * nothing on its networks, so they are not wanted and the next reconcile removes
+ * them; a deploy into it later makes them again. Pure, so that is a test.
+ */
+export function environmentNetworksWanted(
+    environments: readonly {
+        readonly id: string;
+        readonly networkMode: string | null;
+        readonly applications: readonly { readonly id: string }[];
+        readonly databases: readonly { readonly id: string }[];
+    }[],
+    names: boolean
+): string[] {
     const wanted = new Set<string>();
     for (const environment of environments) {
+        if (environment.applications.length + environment.databases.length === 0) continue;
         const mode = networkModeOf(environment.networkMode);
         if (mode === "environment") wanted.add(deploy.environmentNetwork(environment.id));
         if (mode === "links") {
@@ -189,11 +213,7 @@ export async function wantedPrivateNetworks(): Promise<string[]> {
             wanted.add(deploy.namesNetwork(environment.id));
         }
     }
-    if (names) {
-        const links = await prisma.privateLink.findMany({ select: { id: true }, take: MAX_LINKS });
-        for (const link of links) wanted.add(deploy.crossLinkNetwork(link.id));
-    }
-    return [...wanted].sort();
+    return [...wanted];
 }
 
 /** The most links between projects one reconcile reads. */

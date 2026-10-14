@@ -18,6 +18,10 @@ const db = {
         updateMany: vi.fn(async () => ({ count: 1 })),
         deleteMany: vi.fn(async () => ({ count: 1 }))
     },
+    // The backing application still exists until Deploy deletes it.
+    application: {
+        findUnique: vi.fn(async (args: { where: { id: string } }) => ({ id: args.where.id }))
+    },
     $transaction: vi.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)),
     ...scoped
 };
@@ -30,6 +34,10 @@ vi.mock("@/lib/deploy-service", () => ({
     createProject: vi.fn(),
     deployApplication: vi.fn()
 }));
+const clearResourceGrants = vi.fn(async () => undefined);
+vi.mock("@polaris/auth", () => ({ clearResourceGrants }));
+const reconcilePrivateNetworks = vi.fn(async () => null);
+vi.mock("@/lib/deploy/service-networks", () => ({ reconcilePrivateNetworks }));
 const pauseOwnedServices = vi.fn(async () => undefined);
 vi.mock("@/lib/apps/app-lifecycle", () => ({
     appUninstallRefusal: vi.fn(async () => null),
@@ -52,6 +60,7 @@ vi.mock("@/lib/app-extensions/registry", async (importOriginal) => ({
 }));
 
 const { uninstallApp } = await import("@/lib/apps/install-service");
+const { UninstallIncompleteError } = await import("@/lib/apps/uninstall-plan");
 
 const ROW = {
     id: "00000000-0000-7000-8000-000000000001",
@@ -71,7 +80,8 @@ describe("uninstallApp", () => {
     it("keeps the data by default: soft-removes the row and clears its secret", async () => {
         await uninstallApp(ROW.ownerId, ROW.id);
         expect(deleteApplication).toHaveBeenCalledWith(ROW.applicationId, ROW.ownerId, {
-            deleteData: false
+            deleteData: false,
+            strict: true
         });
         expect(db.installedApp.updateMany).toHaveBeenCalledWith({
             where: { id: { in: [ROW.id] } },
@@ -87,7 +97,8 @@ describe("uninstallApp", () => {
     it("with the data deleted: purges every install-scoped table, then the row", async () => {
         await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true });
         expect(deleteApplication).toHaveBeenCalledWith(ROW.applicationId, ROW.ownerId, {
-            deleteData: true
+            deleteData: true,
+            strict: true
         });
         expect(db.$transaction).toHaveBeenCalledTimes(1);
         // The files go while the rows that find them still exist.
@@ -135,7 +146,8 @@ describe("uninstallApp", () => {
         }) => (args.select?.ownerId ? [helper] : [])) as never);
         await uninstallApp(home.ownerId, home.id, { deleteData: true });
         expect(deleteApplication).toHaveBeenCalledWith("app-helper", ROW.ownerId, {
-            deleteData: true
+            deleteData: true,
+            strict: true
         });
         expect(db.installedApp.deleteMany).toHaveBeenCalledWith({
             where: { id: { in: [helper.id] } }
@@ -145,6 +157,42 @@ describe("uninstallApp", () => {
     it("refuses an install that is not the caller's", async () => {
         db.installedApp.findFirst.mockResolvedValue(null as never);
         await expect(uninstallApp(ROW.ownerId, ROW.id)).rejects.toThrow("not found");
+        expect(deleteApplication).not.toHaveBeenCalled();
+    });
+
+    it("clears the access people were given, and settles the networks it left", async () => {
+        await uninstallApp(ROW.ownerId, ROW.id);
+        expect(clearResourceGrants).toHaveBeenCalledWith({ kind: "install", id: ROW.id });
+        expect(reconcilePrivateNetworks).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops with what is left when its containers cannot come down, and touches no row", async () => {
+        deleteApplication.mockRejectedValueOnce(new Error("server unreachable") as never);
+        const failure = await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true }).catch(
+            (error: unknown) => error
+        );
+        expect(failure).toBeInstanceOf(UninstallIncompleteError);
+        expect((failure as InstanceType<typeof UninstallIncompleteError>).phase).toBe("containers");
+        expect((failure as InstanceType<typeof UninstallIncompleteError>).left).toContain(
+            "install-row"
+        );
+        expect(db.installedApp.deleteMany).not.toHaveBeenCalled();
+        expect(db.installedApp.updateMany).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(clearResourceGrants).not.toHaveBeenCalled();
+    });
+
+    it("finishes on a retry, and a second run over an app Deploy already removed is a no-op there", async () => {
+        deleteApplication.mockRejectedValueOnce(new Error("server unreachable") as never);
+        await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true }).catch(() => undefined);
+        await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true });
+        expect(db.installedApp.deleteMany).toHaveBeenCalledWith({
+            where: { id: { in: [ROW.id] } }
+        });
+        // The application is gone now: a third run does not ask Deploy again.
+        db.application.findUnique.mockResolvedValueOnce(null as never);
+        deleteApplication.mockClear();
+        await uninstallApp(ROW.ownerId, ROW.id, { deleteData: true });
         expect(deleteApplication).not.toHaveBeenCalled();
     });
 });

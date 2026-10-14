@@ -1,0 +1,121 @@
+/**
+ * Deleting an app takes it off the edge before it comes down, leaves every other
+ * app's routes alone, touches no row when an uninstall's teardown fails, and
+ * hands its release images to the sweep once nothing protects them. The
+ * database, the edge files and the server are fakes - nothing runs on a machine.
+ */
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const APP = "00000000-0000-7000-8000-0000000000bb";
+const OWNER = "00000000-0000-7000-8000-0000000000aa";
+const TARGET = "00000000-0000-7000-8000-0000000000cc";
+
+/** Every database call, in order, as `model.method` with its arguments. */
+const calls: { readonly name: string; readonly args: unknown }[] = [];
+
+const named: Record<string, Record<string, (...args: never[]) => Promise<unknown>>> = {
+    application: {
+        findFirst: async () => ({
+            id: APP,
+            environmentId: "env",
+            volumes: [],
+            target: { id: TARGET, kind: "local", hostId: null, runtime: "compose" }
+        })
+    }
+};
+const prisma = new Proxy(
+    {},
+    {
+        get: (_, model: string) =>
+            new Proxy(
+                {},
+                {
+                    get: (__, method: string) => async (args: unknown) => {
+                        calls.push({ name: `${model}.${method}`, args });
+                        const own = named[model]?.[method];
+                        if (own) return own();
+                        return method.startsWith("findMany") ? [] : null;
+                    }
+                }
+            )
+    }
+);
+vi.mock("@polaris/db", () => ({ prisma }));
+
+const getPorts = vi.fn(async () => {
+    throw new Error("server unreachable");
+});
+vi.mock("@/lib/deploy/runtime", async (load) => ({
+    ...(await load<typeof import("@/lib/deploy/runtime")>()),
+    getPorts
+}));
+vi.mock("@/lib/deploy-project-service", () => ({
+    getFlagsForEnvironment: async () => ({ wipeVolumesOnDelete: false })
+}));
+const writeDynamicFile = vi.fn(async () => undefined);
+vi.mock("@/lib/traefik-dynamic", async (load) => ({
+    ...(await load<object>()),
+    writeDynamicFile
+}));
+const sweepReleaseImages = vi.fn(async () => []);
+vi.mock("@/lib/deploy/release-retention", async (load) => ({
+    ...(await load<typeof import("@/lib/deploy/release-retention")>()),
+    sweepReleaseImages
+}));
+
+const { deleteApplication } = await import("@/lib/deploy-service");
+
+function at(name: string): number {
+    return calls.findIndex((call) => call.name === name);
+}
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    calls.length = 0;
+});
+
+describe("deleting an app", () => {
+    it("unroutes only its own domains, before its containers and rows go", async () => {
+        await deleteApplication(APP, OWNER);
+        const unroute = calls.filter((call) => call.name === "domain.updateMany");
+        expect(unroute).toEqual([
+            {
+                name: "domain.updateMany",
+                args: { where: { applicationId: APP }, data: { enabled: false } }
+            }
+        ]);
+        // No other app's domain is written: the edge is rendered again from the rows.
+        for (const call of calls.filter((one) => one.name.startsWith("domain."))) {
+            if (call.name === "domain.findMany") continue;
+            expect(JSON.stringify(call.args)).toContain(APP);
+        }
+        expect(at("domain.updateMany")).toBeGreaterThanOrEqual(0);
+        expect(at("domain.updateMany")).toBeLessThan(at("deployment.deleteMany"));
+        expect(at("deployment.deleteMany")).toBeLessThan(at("application.delete"));
+    });
+
+    it("hands its release images to the sweep on the machine it ran on", async () => {
+        await deleteApplication(APP, OWNER);
+        expect(sweepReleaseImages).toHaveBeenCalledWith("local");
+    });
+
+    it("strictly, stops before any row goes when its containers cannot come down", async () => {
+        await expect(
+            deleteApplication(APP, OWNER, { deleteData: true, strict: true })
+        ).rejects.toBeInstanceOf(Error);
+        expect(at("domain.updateMany")).toBeGreaterThanOrEqual(0);
+        expect(at("deployment.deleteMany")).toBe(-1);
+        expect(at("application.delete")).toBe(-1);
+        expect(at("installedApp.updateMany")).toBe(-1);
+        expect(sweepReleaseImages).not.toHaveBeenCalled();
+    });
+
+    it("strictly, asks for the same thing again on a retry", async () => {
+        await deleteApplication(APP, OWNER, { strict: true }).catch(() => undefined);
+        const first = calls.map((call) => call.name);
+        calls.length = 0;
+        await deleteApplication(APP, OWNER, { strict: true }).catch(() => undefined);
+        expect(calls.map((call) => call.name)).toEqual(first);
+    });
+});

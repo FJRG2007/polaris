@@ -89,7 +89,12 @@ import {
     githubTokenForOwner
 } from "./github-access";
 import * as deployReleases from "./deploy/releases";
-import { ROLLBACK_WINDOW, sweepReleaseImagesFor } from "./deploy/release-retention";
+import {
+    ROLLBACK_WINDOW,
+    machineOfTarget,
+    sweepReleaseImages,
+    sweepReleaseImagesFor
+} from "./deploy/release-retention";
 import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { refuseWhileCopying } from "./apps/install-copy-hold";
 import { notifyVolumeHealth } from "./notifications/volume-events";
@@ -2389,7 +2394,14 @@ export async function removeApplicationDeployment(
 export async function deleteApplication(
     applicationId: string,
     ownerId: string,
-    options?: { deleteData?: boolean }
+    options?: {
+        deleteData?: boolean;
+        /** A teardown that fails stops the delete before any row goes, so it can be
+         *  retried: an uninstall must never leave containers running for a service
+         *  the database no longer knows. Off for the canvas, which deletes a
+         *  service on a server that may never answer again. */
+        strict?: boolean;
+    }
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -2397,7 +2409,7 @@ export async function deleteApplication(
             id: true,
             environmentId: true,
             volumes: { select: { id: true } },
-            target: { select: { id: true, kind: true } }
+            target: { select: { id: true, kind: true, hostId: true, runtime: true } }
         }
     });
     if (!app) throw new Error("Application not found");
@@ -2410,15 +2422,23 @@ export async function deleteApplication(
     // The Docker volumes it used, named before the rows that name them go.
     const dataVolumes = deleteData ? await appDataVolumeNames(applicationId) : [];
     if (flags.wipeVolumesOnDelete || deleteData) {
-        for (const volume of app.volumes) {
-            await wipeVolume(volume.id, ownerId).catch(() => undefined);
-        }
+        await Promise.all(
+            app.volumes.map((volume) => wipeVolume(volume.id, ownerId).catch(() => undefined))
+        );
     }
 
     // Before its rows go: what its volumes were, so a data volume left on the
     // machine still says whose it was - see `host-resources`.
     await noteAppDeleted(applicationId).catch(() => undefined);
-    await removeApplicationDeployment(applicationId, ownerId).catch(() => undefined);
+    // Off the edge before it comes down, so its names never answer for a
+    // container that is going: a visitor sees it gone, not broken. Only its own
+    // domains - every other app's routes are rendered again exactly as they were.
+    await prisma.domain.updateMany({ where: { applicationId }, data: { enabled: false } });
+    await syncAppRoutes().catch(() => undefined);
+    const teardown = removeApplicationDeployment(applicationId, ownerId);
+    // A service that was never placed on a server has nothing running to fail on.
+    if (options?.strict && app.target) await teardown;
+    else await teardown.catch(() => undefined);
     await prisma.deployment.deleteMany({
         where: { deployableType: "application", deployableId: applicationId }
     });
@@ -2442,16 +2462,25 @@ export async function deleteApplication(
     // longer exists answers for the hostname as an app that is merely down. Resynced
     // here so a deleted app's name goes back to being an unclaimed one.
     await syncAppRoutes().catch(() => undefined);
+    // Its pinned release images, now no row protects them and no container is on
+    // them. The sweep reads the engine, so an image another service still runs
+    // stays. Pulled images are shared by nature and left to the unused-image
+    // prune, which never takes one a container uses. Not awaited: the uninstall
+    // is done, and the housekeeping timer runs the same sweep.
+    const machine = machineOfTarget(app.target);
+    if (machine) void sweepReleaseImages(machine).catch(() => undefined);
     // The emptied volumes themselves, now nothing is attached to them. Each goes
     // through `removeHostVolume`'s own checks; one it refuses is left for the
     // leftover-volume sweep rather than failing a delete that already happened.
     if (dataVolumes.length === 0) return;
     if (app.target?.kind === "local") {
-        for (const name of dataVolumes) {
-            const result = await removeHostVolume(name).catch(() => null);
-            if (!result?.ok)
-                console.error(`polaris: volume ${name} was left for the leftover sweep`);
-        }
+        await Promise.all(
+            dataVolumes.map(async (name) => {
+                const result = await removeHostVolume(name).catch(() => null);
+                if (!result?.ok)
+                    console.error(`polaris: volume ${name} was left for the leftover sweep`);
+            })
+        );
     } else if (app.target) {
         await removeServerVolumes(app.target.id, ownerId, dataVolumes);
     }
@@ -2502,7 +2531,11 @@ async function releaseInstallsOf(applicationId: string): Promise<void> {
         select: { catalogId: true }
     });
     if (installs.length === 0) return;
-    await prisma.installedApp.updateMany({ where: { applicationId }, data: { status: "removed" } });
+    // Removed means no bridge left to dial, so not the credential either.
+    await prisma.installedApp.updateMany({
+        where: { applicationId },
+        data: { status: "removed", encryptedSecret: null, secretNonce: null, secretKeyId: null }
+    });
     // Cycle: bridge-endpoint reaches this module for the hub's port, so the cache
     // it owns is resolved at call time rather than at load.
     if (installs.some((install) => install.catalogId === "messaging-bridge")) {
