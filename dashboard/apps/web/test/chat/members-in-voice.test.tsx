@@ -160,6 +160,11 @@ describe("a member in voice", () => {
         expect(link.getAttribute("title")).toBe("In voice: Lounge");
         expect(link.textContent).toBe("In voice");
         expect(link.querySelector("svg")).toBeTruthy();
+        // The clipped span itself carries the full text too, so the browser's
+        // native tooltip has somewhere to read it from when it is the exact
+        // element under the pointer, not just an ancestor.
+        const clipped = link.querySelector("span.truncate") as HTMLElement;
+        expect(clipped.getAttribute("title")).toBe("In voice: Lounge");
         expect(rowOf("Member A").textContent).not.toContain("Out for a walk");
         // Only the rooms of this space the reader can see were asked about.
         expect(state.asked[0]).toEqual(["v1"]);

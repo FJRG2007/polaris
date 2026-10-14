@@ -168,6 +168,26 @@ change:
   a game - is translated in that person's language (`getUserLocale`), not the
   sender's.
 
+## Full-height screens leave room for the shell's own notices
+
+The shell can show a notice above the page - a disk warning, a denied-access
+line - through `PageNotices` (`apps/web/src/components/page-notices.tsx`),
+which measures what it rendered and publishes it as `--notice-height` on the
+document root; it is `0px` (`packages/ui/src/styles/tokens.css`) when nothing
+is up. A screen that fills the window has to subtract that variable or a
+notice pushes its bottom off a window that does not scroll.
+
+- **`PAGE_FILL` and `PAGE_BLEED`** (`packages/ui/src/shell/app-shell.tsx`)
+  already do - built on those and nothing else needed.
+- **A screen that computes its own `calc(100dvh-...)` instead** does not get
+  it for free: the calendar's month/year/day grids, the vault item list, the
+  deploy canvas, the log viewer, and the inbox and its contacts list all keep
+  their own formula and each needed `-var(--notice-height)` added to it by
+  hand when this variable was introduced. A new screen built the same way
+  needs the same edit, or it only overflows the day a notice happens to be on
+  screen - `test/mail/page-height.test.ts` only holds `PAGE_BLEED`'s own
+  string, not a screen's private formula.
+
 ## Minecraft events
 
 Before adding or changing a Game servers event
