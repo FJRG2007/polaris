@@ -222,7 +222,7 @@ export async function spaceAccessAction(spaceId: string): Promise<{
     try {
         await access.requireSpace(caller, spaceId, "admin");
         const [people, teams, eligibleTeams] = await Promise.all([
-            shelves.spacePeople(spaceId),
+            shelves.spacePeople(spaceId, caller),
             shelves.spaceTeams(spaceId),
             shelves.teamsForSpace(spaceId)
         ]);

@@ -16,6 +16,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import type { NoteActor } from "./access";
+import { contactLines } from "@/lib/privacy-service";
 
 /** A folder as the sidebar draws it. */
 export interface FolderSummary {
@@ -48,6 +49,8 @@ export interface ShelfView {
 export interface ShelfPerson {
     readonly userId: string;
     readonly name: string;
+    /** Their contact line as this viewer may see it: the address, an @handle,
+     *  or empty. Named for the address it used to always be. */
     readonly email: string;
     readonly role: core.SpaceRole;
     /** True for the person who made it: shown, and never editable. */
@@ -220,30 +223,40 @@ export async function deleteSpace(spaceId: string): Promise<void> {
 // People and teams on a space
 // ---------------------------------------------------------------------------
 
-export async function spacePeople(spaceId: string): Promise<ShelfPerson[]> {
+/**
+ * Everybody on a shelf, for the people dialog.
+ *
+ * The contact line under each name is whatever that person lets this viewer see
+ * - their address, their handle, or nothing - by the same rule every other
+ * roster uses. Running a shelf is not a reason to read addresses its members
+ * chose to keep to themselves.
+ */
+export async function spacePeople(spaceId: string, viewer: NoteActor): Promise<ShelfPerson[]> {
+    const person = { select: { id: true, name: true, email: true, username: true } };
     const space = await prisma.noteSpace.findUnique({
         where: { id: spaceId },
         select: {
-            owner: { select: { id: true, name: true, email: true } },
-            members: {
-                orderBy: { createdAt: "asc" },
-                select: { role: true, user: { select: { id: true, name: true, email: true } } }
-            }
+            owner: person,
+            members: { orderBy: { createdAt: "asc" }, select: { role: true, user: person } }
         }
     });
     if (!space) return [];
+    const contacts = await contactLines(viewer, [
+        space.owner,
+        ...space.members.map((member) => member.user)
+    ]);
     return [
         {
             userId: space.owner.id,
             name: space.owner.name,
-            email: space.owner.email,
+            email: contacts.get(space.owner.id) ?? "",
             role: "admin",
             owner: true
         },
         ...space.members.map((member) => ({
             userId: member.user.id,
             name: member.user.name,
-            email: member.user.email,
+            email: contacts.get(member.user.id) ?? "",
             role: member.role as core.SpaceRole,
             owner: false
         }))
