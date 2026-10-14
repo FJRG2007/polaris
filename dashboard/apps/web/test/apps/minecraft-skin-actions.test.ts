@@ -18,6 +18,8 @@ const said: string[] = [];
 const audits: { action: string; metadata: unknown }[] = [];
 let caps: string[] = ["skin"];
 let live: Record<string, unknown> | null = null;
+let stageReply: Record<string, unknown> = { ok: true, staged: true };
+let containerFailure: Error | null = null;
 let linkResponse: Response | null = null;
 /** Whether the viewer moderates the server, and which names are linked to them. */
 let moderates = true;
@@ -98,8 +100,9 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
         _owner: string,
         _install: string,
         work: (server: unknown) => Promise<unknown>
-    ) =>
-        work({
+    ) => {
+        if (containerFailure) throw containerFailure;
+        return work({
             // A fresh id per call, so the remembered caps never leak between tests.
             installedAppId: `server-${(serverId += 1)}`,
             edition: "java",
@@ -108,6 +111,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
                 if (line === "polaris caps")
                     return JSON.stringify({ ok: true, polaris: "1", caps });
                 if (line!.startsWith("polaris skin get")) return JSON.stringify(live ?? { ok: true });
+                if (line!.startsWith("polaris skin stage")) return JSON.stringify(stageReply);
                 if (line!.startsWith("polaris skin apply")) {
                     const hash = line!.includes(SIGNATURE) ? SLIM_HASH : HASH;
                     live = { ok: true, hash, model: "slim", signed: true };
@@ -119,7 +123,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
                 }
                 return JSON.stringify({ ok: true });
             }
-        })
+        });
+    }
 }));
 
 const actions = await import("@polaris-app/game-servers/src/screens/installed/skin-actions");
@@ -135,6 +140,8 @@ beforeEach(() => {
     fetched.length = 0;
     caps = ["skin"];
     live = null;
+    stageReply = { ok: true, staged: true };
+    containerFailure = null;
     linkResponse = null;
     moderates = true;
     linked = [];
@@ -251,9 +258,12 @@ describe("applying a skin", () => {
         });
         expect(result.error).toBeUndefined();
         expect(fetched.some((one) => one.url.includes("mineskin"))).toBe(false);
-        expect(said.filter((line) => line.startsWith("polaris skin"))).toEqual([
-            `polaris skin stage player_one ${packed(HASH, "slim")}`,
-            `polaris skin apply player_one ${SIGNATURE}`,
+        const lines = said.filter((line) => line.startsWith("polaris skin"));
+        const token = lines[0]?.split(" ")[4];
+        expect(token).toMatch(/^[0-9a-f]{16}$/);
+        expect(lines).toEqual([
+            `polaris skin stage player_one ${token} ${packed(HASH, "slim")}`,
+            `polaris skin apply player_one ${token} ${SIGNATURE}`,
             "polaris skin get player_one"
         ]);
         expect(result.live?.state).toBe("read");
@@ -307,6 +317,32 @@ describe("applying a skin", () => {
     });
 });
 
+describe("a change the server does not take", () => {
+    const apply = () =>
+        actions.applySkinAction({
+            installedAppId: INSTALL,
+            player: "player_one",
+            png: base64(SKIN_PNG),
+            model: "slim",
+            signed: { value: packed(HASH, "slim"), signature: SIGNATURE }
+        });
+
+    it("answers with the stage's own refusal and never signs it off", async () => {
+        stageReply = { ok: false, why: "offline" };
+        const result = await apply();
+        expect(result.live).toEqual({ state: "refused", why: "offline" });
+        expect(said.some((line) => line.startsWith("polaris skin apply"))).toBe(false);
+    });
+
+    it("puts an error that carries no sentence of ours into the fallback", async () => {
+        containerFailure = new Error("exec failed: /srv/servers/abc");
+        expect((await apply()).error).toBe("skins.couldNotApply");
+        expect(
+            (await actions.readSkinAction({ installedAppId: INSTALL, player: "player_one" })).error
+        ).toBe("skins.couldNotRead");
+    });
+});
+
 describe("whose skin a player may change", () => {
     const apply = () =>
         actions.applySkinAction({
@@ -329,7 +365,7 @@ describe("whose skin a player may change", () => {
         moderates = false;
         linked = ["player_two"];
         const result = await apply();
-        expect(result.error).toBeDefined();
+        expect(result.error).toBe("minecraft:skins.onlyYourOwn");
         expect(said.some((line) => line.startsWith("polaris skin stage"))).toBe(false);
     });
 

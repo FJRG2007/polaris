@@ -99,11 +99,27 @@ describe("signed skins", () => {
     });
 
     it("stages the value and signs it off in two lines that each fit one command", () => {
-        const lines = skin.skinCommands("player_one", { value: VALUE, signature: SIGNATURE });
-        expect(lines[0]).toBe(`polaris skin stage player_one ${VALUE}`);
-        expect(lines[1]).toBe(`polaris skin apply player_one ${SIGNATURE}`);
+        const lines = skin.skinCommands(
+            "player_one",
+            { value: VALUE, signature: SIGNATURE },
+            "0123456789abcdef"
+        );
+        expect(lines[0]).toBe(`polaris skin stage player_one 0123456789abcdef ${VALUE}`);
+        expect(lines[1]).toBe(`polaris skin apply player_one 0123456789abcdef ${SIGNATURE}`);
         for (const line of lines) expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
         expect(() => skin.skinCommands("player one", { value: VALUE, signature: SIGNATURE })).toThrow();
+        expect(() =>
+            skin.skinCommands("player_one", { value: VALUE, signature: SIGNATURE }, "not a token")
+        ).toThrow();
+    });
+
+    it("ties each change's two lines to a token of its own", () => {
+        const first = skin.skinCommands("player_one", { value: VALUE, signature: SIGNATURE });
+        const second = skin.skinCommands("player_one", { value: VALUE, signature: SIGNATURE });
+        const token = (line: string) => line.split(" ")[4];
+        expect(token(first[0])).toBe(token(first[1]));
+        expect(token(first[0])).toMatch(/^[0-9a-f]{16}$/);
+        expect(token(first[0])).not.toBe(token(second[0]));
     });
 });
 

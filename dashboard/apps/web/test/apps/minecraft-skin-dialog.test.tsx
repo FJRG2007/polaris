@@ -51,13 +51,13 @@ const INSTALLED = "00000000-0000-4000-8000-000000000001";
 const HASH = "a".repeat(64);
 const PNG = "iVBORw0KGgo=";
 
-function open(canEdit: boolean, canRestart = false) {
+function open(canEdit: boolean, canRestart = false, online = true) {
     render(
         <SkinDialog
             installedAppId={INSTALLED}
             player="player-one"
             canEdit={canEdit}
-            online
+            online={online}
             running
             canRestart={canRestart}
             onClose={() => undefined}
@@ -128,6 +128,42 @@ describe("SkinDialog", () => {
             "No Minecraft account has that name."
         );
         expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+    });
+
+    it("reads a linked player's own skin once", async () => {
+        actions.readSkinAction.mockResolvedValue({
+            live: { state: "read", skin: { hash: HASH, model: "slim", signed: true } },
+            ownSkin: true
+        });
+        actions.previewSkinAction.mockResolvedValue({ png: PNG, model: "slim", signed: null });
+        open(false);
+        expect(await screen.findByRole("button", { name: "Load" })).toBeTruthy();
+        await waitFor(() => expect(actions.previewSkinAction).toHaveBeenCalledTimes(1));
+        expect(actions.readSkinAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers no change to a player who is not on the server, and says why", async () => {
+        actions.readSkinAction.mockResolvedValue({ live: { state: "refused", why: "offline" } });
+        open(true, false, false);
+        expect(await screen.findByText(/player-one is not on the server/)).toBeTruthy();
+        expect(screen.queryByText("Their account's own skin")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Load" })).toBeNull();
+    });
+
+    it("puts a refusal from the server into a sentence", async () => {
+        actions.readSkinAction.mockResolvedValue({ live: { state: "read", skin: null } });
+        actions.previewSkinAction.mockResolvedValue({ png: PNG, model: "classic", signed: null });
+        actions.applySkinAction.mockResolvedValue({ live: { state: "refused", why: "notStaged" } });
+        open(true);
+        await screen.findByText("Their account's own skin");
+        fireEvent.change(screen.getByPlaceholderText("Username or link"), {
+            target: { value: "player-two" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Load" }));
+        fireEvent.click(await screen.findByRole("button", { name: "Apply" }));
+        expect((await screen.findByRole("alert")).textContent).toContain(
+            "The server lost the skin before it went on. Apply it again."
+        );
     });
 
     it("says the mod is too old and offers the restart that updates it", async () => {

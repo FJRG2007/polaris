@@ -8,7 +8,8 @@
  * one shows the default skin to everybody else. So what is applied is always a
  * signed value: a Mojang profile's own (asked for with `unsigned=false`), or one
  * a skin-signing service returned for an uploaded PNG. Value and signature go to
- * the mod on two lines, since together they are longer than one command may be.
+ * the mod on two lines, since together they are longer than one command may be,
+ * both under one token so a change made at the same time cannot cross them.
  */
 
 import { z } from "zod";
@@ -180,13 +181,25 @@ function texturesSkin(payload: unknown): { hash: string; model: SkinModel } | nu
     return { hash, model: skin.metadata?.model === "slim" ? "slim" : "classic" };
 }
 
-/** The mod's lines for a skin: the value staged, then signed off. */
-export function skinCommands(player: string, skin: SignedSkin): [string, string] {
+const STAGE_TOKEN = /^[0-9a-f]{8,32}$/;
+
+/** A fresh token tying a staged value to the line that signs it off. */
+export function stageToken(): string {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+}
+
+/** The mod's lines for a skin: the value staged, then signed off, under one token. */
+export function skinCommands(
+    player: string,
+    skin: SignedSkin,
+    token: string = stageToken()
+): [string, string] {
     if (!PLAYER_NAME.test(player)) throw new Error("Not a player name");
+    if (!STAGE_TOKEN.test(token)) throw new Error("Not a stage token");
     if (!signedSkin(skin)) throw new Error("Not a signed skin");
     const lines: [string, string] = [
-        `polaris skin stage ${player} ${skin.value}`,
-        `polaris skin apply ${player} ${skin.signature}`
+        `polaris skin stage ${player} ${token} ${skin.value}`,
+        `polaris skin apply ${player} ${token} ${skin.signature}`
     ];
     if (lines.some((line) => commandBytes(line) > COMMAND_BYTES_MAX))
         throw new Error("Skin too long for one command");

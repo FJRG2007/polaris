@@ -10,7 +10,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import * as skin from "../../lib/minecraft/skin";
-import { gameMessage } from "../../lib/game-message";
+import { gameMessage, readGameMessage } from "../../lib/game-message";
 import { gameWords, messageText } from "../game-words";
 import * as service from "../../lib/minecraft/skin-service";
 import { withServerContainer } from "../../lib/minecraft/service";
@@ -71,7 +71,9 @@ async function failureText(caught: unknown, fallback: string): Promise<string> {
         return caught.failure === "signingBusy" && caught.retryAfterSeconds
             ? t("skins.failures.signingBusyFor", { seconds: caught.retryAfterSeconds })
             : t(`skins.failures.${caught.failure}`);
-    return caught instanceof Error ? await messageText(caught.message) : t(fallback as never);
+    return caught instanceof Error && readGameMessage(caught.message)
+        ? await messageText(caught.message)
+        : t(fallback as never);
 }
 
 /** What a player wears now, as the server says. */

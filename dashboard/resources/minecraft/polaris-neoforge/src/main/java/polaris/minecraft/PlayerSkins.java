@@ -40,19 +40,22 @@ import polaris.minecraft.mixin.ChunkMapAccessor;
  * whoever can see it. The player's own client keeps the skin it loaded until they
  * rejoin.
  *
- * - {@code polaris skin stage <player> <value>}: the packed value, held a minute.
- * - {@code polaris skin apply <player> <signature>}: puts the staged value on with
- *   its signature. Two lines because value and signature together are longer than
- *   one console command may be.
+ * - {@code polaris skin stage <player> <token> <value>}: the packed value, held a
+ *   minute under a token the caller picked.
+ * - {@code polaris skin apply <player> <token> <signature>}: puts the value staged
+ *   under that token on with its signature. Two lines because value and signature
+ *   together are longer than one console command may be; the token keeps two
+ *   changes made at once from pairing one's value with the other's signature.
  * - {@code polaris skin clear <player>}
  * - {@code polaris skin get <player>}: what the live profile carries now.
  */
 public final class PlayerSkins {
     private static final Pattern HASH = Pattern.compile("[0-9a-f]{16,128}");
     private static final Pattern BASE64 = Pattern.compile("[A-Za-z0-9+/]{16,4096}={0,2}");
+    private static final Pattern TOKEN = Pattern.compile("[0-9a-f]{8,32}");
     private static final long STAGED_FOR_MS = 60_000;
 
-    /** Values waiting for their signature, by lowercased name. */
+    /** Values waiting for their signature, by lowercased name and token. */
     private static final Map<String, Staged> STAGED = new ConcurrentHashMap<>();
 
     private record Staged(String value, long at) {}
@@ -64,21 +67,25 @@ public final class PlayerSkins {
         void polaris$retrack(ServerPlayer viewer);
     }
 
-    public static JsonObject stage(MinecraftServer server, String player, String value) {
+    public static JsonObject stage(MinecraftServer server, String player, String token, String value) {
         String clean = value.trim();
+        if (!TOKEN.matcher(token).matches()) return refusal("badToken");
         if (!BASE64.matcher(clean).matches() || skinOf(clean) == null) return refusal("badValue");
         if (server.getPlayerList().getPlayerByName(player) == null) return refusal("offline");
-        STAGED.put(player.toLowerCase(Locale.ROOT), new Staged(clean, System.currentTimeMillis()));
+        long now = System.currentTimeMillis();
+        STAGED.values().removeIf(staged -> now - staged.at() > STAGED_FOR_MS);
+        STAGED.put(stagedKey(player, token), new Staged(clean, now));
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
         reply.addProperty("staged", true);
         return reply;
     }
 
-    public static JsonObject apply(MinecraftServer server, String player, String signature) {
+    public static JsonObject apply(MinecraftServer server, String player, String token, String signature) {
         String clean = signature.trim();
+        if (!TOKEN.matcher(token).matches()) return refusal("badToken");
         if (!BASE64.matcher(clean).matches()) return refusal("badSignature");
-        Staged staged = STAGED.remove(player.toLowerCase(Locale.ROOT));
+        Staged staged = STAGED.remove(stagedKey(player, token));
         if (staged == null || System.currentTimeMillis() - staged.at() > STAGED_FOR_MS) return refusal("notStaged");
         ServerPlayer online = server.getPlayerList().getPlayerByName(player);
         if (online == null) return refusal("offline");
@@ -91,6 +98,10 @@ public final class PlayerSkins {
         put(online.getGameProfile(), staged.value(), clean);
         refresh(server, online);
         return get(server, player);
+    }
+
+    private static String stagedKey(String player, String token) {
+        return player.toLowerCase(Locale.ROOT) + " " + token;
     }
 
     public static JsonObject clear(MinecraftServer server, String player) {

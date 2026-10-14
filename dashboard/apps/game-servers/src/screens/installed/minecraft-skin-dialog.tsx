@@ -58,6 +58,21 @@ function dataUrl(png: string): string {
     return `data:image/png;base64,${png}`;
 }
 
+/** The sentence for a refusal the mod answered with. */
+const REFUSALS = {
+    offline: "offline",
+    notStaged: "notStaged",
+    badValue: "unreadable",
+    badSignature: "unreadable",
+    badToken: "unreadable",
+    unsaved: "unsaved"
+} as const;
+
+function refusalKey(why: string) {
+    const known = (REFUSALS as Record<string, (typeof REFUSALS)[keyof typeof REFUSALS]>)[why];
+    return known ? (`skins.refusals.${known}` as const) : ("skins.refused" as const);
+}
+
 export function SkinDialog({
     installedAppId,
     player,
@@ -100,7 +115,7 @@ export function SkinDialog({
 
     /** What the server says they wear, as something the view can draw. */
     const showLive = useCallback(
-        async (next: LiveSkin, mayEdit: boolean = editable) => {
+        async (next: LiveSkin, mayEdit: boolean) => {
             setLive(next);
             if (next.state !== "read" || !next.skin) {
                 setCurrent(null);
@@ -121,7 +136,7 @@ export function SkinDialog({
             }
             setCurrent({ png: null, url, model: worn });
         },
-        [editable, installedAppId]
+        [installedAppId, player]
     );
 
     useEffect(() => {
@@ -151,6 +166,18 @@ export function SkinDialog({
     }, [installedAppId, player, attempt, canEdit, showLive, t]);
 
     const unsupported = live?.state === "unsupported";
+    // The mod changes a skin only on a player who is in; the read says so when the
+    // list on screen is behind.
+    const offline =
+        live?.state === "refused" ? live.why === "offline" : !online && live?.state !== "read";
+    const changeable = editable && !offline;
+
+    /** Says what went wrong when the server did not take a change. */
+    function answered(next: LiveSkin) {
+        if (next.state === "refused") setError(t(refusalKey(next.why), { name: player }));
+        if (next.state === "unanswered") setError(t("skins.unanswered"));
+        setLive(next);
+    }
     const shown: Shown | null = preview ? { png: preview.png, url: null, model } : current;
 
     async function importFile(file: File) {
@@ -227,12 +254,7 @@ export function SkinDialog({
             })
             .catch(() => ({ error: t("skins.couldNotApply") }) as const);
         setBusy(null);
-        if ("live" in result && result.live) {
-            if (result.live.state === "refused")
-                setError(t("skins.refused", { why: result.live.why }));
-            if (result.live.state === "unanswered") setError(t("skins.unanswered"));
-            setLive(result.live);
-        }
+        if ("live" in result && result.live) answered(result.live);
         if (result.error) {
             setError(result.error);
             return;
@@ -241,7 +263,7 @@ export function SkinDialog({
         setPreview(null);
         setNotice(t("skins.applied"));
         // What the server holds now, not what was sent.
-        await showLive(result.live);
+        await showLive(result.live, editable);
     }
 
     async function reset() {
@@ -259,7 +281,7 @@ export function SkinDialog({
             .clearSkinAction({ installedAppId, player })
             .catch(() => ({ error: t("skins.couldNotApply") }) as const);
         setBusy(null);
-        if ("live" in result && result.live) setLive(result.live);
+        if ("live" in result && result.live) answered(result.live);
         if (result.error) {
             setError(result.error);
             return;
@@ -267,7 +289,7 @@ export function SkinDialog({
         if (!("live" in result) || result.live?.state !== "read") return;
         setPreview(null);
         setNotice(t("skins.resetDone"));
-        await showLive(result.live);
+        await showLive(result.live, editable);
     }
 
     function exportPng() {
@@ -286,7 +308,7 @@ export function SkinDialog({
             <DialogContent
                 className="max-h-[88vh] max-w-2xl overflow-y-auto overscroll-contain"
                 onPaste={(event) => {
-                    if (!editable || unsupported) return;
+                    if (!changeable || unsupported) return;
                     const file = imageFrom(event.clipboardData.items);
                     if (!file) return;
                     event.preventDefault();
@@ -346,7 +368,9 @@ export function SkinDialog({
                                       ? " "
                                       : worn
                                         ? `${t("skins.current")} - ${t(`skins.models.${worn.model}`)}`
-                                        : t("skins.accountSkin")}
+                                        : offline
+                                          ? " "
+                                          : t("skins.accountSkin")}
                             </p>
                         </div>
 
@@ -354,11 +378,13 @@ export function SkinDialog({
                             {worn && !worn.signed && !preview && (
                                 <p className="text-sm text-muted-foreground">{t("skins.unsigned")}</p>
                             )}
-                            {!online && editable && (
-                                <p className="text-sm text-muted-foreground">{t("skins.notOnline")}</p>
+                            {offline && (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("skins.notOnline", { name: player })}
+                                </p>
                             )}
 
-                            {editable && (
+                            {changeable && (
                                 <section className="flex min-w-0 flex-col gap-3">
                                     <h3 className="text-sm font-medium">{t("skins.import")}</h3>
                                     <div
@@ -478,7 +504,7 @@ export function SkinDialog({
                             {t("skins.export")}
                         </Button>
                     )}
-                    {editable && !unsupported && !readError && worn && !preview && (
+                    {changeable && !unsupported && !readError && worn && !preview && (
                         <Button variant="outline" size="sm" onClick={() => void reset()} disabled={working}>
                             {busy === "reset" && <Loader2 className="size-4 animate-spin" aria-hidden />}
                             {t("skins.reset")}
@@ -497,7 +523,7 @@ export function SkinDialog({
                             {t("skins.discard")}
                         </Button>
                     )}
-                    {preview ? (
+                    {preview && changeable ? (
                         <Button size="sm" onClick={() => void apply()} disabled={working}>
                             {busy === "apply" && <Loader2 className="size-4 animate-spin" aria-hidden />}
                             {busy === "apply" ? t("skins.applying") : t("skins.apply")}

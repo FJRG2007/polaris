@@ -198,7 +198,9 @@ export async function applySkin(
 ): Promise<LiveSkin> {
     if (!(await capabilities(server)).has(skin.SKIN_CAP)) return { state: "unsupported" };
     const [stage, apply] = skin.skinCommands(player, signed);
-    await server.say([stage]);
+    const staged = skin.parseSkinReply(await server.say([stage]));
+    if (!staged) return { state: "unanswered" };
+    if (!staged.ok) return { state: "refused", why: staged.why };
     const answer = skin.parseSkinReply(await server.say([apply]));
     if (answer && !answer.ok) return { state: "refused", why: answer.why };
     return readLiveSkin(server, player);
