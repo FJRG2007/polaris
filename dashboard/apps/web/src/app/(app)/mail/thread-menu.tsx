@@ -52,8 +52,8 @@ import {
     Pin,
     PinOff,
     Copy,
-    CornerUpLeft,
-    CornerUpRight,
+    Reply,
+    ReplyAll,
     Forward,
     Link2,
     Mail,
@@ -148,7 +148,7 @@ export function ThreadContextMenu({
                     onSelect={() => onAnswer("reply", thread.leadMessageId)}
                     disabled={!thread.leadMessageId}
                 >
-                    <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
+                    <Reply className="size-3.5 shrink-0" aria-hidden />
                     {t("thread.reply")}
                     <MenuShortcut keys={keyFor("reply")} />
                 </ContextMenuItem>
@@ -156,7 +156,7 @@ export function ThreadContextMenu({
                     onSelect={() => onAnswer("reply-all", thread.leadMessageId)}
                     disabled={!thread.leadMessageId}
                 >
-                    <CornerUpRight className="size-3.5 shrink-0" aria-hidden />
+                    <ReplyAll className="size-3.5 shrink-0" aria-hidden />
                     {t("thread.replyAll")}
                     <MenuShortcut keys={keyFor("replyAll")} />
                 </ContextMenuItem>
