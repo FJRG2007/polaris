@@ -724,7 +724,9 @@ function CameraCard() {
                 ) : null}
                 {showing && !inCall && maskState?.problem ? (
                     <p className="text-xs text-warning">
-                        {t("devices.camera.failed", { problem: cameraProblemText(maskState.problem, tChat) })}
+                        {t("devices.camera.failed", {
+                            problem: cameraProblemText(maskState.problem, tChat)
+                        })}
                     </p>
                 ) : showing && !inCall && maskState?.track ? (
                     <p className="text-xs text-success">{t("devices.camera.running")}</p>

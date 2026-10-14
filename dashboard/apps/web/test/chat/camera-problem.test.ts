@@ -21,8 +21,12 @@ describe("what went wrong", () => {
 
     it("puts the driver's words inside Polaris's sentence", () => {
         const problem = problemOf(new CameraFailure("graphics", "ERROR: 0:1: bad"));
-        expect(cameraProblemText(problem, t)).toBe('cameraProblem.graphicsSaid {"said":"ERROR: 0:1: bad"}');
-        expect(cameraProblemText({ code: "graphics", said: null }, t)).toBe("cameraProblem.graphics");
+        expect(cameraProblemText(problem, t)).toBe(
+            'cameraProblem.graphicsSaid {"said":"ERROR: 0:1: bad"}'
+        );
+        expect(cameraProblemText({ code: "graphics", said: null }, t)).toBe(
+            "cameraProblem.graphics"
+        );
     });
 
     it("says it said nothing when nothing was said", () => {

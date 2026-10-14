@@ -96,15 +96,20 @@ describe("which way frames go", () => {
 
     it("prefers insertable streams, which no hidden tab throttles", () => {
         expect(
-            mask.framePath({ processor: true, generator: true, videoFrame: true, captureStream: true })
+            mask.framePath({
+                processor: true,
+                generator: true,
+                videoFrame: true,
+                captureStream: true
+            })
         ).toBe("insertable");
     });
 
     it("falls back to a captured canvas when any piece is missing", () => {
         // Safari and Firefox: a processor in workers at most, no generator.
-        expect(mask.framePath({ ...none, processor: true, videoFrame: true, captureStream: true })).toBe(
-            "canvas"
-        );
+        expect(
+            mask.framePath({ ...none, processor: true, videoFrame: true, captureStream: true })
+        ).toBe("canvas");
         expect(mask.framePath({ ...none, captureStream: true })).toBe("canvas");
     });
 
@@ -116,7 +121,10 @@ describe("which way frames go", () => {
         class Canvas {
             captureStream(): void {}
         }
-        expect(mask.frameSupport({ HTMLCanvasElement: Canvas })).toEqual({ ...none, captureStream: true });
+        expect(mask.frameSupport({ HTMLCanvasElement: Canvas })).toEqual({
+            ...none,
+            captureStream: true
+        });
         expect(
             mask.frameSupport({
                 MediaStreamTrackProcessor: class {},

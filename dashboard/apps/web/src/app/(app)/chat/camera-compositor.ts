@@ -177,7 +177,10 @@ void main() {
  * Build the compositor on a WebGL 2 context, or throw saying why not - a
  * shader that will not compile is a reason the screen can show.
  */
-export function createCompositor(gl: WebGL2RenderingContext, options: CompositorOptions): Compositor {
+export function createCompositor(
+    gl: WebGL2RenderingContext,
+    options: CompositorOptions
+): Compositor {
     const programs = {
         temporal: program(gl, TEMPORAL),
         refine: program(gl, REFINE),
@@ -326,7 +329,12 @@ export function createCompositor(gl: WebGL2RenderingContext, options: Compositor
         }
 
         const cover = options.image
-            ? mask.coverUv(options.image.naturalWidth, options.image.naturalHeight, output.width, output.height)
+            ? mask.coverUv(
+                  options.image.naturalWidth,
+                  options.image.naturalHeight,
+                  output.width,
+                  output.height
+              )
             : [1, 1, 0, 0];
         draw(
             null,
@@ -349,7 +357,13 @@ export function createCompositor(gl: WebGL2RenderingContext, options: Compositor
         if (!current) return null;
         prepare();
         reading = sized(gl, reading, { width, height });
-        draw(reading, { width, height }, programs.copy, { source: current.texture }, () => undefined);
+        draw(
+            reading,
+            { width, height },
+            programs.copy,
+            { source: current.texture },
+            () => undefined
+        );
         const pixels = new Uint8Array(width * height * 4);
         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
         finishPass();
@@ -430,7 +444,17 @@ function sized(gl: WebGL2RenderingContext, current: Target | null, size: Size): 
         gl.deleteTexture(current.texture);
     }
     const made = texture(gl);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, size.width, size.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA8,
+        size.width,
+        size.height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        null
+    );
     const framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, made, 0);

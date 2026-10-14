@@ -1838,7 +1838,9 @@ function Split({
                                     )}
                                 {backgroundProblem && (
                                     <p className="px-2 pb-1 text-xs text-muted-foreground">
-                                        {t("callRoom.noBackground", { problem: cameraProblemText(backgroundProblem, t) })}
+                                        {t("callRoom.noBackground", {
+                                            problem: cameraProblemText(backgroundProblem, t)
+                                        })}
                                     </p>
                                 )}
                                 {pickProblem && (

@@ -82,7 +82,9 @@ describe("the background runtime and model the call asks for", () => {
     it("has its model committed where the build copies it from", () => {
         expect(existsSync(join(MODELS, MODEL_FILE))).toBe(true);
         // A TFLite flatbuffer, not a pointer file or an HTML error page.
-        expect(readFileSync(join(MODELS, MODEL_FILE)).subarray(4, 8).toString("latin1")).toBe("TFL3");
+        expect(readFileSync(join(MODELS, MODEL_FILE)).subarray(4, 8).toString("latin1")).toBe(
+            "TFL3"
+        );
     });
 
     it("comes from files the installed package still has", () => {

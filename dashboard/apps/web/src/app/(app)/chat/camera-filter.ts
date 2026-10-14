@@ -479,10 +479,7 @@ function loader(): Promise<Loaded> {
  * - a machine with WebGL 2 but a blocklisted driver still gets a background,
  * only a slower one. Both share the canvas, so the mask is a texture either way.
  */
-async function createSegmenter(
-    loaded: Loaded,
-    canvas: HTMLCanvasElement
-): Promise<ImageSegmenter> {
+async function createSegmenter(loaded: Loaded, canvas: HTMLCanvasElement): Promise<ImageSegmenter> {
     const files = wasmFiles(loaded.simd);
     const fileset = {
         wasmLoaderPath: `${ASSETS}/${files.loader}`,

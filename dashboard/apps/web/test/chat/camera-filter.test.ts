@@ -46,7 +46,10 @@ vi.mock("@mediapipe/tasks-vision", () => ({
                 if (modelBroken) throw new Error("lost context");
                 const answer = { width: 256, height: 256, getAsWebGLTexture: () => ({}) };
                 // Background first, person last - the order the runtime uses.
-                return { confidenceMasks: [{ ...answer, width: 1 }, answer], close: () => undefined };
+                return {
+                    confidenceMasks: [{ ...answer, width: 1 }, answer],
+                    close: () => undefined
+                };
             },
             close: () => undefined
         })
@@ -81,9 +84,15 @@ class FakeCanvas {
         if (kind === "webgl2") {
             if (!webgl) return null;
             const loss = { loseContext: () => void (released += 1) };
-            return { getExtension: (name: string) => (name === "WEBGL_lose_context" ? loss : null) };
+            return {
+                getExtension: (name: string) => (name === "WEBGL_lose_context" ? loss : null)
+            };
         }
-        return { globalCompositeOperation: "source-over", filter: "none", drawImage: () => undefined };
+        return {
+            globalCompositeOperation: "source-over",
+            filter: "none",
+            drawImage: () => undefined
+        };
     }
     captureStream(): { getVideoTracks: () => unknown[] } {
         return { getVideoTracks: () => [{ id: "masked", stop: () => undefined }] };
