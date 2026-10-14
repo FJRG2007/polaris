@@ -24,11 +24,14 @@ pub fn is_app_project(name: &str) -> bool {
         None => true,
         Some(m) => {
             (1..=8).contains(&m.len())
-                && m.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+                && m.chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
         }
     };
     hash.len() == 8
-        && hash.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
+        && hash
+            .chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c))
         && marker_ok
 }
 
@@ -115,8 +118,7 @@ mod tests {
 
     #[test]
     fn lists_and_removes_only_project_directories() {
-        let root =
-            std::env::temp_dir().join(format!("polaris-dirs-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("polaris-dirs-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("polaris-0a1b2c3d")).unwrap();
         std::fs::write(root.join("polaris-0a1b2c3d").join("compose.yml"), "x").unwrap();

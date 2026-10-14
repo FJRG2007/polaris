@@ -10,11 +10,9 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@polaris/hostd-client", () => ({ HostdClient: class {} }));
 vi.mock("@/lib/deploy/service-networks", () => ({ wantedPrivateNetworks: async () => [] }));
 
-const {
-    findLeftovers,
-    liveContainers,
-    routeIdsIn
-} = await import("@/lib/deploy/uninstall-leftovers");
+const { findLeftovers, liveContainers, routeIdsIn } = await import(
+    "@/lib/deploy/uninstall-leftovers"
+);
 const { leftByRemovedApp } = await import("@/lib/deploy/host-volumes");
 
 const LIVE_APP = "polaris-0a1b2c3d";

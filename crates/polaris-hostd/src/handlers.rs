@@ -526,7 +526,11 @@ fn deploy_dirs_remove<R: Read>(state: &AppState, req: &Request, body: &mut R) ->
         Some(false) => {}
         Some(true) => return Response::text(409, "Conflict", "project still has containers"),
         None => {
-            return Response::text(502, "Bad Gateway", "could not check the project's containers")
+            return Response::text(
+                502,
+                "Bad Gateway",
+                "could not check the project's containers",
+            )
         }
     }
     match crate::deploy_dirs::remove(&state.config.deploy_root, &request.project) {

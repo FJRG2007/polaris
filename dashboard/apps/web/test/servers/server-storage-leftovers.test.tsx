@@ -99,7 +99,9 @@ describe("what an uninstall left behind", () => {
         expect(within(section).getByText("polaris-a1b2c3d4-web-1")).toBeTruthy();
         expect(within(section).getByText("polaris-net-a1b2c3d4")).toBeTruthy();
         expect(within(section).getByText("polaris-a1b2c3d4")).toBeTruthy();
-        expect(within(section).getByText("polaris-app-018f2b7a-0000-7000-8000-0000000000f6")).toBeTruthy();
+        expect(
+            within(section).getByText("polaris-app-018f2b7a-0000-7000-8000-0000000000f6")
+        ).toBeTruthy();
         expect(within(section).getByText("Container")).toBeTruthy();
         expect(within(section).getByText("Network")).toBeTruthy();
         expect(within(section).getByText("Deploy folder")).toBeTruthy();

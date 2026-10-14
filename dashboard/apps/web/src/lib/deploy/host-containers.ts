@@ -116,7 +116,9 @@ export async function removeStrayContainer(id: string): Promise<ContainerRemoval
         .catch(() => null);
     if (!reply) return { ok: false, reason: "This machine would not answer. Nothing was removed." };
     if (reply.status === 204) return { ok: true };
-    if (reply.status === 404) return { ok: false, reason: "That container is not on this machine any more." };
-    if (reply.status === 409) return { ok: false, reason: "The machine is busy with it. Nothing was removed." };
+    if (reply.status === 404)
+        return { ok: false, reason: "That container is not on this machine any more." };
+    if (reply.status === 409)
+        return { ok: false, reason: "The machine is busy with it. Nothing was removed." };
     return { ok: false, reason: "This machine refused to remove it." };
 }

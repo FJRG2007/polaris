@@ -265,7 +265,9 @@ export class HostdClient {
             JSON.stringify({ project })
         );
         if (response.status !== 200) {
-            throw new Error(`hostd directory removal failed (${response.status}): ${response.body}`);
+            throw new Error(
+                `hostd directory removal failed (${response.status}): ${response.body}`
+            );
         }
     }
 

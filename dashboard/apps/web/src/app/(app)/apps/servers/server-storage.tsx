@@ -351,10 +351,10 @@ export function ServerStorage() {
                                                           : volume.removedApp && volume.project
                                                             ? `${t("storage.removedApp")} (${volume.project})`
                                                             : volume.project
-                                                            ? t("storage.createdBy", {
-                                                                  project: volume.project
-                                                              })
-                                                            : t("storage.noRecord")}
+                                                              ? t("storage.createdBy", {
+                                                                    project: volume.project
+                                                                })
+                                                              : t("storage.noRecord")}
                                                     {/* A move's copier is what holds it: the
                                                     step it is on says more than its name. */}
                                                     {move

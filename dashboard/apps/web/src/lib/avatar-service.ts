@@ -78,12 +78,18 @@ const ALLOWED_MIME = new Map<string, string>([
  * stored and worried about later.
  */
 export function sniffImageMime(bytes: Uint8Array): string | null {
-    const starts = (...signature: number[]) => signature.every((byte, index) => bytes[index] === byte);
+    const starts = (...signature: number[]) =>
+        signature.every((byte, index) => bytes[index] === byte);
     if (starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return "image/png";
     if (starts(0xff, 0xd8, 0xff)) return "image/jpeg";
     if (starts(0x47, 0x49, 0x46, 0x38)) return "image/gif";
     // RIFF....WEBP
-    if (starts(0x52, 0x49, 0x46, 0x46) && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42) {
+    if (
+        starts(0x52, 0x49, 0x46, 0x46) &&
+        bytes[8] === 0x57 &&
+        bytes[9] === 0x45 &&
+        bytes[10] === 0x42
+    ) {
         return "image/webp";
     }
     return null;
@@ -115,7 +121,10 @@ export async function avatarSettings(): Promise<AvatarSettings> {
     return { choice: choice ?? AUTOMATIC_TARGET, resolved, gravatar, options };
 }
 
-export async function setAvatarSettings(input: { target: string; gravatar: boolean }): Promise<void> {
+export async function setAvatarSettings(input: {
+    target: string;
+    gravatar: boolean;
+}): Promise<void> {
     await setSetting(AVATAR_TARGET_KEY, input.target);
     await setSetting(AVATAR_GRAVATAR_KEY, input.gravatar ? "on" : "off");
 }
@@ -162,7 +171,8 @@ interface AvatarRow {
 
 async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
     if (owner.kind === "user") return prisma.userAvatar.findUnique({ where: { userId: owner.id } });
-    if (owner.kind === "banner") return prisma.userBanner.findUnique({ where: { userId: owner.id } });
+    if (owner.kind === "banner")
+        return prisma.userBanner.findUnique({ where: { userId: owner.id } });
     if (owner.kind === "org") {
         return prisma.organizationAvatar.findUnique({ where: { orgId: owner.id } });
     }
@@ -182,7 +192,11 @@ async function readRow(owner: AvatarOwner): Promise<AvatarRow | null> {
  * failed upload that has already deleted the previous photo leaves whoever
  * uploaded it worse off than when they started.
  */
-export async function storeAvatar(owner: AvatarOwner, bytes: Uint8Array, mime: string): Promise<void> {
+export async function storeAvatar(
+    owner: AvatarOwner,
+    bytes: Uint8Array,
+    mime: string
+): Promise<void> {
     const extension = ALLOWED_MIME.get(mime);
     if (!extension) throw new Error("That kind of image is not accepted");
 
@@ -276,7 +290,8 @@ export async function deleteAvatar(owner: AvatarOwner): Promise<void> {
     const existing = await readRow(owner);
     if (!existing) return;
     if (owner.kind === "user") await prisma.userAvatar.delete({ where: { userId: owner.id } });
-    else if (owner.kind === "banner") await prisma.userBanner.delete({ where: { userId: owner.id } });
+    else if (owner.kind === "banner")
+        await prisma.userBanner.delete({ where: { userId: owner.id } });
     else if (owner.kind === "org") {
         await prisma.organizationAvatar.delete({ where: { orgId: owner.id } });
     } else if (owner.kind === "orgBanner") {
@@ -483,9 +498,12 @@ export async function gravatarImage(email: string): Promise<GravatarAnswer> {
     let image: AvatarImage | null = null;
     let answered = false;
     try {
-        const response = await fetch(`https://gravatar.com/avatar/${hash}?d=404&s=${GRAVATAR_SIZE}`, {
-            signal: AbortSignal.timeout(GRAVATAR_TIMEOUT_MS)
-        });
+        const response = await fetch(
+            `https://gravatar.com/avatar/${hash}?d=404&s=${GRAVATAR_SIZE}`,
+            {
+                signal: AbortSignal.timeout(GRAVATAR_TIMEOUT_MS)
+            }
+        );
         // A picture and a 404 are both Gravatar telling us about the address.
         // A 429 or a 502 is Gravatar telling us about Gravatar, so it is worth
         // asking again shortly rather than standing in for an answer all day.
@@ -499,7 +517,11 @@ export async function gravatarImage(email: string): Promise<GravatarAnswer> {
             // changes, so tagging by it would pin the first Gravatar somebody
             // had into every browser that ever loaded it.
             if (mime && bytes.length <= MAX_AVATAR_BYTES) {
-                image = { bytes, mime, etag: `"g${createHash("sha256").update(bytes).digest("hex").slice(0, 16)}"` };
+                image = {
+                    bytes,
+                    mime,
+                    etag: `"g${createHash("sha256").update(bytes).digest("hex").slice(0, 16)}"`
+                };
             }
         }
     } catch (error) {
@@ -550,7 +572,8 @@ export interface GravatarAnswer {
 async function linkedImage(url: string): Promise<GravatarAnswer> {
     const key = `linked:${url}`;
     const cached = gravatarCache.get(key);
-    if (cached && Date.now() < cached.until) return { image: cached.image, certain: !cached.failed };
+    if (cached && Date.now() < cached.until)
+        return { image: cached.image, certain: !cached.failed };
 
     let image: AvatarImage | null = null;
     let answered = false;
@@ -639,14 +662,19 @@ export async function resolveAvatar(userId: string): Promise<AvatarAnswer> {
     if (user.image) {
         const { image, certain } = await linkedImage(user.image);
         if (image) {
-            return { picture: { etag: image.etag, mime: image.mime, load: async () => image.bytes }, certain };
+            return {
+                picture: { etag: image.etag, mime: image.mime, load: async () => image.bytes },
+                certain
+            };
         }
     }
 
     if (!(await gravatarEnabled())) return { picture: null, certain: true };
     const { image, certain } = await gravatarImage(user.email);
     return {
-        picture: image ? { etag: image.etag, mime: image.mime, load: async () => image.bytes } : null,
+        picture: image
+            ? { etag: image.etag, mime: image.mime, load: async () => image.bytes }
+            : null,
         certain
     };
 }
@@ -694,7 +722,6 @@ export async function resolveChatAvatar(
 ): Promise<AvatarRef | null> {
     return uploadedAvatar({ kind, id });
 }
-
 
 async function drain(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
     const chunks: Uint8Array[] = [];

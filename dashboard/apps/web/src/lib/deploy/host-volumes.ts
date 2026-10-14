@@ -359,8 +359,7 @@ export async function hostVolumes(
                     ? `/drive?c=container:${through.id}&p=${encodeURIComponent(way.destination.replace(/^\/+|\/+$/g, ""))}`
                     : null,
             spare: !inUse && belongsTo === null && Number.isFinite(age) && age > SETTLING_MS,
-            removedApp:
-                owners !== null && belongsTo === null && leftByRemovedApp(project, owners),
+            removedApp: owners !== null && belongsTo === null && leftByRemovedApp(project, owners),
             description: app?.description ?? note?.description ?? null,
             lastUsedAt: used
                 ? new Date(now).toISOString()
