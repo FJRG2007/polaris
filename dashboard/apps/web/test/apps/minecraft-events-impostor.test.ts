@@ -109,7 +109,7 @@ describe("the station", () => {
                         if (typeof cell === "number") rooms.add(cell);
                     }
                     expect(rooms.size).toBe(layout.rooms.length);
-                    if (design < im.SKELD_SINCE) {
+                    if (design < im.SHIP_SINCE) {
                         expect(layout.meeting.col).toBe(1);
                         expect(layout.meeting.row).toBe(1);
                     } else expect(layout.meeting.name).toBe("cafeteria");

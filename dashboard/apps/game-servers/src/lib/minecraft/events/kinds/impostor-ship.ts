@@ -1,5 +1,5 @@
 /**
- * The impostor station from design 3 (`impostor.ts` `SKELD_SINCE`): a ship laid
+ * The impostor station from design 3 (`impostor.ts` `SHIP_SINCE`): a ship laid
  * out the way the game it is modelled on lays out its own - a cafeteria at the
  * top with the emergency table, long corridors off it, and themed rooms round
  * it, each drawn by hand for what it is.
@@ -32,7 +32,7 @@ export const WING_COLS = 2;
 export const COLS_FULL = 7;
 export const ROWS_FULL = 3;
 
-export const SKELD_ROOMS = [
+export const SHIP_ROOMS = [
     "cafeteria",
     "reactor",
     "upperEngine",
@@ -48,11 +48,11 @@ export const SKELD_ROOMS = [
     "shields",
     "communications"
 ] as const;
-export type SkeldRoom = (typeof SKELD_ROOMS)[number];
+export type ShipRoom = (typeof SHIP_ROOMS)[number];
 
 /** A room on the grid: the cells it spans, and its size, walls included. */
 export interface Plot {
-    readonly name: SkeldRoom;
+    readonly name: ShipRoom;
     readonly cols: readonly [number, number];
     readonly rows: readonly [number, number];
     readonly w: number;
@@ -110,7 +110,7 @@ export const EDGES: readonly (readonly [number, number, number, number])[] = [
 export const SPACE_COLS = 2;
 
 /** Each room's floor. */
-export const FLOORS: Readonly<Record<SkeldRoom, string>> = {
+export const FLOORS: Readonly<Record<ShipRoom, string>> = {
     cafeteria: "minecraft:polished_andesite",
     reactor: "minecraft:polished_blackstone_bricks",
     upperEngine: "minecraft:smooth_stone",
@@ -174,7 +174,7 @@ const FRAME = "minecraft:black_concrete";
 const METAL = "minecraft:iron_block";
 
 /** What stands or hangs on another block: taken down before anything. */
-export const SKELD_STANDING: readonly string[] = [
+export const SHIP_STANDING: readonly string[] = [
     "minecraft:lantern",
     CARPET_BLUE,
     CARPET_WHITE,
@@ -475,7 +475,7 @@ const communications: Template = (c) => {
     c.station("switch", 9, 9);
 };
 
-export const TEMPLATES: Readonly<Record<SkeldRoom, Template>> = {
+export const TEMPLATES: Readonly<Record<ShipRoom, Template>> = {
     cafeteria,
     reactor,
     upperEngine: engine,
@@ -492,8 +492,8 @@ export const TEMPLATES: Readonly<Record<SkeldRoom, Template>> = {
     communications
 };
 
-/** Every block the rooms are furnished with but `SKELD_STANDING`. */
-export const SKELD_BLOCKS: readonly string[] = [
+/** Every block the rooms are furnished with but `SHIP_STANDING`. */
+export const SHIP_BLOCKS: readonly string[] = [
     "minecraft:chain",
     BARREL,
     DESK_STONE,

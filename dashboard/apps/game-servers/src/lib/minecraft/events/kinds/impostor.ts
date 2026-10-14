@@ -12,8 +12,8 @@
  * the vent it is paired with (`layoutFor`). Laid out from the run's id and the
  * number of rows, so a restart lays out the same.
  *
- * From design 3 (`SKELD_SINCE`) the station is a ship instead
- * (`impostor-skeld.ts`): a cafeteria with the emergency table, themed rooms
+ * From design 3 (`SHIP_SINCE`) the station is a ship instead
+ * (`impostor-ship.ts`): a cafeteria with the emergency table, themed rooms
  * of their own sizes joined by long corridors and halls, each furnished by
  * hand for what it is, with its tasks where they make sense and a vent where
  * one can go. A run built on an older design keeps its own.
@@ -42,7 +42,7 @@ import type { Fill } from "./arena-game";
 import { asciiJson, customNameValue, text } from "../commands";
 import { seeded, shuffled } from "../trivia-bank";
 import * as decor from "./arena-decor";
-import * as skeld from "./impostor-skeld";
+import * as ship from "./impostor-ship";
 
 /** How many can play: a seat each at the table. */
 export const MOST = 15;
@@ -58,9 +58,9 @@ export const PER_IMPOSTOR = 3;
  *  room, and every room furnished for what it is. */
 export const DESIGN = 3;
 export const FURNISHED_SINCE = 2;
-/** From 3: the ship (`impostor-skeld.ts`), past eight players with its engine
+/** From 3: the ship (`impostor-ship.ts`), past eight players with its engine
  *  wing. */
-export const SKELD_SINCE = 3;
+export const SHIP_SINCE = 3;
 
 // ------------------------------------------------------------------ the station
 
@@ -145,10 +145,10 @@ export function rowsFor(players: number): number {
 }
 
 function sizeOf(rows: number, design: number): { width: number; depth: number } {
-    if (design >= SKELD_SINCE)
+    if (design >= SHIP_SINCE)
         return {
-            width: skeldCols(rows) * skeld.PITCH,
-            depth: skeld.ROWS_FULL * skeld.PITCH
+            width: shipCols(rows) * ship.PITCH,
+            depth: ship.ROWS_FULL * ship.PITCH
         };
     const g = geometryOf(design);
     const pitch = g.room + g.gap;
@@ -177,7 +177,7 @@ export function stationBox(
 
 /** The rows a built station has, from its box. */
 export function rowsOf(box: Box, design = DESIGN): number {
-    if (design >= SKELD_SINCE) return box.x2 - box.x1 + 1 >= skeld.COLS_FULL * skeld.PITCH ? 4 : 3;
+    if (design >= SHIP_SINCE) return box.x2 - box.x1 + 1 >= ship.COLS_FULL * ship.PITCH ? 4 : 3;
     const g = geometryOf(design);
     return Math.round((box.z2 - box.z1 + 1 + g.gap) / (g.room + g.gap));
 }
@@ -202,8 +202,8 @@ export const ROOM_NAMES = [
 ] as const;
 export type RoomName = (typeof ROOM_NAMES)[number];
 /** What any room is called: a working room's name, the meeting room or the
- *  bridge, or one of the ship's (`SKELD_SINCE`). */
-export type PlaceName = RoomName | "meeting" | "bridge" | skeld.SkeldRoom;
+ *  bridge, or one of the ship's (`SHIP_SINCE`). */
+export type PlaceName = RoomName | "meeting" | "bridge" | ship.ShipRoom;
 
 export interface Room {
     readonly index: number;
@@ -216,7 +216,7 @@ export interface Room {
     readonly floor: string;
     /** Left unlit, its floor dark glass (`FURNISHED_SINCE`). */
     readonly dark?: boolean;
-    /** Its size, walls included, where rooms differ (`SKELD_SINCE`). */
+    /** Its size, walls included, where rooms differ (`SHIP_SINCE`). */
     readonly w?: number;
     readonly d?: number;
 }
@@ -262,7 +262,7 @@ export interface Layout {
     readonly props: readonly Prop[];
     /** Where the bridge's sky has a star, by `dx,dy` along its backdrop. */
     readonly stars: ReadonlySet<string>;
-    /** What furnishes the ship's rooms, as it is built (`SKELD_SINCE`). */
+    /** What furnishes the ship's rooms, as it is built (`SHIP_SINCE`). */
     readonly pieces: readonly Fill[];
 }
 
@@ -441,7 +441,7 @@ export const STATION_BLOCKS: readonly string[] = [
     PLATE,
     VENT,
     ...STANDING,
-    ...skeld.SKELD_STANDING.map(bareId),
+    ...ship.SHIP_STANDING.map(bareId),
     CONSOLE,
     TABLE,
     TABLE_MIDDLE,
@@ -456,7 +456,7 @@ export const STATION_BLOCKS: readonly string[] = [
                     ![CONSOLE, WINDOW, DARK_FLOOR].includes(id)
             )
     ),
-    ...skeld.SKELD_BLOCKS,
+    ...ship.SHIP_BLOCKS,
     LIGHT,
     ROOF,
     WALL_BLOCK,
@@ -482,7 +482,7 @@ function roomCorner(box: Box, col: number, row: number, g: Geometry): { x: numbe
  * room but the meeting room is furnished (`furnishing`).
  */
 export function layoutFor(seed: string, box: Box, design = DESIGN): Layout {
-    if (design >= SKELD_SINCE) return skeldLayout(seed, box, design);
+    if (design >= SHIP_SINCE) return shipLayout(seed, box, design);
     const g = geometryOf(design);
     const furnished = design >= FURNISHED_SINCE;
     const rows = rowsOf(box, design);
@@ -615,7 +615,7 @@ export type Cell = "void" | "wall" | "corridor" | "space" | "window" | number;
  *  (its index), the bridge's space or window, or nothing, with `x1`, `z1` at
  *  [0][0]. */
 export function planOf(layout: Layout): Cell[][] {
-    if (layout.design >= SKELD_SINCE) return skeldPlan(layout);
+    if (layout.design >= SHIP_SINCE) return shipPlan(layout);
     const { box, rooms } = layout;
     const g = geometryOf(layout.design);
     const side = g.room;
@@ -726,7 +726,7 @@ function lit(g: Geometry, room: Room, dx: number, dz: number): boolean {
  * it would drop as an item.
  */
 export function stationFills(layout: Layout): Fill[] {
-    if (layout.design >= SKELD_SINCE) return skeldFills(layout);
+    if (layout.design >= SHIP_SINCE) return shipFills(layout);
     const { box } = layout;
     const g = geometryOf(layout.design);
     const wall = g.wall;
@@ -874,13 +874,13 @@ function furniture(layout: Layout): Fill[] {
 // ------------------------------------------------------------------ the ship
 
 /** The ship's columns of cells: the engine wing only on four rows. */
-function skeldCols(rows: number): number {
-    return rows >= 4 ? skeld.COLS_FULL : skeld.COLS_FULL - skeld.WING_COLS;
+function shipCols(rows: number): number {
+    return rows >= 4 ? ship.COLS_FULL : ship.COLS_FULL - ship.WING_COLS;
 }
 
 /** The first column of cells a ship of this many rows has. */
-function skeldFirst(rows: number): number {
-    return rows >= 4 ? 0 : skeld.WING_COLS;
+function shipFirst(rows: number): number {
+    return rows >= 4 ? 0 : ship.WING_COLS;
 }
 
 /** The middle of a span of cells, by the ship's own columns. */
@@ -891,28 +891,28 @@ function cellMiddle(
     rows: readonly [number, number]
 ): { x: number; z: number } {
     return {
-        x: box.x1 + ((cols[0] + cols[1] - 2 * first + 1) * skeld.PITCH) / 2,
-        z: box.z1 + ((rows[0] + rows[1] + 1) * skeld.PITCH) / 2
+        x: box.x1 + ((cols[0] + cols[1] - 2 * first + 1) * ship.PITCH) / 2,
+        z: box.z1 + ((rows[0] + rows[1] + 1) * ship.PITCH) / 2
     };
 }
 
 /** Vent pairs on the small ship and the full one. */
-const SKELD_PAIRS = { small: 3, full: 4 } as const;
+const SHIP_PAIRS = { small: 3, full: 4 } as const;
 /** How near a doorway nothing in the way of walking is put. */
 const DOOR_CLEAR = 2;
 
 /**
- * The ship's rooms, from the run's id: every room where `impostor-skeld`
+ * The ship's rooms, from the run's id: every room where `impostor-ship`
  * places it, drawn by its template; the stations each template asks for; the
  * vents drawn among the rooms that have a place for one, paired both ways; and
  * the furnishing, kept off the stations, the vents and where they let out, the
  * seats round the table and the doorways, merged into as few fills as cover it.
  */
-function skeldLayout(seed: string, box: Box, design: number): Layout {
+function shipLayout(seed: string, box: Box, design: number): Layout {
     const rows = rowsOf(box, design);
-    const first = skeldFirst(rows);
+    const first = shipFirst(rows);
     const random = seeded(`${seed}-impostor-${design}`);
-    const rooms: Room[] = skeld.PLOTS.filter((plot) => rows >= 4 || !plot.wing).map(
+    const rooms: Room[] = ship.PLOTS.filter((plot) => rows >= 4 || !plot.wing).map(
         (plot, index) => {
             const middle = cellMiddle(box, first, plot.cols, plot.rows);
             return {
@@ -924,7 +924,7 @@ function skeldLayout(seed: string, box: Box, design: number): Layout {
                 w: plot.w,
                 d: plot.d,
                 name: plot.name,
-                floor: skeld.FLOORS[plot.name]
+                floor: ship.FLOORS[plot.name]
             };
         }
     );
@@ -936,13 +936,13 @@ function skeldLayout(seed: string, box: Box, design: number): Layout {
         const w = room.w! - 2;
         const d = room.d! - 2;
         const at = (u: number, l: number, v: number) => `${room.x + 1 + u},${l},${room.z + 1 + v}`;
-        skeld.TEMPLATES[room.name as skeld.SkeldRoom]({
+        ship.TEMPLATES[room.name as ship.ShipRoom]({
             w,
             d,
             random,
             put(block, u1, l1, v1, u2 = u1, l2 = l1, v2 = v1) {
                 for (let u = Math.max(0, u1); u <= Math.min(w - 1, u2); u += 1)
-                    for (let l = Math.max(1, l1); l <= Math.min(skeld.WALL, l2); l += 1)
+                    for (let l = Math.max(1, l1); l <= Math.min(ship.WALL, l2); l += 1)
                         for (let v = Math.max(0, v1); v <= Math.min(d - 1, v2); v += 1)
                             if (!drawn.has(at(u, l, v))) drawn.set(at(u, l, v), block);
             },
@@ -966,14 +966,14 @@ function skeldLayout(seed: string, box: Box, design: number): Layout {
             }
         });
     }
-    const pairs = rows >= 4 ? SKELD_PAIRS.full : SKELD_PAIRS.small;
+    const pairs = rows >= 4 ? SHIP_PAIRS.full : SHIP_PAIRS.small;
     const vents: Vent[] = shuffled(spots, random)
         .slice(0, pairs * 2)
         .map((spot, index) => ({ ...spot, to: index % 2 === 0 ? index + 1 : index - 1 }));
     const stars = new Set<string>();
     const navigation = rooms.find((one) => one.name === "navigation")!;
     for (let dz = 1; dz < navigation.d! - 1; dz += 1)
-        for (let dy = 1; dy <= skeld.WALL; dy += 1) if (random() < 0.22) stars.add(`${dz},${dy}`);
+        for (let dy = 1; dy <= ship.WALL; dy += 1) if (random() < 0.22) stars.add(`${dz},${dy}`);
     const bare: Layout = {
         box,
         design,
@@ -986,11 +986,11 @@ function skeldLayout(seed: string, box: Box, design: number): Layout {
         stars,
         pieces: []
     };
-    return { ...bare, pieces: skeldPieces(bare, drawn) };
+    return { ...bare, pieces: shipPieces(bare, drawn) };
 }
 
 /** What the templates drew, kept where it is in nobody's way. */
-function skeldPieces(layout: Layout, drawn: ReadonlyMap<string, string>): Fill[] {
+function shipPieces(layout: Layout, drawn: ReadonlyMap<string, string>): Fill[] {
     const { box } = layout;
     const plan = planOf(layout);
     const cell = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
@@ -1023,8 +1023,8 @@ function skeldPieces(layout: Layout, drawn: ReadonlyMap<string, string>): Fill[]
     const held = (key: string, block: string) => {
         const [x, level, z] = key.split(",").map(Number) as [number, number, number];
         if (block.includes("hanging=true"))
-            return level === skeld.WALL || stays.has(`${x},${level + 1},${z}`);
-        if (!(skeld.SKELD_STANDING as readonly string[]).includes(bareId(block))) return true;
+            return level === ship.WALL || stays.has(`${x},${level + 1},${z}`);
+        if (!(ship.SHIP_STANDING as readonly string[]).includes(bareId(block))) return true;
         return level === 1 || stays.has(`${x},${level - 1},${z}`);
     };
     for (let changed = true; changed; ) {
@@ -1091,10 +1091,10 @@ function merged(
 
 /** The ship from above: its rooms, navigation's space and window, the halls
  *  and the corridors between cells, walled where they cross nothing. */
-function skeldPlan(layout: Layout): Cell[][] {
+function shipPlan(layout: Layout): Cell[][] {
     const { box, rooms } = layout;
-    const first = skeldFirst(layout.rows);
-    const cols = skeldCols(layout.rows);
+    const first = shipFirst(layout.rows);
+    const cols = shipCols(layout.rows);
     const width = box.x2 - box.x1 + 1;
     const depth = box.z2 - box.z1 + 1;
     const plan: Cell[][] = Array.from({ length: width }, () =>
@@ -1114,11 +1114,11 @@ function skeldPlan(layout: Layout): Cell[][] {
     const navigation = rooms.find((one) => one.name === "navigation")!;
     const inner = navigation.w! - 2;
     for (let dz = 1; dz < navigation.d! - 1; dz += 1)
-        for (let u = inner - skeld.SPACE_COLS - 1; u < inner; u += 1)
+        for (let u = inner - ship.SPACE_COLS - 1; u < inner; u += 1)
             set(
                 navigation.x + 1 + u,
                 navigation.z + dz,
-                u >= inner - skeld.SPACE_COLS ? "space" : "window"
+                u >= inner - ship.SPACE_COLS ? "space" : "window"
             );
     const middle = (col: number, row: number) => cellMiddle(box, first, [col, col], [row, row]);
     const has = (col: number) => col >= first && col - first < cols;
@@ -1127,7 +1127,7 @@ function skeldPlan(layout: Layout): Cell[][] {
         const here = at(x, z);
         if (here === "void" || here === "wall") set(x, z, "corridor");
     };
-    for (const [col, row] of skeld.HALLS) {
+    for (const [col, row] of ship.HALLS) {
         if (!has(col)) continue;
         const hall = middle(col, row);
         for (let dx = -2; dx <= 2; dx += 1)
@@ -1136,7 +1136,7 @@ function skeldPlan(layout: Layout): Cell[][] {
                     walls.push({ x: hall.x + dx, z: hall.z + dz });
                 else corridor(hall.x + dx, hall.z + dz);
     }
-    for (const [c1, r1, c2, r2] of skeld.EDGES) {
+    for (const [c1, r1, c2, r2] of ship.EDGES) {
         if (!has(c1) || !has(c2)) continue;
         const from = middle(c1, r1);
         const to = middle(c2, r2);
@@ -1157,7 +1157,7 @@ function skeldPlan(layout: Layout): Cell[][] {
 
 /** Where the ship's roof has a light, by `x,z`: a grid of them over every
  *  room, and every fourth block along the middle of a corridor. */
-function skeldLights(layout: Layout, plan: readonly (readonly Cell[])[]): Set<string> {
+function shipLights(layout: Layout, plan: readonly (readonly Cell[])[]): Set<string> {
     const { box } = layout;
     const cell = (x: number, z: number) => plan[x - box.x1]?.[z - box.z1];
     const lights = new Set<string>();
@@ -1186,9 +1186,9 @@ function skeldLights(layout: Layout, plan: readonly (readonly Cell[])[]): Set<st
  * on something after what holds it; and last the corridor stretch kept back,
  * its first corner the proof that the blocks stayed.
  */
-function skeldFills(layout: Layout): Fill[] {
+function shipFills(layout: Layout): Fill[] {
     const { box } = layout;
-    const wall = skeld.WALL;
+    const wall = ship.WALL;
     const plan = planOf(layout);
     const y0 = box.y1;
     const roof = y0 + wall + 1;
@@ -1217,7 +1217,7 @@ function skeldFills(layout: Layout): Fill[] {
     for (const rect of rectangles(plan, (cell) => cell === "wall"))
         fills.push(flat(rect, WALL_BLOCK, y0, y0 + wall));
     for (const rect of corridors) fills.push(flat(rect, CORRIDOR_FLOOR, y0));
-    const lights = skeldLights(layout, plan);
+    const lights = shipLights(layout, plan);
     for (const key of lights) {
         const [x, z] = key.split(",").map(Number) as [number, number];
         fills.push(one(x, roof, z, LIGHT));
@@ -1242,7 +1242,7 @@ function skeldFills(layout: Layout): Fill[] {
         fills.push(one(backdrop, y0, z, SPACE));
         for (let dy = 1; dy <= wall; dy += 1)
             fills.push(one(backdrop, y0 + dy, z, layout.stars.has(`${dz},${dy}`) ? LIGHT : SPACE));
-        for (let x = backdrop - skeld.SPACE_COLS + 1; x < backdrop; x += 1)
+        for (let x = backdrop - ship.SPACE_COLS + 1; x < backdrop; x += 1)
             fills.push(one(x, y0, z, DARK_FLOOR));
     }
     fills.push(...furniture(layout), ...layout.pieces);
