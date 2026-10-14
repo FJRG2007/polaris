@@ -6,9 +6,11 @@
  * from. So an address is matched against every way it can belong to an account,
  * and only the ways that prove it does:
  *
- * - **The address they sign in with**, once it is verified. An unverified one is
- *   only somebody's say-so, and the face it would put on a stranger's mail is
- *   exactly the impersonation this must not hand out.
+ * - **The address they sign in with**, verified or not. Public sign-up is closed
+ *   and nobody can change their own sign-in address, so it is always the one an
+ *   administrator gave the account - set up by hand or sent an invite - and an
+ *   administrator's word is the proof. Asking for a verification on top would
+ *   take the face away from every account an administrator created directly.
  * - **Their other addresses** (`UserEmail`), once each is verified. Adding an
  *   address is free; proving it is what makes it theirs.
  * - **A mailbox on a mail server this Polaris runs**, that they have signed in
@@ -116,7 +118,7 @@ async function lookUp(address: string, local: string, domain: string): Promise<s
     const same = { equals: address, mode: "insensitive" as const };
     const [primaries, alternates, mailboxes] = await Promise.all([
         prisma.user.findMany({
-            where: { email: same, emailVerified: true },
+            where: { email: same },
             select: { id: true, email: true },
             take: MATCH_LIMIT
         }),

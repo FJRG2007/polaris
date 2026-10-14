@@ -113,9 +113,9 @@ describe("which account an address belongs to", () => {
         expect(await addressOwner("  PERSON.ONE@example.test ")).toBe("u1");
     });
 
-    it("ignores a sign-in address nobody has verified", async () => {
+    it("matches a sign-in address an administrator never had verified", async () => {
         users = [{ id: "u1", email: "person.one@example.test", emailVerified: false }];
-        expect(await addressOwner("person.one@example.test")).toBeNull();
+        expect(await addressOwner("person.one@example.test")).toBe("u1");
     });
 
     it("matches a verified alternate address and ignores an unverified claim", async () => {
