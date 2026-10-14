@@ -9,16 +9,13 @@
 import { useCrmT } from "./i18n";
 import { hostUi } from "@polaris/app-host/client";
 import { Plus, X } from "lucide-react";
+import * as flow from "@polaris/ui/automation";
 import * as model from "../model/workflows";
 import { FilterButton } from "./filter-panel";
 import { EMPTY_FILTER } from "../model/filters";
 import {
     Button,
     Checkbox,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     Input,
     Select,
     Textarea
@@ -509,7 +506,9 @@ export interface ActionListProps {
     readonly onChange: (actions: model.WorkflowAction[]) => void;
 }
 
-/** A list of actions, each with its settings, and the menu that adds one. */
+/** A list of actions, each a card with its settings that can be put in
+ *  another order, and the menu that adds one - the cards every rule builder
+ *  draws. */
 export function ActionList({
     object,
     trigger,
@@ -523,68 +522,82 @@ export function ActionList({
     const offered = kinds.filter(
         (kind) => words.actionFits(kind, trigger) && words.actionOffered(kind, options)
     );
+    const kindText = (kind: model.ActionKind) => t(`workflows.actionKinds.${kind}`);
+    const rows = actions.map((action, index) => ({ id: String(index), action }));
     return (
         <div className="flex min-w-0 flex-col gap-2">
             {actions.length === 0 ? (
                 <p className="text-[0.8125rem] text-muted-foreground">{t("workflows.noActions")}</p>
             ) : (
-                <ol className="flex min-w-0 flex-col gap-2">
-                    {actions.map((action, index) => (
-                        <li
-                            key={index}
-                            className="flex min-w-0 flex-col gap-2 rounded-lg bg-muted/50 p-3"
-                        >
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="truncate text-[0.8125rem] font-medium">
-                                    {index + 1}. {t(`workflows.actionKinds.${action.kind}`)}
-                                </span>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="size-7 shrink-0 p-0"
-                                    aria-label={t("workflows.removeAction")}
-                                    title={t("workflows.removeAction")}
-                                    onClick={() =>
-                                        onChange(actions.filter((_, at) => at !== index))
+                <flow.SortableList
+                    items={rows}
+                    label={t("workflows.actions")}
+                    handleLabel={t("workflows.moveAction")}
+                    onMove={(from, to) => onChange(flow.moved(actions, from, to))}
+                >
+                    {({ action }, index, handle) => (
+                        <flow.NodeCard
+                            handle={handle}
+                            number={index + 1}
+                            kind={
+                                <flow.KindPicker
+                                    value={action.kind}
+                                    kinds={
+                                        offered.includes(action.kind)
+                                            ? offered
+                                            : [action.kind, ...offered]
                                     }
-                                >
-                                    <X className="size-3.5" />
-                                </Button>
+                                    label={t("workflows.actionKind")}
+                                    text={kindText}
+                                    onChange={(kind) =>
+                                        onChange(
+                                            actions.map((one, at) =>
+                                                at === index ? words.newAction(kind, options) : one
+                                            )
+                                        )
+                                    }
+                                />
+                            }
+                            removeLabel={t("workflows.removeAction")}
+                            upLabel={t("workflows.moveUp")}
+                            downLabel={t("workflows.moveDown")}
+                            onUp={
+                                index > 0
+                                    ? () => onChange(flow.moved(actions, index, index - 1))
+                                    : undefined
+                            }
+                            onDown={
+                                index < actions.length - 1
+                                    ? () => onChange(flow.moved(actions, index, index + 1))
+                                    : undefined
+                            }
+                            onRemove={() => onChange(actions.filter((_, at) => at !== index))}
+                        >
+                            <div className="min-w-0 sm:col-span-2">
+                                <ActionFields
+                                    object={object}
+                                    trigger={trigger}
+                                    action={action}
+                                    options={options}
+                                    onChange={(next) =>
+                                        onChange(
+                                            actions.map((one, at) => (at === index ? next : one))
+                                        )
+                                    }
+                                />
                             </div>
-                            <ActionFields
-                                object={object}
-                                trigger={trigger}
-                                action={action}
-                                options={options}
-                                onChange={(next) =>
-                                    onChange(actions.map((one, at) => (at === index ? next : one)))
-                                }
-                            />
-                        </li>
-                    ))}
-                </ol>
+                        </flow.NodeCard>
+                    )}
+                </flow.SortableList>
             )}
             {offered.length > 0 && actions.length < model.MAX_WORKFLOW_ACTIONS ? (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="self-start">
-                            <Plus className="size-4" />
-                            {t("workflows.addAction")}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                        {offered.map((kind) => (
-                            <DropdownMenuItem
-                                key={kind}
-                                onSelect={() =>
-                                    onChange([...actions, words.newAction(kind, options)])
-                                }
-                            >
-                                {t(`workflows.actionKinds.${kind}`)}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <flow.AddMenu
+                    label={t("workflows.addAction")}
+                    options={offered.map((kind) => ({ value: kind, label: kindText(kind) }))}
+                    onPick={(kind) =>
+                        onChange([...actions, words.newAction(kind as model.ActionKind, options)])
+                    }
+                />
             ) : null}
         </div>
     );
