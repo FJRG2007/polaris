@@ -13,6 +13,7 @@
 
 mod config;
 mod deploy;
+mod deploy_dirs;
 mod docker;
 mod handlers;
 mod http;
