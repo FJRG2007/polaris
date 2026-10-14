@@ -41,6 +41,7 @@ import * as accounts from "@/lib/mailbox/accounts";
 import * as mailImport from "@/lib/mailbox/import";
 import * as mailExport from "@/lib/mailbox/export";
 import * as messages from "@/lib/mailbox/messages";
+import { readNoticesAboutMessages } from "@/lib/mailbox/mail-notices";
 import * as contacts from "@/lib/mailbox/contacts";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import * as templates from "@/lib/mailbox/templates";
@@ -420,6 +421,16 @@ export async function syncAllAction() {
 /* Messages                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/** Actions after which a conversation is dealt with, and a notice about it on
+ *  the bell is not something to go on counting. */
+const DEALT_WITH: ReadonlySet<z.infer<typeof core.mailMessageAction>> = new Set([
+    "read",
+    "archive",
+    "trash",
+    "delete",
+    "junk"
+]);
+
 export async function actOnAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailActionSchema.safeParse(input);
@@ -431,6 +442,10 @@ export async function actOnAction(input: unknown) {
             parsed.data.action,
             { scope: parsed.data.scope, strict: true }
         );
+        // Read, filed or thrown away: the bell's notices about it go too.
+        if (DEALT_WITH.has(parsed.data.action)) {
+            await readNoticesAboutMessages(userId, parsed.data.messageIds);
+        }
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -465,6 +480,7 @@ export async function moveAction(input: unknown) {
             parsed.data.folderId,
             { scope: parsed.data.scope, strict: true }
         );
+        await readNoticesAboutMessages(userId, parsed.data.messageIds);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -1074,6 +1090,7 @@ export async function moveToFolderAction(input: unknown) {
             parsed.data.folderId,
             { scope: parsed.data.scope, strict: true }
         );
+        await readNoticesAboutMessages(userId, parsed.data.messageIds);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.moveFailed");

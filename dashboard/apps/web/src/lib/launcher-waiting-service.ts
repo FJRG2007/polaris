@@ -17,6 +17,7 @@ import { onShelf } from "@/lib/mailbox/access";
 import { addressesFrom } from "@/lib/mailbox/json";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { actOnMessages } from "@/lib/mailbox/messages";
+import { readNoticesAboutThreads } from "@/lib/mailbox/mail-notices";
 import { markChannelsRead } from "@/lib/chat/messages";
 import { adminWaiting, dismissAdminWaiting } from "@/lib/admin-waiting";
 import { listChannels, unreadConversations } from "@/lib/chat/chat-service";
@@ -173,19 +174,21 @@ async function markThreadRead(userId: string, threadId: string): Promise<void> {
         "read",
         { scope: "conversation" }
     );
+    await readNoticesAboutThreads(userId, [threadId]);
 }
 
 /** Every unread message the badge counts, read in batches. */
 async function markAllMailRead(userId: string): Promise<void> {
     const where = await unreadMailWhere(userId);
+    const threads = new Set<string>();
     for (let batch = 0; batch < MAIL_BATCHES; batch += 1) {
         const rows = await prisma.mailMessage.findMany({
             where,
-            select: { id: true },
+            select: { id: true, threadId: true },
             orderBy: { sentAt: "desc" },
             take: MAIL_BATCH
         });
-        if (rows.length === 0) return;
+        if (rows.length === 0) break;
         const done = await actOnMessages(
             userId,
             rows.map((row) => row.id),
@@ -193,8 +196,11 @@ async function markAllMailRead(userId: string): Promise<void> {
         );
         // Nothing moved: the server refused, and asking again would only get the
         // same rows back.
-        if (done === 0) return;
+        if (done === 0) break;
+        for (const row of rows) threads.add(row.threadId);
     }
+    // The bell's notices about what was just read, so its count goes with it.
+    await readNoticesAboutThreads(userId, [...threads]);
 }
 
 // ---------------------------------------------------------------------------

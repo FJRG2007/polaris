@@ -119,7 +119,7 @@ describe("what a live frame does", () => {
 
     it("validates what comes back rather than blanking the rail on a shape it does not know", () => {
         expect(shell).toContain("const parsed = railSchema.safeParse(body);");
-        expect(shell).toContain("if (parsed.success) setRail(parsed.data);");
+        expect(shell).toContain("if (parsed.success) setRail({ ...parsed.data, at: asked });");
     });
 });
 

@@ -46,6 +46,7 @@ import {
     markNotificationsReadAction
 } from "@/app/(app)/account/notifications/actions";
 import { useShelfScope, useShelfSeed } from "@/components/shelf-scope";
+import { conversationLink } from "@/lib/mailbox/conversation-link";
 
 export interface NotificationFeed {
     items: NotificationView[];
@@ -57,9 +58,51 @@ export interface NotificationFeed {
     /** A selection, in one write rather than one per row. */
     markManyRead: (ids: readonly string[]) => void;
     removeMany: (ids: readonly string[]) => void;
+    /**
+     * Show these read now, for a change another screen is making that reads
+     * them on the server as part of it - a conversation read or filed in Mail
+     * reads the notices about it. Frames from the stream are held back until it
+     * is answered; a refusal puts them back unread.
+     */
+    holdRead: (ids: readonly string[]) => NoticeHold;
 }
 
+/** A change another screen has asked the bell to show before the server has it. */
+export interface NoticeHold {
+    readonly settle: () => void;
+    readonly abandon: () => void;
+}
+
+/** The longest the stream is held back for another screen's change. */
+const HOLD_MS = 60_000;
+
+const NO_HOLD: NoticeHold = { settle: () => undefined, abandon: () => undefined };
+
 const FeedContext = createContext<NotificationFeed | null>(null);
+
+/**
+ * Mark the bell's notices about these Mail conversations read now, held until
+ * Mail's own action is answered. Does nothing outside the provider.
+ */
+export function useHoldConversationNotices(): (threadIds: readonly string[]) => NoticeHold {
+    // Read when called rather than when drawn, so the function stays the same
+    // one while the feed changes under it.
+    const current = useContext(FeedContext);
+    const latest = useRef(current);
+    latest.current = current;
+    return useCallback(
+        (threadIds) => {
+            const feed = latest.current;
+            if (!feed || threadIds.length === 0) return NO_HOLD;
+            const links = new Set(threadIds.map(conversationLink));
+            const ids = feed.items
+                .filter((row) => !row.read && row.href && links.has(row.href))
+                .map((row) => row.id);
+            return ids.length === 0 ? NO_HOLD : feed.holdRead(ids);
+        },
+        []
+    );
+}
 
 /** The shared feed. Only valid under NotificationsProvider. */
 export function useNotificationFeed(): NotificationFeed {
@@ -237,6 +280,41 @@ export function NotificationsProvider({ initial, children }: { initial: Notifica
                 apply({ kind: "readMany", ids: unreadIds }, () =>
                     markNotificationsReadAction({ ids: unreadIds })
                 );
+            },
+            holdRead: (ids) => {
+                const held = items.filter((row) => !row.read && ids.includes(row.id)).map((row) => row.id);
+                if (held.length === 0) return NO_HOLD;
+                setItems((rows) => applyFeedMutation(rows, { kind: "readMany", ids: held }));
+                inFlight.current += 1;
+                let open = true;
+                const close = () => {
+                    open = false;
+                    clearTimeout(expiry);
+                    inFlight.current -= 1;
+                };
+                // Never answered - the screen that asked went away mid-flight -
+                // must not hold the bell's stream back for good.
+                const expiry = setTimeout(() => {
+                    if (open) close();
+                }, HOLD_MS);
+                return {
+                    // Written by the other screen's own action, so there is
+                    // nothing to send: the other tabs are told, and frames flow
+                    // again with the server already agreeing.
+                    settle: () => {
+                        if (!open) return;
+                        close();
+                        peers.current?.post({ kind: "begin", mutation: { kind: "readMany", ids: held } });
+                        peers.current?.post({ kind: "end" });
+                    },
+                    abandon: () => {
+                        if (!open) return;
+                        close();
+                        setItems((rows) =>
+                            rows.map((row) => (held.includes(row.id) ? { ...row, read: false } : row))
+                        );
+                    }
+                };
             },
             removeMany: (ids) => {
                 const present = items.filter((row) => ids.includes(row.id)).map((row) => row.id);

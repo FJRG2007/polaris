@@ -62,7 +62,9 @@ describe("marking it read on the way in", () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         const mark = view.slice(view.indexOf("const [readOnOpen, setReadOnOpen]"));
         const body = mark.slice(0, mark.indexOf("const act = useCallback"));
-        expect(body).toContain("nudgeUnread(unreadNudges([row]))");
+        expect(body).toContain("const counts = nudgeUnread(unreadNudges([row]), [row.id]);");
+        expect(body).toContain("counts.abandon();");
+        expect(body).toContain("counts.settle();");
         expect(body).toContain("patchUntilAnswered([row.id], { unreadCount: 0 })");
         // Nobody waits on the answer, and it is carried on past the pane closing:
         // a refusal takes the change back, and a yes is settled and the list

@@ -31,8 +31,15 @@ import { MAIL_PALETTE, coloursFor } from "./palette";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import { Button, PAGE_BLEED, useToast } from "@polaris/ui";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { useNudgeMailUnread } from "@/components/mail-unread";
+import {
+    beginUnreadChange,
+    subscribeUnreadOverlay,
+    unreadOverlay,
+    unreadOverlayVersion,
+    type UnreadHandle
+} from "@/lib/mailbox/unread-overlay";
 import { mailCache } from "@/lib/mailbox/mail-cache";
+import { useHoldConversationNotices } from "@/components/notifications/notifications-provider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailIdentityView, MailLabelView } from "@/lib/mailbox/labels";
 import { FolderRoleDialog, type MissingFolderRole } from "./folder-role-dialog";
@@ -45,6 +52,7 @@ import {
     useContext,
     useCallback,
     createContext,
+    useSyncExternalStore,
     type ReactNode
 } from "react";
 
@@ -111,11 +119,18 @@ export interface MailContextValue {
      * the reader their click did nothing - and the row beside it has already
      * gone un-bold, so they can see the two disagree.
      *
-     * Laid over the server's own figures and dropped the moment those figures
-     * move, which is the same shape the list's row overlay has and for the same
-     * reason: this is what somebody just did, not what is true.
+     * Laid over the server's own figures through the shared ledger in
+     * `lib/mailbox/unread-overlay`, which the app badge outside Mail reads too.
+     * Settle the handle when the server agrees and abandon it when it refuses:
+     * a refusal puts every count back at once.
+     *
+     * `threads` names the conversations dealt with - read, filed, thrown away -
+     * whose notices on the bell go read with them, on the same handle.
      */
-    readonly nudgeUnread: (entries: readonly UnreadNudge[]) => void;
+    readonly nudgeUnread: (
+        entries: readonly UnreadNudge[],
+        threads?: readonly string[]
+    ) => UnreadHandle;
     /**
      * Show a folder renamed, or gone, before the mail server has answered.
      *
@@ -282,12 +297,15 @@ export function MailShell({
     const [rail, setRail] = useState({
         accounts: sentAccounts,
         folders: sentFolders,
-        unread: sentUnread
+        unread: sentUnread,
+        // When these were asked for: 0 for what the server rendered, which is
+        // older than every change this browser has made.
+        at: 0
     });
     // The server has rendered again - a mailbox added, a label written, a shelf
     // switched - and what it says now is the truth this was standing in for.
     useEffect(() => {
-        setRail({ accounts: sentAccounts, folders: sentFolders, unread: sentUnread });
+        setRail({ accounts: sentAccounts, folders: sentFolders, unread: sentUnread, at: 0 });
     }, [sentAccounts, sentFolders, sentUnread]);
     const accounts = rail.accounts;
     const folders = rail.folders;
@@ -296,7 +314,6 @@ export function MailShell({
     useEffect(() => {
         mailCache.setAccounts(accounts.map((account) => account.id));
     }, [accounts]);
-    const nudgeBadge = useNudgeMailUnread();
     const pathname = usePathname();
     const search = useSearchParams();
     const [composing, setComposing] = useState<ComposerSeed | null>(null);
@@ -308,56 +325,60 @@ export function MailShell({
     /**
      * What this browser has already done that the server's counts predate.
      *
-     * Keyed by folder and by mailbox, so one map covers both numbers the rail
-     * draws. Dropped the instant the server's own figures move rather than after
-     * a wait: the signature below is the counts themselves, so the overlay lives
-     * exactly as long as the disagreement it exists to cover, and never doubles
-     * a change that has already landed.
+     * Read from the shared ledger, which the app badge outside Mail reads too,
+     * so one action moves the folder, the mailbox and the badge together. Kept
+     * over any count asked for before the change was confirmed - a frame that
+     * set off a recount just before the click used to drop the overlay and put
+     * the old number back until the mail server answered.
      */
-    const [drift, setDrift] = useState<Record<string, number>>({});
-    const truth = useMemo(
-        () =>
-            `${unread.total}|${folders.map((folder) => `${folder.id}:${folder.unread}`).join(",")}`,
-        [unread, folders]
+    const overlayVersion = useSyncExternalStore(
+        subscribeUnreadOverlay,
+        unreadOverlayVersion,
+        () => 0
     );
-    useEffect(() => {
-        setDrift((held) => (Object.keys(held).length === 0 ? held : {}));
-    }, [truth]);
+    const drift = useMemo(
+        () => unreadOverlay(rail.at),
+        // The ledger's version is what says the overlay moved.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [rail.at, overlayVersion]
+    );
 
+    const holdNotices = useHoldConversationNotices();
     const nudgeUnread = useCallback(
-        (entries: readonly UnreadNudge[]) => {
-            const wanted = entries.filter((entry) => entry.by !== 0);
-            if (wanted.length === 0) return;
-            // The badge outside Mail counts inboxes across every shelf, which is
-            // the same question the mailbox badges here answer - so it moves on
-            // the same deltas rather than waiting for the mail server to be told
-            // and to announce it. See `useNudgeMailUnread`.
-            nudgeBadge(
-                wanted.reduce((sum, entry) => {
+        (entries: readonly UnreadNudge[], threads: readonly string[] = []): UnreadHandle => {
+            const notices = holdNotices(threads);
+            const counts = beginUnreadChange(
+                entries.flatMap((entry) => {
                     const folder = folders.find((one) => one.id === entry.folderId);
-                    return folder?.role === "inbox" ? sum + entry.by : sum;
-                }, 0)
+                    // The badge on the mailbox, and the app badge, count inboxes
+                    // and nothing else, so mail read in Archive moves the
+                    // folder's number and not those. Decided here rather than by
+                    // the caller: the screen knows which folder a row was in, not
+                    // what that folder means.
+                    return folder
+                        ? [
+                              {
+                                  folderId: folder.id,
+                                  accountId: folder.accountId,
+                                  inbox: folder.role === "inbox",
+                                  by: entry.by
+                              }
+                          ]
+                        : [];
+                })
             );
-            setDrift((held) => {
-                const next = { ...held };
-                for (const entry of wanted) {
-                    const folder = folders.find((one) => one.id === entry.folderId);
-                    if (!folder) continue;
-                    next[`f:${folder.id}`] = (next[`f:${folder.id}`] ?? 0) + entry.by;
-                    // The badge on the mailbox counts inboxes and nothing else,
-                    // so mail read in Archive moves the folder's number and not
-                    // that one. Decided here rather than by the caller: the
-                    // screen knows which folder a row was in, not what that
-                    // folder means.
-                    if (folder.role === "inbox") {
-                        next[`a:${folder.accountId}`] =
-                            (next[`a:${folder.accountId}`] ?? 0) + entry.by;
-                    }
+            return {
+                settle: () => {
+                    counts.settle();
+                    notices.settle();
+                },
+                abandon: () => {
+                    counts.abandon();
+                    notices.abandon();
                 }
-                return next;
-            });
+            };
         },
-        [folders, nudgeBadge]
+        [folders, holdNotices]
     );
 
     /**
@@ -399,10 +420,10 @@ export function MailShell({
      *  have just done laid over, and never below nothing. */
     const shownFolders = useMemo(() => {
         const counted =
-            Object.keys(drift).length === 0
+            Object.keys(drift.folders).length === 0
                 ? folders
                 : folders.map((folder) => {
-                      const by = drift[`f:${folder.id}`] ?? 0;
+                      const by = drift.folders[folder.id] ?? 0;
                       return by === 0
                           ? folder
                           : { ...folder, unread: Math.max(0, folder.unread + by) };
@@ -422,13 +443,13 @@ export function MailShell({
         });
     }, [folders, drift, folderEdits]);
     const shownUnread = useMemo(() => {
-        if (Object.keys(drift).length === 0) return unread;
+        if (Object.keys(drift.accounts).length === 0) return unread;
         const byAccount: Record<string, number> = {};
         let total = 0;
         for (const account of accounts) {
             const count = Math.max(
                 0,
-                (unread.byAccount[account.id] ?? 0) + (drift[`a:${account.id}`] ?? 0)
+                (unread.byAccount[account.id] ?? 0) + (drift.accounts[account.id] ?? 0)
             );
             if (count > 0) byAccount[account.id] = count;
             total += count;
@@ -448,17 +469,28 @@ export function MailShell({
      * number beside a folder.
      */
     const pullRail = useCallback(() => {
+        const asked = Date.now();
         void fetch(RAIL_PATH, { cache: "no-store" })
             .then((response) => (response.ok ? response.json() : null))
             .then((body) => {
                 const parsed = railSchema.safeParse(body);
-                if (parsed.success) setRail(parsed.data);
+                if (parsed.success) setRail({ ...parsed.data, at: asked });
             })
             .catch(() => {
                 // The rail stays as it is, which is the last thing the server
                 // actually said. The next frame asks again.
             });
     }, []);
+
+    // A change was confirmed: ask for the rail now, so its numbers settle on
+    // the server's as soon as the server has them rather than on the next frame.
+    useEffect(
+        () =>
+            subscribeUnreadOverlay((event) => {
+                if (event === "settled") pullRail();
+            }),
+        [pullRail]
+    );
 
     /** Both halves of the screen, and never the router. See `refreshMailbox` on
      *  the context for why that is the whole point of it. */

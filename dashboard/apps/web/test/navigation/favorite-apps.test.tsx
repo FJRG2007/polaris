@@ -25,6 +25,10 @@ const save = vi.fn<(input: unknown) => Promise<{ error?: string }>>();
 const show = vi.fn();
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
+// The bell's provider reaches the server actions, which read the environment.
+vi.mock("@/components/notifications/notifications-provider", () => ({
+    useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })
+}));
 vi.mock("@/app/(app)/app-launcher-actions", () => ({
     saveFavoriteAppsAction: (input: unknown) => save(input)
 }));

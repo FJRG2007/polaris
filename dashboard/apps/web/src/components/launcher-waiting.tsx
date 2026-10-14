@@ -25,6 +25,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useToast, type AppTileAction, type PolarisApp } from "@polaris/ui";
 import { useNudgeAppUnread, useServerUnread } from "@/components/app-unread";
+import { beginUnreadChange } from "@/lib/mailbox/unread-overlay";
+import { useHoldConversationNotices } from "@/components/notifications/notifications-provider";
 import { markLauncherReadAction } from "@/app/(app)/launcher-waiting-actions";
 import {
     badgeDelta,
@@ -62,6 +64,7 @@ export function useLauncherMarks(
     const toast = useToast();
     const server = useServerUnread();
     const nudge = useNudgeAppUnread();
+    const holdNotices = useHoldConversationNotices();
     const recountAdmin = useAdminRecount();
     const [waiting, setWaiting] = useState<LauncherWaiting | null>(lastKnown);
     const latest = useRef<LauncherWaiting | null>(lastKnown);
@@ -111,7 +114,31 @@ export function useLauncherMarks(
             const after = app ? withoutApp(before, app) : withoutAll(before);
             const touched = app ? [app] : [...markableApps(before)];
             apply(after);
-            const undo = touched.map((one) => nudge(one, badgeDelta(before, after, one)));
+            // Mail's badge moves on Mail's own ledger, which every count of
+            // unread mail reads - the tile, the tab, the rail inside Mail - and
+            // which keeps the change over a recount asked for before it landed.
+            // And the bell's notices about the conversations listed here, which
+            // the server reads in the same action.
+            const notices = touched.includes("mail")
+                ? holdNotices(
+                      before.groups
+                          .find((group) => group.app === "mail")
+                          ?.items.map((item) => item.id) ?? []
+                  )
+                : null;
+            const mail = touched.includes("mail")
+                ? beginUnreadChange([
+                      {
+                          folderId: null,
+                          accountId: null,
+                          inbox: true,
+                          by: badgeDelta(before, after, "mail")
+                      }
+                  ])
+                : null;
+            const undo = touched
+                .filter((one) => one !== "mail")
+                .map((one) => nudge(one, badgeDelta(before, after, one)));
             marking.current += 1;
             const result = await markLauncherReadAction(
                 app ? { scope: "app", app } : { scope: "all" }
@@ -122,18 +149,22 @@ export function useLauncherMarks(
                 });
             if (result.error) {
                 for (const one of undo) one();
+                mail?.abandon();
+                notices?.abandon();
                 if (latest.current === after) apply(before);
                 toast.show({ title: result.error });
                 void refresh();
                 return;
             }
+            mail?.settle();
+            notices?.settle();
             if (touched.includes("admin")) recountAdmin();
             if (marking.current === 0 && missed.current) {
                 missed.current = false;
                 void refresh();
             }
         },
-        [apply, nudge, recountAdmin, refresh, t, toast]
+        [apply, holdNotices, nudge, recountAdmin, refresh, t, toast]
     );
 
     const markable = markableApps(waiting);

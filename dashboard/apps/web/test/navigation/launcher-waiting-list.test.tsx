@@ -7,6 +7,7 @@
  * back and says so; a fault alone (a Google API off) offers no mark.
  */
 
+import { resetUnreadOverlay, unreadOverlay } from "@/lib/mailbox/unread-overlay";
 import { AppSwitcher, DropdownMenuItem } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
@@ -38,6 +39,11 @@ vi.mock("@/components/app-unread", () => ({
     }
 }));
 vi.mock("@/components/admin-waiting", () => ({ useAdminRecount: () => () => undefined }));
+// The bell's provider reaches the server actions, which read the environment.
+// The list only needs a hold it can settle.
+vi.mock("@/components/notifications/notifications-provider", () => ({
+    useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })
+}));
 vi.mock("@polaris/ui", async (original) => ({
     ...(await original<typeof import("@polaris/ui")>()),
     useToast: () => ({
@@ -142,6 +148,7 @@ function Menu() {
 }
 
 beforeEach(() => {
+    resetUnreadOverlay();
     marked.length = 0;
     nudges.length = 0;
     shown.length = 0;
@@ -200,11 +207,13 @@ describe("marking read from the app menu", () => {
         const { user } = await open();
         await user.click(screen.getByRole("menuitem", { name: "Mark everything read" }));
         expect(marked).toEqual([{ scope: "all" }]);
+        // Mail's count moves on Mail's own ledger, which every unread count of
+        // mail reads, rather than on the tile's nudge.
         expect(nudges).toEqual([
             ["chat", -7],
-            ["mail", -2],
             ["admin", -3]
         ]);
+        expect(unreadOverlay(0).inbox).toBe(-2);
         expect(screen.queryByRole("menuitem", { name: "Mark all seen in Management" })).toBeNull();
         expect(screen.queryByRole("menuitem", { name: "Mark everything read" })).toBeNull();
     });
