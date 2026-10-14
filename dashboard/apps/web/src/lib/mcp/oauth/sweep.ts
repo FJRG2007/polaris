@@ -65,9 +65,6 @@ export async function sweepOAuth(now: Date = new Date()): Promise<OAuthSweepResu
     // A code is checked against its expiry when exchanged, so an expired one
     // can never be used; a used one is only kept to catch a replay inside its
     // five minutes.
-    // A code is checked against its expiry when exchanged, so an expired one
-    // can never be used; a used one is only kept to catch a replay inside its
-    // five minutes.
     const codeWhere = { expiresAt: { lt: now } };
     const codes = await deleteInBatches(
         (take) => prisma.oAuthCode.findMany({ where: codeWhere, select: { id: true }, take }),
