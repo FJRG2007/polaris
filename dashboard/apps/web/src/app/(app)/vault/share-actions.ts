@@ -28,6 +28,7 @@ import { revalidatePath } from "next/cache";
 import { schemaRefusal, vaultRefusal } from "./vault-refusal";
 import { getTranslations } from "@/lib/i18n/request";
 import * as vaultOrgs from "@/lib/vault/orgs";
+import { collectionsFor } from "@/lib/vault/sync";
 import * as ciphers from "@/lib/vault/ciphers";
 import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
@@ -497,14 +498,25 @@ export async function vaultCollectionsAction(
     vaultId: string
 ): Promise<{ collections?: Record<string, unknown>[]; error?: string }> {
     const user = await requirePermission("vault.use");
-    // Reading the list is for anybody who holds the key, not only for whoever
-    // administers the vault: it is how a member picks where to file.
+    // An administrator reads every collection. A member who holds the key reads
+    // the ones they were put in - it is how they pick where to file - and not the
+    // names of the rest, which is what the client API answers them too.
+    const gate = await administered(vaultId);
+    if (gate.ok) return { collections: await vaultOrgs.listOrgCollections(vaultId) };
     const standing = await vaultOrgs.standingIn(user.id, vaultId);
-    if (!standing?.confirmed) {
-        const gate = await administered(vaultId);
-        if (!gate.ok) return { error: await vaultRefusal("errors.notInVault") };
-    }
-    return { collections: await vaultOrgs.listOrgCollections(vaultId) };
+    if (!standing?.confirmed) return { error: await vaultRefusal("errors.notInVault") };
+    const mine = await collectionsFor(user.id);
+    return {
+        collections: mine
+            .filter((collection) => collection.organizationId === vaultId)
+            .map((collection) => ({
+                object: "collection",
+                id: collection.id,
+                organizationId: collection.organizationId,
+                name: collection.name,
+                externalId: collection.externalId
+            }))
+    };
 }
 
 /** Make or rename a collection. The name is encrypted under the vault's key. */
