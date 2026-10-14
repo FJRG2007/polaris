@@ -99,7 +99,7 @@ export function HeaderCell({
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-48">
-                    {sortable(field.kind) ? (
+                    {sortable(field.kind, field) ? (
                         <>
                             <DropdownMenuItem onSelect={() => onSort("asc")}>
                                 <ArrowUp className="size-3.5" />

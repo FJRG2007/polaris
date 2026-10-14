@@ -371,6 +371,7 @@
         "target": "Vincula con",
         "targetFixed": "Con qué vincula no se puede cambiar una vez creado el campo.",
         "cardinality": "Contiene",
+        "cardinalityFixed": "Cuántos contiene no se puede cambiar una vez creado el campo.",
         "cardinalities": {
             "one": "Un registro",
             "many": "Varios registros"

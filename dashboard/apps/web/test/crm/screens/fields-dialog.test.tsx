@@ -104,3 +104,65 @@ describe("fields dialog, money field", () => {
         expect(fixed.textContent).toMatch(/^GBP - /);
     });
 });
+
+describe("fields dialog, relation field", () => {
+    it("sends the kind it links to and that it holds several", async () => {
+        const onCreated = newField();
+        fireEvent.change(screen.getByPlaceholderText(/./), { target: { value: "Partners" } });
+        await chooseKind("Linked records");
+        fireEvent.click(await screen.findByRole("combobox", { name: "Links to" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Companies" }));
+        fireEvent.click(screen.getByRole("combobox", { name: "Holds" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Several records" }));
+        fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+        await waitFor(() => expect(onCreated).toHaveBeenCalled());
+        expect(state.created).toEqual([
+            {
+                object: "opportunities",
+                field: { label: "Partners", kind: "relation", options: ["companies", "many"] }
+            }
+        ]);
+    });
+
+    it("starts linking to its own kind, one record at a time", async () => {
+        newField();
+        await chooseKind("Linked records");
+        expect(
+            (await screen.findByRole("combobox", { name: "Links to" })).textContent
+        ).toContain("Opportunities");
+        expect(screen.getByRole("combobox", { name: "Holds" }).textContent).toContain(
+            "One record"
+        );
+    });
+
+    it("shows an existing relation's target and size as fixed, with no pickers", async () => {
+        render(
+            <FieldsDialog
+                object="opportunities"
+                fields={[
+                    {
+                        id: "f1",
+                        slot: "cRel1",
+                        label: "Partners",
+                        kind: "relation",
+                        options: ["people", "many"]
+                    }
+                ]}
+                canDelete
+                onCreated={noop}
+                onChanged={noop}
+                onClose={noop}
+            />,
+            { wrapper: crmHost() }
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Edit field" }));
+        expect(screen.queryByRole("combobox", { name: "Links to" })).toBeNull();
+        expect(screen.queryByRole("combobox", { name: "Holds" })).toBeNull();
+        expect(
+            screen.getByTitle("What it links to cannot change once the field exists.").textContent
+        ).toBe("People");
+        expect(
+            screen.getByTitle("How many it holds cannot change once the field exists.").textContent
+        ).toBe("Several records");
+    });
+});

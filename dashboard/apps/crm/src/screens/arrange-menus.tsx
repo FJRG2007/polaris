@@ -51,7 +51,7 @@ export function SortMenu({
     const name = useFieldName(object);
     const full = sorts.length >= MAX_SORTS;
     const free = fieldsOf(object, custom).filter(
-        (field) => sortable(field.kind) && !sorts.some((sort) => sort.key === field.key)
+        (field) => sortable(field.kind, field) && !sorts.some((sort) => sort.key === field.key)
     );
     const set = (index: number, next: ViewSort | null) =>
         onChange(sorts.flatMap((sort, at) => (at === index ? (next ? [next] : []) : [sort])));

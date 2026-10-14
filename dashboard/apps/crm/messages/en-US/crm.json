@@ -371,6 +371,7 @@
         "target": "Links to",
         "targetFixed": "What it links to cannot change once the field exists.",
         "cardinality": "Holds",
+        "cardinalityFixed": "How many it holds cannot change once the field exists.",
         "cardinalities": {
             "one": "One record",
             "many": "Several records"

@@ -7,8 +7,10 @@
  * cell reads as empty faster than a dash does.
  */
 
+import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { optionLabel } from "./custom-fields";
+import { recordHref } from "../model/related";
 import { useCrmT } from "./i18n";
 import { plainText } from "./format";
 import { hostUi } from "@polaris/app-host/client";
@@ -47,6 +49,28 @@ export function RefChip({ target, value }: { target: CrmObject; value: Ref }) {
             <span className="truncate" title={value.name}>
                 {value.name}
             </span>
+        </span>
+    );
+}
+
+/**
+ * The records a relation somebody added holds, as chips that open each one.
+ * A press on a chip goes to the record, not into the cell's editor.
+ */
+export function RefChips({ target, value }: { target: CrmObject; value: readonly Ref[] }) {
+    return (
+        <span className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden">
+            {value.map((ref) => (
+                <Link
+                    key={ref.id}
+                    href={recordHref(target, ref.id)}
+                    className="min-w-0 shrink rounded hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={keep}
+                    onDoubleClick={keep}
+                >
+                    <RefChip target={target} value={ref} />
+                </Link>
+            ))}
         </span>
     );
 }
@@ -222,6 +246,7 @@ export function CellDisplay({
         case "member":
             return <MemberLine value={value as Ref} />;
         case "relation":
+            if (Array.isArray(value)) return <RefChips target={field.target!} value={value} />;
             return <RefChip target={field.target!} value={value as Ref} />;
         case "number":
         case "money":
