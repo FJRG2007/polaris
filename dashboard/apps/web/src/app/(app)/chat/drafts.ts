@@ -32,7 +32,7 @@
 
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 
-const KEY = "polaris.chat.drafts";
+export const KEY = "polaris.chat.drafts";
 
 /**
  * How long a draft is kept.

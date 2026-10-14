@@ -17,7 +17,8 @@
  *
  * What a tab keeps of an account between loads goes too: recent places and
  * searches, the last place in each app, the snapshots painted before a read
- * lands, and the mail kept for offline reading. Those are the previous account's
+ * lands, the mail kept for offline reading, unsent chat drafts, copied tasks,
+ * recent emoji and media, and the photo put behind the camera in a call. Those are the previous account's
  * titles and subject lines, and keying them by account would only keep them on a
  * shared device for longer.
  */
@@ -29,6 +30,14 @@ import { PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
 import { STORE_KEY as RECENT_SEARCH_KEY } from "@/lib/search/recent";
 import { STORE_KEY as RECENT_PLACES_KEY } from "@/lib/overview/recent-places";
 import { SHARED_CURSOR_KEY as MAIL_CURSOR_KEY } from "@/components/mail-unread";
+import { KEY as DRAFTS_KEY } from "@/app/(app)/chat/drafts";
+import { KEY as TASK_CLIPBOARD_KEY } from "@/app/(app)/tasks/clipboard";
+import { KEY as SOUNDBOARD_KEY } from "@/app/(app)/chat/soundboard-prefs";
+import { EMOJI_KEY, LAST_CHANNEL_KEY, MEDIA_KEY } from "@/app/(app)/chat/recents";
+import {
+    IMAGE_KEY as CAMERA_BACKGROUND_IMAGE_KEY,
+    KEY as CAMERA_BACKGROUND_KEY
+} from "@/app/(app)/chat/camera-background";
 
 /** The account this browser was last drawn for. */
 export const ACCOUNT_MARKER_KEY = "polaris.account.current";
@@ -54,7 +63,15 @@ const ACCOUNT_KEYS: ReadonlySet<string> = new Set([
     APP_USAGE_KEY,
     RECENT_PLACES_KEY,
     RECENT_SEARCH_KEY,
-    MAIL_CURSOR_KEY
+    MAIL_CURSOR_KEY,
+    DRAFTS_KEY,
+    TASK_CLIPBOARD_KEY,
+    SOUNDBOARD_KEY,
+    EMOJI_KEY,
+    MEDIA_KEY,
+    LAST_CHANNEL_KEY,
+    CAMERA_BACKGROUND_KEY,
+    CAMERA_BACKGROUND_IMAGE_KEY
 ]);
 
 function readMarker(): string | null {

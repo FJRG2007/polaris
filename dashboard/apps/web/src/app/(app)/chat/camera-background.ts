@@ -36,8 +36,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
-const KEY = "polaris.call.camera-background";
-const IMAGE_KEY = "polaris.call.camera-background-image";
+export const KEY = "polaris.call.camera-background";
+export const IMAGE_KEY = "polaris.call.camera-background-image";
 
 /** What somebody who has never touched it gets. */
 export const BACKGROUND_DEFAULT: CameraBackground = "off";

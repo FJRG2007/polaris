@@ -25,8 +25,8 @@
  *  second catalogue. */
 const KEEP = 24;
 
-const EMOJI_KEY = "polaris.chat.recent.emoji";
-const MEDIA_KEY = "polaris.chat.recent.media";
+export const EMOJI_KEY = "polaris.chat.recent.emoji";
+export const MEDIA_KEY = "polaris.chat.recent.media";
 
 /** One GIF or sticker, as the grid needs to draw it again without asking
  *  anybody. */
@@ -63,7 +63,7 @@ export function rememberMedia(media: RecentMedia): void {
 }
 
 /** Where each space's last-opened channel is kept, one entry per space. */
-const LAST_CHANNEL_KEY = "polaris.chat.lastChannel";
+export const LAST_CHANNEL_KEY = "polaris.chat.lastChannel";
 
 /** What direct messages are filed under. They belong to no space, and they are
  *  still a place somebody comes back to. Ids are uuids, so this cannot collide

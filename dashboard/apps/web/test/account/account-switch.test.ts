@@ -61,14 +61,23 @@ function seedTraces(): void {
     window.localStorage.setItem("polaris.place.drive", "/drive/f/ana");
     window.localStorage.setItem("polaris.apps.usage", "{}");
     window.localStorage.setItem("polaris.mail.announced", "x");
+    window.localStorage.setItem("polaris.chat.drafts", '{"c1":"see you at"}');
+    window.localStorage.setItem("polaris.tasks.clipboard", '["Pay rent"]');
+    window.localStorage.setItem("polaris.chat.soundboard", "{}");
+    window.localStorage.setItem("polaris.chat.recent.emoji", "[]");
+    window.localStorage.setItem("polaris.chat.recent.media", "[]");
+    window.localStorage.setItem("polaris.chat.lastChannel", "c1");
+    window.localStorage.setItem("polaris.call.camera-background", "image");
+    window.localStorage.setItem("polaris.call.camera-background-image", "data:image/png;base64,AA");
     window.localStorage.setItem("polaris.theme", "dark");
+    window.localStorage.setItem("polaris.mic.device", "default");
 }
 
 describe("forgetAccountTraces", () => {
     it("clears what was kept for the account and nothing that belongs to the device", async () => {
         seedTraces();
         await forgetAccountTraces();
-        expect(storedKeys()).toEqual(["polaris.theme"]);
+        expect(storedKeys()).toEqual(["polaris.theme", "polaris.mic.device"]);
         expect(dropped).toEqual({ snapshots: 1, mail: 1 });
     });
 });

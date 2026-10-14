@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const KEY = "polaris.chat.soundboard";
+export const KEY = "polaris.chat.soundboard";
 
 /** Same-tab announcement, since the storage event only reaches other tabs. */
 const CHANGED = "polaris:soundboard-prefs";
