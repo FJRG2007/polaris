@@ -693,7 +693,8 @@
             "sum": "Suma",
             "avg": "Media",
             "min": "Mínimo",
-            "max": "Máximo"
+            "max": "Máximo",
+            "weighted": "Suma ponderada"
         },
         "granularities": {
             "day": "Día",
@@ -717,6 +718,7 @@
             "groupBy": "Agrupar por",
             "granularity": "Por",
             "wide": "Ancho total",
+            "weightedHint": "Cada trato cuenta según la probabilidad de su etapa en la previsión: los ganados enteros, los perdidos nada.",
             "noNumbers": "Estos registros no tienen números ni importes que sumar. Cuéntalos en su lugar.",
             "noSplits": "Estos registros no tienen un campo por el que dividir este gráfico. Elige otro gráfico.",
             "incomplete": "Completa todas las opciones de arriba.",

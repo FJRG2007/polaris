@@ -23,7 +23,9 @@ import { listWhere } from "./query";
 import { prisma } from "@polaris/db";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
+import { loadOdds } from "./forecast";
 import { shelfPeople } from "./records";
+import { WON_STAGE } from "../model/forecast";
 import { readConfig } from "../model/views";
 import * as model from "../model/dashboards";
 import { recordSelect, table, toRecord, columnOf } from "./columns";
@@ -264,9 +266,33 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
           }
         : { _count: { _all: true } };
 
+    // A weighted amount is counted per stage as well, and each stage's sum
+    // weighed by its odds: won in full, lost and unknown stages not at all.
+    let weigh: ((stage: unknown) => number) | null = null;
+    if (checked.measure === "weighted") {
+        const odds: Readonly<Record<string, number>> = await loadOdds(actor);
+        weigh = (stage) => (stage === WON_STAGE ? 1 : (odds[String(stage)] ?? 0) / 100);
+    }
+    const tally = (row: GroupRow): model.Tally => {
+        const plain = tallyOf(row, column);
+        return weigh
+            ? { ...plain, sum: plain.sum * weigh(row.stage), min: null, max: null }
+            : plain;
+    };
+    const splitBy = (by: string): string[] => (weigh && by !== "stage" ? [by, "stage"] : [by]);
+
     if (!checked.groupBy) {
-        const row = (await table(object).aggregate({ where, ...measures })) as GroupRow;
-        return { kind: "number", value: model.measureOf(tallyOf(row, column), checked.measure) };
+        if (!weigh) {
+            const row = (await table(object).aggregate({ where, ...measures })) as GroupRow;
+            return { kind: "number", value: model.measureOf(tally(row), checked.measure) };
+        }
+        const rows = (await table(object).groupBy({
+            by: ["stage"],
+            where,
+            ...measures
+        })) as GroupRow[];
+        const total = rows.reduce((sum, row) => model.addTally(sum, tally(row)), model.EMPTY_TALLY);
+        return { kind: "number", value: model.measureOf(total, checked.measure) };
     }
 
     const field = fieldOf(object, checked.groupBy, custom)!;
@@ -279,7 +305,7 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
     if (checked.granularity) {
         const granularity = checked.granularity;
         const rows = (await table(object).groupBy({
-            by: [by],
+            by: splitBy(by),
             where: { AND: [where, { NOT: { [by]: null } }] },
             ...measures,
             orderBy: { [by]: "asc" },
@@ -293,7 +319,7 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
             const bucket = model.bucketOf(at, granularity);
             periods.set(
                 bucket,
-                model.addTally(periods.get(bucket) ?? model.EMPTY_TALLY, tallyOf(row, column))
+                model.addTally(periods.get(bucket) ?? model.EMPTY_TALLY, tally(row))
             );
         }
         const present = [...periods.keys()].sort();
@@ -316,7 +342,7 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
     }
 
     const rows = (await table(object).groupBy({
-        by: [by],
+        by: splitBy(by),
         where,
         ...measures,
         orderBy: { _count: { [by]: "desc" } },
@@ -327,10 +353,7 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
     for (const row of rows.slice(0, CATEGORY_CAP)) {
         const raw = row[by];
         const key = raw === null || raw === undefined ? "" : String(raw);
-        tallies.set(
-            key,
-            model.addTally(tallies.get(key) ?? model.EMPTY_TALLY, tallyOf(row, column))
-        );
+        tallies.set(key, model.addTally(tallies.get(key) ?? model.EMPTY_TALLY, tally(row)));
     }
 
     // A choice keeps its own order - a pipeline reads left to right - and

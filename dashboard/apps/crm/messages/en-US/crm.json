@@ -693,7 +693,8 @@
             "sum": "Sum",
             "avg": "Average",
             "min": "Smallest",
-            "max": "Largest"
+            "max": "Largest",
+            "weighted": "Weighted sum"
         },
         "granularities": {
             "day": "Day",
@@ -717,6 +718,7 @@
             "groupBy": "Split by",
             "granularity": "Per",
             "wide": "Full width",
+            "weightedHint": "Each deal counts at its stage's odds from the forecast: won in full, lost not at all.",
             "noNumbers": "These records have no number or amount to add up. Count them instead.",
             "noSplits": "These records have no field this chart can split by. Pick another chart.",
             "incomplete": "Fill in every choice above.",

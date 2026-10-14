@@ -81,7 +81,7 @@ export function WidgetDialog({
     const objects = CRM_OBJECTS.filter((object) => choices.objects[object]);
     const current = choices.objects[draft.object];
     const custom = current?.custom ?? [];
-    const measurable = model.measureFields(draft.object, custom);
+    const measurable = model.measureFields(draft.object, custom, draft.measure);
     const splits = model.splitFields(draft.object, draft.chart, custom);
     const measured = draft.field ? fieldOf(draft.object, draft.field, custom) : undefined;
     const split = draft.groupBy ? fieldOf(draft.object, draft.groupBy, custom) : undefined;
@@ -108,9 +108,11 @@ export function WidgetDialog({
                 ? fieldOf(next.object, next.groupBy, choices.objects[next.object]?.custom ?? [])
                 : undefined;
             next.granularity = by && model.dated(by) ? (next.granularity ?? "month") : null;
+            if (!model.measuresOf(next.object).includes(next.measure)) next.measure = "sum";
             const numbers = model.measureFields(
                 next.object,
-                choices.objects[next.object]?.custom ?? []
+                choices.objects[next.object]?.custom ?? [],
+                next.measure
             );
             if (next.measure === "count") {
                 next.field = null;
@@ -199,7 +201,7 @@ export function WidgetDialog({
                                 onValueChange={(measure) =>
                                     change({ measure: measure as model.Measure })
                                 }
-                                options={model.MEASURES.map((measure) => ({
+                                options={model.measuresOf(draft.object).map((measure) => ({
                                     value: measure,
                                     label: t(`dashboards.measures.${measure}`)
                                 }))}
@@ -268,6 +270,11 @@ export function WidgetDialog({
                                 </Labeled>
                             ) : null}
                         </div>
+                    ) : null}
+                    {draft.measure === "weighted" ? (
+                        <p className="text-[0.75rem] text-muted-foreground">
+                            {t("dashboards.dialog.weightedHint")}
+                        </p>
                     ) : null}
                     <label className="flex items-center gap-2 text-[0.8125rem]">
                         <Switch

@@ -17,6 +17,7 @@ const db = vi.hoisted(() => ({
     },
     crmField: { findMany: vi.fn(async () => []) },
     crmView: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+    crmForecast: { findUnique: vi.fn(async (): Promise<unknown> => null) },
     crmDashboard: {
         findFirst: vi.fn(async (): Promise<unknown> => ({ id: "d1" })),
         update: vi.fn(async ({ data }: { data: { widgets: string } }) => ({
@@ -36,6 +37,7 @@ vi.mock("@polaris/db", () => ({
         crmPerson: db.companies,
         crmField: db.crmField,
         crmView: db.crmView,
+        crmForecast: db.crmForecast,
         crmDashboard: db.crmDashboard
     },
     Prisma: { Decimal: class {} }
@@ -108,6 +110,71 @@ describe("one figure", () => {
             [{ where: unknown }]
         ];
         expect(query.where).toEqual({ AND: [ALIVE, { amountCurrency: "EUR" }] });
+    });
+
+    it("weighs each stage's amount by the shelf's odds: won in full, lost not at all", async () => {
+        db.crmForecast.findUnique.mockResolvedValueOnce({ odds: JSON.stringify({ meeting: 50 }) });
+        const sum = (stage: string, amount: number, count = 1) => ({
+            stage,
+            _count: { _all: count, amount: count },
+            _sum: { amount: String(amount) },
+            _min: { amount },
+            _max: { amount }
+        });
+        db.opportunities.groupBy.mockResolvedValueOnce([
+            sum("customer", 1000),
+            sum("meeting", 500, 2),
+            sum("new", 200),
+            sum("lost", 300)
+        ]);
+        const answer = await dashboards.widgetData(
+            actor(),
+            widget({ measure: "weighted", field: "amount", currency: "EUR" })
+        );
+        // 1000 + 500 x 50% + 200 x the default 10% + 0.
+        expect(answer).toEqual({ kind: "number", value: 1270 });
+        const [[query]] = db.opportunities.groupBy.mock.calls as unknown as [
+            [{ by: string[]; where: unknown }]
+        ];
+        expect(query.by).toEqual(["stage"]);
+        expect(query.where).toEqual({ AND: [ALIVE, { amountCurrency: "EUR" }] });
+        expect(db.opportunities.aggregate).not.toHaveBeenCalled();
+    });
+
+    it("splits a weighted amount by company, counting each company's stages apart", async () => {
+        const row = (companyId: string, stage: string, amount: number) => ({
+            companyId,
+            stage,
+            _count: { _all: 1, amount: 1 },
+            _sum: { amount },
+            _min: { amount },
+            _max: { amount }
+        });
+        db.opportunities.groupBy.mockResolvedValueOnce([
+            row("c1", "customer", 100),
+            row("c1", "proposal", 100),
+            row("c2", "screening", 1000)
+        ]);
+        const answer = await dashboards.widgetData(
+            actor(),
+            widget({
+                chart: "bar",
+                groupBy: "company",
+                measure: "weighted",
+                field: "amount",
+                currency: "EUR"
+            })
+        );
+        // c1: 100 + 100 x 60%; c2: 1000 x 20%.
+        expect(answer).toMatchObject({
+            kind: "groups",
+            points: [
+                { key: "c2", value: 200 },
+                { key: "c1", value: 160 }
+            ]
+        });
+        const [[query]] = db.opportunities.groupBy.mock.calls as unknown as [[{ by: string[] }]];
+        expect(query.by).toEqual(["companyId", "stage"]);
     });
 
     it("counts only what a saved view lists", async () => {
