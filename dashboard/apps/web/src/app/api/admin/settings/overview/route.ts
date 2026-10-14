@@ -11,6 +11,10 @@
  * of it lands in the same render, and separate round trips would fill the update
  * line, then the addresses, then the IPs, each a frame apart.
  *
+ * Each part answers on its own clock: one that throws or takes longer than
+ * `PART_TIMEOUT_MS` comes back null instead of holding the other two, so one
+ * slow probe never leaves the whole page on placeholders.
+ *
  * Admin-only. Node runtime for Prisma.
  */
 
@@ -25,19 +29,35 @@ import type { SettingsOverview } from "@/app/(app)/admin/settings/overview";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Well inside the page's own wait, so a slow part arrives as null, not as a
+ *  request the page gave up on. */
+const PART_TIMEOUT_MS = 12_000;
+
+/** A part's answer, or null when it failed or ran past `PART_TIMEOUT_MS`. */
+async function within<T>(work: Promise<T>): Promise<T | null> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), PART_TIMEOUT_MS);
+    });
+    try {
+        return await Promise.race([work.catch(() => null), late]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 export async function GET(): Promise<Response> {
     const refused = await apiAdmin();
     if (refused instanceof Response) return refused;
     const [status, addresses, network] = await Promise.all([
-        getUpdateStatus(),
-        checkedAddresses(),
-        getNetworkStatus()
+        within(getUpdateStatus()),
+        within(checkedAddresses()),
+        within(getNetworkStatus())
     ]);
     const overview: SettingsOverview = {
         status,
         addresses,
-        publicIp: network.publicIp,
-        serverIp: network.subdomainIp
+        network: network ? { publicIp: network.publicIp, serverIp: network.subdomainIp } : null
     };
     return NextResponse.json(overview);
 }

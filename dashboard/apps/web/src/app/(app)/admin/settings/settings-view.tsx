@@ -108,6 +108,18 @@ const AUTO_CHECK_FLOOR_MS = 30_000;
  *  retries space out while the dashboard is not answering. The server's slowest
  *  path (GitHub, the registry, the IP echo) is bounded well inside the timeout. */
 const OVERVIEW_TIMEOUT_MS = 30_000;
+
+/** An overview from a build before `network` was one part - the dashboard
+ *  still answering in the middle of an update - read the same way. */
+function withNetwork(
+    overview: SettingsOverview & { publicIp?: string | null; serverIp?: string | null }
+): SettingsOverview {
+    if (overview.network !== undefined || !("publicIp" in overview)) return overview;
+    return {
+        ...overview,
+        network: { publicIp: overview.publicIp ?? null, serverIp: overview.serverIp ?? null }
+    };
+}
 const OVERVIEW_RETRY_FIRST_MS = 2_000;
 const OVERVIEW_RETRY_MAX_MS = 30_000;
 
@@ -258,14 +270,21 @@ export function SettingsView({
                     signal: attempt.signal
                 });
                 if (answer.ok) {
-                    const overview = (await answer.json()) as SettingsOverview;
+                    const overview = withNetwork((await answer.json()) as SettingsOverview);
                     // A check that answered first is newer than this one.
-                    setStatus((current) => current ?? overview.status);
-                    setAddresses(overview.addresses);
-                    setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
+                    if (overview.status) setStatus((current) => current ?? overview.status);
+                    if (overview.addresses) setAddresses(overview.addresses);
+                    if (overview.network) setNetwork(overview.network);
+                    // A part that did not answer in time keeps its placeholder
+                    // and is asked for again; the rest stays as it landed.
+                    if (overview.status && overview.addresses && overview.network) return;
+                } else if (answer.status === 401 || answer.status === 403) {
+                    // Signed out or no longer an admin: asking again changes nothing.
                     return;
                 }
-                if (answer.status < 500) return;
+                // Anything else - the edge's own 404 or 502 while the new
+                // dashboard starts after an update, a page that is not JSON -
+                // is asked again, never left on placeholders.
             } catch {
                 if (controller.signal.aborted) return;
             } finally {
