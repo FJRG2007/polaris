@@ -382,6 +382,7 @@ const AWAITED = [
     "releaseStorage",
     "requestOrigin",
     "safeName",
+    "safeUrl",
     "serviceRef",
     "subscribeMeetingEvents"
 ];

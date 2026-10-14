@@ -98,4 +98,25 @@ describe("asking for a screen", () => {
         await openScreen({});
         expect(asked[1]!.audio).toBeTruthy();
     });
+
+    it("keeps asking for sound after a capture that failed this once", async () => {
+        answer = async (constraints) => {
+            if (constraints.audio) throw failure("NotReadableError");
+            return screen;
+        };
+        await expect(openScreen({})).resolves.toBe(screen);
+        expect(asked[1]!.audio).toBeUndefined();
+
+        asked.length = 0;
+        answer = async () => screen;
+        await openScreen({});
+        expect(asked[0]!.audio).toBeTruthy();
+    });
+
+    it("asks again a browser written down before the note named its build", async () => {
+        // What every install wrote until now, kept for good.
+        store.set("polaris.call.no-screen-sound", "1");
+        await openScreen({});
+        expect(asked[0]!.audio).toBeTruthy();
+    });
 });

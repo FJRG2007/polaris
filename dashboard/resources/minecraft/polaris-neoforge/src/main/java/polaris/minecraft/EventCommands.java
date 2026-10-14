@@ -40,11 +40,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - {@code polaris season halloween key=value ...} ({@link SeasonalHalloween}).
  * - {@code polaris season winter key=value ...} ({@link SeasonalWinter}).
  *
+ * - {@code polaris skin stage <player> <token> <value>}, {@code apply <player> <token> <signature>}, {@code clear <player>},
+ *   {@code get <player>} ({@link PlayerSkins}).
+ *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
     /** What `polaris caps` lists; the dashboard checks each by name. */
-    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season", "season-mobs", "season-halloween", "season-winter"};
+    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season", "season-mobs", "season-halloween", "season-winter", "skin"};
 
     private final String version;
 
@@ -85,6 +88,27 @@ final class EventCommands {
                                         StringArgumentType.getString(context, "settings"))))))
                         .then(Commands.literal("clear").executes(context -> answer(context, SeasonalDecor::clear)))
                         .then(Commands.literal("status").executes(context -> answer(context, server -> SeasonalDecor.status()))))
+                .then(Commands.literal("skin")
+                        .then(Commands.literal("stage").then(Commands.argument("player", StringArgumentType.word())
+                                .then(Commands.argument("token", StringArgumentType.word())
+                                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                                .executes(context -> answer(context, server -> PlayerSkins.stage(server,
+                                                        StringArgumentType.getString(context, "player"),
+                                                        StringArgumentType.getString(context, "token"),
+                                                        StringArgumentType.getString(context, "value"))))))))
+                        .then(Commands.literal("apply").then(Commands.argument("player", StringArgumentType.word())
+                                .then(Commands.argument("token", StringArgumentType.word())
+                                        .then(Commands.argument("signature", StringArgumentType.greedyString())
+                                                .executes(context -> answer(context, server -> PlayerSkins.apply(server,
+                                                        StringArgumentType.getString(context, "player"),
+                                                        StringArgumentType.getString(context, "token"),
+                                                        StringArgumentType.getString(context, "signature"))))))))
+                        .then(Commands.literal("clear").then(Commands.argument("player", StringArgumentType.word())
+                                .executes(context -> answer(context, server -> PlayerSkins.clear(server,
+                                        StringArgumentType.getString(context, "player"))))))
+                        .then(Commands.literal("get").then(Commands.argument("player", StringArgumentType.word())
+                                .executes(context -> answer(context, server -> PlayerSkins.get(server,
+                                        StringArgumentType.getString(context, "player")))))))
                 .then(Commands.literal("stash")
                         .then(Commands.literal("save").then(playerAndKey(EventStash::save)))
                         .then(Commands.literal("restore").then(playerAndKey(EventStash::restore))))

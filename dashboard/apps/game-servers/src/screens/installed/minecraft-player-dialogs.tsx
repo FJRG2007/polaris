@@ -65,6 +65,7 @@ const { AccountInput } = hostUi.accountInput;
 export type PlayerDialog =
     | "timeout"
     | "inventory"
+    | "skin"
     | "location"
     | "history"
     | "access"

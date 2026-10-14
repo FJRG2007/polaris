@@ -143,6 +143,27 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         docs: setup.SETUP_GUIDES.copilot
     },
     {
+        id: "gemini",
+        name: "Gemini",
+        aliases: ["google", "bard"],
+        logo: { src: "/logos/gemini.svg" },
+        steps: [{ key: "step1" }, { key: "step2" }, { key: "step3", copy: [url] }],
+        notes: ["availability"],
+        open: { key: "open", href: setup.GEMINI_APP_URL },
+        docs: setup.SETUP_GUIDES.gemini
+    },
+    {
+        id: "geminiCli",
+        name: "Gemini CLI",
+        aliases: ["google"],
+        logo: { src: "/logos/gemini.svg" },
+        steps: [
+            { key: "step1", copy: [command((urls) => setup.geminiAddCommand(urls.http))] },
+            { key: "step2", copy: [command(() => setup.geminiAuthCommand())] }
+        ],
+        docs: setup.SETUP_GUIDES.geminiCli
+    },
+    {
         id: "codex",
         name: "Codex CLI",
         aliases: ["openai"],

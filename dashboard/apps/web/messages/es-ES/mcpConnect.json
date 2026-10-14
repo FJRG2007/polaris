@@ -82,6 +82,17 @@
             "vscode": "Copilot en VS Code usa la configuración de <b>Visual Studio Code</b>.",
             "cloudAgent": "El agente en la nube de Copilot no puede iniciar sesión en servidores, así que necesita una clave de API."
         },
+        "gemini": {
+            "step1": "Abre <b>gemini.google.com</b> en un ordenador y ve a <b>Settings</b> > <b>Connected Apps</b>.",
+            "step2": "En <b>Custom apps</b>, haz clic en <b>Add a custom app</b>.",
+            "step3": "Pega esta URL, haz clic en <b>Next</b> e inicia sesión aquí cuando Gemini te lo pida.",
+            "availability": "Google solo ofrece las apps personalizadas a cuentas personales en EE. UU., en inglés y con Keep Activity activado.",
+            "open": "Abrir Gemini"
+        },
+        "geminiCli": {
+            "step1": "Ejecuta esto en una terminal:",
+            "step2": "Después, dentro de Gemini CLI, inicia sesión:"
+        },
         "codex": {
             "step1": "Ejecuta esto en una terminal para añadir Polaris e iniciar sesión:"
         },

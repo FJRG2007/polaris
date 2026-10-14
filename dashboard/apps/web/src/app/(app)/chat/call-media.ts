@@ -81,11 +81,23 @@ export async function openMedia(
  *  is asked for one once rather than on every press. */
 const NO_SCREEN_SOUND = "polaris.call.no-screen-sound";
 
+/**
+ * Which browser said so: the note holds for that build and no other.
+ *
+ * It used to be a bare "1" kept for good, so one bad moment - or a browser
+ * since updated to one that can - left every share from that machine silent
+ * with nothing on screen saying why. A note from another build, those included,
+ * is asked about again.
+ */
+function engine(): string {
+    return (typeof navigator !== "undefined" && navigator.userAgent) || "unknown";
+}
+
 /** Whether a screen's sound is worth asking this browser for at all. */
 function screenSoundWorthAsking(): boolean {
     if (typeof window === "undefined") return false;
     try {
-        return window.localStorage.getItem(NO_SCREEN_SOUND) !== "1";
+        return window.localStorage.getItem(NO_SCREEN_SOUND) !== engine();
     } catch {
         // Storage refused. Asking is the right guess: every browser that can
         // carry a screen's sound is one that would have answered yes here.
@@ -93,16 +105,22 @@ function screenSoundWorthAsking(): boolean {
     }
 }
 
-/** Written down the moment a browser says it cannot, and never unwritten: this
- *  is a fact about the engine, not about the moment. */
+/** Written down the moment a browser says it cannot: a fact about the engine,
+ *  not about the moment, so it holds until the browser changes. */
 function rememberNoScreenSound(): void {
     if (typeof window === "undefined") return;
     try {
-        window.localStorage.setItem(NO_SCREEN_SOUND, "1");
+        window.localStorage.setItem(NO_SCREEN_SOUND, engine());
     } catch {
         // The share still happens; this browser will simply be asked the long
         // way round again next time.
     }
+}
+
+/** The refusals that are about what the engine can do, not about this moment. */
+function cannotCarrySound(error: unknown): boolean {
+    const name = (error as Error | undefined)?.name;
+    return name === "TypeError" || name === "NotSupportedError";
 }
 
 /**
@@ -169,12 +187,13 @@ export async function openScreen(video: MediaTrackConstraints): Promise<MediaStr
         // it usually is - and asking the same question twice over one press is
         // not something to do with it.
         if (isDenial(caught) || (caught as Error)?.name === "AbortError") throw caught;
-        // The sound is the only difference between the two requests, so this is
-        // the browser saying it cannot carry one. Written down before the retry
-        // rather than after it, because the retry is the half that may have
-        // nothing left to spend - and once this is written there is no first
-        // request to spend it.
-        rememberNoScreenSound();
+        // The sound is the only difference between the two requests, so this
+        // share goes without it. Only an engine that says it cannot take the
+        // request is written down - before the retry, because the retry is the
+        // half that may have nothing left to spend. Anything else, a capture
+        // that would not start this once, costs this share its sound and not
+        // every share after it.
+        if (cannotCarrySound(caught)) rememberNoScreenSound();
         return await ask(false);
     }
 }

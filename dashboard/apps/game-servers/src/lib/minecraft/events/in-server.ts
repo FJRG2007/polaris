@@ -33,7 +33,8 @@ const CAPABILITIES = [
     "season",
     "season-mobs",
     "season-halloween",
-    "season-winter"
+    "season-winter",
+    "skin"
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];

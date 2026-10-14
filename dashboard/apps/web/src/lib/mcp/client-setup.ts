@@ -103,12 +103,24 @@ export function kimiAddCommand(url: string): string {
     return `kimi mcp add --transport http --auth oauth ${SERVER_NAME} ${url}`;
 }
 
+export function geminiAddCommand(url: string): string {
+    return `gemini mcp add --scope user --transport http ${SERVER_NAME} ${url}`;
+}
+
+/** Typed inside a Gemini CLI session, not in the shell. */
+export function geminiAuthCommand(): string {
+    return `/mcp auth ${SERVER_NAME}`;
+}
+
 export function kimiAuthCommand(): string {
     return `kimi mcp auth ${SERVER_NAME}`;
 }
 
 /** Where Claude's connector settings open (claude.com/docs/connectors). */
 export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";
+
+/** Where the Gemini app's settings open (support.google.com/gemini/answer/17209137). */
+export const GEMINI_APP_URL = "https://gemini.google.com";
 
 /** Where Grok's connectors open (docs.x.ai/grok/connectors). */
 export const GROK_CONNECTORS_URL = "https://grok.com/connectors";
@@ -129,5 +141,7 @@ export const SETUP_GUIDES = {
     zapier: "https://help.zapier.com/hc/en-us/articles/38777069364109-Connect-remote-MCP-servers-to-Zapier-using-MCP-Client",
     make: "https://apps.make.com/mcp-client",
     opencode: "https://opencode.ai/docs/mcp-servers/",
-    kimi: "https://moonshotai.github.io/kimi-cli/en/customization/mcp.html"
+    kimi: "https://moonshotai.github.io/kimi-cli/en/customization/mcp.html",
+    gemini: "https://support.google.com/gemini/answer/17209137",
+    geminiCli: "https://geminicli.com/docs/tools/mcp-server/"
 } as const;

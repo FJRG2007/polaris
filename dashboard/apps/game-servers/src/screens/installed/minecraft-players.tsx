@@ -37,6 +37,7 @@ import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PlayerIconAction, PlayersTable } from "../../components/game-players-table";
 import { RowContextMenu, RowMenuButton, type RowMenuEntry } from "../../components/row-menu";
 import { InventoryExportMenu, InventoryImportButton } from "./minecraft-inventory-transfer";
+import { SkinDialog } from "./minecraft-skin-dialog";
 import { foldPlayers, GAME_MODES, type PlayerEntry } from "../../lib/minecraft/players";
 import type { QueuedAction } from "../../lib/minecraft/queue";
 import { describeQueuedText, waitingOnText } from "./queue-text";
@@ -71,6 +72,7 @@ import {
     ShieldBan,
     ShieldMinus,
     ShieldPlus,
+    Shirt,
     Skull,
     Sparkles,
     Timer,
@@ -111,6 +113,7 @@ export function MinecraftPlayers({
     passwords,
     canResetPasswords,
     canManage = false,
+    canModerate = false,
     onPasswordsChanged,
     onChanged
 }: {
@@ -155,6 +158,8 @@ export function MinecraftPlayers({
     /** Answering a refusal - allowing its address, or clearing it - takes the
      *  manage grant too. */
     canManage?: boolean;
+    /** Changing a skin takes the moderate grant; reading one, only read. */
+    canModerate?: boolean;
     onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
@@ -933,6 +938,20 @@ export function MinecraftPlayers({
                     onChanged={onChanged}
                 />
             )}
+            {acting?.dialog === "skin" && target && (
+                <SkinDialog
+                    installedAppId={installedAppId}
+                    player={target.name}
+                    canEdit={canModerate}
+                    online={onlineNames.some(
+                        (name) => name.toLowerCase() === target.name.toLowerCase()
+                    )}
+                    running={answering}
+                    canRestart={canManage}
+                    playersOnline={status?.players.online ?? 0}
+                    onClose={() => setActing(null)}
+                />
+            )}
             {acting?.dialog === "location" && target && (
                 <LocationDialog
                     installedAppId={installedAppId}
@@ -1526,6 +1545,15 @@ function moreEntries({
             icon: <Backpack className="size-4" />,
             disabled: !live || bedrock,
             onSelect: () => onOpen("inventory")
+        },
+        // Read by anybody on this screen; the dialog offers changing it only to
+        // whoever may moderate.
+        {
+            kind: "item",
+            text: t("playersTab.menu.skin"),
+            icon: <Shirt className="size-4" />,
+            disabled: !live || bedrock,
+            onSelect: () => onOpen("skin")
         },
         {
             kind: "item",
