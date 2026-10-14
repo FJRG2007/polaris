@@ -25,7 +25,10 @@ describe("quoted-printable", () => {
     });
 
     it("joins the soft line breaks the sender added to stay under 76 characters", () => {
-        const raw = Buffer.from("Gracias por ponerme en contacto con Ada=\r\n. Un saludo", "latin1");
+        const raw = Buffer.from(
+            "Gracias por ponerme en contacto con Ada=\r\n. Un saludo",
+            "latin1"
+        );
         expect(decodePart(raw, { encoding: "quoted-printable", charset: "utf-8" })).toBe(
             "Gracias por ponerme en contacto con Ada. Un saludo"
         );

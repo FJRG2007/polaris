@@ -27,7 +27,9 @@ describe("navigationEntries", () => {
         // Management owns these two despite living at the top level.
         expect(hrefs).not.toContain("/admin/integrations");
         expect(hrefs).not.toContain("/admin/settings");
-        expect(navigationEntries(true, ALL_APPS).map((entry) => entry.href)).toContain("/admin/users");
+        expect(navigationEntries(true, ALL_APPS).map((entry) => entry.href)).toContain(
+            "/admin/users"
+        );
     });
 
     it("withholds an app the role does not open, and the subjects inside it", () => {
@@ -63,16 +65,26 @@ describe("navigationEntries", () => {
 
 describe("resourceEntries", () => {
     it("names the app an app entry opens, so the row can wear its logo", () => {
-        const apps = navigationEntries(true, ALL_APPS).filter((entry) => entry.id.startsWith("app:"));
+        const apps = navigationEntries(true, ALL_APPS).filter((entry) =>
+            entry.id.startsWith("app:")
+        );
         expect(apps.length).toBeGreaterThan(0);
         for (const entry of apps) expect(entry.appId).toBe(entry.id.slice("app:".length));
-        const sections = navigationEntries(true, ALL_APPS).filter((entry) => entry.id.startsWith("section:"));
+        const sections = navigationEntries(true, ALL_APPS).filter((entry) =>
+            entry.id.startsWith("section:")
+        );
         for (const entry of sections) expect(entry.appId).toBeUndefined();
     });
 
     it("groups a service under Deploy and keeps where it lives", () => {
         const [entry] = resourceEntries([
-            { id: "a1", kind: "service", label: "api", context: "Acme / production", href: "/apps/deploy/p1" }
+            {
+                id: "a1",
+                kind: "service",
+                label: "api",
+                context: "Acme / production",
+                href: "/apps/deploy/p1"
+            }
         ]);
         expect(entry?.group).toBe("Deploy");
         expect(entry?.label).toBe("api");

@@ -35,9 +35,9 @@ describe("app logos", () => {
 
     it("draws the fallback for an app without a logo, and only then", () => {
         const fallback = createElement("i", { "data-fallback": "" });
-        expect(renderToStaticMarkup(createElement(AppLogo, { appId: "not-an-app", fallback }))).toBe(
-            '<i data-fallback=""></i>'
-        );
+        expect(
+            renderToStaticMarkup(createElement(AppLogo, { appId: "not-an-app", fallback }))
+        ).toBe('<i data-fallback=""></i>');
         const html = renderToStaticMarkup(createElement(AppLogo, { appId: "mail", fallback }));
         expect(html).toContain('data-app-logo="mail"');
         expect(html).not.toContain("data-fallback");

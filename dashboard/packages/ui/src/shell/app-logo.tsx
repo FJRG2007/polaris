@@ -365,12 +365,26 @@ export function AppLogo({
             style={{ width: size, height: size, flexShrink: 0 }}
         >
             <defs>
-                <linearGradient id={ids.base} x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                <linearGradient
+                    id={ids.base}
+                    x1="4"
+                    y1="4"
+                    x2="28"
+                    y2="28"
+                    gradientUnits="userSpaceOnUse"
+                >
                     <stop offset="0" stopColor={light} />
                     <stop offset="0.55" stopColor={mid} />
                     <stop offset="1" stopColor={deep} />
                 </linearGradient>
-                <linearGradient id={ids.face} x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                <linearGradient
+                    id={ids.face}
+                    x1="4"
+                    y1="4"
+                    x2="28"
+                    y2="28"
+                    gradientUnits="userSpaceOnUse"
+                >
                     <stop offset="0" stopColor={light} />
                     <stop offset="1" stopColor={mid} />
                 </linearGradient>

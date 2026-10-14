@@ -78,7 +78,9 @@ export function EntryRow({ entry, ...row }: RowProps & { entry: CommandEntry }) 
             <AppLogo
                 appId={entry.appId ?? ""}
                 size={18}
-                fallback={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                fallback={
+                    <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                }
             />
             <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm" title={entry.label}>

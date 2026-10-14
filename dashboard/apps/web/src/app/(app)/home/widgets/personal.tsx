@@ -68,11 +68,23 @@ export function ShortcutsWidget({
                             <AppLogo
                                 appId={appId}
                                 size={20}
-                                fallback={<Icon className="size-4 text-muted-foreground" aria-hidden="true" />}
+                                fallback={
+                                    <Icon
+                                        className="size-4 text-muted-foreground"
+                                        aria-hidden="true"
+                                    />
+                                }
                             />
-                            <span className="truncate text-sm font-medium" title={shortcut.label}>{shortcut.label}</span>
+                            <span className="truncate text-sm font-medium" title={shortcut.label}>
+                                {shortcut.label}
+                            </span>
                             {shortcut.context ? (
-                                <span className="truncate text-xs text-muted-foreground" title={shortcut.context}>{shortcut.context}</span>
+                                <span
+                                    className="truncate text-xs text-muted-foreground"
+                                    title={shortcut.context}
+                                >
+                                    {shortcut.context}
+                                </span>
                             ) : null}
                         </Link>
                         <button
@@ -127,7 +139,12 @@ export function RecentWidget() {
                 <WidgetRow
                     key={place.href}
                     href={place.href}
-                    icon={<Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                    icon={
+                        <Clock
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
+                    }
                     label={place.label}
                     detail={place.context}
                     action={
@@ -164,7 +181,9 @@ export function NotificationsWidget() {
                         <span
                             className={cn(
                                 "grid size-7 shrink-0 place-items-center rounded-md",
-                                item.read ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
+                                item.read
+                                    ? "bg-muted text-muted-foreground"
+                                    : "bg-primary/10 text-primary"
                             )}
                         >
                             <Bell className="size-3.5" aria-hidden="true" />
@@ -214,7 +233,12 @@ export function AppsWidget({
                         <AppLogo
                             appId={app.id}
                             size={20}
-                            fallback={<Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+                            fallback={
+                                <Icon
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
+                            }
                         />
                         <span className="truncate text-sm font-medium">{navLabel(app.label)}</span>
                     </Link>
