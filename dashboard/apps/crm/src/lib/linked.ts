@@ -10,7 +10,7 @@
  * Server-only.
  */
 
-import { type Prisma } from "@polaris/db";
+import { Prisma } from "@polaris/db";
 import { nameSelect, refName, table } from "./columns";
 import { recordWhere, shelfWhere, type CrmActor } from "./access";
 import {
@@ -76,6 +76,62 @@ export async function nameLinks<T extends CrmRecord>(
     });
 }
 
+/**
+ * Relation lists about to be written, per record: a list keeps the ids it
+ * already holds that the writer cannot see - a record they may not read, or
+ * one in the trash - since they could not have meant to take those out. A
+ * list that holds one record is replaced when the writer picks one, and kept
+ * when they only clear it. Records that end up written the same are grouped,
+ * so each group is one update; null when the values hold no relation list.
+ */
+export async function keepUnseenLinks(
+    actor: CrmActor,
+    rows: readonly Record<string, unknown>[],
+    custom: readonly FieldDef[],
+    data: Readonly<Record<string, unknown>>
+): Promise<{ ids: string[]; data: Record<string, unknown> }[] | null> {
+    const fields = custom.filter((field) => isLinkList(field) && field.key in data);
+    if (fields.length === 0) return null;
+    const stored = (row: Record<string, unknown>, slot: string): string[] =>
+        Array.isArray(row[slot]) ? (row[slot] as string[]) : [];
+    const seen = new Map<CrmObject, Set<string>>();
+    await Promise.all(
+        [...new Set(fields.map((field) => field.target!))].map(async (target) => {
+            const ids = new Set(
+                fields
+                    .filter((field) => field.target === target)
+                    .flatMap((field) => rows.flatMap((row) => stored(row, field.key)))
+            );
+            const visible = new Set<string>();
+            seen.set(target, visible);
+            if (ids.size === 0 || !actor.can[target].read) return;
+            const found = (await table(target).findMany({
+                where: { id: { in: [...ids] }, ...recordWhere(actor, target), deletedAt: null },
+                select: { id: true }
+            })) as { id: string }[];
+            for (const row of found) visible.add(row.id);
+        })
+    );
+    const groups = new Map<string, { ids: string[]; data: Record<string, unknown> }>();
+    for (const row of rows) {
+        const written: Record<string, unknown> = { ...data };
+        for (const field of fields) {
+            const posted = data[field.key] as readonly string[];
+            const unseen = stored(row, field.key).filter((id) => !seen.get(field.target!)!.has(id));
+            written[field.key] = field.many
+                ? [...new Set([...posted, ...unseen])]
+                : posted.length > 0
+                  ? [...posted]
+                  : unseen;
+        }
+        const key = JSON.stringify(fields.map((field) => written[field.key]));
+        const group = groups.get(key) ?? { ids: [], data: written };
+        group.ids.push(String(row.id));
+        groups.set(key, group);
+    }
+    return [...groups.values()];
+}
+
 function refsAt(record: CrmRecord, key: string): readonly Ref[] {
     const value = record.values[key];
     return Array.isArray(value) ? value : [];
@@ -117,6 +173,16 @@ export async function relinkRecords(
     return rewriteLinks(tx, actor, merged, keepId);
 }
 
+/** The table each kind of record is kept in, for the set-based sweep. */
+const TABLES: Readonly<Record<CrmObject, string>> = {
+    companies: "CrmCompany",
+    people: "CrmPerson",
+    opportunities: "CrmOpportunity"
+};
+
+/** The most rows one statement of the sweep rewrites. */
+const SWEEP_BATCH = 1000;
+
 async function rewriteLinks(
     tx: Prisma.TransactionClient,
     actor: CrmActor,
@@ -134,19 +200,26 @@ async function rewriteLinks(
             },
             select: { id: true, ...Object.fromEntries(LINK_SLOTS.map((slot) => [slot, true])) }
         })) as Record<string, unknown>[];
-        for (const row of rows) {
-            const data: Record<string, string[]> = {};
-            for (const slot of LINK_SLOTS) {
+        for (const slot of LINK_SLOTS) {
+            const changed: Unlinked[] = [];
+            for (const row of rows) {
                 const before = Array.isArray(row[slot]) ? (row[slot] as string[]) : [];
                 if (!before.some((id) => doomed.has(id))) continue;
                 const after = [
                     ...new Set(before.map((id) => (doomed.has(id) ? keepId : id)))
                 ].filter((id): id is string => id !== null);
-                data[slot] = after;
-                unlinked.push({ object, recordId: String(row.id), slot, before, after });
+                changed.push({ object, recordId: String(row.id), slot, before, after });
             }
-            if (Object.keys(data).length > 0)
-                await table(object, tx).update({ where: { id: row.id }, data });
+            for (let start = 0; start < changed.length; start += SWEEP_BATCH) {
+                const batch = changed.slice(start, start + SWEEP_BATCH);
+                const values = Prisma.join(
+                    batch.map((one) => Prisma.sql`(${one.recordId}::uuid, ${one.after}::uuid[])`)
+                );
+                const target = Prisma.raw(`"${TABLES[object]}"`);
+                const column = Prisma.raw(`"${slot}"`);
+                await tx.$executeRaw`UPDATE ${target} AS t SET ${column} = v.after, "updatedAt" = now() AT TIME ZONE 'UTC' FROM (VALUES ${values}) AS v(id, after) WHERE t."id" = v.id`;
+            }
+            unlinked.push(...changed);
         }
     }
     return unlinked;

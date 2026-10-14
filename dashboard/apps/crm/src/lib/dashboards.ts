@@ -279,7 +279,6 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
             ? { ...plain, sum: plain.sum * weigh(row.stage), min: null, max: null }
             : plain;
     };
-    const splitBy = (by: string): string[] => (weigh && by !== "stage" ? [by, "stage"] : [by]);
 
     if (!checked.groupBy) {
         if (!weigh) {
@@ -302,18 +301,54 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
     }
     const by = spec.column;
 
+    // The groups shown, at most `cap` of them. A weighted figure is the sum of
+    // its stages, so the groups are picked first and then every stage of each
+    // is counted: a cap never leaves one of them short.
+    const groups = async (
+        scope: Record<string, unknown>,
+        orderBy: Record<string, unknown>,
+        cap: number,
+        among: (keys: unknown[]) => Record<string, unknown>
+    ): Promise<{ rows: GroupRow[]; capped: boolean }> => {
+        if (!weigh || by === "stage") {
+            const rows = (await table(object).groupBy({
+                by: [by],
+                where: scope,
+                ...measures,
+                orderBy,
+                take: cap + 1
+            })) as GroupRow[];
+            return { rows: rows.slice(0, cap), capped: rows.length > cap };
+        }
+        const picked = (await table(object).groupBy({
+            by: [by],
+            where: scope,
+            _count: { _all: true },
+            orderBy,
+            take: cap + 1
+        })) as GroupRow[];
+        const keys = picked.slice(0, cap).map((row) => row[by]);
+        const rows =
+            keys.length === 0
+                ? []
+                : ((await table(object).groupBy({
+                      by: [by, "stage"],
+                      where: { AND: [scope, among(keys)] },
+                      ...measures
+                  })) as GroupRow[]);
+        return { rows, capped: picked.length > cap };
+    };
+
     if (checked.granularity) {
         const granularity = checked.granularity;
-        const rows = (await table(object).groupBy({
-            by: splitBy(by),
-            where: { AND: [where, { NOT: { [by]: null } }] },
-            ...measures,
-            orderBy: { [by]: "asc" },
-            take: DATE_CAP + 1
-        })) as GroupRow[];
-        const capped = rows.length > DATE_CAP;
+        const { rows, capped } = await groups(
+            { AND: [where, { NOT: { [by]: null } }] },
+            { [by]: "asc" },
+            DATE_CAP,
+            (keys) => ({ [by]: { gte: keys[0], lte: keys[keys.length - 1] } })
+        );
         const periods = new Map<string, model.Tally>();
-        for (const row of rows.slice(0, DATE_CAP)) {
+        for (const row of rows) {
             const at = row[by];
             if (!(at instanceof Date)) continue;
             const bucket = model.bucketOf(at, granularity);
@@ -341,16 +376,19 @@ export async function widgetData(actor: CrmActor, widget: model.Widget): Promise
         };
     }
 
-    const rows = (await table(object).groupBy({
-        by: splitBy(by),
+    const { rows, capped } = await groups(
         where,
-        ...measures,
-        orderBy: { _count: { [by]: "desc" } },
-        take: CATEGORY_CAP + 1
-    })) as GroupRow[];
-    const capped = rows.length > CATEGORY_CAP;
+        { _count: { [by]: "desc" } },
+        CATEGORY_CAP,
+        (keys) => ({
+            OR: [
+                { [by]: { in: keys.filter((key) => key !== null) } },
+                ...(keys.includes(null) ? [{ [by]: null }] : [])
+            ]
+        })
+    );
     const tallies = new Map<string, model.Tally>();
-    for (const row of rows.slice(0, CATEGORY_CAP)) {
+    for (const row of rows) {
         const raw = row[by];
         const key = raw === null || raw === undefined ? "" : String(raw);
         tallies.set(key, model.addTally(tallies.get(key) ?? model.EMPTY_TALLY, tally(row)));

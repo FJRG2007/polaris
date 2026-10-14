@@ -1047,15 +1047,17 @@ export async function runManualWorkflow(
 
 /**
  * What the timeline just logged, handed to the workflows it sets off. Called
- * for every logged change; reads nothing when the change can set nothing off,
- * and nothing at all from inside a workflow's own run.
+ * for every logged change; reads nothing when the change can set nothing off.
+ * A change a workflow's run makes sets no workflow off, so runs cannot set
+ * each other off in a loop, but it still wakes the runs waiting for the
+ * record: each of those goes on only when it matches, and is claimed first.
  */
 export async function onRecordEvents(
     actor: CrmActor,
     object: CrmObject,
     logged: readonly NewEvent[]
 ): Promise<void> {
-    if (running.getStore()) return;
+    const inRun = running.getStore() === true;
     const events = model.eventsOf(logged);
     if (events.length === 0) return;
     const rows = (await prisma.crmWorkflow.findMany({
@@ -1063,13 +1065,15 @@ export async function onRecordEvents(
         take: model.MAX_WORKFLOWS
     })) as StoredWorkflow[];
     if (rows.length === 0) return;
-    const fields = fieldsOf(object, await loadFields(actor.shelf, object));
-    for (const row of rows) {
-        const trigger = model.readTrigger(row.trigger);
-        if (!trigger) continue;
-        for (const event of events) {
-            if (!model.triggerMatches(trigger, event, fields)) continue;
-            await runWorkflow(row, { object, recordId: event.recordId, event });
+    if (!inRun) {
+        const fields = fieldsOf(object, await loadFields(actor.shelf, object));
+        for (const row of rows) {
+            const trigger = model.readTrigger(row.trigger);
+            if (!trigger) continue;
+            for (const event of events) {
+                if (!model.triggerMatches(trigger, event, fields)) continue;
+                await runWorkflow(row, { object, recordId: event.recordId, event });
+            }
         }
     }
     await wakeWaitingRuns(

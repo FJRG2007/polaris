@@ -341,17 +341,27 @@ describe("running on record changes", () => {
         expect(call.data.lastError).toMatch(/.+/);
     });
 
-    it("reads nothing for a change no trigger can match, and nothing from inside a run", async () => {
+    it("reads nothing for a change no trigger can match", async () => {
         await workflows.onRecordEvents(actorWith(allowed), "companies", [
             { recordId: RECORD, kind: "restored" }
         ]);
         expect(db.crmWorkflow.findMany).not.toHaveBeenCalled();
+    });
+
+    it("sets nothing off from inside a run, but wakes the runs waiting for the record", async () => {
+        db.crmWorkflow.findMany.mockResolvedValueOnce([stored({ kind: "created" })]);
         await workflows.withinWorkflow(() =>
             workflows.onRecordEvents(actorWith(allowed), "companies", [
                 { recordId: RECORD, kind: "created", changes: [] }
             ])
         );
-        expect(db.crmWorkflow.findMany).not.toHaveBeenCalled();
+        expect(crmHost.crmRunner).not.toHaveBeenCalled();
+        expect(db.crmWorkflowRun.create).not.toHaveBeenCalled();
+        expect(db.crmWorkflowRun.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ recordId: { in: [RECORD] }, status: "waiting" })
+            })
+        );
     });
 });
 

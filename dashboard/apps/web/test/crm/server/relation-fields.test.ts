@@ -22,10 +22,16 @@ const { delegate, tables } = vi.hoisted(() => {
         updateMany: vi.fn(async () => ({ count: 0 })),
         deleteMany: vi.fn(async () => ({ count: 1 }))
     });
-    return { delegate, tables: {} as Record<string, ReturnType<typeof delegate>> };
+    return {
+        delegate,
+        tables: {} as Record<string, ReturnType<typeof delegate>> & {
+            statements?: { text: string; values: unknown[] }[];
+        }
+    };
 });
 
 vi.mock("@polaris/db", () => {
+    tables.statements = [];
     tables.crmCompany = delegate();
     tables.crmPerson = delegate();
     tables.crmOpportunity = delegate();
@@ -40,7 +46,40 @@ vi.mock("@polaris/db", () => {
         crmFavorite: { deleteMany: vi.fn(async () => ({ count: 0 })) }
     };
     client.$transaction = async (run: (tx: unknown) => unknown) => run(client);
-    return { prisma: client, Prisma: { Decimal: class {} } };
+    // A statement as its text, with each value a placeholder.
+    type Sql = { text: string; values: unknown[] };
+    const isSql = (value: unknown): value is Sql =>
+        typeof value === "object" && value !== null && "text" in value && "values" in value;
+    const sql = (parts: readonly string[], ...values: unknown[]): Sql =>
+        values.reduce<Sql>(
+            (built, value, at) =>
+                isSql(value)
+                    ? {
+                          text: `${built.text}${value.text}${parts[at + 1]}`,
+                          values: [...built.values, ...value.values]
+                      }
+                    : {
+                          text: `${built.text}?${parts[at + 1]}`,
+                          values: [...built.values, value]
+                      },
+            { text: parts[0]!, values: [] }
+        );
+    client.$executeRaw = vi.fn(async (parts: readonly string[], ...values: unknown[]) => {
+        tables.statements!.push(sql(parts, ...values));
+        return 1;
+    });
+    return {
+        prisma: client,
+        Prisma: {
+            Decimal: class {},
+            sql,
+            raw: (text: string): Sql => ({ text, values: [] }),
+            join: (items: Sql[]): Sql => ({
+                text: items.map((item) => item.text).join(","),
+                values: items.flatMap((item) => item.values)
+            })
+        }
+    };
 });
 vi.mock("@polaris/app-host", () => ({
     host: { crmHost: {}, i18nRequest: { getLocale: async () => "en-US" } }
@@ -52,7 +91,7 @@ import { ruleWhere } from "@polaris-app/crm/src/lib/filters";
 import { linkedIds } from "@polaris-app/crm/src/model/import";
 import { normalizeInput } from "@polaris-app/crm/src/model/values";
 import { nameLinks, relinkRecords } from "@polaris-app/crm/src/lib/linked";
-import { createRecord, destroyRecords } from "@polaris-app/crm/src/lib/records";
+import { createRecord, destroyRecords, updateRecords } from "@polaris-app/crm/src/lib/records";
 import { customDef, fieldInputSchema } from "@polaris-app/crm/src/model/fields";
 import { columnOf, readValue, toRecord, writeData } from "@polaris-app/crm/src/lib/columns";
 
@@ -86,7 +125,8 @@ const actor = (people = allowed) =>
 beforeEach(() => {
     vi.clearAllMocks();
     // A value queued for one test never leaks into the next.
-    for (const table of Object.values(tables)) {
+    tables.statements!.length = 0;
+    for (const table of [tables.crmCompany!, tables.crmPerson!, tables.crmOpportunity!]) {
         const fresh = delegate();
         for (const [method, fn] of Object.entries(table))
             fn.mockReset().mockImplementation(
@@ -236,7 +276,10 @@ describe("saving", () => {
             deletedAt: null,
             cRel1: [A, B]
         });
-        await createRecord(actor(), "people", { name: { first: "Example", last: "" }, cRel1: [A, B] });
+        await createRecord(actor(), "people", {
+            name: { first: "Example", last: "" },
+            cRel1: [A, B]
+        });
         const [[count]] = tables.crmCompany!.count.mock.calls as unknown as [
             [{ where: Record<string, unknown> }]
         ];
@@ -245,6 +288,61 @@ describe("saving", () => {
             [{ data: Record<string, unknown> }]
         ];
         expect(made.data.cRel1).toEqual([A, B]);
+    });
+});
+
+describe("editing a list", () => {
+    beforeEach(() => {
+        db.fields = [
+            {
+                id: "f1",
+                slot: "cRel1",
+                label: "Partners",
+                kind: "relation",
+                options: JSON.stringify(["companies", "many"])
+            },
+            {
+                id: "f2",
+                slot: "cRel2",
+                label: "Referrer",
+                kind: "relation",
+                options: JSON.stringify(["companies", "one"])
+            }
+        ];
+    });
+
+    it("keeps the links the editor cannot see, record by record", async () => {
+        tables.crmCompany!.count.mockResolvedValueOnce(1);
+        tables.crmPerson!.findMany.mockResolvedValueOnce([
+            { id: "p1", cRel1: [A, C], cRel2: [] },
+            { id: "p2", cRel1: [A], cRel2: [] }
+        ]);
+        // A is seen; C is in the trash or not the editor's to read.
+        tables.crmCompany!.findMany.mockResolvedValueOnce([{ id: A }]);
+        await updateRecords(actor(), "people", ["p1", "p2"], { cRel1: [B] });
+        const [[read]] = tables.crmCompany!.findMany.mock.calls as unknown as [
+            [{ where: Record<string, unknown> }]
+        ];
+        expect(read.where).toMatchObject({ id: { in: [A, C] }, orgId: "o1", deletedAt: null });
+        const writes = tables.crmPerson!.updateMany.mock.calls as unknown as [
+            { where: { id: { in: string[] } }; data: Record<string, unknown> }
+        ][];
+        expect(writes.map(([call]) => [call.where.id.in, call.data.cRel1])).toEqual([
+            [["p1"], [B, C]],
+            [["p2"], [B]]
+        ]);
+    });
+
+    it("replaces a one-record link when one is picked, and keeps it when only cleared", async () => {
+        tables.crmCompany!.count.mockResolvedValueOnce(1);
+        tables.crmPerson!.findMany.mockResolvedValueOnce([{ id: "p1", cRel1: [], cRel2: [C] }]);
+        await updateRecords(actor(), "people", ["p1"], { cRel2: [B] });
+        tables.crmPerson!.findMany.mockResolvedValueOnce([{ id: "p1", cRel1: [], cRel2: [C] }]);
+        await updateRecords(actor(), "people", ["p1"], { cRel2: [] });
+        const writes = tables.crmPerson!.updateMany.mock.calls as unknown as [
+            { data: Record<string, unknown> }
+        ][];
+        expect(writes.map(([call]) => call.data.cRel2)).toEqual([[B], [C]]);
     });
 });
 
@@ -260,13 +358,15 @@ describe("a linked record that goes", () => {
                 options: JSON.stringify(["companies", "many"])
             }
         ];
-        tables.crmCompany!.findMany
-            .mockResolvedValueOnce([{ id: A, name: "Example One", deletedAt: new Date() }])
+        tables
+            .crmCompany!.findMany.mockResolvedValueOnce([
+                { id: A, name: "Example One", deletedAt: new Date() }
+            ])
             .mockResolvedValueOnce([])
             // The link that stays, named for the timeline.
             .mockResolvedValueOnce([{ id: B, name: "Example Two" }]);
-        tables.crmPerson!.findMany
-            .mockResolvedValueOnce([])
+        tables
+            .crmPerson!.findMany.mockResolvedValueOnce([])
             .mockResolvedValueOnce([{ id: "p1", cRel1: [B, A], cRel2: [], cRel3: [] }]);
         expect(await destroyRecords(actor(), "companies", [A])).toBe(1);
         const lookups = tables.crmPerson!.findMany.mock.calls as unknown as [
@@ -274,12 +374,18 @@ describe("a linked record that goes", () => {
         ][];
         expect(lookups.at(-1)![0].where).toMatchObject({
             orgId: "o1",
-            OR: [{ cRel1: { hasSome: [A] } }, { cRel2: { hasSome: [A] } }, { cRel3: { hasSome: [A] } }]
+            OR: [
+                { cRel1: { hasSome: [A] } },
+                { cRel2: { hasSome: [A] } },
+                { cRel3: { hasSome: [A] } }
+            ]
         });
-        expect(tables.crmPerson!.update).toHaveBeenCalledWith({
-            where: { id: "p1" },
-            data: { cRel1: [B] }
-        });
+        expect(tables.statements).toEqual([
+            {
+                text: `UPDATE "CrmPerson" AS t SET "cRel1" = v.after, "updatedAt" = now() AT TIME ZONE 'UTC' FROM (VALUES (?::uuid, ?::uuid[])) AS v(id, after) WHERE t."id" = v.id`,
+                values: ["p1", [B]]
+            }
+        ]);
         const { prisma } = await import("@polaris/db");
         const logged = (
             prisma as unknown as {
@@ -306,10 +412,8 @@ describe("a linked record that goes", () => {
         ]);
         const { prisma } = await import("@polaris/db");
         const changed = await relinkRecords(prisma as never, actor(), [B, C], A);
-        expect(tables.crmCompany!.update).toHaveBeenCalledWith({
-            where: { id: "c9" },
-            data: { cRel1: [A] }
-        });
+        expect(tables.statements!.map((one) => one.values)).toEqual([["c9", [A]]]);
+        expect(tables.statements![0]!.text).toContain('UPDATE "CrmCompany" AS t SET "cRel1"');
         expect(changed).toEqual([
             { object: "companies", recordId: "c9", slot: "cRel1", before: [A, B, C], after: [A] }
         ]);

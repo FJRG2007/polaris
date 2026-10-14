@@ -11,7 +11,7 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { loadFields } from "./fields";
-import { nameLinks, unlinkRecords } from "./linked";
+import { keepUnseenLinks, nameLinks, unlinkRecords } from "./linked";
 import { recordHref, relatedLists } from "../model/related";
 import { prisma } from "@polaris/db";
 import { dropEvents, logEvents, type NewEvent } from "./timeline";
@@ -448,7 +448,17 @@ export async function updateRecords(
         where,
         select: recordSelect(object)
     })) as Record<string, unknown>[];
-    await table(object).updateMany({ where, data: { ...data, updatedById: actor.user.id } });
+    const groups = await keepUnseenLinks(actor, before, custom, data);
+    if (groups === null) {
+        await table(object).updateMany({ where, data: { ...data, updatedById: actor.user.id } });
+    } else {
+        for (const group of groups) {
+            await table(object).updateMany({
+                where: { ...where, id: { in: group.ids } },
+                data: { ...group.data, updatedById: actor.user.id }
+            });
+        }
+    }
     const rows = (await table(object).findMany({ where, select: recordSelect(object) })) as Record<
         string,
         unknown

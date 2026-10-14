@@ -150,11 +150,16 @@ describe("one figure", () => {
             _min: { amount },
             _max: { amount }
         });
-        db.opportunities.groupBy.mockResolvedValueOnce([
-            row("c1", "customer", 100),
-            row("c1", "proposal", 100),
-            row("c2", "screening", 1000)
-        ]);
+        db.opportunities.groupBy
+            .mockResolvedValueOnce([
+                { companyId: "c1", _count: { _all: 2 } },
+                { companyId: "c2", _count: { _all: 1 } }
+            ])
+            .mockResolvedValueOnce([
+                row("c1", "customer", 100),
+                row("c1", "proposal", 100),
+                row("c2", "screening", 1000)
+            ]);
         const answer = await dashboards.widgetData(
             actor(),
             widget({
@@ -173,8 +178,44 @@ describe("one figure", () => {
                 { key: "c1", value: 160 }
             ]
         });
-        const [[query]] = db.opportunities.groupBy.mock.calls as unknown as [[{ by: string[] }]];
+        const [[picked], [query]] = db.opportunities.groupBy.mock.calls as unknown as [
+            [{ by: string[]; take: number }],
+            [{ by: string[]; where: { AND: unknown[] }; take?: number }]
+        ];
+        expect(picked).toMatchObject({ by: ["companyId"], take: dashboards.CATEGORY_CAP + 1 });
         expect(query.by).toEqual(["companyId", "stage"]);
+        // Every stage of the companies picked, so no company's figure is short.
+        expect(query.take).toBeUndefined();
+        expect(query.where.AND[1]).toEqual({ OR: [{ companyId: { in: ["c1", "c2"] } }] });
+    });
+
+    it("picks the companies first past the cap, then weighs every stage of each", async () => {
+        db.opportunities.groupBy.mockResolvedValueOnce(
+            Array.from({ length: dashboards.CATEGORY_CAP + 1 }, (_, at) => ({
+                companyId: at === 0 ? null : `c${at}`,
+                _count: { _all: 1 }
+            }))
+        );
+        const answer = await dashboards.widgetData(
+            actor(),
+            widget({
+                chart: "bar",
+                groupBy: "company",
+                measure: "weighted",
+                field: "amount",
+                currency: "EUR"
+            })
+        );
+        expect(answer).toMatchObject({ capped: true });
+        const [, [query]] = db.opportunities.groupBy.mock.calls as unknown as [
+            unknown,
+            [{ where: { AND: [unknown, { OR: Record<string, unknown>[] }] } }]
+        ];
+        const [listed, empty] = query.where.AND[1].OR;
+        expect((listed!.companyId as { in: string[] }).in).toHaveLength(
+            dashboards.CATEGORY_CAP - 1
+        );
+        expect(empty).toEqual({ companyId: null });
     });
 
     it("counts only what a saved view lists", async () => {
