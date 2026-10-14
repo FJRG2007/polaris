@@ -110,7 +110,11 @@ export function RuleRow({
                     onChange={onToggle}
                     aria-label={toggleLabel}
                 />
-                {open ? open({ className: bodyClass, children: body }) : <div className={bodyClass}>{body}</div>}
+                {open ? (
+                    open({ className: bodyClass, children: body })
+                ) : (
+                    <div className={bodyClass}>{body}</div>
+                )}
                 <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                     {last ? (
                         <>
@@ -123,7 +127,9 @@ export function RuleRow({
                 </span>
                 {actions && <span className="flex shrink-0 items-center gap-1">{actions}</span>}
             </div>
-            {detail && <div className="min-w-0 break-words text-xs [overflow-wrap:anywhere]">{detail}</div>}
+            {detail && (
+                <div className="min-w-0 break-words text-xs [overflow-wrap:anywhere]">{detail}</div>
+            )}
         </li>
     );
 }
@@ -196,10 +202,16 @@ export function RunRow({
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-left"
             >
                 <OutcomeBadge outcome={outcome} />
-                <span className="min-w-0 flex-1 truncate text-sm" title={typeof cause === "string" ? cause : undefined}>
+                <span
+                    className="min-w-0 flex-1 truncate text-sm"
+                    title={typeof cause === "string" ? cause : undefined}
+                >
                     {cause}
                 </span>
-                <span className="shrink-0 text-xs tabular-nums text-foreground-subtle" title={atTitle}>
+                <span
+                    className="shrink-0 text-xs tabular-nums text-foreground-subtle"
+                    title={atTitle}
+                >
                     {at}
                 </span>
                 <ChevronDown

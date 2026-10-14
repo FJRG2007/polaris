@@ -13,13 +13,7 @@ import * as flow from "@polaris/ui/automation";
 import * as model from "../model/workflows";
 import { FilterButton } from "./filter-panel";
 import { EMPTY_FILTER } from "../model/filters";
-import {
-    Button,
-    Checkbox,
-    Input,
-    Select,
-    Textarea
-} from "@polaris/ui";
+import { Button, Checkbox, Input, Select, Textarea } from "@polaris/ui";
 import { fieldLabel, optionLabel, useCustomFields } from "./custom-fields";
 import {
     CRM_OBJECTS,

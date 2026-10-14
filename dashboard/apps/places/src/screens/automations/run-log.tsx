@@ -138,9 +138,7 @@ export function RunLog({
                                 atTitle={format.dateTime(run.startedAt)}
                             >
                                 {reason && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {reason}
-                                    </p>
+                                    <p className="text-xs text-muted-foreground">{reason}</p>
                                 )}
                                 {run.status === "waiting" && run.dueAt && (
                                     <p className="text-xs text-muted-foreground">

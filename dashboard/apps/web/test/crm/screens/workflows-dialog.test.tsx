@@ -191,7 +191,9 @@ describe("the workflows dialog", () => {
         );
         await waitFor(() =>
             expect(
-                screen.getByRole("switch", { name: "Turn off Welcome" }).getAttribute("aria-checked")
+                screen
+                    .getByRole("switch", { name: "Turn off Welcome" })
+                    .getAttribute("aria-checked")
             ).toBe("true")
         );
     });

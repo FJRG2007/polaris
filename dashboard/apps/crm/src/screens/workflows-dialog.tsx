@@ -267,7 +267,11 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
                     />
                 </div>
                 {layout === "visual" ? (
-                    <WorkflowDiagram object={object} trigger={draft.trigger} actions={draft.actions} />
+                    <WorkflowDiagram
+                        object={object}
+                        trigger={draft.trigger}
+                        actions={draft.actions}
+                    />
                 ) : (
                     <ol className="flex min-w-0 flex-col">
                         <flow.Stage
@@ -544,7 +548,9 @@ export function WorkflowsDialog(props: WorkflowsDialogProps) {
     } else {
         body = (
             <div className="max-h-[60vh] min-h-0 overflow-y-auto overscroll-contain">
-                <rules.RuleList label={t("workflows.title", { objects: t(`objects.${object}.plural`) })}>
+                <rules.RuleList
+                    label={t("workflows.title", { objects: t(`objects.${object}.plural`) })}
+                >
                     {rows.map((row) => (
                         <rules.RuleRow
                             key={row.id}

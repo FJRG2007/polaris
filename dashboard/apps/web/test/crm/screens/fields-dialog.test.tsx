@@ -127,12 +127,10 @@ describe("fields dialog, relation field", () => {
     it("starts linking to its own kind, one record at a time", async () => {
         newField();
         await chooseKind("Linked records");
-        expect(
-            (await screen.findByRole("combobox", { name: "Links to" })).textContent
-        ).toContain("Opportunities");
-        expect(screen.getByRole("combobox", { name: "Holds" }).textContent).toContain(
-            "One record"
+        expect((await screen.findByRole("combobox", { name: "Links to" })).textContent).toContain(
+            "Opportunities"
         );
+        expect(screen.getByRole("combobox", { name: "Holds" }).textContent).toContain("One record");
     });
 
     it("shows an existing relation's target and size as fixed, with no pickers", async () => {

@@ -75,12 +75,12 @@ describe("the places automation list, on the shared rule pieces", () => {
     it("lists an automation as a rule row, switch and all", async () => {
         open();
         expect(await screen.findByText("Porch light at dusk")).toBeTruthy();
-        expect(
-            screen.getByRole("switch", { name: "Switch off Porch light at dusk" })
-        ).toBeTruthy();
+        expect(screen.getByRole("switch", { name: "Switch off Porch light at dusk" })).toBeTruthy();
         expect(screen.getByRole("link", { name: "Porch light at dusk" })).toHaveProperty(
             "href",
-            expect.stringContaining("/places/devices/automations/99999999-9999-4999-8999-999999999999")
+            expect.stringContaining(
+                "/places/devices/automations/99999999-9999-4999-8999-999999999999"
+            )
         );
     });
 
@@ -122,8 +122,6 @@ describe("the places automation list, on the shared rule pieces", () => {
         ).toHaveProperty("disabled", true);
         expect(screen.queryByRole("button", { name: /Run .* now/ })).toBeNull();
         expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
-        expect(
-            screen.getByRole("link", { name: "What Porch light at dusk did" })
-        ).toBeTruthy();
+        expect(screen.getByRole("link", { name: "What Porch light at dusk did" })).toBeTruthy();
     });
 });
