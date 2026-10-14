@@ -150,6 +150,17 @@ describe("SkinDialog", () => {
         expect(screen.queryByRole("button", { name: "Load" })).toBeNull();
     });
 
+    it("lets a skin be set for a player who is not on, for their next join", async () => {
+        actions.readSkinAction.mockResolvedValue({
+            live: { state: "read", skin: null, offline: true }
+        });
+        open(true, false, false);
+        expect(
+            await screen.findByText("player-one is not on the server. A change goes on when they next join.")
+        ).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Load" })).toBeTruthy();
+    });
+
     it("puts a refusal from the server into a sentence", async () => {
         actions.readSkinAction.mockResolvedValue({ live: { state: "read", skin: null } });
         actions.previewSkinAction.mockResolvedValue({ png: PNG, model: "classic", signed: null });

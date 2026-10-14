@@ -166,8 +166,8 @@ export function SkinDialog({
     }, [installedAppId, player, attempt, canEdit, showLive, t]);
 
     const unsupported = live?.state === "unsupported";
-    // The mod changes a skin only on a player who is in; the read says so when the
-    // list on screen is behind.
+    // An older mod changes a skin only on a player who is in, and refuses one who
+    // is not; a newer one reads back what is kept for them, marked offline.
     const offline =
         live?.state === "refused" ? live.why === "offline" : !online && live?.state !== "read";
     const changeable = editable && !offline;
@@ -387,6 +387,11 @@ export function SkinDialog({
                             {offline && (
                                 <p className="text-sm text-muted-foreground">
                                     {t("skins.notOnline", { name: player })}
+                                </p>
+                            )}
+                            {live?.state === "read" && live.offline && (
+                                <p className="text-sm text-muted-foreground">
+                                    {t("skins.nextJoin", { name: player })}
                                 </p>
                             )}
 

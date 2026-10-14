@@ -3034,6 +3034,7 @@
         "accountSkin": "Their account's own skin",
         "unsigned": "Only they can see this skin. Apply it again to show it to everyone.",
         "notOnline": "{name} is not on the server. Their skin can be seen and changed while they are.",
+        "nextJoin": "{name} is not on the server. A change goes on when they next join.",
         "import": "Change skin",
         "importTitle": "Change {name}'s skin",
         "importHint": "A skin file, a link, or a Minecraft username.",
