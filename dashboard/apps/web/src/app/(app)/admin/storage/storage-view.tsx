@@ -470,7 +470,11 @@ function errorText(t: T, error: MoveError): string {
                       })
                     : t("storage.errors.noSpace");
             case "mismatch":
-                return t("storage.errors.mismatch");
+                return error.file
+                    ? t("storage.errors.mismatchFile", { file: error.file })
+                    : t("storage.errors.mismatch");
+            case "noLinks":
+                return t("storage.errors.noLinks", { file: error.file ?? "" });
             case "unreadable":
                 return t("storage.errors.unreadable");
             case "unwritable":

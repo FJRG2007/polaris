@@ -159,7 +159,9 @@ export function ServerStorage({
               : null;
     // A running server is stopped while its world is copied, for anything but
     // `park`, which waits until it is stopped anyway.
-    const stopsIt = view.running && mode !== "park" && !unchanged;
+    // A failed move is tried again with the same choice, which Apply cannot offer.
+    const retrying = unchanged && view.move?.state === "failed";
+    const stopsIt = view.running && mode !== "park" && (!unchanged || retrying);
 
     function apply(): void {
         setConfirming(false);
@@ -306,7 +308,11 @@ export function ServerStorage({
                         ) : null}
                         {view.move.error ? (
                             <p className="text-danger-ink">
-                                {t(`storage.errors.${view.move.error.code}`)}
+                                {view.move.error.code === "mismatch" && view.move.error.file
+                                    ? t("storage.errors.mismatchFile", { file: view.move.error.file })
+                                    : t(`storage.errors.${view.move.error.code}`, {
+                                          file: view.move.error.file ?? ""
+                                      })}
                             </p>
                         ) : null}
                     </div>
@@ -319,11 +325,13 @@ export function ServerStorage({
                 <div className="flex justify-end">
                     <Button
                         size="sm"
-                        disabled={disabledReason !== null || unchanged || needsNas || pending}
+                        disabled={
+                            disabledReason !== null || (unchanged && !retrying) || needsNas || pending
+                        }
                         onClick={() => (stopsIt ? setConfirming(true) : apply())}
                     >
                         {pending ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                        {t("storage.apply")}
+                        {retrying ? t("storage.retry") : t("storage.apply")}
                     </Button>
                 </div>
             </CardBody>

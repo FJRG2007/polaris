@@ -60,6 +60,9 @@ export interface MoveError {
         | "cleanFailed"
         | "originShared";
     readonly detail?: string;
+    /** The file a failed copy is about, relative to the volume: the one that did
+     *  not match, or a link the destination could not store. */
+    readonly file?: string;
     readonly freeBytes?: number;
     readonly neededBytes?: number;
     /** The rollback could not start the app again. */
@@ -1064,9 +1067,51 @@ async function runOneShot(
     }
 }
 
+/**
+ * Empty the copies earlier failed moves of this volume left behind. Each sits in
+ * a folder of its own move that the volume never pointed at (`switched` stayed
+ * false), so nothing reads it; a rollback that could not empty one (an SMB share
+ * skips files while a folder is deleted under it) left it holding NAS space, and
+ * trying again is the moment to finish that. Best effort: it never fails a move.
+ */
+async function clearEarlierCopies(
+    context: MoveContext,
+    ports: Awaited<ReturnType<typeof getPorts>>
+): Promise<void> {
+    const earlier = await prisma.storageMove.findMany({
+        where: {
+            volumeId: context.row.volumeId,
+            id: { not: context.row.id },
+            state: "failed",
+            switched: false
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, destination: true },
+        take: 5
+    });
+    for (const move of earlier) {
+        try {
+            const left = plan.parsePlacement(move.destination);
+            if (left.kind === "volume") continue;
+            if (plan.placementsOverlap(left, context.origin)) continue;
+            if (plan.placementsOverlap(left, context.destination)) continue;
+            if (await originShared(context.row.volumeId, left)) continue;
+            if (left.kind === "nas") {
+                const mount = await resolveMountTarget(left.connectionId, context.row.ownerId);
+                if (!mount) continue;
+                await ports.ensureMount(mount);
+            }
+            await runOneShot(context, ports, plan.cleanupSpec(`${move.id}-copy`, left));
+        } catch (caught) {
+            console.error(`polaris: storage move ${move.id} still holds its copy:`, caught);
+        }
+    }
+}
+
 async function copy(context: MoveContext): Promise<void> {
     await withPorts(context, async (ports) => {
         await mountShares(context, ports);
+        await clearEarlierCopies(context, ports);
         const dockerName = await dockerNameOf(context, ports);
         // Kept with the move: once the app is on the copy, nothing else knows
         // what the original volume was called, and emptying it needs the name.
@@ -1115,9 +1160,11 @@ async function copy(context: MoveContext): Promise<void> {
                 .slice(-3)
                 .join(" ")
                 .slice(0, 300);
+            const file = outcome.failure === "noLinks" ? report.noLinks : report.differ;
             throw new MoveFailure({
                 code: outcome.failure,
                 ...(said ? { detail: said } : {}),
+                ...(file ? { file } : {}),
                 ...(outcome.failure === "noSpace"
                     ? { freeBytes: report.freeBytes, neededBytes: report.sourceBytes }
                     : {})
@@ -1224,7 +1271,8 @@ async function rollBack(context: MoveContext): Promise<void> {
                     if (!mount) return;
                     await ports.ensureMount(mount);
                 }
-                await runOneShot(context, ports, spec);
+                const { exitCode, log } = await runOneShot(context, ports, spec);
+                if (exitCode !== 0) throw new Error(log.trim().slice(-300) || `exit ${exitCode}`);
             }).catch((caught: unknown) =>
                 console.error(`polaris: storage move ${context.row.id} left its copy:`, caught)
             );
