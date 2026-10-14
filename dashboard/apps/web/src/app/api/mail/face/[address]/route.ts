@@ -5,24 +5,35 @@
  * message in a mailbox is from an organisation that has a mark - which is what
  * makes this worth having at all.
  *
- * Three answers, in this order:
+ * Four answers, in this order:
  *
- * - **Somebody on this Polaris.** A colleague writing from an address that
- *   belongs to an account here gets the picture they chose, the same one their
- *   messages carry in Chat.
+ * - **Somebody on this Polaris.** An address that provably belongs to an account
+ *   here - any of their addresses, see `face-owner` - gets the picture they
+ *   chose, the same one their messages carry in Chat. Only when the reader may
+ *   see it under that person's privacy settings; otherwise the address is
+ *   answered exactly as if nobody here owned it.
+ * - **Their Gravatar**, when the instance uses Gravatar at all. Fetched by
+ *   Polaris, never by the browser, and remembered for a day either way.
  * - **The sender's own site.** Fetched by Polaris, never by the browser, so what
  *   the site learns is that a server asked. The one already in front of the
  *   reader is a page they are not visiting.
  * - **Nothing.** The list draws initials, which is better than a broken picture
  *   and better than a grey circle pretending to be one.
  *
- * Cached in this process by domain rather than by address, because a hundred
- * messages from one shop are one question, and cached in the browser for a day
- * so scrolling a mailbox does not re-ask.
+ * A person's picture is served here rather than through a redirect to their
+ * avatar, which saves the browser a second request per face, and is kept by the
+ * browser only on condition: it asks again on every use and is answered with a
+ * 304, so a picture somebody has since hidden is not shown from a cache.
+ *
+ * Marks are cached in this process by domain rather than by address, because a
+ * hundred messages from one shop are one question, and in the browser for an
+ * hour so scrolling a mailbox does not re-ask - and so an address that turns out
+ * to be a colleague's shows their face the same day.
  */
 
-import { prisma } from "@polaris/db";
 import { apiPermission } from "@/lib/api-session";
+import { resolveAvatar } from "@/lib/avatar-service";
+import { addressGravatar, visibleOwner } from "@/lib/mailbox/face-owner";
 import { markDomains } from "@/lib/mailbox/sender-domain";
 import { iconLinks, MAX_HTML_BYTES } from "@/lib/mailbox/site-icon";
 import { follow, readAtMost, readCapped, safeUrl } from "@/lib/safe-fetch";
@@ -34,6 +45,19 @@ export const dynamic = "force-dynamic";
 /** A mark is a small file. Anything bigger is not one, and fetching it would be
  *  somebody using this to move bytes through the server. */
 const MAX_BYTES = 512 * 1024;
+
+/** How long the browser keeps a mark, a Gravatar or "nothing" before asking
+ *  again. Private: what an address shows depends on who is asking. */
+const MARK_CACHE = "private, max-age=3600";
+
+/** A person's picture is kept but checked on every use, so a privacy change or
+ *  a new photo reaches the reader at once. The check is a 304 and no bytes. */
+const PERSON_CACHE = "private, no-cache";
+
+/** How long a cold Gravatar lookup may hold the face before the mark hunt is
+ *  tried instead. Gravatar's own ceiling is four seconds; a queue in front of it
+ *  should not add to that. */
+const GRAVATAR_WAIT_MS = 5_000;
 
 /** How long an answer is kept here. A brand's mark does not change often, and a
  *  site that has none should not be asked again on every scroll. */
@@ -120,25 +144,50 @@ export async function GET(
     const domain = wanted.slice(at + 1).replace(/[^a-z0-9.-]/g, "");
     if (!domain.includes(".")) return gone();
 
-    // Somebody with an account here. Their own picture, not a guess at their
-    // employer's logo.
-    const person = await prisma.user.findFirst({
-        where: { email: wanted },
-        select: { id: true }
-    });
-    if (person) {
-        return Response.redirect(
-            new URL(`/api/avatar/${person.id}`, "http://polaris.invalid"),
-            307
-        );
+    // Somebody with an account here, when this reader may see them. Their own
+    // picture, not a guess at their employer's logo.
+    const owner = await visibleOwner(wanted, { id: user.id, isAdmin: Boolean(user.isAdmin) });
+    if (owner) {
+        const { picture } = await resolveAvatar(owner);
+        if (picture) {
+            if (request.headers.get("if-none-match") === picture.etag) {
+                return new Response(null, {
+                    status: 304,
+                    headers: { etag: picture.etag, "cache-control": PERSON_CACHE }
+                });
+            }
+            // A photo whose storage is not answering this second falls through
+            // to what a stranger at the address would get, rather than a hole.
+            const bytes = await picture.load();
+            if (bytes) return image(bytes, picture.mime, PERSON_CACHE, picture.etag);
+        }
+    }
+
+    // Their Gravatar, asked by this server. Skipped when it is not answering in
+    // time: the site's mark is still worth a try.
+    const wait = deadline(
+        GRAVATAR_WAIT_MS,
+        `${wanted} waited too long for Gravatar`,
+        request.signal
+    );
+    const gravatar = await addressGravatar(wanted, wait.signal).finally(() => wait.clear());
+    if (gravatar?.image) {
+        const { bytes, mime, etag } = gravatar.image;
+        if (request.headers.get("if-none-match") === etag) {
+            return new Response(null, {
+                status: 304,
+                headers: { etag, "cache-control": MARK_CACHE }
+            });
+        }
+        return image(bytes, mime, MARK_CACHE, etag);
     }
 
     const held = remembered().get(domain);
     if (held && Date.now() - held.at < REMEMBER_MS) {
-        return held.bytes ? picture(held.bytes, held.type) : gone();
+        return held.bytes ? image(held.bytes, held.type, MARK_CACHE) : gone();
     }
 
-    const wait = deadline(BUDGET_MS, `${domain} waited too long for a hunt`, request.signal);
+    const hunt = deadline(BUDGET_MS, `${domain} waited too long for a hunt`, request.signal);
     try {
         const found = await sameDomain(
             domain,
@@ -152,13 +201,13 @@ export async function GET(
                     });
                     return mark;
                 }, abandoned),
-            wait.signal
+            hunt.signal
         );
-        return found ? picture(found.bytes, found.type) : gone();
+        return found ? image(found.bytes, found.type, MARK_CACHE) : gone();
     } catch {
         return busy();
     } finally {
-        wait.clear();
+        hunt.clear();
     }
 }
 
@@ -261,16 +310,16 @@ function contentType(response: { headers: Headers }): string {
  * document that `sandbox` has put in an opaque origin and `default-src 'none'`
  * has left nothing to execute with.
  */
-function picture(bytes: Uint8Array, type: string): Response {
-    return new Response(new Uint8Array(bytes), {
-        headers: {
-            "content-type": type,
-            "content-length": String(bytes.length),
-            "x-content-type-options": "nosniff",
-            "content-security-policy": "default-src 'none'; sandbox",
-            "cache-control": "private, max-age=86400"
-        }
-    });
+function image(bytes: Uint8Array, type: string, cache: string, etag?: string): Response {
+    const headers: Record<string, string> = {
+        "content-type": type,
+        "content-length": String(bytes.length),
+        "x-content-type-options": "nosniff",
+        "content-security-policy": "default-src 'none'; sandbox",
+        "cache-control": cache
+    };
+    if (etag) headers.etag = etag;
+    return new Response(new Uint8Array(bytes), { headers });
 }
 
 /** No picture. The list draws initials, which is what an `<img>` that fails
@@ -278,7 +327,7 @@ function picture(bytes: Uint8Array, type: string): Response {
 function gone(): Response {
     return new Response(null, {
         status: 404,
-        headers: { "cache-control": "private, max-age=3600" }
+        headers: { "cache-control": MARK_CACHE }
     });
 }
 

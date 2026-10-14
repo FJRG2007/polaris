@@ -100,7 +100,7 @@ export interface AvatarSettings {
 
 /** Whether this instance may look an address up on Gravatar. On unless somebody
  *  turned it off: a fresh install should show the faces people already have. */
-async function gravatarEnabled(): Promise<boolean> {
+export async function gravatarEnabled(): Promise<boolean> {
     return (await getSetting(AVATAR_GRAVATAR_KEY)) !== "off";
 }
 
@@ -360,7 +360,7 @@ async function removeFile(connectionId: string | null, path: string): Promise<bo
     }
 }
 
-interface AvatarImage {
+export interface AvatarImage {
     readonly bytes: Uint8Array;
     readonly mime: string;
     /** Changes whenever the picture does, so a browser can be told to keep the
@@ -473,7 +473,7 @@ const gravatarCache = new Map<string, GravatarMemo>();
  * "nobody" instead of handing back a generated pattern, so an account with no
  * picture anywhere can still fall through to its initials.
  */
-async function gravatarImage(email: string): Promise<GravatarAnswer> {
+export async function gravatarImage(email: string): Promise<GravatarAnswer> {
     const hash = gravatarHash(email);
     const cached = gravatarCache.get(hash);
     if (cached && Date.now() < cached.until) {
@@ -527,7 +527,7 @@ async function gravatarImage(email: string): Promise<GravatarAnswer> {
 /** A Gravatar answer, and whether it is one. `certain` is false when the lookup
  *  failed: the caller may still have a picture to serve - the last one - but
  *  must not let a browser cache "there is none" on the strength of it. */
-interface GravatarAnswer {
+export interface GravatarAnswer {
     readonly image: AvatarImage | null;
     readonly certain: boolean;
 }
