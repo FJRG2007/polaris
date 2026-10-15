@@ -4,7 +4,7 @@
  * last two need a restart.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { boundToShare, mountTypes, nasBinding } from "@/lib/deploy/nas-binding";
 
 const TABLE = [
@@ -48,6 +48,12 @@ describe("mountTypes", () => {
         const stacked = `${TABLE}\n50 40 8:1 /x /data/uploads rw - ext4 /dev/sda1 rw`;
         expect(mountTypes(stacked, ["/data/uploads"]).get("/data/uploads")).toBe("ext4");
     });
+
+    it("decodes every character the kernel escapes in a mount point", () => {
+        const escaped = "44 22 0:52 /x /a\\011b\\134c\\012d rw - cifs //nas/share rw";
+        const point = "/a\tb\\c\nd";
+        expect(mountTypes(escaped, [point]).get(point)).toBe("cifs");
+    });
 });
 
 describe("boundToShare", () => {
@@ -85,5 +91,22 @@ describe("nasBinding", () => {
         await expect(
             nasBinding(ports({ ls: { code: 1, output: "Stale file handle" } }), "c", ["/data"])
         ).resolves.toBe("dead");
+    });
+
+    it("is unknown, never the share, when the files hang like a hard NFS mount that died", async () => {
+        vi.useFakeTimers();
+        try {
+            const hung = {
+                runIn: async (_container: string, argv: readonly string[]) =>
+                    argv[0] === "cat"
+                        ? { code: 0, output: TABLE }
+                        : new Promise<{ code: number; output: string }>(() => undefined)
+            };
+            const binding = nasBinding(hung, "c", ["/srv"]);
+            await vi.advanceTimersByTimeAsync(20_000);
+            await expect(binding).resolves.toBe("unknown");
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

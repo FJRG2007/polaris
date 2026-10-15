@@ -40,7 +40,13 @@ const ON_SHARE = [
     "40 22 0:52 /p/secrets /app/secrets rw - cifs //nas/share rw",
     "41 22 0:52 /p/uploads /app/uploads rw - cifs //nas/share rw"
 ].join("\n");
+const ON_DISK = [
+    "40 22 8:1 /var/lib/x /app/secrets rw - ext4 /dev/sda1 rw",
+    "41 22 8:1 /var/lib/y /app/uploads rw - ext4 /dev/sda1 rw"
+].join("\n");
 
+/** What `cat /proc/self/mountinfo` inside the service answers. */
+let table = ON_SHARE;
 /** What `ls` inside the service answers, one entry per call, the last repeating. */
 let looks: Array<{ code: number; output: string } | Error> = [];
 let mount: () => Promise<boolean> = async () => false;
@@ -49,8 +55,7 @@ let restartedByShare: string[] = [];
 const ports = {
     ensureMount: vi.fn(() => mount()),
     runIn: vi.fn(async (_container: string, argv: readonly string[]) => {
-        // Where the volumes are mounted: on the share, both of them.
-        if (argv[0] === "cat") return { code: 0, output: ON_SHARE };
+        if (argv[0] === "cat") return { code: 0, output: table };
         const next = looks.length > 1 ? looks.shift()! : looks[0]!;
         if (next instanceof Error) throw next;
         return next;
@@ -80,6 +85,7 @@ async function watcher() {
 beforeEach(() => {
     vi.clearAllMocks();
     looks = [FINE];
+    table = ON_SHARE;
     mount = async () => false;
     restartedByShare = [];
     nativeMounts = true;
@@ -111,6 +117,30 @@ describe("a service holding a dead mount", () => {
         await checkNasVolumes();
         expect(notifyVolumeHealth).toHaveBeenCalledTimes(2);
         expect(notifyVolumeHealth).toHaveBeenLastCalledWith(expect.anything(), "back");
+    });
+});
+
+describe("a service writing to the machine's own disk instead of the share", () => {
+    it("is restarted, and its owner told once when it stays off the share", async () => {
+        table = ON_DISK;
+        const { checkNasVolumes } = await watcher();
+        await checkNasVolumes();
+        await checkNasVolumes();
+        expect(ports.container).toHaveBeenCalledOnce();
+        expect(ports.container).toHaveBeenCalledWith(expect.stringContaining("orphion"), "restart");
+        expect(notifyVolumeHealth).toHaveBeenCalledOnce();
+        expect(notifyVolumeHealth).toHaveBeenLastCalledWith(expect.anything(), "detached");
+    });
+
+    it("is said reconnected when the restart puts it on the share", async () => {
+        table = ON_DISK;
+        ports.container.mockImplementationOnce(async () => {
+            table = ON_SHARE;
+        });
+        const { checkNasVolumes } = await watcher();
+        await checkNasVolumes();
+        expect(notifyVolumeHealth).toHaveBeenCalledOnce();
+        expect(notifyVolumeHealth).toHaveBeenLastCalledWith(expect.anything(), "reconnected");
     });
 });
 

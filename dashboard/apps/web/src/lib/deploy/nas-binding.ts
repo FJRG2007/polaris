@@ -13,8 +13,9 @@
  * - `local`: not on a network filesystem at all - started while the share was
  *   not mounted, so it is writing into a folder on the machine's own disk.
  *
- * `unknown` is a service whose image cannot be asked (no `cat`, no `ls`); callers
- * treat it the way they did before this existed.
+ * `unknown` is a service whose image cannot be asked (no `cat`, no `ls`), or whose
+ * files did not answer in time - a hard NFS mount that died hangs instead of
+ * failing; callers treat it the way they did before this existed.
  */
 
 import { withTimeout } from "@polaris/core";
@@ -46,7 +47,9 @@ export function mountTypes(table: string, paths: readonly string[]): Map<string,
     const types = new Map<string, string | null>([...wanted].map((path) => [path, null]));
     for (const line of table.split("\n")) {
         const fields = line.split(" ");
-        const point = fields[4]?.replace(/\\040/g, " ");
+        const point = fields[4]?.replace(/\\([0-7]{3})/g, (_, code: string) =>
+            String.fromCharCode(parseInt(code, 8))
+        );
         if (point === undefined || !wanted.has(point)) continue;
         const separator = fields.indexOf("-");
         const type = separator >= 0 ? fields[separator + 1] : undefined;
@@ -92,7 +95,6 @@ export async function nasBinding(
         return table === null ? "unknown" : "share";
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (DEAD_MOUNT.test(message)) return "dead";
-        return table === null ? "unknown" : "share";
+        return DEAD_MOUNT.test(message) ? "dead" : "unknown";
     }
 }
