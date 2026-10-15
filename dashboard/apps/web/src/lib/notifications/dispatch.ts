@@ -17,6 +17,7 @@ import { prisma } from "@polaris/db";
 import { isViewing } from "./presence";
 import { sendSms } from "./sms-service";
 import { sendWebhook } from "./webhook-sender";
+import { queueOutboundHooks } from "./outbound-hooks";
 import { sendAuthEmail } from "@/lib/auth-mail";
 import { appBaseUrl } from "@/lib/domain-service";
 import { wordsFor } from "./notice-words";
@@ -347,6 +348,20 @@ export async function notify(input: NotifyInput): Promise<void> {
 
     void fanOut(input, level, rule, event.critical === true).catch((error) => {
         console.error("polaris: notification fan-out failed:", error);
+    });
+
+    // The account's signed webhooks choose their own events, so they follow
+    // neither the rule above nor quiet hours: a program does not sleep.
+    void (async () =>
+        queueOutboundHooks(input.userId, {
+            event: input.event,
+            level,
+            title: input.title,
+            body: input.body ?? null,
+            url: await absoluteHref(input.href),
+            at: new Date().toISOString()
+        }))().catch((error) => {
+        console.error("polaris: queueing signed webhooks failed:", error);
     });
 }
 

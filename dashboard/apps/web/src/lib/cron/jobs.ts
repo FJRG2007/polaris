@@ -745,6 +745,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // it stopped and start two.
         leaseMs: 10 * MINUTE,
         run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
+    },
+    {
+        key: "outbound-webhooks",
+        // Every minute: the first retry of a signed webhook is due a minute after
+        // the try that failed. Also drops log rows past their thirty days.
+        everyMs: MINUTE,
+        // Leased, although every row is claimed on its own: two passes would only
+        // race each other for the same rows and both lose time doing it.
+        leaseMs: 5 * MINUTE,
+        run: async () => (await import("@/lib/notifications/outbound-hooks")).runOutboundHooks()
     }
 ];
 

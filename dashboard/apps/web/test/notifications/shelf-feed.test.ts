@@ -56,6 +56,7 @@ vi.mock("../../src/lib/notifications/destinations", () => ({
 }));
 
 const service = await import("@/lib/notification-service");
+vi.mock("../../src/lib/notifications/outbound-hooks", () => ({ queueOutboundHooks: async () => {} }));
 const { notify } = await import("@/lib/notifications/dispatch");
 
 const ON_SHELF = { OR: [{ shelf: null }, { shelf: "acme" }] };

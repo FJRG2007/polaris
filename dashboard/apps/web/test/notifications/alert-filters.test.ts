@@ -52,6 +52,7 @@ vi.mock("../../src/lib/notifications/destinations", () => ({
     })
 }));
 vi.mock("../../src/lib/notifications/webhook-sender", () => ({ sendWebhook: (...args: unknown[]) => sent(...(args as [])) }));
+vi.mock("../../src/lib/notifications/outbound-hooks", () => ({ queueOutboundHooks: async () => {} }));
 vi.mock("../../src/lib/notifications/sms-service", () => ({ sendSms: async () => ({}) }));
 
 const { notify, QUIET_HOURS, QUIET_SEVERITY } = await import("../../src/lib/notifications/dispatch");
