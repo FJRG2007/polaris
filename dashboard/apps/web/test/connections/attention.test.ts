@@ -10,7 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rows, alerts, throttle, broken } = vi.hoisted(() => ({
+const { rows, alerts, throttle, broken, answered } = vi.hoisted(() => ({
     rows: new Map<
         string,
         {
@@ -24,11 +24,25 @@ const { rows, alerts, throttle, broken } = vi.hoisted(() => ({
     alerts: [] as { event: string; title: string; body: string }[],
     throttle: { ok: true },
     /** Set when the test wants the write itself to fail. */
-    broken: { write: false }
+    broken: { write: false },
+    /** The bell alerts each clear answered, by the links it matched. */
+    answered: [] as string[][]
+}));
+
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        notification: {
+            updateMany: async (input: { where: { href: { in: string[] } } }) => {
+                answered.push(input.where.href.in);
+                return { count: 1 };
+            }
+        }
+    }
 }));
 
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async (provider: string) => rows.get(provider) ?? null,
+    listIntegrationStates: async () => new Map(rows),
     upsertIntegration: async (provider: string, input: { config?: Record<string, unknown> }) => {
         if (broken.write) throw new Error("database is gone");
         const existing = rows.get(provider);
@@ -51,8 +65,14 @@ import {
     clearConnectionFailure,
     connectionFailure,
     describeFailure,
+    attentionHref,
     recordConnectionFailure
 } from "@/lib/connections/attention";
+
+beforeEach(() => {
+    rows.clear();
+    answered.length = 0;
+});
 
 function install(provider: string, config: Record<string, unknown> = {}): void {
     rows.set(provider, { provider, enabled: true, config, hasSecret: true, updatedAt: null });
@@ -148,5 +168,23 @@ describe("clearConnectionFailure", () => {
         install("epic", { clientId: "abc" });
         await clearConnectionFailure("epic");
         expect(rows.get("epic")?.config).toEqual({ clientId: "abc" });
+        expect(answered).toEqual([]);
+    });
+
+    it("answers that service's alert in every bell", async () => {
+        install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
+        install("spotify", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "y" } });
+        await clearConnectionFailure("epic");
+
+        // Spotify still needs attention, so an older alert that does not say
+        // which service it was about stays where it is.
+        expect(answered).toEqual([[attentionHref("epic")]]);
+    });
+
+    it("answers the older unnamed alerts once nothing needs attention", async () => {
+        install("spotify", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "y" } });
+        await clearConnectionFailure("spotify");
+
+        expect(answered).toEqual([[attentionHref("spotify"), "/admin/integrations"]]);
     });
 });

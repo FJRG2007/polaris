@@ -20,14 +20,29 @@
  * happened the last time an alert was due.
  */
 
+import { prisma } from "@polaris/db";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { findConnectionProvider } from "@polaris/core";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
-import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
+import {
+    getIntegrationState,
+    listIntegrationStates,
+    upsertIntegration
+} from "@/lib/integration-service";
 
 /** Held on the integration's own config, so forgetting the application forgets
  *  its failures with it. */
 const FAILURE = "lastFailure";
+
+/** The alert's event, and the plain link alerts raised before they named
+ *  their service carried. */
+const EVENT = "integration.attention";
+const PLAIN_HREF = "/admin/integrations";
+
+/** Where an alert about this service points: its own setup, opened on arrival. */
+export function attentionHref(provider: string): string {
+    return `${PLAIN_HREF}?configure=${provider}`;
+}
 
 /** How often one service may raise this. */
 const ALERT_WINDOW_MS = 60 * 60 * 1000;
@@ -102,7 +117,7 @@ export async function recordConnectionFailure(
         const name = findConnectionProvider(provider)?.name ?? provider;
         await notifyOperators({
             permission: "settings.manage",
-            event: "integration.attention",
+            event: EVENT,
             // i18n-ignore the fallback; each operator reads `say` in their language
             title: `${name} could not complete an authorization`,
             body: `Somebody tried to connect their ${name} account and it was refused. ${name} said: ${reason}`,
@@ -111,7 +126,7 @@ export async function recordConnectionFailure(
                 body: t("connections.refusedBody", { name, reason })
             }),
             ...notice,
-            href: "/admin/integrations",
+            href: attentionHref(provider),
             level: "warning",
             actionRequired: true
         });
@@ -131,7 +146,31 @@ export async function clearConnectionFailure(provider: string): Promise<void> {
         const config = { ...state.config };
         delete config[FAILURE];
         await upsertIntegration(provider, { config });
+        await answerAlerts(provider);
     } catch (error) {
         console.error("polaris: could not clear the connection failure:", error);
     }
+}
+
+/**
+ * Read and answer this service's alerts in every operator's bell.
+ *
+ * The failure is the deployment's, not one reader's, so once it is gone the
+ * "Action needed" it raised is answered for all of them - left standing it is a
+ * chore nobody can clear because nothing is wrong. Alerts from before they named
+ * their service are answered once no service is left needing attention.
+ */
+async function answerAlerts(provider: string): Promise<void> {
+    const stillFailing = [...(await listIntegrationStates()).values()].some(
+        (state) => readConnectionFailure(state.config) !== null
+    );
+    const hrefs = stillFailing ? [attentionHref(provider)] : [attentionHref(provider), PLAIN_HREF];
+    await prisma.notification.updateMany({
+        where: {
+            type: EVENT,
+            href: { in: hrefs },
+            OR: [{ readAt: null }, { actionRequired: true }]
+        },
+        data: { readAt: new Date(), actionRequired: false }
+    });
 }

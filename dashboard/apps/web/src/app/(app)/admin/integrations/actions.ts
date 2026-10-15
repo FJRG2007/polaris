@@ -16,6 +16,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
+import { clearConnectionFailure } from "@/lib/connections/attention";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
@@ -114,6 +115,29 @@ export async function saveConnectionSignInAction(
     });
     revalidatePath("/admin/integrations");
     revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Mark a service's last refusal as seen: the card stops saying it needs
+ * attention and its alert is answered in every operator's bell. For a failure
+ * the operator has dealt with outside Polaris, or decided to leave.
+ */
+export async function dismissConnectionFailureAction(provider: string): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    if (typeof provider !== "string" || !findConnectionProvider(provider))
+        return { error: t("integrations.errors.unknownService") };
+
+    await clearConnectionFailure(provider);
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { failureDismissed: true }
+    });
+    revalidatePath("/admin/integrations");
     return {};
 }
 
