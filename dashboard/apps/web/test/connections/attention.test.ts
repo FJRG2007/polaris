@@ -71,6 +71,7 @@ import {
     connectionFailure,
     describeFailure,
     attentionHref,
+    markConnectionFailureSeen,
     recordConnectionFailure
 } from "@/lib/connections/attention";
 
@@ -198,8 +199,8 @@ describe("clearConnectionFailure", () => {
         expect((await connectionFailure("google"))?.kind).toBe("api-off");
         expect(answered).toEqual([]);
 
-        // An operator marking it seen clears it whatever it was.
-        expect(await clearConnectionFailure("google")).toBe(true);
+        // Drive answering again clears it.
+        expect(await clearConnectionFailure("google", "api-off")).toBe(true);
         expect(await connectionFailure("google")).toBeNull();
     });
 
@@ -234,5 +235,61 @@ describe("clearConnectionFailure", () => {
         await clearConnectionFailure("spotify");
 
         expect(answered).toEqual([[attentionHref("spotify"), "/admin/integrations"]]);
+    });
+});
+
+describe("markConnectionFailureSeen", () => {
+    it("keeps the failure - the service still needs attention - and answers its alerts", async () => {
+        install("spotify", {
+            lastFailure: { at: "2026-10-13T20:23:06.000Z", reason: "invalid_client" }
+        });
+        expect(await markConnectionFailureSeen("spotify")).toBe(true);
+
+        const failure = await connectionFailure("spotify");
+        expect(failure?.reason).toBe("invalid_client");
+        expect(failure?.seenAt).toEqual(expect.any(String));
+        // Nothing else needs reading, so the older unnamed alerts go too.
+        expect(answered).toEqual([[attentionHref("spotify"), "/admin/integrations"]]);
+    });
+
+    it("leaves the older unnamed alerts while another service is unread", async () => {
+        install("spotify", { lastFailure: { at: "2026-10-13T20:23:06.000Z", reason: "x" } });
+        install("epic", { lastFailure: { at: "2026-10-13T20:23:06.000Z", reason: "y" } });
+        await markConnectionFailureSeen("spotify");
+        expect(answered).toEqual([[attentionHref("spotify")]]);
+    });
+
+    it("keeps the mark when the same failure happens again, and drops it on a new one", async () => {
+        install("spotify");
+        await recordConnectionFailure("spotify", "invalid_client");
+        await markConnectionFailureSeen("spotify");
+        const seenAt = (await connectionFailure("spotify"))?.seenAt;
+
+        await recordConnectionFailure("spotify", "invalid_client");
+        expect((await connectionFailure("spotify"))?.seenAt).toBe(seenAt);
+
+        await recordConnectionFailure("spotify", "redirect_uri_mismatch");
+        expect((await connectionFailure("spotify"))?.seenAt).toBeUndefined();
+    });
+
+    it("does not raise the alert again for a failure already marked seen", async () => {
+        install("spotify");
+        await recordConnectionFailure("spotify", "invalid_client");
+        await markConnectionFailureSeen("spotify");
+        alerts.length = 0;
+
+        await recordConnectionFailure("spotify", "invalid_client");
+        expect(alerts).toEqual([]);
+
+        await recordConnectionFailure("spotify", "redirect_uri_mismatch");
+        expect(alerts).toHaveLength(1);
+    });
+
+    it("says so when it could not save the mark", async () => {
+        install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        broken.write = true;
+        expect(await markConnectionFailureSeen("epic")).toBe(false);
+        vi.restoreAllMocks();
     });
 });

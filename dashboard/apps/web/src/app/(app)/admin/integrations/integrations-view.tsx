@@ -333,6 +333,7 @@ export function IntegrationsView({
                                                     <AttentionBadge
                                                         slug={card.slug}
                                                         name={card.name}
+                                                        seen={Boolean(card.failure.seenAt)}
                                                     />
                                                 ) : card.enabled ? (
                                                     <Badge variant="success">
@@ -734,9 +735,10 @@ function useMarkSeen(slug: string) {
     return { pending, error, markSeen };
 }
 
-/** The grid's "Needs attention", with the same "seen" next to it so a card can
- *  be cleared without opening it. */
-function AttentionBadge({ slug, name }: { slug: string; name: string }) {
+/** The grid's "Needs attention", with the same "seen" next to it so its alert
+ *  can be read without opening the card. Seen, the badge stays: the service
+ *  still is not working. */
+function AttentionBadge({ slug, name, seen }: { slug: string; name: string; seen: boolean }) {
     const t = useTranslations("admin");
     const { pending, error, markSeen } = useMarkSeen(slug);
     const label = t("integrations.attention.seenNamed", { name });
@@ -745,21 +747,23 @@ function AttentionBadge({ slug, name }: { slug: string; name: string }) {
         <span className="flex shrink-0 flex-col items-end gap-1">
             <span className="flex items-center gap-1">
                 <Badge variant="warning">{t("integrations.grid.needsAttention")}</Badge>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground hover:text-success size-11 shrink-0 p-0 sm:size-7"
-                    aria-label={label}
-                    title={label}
-                    disabled={pending}
-                    onClick={markSeen}
-                >
-                    {pending ? (
-                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                    ) : (
-                        <Check className="size-3.5 shrink-0" />
-                    )}
-                </Button>
+                {seen ? null : (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground hover:text-success size-11 shrink-0 p-0 sm:size-7"
+                        aria-label={label}
+                        title={label}
+                        disabled={pending}
+                        onClick={markSeen}
+                    >
+                        {pending ? (
+                            <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                        ) : (
+                            <Check className="size-3.5 shrink-0" />
+                        )}
+                    </Button>
+                )}
             </span>
             {error ? (
                 <span role="alert" className="text-danger max-w-40 text-right text-xs">
@@ -815,15 +819,22 @@ function AttentionNotice({
                         {error}
                     </span>
                 ) : null}
-                <Button
-                    size="sm"
-                    variant="secondary"
-                    className="mt-1 self-start"
-                    disabled={pending}
-                    onClick={onSeen}
-                >
-                    {t("integrations.attention.seen")}
-                </Button>
+                {failure.seenAt ? (
+                    <span className="text-muted-foreground mt-1 inline-flex items-center gap-1">
+                        <Check className="size-3.5 shrink-0" />
+                        {t("integrations.attention.alreadySeen")}
+                    </span>
+                ) : (
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        className="mt-1 self-start"
+                        disabled={pending}
+                        onClick={onSeen}
+                    >
+                        {t("integrations.attention.seen")}
+                    </Button>
+                )}
             </div>
         </div>
     );

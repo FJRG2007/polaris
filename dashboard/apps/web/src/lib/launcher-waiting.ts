@@ -37,8 +37,15 @@ export const ADMIN_ITEM_IDS = ["reports", "cases", "update", "apis"] as const;
 
 export type AdminItemId = (typeof ADMIN_ITEM_IDS)[number];
 
-/** The Management entries the menu can mark seen. APIs are a fault. */
-export const DISMISSABLE_ADMIN_ITEMS: readonly AdminItemId[] = ["reports", "cases", "update"];
+/** The Management entries the menu can mark seen. A switched-off API seen
+ *  stays off - Integrations still says so - but stops counting until another
+ *  one goes off. */
+export const DISMISSABLE_ADMIN_ITEMS: readonly AdminItemId[] = [
+    "reports",
+    "cases",
+    "update",
+    "apis"
+];
 
 /** The longest title or detail an entry carries. A row truncates long before
  *  it, and the full text is in what the entry opens. */

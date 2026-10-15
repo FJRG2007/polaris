@@ -69,6 +69,24 @@ describe("marking a refused service seen from the grid", () => {
         expect(dismiss).toHaveBeenCalledWith(first.slug);
     });
 
+    it("keeps saying it needs attention once seen, without asking again", () => {
+        const [first] = SERVICE_INTEGRATIONS;
+        if (!first) throw new Error("catalogue too small");
+        const seen = card(first.slug, {
+            failure: {
+                at: "2026-10-15T10:00:00.000Z",
+                reason: "invalid_client",
+                kind: "refusal",
+                seenAt: "2026-10-15T11:00:00.000Z"
+            }
+        });
+        render(withMessages(<IntegrationsView cards={[seen]} />, "en-US"));
+
+        expect(screen.getByText("Needs attention")).toBeTruthy();
+        expect(screen.queryByText("On")).toBeNull();
+        expect(screen.queryAllByRole("button", { name: /as seen$/ })).toHaveLength(0);
+    });
+
     it("says on the card when it could not be marked", async () => {
         const [first] = SERVICE_INTEGRATIONS;
         if (!first) throw new Error("catalogue too small");

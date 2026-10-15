@@ -44,7 +44,7 @@ import {
     readDocument
 } from "./documents";
 import { getConnection, listConnections, readCredential } from "@/lib/connections/store";
-import { recordConnectionFailure } from "@/lib/connections/attention";
+import { clearConnectionFailure, recordConnectionFailure } from "@/lib/connections/attention";
 import {
     GOOGLE_DRIVE_FILE_SCOPE,
     GOOGLE_DRIVE_READ_SCOPE,
@@ -182,6 +182,11 @@ async function tokenFor(userId: string, connectionId: string, need: string): Pro
     }
 }
 
+/** Whether a "Drive is turned off" may still be held on the Google card. True
+ *  from start, so the first call that works after a restart clears one; false
+ *  after that, so a working Drive does not read the integration on every call. */
+let driveOffHeld = true;
+
 /** Google's answer, refused as a sentence somebody can act on. */
 async function driveFetch(token: string, url: string, init: RequestInit = {}): Promise<Response> {
     const response = await fetch(url, {
@@ -190,7 +195,11 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
         cache: "no-store",
         signal: AbortSignal.timeout(30_000)
     });
-    if (response.ok) return response;
+    if (response.ok) {
+        if (driveOffHeld && (await clearConnectionFailure("google", "api-off")))
+            driveOffHeld = false;
+        return response;
+    }
     if (response.status === 404) throw new OfficeGoogleError("not-found");
     // Read the way every other Google call here is read, so the Drive API being
     // off in the operator's project is said as that - not as a file somebody
@@ -200,6 +209,7 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
         await response.json().catch(() => undefined)
     );
     if (problem.kind === "setup") {
+        driveOffHeld = true;
         // Nothing the reader can do: the switch is in the operator's Google
         // Cloud project. Recorded on the integration and raised to whoever may
         // configure it, once an hour however many people run into it.
