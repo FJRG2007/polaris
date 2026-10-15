@@ -364,7 +364,7 @@ export function MultiSeriesChart({
     max?: number;
     format?: (value: number) => string;
     formatTime?: (at: number) => string;
-    label?: string;
+    label: string;
     height?: number;
     className?: string;
 }) {
@@ -432,7 +432,7 @@ export function MultiSeriesChart({
     return (
         <div className={cn("min-w-0 rounded-lg border border-border/60 p-3", className)}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                {label ? <span className="text-sm font-medium">{label}</span> : <span />}
+                <span className="text-sm font-medium">{label}</span>
                 {anyPresent ? <span className="text-xs text-muted-foreground/70">{format(yMax)}</span> : null}
             </div>
             {!anyPresent ? (
@@ -459,7 +459,7 @@ export function MultiSeriesChart({
                         viewBox={`0 0 ${width} ${height}`}
                         preserveAspectRatio="none"
                         role="img"
-                        aria-label={label ?? "History"}
+                        aria-label={label}
                     >
                         {[0.25, 0.5, 0.75].map((fraction) => (
                             <line

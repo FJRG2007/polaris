@@ -702,6 +702,12 @@
         "heading": "Server insights",
         "description": "Unusual stretches in each server's load, and when its disk fills at the current pace.",
         "failed": "Insights could not be read: {reason}",
+        "pages": {
+            "label": "Server pages",
+            "range": "Servers {from}-{to} of {total}",
+            "previous": "Previous servers",
+            "next": "Next servers"
+        },
         "forecast": {
             "heading": "Disk forecast",
             "filling": "Full in about {days, plural, one {# day} other {# days}}",
@@ -717,13 +723,12 @@
         },
         "anomalies": {
             "heading": "Unusual activity",
-            "hint": "Each hour is compared with the day before it, and listed when it sits at least 3.5 times the usual spread from the median.",
+            "hint": "Hours that stood out from the day before them.",
             "none": "Nothing unusual in the last 7 days.",
             "tooNew": "Not enough history yet. Unusual activity is spotted after {hours} hours of readings.",
             "high": "Unusually high",
             "low": "Unusually low",
             "value": "{value}, usually {usual}",
-            "score": "{score}x the usual spread",
             "lasted": "until {time}",
             "warning": "Notable",
             "danger": "Severe",

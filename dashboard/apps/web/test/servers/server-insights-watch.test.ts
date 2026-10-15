@@ -15,11 +15,13 @@ const HOUR = 3_600_000;
 const settings = new Map<string, string>();
 const told: { userId: string; event: string; level?: string; audience?: string }[] = [];
 let insights: ServerInsight[] = [];
+let hosts = [{ id: HOST, name: "web-1", ownerId: "owner" }];
+let failAfter = Number.POSITIVE_INFINITY;
 
 vi.mock("@polaris/db", () => ({
     VISIBLE_USER: {},
     prisma: {
-        host: { findMany: async () => [{ id: HOST, name: "web-1", ownerId: "owner" }] },
+        host: { findMany: async () => hosts },
         user: {
             findMany: async ({ where }: { where: { isAdmin?: boolean; id?: { in: string[] } } }) =>
                 where.isAdmin ? [{ id: "admin" }] : (where.id?.in ?? []).map((id) => ({ id }))
@@ -44,7 +46,10 @@ vi.mock("@/lib/setting-store", () => ({
 }));
 vi.mock("@/lib/server-insights/insights", () => ({
     FORECAST_WARN_DAYS: 14,
-    readServerInsights: async (subjects: string[]) => insights.filter((one) => subjects.includes(one.subject))
+    readServerInsights: async (subjects: string[]) => {
+        if (failAfter-- <= 0) throw new Error("rollups unavailable");
+        return insights.filter((one) => subjects.includes(one.subject));
+    }
 }));
 
 const { freshAnomalies, watchServerInsights } = await import("../../src/lib/server-insights/insights-watch");
@@ -76,6 +81,8 @@ function insight(subject: string, starts: number[], diskWarning = false): Server
 beforeEach(() => {
     settings.clear();
     told.length = 0;
+    hosts = [{ id: HOST, name: "web-1", ownerId: "owner" }];
+    failAfter = Number.POSITIVE_INFINITY;
 });
 
 describe("freshAnomalies", () => {
@@ -145,5 +152,25 @@ describe("watchServerInsights", () => {
         insights = [insight(HOST, [], true)];
         await watchServerInsights(NOW);
         expect(told.filter((one) => one.event === "server.forecast")).toHaveLength(1);
+    });
+
+    it("does not repeat what an earlier chunk told when a later one fails", async () => {
+        const others = Array.from({ length: 25 }, (_, index) => ({
+            id: `0190a1b2-c3d4-7e5f-8a9b-${String(index).padStart(12, "0")}`,
+            name: `node-${index}`,
+            ownerId: "owner"
+        }));
+        hosts = [{ id: HOST, name: "web-1", ownerId: "owner" }, ...others];
+        insights = [insight(HOST, [NOW.getTime() - HOUR], true), insight(LOCAL, [NOW.getTime() - HOUR])];
+        failAfter = 1;
+        await expect(watchServerInsights(NOW)).rejects.toThrow("rollups unavailable");
+        expect(told.map((one) => one.event).sort()).toEqual(["server.anomaly", "server.forecast"]);
+
+        failAfter = Number.POSITIVE_INFINITY;
+        await watchServerInsights(new Date(NOW.getTime() + HOUR));
+        expect(told.filter((one) => one.userId === "owner")).toHaveLength(2);
+        expect(told.filter((one) => one.userId === "admin")).toEqual([
+            expect.objectContaining({ event: "server.anomaly", audience: "admins" })
+        ]);
     });
 });

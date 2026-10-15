@@ -204,28 +204,32 @@ export async function watchServerInsights(now = new Date()): Promise<void> {
     const subjects = [...names.keys()];
     const nextWarned: string[] = [];
     let latest = watermark ?? now.getTime() - FIRST_RUN_MS;
-    for (let index = 0; index < subjects.length; index += CHUNK) {
-        const insights = await readServerInsights(subjects.slice(index, index + CHUNK), now);
-        const fresh = freshAnomalies(insights, watermark, now.getTime());
-        for (const insight of insights) {
-            if (stillWarned(insight, warned.has(insight.subject))) nextWarned.push(insight.subject);
-            const started = fresh.filter((one) => one.subject === insight.subject).map((one) => one.anomaly);
-            // Everything that started moves the watermark, told or not: a stretch
-            // held back by the cooldown is not told later either.
-            for (const anomaly of started) latest = Math.max(latest, anomaly.start);
-            const anomalies = throttleAnomalies(insight.subject, started, lastTold, now.getTime());
-            for (const anomaly of anomalies) lastTold.set(`${insight.subject}:${anomaly.metric}`, now.getTime());
-            const forecast = insight.diskWarning && !warned.has(insight.subject) ? insight.forecast : null;
-            if (anomalies.length === 0 && !forecast) continue;
-            const server = names.get(insight.subject) ?? "";
-            for (const userId of recipientsFor(insight.subject, owners, admins)) {
-                if (!visible.has(userId)) continue;
-                await tell(userId, insight.subject, server, anomalies, forecast);
+    let read = 0;
+    try {
+        for (; read < subjects.length; read += CHUNK) {
+            const insights = await readServerInsights(subjects.slice(read, read + CHUNK), now);
+            const fresh = freshAnomalies(insights, watermark, now.getTime());
+            for (const insight of insights) {
+                if (stillWarned(insight, warned.has(insight.subject))) nextWarned.push(insight.subject);
+                const started = fresh.filter((one) => one.subject === insight.subject).map((one) => one.anomaly);
+                // Everything that started moves the watermark, told or not: a stretch
+                // held back by the cooldown is not told later either.
+                for (const anomaly of started) latest = Math.max(latest, anomaly.start);
+                const anomalies = throttleAnomalies(insight.subject, started, lastTold, now.getTime());
+                for (const anomaly of anomalies) lastTold.set(`${insight.subject}:${anomaly.metric}`, now.getTime());
+                const forecast = insight.diskWarning && !warned.has(insight.subject) ? insight.forecast : null;
+                if (anomalies.length === 0 && !forecast) continue;
+                const server = names.get(insight.subject) ?? "";
+                for (const userId of recipientsFor(insight.subject, owners, admins)) {
+                    if (!visible.has(userId)) continue;
+                    await tell(userId, insight.subject, server, anomalies, forecast);
+                }
             }
         }
+        await setSetting(WATERMARK_KEY, String(latest));
+    } finally {
+        const unread = subjects.slice(read).filter((subject) => warned.has(subject));
+        await setSetting(WARNED_KEY, JSON.stringify([...nextWarned, ...unread]));
+        await setSetting(TOLD_KEY, JSON.stringify(Object.fromEntries(lastTold)));
     }
-
-    await setSetting(WATERMARK_KEY, String(latest));
-    await setSetting(WARNED_KEY, JSON.stringify(nextWarned));
-    await setSetting(TOLD_KEY, JSON.stringify(Object.fromEntries(lastTold)));
 }

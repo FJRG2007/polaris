@@ -163,7 +163,7 @@ describe("ServerInsightsPanel", () => {
         expect(screen.getByText("Fills soon")).toBeTruthy();
         expect(screen.getByText("Severe")).toBeTruthy();
         expect(screen.getByText(/96%, usually 21%/)).toBeTruthy();
-        expect(screen.getByText(/9\.3x the usual spread/)).toBeTruthy();
+        expect(screen.queryByText(/usual spread/)).toBeNull();
     });
 
     it("tells a server too new to judge from one that was calm", async () => {

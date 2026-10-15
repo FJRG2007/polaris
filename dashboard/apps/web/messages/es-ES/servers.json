@@ -702,6 +702,12 @@
         "heading": "Tendencias",
         "description": "Tramos inusuales en la carga de cada servidor, y cuándo se llena su disco al ritmo actual.",
         "failed": "No se pudo leer el análisis: {reason}",
+        "pages": {
+            "label": "Páginas",
+            "range": "Servidores {from}-{to} de {total}",
+            "previous": "Servidores previos",
+            "next": "Más servidores"
+        },
         "forecast": {
             "heading": "Llenado del disco",
             "filling": "Lleno en unos {days, plural, one {# día} other {# días}}",
@@ -717,13 +723,12 @@
         },
         "anomalies": {
             "heading": "Actividad inusual",
-            "hint": "Cada hora se compara con el día anterior, y aparece si se aleja de la mediana al menos 3,5 veces la variación habitual.",
+            "hint": "Horas que se salieron de lo normal respecto al día anterior.",
             "none": "Nada inusual en los últimos 7 días.",
             "tooNew": "Aún no hay historial suficiente. La actividad inusual se detecta tras {hours} horas de lecturas.",
             "high": "Inusualmente alto",
             "low": "Inusualmente bajo",
             "value": "{value}, lo normal es {usual}",
-            "score": "{score}x la variación normal",
             "lasted": "hasta {time}",
             "warning": "Notable",
             "danger": "Grave",

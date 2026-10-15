@@ -24,7 +24,7 @@ import {
 } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { formatMetric, formatScore } from "./insight-format";
+import { formatMetric } from "./insight-format";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -151,8 +151,6 @@ function AnomalyRow({
                 {anomaly.end > anomaly.start ? ` ${t("insights.anomalies.lasted", { time: display.time(anomaly.end) })}` : null}
                 {" - "}
                 {t("insights.anomalies.value", { value, usual })}
-                {" - "}
-                {t("insights.anomalies.score", { score: formatScore(anomaly.score) })}
             </p>
         </li>
     );

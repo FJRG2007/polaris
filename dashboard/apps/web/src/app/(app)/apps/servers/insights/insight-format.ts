@@ -11,8 +11,3 @@ export function formatMetric(metric: InsightMetric, value: number | null): strin
     if (metric === "network") return `${formatBytes(Math.max(0, Math.round(value)))}/s`;
     return `${Math.round(value)}%`;
 }
-
-/** A score as it is said: one decimal under ten, whole above. */
-export function formatScore(score: number): string {
-    return score < 10 ? score.toFixed(1) : String(Math.round(score));
-}
