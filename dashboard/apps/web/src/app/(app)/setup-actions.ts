@@ -39,7 +39,10 @@ export interface SetupState {
 const NOTHING: SetupState = { offer: false, installed: [] };
 
 async function readMark(): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key: SETUP_MARK_KEY }, select: { value: true } });
+    const row = await prisma.setting.findUnique({
+        where: { key: SETUP_MARK_KEY },
+        select: { value: true }
+    });
     return row?.value ?? null;
 }
 
@@ -51,13 +54,38 @@ async function installedSetupApps(): Promise<SetupApp[]> {
     return verdicts.filter(([, present]) => present).map(([app]) => app);
 }
 
+/** How established this Polaris is: up to two accounts (two is already "more
+ *  than the viewer"), and whether any app is installed. A failed answer counts
+ *  as established, so an error never opens the setup on somebody. */
+async function establishment(): Promise<{ accounts: number; appsInstalled: boolean }> {
+    try {
+        const [accounts, app] = await Promise.all([
+            prisma.user.findMany({ take: 2, select: { id: true } }),
+            prisma.installedApp.findFirst({
+                where: { status: { not: "removed" } },
+                select: { id: true }
+            })
+        ]);
+        return { accounts: accounts.length, appsInstalled: app !== null };
+    } catch {
+        return { accounts: 2, appsInstalled: true };
+    }
+}
+
 /** Whether to open the setup, and what it would find installed. Silent for
  *  anybody who may not install: they are never offered it. */
 export async function setupStateAction(): Promise<SetupState> {
     const user = await backgroundUser();
     if (!user || !user.isAdmin || user.viewingAs) return NOTHING;
-    const [mark, installed] = await Promise.all([readMark().catch(() => "unknown"), installedSetupApps()]);
-    return { offer: shouldOfferSetup({ isAdmin: user.isAdmin, viewingAs: false, mark }), installed };
+    const [mark, installed, established] = await Promise.all([
+        readMark().catch(() => "unknown"),
+        installedSetupApps(),
+        establishment()
+    ]);
+    return {
+        offer: shouldOfferSetup({ isAdmin: user.isAdmin, viewingAs: false, mark, ...established }),
+        installed
+    };
 }
 
 /** Install one of the setup's apps with the marketplace's one-click defaults. */
@@ -86,18 +114,15 @@ export async function installSetupAppAction(input: unknown): Promise<{ error?: s
         if (message === "This app is already installed") return {};
         console.error(`[setup] ${parsed.data} install failed`, caught);
         // The cause names internals; the reader gets what they can do about it.
-        return {
-            error: message.includes("could not be installed")
-                ? t("errors.download", { app: manifest.name })
-                : t("errors.install", { app: manifest.name })
-        };
+        return { error: t("errors.install", { app: manifest.name }) };
     }
 }
 
 /** Remember that the setup was finished or skipped, for every administrator. */
 export async function finishSetupAction(outcome: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
-    if (!user.isAdmin || user.viewingAs) return { error: (await getTranslations("setup"))("errors.adminOnly") };
+    if (!user.isAdmin || user.viewingAs)
+        return { error: (await getTranslations("setup"))("errors.adminOnly") };
     const parsed = setupOutcomeSchema.safeParse(outcome);
     if (!parsed.success) return {};
     await prisma.setting

@@ -29,7 +29,9 @@ function useSetupState(round = 0): { offer: boolean; installed: readonly SetupAp
     useEffect(() => {
         let live = true;
         setupStateAction()
-            .then((answer) => live && setState({ offer: answer.offer, installed: answer.installed }))
+            .then(
+                (answer) => live && setState({ offer: answer.offer, installed: answer.installed })
+            )
             // An offer is not worth an error: without an answer nothing opens, and
             // the panel lists every app as not installed yet.
             .catch(() => live && setState({ offer: false, installed: [] }));

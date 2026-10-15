@@ -52,7 +52,6 @@
     "errors": {
         "adminOnly": "Solo un administrador puede instalar apps.",
         "unknownApp": "Esa app no se ofrece aquí.",
-        "download": "{app} no se instaló: no se pudieron descargar sus archivos. Comprueba que este servidor llega a internet y repite.",
         "install": "{app} no se instaló. Repite, o ábrela en Marketplace para ver qué necesita.",
         "network": "Polaris no respondió. Comprueba tu conexión y repite."
     },

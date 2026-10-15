@@ -8,8 +8,8 @@
  * through the same path the marketplace uses, one at a time.
  *
  * Offered once per deployment, to the first administrator who opens the
- * Overview: whoever finishes or skips it answers for everybody, and it stays
- * reachable from Management afterwards. The mark lives in the instance settings
+ * Overview of a new one (see `shouldOfferSetup`): whoever finishes or skips it
+ * answers for everybody, and it stays reachable from Management afterwards. The mark lives in the instance settings
  * (`SETUP_MARK_KEY`).
  *
  * Pure and safe in the browser.
@@ -60,20 +60,32 @@ export const setupAppSchema = z.enum(SETUP_APPS);
 
 /**
  * Whether the setup opens by itself for this viewer: an administrator, as
- * themselves rather than viewing as somebody else, on a deployment where nobody
- * has finished or skipped it yet.
+ * themselves rather than viewing as somebody else, on a deployment that is
+ * still new - nobody has finished or skipped the setup, the viewer is its only
+ * account, and no marketplace app is installed yet.
+ *
+ * The last two keep an established Polaris from being greeted with a first-run
+ * screen after an Update: one with other accounts or with apps installed was
+ * set up long before the setup existed, whatever its mark says. It is still
+ * reachable from Management there.
  */
 export function shouldOfferSetup({
     isAdmin,
     viewingAs,
-    mark
+    mark,
+    accounts,
+    appsInstalled
 }: {
     isAdmin: boolean;
     viewingAs: boolean;
     /** The stored outcome, or null when there is none. */
     mark: string | null;
+    /** How many accounts this Polaris has, counting the viewer. */
+    accounts: number;
+    /** Whether any marketplace app is installed. */
+    appsInstalled: boolean;
 }): boolean {
-    return isAdmin && !viewingAs && mark === null;
+    return isAdmin && !viewingAs && mark === null && accounts <= 1 && !appsInstalled;
 }
 
 /** Where each install stands on the wizard's last step. */

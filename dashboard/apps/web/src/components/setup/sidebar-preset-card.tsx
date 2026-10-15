@@ -14,7 +14,12 @@ import { Check } from "lucide-react";
 import { Card, CardBody, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
-import { matchPreset, presetPrefs, SIDEBAR_PRESET_IDS, type SidebarPresetId } from "@/lib/setup/sidebar-presets";
+import {
+    matchPreset,
+    presetPrefs,
+    SIDEBAR_PRESET_IDS,
+    type SidebarPresetId
+} from "@/lib/setup/sidebar-presets";
 
 export function SidebarPresetCard() {
     const t = useTranslations("setup");
@@ -33,10 +38,16 @@ export function SidebarPresetCard() {
                     <p className="text-sm font-medium">{t("presets.title")}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{t("presets.hint")}</p>
                     {current === "custom" ? (
-                        <p className="mt-1 text-xs text-muted-foreground">{t("presets.customHint")}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {t("presets.customHint")}
+                        </p>
                     ) : null}
                 </div>
-                <div role="radiogroup" aria-label={t("presets.title")} className="grid gap-2 sm:grid-cols-2">
+                <div
+                    role="radiogroup"
+                    aria-label={t("presets.title")}
+                    className="grid gap-2 sm:grid-cols-2"
+                >
                     {SIDEBAR_PRESET_IDS.map((id) => {
                         const chosen = id === current;
                         return (
@@ -63,7 +74,10 @@ export function SidebarPresetCard() {
                                 </span>
                                 <Check
                                     aria-hidden
-                                    className={cn("mt-0.5 size-4 shrink-0 text-primary", !chosen && "invisible")}
+                                    className={cn(
+                                        "mt-0.5 size-4 shrink-0 text-primary",
+                                        !chosen && "invisible"
+                                    )}
                                 />
                             </button>
                         );
