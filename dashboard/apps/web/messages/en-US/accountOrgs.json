@@ -382,5 +382,50 @@
         "chooseHolder": "Choose who this mailbox is for.",
         "handOut": "That mailbox could not be handed out.",
         "takeBack": "That mailbox could not be taken back."
+    },
+    "quotas": {
+        "title": "Limits",
+        "intro": "What {org} may hold on this Polaris. Anything already past a limit stays; only the next one is refused.",
+        "adminsOnly": "Only an administrator of this Polaris can change these limits.",
+        "blankHint": "Leave a field empty for no limit.",
+        "usage": "Usage",
+        "noLimit": "No limit",
+        "usedOf": "{used} of {limit}",
+        "inUse": "{used} in use",
+        "over": "Past its limit",
+        "fieldLabel": "Limit for {dimension}",
+        "save": "Save limits",
+        "saved": "Limits saved.",
+        "refresh": "Refresh",
+        "loadFailed": "The limits could not be read. Try again.",
+        "saveFailed": "The limits could not be saved. Try again.",
+        "dimensions": {
+            "members": "People",
+            "teams": "Teams",
+            "projects": "Projects",
+            "services": "Services",
+            "databases": "Databases",
+            "cpus": "CPU cores",
+            "memoryMb": "Memory"
+        },
+        "units": {
+            "cpus": "{value} cores",
+            "memoryMb": "{value} MB"
+        },
+        "issues": {
+            "number": "Enter a number",
+            "whole": "Enter a whole number",
+            "tooSmall": "That is below the lowest limit allowed",
+            "tooLarge": "That is more than Polaris can track"
+        },
+        "refused": {
+            "members": "Your organization reached its limit of {limit, plural, one {# person} other {# people}}, counting open invitations. Ask an admin to raise it.",
+            "teams": "Your organization reached its limit of {limit, plural, one {# team} other {# teams}}. Ask an admin to raise it.",
+            "projects": "Your organization reached its limit of {limit, plural, one {# project} other {# projects}}. Ask an admin to raise it.",
+            "services": "Your organization reached its limit of {limit, plural, one {# service} other {# services}}. Ask an admin to raise it.",
+            "databases": "Your organization reached its limit of {limit, plural, one {# database} other {# databases}}. Ask an admin to raise it.",
+            "cpus": "This would take your organization past its limit of {limit} CPU cores. Ask an admin to raise it.",
+            "memoryMb": "This would take your organization past its limit of {limit} MB of memory. Ask an admin to raise it."
+        }
     }
 }

@@ -382,5 +382,50 @@
         "chooseHolder": "Elige para quién es este buzón.",
         "handOut": "No se ha podido repartir ese buzón.",
         "takeBack": "No se ha podido retirar ese buzón."
+    },
+    "quotas": {
+        "title": "Límites",
+        "intro": "Lo que {org} puede tener en este Polaris. Lo que ya pasa de un límite se queda; solo se rechaza lo siguiente.",
+        "adminsOnly": "Solo un administrador de este Polaris puede cambiar estos límites.",
+        "blankHint": "Deja un campo vacío para no poner límite.",
+        "usage": "Uso",
+        "noLimit": "Sin límite",
+        "usedOf": "{used} de {limit}",
+        "inUse": "{used} en uso",
+        "over": "Pasado del límite",
+        "fieldLabel": "Límite de {dimension}",
+        "save": "Guardar límites",
+        "saved": "Límites guardados.",
+        "refresh": "Actualizar",
+        "loadFailed": "No se pudieron leer los límites. Inténtalo de nuevo.",
+        "saveFailed": "No se pudieron guardar los límites. Inténtalo de nuevo.",
+        "dimensions": {
+            "members": "Personas",
+            "teams": "Equipos",
+            "projects": "Proyectos",
+            "services": "Servicios",
+            "databases": "Bases de datos",
+            "cpus": "Núcleos de CPU",
+            "memoryMb": "Memoria"
+        },
+        "units": {
+            "cpus": "{value} núcleos",
+            "memoryMb": "{value} MB"
+        },
+        "issues": {
+            "number": "Escribe un número",
+            "whole": "Escribe un número entero",
+            "tooSmall": "Está por debajo del límite mínimo",
+            "tooLarge": "Es más de lo que Polaris puede contar"
+        },
+        "refused": {
+            "members": "Tu organización llegó a su límite de {limit, plural, one {# persona} other {# personas}}, contando invitaciones abiertas. Pide a un admin que lo suba.",
+            "teams": "Tu organización llegó a su límite de {limit, plural, one {# equipo} other {# equipos}}. Pide a un admin que lo suba.",
+            "projects": "Tu organización llegó a su límite de {limit, plural, one {# proyecto} other {# proyectos}}. Pide a un admin que lo suba.",
+            "services": "Tu organización llegó a su límite de {limit, plural, one {# servicio} other {# servicios}}. Pide a un admin que lo suba.",
+            "databases": "Tu organización llegó a su límite de {limit, plural, one {# base de datos} other {# bases de datos}}. Pide a un admin que lo suba.",
+            "cpus": "Esto pasaría tu organización de su límite de {limit} núcleos de CPU. Pide a un admin que lo suba.",
+            "memoryMb": "Esto pasaría tu organización de su límite de {limit} MB de memoria. Pide a un admin que lo suba."
+        }
     }
 }

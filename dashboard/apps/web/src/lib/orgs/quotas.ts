@@ -71,22 +71,6 @@ export const orgQuotaInputSchema = z.object({
 
 export type OrgQuotaInput = z.infer<typeof orgQuotaInputSchema>;
 
-/**
- * The cap that actually applies when the instance has one of its own as well.
- * The instance's uses zero for "none" (its field predates this); the tighter of
- * the two wins, and `source` says whose it is so a refusal can name the right one.
- */
-export function effectiveCap(
-    instanceCap: number,
-    orgCap: number | null
-): { limit: number | null; source: "org" | "instance" | null } {
-    const instance = instanceCap > 0 ? instanceCap : null;
-    if (orgCap === null && instance === null) return { limit: null, source: null };
-    if (orgCap === null) return { limit: instance, source: "instance" };
-    if (instance === null || orgCap <= instance) return { limit: orgCap, source: "org" };
-    return { limit: instance, source: "instance" };
-}
-
 /** True when one more fits under the cap. */
 export function roomForOne(limit: number | null, current: number): boolean {
     return limit === null || current < limit;

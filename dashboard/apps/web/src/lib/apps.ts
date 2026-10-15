@@ -2620,6 +2620,14 @@ export function orgSubapp(slug: string): AppSubapp {
                 ]
             },
             {
+                // Everybody on the roster can see what the organization may hold;
+                // only a platform administrator can change it, on the screen itself.
+                label: "Limits", // i18n-ignore
+                href: `${base}/limits`,
+                icon: Gauge,
+                keywords: ["quota", "quotas", "caps", "how many", "allowance", "usage"]
+            },
+            {
                 label: "Activity", // i18n-ignore
                 href: `${base}/activity`,
                 icon: History,
