@@ -134,6 +134,7 @@ export * from "./vault-cards.js";
 export * from "./schemas/storage.js";
 export * from "./schemas/deploy.js";
 export * from "./schemas/build-settings.js";
+export * from "./schemas/server-templates.js";
 export * from "./edge-config.js";
 export * from "./frame-protection.js";
 export * from "./schemas/database.js";

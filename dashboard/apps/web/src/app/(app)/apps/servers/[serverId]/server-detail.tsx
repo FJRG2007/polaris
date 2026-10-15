@@ -26,6 +26,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { ServerSshKeys } from "../server-ssh-keys";
 import { ServerNotesPanel } from "../server-notes-panel";
+import { ServerTemplatesPanel } from "./server-templates-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
 import { useLiveResource } from "@/components/use-live-resource";
@@ -62,7 +63,9 @@ const TABS = [
     { id: "keys", needsHost: true },
     // Only a registered server has an id to hang a history on: the box Polaris
     // runs on has no Host row until it is enrolled.
-    { id: "notes", needsHost: true }
+    { id: "notes", needsHost: true },
+    // Checked and fixed over the server's SSH login, so only where there is one.
+    { id: "templates", needsHost: true }
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -211,6 +214,12 @@ export function ServerDetail({
                 <ServerNotesPanel hostId={server.hostId} />
             ) : tab === "keys" && server.hostId ? (
                 <ServerSshKeys hostId={server.hostId} />
+            ) : tab === "templates" && server.hostId ? (
+                <ServerTemplatesPanel
+                    hostId={server.hostId}
+                    serverName={server.name}
+                    root={server.sudo || server.detail === "root"}
+                />
             ) : tab === "storage" && server.kind === "local" ? (
                 <ServerStorage />
             ) : tab === "overview" ? (
