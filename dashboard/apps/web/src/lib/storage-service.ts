@@ -37,7 +37,6 @@ import {
     type HostConnection
 } from "@/lib/host-service";
 import { hostRootAccess, managesServers, reachesLocalHost } from "@/lib/drive-root";
-import { getLocalHostId } from "@/lib/local-server";
 import {
     borrowSftp,
     borrowSmb,
@@ -922,6 +921,8 @@ export async function listAccessibleConnections(userId: string, shelfOrgId: stri
  * (`reachesLocalHost`).
  */
 async function listHostsReached(userId: string) {
+    // Loaded here rather than with this module, which nearly everything imports.
+    const { getLocalHostId } = await import("@/lib/local-server");
     const [owned, localHostId] = await Promise.all([listHosts(userId), getLocalHostId()]);
     if (!localHostId || owned.some((host) => host.id === localHostId)) return owned;
     if (!reachesLocalHost({ localHostId, hostId: localHostId, managesServers: await managesServers(userId) }))

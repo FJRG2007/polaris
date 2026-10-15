@@ -11,7 +11,11 @@
  */
 
 import { prisma } from "@polaris/db";
-import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
+
+/** Loaded when asked rather than with this module: the storage service imports
+ *  this one, and nearly everything imports the storage service, while the
+ *  request's access loads the session layer and its environment with it. */
+const access = () => import("@/lib/effective-access");
 
 /** The decision itself, kept pure so it can be asserted without a database. */
 export function browsesAsRoot(input: {
@@ -38,6 +42,7 @@ export async function hostRootAccess(userId: string, hostId: string): Promise<Ho
         prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }),
         prisma.host.findUnique({ where: { id: hostId }, select: { sudo: true } })
     ]);
+    const { effectiveCan, effectiveIsAdmin } = await access();
     const admin = await effectiveIsAdmin(userId, user?.isAdmin === true);
     const managesServers = admin || (await effectiveCan(userId, "system.manage"));
     const sudo = host?.sudo === true;
@@ -64,6 +69,7 @@ export function reachesLocalHost(input: {
 /** Whether this viewer manages servers - an administrator, or the permission the
  *  Servers app manages them with. */
 export async function managesServers(userId: string): Promise<boolean> {
+    const { effectiveCan, effectiveIsAdmin } = await access();
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
     return (await effectiveIsAdmin(userId, user?.isAdmin === true)) || effectiveCan(userId, "system.manage");
 }

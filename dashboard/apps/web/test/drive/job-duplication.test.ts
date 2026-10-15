@@ -20,15 +20,6 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Whether a server is read as root asks the request's access, which loads the
-// session layer and its environment; nothing here is about root.
-vi.mock("@/lib/drive-root", () => ({
-    hostRootAccess: async () => ({ asRoot: false, sudo: false, managesServers: false }),
-    managesServers: async () => false,
-    reachesLocalHost: () => false
-}));
-vi.mock("@/lib/local-server", () => ({ getLocalHostId: async () => null }));
-
 const CONNECTION = "11111111-1111-4111-8111-111111111111";
 const ADA = "22222222-2222-4222-8222-222222222222";
 const GRACE = "33333333-3333-4333-8333-333333333333";
