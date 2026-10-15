@@ -745,7 +745,11 @@ export async function setWafRule(
 ): Promise<void> {
     await assertScopeOwner(ownerId, scopeType, scopeId);
     const parsed = wafRuleInputSchema.parse(input);
-    await restorePoints.capture("firewall", restorePoints.restoreKeys.firewall(scopeType, scopeId), { actorId: ownerId });
+    await restorePoints.capture(
+        "firewall",
+        restorePoints.restoreKeys.firewall(scopeType, scopeId),
+        { actorId: ownerId }
+    );
     // "Empty" is the state a never-configured scope is in, not merely a falsy one: the
     // injection checks and email obfuscation are ON when nothing has been saved, so a
     // scope that switches any of them OFF is carrying a decision and its row has to

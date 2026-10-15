@@ -40,7 +40,12 @@ export async function setBinRetentionDays(days: number): Promise<void> {
 }
 
 /** Take a service off its server and into the bin. Its volumes are untouched. */
-export async function binApplication(applicationId: string, ownerId: string, actorId: string, at = new Date()): Promise<void> {
+export async function binApplication(
+    applicationId: string,
+    ownerId: string,
+    actorId: string,
+    at = new Date()
+): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { id: true }
@@ -48,17 +53,27 @@ export async function binApplication(applicationId: string, ownerId: string, act
     if (!app) throw new Error("Application not found");
     const deploy = await import("@/lib/deploy-service");
     // The routes as they were, so a restore turns back on exactly the names that answered.
-    await restorePoints.capture("routes", restorePoints.restoreKeys.routes(applicationId), { actorId });
+    await restorePoints.capture("routes", restorePoints.restoreKeys.routes(applicationId), {
+        actorId
+    });
     await prisma.domain.updateMany({ where: { applicationId }, data: { enabled: false } });
     await deploy.syncAppRoutes().catch(() => undefined);
     await deploy.removeApplicationDeployment(applicationId, ownerId).catch((error: unknown) => {
         console.error(`recycle-bin: could not stop service ${applicationId}:`, error);
     });
-    await prisma.application.update({ where: { id: applicationId }, data: { binnedAt: at, binnedById: actorId } });
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { binnedAt: at, binnedById: actorId }
+    });
 }
 
 /** Take a database's container down and into the bin. Its data volume stays. */
-export async function binDatabase(databaseId: string, ownerId: string, actorId: string, at = new Date()): Promise<void> {
+export async function binDatabase(
+    databaseId: string,
+    ownerId: string,
+    actorId: string,
+    at = new Date()
+): Promise<void> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         select: { id: true, parentId: true }
@@ -72,21 +87,39 @@ export async function binDatabase(databaseId: string, ownerId: string, actorId: 
             console.error(`recycle-bin: could not stop database ${databaseId}:`, error);
         });
     }
-    await prisma.managedDatabase.update({ where: { id: databaseId }, data: { binnedAt: at, binnedById: actorId } });
+    await prisma.managedDatabase.update({
+        where: { id: databaseId },
+        data: { binnedAt: at, binnedById: actorId }
+    });
 }
 
 /** Bin a project and everything it runs, all under the same moment. */
-export async function binProject(projectId: string, ownerId: string, actorId: string): Promise<void> {
-    const project = await prisma.project.findFirst({ where: { id: projectId, ownerId }, select: { id: true } });
+export async function binProject(
+    projectId: string,
+    ownerId: string,
+    actorId: string
+): Promise<void> {
+    const project = await prisma.project.findFirst({
+        where: { id: projectId, ownerId },
+        select: { id: true }
+    });
     if (!project) throw new Error("Only the project's owner can delete it");
     const at = new Date();
     const [databases, applications] = await Promise.all([
-        prisma.managedDatabase.findMany({ where: { environment: { projectId } }, orderBy: { parentId: "desc" }, select: { id: true } }),
+        prisma.managedDatabase.findMany({
+            where: { environment: { projectId } },
+            orderBy: { parentId: "desc" },
+            select: { id: true }
+        }),
         prisma.application.findMany({ where: { environment: { projectId } }, select: { id: true } })
     ]);
-    for (const application of applications) await binApplication(application.id, ownerId, actorId, at);
+    for (const application of applications)
+        await binApplication(application.id, ownerId, actorId, at);
     for (const database of databases) await binDatabase(database.id, ownerId, actorId, at);
-    await prisma.project.update({ where: { id: projectId }, data: { binnedAt: at, binnedById: actorId } });
+    await prisma.project.update({
+        where: { id: projectId },
+        data: { binnedAt: at, binnedById: actorId }
+    });
 }
 
 export interface BinEntry {
@@ -108,19 +141,37 @@ export async function listBin(userId: string): Promise<BinEntry[]> {
     const [days, manages] = await Promise.all([binRetentionDays(), managedProjectWhere(userId)]);
     const binned = { binnedAt: { not: null } };
     const [projects, applications, databases] = await Promise.all([
-        prisma.project.findMany({ where: { ...manages, ...binned }, select: { id: true, name: true, binnedAt: true }, take: 200 }),
+        prisma.project.findMany({
+            where: { ...manages, ...binned },
+            select: { id: true, name: true, binnedAt: true },
+            take: 200
+        }),
         prisma.application.findMany({
             where: { ...binned, environment: { project: { ...manages, binnedAt: null } } },
-            select: { id: true, name: true, binnedAt: true, environment: { select: { project: { select: { name: true } } } } },
+            select: {
+                id: true,
+                name: true,
+                binnedAt: true,
+                environment: { select: { project: { select: { name: true } } } }
+            },
             take: 200
         }),
         prisma.managedDatabase.findMany({
             where: { ...binned, environment: { project: { ...manages, binnedAt: null } } },
-            select: { id: true, name: true, binnedAt: true, environment: { select: { project: { select: { name: true } } } } },
+            select: {
+                id: true,
+                name: true,
+                binnedAt: true,
+                environment: { select: { project: { select: { name: true } } } }
+            },
             take: 200
         })
     ]);
-    const entry = (kind: BinKind, row: { id: string; name: string; binnedAt: Date | null }, projectName: string | null): BinEntry => {
+    const entry = (
+        kind: BinKind,
+        row: { id: string; name: string; binnedAt: Date | null },
+        projectName: string | null
+    ): BinEntry => {
         const at = row.binnedAt ?? new Date();
         return {
             kind,
@@ -138,22 +189,49 @@ export async function listBin(userId: string): Promise<BinEntry[]> {
     ].sort((a, b) => b.binnedAt.localeCompare(a.binnedAt));
 }
 
-async function restoreApplicationRow(applicationId: string, ownerId: string, actorId: string): Promise<void> {
-    await prisma.application.update({ where: { id: applicationId }, data: { binnedAt: null, binnedById: null } });
+async function restoreApplicationRow(
+    applicationId: string,
+    ownerId: string,
+    actorId: string
+): Promise<void> {
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: { binnedAt: null, binnedById: null }
+    });
     // The routes snapshot taken when it was binned names the domains that answered.
-    const [point] = await restorePoints.listRestorePoints("routes", restorePoints.restoreKeys.routes(applicationId));
+    const [point] = await restorePoints.listRestorePoints(
+        "routes",
+        restorePoints.restoreKeys.routes(applicationId)
+    );
     const enabled = point
-        ? point.changes.filter((change) => change.fields.some((field) => field.field === "enabled" && field.after === "true")).map((change) => change.item)
+        ? point.changes
+              .filter((change) =>
+                  change.fields.some((field) => field.field === "enabled" && field.after === "true")
+              )
+              .map((change) => change.item)
         : [];
-    if (enabled.length > 0) await prisma.domain.updateMany({ where: { applicationId, hostname: { in: enabled } }, data: { enabled: true } });
+    if (enabled.length > 0)
+        await prisma.domain.updateMany({
+            where: { applicationId, hostname: { in: enabled } },
+            data: { enabled: true }
+        });
     const deploy = await import("@/lib/deploy-service");
     await deploy.syncAppRoutes().catch(() => undefined);
-    await deploy.deployApplication(applicationId, ownerId, actorId, { trigger: "manual" }).catch((error: unknown) => {
-        console.error(`recycle-bin: restored service ${applicationId} did not redeploy:`, error);
-    });
+    await deploy
+        .deployApplication(applicationId, ownerId, actorId, { trigger: "manual" })
+        .catch((error: unknown) => {
+            console.error(
+                `recycle-bin: restored service ${applicationId} did not redeploy:`,
+                error
+            );
+        });
 }
 
-async function restoreDatabaseRow(databaseId: string, ownerId: string, actorId: string): Promise<void> {
+async function restoreDatabaseRow(
+    databaseId: string,
+    ownerId: string,
+    actorId: string
+): Promise<void> {
     const db = await prisma.managedDatabase.update({
         where: { id: databaseId },
         data: { binnedAt: null, binnedById: null },
@@ -168,13 +246,26 @@ async function restoreDatabaseRow(databaseId: string, ownerId: string, actorId: 
 
 async function ownerOf(kind: BinKind, id: string): Promise<string | null> {
     if (kind === "project") {
-        return (await prisma.project.findFirst({ where: { id, ...INCLUDING_BINNED }, select: { ownerId: true } }))?.ownerId ?? null;
+        return (
+            (
+                await prisma.project.findFirst({
+                    where: { id, ...INCLUDING_BINNED },
+                    select: { ownerId: true }
+                })
+            )?.ownerId ?? null
+        );
     }
     const where = { id, ...INCLUDING_BINNED };
     const row =
         kind === "application"
-            ? await prisma.application.findFirst({ where, select: { environment: { select: { project: { select: { ownerId: true } } } } } })
-            : await prisma.managedDatabase.findFirst({ where, select: { environment: { select: { project: { select: { ownerId: true } } } } } });
+            ? await prisma.application.findFirst({
+                  where,
+                  select: { environment: { select: { project: { select: { ownerId: true } } } } }
+              })
+            : await prisma.managedDatabase.findFirst({
+                  where,
+                  select: { environment: { select: { project: { select: { ownerId: true } } } } }
+              });
     return row?.environment.project.ownerId ?? null;
 }
 
@@ -186,34 +277,62 @@ async function ownerOf(kind: BinKind, id: string): Promise<string | null> {
 async function requireBinned(kind: BinKind, id: string, userId: string): Promise<string> {
     const manages = await managedProjectWhere(userId);
     const binned = { id, binnedAt: { not: null } };
-    const throughProject = { select: { environment: { select: { project: { select: { ownerId: true } } } } } };
+    const throughProject = {
+        select: { environment: { select: { project: { select: { ownerId: true } } } } }
+    };
     const ownerId =
         kind === "project"
-            ? (await prisma.project.findFirst({ where: { ...binned, ...manages }, select: { ownerId: true } }))?.ownerId
+            ? (
+                  await prisma.project.findFirst({
+                      where: { ...binned, ...manages },
+                      select: { ownerId: true }
+                  })
+              )?.ownerId
             : kind === "application"
-              ? (await prisma.application.findFirst({ where: { ...binned, environment: { project: manages } }, ...throughProject }))
-                    ?.environment.project.ownerId
-              : (await prisma.managedDatabase.findFirst({ where: { ...binned, environment: { project: manages } }, ...throughProject }))
-                    ?.environment.project.ownerId;
+              ? (
+                    await prisma.application.findFirst({
+                        where: { ...binned, environment: { project: manages } },
+                        ...throughProject
+                    })
+                )?.environment.project.ownerId
+              : (
+                    await prisma.managedDatabase.findFirst({
+                        where: { ...binned, environment: { project: manages } },
+                        ...throughProject
+                    })
+                )?.environment.project.ownerId;
     if (!ownerId) throw new Error("That item is no longer in the recycle bin");
     return ownerId;
 }
 
 /** Bring an item back and redeploy it. */
-export async function restoreFromBin(kind: BinKind, id: string, userId: string, actorId: string): Promise<void> {
+export async function restoreFromBin(
+    kind: BinKind,
+    id: string,
+    userId: string,
+    actorId: string
+): Promise<void> {
     const ownerId = await requireBinned(kind, id, userId);
     if (kind === "application") return restoreApplicationRow(id, ownerId, actorId);
     if (kind === "database") return restoreDatabaseRow(id, ownerId, actorId);
-    const project = await prisma.project.findFirst({ where: { id, ownerId, binnedAt: { not: null } }, select: { binnedAt: true } });
+    const project = await prisma.project.findFirst({
+        where: { id, ownerId, binnedAt: { not: null } },
+        select: { binnedAt: true }
+    });
     await prisma.project.update({ where: { id }, data: { binnedAt: null, binnedById: null } });
     // Only what was binned with the project; something deleted on its own before stays in the bin.
     const together = { binnedAt: project?.binnedAt ?? undefined, environment: { projectId: id } };
     const [databases, applications] = await Promise.all([
-        prisma.managedDatabase.findMany({ where: together, orderBy: { parentId: "asc" }, select: { id: true } }),
+        prisma.managedDatabase.findMany({
+            where: together,
+            orderBy: { parentId: "asc" },
+            select: { id: true }
+        }),
         prisma.application.findMany({ where: together, select: { id: true } })
     ]);
     for (const database of databases) await restoreDatabaseRow(database.id, ownerId, actorId);
-    for (const application of applications) await restoreApplicationRow(application.id, ownerId, actorId);
+    for (const application of applications)
+        await restoreApplicationRow(application.id, ownerId, actorId);
 }
 
 /** Delete for good, data included. Releases the names it held. */
@@ -244,8 +363,16 @@ export async function purgeRecycleBin(now = new Date()): Promise<{ purged: numbe
     const expired = { binnedAt: { lt: cutoff } };
     const [projects, applications, databases] = await Promise.all([
         prisma.project.findMany({ where: expired, select: { id: true }, take: PURGE_BATCH }),
-        prisma.application.findMany({ where: { ...expired, environment: { project: { binnedAt: null } } }, select: { id: true }, take: PURGE_BATCH }),
-        prisma.managedDatabase.findMany({ where: { ...expired, environment: { project: { binnedAt: null } } }, select: { id: true }, take: PURGE_BATCH })
+        prisma.application.findMany({
+            where: { ...expired, environment: { project: { binnedAt: null } } },
+            select: { id: true },
+            take: PURGE_BATCH
+        }),
+        prisma.managedDatabase.findMany({
+            where: { ...expired, environment: { project: { binnedAt: null } } },
+            select: { id: true },
+            take: PURGE_BATCH
+        })
     ]);
     const queue: Array<[BinKind, string]> = [
         ...projects.map((row): [BinKind, string] => ["project", row.id]),

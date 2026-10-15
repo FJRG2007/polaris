@@ -13,13 +13,20 @@ const file = (path: string, bytes = 10) => `-rw-r--r-- user/user ${bytes} 2026-0
 
 describe("cPanel backup listing", () => {
     it("takes plain files and folders", () => {
-        const listing = ["drwxr-xr-x user/user 0 2026-01-01 00:00 backup/", file("backup/homedir/public_html/index.php")].join("\n");
+        const listing = [
+            "drwxr-xr-x user/user 0 2026-01-01 00:00 backup/",
+            file("backup/homedir/public_html/index.php")
+        ].join("\n");
         expect(checkListing(listing)).toEqual({ entries: 2, bytes: 10 });
     });
 
     it("refuses links, parent steps and absolute paths", () => {
-        expect(listingProblem("lrwxrwxrwx user/user 0 2026-01-01 00:00 backup/x -> /etc/passwd")).toBe("specialFiles");
-        expect(listingProblem("hrw-r--r-- user/user 0 2026-01-01 00:00 backup/x link to y")).toBe("specialFiles");
+        expect(
+            listingProblem("lrwxrwxrwx user/user 0 2026-01-01 00:00 backup/x -> /etc/passwd")
+        ).toBe("specialFiles");
+        expect(listingProblem("hrw-r--r-- user/user 0 2026-01-01 00:00 backup/x link to y")).toBe(
+            "specialFiles"
+        );
         expect(listingProblem(file("backup/../../etc/cron.d/x"))).toBe("leavesFolder");
         expect(listingProblem(file("/etc/passwd"))).toBe("absolutePath");
         expect(entryNameProblem("C:/Windows/x")).toBe("absolutePath");
@@ -27,14 +34,20 @@ describe("cPanel backup listing", () => {
     });
 
     it("refuses a backup that unpacks past the cap, and an empty one", () => {
-        expect(() => checkListing(file("big", 21 * 1024 ** 3))).toThrow(expect.objectContaining({ code: "tooLarge" }));
+        expect(() => checkListing(file("big", 21 * 1024 ** 3))).toThrow(
+            expect.objectContaining({ code: "tooLarge" })
+        );
         expect(() => checkListing("\n")).toThrow(expect.objectContaining({ code: "empty" }));
     });
 });
 
 describe("cPanel backup plan", () => {
     it("reads settings files", () => {
-        expect(parseKeyValues("---\nmain_domain: example.test\ndocumentroot: '/home/acct/public_html'\n  - nested\n")).toEqual({
+        expect(
+            parseKeyValues(
+                "---\nmain_domain: example.test\ndocumentroot: '/home/acct/public_html'\n  - nested\n"
+            )
+        ).toEqual({
             main_domain: "example.test",
             documentroot: "/home/acct/public_html"
         });
@@ -69,12 +82,20 @@ describe("cPanel backup plan", () => {
             { name: "example.test", primary: true, documentRoot: "public_html" },
             { name: "addon.test", primary: false, documentRoot: "addon.test" }
         ]);
-        expect(plan.databases).toEqual([{ name: "acct_wp", dump: "mysql/acct_wp.sql", bytes: 100 }]);
+        expect(plan.databases).toEqual([
+            { name: "acct_wp", dump: "mysql/acct_wp.sql", bytes: 100 }
+        ]);
         expect(plan.warnings).toEqual([]);
     });
 
     it("warns when the backup has no domains or no home folder", () => {
-        const plan = planFrom({ account: null, userdataMain: null, userdata: {}, dumps: [], hasHome: false });
+        const plan = planFrom({
+            account: null,
+            userdataMain: null,
+            userdata: {},
+            dumps: [],
+            hasHome: false
+        });
         expect(plan.warnings).toEqual([{ code: "noDomains" }, { code: "noHome" }]);
     });
 });

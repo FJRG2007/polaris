@@ -16,7 +16,12 @@ import {
 
 const SOURCE_ID = "00000000-0000-4000-8000-000000000001";
 const TARGET_ID = "00000000-0000-4000-8000-000000000002";
-const CLIENT = { engine: "mariadb", username: "app", password: "fixture-pass", database: "app" } as const;
+const CLIENT = {
+    engine: "mariadb",
+    username: "app",
+    password: "fixture-pass",
+    database: "app"
+} as const;
 
 describe("environment stages", () => {
     it("reads an unmarked default environment as production and others as unset", () => {
@@ -87,7 +92,10 @@ describe("planPromotion", () => {
 
 describe("WordPress address rewrite", () => {
     it("keeps only real prefixes from the listing", () => {
-        expect(parseWordpressPrefixes("wp_\nblog_\n\nbad prefix_\nwp_\n")).toEqual(["wp_", "blog_"]);
+        expect(parseWordpressPrefixes("wp_\nblog_\n\nbad prefix_\nwp_\n")).toEqual([
+            "wp_",
+            "blog_"
+        ]);
     });
 
     it("rewrites home, siteurl and post links for every install", () => {
@@ -96,7 +104,14 @@ describe("WordPress address rewrite", () => {
             from: "staging.example.test",
             to: "www.example.test"
         });
-        expect(command?.argv.slice(0, 6)).toEqual(["mariadb", "-uapp", "-pfixture-pass", "-N", "-B", "app"]);
+        expect(command?.argv.slice(0, 6)).toEqual([
+            "mariadb",
+            "-uapp",
+            "-pfixture-pass",
+            "-N",
+            "-B",
+            "app"
+        ]);
         const sql = command?.argv.at(-1) ?? "";
         expect(sql).toContain("UPDATE `wp_options`");
         expect(sql).toContain("'//staging.example.test', '//www.example.test'");
@@ -105,10 +120,18 @@ describe("WordPress address rewrite", () => {
 
     it("refuses an address that is not a host name instead of quoting it", () => {
         expect(
-            wordpressAddressCommand(CLIENT, { prefixes: ["wp_"], from: "a.test'; DROP TABLE x; --", to: "b.test" })
+            wordpressAddressCommand(CLIENT, {
+                prefixes: ["wp_"],
+                from: "a.test'; DROP TABLE x; --",
+                to: "b.test"
+            })
         ).toBeNull();
-        expect(wordpressAddressCommand(CLIENT, { prefixes: ["wp_"], from: "a.test", to: "a.test" })).toBeNull();
-        expect(wordpressAddressCommand(CLIENT, { prefixes: ["x`y_"], from: "a.test", to: "b.test" })).toBeNull();
+        expect(
+            wordpressAddressCommand(CLIENT, { prefixes: ["wp_"], from: "a.test", to: "a.test" })
+        ).toBeNull();
+        expect(
+            wordpressAddressCommand(CLIENT, { prefixes: ["x`y_"], from: "a.test", to: "b.test" })
+        ).toBeNull();
     });
 });
 
@@ -116,15 +139,20 @@ describe("pinnedImageRef", () => {
     const digest = `sha256:${"a".repeat(64)}`;
 
     it("pins a Docker Hub tag however the digest spells the repository", () => {
-        expect(pinnedImageRef("wordpress:7.1-apache", [`docker.io/library/wordpress@${digest}`])).toBe(
-            `wordpress@${digest}`
+        expect(
+            pinnedImageRef("wordpress:7.1-apache", [`docker.io/library/wordpress@${digest}`])
+        ).toBe(`wordpress@${digest}`);
+        expect(pinnedImageRef("library/nginx", [`nginx@${digest}`])).toBe(
+            `library/nginx@${digest}`
         );
-        expect(pinnedImageRef("library/nginx", [`nginx@${digest}`])).toBe(`library/nginx@${digest}`);
     });
 
     it("keeps a registry with a port and ignores other repositories", () => {
         expect(
-            pinnedImageRef("registry.test:5000/acme/web:1.2", [`other/web@${digest}`, `registry.test:5000/acme/web@${digest}`])
+            pinnedImageRef("registry.test:5000/acme/web:1.2", [
+                `other/web@${digest}`,
+                `registry.test:5000/acme/web@${digest}`
+            ])
         ).toBe(`registry.test:5000/acme/web@${digest}`);
         expect(pinnedImageRef("acme/web:1.2", [`other/web@${digest}`])).toBeNull();
     });
@@ -140,7 +168,9 @@ describe("serialized value rewrite statements", () => {
 
     it("finds each install's option and metadata tables by name", () => {
         expect(
-            wordpressValueTables("blog_options\nblog_posts\nblog_postmeta\nblog_usermeta\nshop_options\nother_posts\nbad name\n")
+            wordpressValueTables(
+                "blog_options\nblog_posts\nblog_postmeta\nblog_usermeta\nshop_options\nother_posts\nbad name\n"
+            )
         ).toEqual([
             options,
             { table: "blog_postmeta", id: "meta_id", value: "meta_value" },
@@ -155,7 +185,9 @@ describe("serialized value rewrite statements", () => {
         expect(sql).toContain(`X'${Buffer.from("//a.test").toString("hex")}'`);
         expect(sql).toContain("LIMIT 100");
         expect(() => rowsContainingCommand(CLIENT, options, "x", "1 OR 1=1", 10)).toThrow();
-        expect(() => rowsContainingCommand(CLIENT, { ...options, table: "x`y" }, "x", "1", 10)).toThrow();
+        expect(() =>
+            rowsContainingCommand(CLIENT, { ...options, table: "x`y" }, "x", "1", 10)
+        ).toThrow();
     });
 
     it("parses hex rows and skips anything else", () => {
@@ -173,7 +205,9 @@ describe("serialized value rewrite statements", () => {
         );
         expect(script).toContain(`@polaris_value = X'${Buffer.from(hostile).toString("hex")}'`);
         expect(script).not.toContain("DROP TABLE");
-        expect(() => updateRowsScript(options, [{ id: "7; DROP", value: Buffer.alloc(0) }])).toThrow();
+        expect(() =>
+            updateRowsScript(options, [{ id: "7; DROP", value: Buffer.alloc(0) }])
+        ).toThrow();
     });
 
     it("runs a script with each value as its own argument", () => {

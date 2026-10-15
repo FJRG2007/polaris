@@ -39,14 +39,25 @@ const env: Adapter = {
         const [scopeType, scopeId] = splitKey(objectKey);
         const rows = await prisma.envVar.findMany({
             where: { scopeType, scopeId },
-            select: { key: true, isSecret: true, value: true, encryptedValue: true, valueNonce: true, valueKeyId: true }
+            select: {
+                key: true,
+                isSecret: true,
+                value: true,
+                encryptedValue: true,
+                valueNonce: true,
+                valueKeyId: true
+            }
         });
         const items: Body["items"] = {};
         for (const row of rows) {
             items[row.key] = row.isSecret
                 ? {
                       secret: true,
-                      [core.SECRET_FIELD]: { c: b64(row.encryptedValue), n: b64(row.valueNonce), k: row.valueKeyId }
+                      [core.SECRET_FIELD]: {
+                          c: b64(row.encryptedValue),
+                          n: b64(row.valueNonce),
+                          k: row.valueKeyId
+                      }
                   }
                 : { secret: false, value: row.value ?? "" };
         }
@@ -55,9 +66,13 @@ const env: Adapter = {
     async apply(objectKey, body) {
         const [scopeType, scopeId] = splitKey(objectKey);
         await prisma.$transaction(async (tx) => {
-            await tx.envVar.deleteMany({ where: { scopeType, scopeId, key: { notIn: Object.keys(body.items) } } });
+            await tx.envVar.deleteMany({
+                where: { scopeType, scopeId, key: { notIn: Object.keys(body.items) } }
+            });
             for (const [key, item] of Object.entries(body.items)) {
-                const envelope = item[core.SECRET_FIELD] as { c?: string; n?: string; k?: string } | undefined;
+                const envelope = item[core.SECRET_FIELD] as
+                    | { c?: string; n?: string; k?: string }
+                    | undefined;
                 const data =
                     item.secret === true
                         ? {
@@ -67,7 +82,13 @@ const env: Adapter = {
                               valueNonce: bytes(envelope?.n),
                               valueKeyId: envelope?.k ?? null
                           }
-                        : { isSecret: false, value: String(item.value ?? ""), encryptedValue: null, valueNonce: null, valueKeyId: null };
+                        : {
+                              isSecret: false,
+                              value: String(item.value ?? ""),
+                              encryptedValue: null,
+                              valueNonce: null,
+                              valueKeyId: null
+                          };
                 await tx.envVar.upsert({
                     where: { scopeType_scopeId_key: { scopeType, scopeId, key } },
                     create: { scopeType, scopeId, key, ...data },
@@ -102,43 +123,78 @@ const cron: Adapter = {
         const kept = Object.keys(body.items);
         await prisma.serviceCron.deleteMany({ where: { applicationId, id: { notIn: kept } } });
         const present = new Set(
-            (await prisma.serviceCron.findMany({ where: { applicationId }, select: { id: true } })).map((row) => row.id)
+            (
+                await prisma.serviceCron.findMany({
+                    where: { applicationId },
+                    select: { id: true }
+                })
+            ).map((row) => row.id)
         );
         for (const [id, item] of Object.entries(body.items)) {
             const input = item as unknown as Parameters<typeof saveServiceCron>[1];
-            await saveServiceCron(applicationId, { ...input, id: present.has(id) ? id : undefined }, actor.id, false);
+            await saveServiceCron(
+                applicationId,
+                { ...input, id: present.has(id) ? id : undefined },
+                actor.id,
+                false
+            );
         }
     }
 };
 
-const ROUTE_FIELDS = ["kind", "targetPort", "portPinned", "https", "enabled", "certResolver", "pathPrefix"] as const;
+const ROUTE_FIELDS = [
+    "kind",
+    "targetPort",
+    "portPinned",
+    "https",
+    "enabled",
+    "certResolver",
+    "pathPrefix"
+] as const;
 
 /** A service's routes and domains, keyed by application id, one item per hostname. */
 const routes: Adapter = {
     async capture(applicationId) {
-        const rows = await prisma.domain.findMany({ where: { applicationId, kind: { not: "release" } } });
+        const rows = await prisma.domain.findMany({
+            where: { applicationId, kind: { not: "release" } }
+        });
         const items: Body["items"] = {};
         for (const row of rows) {
-            items[row.hostname] = Object.fromEntries(ROUTE_FIELDS.map((field) => [field, row[field] ?? null]));
+            items[row.hostname] = Object.fromEntries(
+                ROUTE_FIELDS.map((field) => [field, row[field] ?? null])
+            );
         }
         return { items };
     },
     async apply(applicationId, body) {
         const hostnames = Object.keys(body.items);
-        await prisma.domain.deleteMany({ where: { applicationId, kind: { not: "release" }, hostname: { notIn: hostnames } } });
+        await prisma.domain.deleteMany({
+            where: { applicationId, kind: { not: "release" }, hostname: { notIn: hostnames } }
+        });
         const { dashboardHosts } = await import("@/lib/domain-edge");
         const [dashboard, pages] = await Promise.all([
             dashboardHosts(),
-            prisma.statusPage.findMany({ where: { customDomain: { in: hostnames } }, select: { customDomain: true } })
+            prisma.statusPage.findMany({
+                where: { customDomain: { in: hostnames } },
+                select: { customDomain: true }
+            })
         ]);
-        const reserved = new Set([...dashboard, ...pages.flatMap((page) => (page.customDomain ? [page.customDomain] : []))]);
+        const reserved = new Set([
+            ...dashboard,
+            ...pages.flatMap((page) => (page.customDomain ? [page.customDomain] : []))
+        ]);
         for (const [hostname, item] of Object.entries(body.items)) {
             if (reserved.has(hostname.toLowerCase())) continue;
-            const data = Object.fromEntries(ROUTE_FIELDS.map((field) => [field, item[field] ?? undefined])) as {
+            const data = Object.fromEntries(
+                ROUTE_FIELDS.map((field) => [field, item[field] ?? undefined])
+            ) as {
                 kind?: string;
                 targetPort: number;
             };
-            const taken = await prisma.domain.findUnique({ where: { hostname }, select: { applicationId: true } });
+            const taken = await prisma.domain.findUnique({
+                where: { hostname },
+                select: { applicationId: true }
+            });
             // A name another service took since then stays where it is.
             if (taken && taken.applicationId !== applicationId) continue;
             if (taken) await prisma.domain.update({ where: { hostname }, data });
@@ -153,7 +209,9 @@ const routes: Adapter = {
 const firewall: Adapter = {
     async capture(objectKey) {
         const [scopeType, scopeId] = splitKey(objectKey);
-        const row = await prisma.wafRule.findUnique({ where: { scopeType_scopeId: { scopeType, scopeId } } });
+        const row = await prisma.wafRule.findUnique({
+            where: { scopeType_scopeId: { scopeType, scopeId } }
+        });
         if (!row) return { items: {} as Body["items"] };
         const { id: _id, createdAt: _c, updatedAt: _u, scopeType: _t, scopeId: _s, ...rule } = row;
         const parsed = Object.fromEntries(
@@ -175,7 +233,12 @@ const firewall: Adapter = {
         if (!rule) {
             await prisma.wafRule.deleteMany({ where: { scopeType, scopeId } });
         } else {
-            await waf.setWafRule(actor.ownerId, scopeType as Parameters<typeof waf.setWafRule>[1], scopeId, rule as never);
+            await waf.setWafRule(
+                actor.ownerId,
+                scopeType as Parameters<typeof waf.setWafRule>[1],
+                scopeId,
+                rule as never
+            );
         }
         const { syncAppRoutes } = await import("@/lib/deploy-service");
         const { syncDashboardRoute } = await import("@/lib/domain-edge");
@@ -188,11 +251,16 @@ const firewall: Adapter = {
 const dns: Adapter = {
     async capture(objectKey) {
         const zone = await import("@/lib/dns/zone-records");
-        const { records } = await zone.zoneRecords(JSON.parse(objectKey) as Parameters<typeof zone.zoneRecords>[0]);
+        const { records } = await zone.zoneRecords(
+            JSON.parse(objectKey) as Parameters<typeof zone.zoneRecords>[0]
+        );
         const items: Body["items"] = {};
         for (const record of records) {
             if (!record.draft) continue;
-            items[`${record.type} ${record.name} ${record.id}`] = { id: record.id, ...record.draft };
+            items[`${record.type} ${record.name} ${record.id}`] = {
+                id: record.id,
+                ...record.draft
+            };
         }
         return { items };
     },
@@ -203,7 +271,8 @@ const dns: Adapter = {
         const wanted = Object.values(body.items) as Array<{ id: string } & Record<string, unknown>>;
         const wantedIds = new Set(wanted.map((item) => item.id));
         for (const record of records) {
-            if (record.draft && !wantedIds.has(record.id)) await zone.deleteZoneRecord(scope, record.id, false);
+            if (record.draft && !wantedIds.has(record.id))
+                await zone.deleteZoneRecord(scope, record.id, false);
         }
         const live = new Set(records.map((record) => record.id));
         for (const { id, ...draft } of wanted) {
@@ -262,9 +331,15 @@ async function prune(kind: string, objectKey: string): Promise<void> {
 /** Instance-wide age sweep, for the scheduled retention pass. Bounded per call. */
 export async function pruneOldRestorePoints(now = new Date()): Promise<{ removed: number }> {
     const cutoff = new Date(now.getTime() - core.MAX_AGE_DAYS * 86_400_000);
-    const old = await prisma.restorePoint.findMany({ where: { createdAt: { lt: cutoff } }, select: { id: true }, take: 1000 });
+    const old = await prisma.restorePoint.findMany({
+        where: { createdAt: { lt: cutoff } },
+        select: { id: true },
+        take: 1000
+    });
     if (old.length === 0) return { removed: 0 };
-    const { count } = await prisma.restorePoint.deleteMany({ where: { id: { in: old.map((row) => row.id) } } });
+    const { count } = await prisma.restorePoint.deleteMany({
+        where: { id: { in: old.map((row) => row.id) } }
+    });
     return { removed: count };
 }
 
@@ -278,7 +353,10 @@ export interface RestorePointView {
 }
 
 /** The object's timeline, newest first, each with its diff against the present. */
-export async function listRestorePoints(kind: core.RestorePointKind, objectKey: string): Promise<RestorePointView[]> {
+export async function listRestorePoints(
+    kind: core.RestorePointKind,
+    objectKey: string
+): Promise<RestorePointView[]> {
     const [points, current] = await Promise.all([
         prisma.restorePoint.findMany({
             where: { kind, objectKey },
@@ -287,9 +365,14 @@ export async function listRestorePoints(kind: core.RestorePointKind, objectKey: 
         }),
         ADAPTERS[kind].capture(objectKey)
     ]);
-    const actorIds = [...new Set(points.flatMap((point) => (point.actorId ? [point.actorId] : [])))];
+    const actorIds = [
+        ...new Set(points.flatMap((point) => (point.actorId ? [point.actorId] : [])))
+    ];
     const actors = actorIds.length
-        ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+        ? await prisma.user.findMany({
+              where: { id: { in: actorIds } },
+              select: { id: true, name: true }
+          })
         : [];
     const names = new Map(actors.map((actor) => [actor.id, actor.name]));
     return points.map((point) => ({

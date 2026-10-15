@@ -16,8 +16,12 @@ const spanish = translatorFor("es-ES", "deploy");
 describe("the template picker's words", () => {
     it("says every template in English as the template does", () => {
         for (const template of SERVICE_TEMPLATES) {
-            expect(english(`view.template.catalog.${template.id}.description`)).toBe(template.description);
-            expect(english(`view.template.catalog.${template.id}.firstRun`)).toBe(template.firstRun);
+            expect(english(`view.template.catalog.${template.id}.description`)).toBe(
+                template.description
+            );
+            expect(english(`view.template.catalog.${template.id}.firstRun`)).toBe(
+                template.firstRun
+            );
         }
     });
 
@@ -25,10 +29,13 @@ describe("the template picker's words", () => {
         for (const template of SERVICE_TEMPLATES) {
             const description = spanish(`view.template.catalog.${template.id}.description`);
             const firstRun = spanish(`view.template.catalog.${template.id}.firstRun`);
-            expect(description, template.id).not.toBe(`view.template.catalog.${template.id}.description`);
+            expect(description, template.id).not.toBe(
+                `view.template.catalog.${template.id}.description`
+            );
             expect(description.trim(), template.id).not.toBe("");
             for (const key of template.secrets) {
-                if (template.firstRun.includes(key)) expect(firstRun, `${template.id}: ${key}`).toContain(key);
+                if (template.firstRun.includes(key))
+                    expect(firstRun, `${template.id}: ${key}`).toContain(key);
             }
         }
     });

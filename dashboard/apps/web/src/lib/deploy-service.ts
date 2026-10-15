@@ -254,7 +254,10 @@ export async function listProjects(userId: string, orgId: string | null) {
         orderBy: { createdAt: "asc" },
         include: {
             environments: {
-                include: { applications: { where: { binnedAt: null }, include: { domains: true } }, databases: { where: { binnedAt: null } } },
+                include: {
+                    applications: { where: { binnedAt: null }, include: { domains: true } },
+                    databases: { where: { binnedAt: null } }
+                },
                 orderBy: { createdAt: "asc" }
             }
         }
@@ -275,7 +278,8 @@ export async function listProjectScopes(ownerId: string) {
                 select: {
                     id: true,
                     name: true,
-                    applications: { where: { binnedAt: null },
+                    applications: {
+                        where: { binnedAt: null },
                         select: { id: true, name: true },
                         orderBy: { createdAt: "asc" }
                     }
@@ -291,7 +295,10 @@ export async function getProject(projectId: string, ownerId: string) {
         where: { id: projectId, ...(await visibleProjectWhere(ownerId)) },
         include: {
             environments: {
-                include: { applications: { where: { binnedAt: null } }, databases: { where: { binnedAt: null } } },
+                include: {
+                    applications: { where: { binnedAt: null } },
+                    databases: { where: { binnedAt: null } }
+                },
                 orderBy: { createdAt: "asc" }
             }
         }
@@ -305,7 +312,8 @@ export async function getProjectFull(projectId: string, ownerId: string) {
         include: {
             environments: {
                 include: {
-                    applications: { where: { binnedAt: null },
+                    applications: {
+                        where: { binnedAt: null },
                         include: {
                             domains: true,
                             target: true,
@@ -315,7 +323,10 @@ export async function getProjectFull(projectId: string, ownerId: string) {
                     // The child count comes along so the screen can say, before an
                     // instance is removed, that the databases hosted inside it go
                     // with it - the one thing about this that is not recoverable.
-                    databases: { where: { binnedAt: null }, include: { _count: { select: { children: true } } } }
+                    databases: {
+                        where: { binnedAt: null },
+                        include: { _count: { select: { children: true } } }
+                    }
                 },
                 orderBy: { createdAt: "asc" }
             }
@@ -493,8 +504,14 @@ export async function getVolumeOwner(
 async function tearDownEnvironment(environmentId: string, ownerId: string): Promise<void> {
     // Whatever of it sits in the recycle bin goes too: its data is on the same
     // servers, and the rows are about to cascade away with the environment.
-    await prisma.application.updateMany({ where: { environmentId }, data: { binnedAt: null, binnedById: null } });
-    await prisma.managedDatabase.updateMany({ where: { environmentId }, data: { binnedAt: null, binnedById: null } });
+    await prisma.application.updateMany({
+        where: { environmentId },
+        data: { binnedAt: null, binnedById: null }
+    });
+    await prisma.managedDatabase.updateMany({
+        where: { environmentId },
+        data: { binnedAt: null, binnedById: null }
+    });
     const [databases, applications] = await Promise.all([
         prisma.managedDatabase.findMany({
             where: { environmentId },
@@ -1860,7 +1877,8 @@ async function keepRoutesOf(domainId: string, ownerId: string): Promise<void> {
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
         select: { applicationId: true }
     });
-    if (row) await restorePoints.capture("routes", restorePoints.restoreKeys.routes(row.applicationId));
+    if (row)
+        await restorePoints.capture("routes", restorePoints.restoreKeys.routes(row.applicationId));
 }
 
 export async function removeApplicationDomain(domainId: string, ownerId: string): Promise<void> {

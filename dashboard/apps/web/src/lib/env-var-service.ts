@@ -215,8 +215,14 @@ export async function promoteEnvVar(input: {
 }): Promise<boolean> {
     await assertOwnsScope("application", input.serviceId, input.serviceOwnerId);
     await assertOwnsScope("environment", input.environmentId, input.environmentOwnerId);
-    await restorePoints.capture("env", restorePoints.restoreKeys.env("environment", input.environmentId));
-    await restorePoints.capture("env", restorePoints.restoreKeys.env("application", input.serviceId));
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env("environment", input.environmentId)
+    );
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env("application", input.serviceId)
+    );
     const shared = storedValue(input.value, input.isSecret);
     const reference = storedValue(`\${{shared.${input.key}}}`, false);
     try {

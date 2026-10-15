@@ -9,10 +9,14 @@ import { canonical } from "@/lib/restore-points/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const APP = "00000000-0000-7000-8000-0000000000aa";
-const ACTOR = { id: "00000000-0000-7000-8000-0000000000bb", ownerId: "00000000-0000-7000-8000-0000000000bb" };
+const ACTOR = {
+    id: "00000000-0000-7000-8000-0000000000bb",
+    ownerId: "00000000-0000-7000-8000-0000000000bb"
+};
 
 const calls: { readonly name: string; readonly args: unknown }[] = [];
-let point: { id: string; kind: string; objectKey: string; body: string; createdAt: Date } | null = null;
+let point: { id: string; kind: string; objectKey: string; body: string; createdAt: Date } | null =
+    null;
 let statusDomains: string[] = [];
 
 const prisma = new Proxy(
@@ -39,8 +43,18 @@ const prisma = new Proxy(
 const zone = {
     zoneRecords: vi.fn(async () => ({
         records: [
-            { id: "a".repeat(32), type: "A", name: "www", draft: { type: "A", name: "www", content: "192.0.2.1" } },
-            { id: "b".repeat(32), type: "A", name: "old", draft: { type: "A", name: "old", content: "192.0.2.2" } }
+            {
+                id: "a".repeat(32),
+                type: "A",
+                name: "www",
+                draft: { type: "A", name: "www", content: "192.0.2.1" }
+            },
+            {
+                id: "b".repeat(32),
+                type: "A",
+                name: "old",
+                draft: { type: "A", name: "old", content: "192.0.2.2" }
+            }
         ]
     })),
     saveZoneRecord: vi.fn(async () => undefined),
@@ -80,17 +94,34 @@ describe("restoring a point", () => {
             "A new": { id: "c".repeat(32), type: "A", name: "new", content: "192.0.2.3" }
         });
         await restorePoints.restorePoint("point-1", { kind: "dns", objectKey: key }, ACTOR);
-        expect(zone.deleteZoneRecord).toHaveBeenCalledWith(expect.anything(), "b".repeat(32), false);
+        expect(zone.deleteZoneRecord).toHaveBeenCalledWith(
+            expect.anything(),
+            "b".repeat(32),
+            false
+        );
         expect(zone.saveZoneRecord).toHaveBeenCalledTimes(2);
-        for (const call of zone.saveZoneRecord.mock.calls as unknown[][]) expect(call[3]).toBe(false);
+        for (const call of zone.saveZoneRecord.mock.calls as unknown[][])
+            expect(call[3]).toBe(false);
         expect(created()).toHaveLength(1);
         expect((created()[0]?.args as { data: { reason: string } }).data.reason).toBe("restore");
     });
 
     it("keeps one point for a service's scheduled jobs", async () => {
         storedPoint("cron", APP, {
-            one: { name: "one", schedule: "* * * * *", timezone: "UTC", command: "true", enabled: true },
-            two: { name: "two", schedule: "0 * * * *", timezone: "UTC", command: "true", enabled: true }
+            one: {
+                name: "one",
+                schedule: "* * * * *",
+                timezone: "UTC",
+                command: "true",
+                enabled: true
+            },
+            two: {
+                name: "two",
+                schedule: "0 * * * *",
+                timezone: "UTC",
+                command: "true",
+                enabled: true
+            }
         });
         await restorePoints.restorePoint("point-1", { kind: "cron", objectKey: APP }, ACTOR);
         expect(saveServiceCron).toHaveBeenCalledTimes(2);

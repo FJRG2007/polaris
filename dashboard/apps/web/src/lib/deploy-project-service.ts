@@ -843,7 +843,8 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
             environments: {
                 orderBy: { createdAt: "asc" },
                 include: {
-                    applications: { where: { binnedAt: null },
+                    applications: {
+                        where: { binnedAt: null },
                         select: {
                             id: true,
                             name: true,
@@ -851,7 +852,10 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
                             volumes: { select: { id: true } }
                         }
                     },
-                    databases: { where: { binnedAt: null }, select: { id: true, name: true, status: true } }
+                    databases: {
+                        where: { binnedAt: null },
+                        select: { id: true, name: true, status: true }
+                    }
                 }
             }
         }
@@ -1003,7 +1007,8 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
             environments: {
                 orderBy: { createdAt: "asc" },
                 include: {
-                    applications: { where: { binnedAt: null },
+                    applications: {
+                        where: { binnedAt: null },
                         orderBy: { createdAt: "asc" },
                         include: {
                             volumes: true,

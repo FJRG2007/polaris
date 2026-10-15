@@ -184,7 +184,11 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
                 {/* The tab's own heading says what this is; this one only names the list. */}
                 <p className="text-sm font-medium">{t("cron.title")}</p>
                 <div className="flex flex-wrap items-center gap-2">
-                    <RestoreHistoryButton target={{ kind: "cron", applicationId }} canRestore={manage} onRestored={reload} />
+                    <RestoreHistoryButton
+                        target={{ kind: "cron", applicationId }}
+                        canRestore={manage}
+                        onRestored={reload}
+                    />
                     {manage && !draft && (
                         <Button size="sm" onClick={() => setDraft(emptyDraft())}>
                             <Plus className="size-4" /> {t("cron.newJob")}

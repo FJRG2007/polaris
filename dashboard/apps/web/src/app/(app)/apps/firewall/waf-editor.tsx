@@ -595,7 +595,9 @@ export function WafEditor({
                 />
                 <RestoreHistoryButton
                     target={{ kind: "firewall", scopeType, scopeId }}
-                    canRestore={scopeType === "polaris" || scopeType === "global" ? canOperate : true}
+                    canRestore={
+                        scopeType === "polaris" || scopeType === "global" ? canOperate : true
+                    }
                     onRestored={() => setRevision((value) => value + 1)}
                 />
             </div>

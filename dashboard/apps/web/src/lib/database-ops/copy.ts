@@ -121,7 +121,13 @@ export async function copyInto(
     const operation = await startOperation(databaseId, "copy", actorId);
     const run = (async () => {
         try {
-            await safetyCopy(databaseId, ownerId, actorId, operation, options.alwaysBackUp === true);
+            await safetyCopy(
+                databaseId,
+                ownerId,
+                actorId,
+                operation,
+                options.alwaysBackUp === true
+            );
             if (from) await copyFromManaged(from, into, ownerId, operation);
             else if (external) await copyFromExternal(external, into, operation);
             else if (saved) await copyFromSaved(saved, into, operation);

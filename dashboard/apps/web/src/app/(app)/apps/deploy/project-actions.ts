@@ -64,7 +64,11 @@ import {
 const DEPLOY_PATH = "/apps/deploy";
 
 /** What a token that may change things can do through the Deploy API. */
-const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = ["deploy.run", "variables.write", "domains.manage"];
+const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = [
+    "deploy.run",
+    "variables.write",
+    "domains.manage"
+];
 
 /** The one shape every action here answers with, so a caller never has to guess
  *  whether a missing `error` means success or a field it forgot to read. */
@@ -79,7 +83,8 @@ async function attempt<T>(
     try {
         return await body();
     } catch (caught) {
-        if (caught instanceof promotion.PromotionRefusal) return { error: await reply(caught.key, caught.params) };
+        if (caught instanceof promotion.PromotionRefusal)
+            return { error: await reply(caught.key, caught.params) };
         return { error: caught instanceof Error ? caught.message : await reply(fallback) };
     }
 }
@@ -192,7 +197,8 @@ export async function renameEnvironmentAction(input: {
     return attempt("environment.renameFailed", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentNameSchema.safeParse(input);
-        if (!parsed.success) return { error: await firstIssue(parsed.error, "environment.checkName") };
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkName") };
         const access = await requireEnvironmentAccess(
             parsed.data.environmentId,
             user.id,
@@ -382,7 +388,10 @@ export async function createProjectTokenAction(
         );
         // A token acts with its minter's access and never more, so one that may
         // change things is only minted by somebody who can change something here.
-        if (parsed.data.canManage && !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))) {
+        if (
+            parsed.data.canManage &&
+            !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))
+        ) {
             return {
                 error: await reply("tokens.beyondYourAccess")
             };
@@ -829,7 +838,11 @@ export async function setEnvironmentStageAction(input: {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentStageSchema.safeParse(input);
         if (!parsed.success) return { error: await reply("common.pickOption") };
-        const access = await requireEnvironmentAccess(parsed.data.environmentId, user.id, "project.settings");
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "project.settings"
+        );
         await prisma.environment.update({
             where: { id: parsed.data.environmentId },
             data: { stage: parsed.data.stage }
@@ -840,7 +853,11 @@ export async function setEnvironmentStageAction(input: {
 }
 
 /** What the dialog sends; the data stays out unless it says otherwise. */
-type PromotionRequest = { sourceEnvironmentId: string; targetEnvironmentId: string; includeData?: boolean };
+type PromotionRequest = {
+    sourceEnvironmentId: string;
+    targetEnvironmentId: string;
+    includeData?: boolean;
+};
 
 /**
  * Who may promote: deploying into the target, being allowed into the source
@@ -849,8 +866,13 @@ type PromotionRequest = { sourceEnvironmentId: string; targetEnvironmentId: stri
  * with the same checks, so the dialog offers only what the action allows.
  */
 async function promotionAccess(input: EnvironmentPromotionInput, userId: string) {
-    const access = await requireEnvironmentAccess(input.targetEnvironmentId, userId, "project.read");
-    if (!accessInEnvironment(access, input.sourceEnvironmentId)) throw new Error(await reply("environment.notFound"));
+    const access = await requireEnvironmentAccess(
+        input.targetEnvironmentId,
+        userId,
+        "project.read"
+    );
+    if (!accessInEnvironment(access, input.sourceEnvironmentId))
+        throw new Error(await reply("environment.notFound"));
     return {
         access,
         canDeploy: accessCan(access, "deploy.run"),
@@ -864,7 +886,8 @@ export async function previewPromotionAction(
     return attempt("environment.promoteFailed", async () => {
         const user = await requirePermission("deploy.read");
         const parsed = environmentPromotionSchema.safeParse(input);
-        if (!parsed.success) return { error: await firstIssue(parsed.error, "environment.checkDetails") };
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkDetails") };
         const { access, canDeploy, canCopyData } = await promotionAccess(parsed.data, user.id);
         const preview = await promotion.previewPromotion(
             access.projectId,
@@ -877,14 +900,18 @@ export async function previewPromotionAction(
 }
 
 /** Promote one environment into another; runs on, followed in the history. */
-export async function promoteEnvironmentAction(input: PromotionRequest): Promise<Result<{ id: string }>> {
+export async function promoteEnvironmentAction(
+    input: PromotionRequest
+): Promise<Result<{ id: string }>> {
     return attempt("environment.promoteFailed", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentPromotionSchema.safeParse(input);
-        if (!parsed.success) return { error: await firstIssue(parsed.error, "environment.checkDetails") };
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkDetails") };
         const { access, canDeploy, canCopyData } = await promotionAccess(parsed.data, user.id);
         if (!canDeploy) return { error: await reply("environment.promoteCannotDeploy") };
-        if (parsed.data.includeData && !canCopyData) return { error: await reply("environment.promoteCannotCopyData") };
+        if (parsed.data.includeData && !canCopyData)
+            return { error: await reply("environment.promoteCannotCopyData") };
         const started = await promotion.startPromotion({
             projectId: access.projectId,
             ownerId: access.ownerId,
@@ -899,7 +926,10 @@ export async function promoteEnvironmentAction(input: PromotionRequest): Promise
             action: "deploy.env.promote",
             targetType: "environment",
             targetId: parsed.data.targetEnvironmentId,
-            metadata: { from: parsed.data.sourceEnvironmentId, includeData: parsed.data.includeData }
+            metadata: {
+                from: parsed.data.sourceEnvironmentId,
+                includeData: parsed.data.includeData
+            }
         });
         refresh(access.projectId);
         return { id: started.id };

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { canonical, diffBodies, isDuplicate, hashOf, parseBody, prunable } from "@/lib/restore-points/core";
+import {
+    canonical,
+    diffBodies,
+    isDuplicate,
+    hashOf,
+    parseBody,
+    prunable
+} from "@/lib/restore-points/core";
 
 describe("restore point diff", () => {
     it("says what restoring a point would bring back, take away and change", () => {
@@ -13,8 +20,15 @@ describe("restore point diff", () => {
     });
 
     it("never shows a secret in clear on either side", () => {
-        const changes = diffBodies({ items: { KEY: { envelope: "old" } } }, { items: { KEY: { envelope: "new" } } });
-        expect(changes[0]?.fields[0]).toEqual({ field: "envelope", before: "********", after: "********" });
+        const changes = diffBodies(
+            { items: { KEY: { envelope: "old" } } },
+            { items: { KEY: { envelope: "new" } } }
+        );
+        expect(changes[0]?.fields[0]).toEqual({
+            field: "envelope",
+            before: "********",
+            after: "********"
+        });
     });
 
     it("finds nothing to restore in a point equal to the present", () => {

@@ -133,7 +133,9 @@ export class HostdPorts implements RuntimePorts {
     public async imageRepoDigests(imageId: string): Promise<string[]> {
         const response = await this.client.dockerRequest("GET", "/system/df?type=image");
         if (response.status < 200 || response.status >= 300) return [];
-        const parsed = JSON.parse(response.body) as { Images?: { Id?: unknown; RepoDigests?: unknown }[] | null };
+        const parsed = JSON.parse(response.body) as {
+            Images?: { Id?: unknown; RepoDigests?: unknown }[] | null;
+        };
         const image = (parsed.Images ?? []).find((entry) => entry.Id === imageId);
         return Array.isArray(image?.RepoDigests)
             ? image.RepoDigests.filter((digest): digest is string => typeof digest === "string")

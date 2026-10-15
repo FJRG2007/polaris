@@ -123,12 +123,21 @@ export interface StartImportInput {
 /** Record the import and start it. Answers its id; refuses while another runs. */
 export async function startCpanelImport(input: StartImportInput): Promise<string> {
     const running = await prisma.deployImport.findFirst({
-        where: { ownerId: input.ownerId, status: "running", updatedAt: { gte: new Date(Date.now() - STALE_MS) } },
+        where: {
+            ownerId: input.ownerId,
+            status: "running",
+            updatedAt: { gte: new Date(Date.now() - STALE_MS) }
+        },
         select: { id: true }
     });
     if (running) throw new ImportBusy();
     const row = await prisma.deployImport.create({
-        data: { ownerId: input.ownerId, orgId: input.orgId, actorId: input.actorId, source: "cpanel" },
+        data: {
+            ownerId: input.ownerId,
+            orgId: input.orgId,
+            actorId: input.actorId,
+            source: "cpanel"
+        },
         select: { id: true }
     });
     void runImport(row.id, input);
@@ -150,7 +159,10 @@ async function runImport(id: string, input: StartImportInput): Promise<void> {
             projectId: result.projectId,
             result: {
                 ...result,
-                warnings: result.warnings.map((warning) => ({ code: warning.code, ...(warning.name ? { name: warning.name } : {}) }))
+                warnings: result.warnings.map((warning) => ({
+                    code: warning.code,
+                    ...(warning.name ? { name: warning.name } : {})
+                }))
             },
             finishedAt: new Date()
         });
@@ -160,8 +172,14 @@ async function runImport(id: string, input: StartImportInput): Promise<void> {
             action: "deploy.project.import",
             targetType: "project",
             targetId: result.projectId,
-            metadata: { services: result.services, databases: result.databases, domains: result.domains.length }
-        }).catch((error: unknown) => console.error("panel-import: the import was not audited:", error));
+            metadata: {
+                services: result.services,
+                databases: result.databases,
+                domains: result.domains.length
+            }
+        }).catch((error: unknown) =>
+            console.error("panel-import: the import was not audited:", error)
+        );
     } catch (error) {
         // A refusal is kept as its code and worded for whoever reads it; anything else
         // names internals, so it stays in the log.

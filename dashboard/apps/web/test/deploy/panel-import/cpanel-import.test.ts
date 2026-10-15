@@ -18,36 +18,48 @@ let scratch = "";
 let plan: CpanelPlan;
 const events: string[] = [];
 
-const createProject = vi.fn(async (_owner: string, name: string, _org: string | null, _mode?: string) => {
-    events.push(`project ${name}`);
-    return { id: "project-1", environments: [{ id: "env-1" }] };
-});
+const createProject = vi.fn(
+    async (_owner: string, name: string, _org: string | null, _mode?: string) => {
+        events.push(`project ${name}`);
+        return { id: "project-1", environments: [{ id: "env-1" }] };
+    }
+);
 const createApplication = vi.fn(async (_owner: string, input: { name: string }) => {
     events.push(`service ${input.name}`);
     return { id: `app-${input.name}` };
 });
-const addApplicationDomain = vi.fn(async (id: string, _owner: string, opts: { hostname: string }) => {
-    if (opts.hostname === "taken.test") throw new Error("taken");
-    events.push(`domain ${opts.hostname} -> ${id}`);
-    return opts.hostname;
-});
+const addApplicationDomain = vi.fn(
+    async (id: string, _owner: string, opts: { hostname: string }) => {
+        if (opts.hostname === "taken.test") throw new Error("taken");
+        events.push(`domain ${opts.hostname} -> ${id}`);
+        return opts.hostname;
+    }
+);
 const deployApplication = vi.fn(async (id: string) => {
     events.push(`deploy ${id}`);
     return "deployment";
 });
-const createDatabase = vi.fn(async (_owner: string, input: { name: string; instanceId?: string }) => {
-    events.push(`database ${input.name}${input.instanceId ? ` in ${input.instanceId}` : ""}`);
-    return { id: `db-${input.name}` };
-});
-const deployDatabaseAndWait = vi.fn(async (_id: string, _owner: string, _actor: string): Promise<string | null> => null);
+const createDatabase = vi.fn(
+    async (_owner: string, input: { name: string; instanceId?: string }) => {
+        events.push(`database ${input.name}${input.instanceId ? ` in ${input.instanceId}` : ""}`);
+        return { id: `db-${input.name}` };
+    }
+);
+const deployDatabaseAndWait = vi.fn(
+    async (_id: string, _owner: string, _actor: string): Promise<string | null> => null
+);
 const restoreDumpInto = vi.fn(async (context: { id: string }, file: { local: string }) => {
     expect((await stat(file.local)).size).toBeGreaterThan(0);
     events.push(`load ${context.id}`);
 });
-const storeSourceFolder = vi.fn(async (id: string, _owner: string, dir: string, _name: string, counted: { files: number }) => {
-    events.push(`source ${id} ${dir.slice(scratch.length).replace(/\\/g, "/")} ${counted.files}`);
-    return {};
-});
+const storeSourceFolder = vi.fn(
+    async (id: string, _owner: string, dir: string, _name: string, counted: { files: number }) => {
+        events.push(
+            `source ${id} ${dir.slice(scratch.length).replace(/\\/g, "/")} ${counted.files}`
+        );
+        return {};
+    }
+);
 
 const deleteProject = vi.fn(async (id: string) => void events.push(`delete project ${id}`));
 const deleteApplication = vi.fn(async (id: string) => void events.push(`delete service ${id}`));
@@ -71,9 +83,16 @@ const databaseConnection = vi.fn(async (id: string) => ({
     password: "pa'ss",
     uri: `mysql://polaris_user:x@mysql-${id}:3306/db`
 }));
-const setEnvVars = vi.fn(async (_scope: string, _id: string, _owner: string, vars: Array<{ key: string }>) => vars.length);
+const setEnvVars = vi.fn(
+    async (_scope: string, _id: string, _owner: string, vars: Array<{ key: string }>) => vars.length
+);
 
-vi.mock("@/lib/database-service", () => ({ createDatabase, deployDatabaseAndWait, deleteDatabase, databaseConnection }));
+vi.mock("@/lib/database-service", () => ({
+    createDatabase,
+    deployDatabaseAndWait,
+    deleteDatabase,
+    databaseConnection
+}));
 vi.mock("@/lib/env-var-service", () => ({ setEnvVars }));
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -83,7 +102,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/deploy/source-upload", () => ({ storeSourceFolder }));
-vi.mock("@/lib/deploy-target-service", () => ({ getOrCreateLocalTarget: async () => ({ id: "target-1" }) }));
+vi.mock("@/lib/deploy-target-service", () => ({
+    getOrCreateLocalTarget: async () => ({ id: "target-1" })
+}));
 vi.mock("@/lib/deploy/service-networks", () => ({ NEW_ENVIRONMENT_NETWORK_MODE: "environment" }));
 vi.mock("@/lib/database-ops/restore", () => ({ restoreDumpInto }));
 vi.mock("@/lib/database-ops/ops", () => ({
@@ -94,9 +115,16 @@ vi.mock("@/lib/deploy/panel-import/cpanel", () => ({
     inspectCpanelBackup: async () => ({ dir: scratch, root: join(scratch, "backup"), plan })
 }));
 
-const { importCpanelBackup, pickDatabase, rollbackScope } = await import("@/lib/deploy/panel-import/import");
+const { importCpanelBackup, pickDatabase, rollbackScope } = await import(
+    "@/lib/deploy/panel-import/import"
+);
 
-const input = (orgId: string | null = null) => ({ archive: "backup.tar.gz", ownerId: OWNER, orgId, actorId: OWNER });
+const input = (orgId: string | null = null) => ({
+    archive: "backup.tar.gz",
+    ownerId: OWNER,
+    orgId,
+    actorId: OWNER
+});
 
 beforeEach(async () => {
     events.length = 0;
@@ -160,7 +188,11 @@ describe("importCpanelBackup", () => {
             { code: "domainTaken", name: "taken.test" },
             { code: "folderMissing", name: "gone.test" }
         ]);
-        expect(createDatabase.mock.calls[0]?.[1]).toMatchObject({ engine: "mysql", databaseName: "acct_shop", environmentId: "env-1" });
+        expect(createDatabase.mock.calls[0]?.[1]).toMatchObject({
+            engine: "mysql",
+            databaseName: "acct_shop",
+            environmentId: "env-1"
+        });
         await expect(stat(scratch)).rejects.toThrow();
     });
 
@@ -175,7 +207,10 @@ describe("importCpanelBackup", () => {
     it("picks another project name when the first is taken", async () => {
         createProject.mockRejectedValueOnce(Object.assign(new Error("unique"), { code: "P2002" }));
         await importCpanelBackup(input("org-1"));
-        expect(createProject.mock.calls.map((call) => call[1])).toEqual(["main.test", "main.test 2"]);
+        expect(createProject.mock.calls.map((call) => call[1])).toEqual([
+            "main.test",
+            "main.test 2"
+        ]);
         expect(createProject.mock.calls[1]?.[2]).toBe("org-1");
     });
 
@@ -188,7 +223,11 @@ describe("importCpanelBackup", () => {
 
     it("takes the whole project back when a site cannot be made", async () => {
         storeSourceFolder.mockRejectedValueOnce(new Error("disk full"));
-        present = { environments: 1, applications: ["app-main.test"], databases: ["db-acct_shop", "db-acct_wp"] };
+        present = {
+            environments: 1,
+            applications: ["app-main.test"],
+            databases: ["db-acct_shop", "db-acct_wp"]
+        };
         await expect(importCpanelBackup(input())).rejects.toThrow("disk full");
         expect(events.at(-1)).toBe("delete project project-1");
         expect(deleteApplication).not.toHaveBeenCalled();
@@ -197,10 +236,18 @@ describe("importCpanelBackup", () => {
 
     it("keeps a project somebody added to, removing only what the import made", async () => {
         storeSourceFolder.mockRejectedValueOnce(new Error("disk full"));
-        present = { environments: 1, applications: ["app-main.test", "app-theirs"], databases: ["db-acct_shop", "db-acct_wp"] };
+        present = {
+            environments: 1,
+            applications: ["app-main.test", "app-theirs"],
+            databases: ["db-acct_shop", "db-acct_wp"]
+        };
         await expect(importCpanelBackup(input())).rejects.toThrow("disk full");
         expect(deleteProject).not.toHaveBeenCalled();
-        expect(events.slice(-3)).toEqual(["delete service app-main.test", "delete database db-acct_wp", "delete database db-acct_shop"]);
+        expect(events.slice(-3)).toEqual([
+            "delete service app-main.test",
+            "delete database db-acct_wp",
+            "delete database db-acct_shop"
+        ]);
     });
 
     it("has nothing to take back when the project was never made", async () => {
@@ -213,11 +260,17 @@ describe("importCpanelBackup", () => {
 describe("rollbackScope", () => {
     const made = { projectId: "p", applications: ["a"], databases: ["d"] };
     it("takes the project when it holds only what the import made", () => {
-        expect(rollbackScope(made, { environments: 1, applications: ["a"], databases: [] })).toBe("project");
+        expect(rollbackScope(made, { environments: 1, applications: ["a"], databases: [] })).toBe(
+            "project"
+        );
     });
     it("keeps it when anything else is in it", () => {
-        expect(rollbackScope(made, { environments: 1, applications: ["a"], databases: ["d", "x"] })).toBe("own");
-        expect(rollbackScope(made, { environments: 2, applications: ["a"], databases: ["d"] })).toBe("own");
+        expect(
+            rollbackScope(made, { environments: 1, applications: ["a"], databases: ["d", "x"] })
+        ).toBe("own");
+        expect(
+            rollbackScope(made, { environments: 2, applications: ["a"], databases: ["d"] })
+        ).toBe("own");
     });
 });
 
@@ -249,14 +302,24 @@ describe("pointing a site at its database", () => {
         expect(stored).toContain("// define( 'DB_NAME', 'commented' );");
         expect(stored).toContain("$table_prefix = 'wp_';");
         const call = setEnvVars.mock.calls.find((args) => args[1] === "app-main.test");
-        expect(call?.[3].map((entry) => entry.key)).toEqual(["DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DATABASE_URL"]);
+        expect(call?.[3].map((entry) => entry.key)).toEqual([
+            "DB_HOST",
+            "DB_PORT",
+            "DB_NAME",
+            "DB_USER",
+            "DB_PASSWORD",
+            "DATABASE_URL"
+        ]);
         // The addon site has no config and two databases to choose from: left alone, quietly.
         expect(setEnvVars.mock.calls.some((args) => args[1] === "app-addon.test")).toBe(false);
         expect(result.warnings.some((warning) => warning.code === "databaseUnlinked")).toBe(false);
     });
 
     it("warns when the config names a database that did not come over", async () => {
-        await writeFile(join(scratch, "backup", "homedir", "public_html", "wp-config.php"), WP.replace("acct_wp", "other"));
+        await writeFile(
+            join(scratch, "backup", "homedir", "public_html", "wp-config.php"),
+            WP.replace("acct_wp", "other")
+        );
         const result = await importCpanelBackup(input());
         expect(result.warnings).toContainEqual({ code: "databaseUnlinked", name: "main.test" });
     });

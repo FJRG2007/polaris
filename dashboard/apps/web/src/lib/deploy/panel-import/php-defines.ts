@@ -23,7 +23,17 @@ interface Token {
 
 const IDENT_START = /[A-Za-z_\u0080-￿]/;
 const IDENT_PART = /[A-Za-z0-9_\u0080-￿]/;
-const DOUBLE_ESCAPES: Record<string, string> = { n: "\n", t: "\t", r: "\r", v: "\v", e: "\x1b", f: "\f", "\\": "\\", $: "$", '"': '"' };
+const DOUBLE_ESCAPES: Record<string, string> = {
+    n: "\n",
+    t: "\t",
+    r: "\r",
+    v: "\v",
+    e: "\x1b",
+    f: "\f",
+    "\\": "\\",
+    $: "$",
+    '"': '"'
+};
 
 /** Where the PHP after `?>` starts again, or the end of the file. */
 function nextOpenTag(source: string, from: number): number {
@@ -60,7 +70,8 @@ function doubleQuoted(source: string, start: number): Token {
         const char = source[at] as string;
         if (char === "\\" && at + 1 < source.length) {
             const next = source[at + 1] as string;
-            if (value !== undefined) value += DOUBLE_ESCAPES[next] ?? (next === quote ? next : `\\${next}`);
+            if (value !== undefined)
+                value += DOUBLE_ESCAPES[next] ?? (next === quote ? next : `\\${next}`);
             at += 2;
             continue;
         }
@@ -69,12 +80,20 @@ function doubleQuoted(source: string, start: number): Token {
         at += 1;
     }
     const end = Math.min(at + 1, source.length);
-    return { kind: "string", start, end, text: source.slice(start, end), ...(quote === '"' && value !== undefined ? { value } : {}) };
+    return {
+        kind: "string",
+        start,
+        end,
+        text: source.slice(start, end),
+        ...(quote === '"' && value !== undefined ? { value } : {})
+    };
 }
 
 /** A heredoc or nowdoc from its `<<<`, to the end of its closing label. */
 function heredoc(source: string, start: number): Token | null {
-    const opening = /^<<<[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1\r?\n/.exec(source.slice(start, start + 256));
+    const opening = /^<<<[ \t]*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1\r?\n/.exec(
+        source.slice(start, start + 256)
+    );
     if (!opening) return null;
     const label = opening[2] as string;
     const closing = new RegExp(`^[ \\t]*${label}(?![A-Za-z0-9_])`, "m");
@@ -148,9 +167,19 @@ export function findDefines(source: string): DefineCall[] {
         const token = tokens[index] as Token;
         if (token.kind !== "ident" || token.text.toLowerCase() !== "define") continue;
         const before = tokens[index - 1];
-        if (before && NOT_A_CALL.has(before.kind === "ident" ? before.text.toLowerCase() : before.text)) continue;
+        if (
+            before &&
+            NOT_A_CALL.has(before.kind === "ident" ? before.text.toLowerCase() : before.text)
+        )
+            continue;
         const [open, name, comma] = [tokens[index + 1], tokens[index + 2], tokens[index + 3]];
-        if (open?.text !== "(" || name?.kind !== "string" || name.value === undefined || comma?.text !== ",") continue;
+        if (
+            open?.text !== "(" ||
+            name?.kind !== "string" ||
+            name.value === undefined ||
+            comma?.text !== ","
+        )
+            continue;
         // The second argument runs to the `,` or `)` that closes it at its own depth.
         let depth = 0;
         let last = index + 3;
@@ -165,7 +194,12 @@ export function findDefines(source: string): DefineCall[] {
         const first = tokens[index + 4] as Token;
         const end = (tokens[last] as Token).end;
         const only = last === index + 4 && first.kind === "string" && first.value !== undefined;
-        calls.push({ name: name.value, start: first.start, end, value: only ? (first.value as string) : null });
+        calls.push({
+            name: name.value,
+            start: first.start,
+            end,
+            value: only ? (first.value as string) : null
+        });
         index = last;
     }
     return calls;
@@ -178,11 +212,17 @@ export function phpLiteral(value: string): string {
 
 /** The file with every `define` of a name in `values` set to that value. Answers
  *  the names it changed; a name the file never defines is left out. */
-export function rewriteDefines(source: string, values: Readonly<Record<string, string>>): { text: string; changed: string[] } {
+export function rewriteDefines(
+    source: string,
+    values: Readonly<Record<string, string>>
+): { text: string; changed: string[] } {
     const calls = findDefines(source).filter((call) => Object.hasOwn(values, call.name));
     let text = source;
     for (const call of [...calls].reverse()) {
-        text = text.slice(0, call.start) + phpLiteral(values[call.name] as string) + text.slice(call.end);
+        text =
+            text.slice(0, call.start) +
+            phpLiteral(values[call.name] as string) +
+            text.slice(call.end);
     }
     return { text, changed: [...new Set(calls.map((call) => call.name))] };
 }

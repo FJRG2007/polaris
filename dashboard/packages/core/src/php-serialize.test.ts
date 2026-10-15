@@ -44,7 +44,9 @@ describe("replaceInStoredText", () => {
     it("walks a serialized value stored inside a serialized string", () => {
         const inner = `a:1:{i:0;${s(`https:${FROM}`)}}`;
         const innerAfter = `a:1:{i:0;${s(`https:${TO}`)}}`;
-        expect(replaceInStoredText(`a:1:{i:0;${s(inner)}}`, FROM, TO)).toBe(`a:1:{i:0;${s(innerAfter)}}`);
+        expect(replaceInStoredText(`a:1:{i:0;${s(inner)}}`, FROM, TO)).toBe(
+            `a:1:{i:0;${s(innerAfter)}}`
+        );
     });
 
     it("leaves a malformed serialized value untouched", () => {
@@ -58,7 +60,11 @@ describe("replaceInStoredText", () => {
     });
 
     it("keeps bytes that are not UTF-8", () => {
-        const latin = Buffer.concat([Buffer.from(`s:${FROM.length + 2}:"`, "latin1"), Buffer.from([0xe9, 0xff]), Buffer.from(`${FROM}";`, "latin1")]);
+        const latin = Buffer.concat([
+            Buffer.from(`s:${FROM.length + 2}:"`, "latin1"),
+            Buffer.from([0xe9, 0xff]),
+            Buffer.from(`${FROM}";`, "latin1")
+        ]);
         const out = replaceInStoredValue(latin, FROM, TO);
         expect(out.subarray(0, 4).toString("latin1")).toBe(`s:${TO.length + 2}`.slice(0, 4));
         expect(out.includes(Buffer.from([0xe9, 0xff]))).toBe(true);

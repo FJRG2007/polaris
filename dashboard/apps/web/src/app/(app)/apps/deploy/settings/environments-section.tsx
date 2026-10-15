@@ -96,7 +96,10 @@ export function EnvironmentsSection({
         if (stage === environment.stage) return;
         setError(null);
         startTransition(async () => {
-            const result = await setEnvironmentStageAction({ environmentId: environment.id, stage });
+            const result = await setEnvironmentStageAction({
+                environmentId: environment.id,
+                stage
+            });
             if (result.error) setError(result.error);
             else router.refresh();
         });
@@ -140,7 +143,8 @@ export function EnvironmentsSection({
                                             value={draft}
                                             onChange={(event) => setDraft(event.target.value)}
                                             onKeyDown={(event) => {
-                                                if (event.key === "Enter") commitRename(environment);
+                                                if (event.key === "Enter")
+                                                    commitRename(environment);
                                                 if (event.key === "Escape") setRenaming(null);
                                             }}
                                             className="h-8 max-w-56"
@@ -179,20 +183,25 @@ export function EnvironmentsSection({
                                                     {t("environments.default")}
                                                 </span>
                                             )}
-                                            {environment.pullRequest !== null && environment.previewRepo && (
-                                                <a
-                                                    href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    title={t("environments.openPullRequest")}
-                                                    className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
-                                                >
-                                                    {t("environments.previewOf", { number: environment.pullRequest })}
-                                                </a>
-                                            )}
+                                            {environment.pullRequest !== null &&
+                                                environment.previewRepo && (
+                                                    <a
+                                                        href={`https://github.com/${environment.previewRepo}/pull/${environment.pullRequest}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        title={t("environments.openPullRequest")}
+                                                        className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        {t("environments.previewOf", {
+                                                            number: environment.pullRequest
+                                                        })}
+                                                    </a>
+                                                )}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
-                                            {t("environments.services", { count: environment.serviceCount })}
+                                            {t("environments.services", {
+                                                count: environment.serviceCount
+                                            })}
                                             {environment.branch
                                                 ? t.rich("environments.follows", {
                                                       branch: environment.branch,
@@ -203,7 +212,9 @@ export function EnvironmentsSection({
                                                       )
                                                   })
                                                 : null}
-                                            {t("environments.created", { date: display.date(environment.createdAt) })}
+                                            {t("environments.created", {
+                                                date: display.date(environment.createdAt)
+                                            })}
                                         </p>
                                     </div>
                                 )}
@@ -215,7 +226,9 @@ export function EnvironmentsSection({
                                     size="icon"
                                     disabled={reachable.size < 2}
                                     onClick={() => setPromoting(environment)}
-                                    aria-label={t("environments.promoteNamed", { name: environment.name })}
+                                    aria-label={t("environments.promoteNamed", {
+                                        name: environment.name
+                                    })}
                                     title={
                                         reachable.size < 2
                                             ? t("environments.promoteNeedsTwo")
@@ -230,7 +243,9 @@ export function EnvironmentsSection({
                                     <Select
                                         value={environment.stage ?? "none"}
                                         onValueChange={(value) => setStage(environment, value)}
-                                        aria-label={t("environments.stageNamed", { name: environment.name })}
+                                        aria-label={t("environments.stageNamed", {
+                                            name: environment.name
+                                        })}
                                         className="h-8 w-36"
                                         options={[
                                             { value: "none", label: t("environments.stageNone") },
@@ -244,7 +259,9 @@ export function EnvironmentsSection({
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => startRename(environment)}
-                                        aria-label={t("environments.renameNamed", { name: environment.name })}
+                                        aria-label={t("environments.renameNamed", {
+                                            name: environment.name
+                                        })}
                                         title={t("environments.rename")}
                                     >
                                         <Pencil className="size-4" />
@@ -254,17 +271,27 @@ export function EnvironmentsSection({
                                         size="icon"
                                         disabled={environment.isDefault || pending}
                                         onClick={() => makeDefault(environment)}
-                                        aria-label={t("environments.makeDefaultNamed", { name: environment.name })}
-                                        title={environment.isDefault ? t("environments.alreadyDefault") : t("environments.makeDefault")}
+                                        aria-label={t("environments.makeDefaultNamed", {
+                                            name: environment.name
+                                        })}
+                                        title={
+                                            environment.isDefault
+                                                ? t("environments.alreadyDefault")
+                                                : t("environments.makeDefault")
+                                        }
                                     >
-                                        <Star className={`size-4 ${environment.isDefault ? "fill-current" : ""}`} />
+                                        <Star
+                                            className={`size-4 ${environment.isDefault ? "fill-current" : ""}`}
+                                        />
                                     </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
                                         disabled={environment.isDefault}
                                         onClick={() => setDeleting(environment)}
-                                        aria-label={t("environments.deleteNamed", { name: environment.name })}
+                                        aria-label={t("environments.deleteNamed", {
+                                            name: environment.name
+                                        })}
                                         title={
                                             environment.isDefault
                                                 ? t("environments.promoteFirst")
@@ -293,7 +320,9 @@ export function EnvironmentsSection({
             <NetworkingCard settings={settings} canManage={canManage} />
 
             <PromoteDialog
-                environments={settings.environments.filter((environment) => reachable.has(environment.id))}
+                environments={settings.environments.filter((environment) =>
+                    reachable.has(environment.id)
+                )}
                 canCopyData={promotion.canCopyData}
                 source={promoting}
                 onClose={() => {

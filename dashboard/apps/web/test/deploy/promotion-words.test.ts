@@ -8,7 +8,15 @@ import { describe, expect, it } from "vitest";
 import { ENVIRONMENT_STAGES } from "@polaris/core";
 import { translatorFor } from "@/lib/i18n/translate";
 
-const REASONS = ["missing", "engine", "dataFailed", "builtDifferently", "noImage", "otherRepository", "notDeployed"];
+const REASONS = [
+    "missing",
+    "engine",
+    "dataFailed",
+    "builtDifferently",
+    "noImage",
+    "otherRepository",
+    "notDeployed"
+];
 const STATUSES = ["running", "succeeded", "partial", "failed"];
 const OUTCOMES = ["deployed", "copied", "skipped", "failed"];
 

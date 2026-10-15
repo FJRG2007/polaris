@@ -40,7 +40,12 @@ import { setEnvVars } from "@/lib/env-var-service";
 import { findDefines, rewriteDefines } from "./php-defines";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
-import { inspectCpanelBackup, type CpanelPlan, type ImportDomain, type ImportWarning } from "./cpanel";
+import {
+    inspectCpanelBackup,
+    type CpanelPlan,
+    type ImportDomain,
+    type ImportWarning
+} from "./cpanel";
 
 /**
  * The port an imported site is served on. Nixpacks' PHP provider serves through
@@ -94,8 +99,11 @@ export interface ProjectContents {
 /** Whether the whole project can go, or only what the import made: anything in it
  *  the import did not make (somebody added a service while it ran) keeps it. */
 export function rollbackScope(made: MadeByImport, present: ProjectContents): "project" | "own" {
-    const ours = (ids: readonly string[], own: readonly string[]) => ids.every((id) => own.includes(id));
-    return present.environments <= 1 && ours(present.applications, made.applications) && ours(present.databases, made.databases)
+    const ours = (ids: readonly string[], own: readonly string[]) =>
+        ids.every((id) => own.includes(id));
+    return present.environments <= 1 &&
+        ours(present.applications, made.applications) &&
+        ours(present.databases, made.databases)
         ? "project"
         : "own";
 }
@@ -117,13 +125,19 @@ export async function rollBackImport(made: MadeByImport, ownerId: string): Promi
         databases: databases.map((row) => row.id)
     };
     const attempt = (what: string, run: () => Promise<unknown>) =>
-        run().catch((error: unknown) => console.error(`panel-import: could not take back ${what}:`, error));
+        run().catch((error: unknown) =>
+            console.error(`panel-import: could not take back ${what}:`, error)
+        );
     if (rollbackScope(made, present) === "project") {
-        await attempt(`project ${projectId}`, () => deployService.deleteProject(projectId, ownerId));
+        await attempt(`project ${projectId}`, () =>
+            deployService.deleteProject(projectId, ownerId)
+        );
         return;
     }
     for (const id of made.applications) {
-        await attempt(`service ${id}`, () => deployService.deleteApplication(id, ownerId, { deleteData: true }));
+        await attempt(`service ${id}`, () =>
+            deployService.deleteApplication(id, ownerId, { deleteData: true })
+        );
     }
     // The databases inside the instance first, the instance last.
     for (const id of [...made.databases].reverse()) {
@@ -138,7 +152,10 @@ export interface ImportedDatabase {
 }
 
 /** The site's own database: the one its config names, else the only one there is. */
-export function pickDatabase(named: string | null, imported: readonly ImportedDatabase[]): ImportedDatabase | undefined {
+export function pickDatabase(
+    named: string | null,
+    imported: readonly ImportedDatabase[]
+): ImportedDatabase | undefined {
     const found = named ? imported.find((database) => database.original === named) : undefined;
     return found ?? (imported.length === 1 ? imported[0] : undefined);
 }
@@ -166,7 +183,9 @@ async function connectSite(
     imported: readonly ImportedDatabase[]
 ): Promise<boolean> {
     const config = await readWpConfig(folder);
-    const named = config ? (findDefines(config.text).find((call) => call.name === "DB_NAME")?.value ?? null) : null;
+    const named = config
+        ? (findDefines(config.text).find((call) => call.name === "DB_NAME")?.value ?? null)
+        : null;
     const database = pickDatabase(named, imported);
     if (!database) return !config;
     const connection = await databaseService.databaseConnection(database.id, ownerId);
@@ -176,7 +195,8 @@ async function connectSite(
             DB_USER: connection.username,
             DB_PASSWORD: connection.password,
             // WordPress takes the port after the host; 3306 is the one it assumes.
-            DB_HOST: connection.port === 3306 ? connection.host : `${connection.host}:${connection.port}`
+            DB_HOST:
+                connection.port === 3306 ? connection.host : `${connection.host}:${connection.port}`
         });
         await writeFile(config.path, text);
     }
@@ -206,7 +226,8 @@ export function siteFolders(plan: CpanelPlan): SiteFolder[] {
         byRoot.set(domain.documentRoot, list);
     }
     // No domains read: the main site's folder still comes over, to be given one after.
-    if (byRoot.size === 0) return plan.hasHome ? [{ documentRoot: "public_html", domains: [] }] : [];
+    if (byRoot.size === 0)
+        return plan.hasHome ? [{ documentRoot: "public_html", domains: [] }] : [];
     return [...byRoot.entries()].map(([documentRoot, domains]) => ({ documentRoot, domains }));
 }
 
@@ -217,7 +238,12 @@ async function createFreshProject(ownerId: string, name: string, orgId: string |
     for (let attempt = 1; ; attempt += 1) {
         try {
             const named = attempt === 1 ? name : `${name} ${attempt}`;
-            return await deployService.createProject(ownerId, named, orgId, NEW_ENVIRONMENT_NETWORK_MODE);
+            return await deployService.createProject(
+                ownerId,
+                named,
+                orgId,
+                NEW_ENVIRONMENT_NETWORK_MODE
+            );
         } catch (error) {
             const taken = (error as { code?: unknown } | null)?.code === "P2002";
             if (!taken || attempt >= 20) throw error;
@@ -246,7 +272,12 @@ async function isFolder(path: string): Promise<boolean> {
 
 /** Load one plain `.sql` dump into a deployed database through the restore path,
  *  which takes a gzipped dump. */
-async function loadDump(databaseId: string, ownerId: string, actorId: string, dump: string): Promise<void> {
+async function loadDump(
+    databaseId: string,
+    ownerId: string,
+    actorId: string,
+    dump: string
+): Promise<void> {
     const gzipped = `${dump}.gz`;
     await pipeline(createReadStream(dump), createGzip(), createWriteStream(gzipped));
     try {
@@ -275,7 +306,11 @@ export async function importCpanelBackup(
         const { ownerId, actorId } = input;
         const warnings = [...plan.warnings];
         const primary = plan.domains.find((domain) => domain.primary)?.name;
-        const project = await createFreshProject(ownerId, primary ?? plan.account ?? "Imported site", input.orgId);
+        const project = await createFreshProject(
+            ownerId,
+            primary ?? plan.account ?? "Imported site",
+            input.orgId
+        );
         made.projectId = project.id;
         const environmentId = project.environments[0]?.id;
         if (!environmentId) throw new Error("The new project has no environment");
@@ -297,14 +332,26 @@ export async function importCpanelBackup(
                     ...(instanceId ? { instanceId } : {})
                 });
                 made.databases.push(created.id);
-                const failed = await databaseService.deployDatabaseAndWait(created.id, ownerId, actorId);
+                const failed = await databaseService.deployDatabaseAndWait(
+                    created.id,
+                    ownerId,
+                    actorId
+                );
                 if (failed) throw new Error(failed);
                 instanceId ??= created.id;
-                await loadDump(created.id, ownerId, actorId, join(root, ...database.dump.split("/")));
+                await loadDump(
+                    created.id,
+                    ownerId,
+                    actorId,
+                    join(root, ...database.dump.split("/"))
+                );
                 databases += 1;
                 imported.push({ original: database.name, id: created.id });
             } catch (error) {
-                console.error(`panel-import: database ${database.name} was not carried over:`, error);
+                console.error(
+                    `panel-import: database ${database.name} was not carried over:`,
+                    error
+                );
                 warnings.push({ code: "databaseFailed", name: database.name });
             }
         }
@@ -330,27 +377,43 @@ export async function importCpanelBackup(
                 safeHeaders: true
             });
             made.applications.push(application.id);
-            const linked = await connectSite(folder, application.id, ownerId, imported).catch((error: unknown) => {
-                console.error(`panel-import: ${name} was not pointed at its database:`, error);
-                return false;
-            });
+            const linked = await connectSite(folder, application.id, ownerId, imported).catch(
+                (error: unknown) => {
+                    console.error(`panel-import: ${name} was not pointed at its database:`, error);
+                    return false;
+                }
+            );
             if (!linked) warnings.push({ code: "databaseUnlinked", name });
-            await storeSourceFolder(application.id, ownerId, folder, name, await countFolder(folder));
+            await storeSourceFolder(
+                application.id,
+                ownerId,
+                folder,
+                name,
+                await countFolder(folder)
+            );
             services += 1;
             for (const domain of site.domains) {
                 try {
                     domains.push(
-                        await deployService.addApplicationDomain(application.id, ownerId, { hostname: domain.name, targetPort: SITE_PORT })
+                        await deployService.addApplicationDomain(application.id, ownerId, {
+                            hostname: domain.name,
+                            targetPort: SITE_PORT
+                        })
                     );
                 } catch (error) {
                     console.error(`panel-import: domain ${domain.name} was not attached:`, error);
                     warnings.push({ code: "domainTaken", name: domain.name });
                 }
             }
-            await deployService.deployApplication(application.id, ownerId, actorId, { trigger: "upload" }).catch((error: unknown) => {
-                console.error(`panel-import: service ${application.id} did not start deploying:`, error);
-                warnings.push({ code: "notDeploying", name });
-            });
+            await deployService
+                .deployApplication(application.id, ownerId, actorId, { trigger: "upload" })
+                .catch((error: unknown) => {
+                    console.error(
+                        `panel-import: service ${application.id} did not start deploying:`,
+                        error
+                    );
+                    warnings.push({ code: "notDeploying", name });
+                });
         }
         await report("finishing", sites.length, sites.length);
         return { projectId: project.id, services, databases, domains, warnings };

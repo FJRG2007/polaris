@@ -19,7 +19,11 @@ type Node =
     | { readonly kind: "raw"; readonly bytes: Buffer }
     | { readonly kind: "string"; readonly bytes: Buffer }
     | { readonly kind: "array"; readonly entries: readonly (readonly [Node, Node])[] }
-    | { readonly kind: "object"; readonly className: Buffer; readonly entries: readonly (readonly [Node, Node])[] };
+    | {
+          readonly kind: "object";
+          readonly className: Buffer;
+          readonly entries: readonly (readonly [Node, Node])[];
+      };
 
 /** Deeper than any real option, shallow enough that a crafted value cannot
  *  exhaust the stack. */
@@ -180,7 +184,11 @@ function write(node: Node, out: Buffer[]): void {
             out.push(node.bytes);
             return;
         case "string":
-            out.push(Buffer.from(`s:${node.bytes.length}:"`, "latin1"), node.bytes, Buffer.from('";', "latin1"));
+            out.push(
+                Buffer.from(`s:${node.bytes.length}:"`, "latin1"),
+                node.bytes,
+                Buffer.from('";', "latin1")
+            );
             return;
         case "array":
             out.push(Buffer.from(`a:${node.entries.length}:{`, "latin1"));
@@ -231,7 +239,9 @@ function walk(node: Node, from: Buffer, to: Buffer, depth: number): Node {
         case "object":
             return {
                 ...node,
-                entries: node.entries.map(([key, value]) => [key, walk(value, from, to, depth + 1)] as const)
+                entries: node.entries.map(
+                    ([key, value]) => [key, walk(value, from, to, depth + 1)] as const
+                )
             };
     }
 }

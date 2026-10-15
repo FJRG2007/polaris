@@ -57,7 +57,15 @@ const MARKERS = ["cp", "userdata", "homedir", "homedir.tar", "mysql"];
 
 /** Something an import could not carry over, as a code the screen words in the
  *  reader's language and the value it names. */
-export const IMPORT_WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying", "databaseUnlinked"] as const;
+export const IMPORT_WARNING_CODES = [
+    "noDomains",
+    "noHome",
+    "databaseFailed",
+    "folderMissing",
+    "domainTaken",
+    "notDeploying",
+    "databaseUnlinked"
+] as const;
 export type ImportWarningCode = (typeof IMPORT_WARNING_CODES)[number];
 export interface ImportWarning {
     readonly code: ImportWarningCode;
@@ -107,7 +115,8 @@ export function entryNameProblem(name: string): BackupRefusalCode | null {
     const unified = name.replace(/\\/g, "/");
     if (unified.startsWith("/") || /^[a-zA-Z]:/.test(unified)) return "absolutePath";
     if (unified.split("/").some((segment) => segment === "..")) return "leavesFolder";
-    if ([...unified].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return "controlCharacters";
+    if ([...unified].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))
+        return "controlCharacters";
     return null;
 }
 
@@ -136,10 +145,14 @@ export function checkListing(listing: string): { entries: number; bytes: number 
 export function parseKeyValues(text: string): Record<string, string> {
     const out: Record<string, string> = {};
     for (const line of text.split(/\r?\n/)) {
-        if (!line.includes(":") || line.trimStart().startsWith("#") || line.startsWith(" ")) continue;
+        if (!line.includes(":") || line.trimStart().startsWith("#") || line.startsWith(" "))
+            continue;
         const at = line.indexOf(":");
         const key = line.slice(0, at).trim().toLowerCase();
-        const value = line.slice(at + 1).trim().replace(/^['"]|['"]$/g, "");
+        const value = line
+            .slice(at + 1)
+            .trim()
+            .replace(/^['"]|['"]$/g, "");
         if (key) out[key] = value;
     }
     return out;
@@ -148,12 +161,16 @@ export function parseKeyValues(text: string): Record<string, string> {
 const DOMAIN = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 /** A document root as cPanel writes it (`/home/user/public_html`), relative to the home. */
-export function relativeDocumentRoot(documentRoot: string | undefined, account: string | null): string {
+export function relativeDocumentRoot(
+    documentRoot: string | undefined,
+    account: string | null
+): string {
     if (!documentRoot) return "public_html";
     const unified = documentRoot.replace(/\\/g, "/").replace(/\/+$/, "");
     const home = account ? `/home/${account}` : null;
     let relative = unified;
-    if (home && (unified === home || unified.startsWith(`${home}/`))) relative = unified.slice(home.length);
+    if (home && (unified === home || unified.startsWith(`${home}/`)))
+        relative = unified.slice(home.length);
     else relative = unified.replace(/^\/home\d*\/[^/]+/, "");
     relative = relative.replace(/^\/+/, "");
     return entryNameProblem(relative) ? "public_html" : relative;
@@ -190,7 +207,11 @@ export function planFrom(input: {
     if (!input.hasHome) warnings.push({ code: "noHome" });
     const databases = input.dumps
         .filter((dump) => dump.file.endsWith(".sql"))
-        .map((dump) => ({ name: dump.file.slice(0, -4), dump: `mysql/${dump.file}`, bytes: dump.bytes }))
+        .map((dump) => ({
+            name: dump.file.slice(0, -4),
+            dump: `mysql/${dump.file}`,
+            bytes: dump.bytes
+        }))
         .filter((database) => /^[A-Za-z0-9_$-]{1,64}$/.test(database.name))
         .sort((a, b) => a.name.localeCompare(b.name));
     return { account: input.account, domains, databases, hasHome: input.hasHome, warnings };
@@ -198,7 +219,10 @@ export function planFrom(input: {
 
 function run(command: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-        const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+        const child = spawn(command, args, {
+            stdio: ["ignore", "pipe", "pipe"],
+            windowsHide: true
+        });
         const out: Buffer[] = [];
         let said = "";
         child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
@@ -226,7 +250,8 @@ async function backupRoot(dir: string): Promise<string> {
     for (const marker of MARKERS) if (await exists(join(dir, marker))) return dir;
     for (const entry of await readdir(dir, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
-        for (const marker of MARKERS) if (await exists(join(dir, entry.name, marker))) return join(dir, entry.name);
+        for (const marker of MARKERS)
+            if (await exists(join(dir, entry.name, marker))) return join(dir, entry.name);
     }
     throw new BackupRefusal("notCpanel");
 }
@@ -256,7 +281,9 @@ async function unpackHomeTar(root: string): Promise<void> {
  * Check and unpack a backup into a new scratch folder and answer its plan and
  * where its root is. The caller removes `dir` when it is done with it.
  */
-export async function inspectCpanelBackup(archive: string): Promise<{ dir: string; root: string; plan: CpanelPlan }> {
+export async function inspectCpanelBackup(
+    archive: string
+): Promise<{ dir: string; root: string; plan: CpanelPlan }> {
     let listing: string;
     try {
         listing = await run("tar", ["-tvzf", archive]);
@@ -276,15 +303,22 @@ export async function inspectCpanelBackup(archive: string): Promise<{ dir: strin
             userdata[entry.name] = await readFile(join(userdataDir, entry.name), "utf8");
         }
         const dumps: { file: string; bytes: number }[] = [];
-        for (const entry of await readdir(join(root, "mysql"), { withFileTypes: true }).catch(() => [])) {
-            if (entry.isFile()) dumps.push({ file: entry.name, bytes: (await stat(join(root, "mysql", entry.name))).size });
+        for (const entry of await readdir(join(root, "mysql"), { withFileTypes: true }).catch(
+            () => []
+        )) {
+            if (entry.isFile())
+                dumps.push({
+                    file: entry.name,
+                    bytes: (await stat(join(root, "mysql", entry.name))).size
+                });
         }
         const plan = planFrom({
             account,
             userdataMain: await readFile(join(userdataDir, "main"), "utf8").catch(() => null),
             userdata,
             dumps,
-            hasHome: (await exists(join(root, "homedir"))) || (await exists(join(root, "homedir.tar")))
+            hasHome:
+                (await exists(join(root, "homedir"))) || (await exists(join(root, "homedir.tar")))
         });
         await unpackHomeTar(root);
         return { dir, root, plan };

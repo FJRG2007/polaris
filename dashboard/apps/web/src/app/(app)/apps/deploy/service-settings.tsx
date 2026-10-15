@@ -1580,7 +1580,11 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                         <Button size="sm" variant="outline" onClick={() => choose("tcp")}>
                             <Network aria-hidden /> {t("publicNet.tcp")}
                         </Button>
-                        <RestoreHistoryButton target={{ kind: "routes", applicationId: app.id }} canRestore onRestored={onChanged} />
+                        <RestoreHistoryButton
+                            target={{ kind: "routes", applicationId: app.id }}
+                            canRestore
+                            onRestored={onChanged}
+                        />
                     </>
                 }
             >

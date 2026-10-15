@@ -86,7 +86,9 @@ export function diffBodies(from: SnapshotBody, to: SnapshotBody): ItemChange[] {
         const before = from.items[item];
         const after = to.items[item];
         const fields: FieldChange[] = [];
-        const names = [...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])].sort();
+        const names = [
+            ...new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
+        ].sort();
         for (const field of names) {
             const was = before?.[field];
             const now = after?.[field];
@@ -112,14 +114,22 @@ export function prunable(
 ): string[] {
     const cutoff = now.getTime() - maxAgeDays * 86_400_000;
     const newestFirst = [...points].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    return newestFirst.filter((point, index) => index >= keep || point.createdAt.getTime() < cutoff).map((point) => point.id);
+    return newestFirst
+        .filter((point, index) => index >= keep || point.createdAt.getTime() < cutoff)
+        .map((point) => point.id);
 }
 
 /** Parses a stored body, refusing anything that is not the expected shape. */
 export function parseBody(text: string): SnapshotBody {
     const parsed = JSON.parse(text) as unknown;
     const items = (parsed as Partial<SnapshotBody> | null)?.items;
-    if (!parsed || typeof parsed !== "object" || !items || typeof items !== "object" || Array.isArray(items)) {
+    if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        !items ||
+        typeof items !== "object" ||
+        Array.isArray(items)
+    ) {
         throw new Error("Restore point body is not readable");
     }
     return parsed as SnapshotBody;

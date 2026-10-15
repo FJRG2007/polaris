@@ -19,7 +19,12 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { mayCreateProjectIn } from "@/lib/deploy-project-access";
 import { stageBody, stagedPath, TooLarge } from "@/lib/deploy/staging";
-import { getImport, ImportBusy, recentImports, startCpanelImport } from "@/lib/deploy/panel-import/jobs";
+import {
+    getImport,
+    ImportBusy,
+    recentImports,
+    startCpanelImport
+} from "@/lib/deploy/panel-import/jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +36,8 @@ export async function POST(request: Request): Promise<Response> {
     const user = await apiPermission("deploy.manage");
     if (user instanceof Response) return user;
     const words = await readerWords("deploySafety");
-    const tooLarge = () => NextResponse.json({ error: words("importSite.tooLarge") }, { status: 413 });
+    const tooLarge = () =>
+        NextResponse.json({ error: words("importSite.tooLarge") }, { status: 413 });
 
     const orgId = await scopeOrgIdFor(user.id);
     if (!(await mayCreateProjectIn({ id: user.id, isAdmin: user.isAdmin }, orgId))) {
@@ -44,12 +50,18 @@ export async function POST(request: Request): Promise<Response> {
     let started = false;
     try {
         await stageBody(request.body, file, MAX_BACKUP_UPLOAD);
-        const id = await startCpanelImport({ archive: file, ownerId: user.id, orgId, actorId: user.id });
+        const id = await startCpanelImport({
+            archive: file,
+            ownerId: user.id,
+            orgId,
+            actorId: user.id
+        });
         started = true;
         return NextResponse.json({ id }, { status: 202 });
     } catch (caught) {
         if (caught instanceof TooLarge) return tooLarge();
-        if (caught instanceof ImportBusy) return NextResponse.json({ error: words("importSite.busy") }, { status: 409 });
+        if (caught instanceof ImportBusy)
+            return NextResponse.json({ error: words("importSite.busy") }, { status: 409 });
         console.error("polaris: could not start a cPanel import:", caught);
         return NextResponse.json({ error: words("importSite.failed") }, { status: 500 });
     } finally {
@@ -67,5 +79,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!query.success) return NextResponse.json({ error: "Invalid query" }, { status: 400 });
     if (!query.data.id) return NextResponse.json({ imports: await recentImports(user.id) });
     const found = await getImport(query.data.id, user.id);
-    return found ? NextResponse.json(found) : NextResponse.json({ error: "Not found" }, { status: 404 });
+    return found
+        ? NextResponse.json(found)
+        : NextResponse.json({ error: "Not found" }, { status: 404 });
 }

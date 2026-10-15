@@ -323,7 +323,9 @@ export class SshPorts implements RuntimePorts {
                 }
             );
             const parsed = JSON.parse(out.trim() || "[]") as unknown;
-            return Array.isArray(parsed) ? parsed.filter((digest): digest is string => typeof digest === "string") : [];
+            return Array.isArray(parsed)
+                ? parsed.filter((digest): digest is string => typeof digest === "string")
+                : [];
         } catch {
             return [];
         }

@@ -21,7 +21,16 @@ import {
     restoreHistoryAction,
     type HistoryTarget
 } from "@/app/(app)/apps/deploy/restore-actions";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Skeleton, cn } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    Skeleton,
+    cn
+} from "@polaris/ui";
 
 const CHANGE_TONE = {
     added: "text-success-ink",
@@ -53,7 +62,13 @@ export function RestoreHistoryButton({
                         <DialogTitle>{t("history.title")}</DialogTitle>
                         <DialogDescription>{t("history.description")}</DialogDescription>
                     </DialogHeader>
-                    {open && <HistoryList target={target} canRestore={canRestore} onRestored={onRestored} />}
+                    {open && (
+                        <HistoryList
+                            target={target}
+                            canRestore={canRestore}
+                            onRestored={onRestored}
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
         </>
@@ -122,24 +137,46 @@ function HistoryList({
     }
     return (
         <div className="flex max-h-[60vh] min-w-0 flex-col gap-3 overflow-y-auto overscroll-contain">
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">{error}</p>}
-            {notice && <p className="rounded-md bg-success-soft px-3 py-2 text-sm text-success-ink">{notice}</p>}
-            {points?.length === 0 && <p className="text-sm text-muted-foreground">{t("history.empty")}</p>}
+            {error && (
+                <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                    {error}
+                </p>
+            )}
+            {notice && (
+                <p className="rounded-md bg-success-soft px-3 py-2 text-sm text-success-ink">
+                    {notice}
+                </p>
+            )}
+            {points?.length === 0 && (
+                <p className="text-sm text-muted-foreground">{t("history.empty")}</p>
+            )}
             {points?.map((point) => {
                 const date = when.format(new Date(point.createdAt));
                 return (
-                    <section key={point.id} className="flex min-w-0 flex-col gap-2 rounded-lg border px-3 py-2.5">
+                    <section
+                        key={point.id}
+                        className="flex min-w-0 flex-col gap-2 rounded-lg border px-3 py-2.5"
+                    >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="min-w-0 text-sm">
                                 <span className="font-medium">{date}</span>
                                 <span className="text-muted-foreground">
                                     {" - "}
-                                    {point.reason === "restore" ? t("history.reasonRestore") : t("history.reasonChange")}
-                                    {point.actorName ? ` ${t("history.by", { name: point.actorName })}` : ""}
+                                    {point.reason === "restore"
+                                        ? t("history.reasonRestore")
+                                        : t("history.reasonChange")}
+                                    {point.actorName
+                                        ? ` ${t("history.by", { name: point.actorName })}`
+                                        : ""}
                                 </span>
                             </div>
                             {canRestore && point.changes.length > 0 && confirming !== point.id && (
-                                <Button size="sm" variant="outline" disabled={pending} onClick={() => setConfirming(point.id)}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={pending}
+                                    onClick={() => setConfirming(point.id)}
+                                >
                                     {t("history.restore")}
                                 </Button>
                             )}
@@ -153,13 +190,19 @@ function HistoryList({
                             <ul className="flex flex-col gap-1 text-xs">
                                 {point.changes.map((change) => (
                                     <li key={`${change.kind}:${change.item}`} className="min-w-0">
-                                        <span className={cn("font-medium", CHANGE_TONE[change.kind])}>
+                                        <span
+                                            className={cn("font-medium", CHANGE_TONE[change.kind])}
+                                        >
                                             {t(`history.${change.kind}`)}
                                         </span>{" "}
                                         <code className="break-all">{change.item}</code>
                                         {change.fields.map((field) => (
-                                            <div key={field.field} className="ml-3 break-all text-muted-foreground">
-                                                {field.field}: {field.after ?? t("history.empty_value")}
+                                            <div
+                                                key={field.field}
+                                                className="ml-3 break-all text-muted-foreground"
+                                            >
+                                                {field.field}:{" "}
+                                                {field.after ?? t("history.empty_value")}
                                                 {change.kind === "changed" && (
                                                     <span className="line-through opacity-70">
                                                         {" "}
@@ -176,10 +219,19 @@ function HistoryList({
                             <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2">
                                 <p className="min-w-0 text-sm">{t("history.confirm", { date })}</p>
                                 <div className="flex gap-2">
-                                    <Button size="sm" variant="ghost" disabled={pending} onClick={() => setConfirming(null)}>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={pending}
+                                        onClick={() => setConfirming(null)}
+                                    >
                                         {t("history.cancel")}
                                     </Button>
-                                    <Button size="sm" disabled={pending} onClick={() => restore(point.id)}>
+                                    <Button
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={() => restore(point.id)}
+                                    >
                                         {pending && <Loader2 className="size-3.5 animate-spin" />}
                                         {t("history.restore")}
                                     </Button>

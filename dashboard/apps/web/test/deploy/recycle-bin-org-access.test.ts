@@ -37,8 +37,14 @@ const prisma = new Proxy(
 const deleteProject = vi.fn(async () => undefined);
 
 vi.mock("@polaris/db", () => ({ prisma, INCLUDING_BINNED: { binnedAt: undefined } }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => undefined }));
-vi.mock("@/lib/restore-points/service", () => ({ listRestorePoints: async () => [], restoreKeys: { routes: (id: string) => id } }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => undefined
+}));
+vi.mock("@/lib/restore-points/service", () => ({
+    listRestorePoints: async () => [],
+    restoreKeys: { routes: (id: string) => id }
+}));
 vi.mock("@/lib/orgs/org-service", () => ({
     orgIdsWhere: async () => orgsRun,
     memberOrgIds: async () => [],
@@ -61,17 +67,24 @@ describe("recycle bin through organization access", () => {
     it("lists what the user owns and what their organizations hold", async () => {
         orgsRun = [ORG];
         await recycleBin.listBin(USER);
-        const listing = calls.find((call) => call.name === "project.findMany")?.args as { where: Record<string, unknown> };
+        const listing = calls.find((call) => call.name === "project.findMany")?.args as {
+            where: Record<string, unknown>;
+        };
         expect(listing.where.OR).toEqual([{ ownerId: USER }, { orgId: { in: [ORG] } }]);
         const services = calls.find((call) => call.name === "application.findMany")?.args as {
             where: { environment: { project: Record<string, unknown> } };
         };
-        expect(services.where.environment.project).toEqual({ OR: [{ ownerId: USER }, { orgId: { in: [ORG] } }], binnedAt: null });
+        expect(services.where.environment.project).toEqual({
+            OR: [{ ownerId: USER }, { orgId: { in: [ORG] } }],
+            binnedAt: null
+        });
     });
 
     it("lists only the user's own items without an organization", async () => {
         await recycleBin.listBin(USER);
-        const listing = calls.find((call) => call.name === "project.findMany")?.args as { where: Record<string, unknown> };
+        const listing = calls.find((call) => call.name === "project.findMany")?.args as {
+            where: Record<string, unknown>;
+        };
         expect(listing.where.OR).toEqual([{ ownerId: USER }]);
     });
 
@@ -79,14 +92,24 @@ describe("recycle bin through organization access", () => {
         orgsRun = [ORG];
         projectRow = { ownerId: OWNER };
         await recycleBin.deleteForever("project", PROJECT, USER);
-        const check = calls.find((call) => call.name === "project.findFirst")?.args as { where: Record<string, unknown> };
-        expect(check.where).toMatchObject({ id: PROJECT, binnedAt: { not: null }, OR: [{ ownerId: USER }, { orgId: { in: [ORG] } }] });
+        const check = calls.find((call) => call.name === "project.findFirst")?.args as {
+            where: Record<string, unknown>;
+        };
+        expect(check.where).toMatchObject({
+            id: PROJECT,
+            binnedAt: { not: null },
+            OR: [{ ownerId: USER }, { orgId: { in: [ORG] } }]
+        });
         expect(deleteProject).toHaveBeenCalledWith(PROJECT, OWNER);
     });
 
     it("refuses an item the user cannot manage", async () => {
-        await expect(recycleBin.restoreFromBin("project", PROJECT, USER, USER)).rejects.toThrow("no longer in the recycle bin");
-        await expect(recycleBin.deleteForever("application", PROJECT, USER)).rejects.toThrow("no longer in the recycle bin");
+        await expect(recycleBin.restoreFromBin("project", PROJECT, USER, USER)).rejects.toThrow(
+            "no longer in the recycle bin"
+        );
+        await expect(recycleBin.deleteForever("application", PROJECT, USER)).rejects.toThrow(
+            "no longer in the recycle bin"
+        );
         expect(deleteProject).not.toHaveBeenCalled();
     });
 });

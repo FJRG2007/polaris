@@ -16,8 +16,20 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectEnvironmentView } from "@/lib/deploy-project-service";
 import type { PromotionPreview, PromotionView } from "@/lib/deploy/promotion";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
-import { listPromotionsAction, previewPromotionAction, promoteEnvironmentAction } from "../project-actions";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
+import {
+    listPromotionsAction,
+    previewPromotionAction,
+    promoteEnvironmentAction
+} from "../project-actions";
 
 export function PromoteDialog({
     environments,
@@ -37,7 +49,11 @@ export function PromoteDialog({
     const [targetId, setTargetId] = useState("");
     const [includeData, setIncludeData] = useState(false);
     const [typed, setTyped] = useState("");
-    const [preview, setPreview] = useState<{ preview: PromotionPreview; canDeploy: boolean; canCopyData: boolean } | null>(null);
+    const [preview, setPreview] = useState<{
+        preview: PromotionPreview;
+        canDeploy: boolean;
+        canCopyData: boolean;
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const targets = environments.filter((environment) => environment.id !== source?.id);
@@ -47,7 +63,11 @@ export function PromoteDialog({
     useEffect(() => {
         if (!source) return;
         const next =
-            source.stage === "development" ? "staging" : source.stage === "staging" ? "production" : null;
+            source.stage === "development"
+                ? "staging"
+                : source.stage === "staging"
+                  ? "production"
+                  : null;
         const pick =
             targets.find((environment) => next !== null && environment.stage === next) ??
             targets.find((environment) => environment.isDefault) ??
@@ -63,9 +83,13 @@ export function PromoteDialog({
         if (!source || !targetId) return;
         let current = true;
         setPreview(null);
-        void previewPromotionAction({ sourceEnvironmentId: source.id, targetEnvironmentId: targetId }).then((result) => {
+        void previewPromotionAction({
+            sourceEnvironmentId: source.id,
+            targetEnvironmentId: targetId
+        }).then((result) => {
             if (!current) return;
-            if (result.error || !result.preview) setError(result.error ?? t("promotion.loadFailed"));
+            if (result.error || !result.preview)
+                setError(result.error ?? t("promotion.loadFailed"));
             else {
                 setError(null);
                 setPreview({
@@ -83,7 +107,10 @@ export function PromoteDialog({
     const target = targets.find((environment) => environment.id === targetId) ?? null;
     const plan = preview?.preview.plan ?? null;
     const needsName = includeData || target?.stage === "production";
-    const nothing = plan !== null && plan.services.length === 0 && (!includeData || plan.databases.length === 0);
+    const nothing =
+        plan !== null &&
+        plan.services.length === 0 &&
+        (!includeData || plan.databases.length === 0);
     const blocked = !preview?.canDeploy
         ? t("promotion.cannotDeploy")
         : includeData && !preview.canCopyData
@@ -93,7 +120,8 @@ export function PromoteDialog({
             : nothing
               ? t("promotion.nothing")
               : null;
-    const ready = preview !== null && blocked === null && (!needsName || typed.trim() === target?.name);
+    const ready =
+        preview !== null && blocked === null && (!needsName || typed.trim() === target?.name);
 
     function submit() {
         if (!source || !target || !ready) return;
@@ -121,7 +149,9 @@ export function PromoteDialog({
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{t("promotion.into")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("promotion.into")}
+                        </span>
                         <Select
                             value={targetId}
                             onValueChange={(value) => {
@@ -162,19 +192,30 @@ export function PromoteDialog({
                         <div className="h-20 animate-pulse rounded-md bg-muted" aria-hidden />
                     ) : plan ? (
                         <div className="flex max-h-64 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border/60 p-3 text-sm">
-                            <p className="font-medium">{t("promotion.overwrites", { name: target?.name ?? "" })}</p>
-                            {plan.services.length === 0 && (!includeData || plan.databases.length === 0) ? (
+                            <p className="font-medium">
+                                {t("promotion.overwrites", { name: target?.name ?? "" })}
+                            </p>
+                            {plan.services.length === 0 &&
+                            (!includeData || plan.databases.length === 0) ? (
                                 <p className="text-muted-foreground">{t("promotion.nothing")}</p>
                             ) : (
                                 <ul className="flex flex-col gap-1">
                                     {plan.services.map((pair) => (
-                                        <li key={pair.targetId} className="truncate" title={pair.name}>
+                                        <li
+                                            key={pair.targetId}
+                                            className="truncate"
+                                            title={pair.name}
+                                        >
                                             {t("promotion.serviceLine", { name: pair.name })}
                                         </li>
                                     ))}
                                     {includeData &&
                                         plan.databases.map((pair) => (
-                                            <li key={pair.targetId} className="truncate text-danger" title={pair.name}>
+                                            <li
+                                                key={pair.targetId}
+                                                className="truncate text-danger"
+                                                title={pair.name}
+                                            >
                                                 {t("promotion.databaseLine", { name: pair.name })}
                                             </li>
                                         ))}
@@ -183,7 +224,11 @@ export function PromoteDialog({
                             {plan.skipped.length > 0 && (
                                 <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
                                     {plan.skipped.map((skip) => (
-                                        <li key={`${skip.kind}:${skip.name}`} className="truncate" title={skip.name}>
+                                        <li
+                                            key={`${skip.kind}:${skip.name}`}
+                                            className="truncate"
+                                            title={skip.name}
+                                        >
                                             {t("promotion.skippedLine", {
                                                 name: skip.name,
                                                 reason: t(`promotion.reasons.${skip.reason}`)
@@ -192,14 +237,17 @@ export function PromoteDialog({
                                     ))}
                                 </ul>
                             )}
-                            <p className="text-xs text-muted-foreground">{t("promotion.noDowntime")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("promotion.noDowntime")}
+                            </p>
                         </div>
                     ) : null}
 
                     {needsName && blocked === null && preview && (
                         <label className="flex flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground">
-                                {t("promotion.typeName", { name: target?.name ?? "" })} <span aria-hidden>*</span>
+                                {t("promotion.typeName", { name: target?.name ?? "" })}{" "}
+                                <span aria-hidden>*</span>
                             </span>
                             <Input
                                 value={typed}
@@ -210,7 +258,9 @@ export function PromoteDialog({
                             />
                         </label>
                     )}
-                    {blocked && preview && <p className="text-sm text-muted-foreground">{blocked}</p>}
+                    {blocked && preview && (
+                        <p className="text-sm text-muted-foreground">{blocked}</p>
+                    )}
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose}>
@@ -262,7 +312,10 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
     }, [projectId, version]);
 
     return (
-        <SettingsCard title={t("promotion.historyTitle")} description={t("promotion.historyDescription")}>
+        <SettingsCard
+            title={t("promotion.historyTitle")}
+            description={t("promotion.historyDescription")}
+        >
             {error && <p className="text-sm text-danger">{error}</p>}
             {promotions === null && !error ? (
                 <div className="h-16 animate-pulse rounded-md bg-muted" aria-hidden />
@@ -271,23 +324,40 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
             ) : (
                 <ul className="flex flex-col divide-y divide-border/40 rounded-md border border-border/60">
                     {(promotions ?? []).map((row) => (
-                        <li key={row.id} className="flex min-w-0 flex-col gap-1 px-3 py-2.5 text-sm">
+                        <li
+                            key={row.id}
+                            className="flex min-w-0 flex-col gap-1 px-3 py-2.5 text-sm"
+                        >
                             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                                 <span className="min-w-0 truncate font-medium">
-                                    {t("promotion.historyLine", { from: row.sourceName, to: row.targetName })}
+                                    {t("promotion.historyLine", {
+                                        from: row.sourceName,
+                                        to: row.targetName
+                                    })}
                                     {row.includeData ? t("promotion.withData") : ""}
                                 </span>
                                 <span className="shrink-0 text-xs text-muted-foreground">
-                                    {t(`promotion.status.${row.status}`)} - {display.date(row.createdAt)}
+                                    {t(`promotion.status.${row.status}`)} -{" "}
+                                    {display.date(row.createdAt)}
                                 </span>
                             </div>
                             {row.steps.length > 0 && (
                                 <ul className="flex flex-col gap-0.5 text-xs text-muted-foreground">
                                     {row.steps.map((step, index) => (
-                                        <li key={`${step.kind}:${step.name}:${index}`} className="truncate" title={step.detail ?? step.name}>
-                                            {t(`promotion.outcome.${step.outcome}`, { name: step.name })}
-                                            {step.reason ? ` - ${t(`promotion.reasons.${step.reason}`)}` : ""}
-                                            {step.note ? ` - ${t(`promotion.notes.${step.note}`)}` : ""}
+                                        <li
+                                            key={`${step.kind}:${step.name}:${index}`}
+                                            className="truncate"
+                                            title={step.detail ?? step.name}
+                                        >
+                                            {t(`promotion.outcome.${step.outcome}`, {
+                                                name: step.name
+                                            })}
+                                            {step.reason
+                                                ? ` - ${t(`promotion.reasons.${step.reason}`)}`
+                                                : ""}
+                                            {step.note
+                                                ? ` - ${t(`promotion.notes.${step.note}`)}`
+                                                : ""}
                                             {step.detail ? ` - ${step.detail}` : ""}
                                         </li>
                                     ))}

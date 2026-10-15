@@ -51,7 +51,12 @@ describe("findDefines", () => {
 });
 
 describe("rewriteDefines", () => {
-    const values = { DB_NAME: "imported", DB_USER: "polaris", DB_PASSWORD: "p'a\\ss", DB_HOST: "mysql-1:3306" };
+    const values = {
+        DB_NAME: "imported",
+        DB_USER: "polaris",
+        DB_PASSWORD: "p'a\\ss",
+        DB_HOST: "mysql-1:3306"
+    };
 
     it("replaces each value and leaves the rest of the file as it was", () => {
         const { text, changed } = rewriteDefines(WP_CONFIG, values);
@@ -61,7 +66,14 @@ describe("rewriteDefines", () => {
         expect(text).toContain("define('DB_PASSWORD', 'p\\'a\\\\ss');");
         expect(text).toContain("define( 'DB_HOST', 'mysql-1:3306' );");
         // Untouched: comments, strings, the heredoc, the method and the charset.
-        for (const kept of ["in_a_doc_comment", "hash_comment", "in_a_string", "in_a_heredoc", "a_method", "utf8mb4"]) {
+        for (const kept of [
+            "in_a_doc_comment",
+            "hash_comment",
+            "in_a_string",
+            "in_a_heredoc",
+            "a_method",
+            "utf8mb4"
+        ]) {
             expect(text).toContain(kept);
         }
         // Reading it back gives the new values.
@@ -75,9 +87,9 @@ describe("rewriteDefines", () => {
     });
 
     it("keeps a third argument", () => {
-        expect(rewriteDefines("<?php define('DB_NAME', 'old', true);", { DB_NAME: "new" }).text).toBe(
-            "<?php define('DB_NAME', 'new', true);"
-        );
+        expect(
+            rewriteDefines("<?php define('DB_NAME', 'old', true);", { DB_NAME: "new" }).text
+        ).toBe("<?php define('DB_NAME', 'new', true);");
     });
 });
 

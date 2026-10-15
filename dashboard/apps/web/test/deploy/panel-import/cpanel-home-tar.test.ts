@@ -28,7 +28,10 @@ async function backupWithHomeTar(homeEntry: string): Promise<string> {
     await mkdir(join(root, "userdata"), { recursive: true });
     await mkdir(join(root, "mysql"), { recursive: true });
     await writeFile(join(root, "userdata", "main"), "main_domain: example.test\n");
-    await writeFile(join(root, "userdata", "example.test"), "documentroot: /home/example/public_html\n");
+    await writeFile(
+        join(root, "userdata", "example.test"),
+        "documentroot: /home/example/public_html\n"
+    );
     await mkdir(join(home, "public_html"), { recursive: true });
     await writeFile(join(home, "public_html", "index.html"), "hello");
     execFileSync("tar", ["-cf", join(root, "homedir.tar"), "-C", home, homeEntry]);
@@ -43,7 +46,9 @@ describe.skipIf(process.platform === "win32")("homedir.tar", () => {
         scratch.push(result.dir);
         expect(result.plan.hasHome).toBe(true);
         expect(result.plan.domains.map((domain) => domain.name)).toEqual(["example.test"]);
-        expect(await readFile(join(result.root, "homedir", "public_html", "index.html"), "utf8")).toBe("hello");
+        expect(
+            await readFile(join(result.root, "homedir", "public_html", "index.html"), "utf8")
+        ).toBe("hello");
         await expect(stat(join(result.root, "homedir.tar"))).rejects.toThrow();
     });
 

@@ -40,7 +40,9 @@ export default async function ProjectSettingsPage({
     const canDeploy = manages && accessCan(access, "deploy.run");
     const promotion = {
         environmentIds: canDeploy
-            ? settings.environments.filter((environment) => accessInEnvironment(access, environment.id)).map((environment) => environment.id)
+            ? settings.environments
+                  .filter((environment) => accessInEnvironment(access, environment.id))
+                  .map((environment) => environment.id)
             : [],
         canCopyData: canDeploy && accessCan(access, "databases.manage")
     };

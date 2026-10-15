@@ -33,12 +33,16 @@ const jobs = await import("@/lib/deploy/panel-import/jobs");
 describe("an import's refusal", () => {
     it("is worded from its code", async () => {
         stored = "absolutePath";
-        expect((await jobs.getImport(row().id, OWNER))?.error).toBe("The backup contains an absolute path.");
+        expect((await jobs.getImport(row().id, OWNER))?.error).toBe(
+            "The backup contains an absolute path."
+        );
     });
 
     it("fills in the limit it names", async () => {
         stored = "tooLarge";
-        expect((await jobs.recentImports(OWNER))[0]?.error).toBe("The backup unpacks to more than 20 GB.");
+        expect((await jobs.recentImports(OWNER))[0]?.error).toBe(
+            "The backup unpacks to more than 20 GB."
+        );
     });
 
     it("falls back to the general sentence for a code it does not know", async () => {

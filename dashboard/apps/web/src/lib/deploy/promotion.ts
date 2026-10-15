@@ -66,7 +66,10 @@ export type PromotionSkipReason =
 /** A promotion refused before it starts, as words the screen says in the reader's language. */
 export class PromotionRefusal extends Error {
     constructor(
-        readonly key: "environment.notFound" | "environment.promoteBusy" | "environment.promoteNothingInCommon",
+        readonly key:
+            | "environment.notFound"
+            | "environment.promoteBusy"
+            | "environment.promoteNothingInCommon",
         readonly params: Record<string, string> = {}
     ) {
         super(`promotion refused: ${key}`);
@@ -158,14 +161,23 @@ export async function startPromotion(input: {
     targetId: string;
     includeData: boolean;
 }): Promise<{ id: string }> {
-    const { source, target } = await loadPair(input.projectId, input.ownerId, input.sourceId, input.targetId);
-    if (await runningInto(target.id)) throw new PromotionRefusal("environment.promoteBusy", { target: target.name });
+    const { source, target } = await loadPair(
+        input.projectId,
+        input.ownerId,
+        input.sourceId,
+        input.targetId
+    );
+    if (await runningInto(target.id))
+        throw new PromotionRefusal("environment.promoteBusy", { target: target.name });
     const plan = planPromotion(
         { services: source.applications, databases: source.databases },
         { services: target.applications, databases: target.databases }
     );
     if (plan.services.length === 0 && (!input.includeData || plan.databases.length === 0))
-        throw new PromotionRefusal("environment.promoteNothingInCommon", { target: target.name, source: source.name });
+        throw new PromotionRefusal("environment.promoteNothingInCommon", {
+            target: target.name,
+            source: source.name
+        });
     const row = await prisma.environmentPromotion.create({
         data: {
             projectId: input.projectId,
@@ -178,16 +190,27 @@ export async function startPromotion(input: {
         },
         select: { id: true }
     });
-    void runPromotion(row.id, input, plan, source.applications, target.applications).catch(async (error: unknown) => {
-        console.error("polaris: a promotion stopped partway:", error);
-        await prisma.environmentPromotion
-            .update({ where: { id: row.id }, data: { status: "failed", finishedAt: new Date() } })
-            .catch(() => undefined);
-    });
+    void runPromotion(row.id, input, plan, source.applications, target.applications).catch(
+        async (error: unknown) => {
+            console.error("polaris: a promotion stopped partway:", error);
+            await prisma.environmentPromotion
+                .update({
+                    where: { id: row.id },
+                    data: { status: "failed", finishedAt: new Date() }
+                })
+                .catch(() => undefined);
+        }
+    );
     return row;
 }
 
-type ServiceRow = { id: string; name: string; sourceType: string; sourceConfig: string; currentDeploymentId: string | null };
+type ServiceRow = {
+    id: string;
+    name: string;
+    sourceType: string;
+    sourceConfig: string;
+    currentDeploymentId: string | null;
+};
 
 async function runPromotion(
     promotionId: string,
@@ -205,7 +228,10 @@ async function runPromotion(
     const save = (status?: string) =>
         prisma.environmentPromotion.update({
             where: { id: promotionId },
-            data: { steps: JSON.stringify(steps), ...(status ? { status, finishedAt: new Date() } : {}) }
+            data: {
+                steps: JSON.stringify(steps),
+                ...(status ? { status, finishedAt: new Date() } : {})
+            }
         });
 
     const copied: string[] = [];
@@ -223,7 +249,12 @@ async function runPromotion(
                 copied.push(pair.targetId);
                 steps.push({ kind: "database", name: pair.name, outcome: "copied" });
             } catch (error) {
-                steps.push({ kind: "database", name: pair.name, outcome: "failed", ...readable(error) });
+                steps.push({
+                    kind: "database",
+                    name: pair.name,
+                    outcome: "failed",
+                    ...readable(error)
+                });
             }
             await save();
         }
@@ -231,11 +262,22 @@ async function runPromotion(
         // all, so a failed copy stops the services from moving.
         if (steps.some((step) => step.kind === "database" && step.outcome === "failed")) {
             for (const pair of plan.services)
-                steps.push({ kind: "service", name: pair.name, outcome: "skipped", reason: "dataFailed" });
+                steps.push({
+                    kind: "service",
+                    name: pair.name,
+                    outcome: "skipped",
+                    reason: "dataFailed"
+                });
             await save("failed");
             return;
         }
-        await pointWordpressAtTarget(plan, copied, input.ownerId, sourceServices, targetServices).catch((error: unknown) => {
+        await pointWordpressAtTarget(
+            plan,
+            copied,
+            input.ownerId,
+            sourceServices,
+            targetServices
+        ).catch((error: unknown) => {
             console.error("polaris: a promoted WordPress could not be given its address:", error);
         });
     }
@@ -250,7 +292,12 @@ async function runPromotion(
         try {
             const release = await releaseOf(from, into, input.ownerId);
             if ("skip" in release) {
-                steps.push({ kind: "service", name: pair.name, outcome: "skipped", reason: release.skip });
+                steps.push({
+                    kind: "service",
+                    name: pair.name,
+                    outcome: "skipped",
+                    reason: release.skip
+                });
             } else {
                 if (release.imageRef) await setImage(into, release.imageRef);
                 await deployService.deployApplication(into.id, input.ownerId, input.actorId, {
@@ -259,7 +306,10 @@ async function runPromotion(
                 });
                 if (release.commitSha)
                     // The poller would otherwise see its branch head and deploy that over it.
-                    await prisma.application.update({ where: { id: into.id }, data: { lastDeployedSha: release.commitSha } });
+                    await prisma.application.update({
+                        where: { id: into.id },
+                        data: { lastDeployedSha: release.commitSha }
+                    });
                 steps.push({
                     kind: "service",
                     name: pair.name,
@@ -273,14 +323,18 @@ async function runPromotion(
         await save();
     }
     const failed = steps.filter((step) => step.outcome === "failed").length;
-    const done = steps.filter((step) => step.outcome === "deployed" || step.outcome === "copied").length;
+    const done = steps.filter(
+        (step) => step.outcome === "deployed" || step.outcome === "copied"
+    ).length;
     await save(failed === 0 ? "succeeded" : done > 0 ? "partial" : "failed");
 }
 
 function parseSource(raw: string): Record<string, unknown> {
     try {
         const parsed = JSON.parse(raw) as unknown;
-        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : {};
     } catch {
         return {};
     }
@@ -295,7 +349,9 @@ async function releaseOf(
     from: ServiceRow,
     into: ServiceRow,
     ownerId: string
-): Promise<{ imageRef?: string; commitSha?: string; tagOnly?: boolean } | { skip: PromotionSkipReason }> {
+): Promise<
+    { imageRef?: string; commitSha?: string; tagOnly?: boolean } | { skip: PromotionSkipReason }
+> {
     if (from.sourceType !== into.sourceType) return { skip: "builtDifferently" };
     const fromSource = parseSource(from.sourceConfig);
     const intoSource = parseSource(into.sourceConfig);
@@ -321,7 +377,11 @@ async function releaseOf(
  * when any of that cannot be read - not deployed, a container that does not
  * answer, an image built rather than pulled.
  */
-async function runningImageRef(serviceId: string, ownerId: string, imageRef: string): Promise<string | null> {
+async function runningImageRef(
+    serviceId: string,
+    ownerId: string,
+    imageRef: string
+): Promise<string | null> {
     const app = await prisma.application.findUnique({
         where: { id: serviceId },
         select: {
@@ -342,7 +402,9 @@ async function runningImageRef(serviceId: string, ownerId: string, imageRef: str
         const inspected = (await ports.inspect(serving.name)) as { Image?: unknown } | null;
         if (typeof inspected?.Image !== "string") return null;
         const reader = ports as { imageRepoDigests?: (imageId: string) => Promise<string[]> };
-        const digests = reader.imageRepoDigests ? await reader.imageRepoDigests(inspected.Image) : [];
+        const digests = reader.imageRepoDigests
+            ? await reader.imageRepoDigests(inspected.Image)
+            : [];
         return pinnedImageRef(imageRef, digests);
     } catch (error) {
         console.error("polaris: the image a promoted service runs could not be read:", error);
@@ -353,7 +415,10 @@ async function runningImageRef(serviceId: string, ownerId: string, imageRef: str
 }
 
 async function setImage(into: ServiceRow, imageRef: string): Promise<void> {
-    const current = await prisma.application.findUnique({ where: { id: into.id }, select: { sourceConfig: true } });
+    const current = await prisma.application.findUnique({
+        where: { id: into.id },
+        select: { sourceConfig: true }
+    });
     const source = parseSource(current?.sourceConfig ?? "{}");
     if (source.imageRef === imageRef) return;
     await prisma.application.update({
@@ -365,7 +430,10 @@ async function setImage(into: ServiceRow, imageRef: string): Promise<void> {
 /** Whether a service runs the WordPress image. */
 function runsWordpress(service: ServiceRow): boolean {
     const image = parseSource(service.sourceConfig).imageRef;
-    return typeof image === "string" && /^(?:docker\.io\/)?(?:library\/)?wordpress(?::|@|$)/.test(image);
+    return (
+        typeof image === "string" &&
+        /^(?:docker\.io\/)?(?:library\/)?wordpress(?::|@|$)/.test(image)
+    );
 }
 
 /** The address a service answers on first. */
@@ -410,18 +478,32 @@ async function pointWordpressAtTarget(
             database: context.own.database
         };
         await withPorts(context, async (ports) => {
-            const listed = await runStep(ports, context.container, wordpressPrefixesCommand(client), [client.password]);
+            const listed = await runStep(
+                ports,
+                context.container,
+                wordpressPrefixesCommand(client),
+                [client.password]
+            );
             const prefixes = parseWordpressPrefixes(listed);
             for (const move of moves) {
                 const command = wordpressAddressCommand(client, { prefixes, ...move });
                 if (command) await runStep(ports, context.container, command, [client.password]);
             }
             const tables = wordpressValueTables(
-                await runStep(ports, context.container, listTablesCommand(client), [client.password])
+                await runStep(ports, context.container, listTablesCommand(client), [
+                    client.password
+                ])
             );
             for (const move of moves) {
                 for (const table of tables) {
-                    await rewriteStoredValues(ports, context.container, client, table, `//${move.from}`, `//${move.to}`);
+                    await rewriteStoredValues(
+                        ports,
+                        context.container,
+                        client,
+                        table,
+                        `//${move.from}`,
+                        `//${move.to}`
+                    );
                 }
             }
         });
@@ -453,7 +535,12 @@ async function rewriteStoredValues(
     let afterId = "0";
     for (let seen = 0; seen < MAX_ROWS; ) {
         const rows = parseHexRows(
-            await runStep(ports, container, rowsContainingCommand(client, table, from, afterId, PAGE), [client.password])
+            await runStep(
+                ports,
+                container,
+                rowsContainingCommand(client, table, from, afterId, PAGE),
+                [client.password]
+            )
         );
         if (rows.length === 0) return;
         seen += rows.length;
@@ -469,7 +556,9 @@ async function rewriteStoredValues(
             await writeFile(local, updateRowsScript(table, changed), { mode: 0o600 });
             try {
                 await stageInto(ports, container, local, inside);
-                await runStep(ports, container, runScriptCommand(client, inside), [client.password]);
+                await runStep(ports, container, runScriptCommand(client, inside), [
+                    client.password
+                ]);
             } finally {
                 await unstage(ports, container, inside);
                 await rm(local, { force: true });
@@ -482,7 +571,8 @@ async function rewriteStoredValues(
 /** A message written for the screen, or none: anything else can name
  *  internals, and is logged instead. */
 function readable(error: unknown): { detail?: string } {
-    if (error instanceof Error && error.name === "DatabaseOperationError") return { detail: error.message };
+    if (error instanceof Error && error.name === "DatabaseOperationError")
+        return { detail: error.message };
     console.error("polaris: a promotion step failed:", error);
     return {};
 }
@@ -525,7 +615,9 @@ export async function listPromotions(projectId: string, limit = 10): Promise<Pro
             steps = [];
         }
         const status =
-            row.status === "running" && row.createdAt.getTime() < cutoff ? "failed" : (row.status as PromotionView["status"]);
+            row.status === "running" && row.createdAt.getTime() < cutoff
+                ? "failed"
+                : (row.status as PromotionView["status"]);
         return {
             id: row.id,
             sourceName: row.sourceName,

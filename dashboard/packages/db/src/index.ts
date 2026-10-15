@@ -92,7 +92,10 @@ export function hidingBinned(base: PrismaClient): PrismaClient {
                     if (!BINNABLE.has(model) || !READS.has(operation)) return query(args);
                     const shaped = (args ?? {}) as { where?: Record<string, unknown> };
                     if (shaped.where && "binnedAt" in shaped.where) return query(args);
-                    return query({ ...shaped, where: { ...shaped.where, binnedAt: null } } as typeof args);
+                    return query({
+                        ...shaped,
+                        where: { ...shaped.where, binnedAt: null }
+                    } as typeof args);
                 }
             }
         }
@@ -101,7 +104,9 @@ export function hidingBinned(base: PrismaClient): PrismaClient {
 
 function client(): PrismaClient {
     const url = boundedUrl();
-    return hidingBinned(url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient());
+    return hidingBinned(
+        url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient()
+    );
 }
 
 export const prisma: PrismaClient = globalForPrisma.polarisPrisma ?? client();

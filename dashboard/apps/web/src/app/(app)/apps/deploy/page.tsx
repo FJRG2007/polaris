@@ -95,7 +95,8 @@ export default async function DeployPage() {
         };
     });
 
-    const canCreateHere = canManage && (await mayCreateProjectIn({ id: user.id, isAdmin: user.isAdmin }, orgId));
+    const canCreateHere =
+        canManage && (await mayCreateProjectIn({ id: user.id, isAdmin: user.isAdmin }, orgId));
 
     return (
         <ProjectsGrid

@@ -98,8 +98,14 @@ function engineFamily(engine: string): string {
  * removes.
  */
 export function planPromotion(
-    source: { readonly services: readonly PromotableService[]; readonly databases: readonly PromotableDatabase[] },
-    target: { readonly services: readonly PromotableService[]; readonly databases: readonly PromotableDatabase[] }
+    source: {
+        readonly services: readonly PromotableService[];
+        readonly databases: readonly PromotableDatabase[];
+    },
+    target: {
+        readonly services: readonly PromotableService[];
+        readonly databases: readonly PromotableDatabase[];
+    }
 ): PromotionPlan {
     const services: PromotionPair[] = [];
     const databases: PromotionPair[] = [];
@@ -240,7 +246,8 @@ export function pinnedImageRef(imageRef: string, repoDigests: readonly string[])
         const at = entry.lastIndexOf("@");
         if (at <= 0) continue;
         const digest = entry.slice(at + 1);
-        if (DIGEST.test(digest) && canonicalRepository(entry.slice(0, at)) === wanted) return `${repository}@${digest}`;
+        if (DIGEST.test(digest) && canonicalRepository(entry.slice(0, at)) === wanted)
+            return `${repository}@${digest}`;
     }
     return null;
 }
@@ -280,8 +287,10 @@ export function wordpressValueTables(listing: string): StoredValueTable[] {
         const prefix = table.slice(0, -"options".length);
         if (!tables.has(`${prefix}posts`)) continue;
         found.push({ table, id: "option_id", value: "option_value" });
-        if (tables.has(`${prefix}postmeta`)) found.push({ table: `${prefix}postmeta`, id: "meta_id", value: "meta_value" });
-        if (tables.has(`${prefix}usermeta`)) found.push({ table: `${prefix}usermeta`, id: "umeta_id", value: "meta_value" });
+        if (tables.has(`${prefix}postmeta`))
+            found.push({ table: `${prefix}postmeta`, id: "meta_id", value: "meta_value" });
+        if (tables.has(`${prefix}usermeta`))
+            found.push({ table: `${prefix}usermeta`, id: "umeta_id", value: "meta_value" });
     }
     return found;
 }
@@ -331,12 +340,19 @@ export function parseHexRows(output: string): { id: string; value: Buffer }[] {
  * of them with each value and id bound as a parameter. Values are bound from
  * hex literals, so no byte of a value is ever read as SQL.
  */
-export function updateRowsScript(target: StoredValueTable, rows: readonly { id: string; value: Buffer }[]): string {
+export function updateRowsScript(
+    target: StoredValueTable,
+    rows: readonly { id: string; value: Buffer }[]
+): string {
     const { table, id, value } = checkedTable(target);
-    const lines = [`PREPARE polaris_write FROM 'UPDATE \`${table}\` SET \`${value}\` = ? WHERE \`${id}\` = ?';`];
+    const lines = [
+        `PREPARE polaris_write FROM 'UPDATE \`${table}\` SET \`${value}\` = ? WHERE \`${id}\` = ?';`
+    ];
     for (const row of rows) {
         if (!/^\d{1,20}$/.test(row.id)) throw new Error("That is not a row id");
-        lines.push(`SET @polaris_value = X'${row.value.toString("hex")}', @polaris_id = ${row.id};`);
+        lines.push(
+            `SET @polaris_value = X'${row.value.toString("hex")}', @polaris_id = ${row.id};`
+        );
         lines.push("EXECUTE polaris_write USING @polaris_value, @polaris_id;");
     }
     lines.push("DEALLOCATE PREPARE polaris_write;");

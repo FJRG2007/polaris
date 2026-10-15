@@ -17,7 +17,11 @@ import * as restorePoints from "@/lib/restore-points/service";
 import { requireApplicationAccess, requireEnvironmentAccess } from "@/lib/deploy-project-access";
 
 const targetSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("env"), scope: z.enum(["application", "environment"]), scopeId: z.string().uuid() }),
+    z.object({
+        kind: z.literal("env"),
+        scope: z.enum(["application", "environment"]),
+        scopeId: z.string().uuid()
+    }),
     z.object({ kind: z.literal("cron"), applicationId: z.string().uuid() }),
     z.object({ kind: z.literal("routes"), applicationId: z.string().uuid() }),
     z.object({
@@ -44,19 +48,37 @@ async function resolve(raw: unknown, write: boolean): Promise<Resolved> {
         case "env": {
             const access =
                 target.scope === "application"
-                    ? await requireApplicationAccess(target.scopeId, user.id, write ? "variables.write" : "variables.read")
-                    : await requireEnvironmentAccess(target.scopeId, user.id, write ? "variables.write" : "variables.read");
+                    ? await requireApplicationAccess(
+                          target.scopeId,
+                          user.id,
+                          write ? "variables.write" : "variables.read"
+                      )
+                    : await requireEnvironmentAccess(
+                          target.scopeId,
+                          user.id,
+                          write ? "variables.write" : "variables.read"
+                      );
             const objectKey = restorePoints.restoreKeys.env(target.scope, target.scopeId);
             return { kind: "env", objectKey, ownerId: access.ownerId, orgId: access.orgId };
         }
         case "cron":
         case "routes": {
             const capability = target.kind === "cron" ? "console.use" : "domains.manage";
-            const access = await requireApplicationAccess(target.applicationId, user.id, write ? capability : "project.read");
-            return { kind: target.kind, objectKey: target.applicationId, ownerId: access.ownerId, orgId: access.orgId };
+            const access = await requireApplicationAccess(
+                target.applicationId,
+                user.id,
+                write ? capability : "project.read"
+            );
+            return {
+                kind: target.kind,
+                objectKey: target.applicationId,
+                ownerId: access.ownerId,
+                orgId: access.orgId
+            };
         }
         case "firewall": {
-            if (target.scopeType === "polaris" || target.scopeType === "global") await requirePermission("system.manage");
+            if (target.scopeType === "polaris" || target.scopeType === "global")
+                await requirePermission("system.manage");
             // Refuses a scope the reader does not own, the same check its editor uses.
             await getWafRule(user.id, target.scopeType, target.scopeId);
             const objectKey = restorePoints.restoreKeys.firewall(target.scopeType, target.scopeId);
@@ -64,7 +86,10 @@ async function resolve(raw: unknown, write: boolean): Promise<Resolved> {
         }
         case "dns": {
             await requirePermission("system.manage");
-            const objectKey = restorePoints.restoreKeys.dns({ kind: "instance", zoneId: target.zoneId });
+            const objectKey = restorePoints.restoreKeys.dns({
+                kind: "instance",
+                zoneId: target.zoneId
+            });
             return { kind: "dns", objectKey, ownerId: user.id, orgId: null };
         }
     }
@@ -82,12 +107,19 @@ export async function listHistoryAction(
     }
 }
 
-export async function restoreHistoryAction(target: HistoryTarget, pointId: string): Promise<{ error?: string }> {
+export async function restoreHistoryAction(
+    target: HistoryTarget,
+    pointId: string
+): Promise<{ error?: string }> {
     try {
         const id = z.string().uuid().parse(pointId);
         const resolved = await resolve(target, true);
         const user = await requirePermission("deploy.manage");
-        await restorePoints.restorePoint(id, resolved, { id: user.id, ownerId: resolved.ownerId, orgId: resolved.orgId });
+        await restorePoints.restorePoint(id, resolved, {
+            id: user.id,
+            ownerId: resolved.ownerId,
+            orgId: resolved.orgId
+        });
         revalidatePath("/apps/deploy");
         return {};
     } catch (error) {
@@ -96,12 +128,22 @@ export async function restoreHistoryAction(target: HistoryTarget, pointId: strin
     }
 }
 
-const binItemSchema = z.object({ kind: z.enum(["application", "database", "project"]), id: z.string().uuid() });
+const binItemSchema = z.object({
+    kind: z.enum(["application", "database", "project"]),
+    id: z.string().uuid()
+});
 
-export async function listBinAction(): Promise<{ entries?: recycleBin.BinEntry[]; days?: number; error?: string }> {
+export async function listBinAction(): Promise<{
+    entries?: recycleBin.BinEntry[];
+    days?: number;
+    error?: string;
+}> {
     try {
         const user = await requirePermission("deploy.read");
-        const [entries, days] = await Promise.all([recycleBin.listBin(user.id), recycleBin.binRetentionDays()]);
+        const [entries, days] = await Promise.all([
+            recycleBin.listBin(user.id),
+            recycleBin.binRetentionDays()
+        ]);
         return { entries, days };
     } catch (error) {
         console.error("polaris: could not list the recycle bin:", error);
@@ -119,7 +161,8 @@ export async function binItemAction(
         const user = await requirePermission("deploy.manage");
         // Access is checked on this item: it has to be the user's own, or on the
         // shelf of an organization they run (see recycle-bin requireBinned).
-        if (verb === "restore") await recycleBin.restoreFromBin(item.kind, item.id, user.id, user.id);
+        if (verb === "restore")
+            await recycleBin.restoreFromBin(item.kind, item.id, user.id, user.id);
         else await recycleBin.deleteForever(item.kind, item.id, user.id);
         await recordAudit({
             actorId: user.id,
@@ -140,7 +183,11 @@ export async function setBinDaysAction(days: number): Promise<{ error?: string }
         const user = await requirePermission("system.manage");
         const parsed = recycleBin.binDaysSchema.parse(days);
         await recycleBin.setBinRetentionDays(parsed);
-        await recordAudit({ actorId: user.id, action: "deploy.bin.retention", metadata: { days: parsed } });
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.bin.retention",
+            metadata: { days: parsed }
+        });
         return {};
     } catch {
         return { error: "daysInvalid" };
