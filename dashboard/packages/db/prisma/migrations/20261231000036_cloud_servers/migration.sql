@@ -1,5 +1,6 @@
 -- The Cloud servers app: connected provider accounts and the servers created
--- through them. Additive only. To reverse, drop both tables.
+-- through them, and the prices read for them. Additive only. To reverse,
+-- drop the three tables.
 
 CREATE TABLE IF NOT EXISTS "CloudAccount" (
     "id" UUID NOT NULL,
@@ -55,3 +56,17 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
     ALTER TABLE "CloudServer" ADD CONSTRAINT "CloudServer_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "Host"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS "CloudPrice" (
+    "id" UUID NOT NULL,
+    "provider" TEXT NOT NULL,
+    "region" TEXT NOT NULL,
+    "size" TEXT NOT NULL,
+    "priceHourly" DOUBLE PRECISION,
+    "priceMonthly" DOUBLE PRECISION,
+    "currency" TEXT,
+    "fetchedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CloudPrice_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "CloudPrice_provider_region_size_key" ON "CloudPrice"("provider", "region", "size");

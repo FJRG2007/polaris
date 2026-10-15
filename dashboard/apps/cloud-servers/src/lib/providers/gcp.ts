@@ -6,19 +6,20 @@
  *   GET  projects/{ubuntu-os-cloud|debian-cloud}/global/images/family/{family}
  *   POST zones/{z}/instances, GET/DELETE zones/{z}/instances/{name}
  *   POST zones/{z}/instances/{name}/{start|stop|reset|setMachineType}
- * Image families: https://cloud.google.com/compute/docs/images/os-details
+ * Image families: https://docs.cloud.google.com/compute/docs/images/os-details
  * The first-boot script is passed as the `startup-script` metadata key, which
  * Google's guest environment runs on every image:
  * https://cloud.google.com/compute/docs/instances/startup-scripts/linux
  *
- * Regions here are zones, where an instance actually lives. Compute Engine's
- * prices come from the Cloud Billing Catalog, which needs its own API and SKU
- * mapping, so cost is reported as not available rather than estimated.
+ * Regions here are zones, where an instance actually lives. Prices come from
+ * the Cloud Billing Catalog (see `pricing/gcp-pricing.ts`); the service account
+ * needs the Cloud Billing API enabled on its project.
  */
 
 import { z } from "zod";
 import { callJson, callVoid, ProviderError } from "../http";
 import { googleAccessToken, serviceAccountSchema } from "../auth/google-jwt";
+import { BILLING_SCOPE, computeSkus, e2Rates, machineHourly } from "../pricing/gcp-pricing";
 import type { CloudMachine, Credentials, MachineStatus, ProviderAdapter } from "./types";
 
 const API = "https://compute.googleapis.com/compute/v1";
@@ -165,8 +166,23 @@ export function createAdapter(credentials: Credentials<"gcp">): ProviderAdapter 
         async destroy(ref) {
             await callVoid(instance(ref), { method: "DELETE", headers: await headers() });
         },
-        async monthlyCost() {
-            return null;
+        async monthlyCost(region, size) {
+            const type = await callJson(
+                z.object({ guestCpus: z.number(), memoryMb: z.number(), isSharedCpu: z.boolean().optional() }),
+                `${zone(region)}/machineTypes/${encodeURIComponent(size)}`,
+                { headers: await headers() }
+            );
+            if (type.isSharedCpu || !size.startsWith("e2-")) return null;
+            const billing = await googleAccessToken(account, BILLING_SCOPE);
+            const rates = e2Rates(await computeSkus(billing.token), region.replace(/-[a-z]$/, ""));
+            if (!rates) return null;
+            return {
+                id: size,
+                label: size,
+                priceHourly: machineHourly(rates, type.guestCpus, type.memoryMb),
+                priceMonthly: null,
+                currency: rates.currency
+            };
         }
     };
 }

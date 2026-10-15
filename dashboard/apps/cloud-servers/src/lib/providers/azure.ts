@@ -8,6 +8,8 @@
  *   GET .../providers/Microsoft.Compute/locations/{location}/vmSizes
  * Network: https://learn.microsoft.com/rest/api/virtualnetwork/
  * Resource groups: https://learn.microsoft.com/rest/api/resources/resource-groups
+ * Images: the URNs listed in https://learn.microsoft.com/azure/virtual-machines/linux/cli-ps-findimage
+ * and Canonical's https://discourse.ubuntu.com/t/find-ubuntu-images-on-azure/34259
  * Prices: the public Retail Prices API, https://learn.microsoft.com/rest/api/cost-management/retail-prices/azure-retail-prices
  *
  * Everything a machine needs lives in one resource group per location
@@ -30,7 +32,7 @@ const LOCATIONS_API = "2022-12-01";
 const IMAGES: readonly { id: string; label: string }[] = [
     { id: "Canonical:ubuntu-24_04-lts:server", label: "Ubuntu 24.04 LTS" },
     { id: "Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2", label: "Ubuntu 22.04 LTS" },
-    { id: "Debian:debian-12:12-gen2", label: "Debian 12" }
+    { id: "Debian:debian-11:11-backports-gen2", label: "Debian 11" }
 ];
 
 const tokenSchema = z.object({ access_token: z.string().min(1), expires_in: z.coerce.number() });

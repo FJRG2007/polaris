@@ -9,6 +9,8 @@
  *   POST /datacenters/{dc}/servers/{id}/{start|stop|reboot}
  *   DELETE /datacenters/{dc}/volumes/{id}
  * Authentication: a token as `Authorization: Bearer`.
+ * Volume fields (type enum, size in GB, imageAlias, sshKeys, base64 userData for
+ * cloud-init images): https://github.com/ionos-cloud/sdk-go/blob/master/docs/models/VolumeProperties.md
  *
  * IONOS servers have no fixed sizes: cores and memory are chosen freely, so the
  * sizes offered are a short list of combinations. IONOS publishes no price API,
@@ -19,7 +21,7 @@
  */
 
 import { z } from "zod";
-import { throwawayPassword } from "../auth/throwaway";
+import { throwawaySshKey } from "../auth/throwaway";
 import { bearer, callJson, callVoid, ProviderError } from "../http";
 import type { CloudMachine, Credentials, MachineStatus, ProviderAdapter, SizeChoice } from "./types";
 
@@ -168,7 +170,8 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
                                         size: 20,
                                         type: "SSD Standard",
                                         imageAlias: spec.image,
-                                        imagePassword: throwawayPassword(),
+                                        // Public Linux images take keys; Polaris never uses this one.
+                                        sshKeys: [throwawaySshKey()],
                                         userData: Buffer.from(spec.userData).toString("base64")
                                     }
                                 }

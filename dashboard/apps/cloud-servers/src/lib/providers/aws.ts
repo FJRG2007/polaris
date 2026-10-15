@@ -11,12 +11,13 @@
  * Image owners: Canonical 099720109477, Debian 136693071363 (the IDs each
  * publisher documents for its official AMIs).
  *
- * EC2 has no price in these answers; its Price List is a separate, very large
- * catalogue, so cost is reported as not available rather than estimated.
+ * Prices: the Price List Query API, one filtered GetProducts call per type and
+ * region (see `pricing/aws-pricing.ts`).
  */
 
 import { z } from "zod";
 import { signV4 } from "../auth/sigv4";
+import { awsHourlyPrice } from "../pricing/aws-pricing";
 import { parseWith, send, ProviderError } from "../http";
 import { child, items, parseXml, textOf, type XmlNode } from "../xml";
 import type { CloudMachine, Credentials, MachineStatus, ProviderAdapter } from "./types";
@@ -220,8 +221,9 @@ export function createAdapter(credentials: Credentials<"aws">): ProviderAdapter 
         async destroy(ref) {
             await call(ref.region, "TerminateInstances", ids(ref));
         },
-        async monthlyCost() {
-            return null;
+        async monthlyCost(region, size) {
+            const hourly = await awsHourlyPrice(credentials, size, region);
+            return hourly === null ? null : { id: size, label: size, priceHourly: hourly, priceMonthly: null, currency: "USD" };
         }
     };
 }

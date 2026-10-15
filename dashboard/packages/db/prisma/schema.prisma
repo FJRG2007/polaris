@@ -13367,3 +13367,19 @@ model CloudServer {
     @@index([ownerId, destroyedAt])
     @@index([accountId, destroyedAt])
 }
+
+// A provider's published price for one size in one region, kept for a day so
+// the hourly refresh does not download a price list every pass. Null prices
+// are kept too: "this provider publishes none" is also worth remembering.
+model CloudPrice {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    provider     String
+    region       String
+    size         String
+    priceHourly  Float?
+    priceMonthly Float?
+    currency     String?
+    fetchedAt    DateTime @default(now())
+
+    @@unique([provider, region, size])
+}

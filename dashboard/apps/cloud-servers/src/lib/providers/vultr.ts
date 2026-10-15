@@ -5,8 +5,8 @@
  *   GET  /v2/regions, /v2/plans?type=vc2, /v2/os
  *   POST /v2/instances, GET/PATCH/DELETE /v2/instances/{id}
  *   POST /v2/instances/{id}/{start|halt|reboot}
- * Plans carry `monthly_cost` in USD and the regions they are sold in. Vultr
- * publishes no hourly figure here, so only the monthly one is used.
+ * Plans carry `hourly_cost` and `monthly_cost` in USD and the regions they are
+ * sold in (checked against a live GET /v2/plans answer, which needs no key).
  * `user_data` is sent base64-encoded, as the API requires.
  */
 
@@ -25,6 +25,7 @@ const planSchema = z.object({
     ram: z.number(),
     disk: z.number(),
     monthly_cost: z.number(),
+    hourly_cost: z.number().optional(),
     locations: z.array(z.string())
 });
 const plansSchema = z.object({ plans: z.array(planSchema).max(1000) });
@@ -62,7 +63,7 @@ function sizeChoice(p: z.infer<typeof planSchema>): SizeChoice {
     return {
         id: p.id,
         label: `${p.vcpu_count} vCPU, ${p.ram / 1024} GB RAM, ${p.disk} GB`,
-        priceHourly: null,
+        priceHourly: p.hourly_cost ?? null,
         priceMonthly: p.monthly_cost,
         currency: "USD"
     };

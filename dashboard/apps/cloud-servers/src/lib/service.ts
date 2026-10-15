@@ -52,6 +52,46 @@ export async function requireCloudUser() {
 /** The most servers one refresh reads, so a job pass stays bounded. */
 const REFRESH_LIMIT = 500;
 
+/** How long a provider's published price is kept before it is read again. */
+export const PRICE_TTL_MS = 24 * 3_600_000;
+
+/** Whether a price read at `fetchedAt` is still good at `now`. */
+export function priceFresh(fetchedAt: Date, now: Date): boolean {
+    return now.getTime() - fetchedAt.getTime() < PRICE_TTL_MS;
+}
+
+type PriceFigures = { priceHourly: number | null; priceMonthly: number | null; currency: string | null };
+
+/**
+ * A size's price, from the day-old cache or the provider. A failed read keeps
+ * the last known figure and is not cached, so it is tried again next time; a
+ * provider that publishes no price is cached as that, so it is not asked hourly.
+ */
+async function cachedPrice(provider: string, adapter: ProviderAdapter, region: string, size: string): Promise<PriceFigures | null> {
+    const where = { provider_region_size: { provider, region, size } };
+    const row = await prisma.cloudPrice.findUnique({ where });
+    const fromRow = (r: PriceFigures) =>
+        r.priceHourly === null && r.priceMonthly === null ? null : { priceHourly: r.priceHourly, priceMonthly: r.priceMonthly, currency: r.currency };
+    if (row && priceFresh(row.fetchedAt, new Date())) return fromRow(row);
+    let read: Awaited<ReturnType<ProviderAdapter["monthlyCost"]>>;
+    try {
+        read = await adapter.monthlyCost(region, size);
+    } catch {
+        return row ? fromRow(row) : null;
+    }
+    const figures = {
+        priceHourly: read?.priceHourly ?? null,
+        priceMonthly: read?.priceMonthly ?? null,
+        currency: read?.currency ?? null
+    };
+    await prisma.cloudPrice.upsert({
+        where,
+        create: { provider, region, size, ...figures },
+        update: { ...figures, fetchedAt: new Date() }
+    });
+    return fromRow(figures);
+}
+
 const accountSelect = {
     id: true,
     provider: true,
@@ -260,7 +300,7 @@ export async function createServer(
     const adapter = await adapterOf(account);
     const enrollment = await host.cloudServersHost.openCloudEnrollment(userId, input.name);
     if (!reachableFromCloud(enrollment.command)) await refuse("errors.notReachable");
-    const price = await adapter.monthlyCost(input.region, input.size).catch(() => null);
+    const price = await cachedPrice(account.provider, adapter, input.region, input.size);
     const machine = await adapter
         .create({ ...input, userData: renderFirstBoot(enrollment.command) })
         .catch(providerRefusal);
@@ -342,7 +382,7 @@ export async function resizeServer(userId: string, serverId: string, size: strin
     const chosen = sizes.find((s) => s.id === size);
     if (!chosen) await refuse("errors.unknownSize");
     await adapter.resize!({ providerId: server.providerId, region: server.region }, size).catch(providerRefusal);
-    const price = chosen?.priceHourly !== null || chosen?.priceMonthly !== null ? chosen : await adapter.monthlyCost(server.region, size).catch(() => null);
+    const price = await cachedPrice(server.account.provider, adapter, server.region, size);
     await prisma.cloudServer.update({
         where: { id: server.id },
         data: {
@@ -407,12 +447,12 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
         const first = servers[0]!;
         try {
             const adapter = await adapterOf(first.account);
-            const prices = new Map<string, Awaited<ReturnType<ProviderAdapter["monthlyCost"]>>>();
+            const prices = new Map<string, PriceFigures | null>();
             for (const server of servers) {
                 const machine = await adapter.get({ providerId: server.providerId, region: server.region });
                 const key = `${server.region}\u0000${machine?.size ?? server.size}`;
                 if (machine && !prices.has(key)) {
-                    prices.set(key, await adapter.monthlyCost(server.region, machine.size).catch(() => null));
+                    prices.set(key, await cachedPrice(first.account.provider, adapter, server.region, machine.size));
                 }
                 const price = prices.get(key);
                 await prisma.cloudServer.update({

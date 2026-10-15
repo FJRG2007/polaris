@@ -184,9 +184,8 @@ describe("AWS EC2", () => {
         expect(made).toEqual({ providerId: "i-0123456789abcdef0", name: "web-1", region: "eu-west-1", size: "t3.micro", status: "creating", ipv4: null });
     });
 
-    it("reports cost as not available and refuses an unknown region", async () => {
+    it("refuses an unknown region before calling anything", async () => {
         const a = await adapter("aws", creds);
-        expect(await a.monthlyCost("eu-west-1", "t3.micro")).toBeNull();
         await expect(a.get({ providerId: "i-0123456789abcdef0", region: "../evil" })).rejects.toBeInstanceOf(ProviderError);
         expect(seen).toHaveLength(0);
     });

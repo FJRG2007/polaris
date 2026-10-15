@@ -55,10 +55,13 @@ const tokenSchema = z.object({
 });
 
 /** An access token for the Compute Engine scope. */
-export async function googleAccessToken(account: ServiceAccount): Promise<{ token: string; expiresAt: number }> {
+export async function googleAccessToken(
+    account: ServiceAccount,
+    scope: string = COMPUTE_SCOPE
+): Promise<{ token: string; expiresAt: number }> {
     const body = new URLSearchParams({
         grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        assertion: buildAssertion(account, COMPUTE_SCOPE, new Date())
+        assertion: buildAssertion(account, scope, new Date())
     });
     const answer = await callJson(tokenSchema, GOOGLE_TOKEN_URL, {
         method: "POST",

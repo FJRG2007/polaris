@@ -345,44 +345,72 @@ function ServerTable({
     const money = useMoney();
     const priceCell = (amount: number | null, currency: string | null) =>
         money(amount, currency) ?? <span className="text-muted-foreground">{t("servers.noPrice")}</span>;
+    const menu = (server: ServerView) =>
+        server.status === "destroyed" ? null : (
+            <ServerMenu server={server} onPower={onPower} onRefresh={onRefresh} onResize={onResize} onDestroy={onDestroy} />
+        );
+    const status = (server: ServerView) => (
+        <Badge variant={TONE[server.status] ?? "neutral"}>{t(`status.${server.status}` as "status.unknown")}</Badge>
+    );
     return (
-        <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[56rem] text-sm">
-                <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                    <tr>
-                        <th className="px-3 py-2 font-medium">{t("servers.name")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.provider")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.region")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.size")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.status")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.address")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.hourly")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.monthly")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.thisMonth")}</th>
-                        <th className="px-3 py-2 font-medium">{t("servers.sinceCreation")}</th>
-                        <th className="px-3 py-2" />
-                    </tr>
-                </thead>
-                <tbody>
-                    {servers.map((server) => {
-                        const gone = server.status === "destroyed";
-                        return (
+        <>
+            {/* Below 640px each server is a stacked card: nothing scrolls sideways. */}
+            <ul className="flex flex-col gap-2 sm:hidden">
+                {servers.map((server) => (
+                    <li key={server.id} className="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-3">
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                            <div className="min-w-0">
+                                <ServerName server={server} />
+                                <p className="truncate text-xs text-muted-foreground">
+                                    {PROVIDER_NAMES[server.provider]} - {accountName.get(server.accountId)}
+                                </p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                                {status(server)}
+                                {menu(server)}
+                            </div>
+                        </div>
+                        <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                            <dt className="text-muted-foreground">{t("servers.region")}</dt>
+                            <dd className="min-w-0 truncate">{server.region}</dd>
+                            <dt className="text-muted-foreground">{t("servers.size")}</dt>
+                            <dd className="min-w-0 truncate">{server.size}</dd>
+                            <dt className="text-muted-foreground">{t("servers.address")}</dt>
+                            <dd className="min-w-0 truncate font-mono text-xs">{server.ipv4 ?? "-"}</dd>
+                            <dt className="text-muted-foreground">{t("servers.hourly")}</dt>
+                            <dd className="min-w-0">{priceCell(server.priceHourly, server.currency)}</dd>
+                            <dt className="text-muted-foreground">{t("servers.monthly")}</dt>
+                            <dd className="min-w-0">{priceCell(server.priceMonthly, server.currency)}</dd>
+                            <dt className="text-muted-foreground">{t("servers.thisMonth")}</dt>
+                            <dd className="min-w-0">{money(server.thisMonth, server.currency) ?? "-"}</dd>
+                            <dt className="text-muted-foreground">{t("servers.sinceCreation")}</dt>
+                            <dd className="min-w-0">{money(server.sinceCreation, server.currency) ?? "-"}</dd>
+                        </dl>
+                    </li>
+                ))}
+            </ul>
+            <div className="hidden overflow-x-auto rounded-lg border border-border sm:block">
+                <table className="w-full min-w-[56rem] text-sm">
+                    <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                        <tr>
+                            <th className="px-3 py-2 font-medium">{t("servers.name")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.provider")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.region")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.size")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.status")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.address")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.hourly")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.monthly")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.thisMonth")}</th>
+                            <th className="px-3 py-2 font-medium">{t("servers.sinceCreation")}</th>
+                            <th className="px-3 py-2" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {servers.map((server) => (
                             <tr key={server.id} className="border-t border-border align-top">
                                 <td className="max-w-[14rem] px-3 py-2">
-                                    {server.hostId ? (
-                                        <Link
-                                            href={`/apps/servers/${server.hostId}`}
-                                            className="block truncate font-medium hover:underline"
-                                            title={t("servers.openInServers")}
-                                        >
-                                            {server.name}
-                                        </Link>
-                                    ) : (
-                                        <span className="block truncate font-medium" title={server.name}>
-                                            {server.name}
-                                        </span>
-                                    )}
-                                    {server.error && <span className="block break-words text-xs text-danger-ink">{server.error}</span>}
+                                    <ServerName server={server} />
                                 </td>
                                 <td className="px-3 py-2">
                                     <span className="block">{PROVIDER_NAMES[server.provider]}</span>
@@ -390,67 +418,92 @@ function ServerTable({
                                 </td>
                                 <td className="px-3 py-2">{server.region}</td>
                                 <td className="px-3 py-2">{server.size}</td>
-                                <td className="px-3 py-2">
-                                    <Badge variant={TONE[server.status] ?? "neutral"}>
-                                        {t(`status.${server.status}` as "status.unknown")}
-                                    </Badge>
-                                </td>
+                                <td className="px-3 py-2">{status(server)}</td>
                                 <td className="px-3 py-2 font-mono text-xs">{server.ipv4 ?? "-"}</td>
                                 <td className="px-3 py-2">{priceCell(server.priceHourly, server.currency)}</td>
                                 <td className="px-3 py-2">{priceCell(server.priceMonthly, server.currency)}</td>
                                 <td className="px-3 py-2">{money(server.thisMonth, server.currency) ?? "-"}</td>
                                 <td className="px-3 py-2">{money(server.sinceCreation, server.currency) ?? "-"}</td>
-                                <td className="px-3 py-2 text-right">
-                                    {!gone && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    aria-label={t("servers.actions", { name: server.name })}
-                                                    title={t("servers.actions", { name: server.name })}
-                                                >
-                                                    <MoreHorizontal className="size-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onSelect={() => onRefresh(server)}>
-                                                    <RefreshCw className="size-4" />
-                                                    {t("servers.refresh")}
-                                                </DropdownMenuItem>
-                                                {server.status === "off" ? (
-                                                    <DropdownMenuItem onSelect={() => onPower(server, "power_on")}>
-                                                        {t("servers.powerOn")}
-                                                    </DropdownMenuItem>
-                                                ) : (
-                                                    <DropdownMenuItem onSelect={() => onPower(server, "power_off")}>
-                                                        {t("servers.powerOff")}
-                                                    </DropdownMenuItem>
-                                                )}
-                                                <DropdownMenuItem
-                                                    disabled={server.status === "off"}
-                                                    onSelect={() => onPower(server, "reboot")}
-                                                >
-                                                    {t("servers.reboot")}
-                                                </DropdownMenuItem>
-                                                {server.resize !== "none" && (
-                                                    <DropdownMenuItem onSelect={() => onResize(server)}>
-                                                        {t("servers.resize")}
-                                                    </DropdownMenuItem>
-                                                )}
-                                                <DropdownMenuItem className="text-danger-ink" onSelect={() => onDestroy(server)}>
-                                                    {t("servers.destroy")}
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    )}
-                                </td>
+                                <td className="px-3 py-2 text-right">{menu(server)}</td>
                             </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+}
+
+/** The server's name, opening it in Servers once it has joined Polaris. */
+function ServerName({ server }: { server: ServerView }) {
+    const t = useCloudT();
+    return (
+        <>
+            {server.hostId ? (
+                <Link
+                    href={`/apps/servers/${server.hostId}`}
+                    className="block truncate font-medium hover:underline"
+                    title={t("servers.openInServers")}
+                >
+                    {server.name}
+                </Link>
+            ) : (
+                <span className="block truncate font-medium" title={server.name}>
+                    {server.name}
+                </span>
+            )}
+            {server.error && <span className="block break-words text-xs text-danger-ink">{server.error}</span>}
+        </>
+    );
+}
+
+function ServerMenu({
+    server,
+    onPower,
+    onRefresh,
+    onResize,
+    onDestroy
+}: {
+    server: ServerView;
+    onPower: (server: ServerView, action: "power_on" | "power_off" | "reboot") => void;
+    onRefresh: (server: ServerView) => void;
+    onResize: (server: ServerView) => void;
+    onDestroy: (server: ServerView) => void;
+}) {
+    const t = useCloudT();
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={t("servers.actions", { name: server.name })}
+                    title={t("servers.actions", { name: server.name })}
+                >
+                    <MoreHorizontal className="size-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => onRefresh(server)}>
+                    <RefreshCw className="size-4" />
+                    {t("servers.refresh")}
+                </DropdownMenuItem>
+                {server.status === "off" ? (
+                    <DropdownMenuItem onSelect={() => onPower(server, "power_on")}>{t("servers.powerOn")}</DropdownMenuItem>
+                ) : (
+                    <DropdownMenuItem onSelect={() => onPower(server, "power_off")}>{t("servers.powerOff")}</DropdownMenuItem>
+                )}
+                <DropdownMenuItem disabled={server.status === "off"} onSelect={() => onPower(server, "reboot")}>
+                    {t("servers.reboot")}
+                </DropdownMenuItem>
+                {server.resize !== "none" && (
+                    <DropdownMenuItem onSelect={() => onResize(server)}>{t("servers.resize")}</DropdownMenuItem>
+                )}
+                <DropdownMenuItem className="text-danger-ink" onSelect={() => onDestroy(server)}>
+                    {t("servers.destroy")}
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
