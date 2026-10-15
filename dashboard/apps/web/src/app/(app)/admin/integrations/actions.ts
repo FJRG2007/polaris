@@ -123,7 +123,9 @@ export async function saveConnectionSignInAction(
  * attention and its alert is answered in every operator's bell. For a failure
  * the operator has dealt with outside Polaris, or decided to leave.
  */
-export async function dismissConnectionFailureAction(provider: string): Promise<{ error?: string }> {
+export async function dismissConnectionFailureAction(
+    provider: string
+): Promise<{ error?: string }> {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
     if (typeof provider !== "string" || !findConnectionProvider(provider))
