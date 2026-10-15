@@ -38,7 +38,7 @@ const METHOD_TONE: Record<string, string> = {
     GET: "text-sky-600 dark:text-sky-400",
     POST: "text-emerald-600 dark:text-emerald-400",
     PUT: "text-amber-600 dark:text-amber-400",
-    DELETE: "text-red-600 dark:text-red-400"
+    DELETE: "text-danger"
 };
 
 const CODE =
@@ -54,6 +54,8 @@ export function ApiReferenceView({
     const t = useTranslations("account");
     const base = useAppUrl();
     const tags = [...new Set(entries.map((entry) => entry.tag))];
+    // i18n-ignore: an HTTP header, typed as is
+    const header = `Authorization: Bearer ${placeholder}`;
 
     return (
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -88,11 +90,8 @@ export function ApiReferenceView({
                 <h2 className="text-sm font-semibold">{t("apiKeys.reference.auth")}</h2>
                 <p className="text-sm text-muted-foreground">{t("apiKeys.reference.authBody")}</p>
                 <div className="flex items-start gap-2">
-                    {/* i18n-ignore: an HTTP header, typed as is */}
-                    <pre
-                        className={cn(CODE, "min-w-0 flex-1")}
-                    >{`Authorization: Bearer ${placeholder}`}</pre>
-                    <CopyButton value={`Authorization: Bearer ${placeholder}`} />
+                    <pre className={cn(CODE, "min-w-0 flex-1")}>{header}</pre>
+                    <CopyButton value={header} />
                 </div>
             </section>
 
@@ -215,7 +214,9 @@ function Operation({
                     <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
                         {t("apiKeys.reference.body")}
                     </summary>
-                    <pre className={cn(CODE, "mt-1 max-h-80 overflow-y-auto")}>{entry.body}</pre>
+                    <pre className={cn(CODE, "mt-1 max-h-80 overflow-y-auto overscroll-y-contain")}>
+                        {entry.body}
+                    </pre>
                 </details>
             ) : entry.binaryType ? (
                 <p className="text-xs text-muted-foreground">
@@ -242,7 +243,12 @@ function Operation({
                                     </span>
                                 ) : null}
                             </summary>
-                            <pre className={cn(CODE, "mt-1 max-h-80 overflow-y-auto")}>
+                            <pre
+                                className={cn(
+                                    CODE,
+                                    "mt-1 max-h-80 overflow-y-auto overscroll-y-contain"
+                                )}
+                            >
                                 {response.schema}
                             </pre>
                         </details>
