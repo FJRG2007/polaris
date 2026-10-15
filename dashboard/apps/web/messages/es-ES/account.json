@@ -262,7 +262,9 @@
             "cli": {
                 "badge": "CLI",
                 "title": "Creada por plr login en un equipo. También aparece en Sesiones, donde se puede cerrar; plr logout también la revoca."
-            }
+            },
+            "reference": "Referencia API",
+            "usage": "Uso"
         },
         "form": {
             "neverExpires": "No caduca",
@@ -335,6 +337,71 @@
                 "tasks": "Tareas",
                 "inbox": "Entrada",
                 "administration": "Administración"
+            }
+        },
+        "reference": {
+            "title": "Referencia de la API",
+            "intro": "Todas las llamadas que puede hacer una clave. Hace lo que permiten sus permisos, nunca más que su dueño.",
+            "back": "Claves API",
+            "download": "Archivo OpenAPI",
+            "auth": "Autenticación",
+            "authBody": "Envía la clave en la cabecera Authorization como token bearer. Los ejemplos usan un marcador; pon tu clave en su lugar.",
+            "changes": "Cambia datos",
+            "parameters": "Parámetros",
+            "body": "Cuerpo",
+            "binaryBody": "Archivo ({type})",
+            "responses": "Respuestas",
+            "example": "Ejemplo",
+            "required": "obligatorio",
+            "textToo": "también texto",
+            "contents": "Contenido",
+            "where": {
+                "path": "ruta",
+                "query": "consulta",
+                "header": "cabecera"
+            }
+        },
+        "usage": {
+            "title": "Uso de {name}",
+            "back": "Claves API",
+            "edit": "Editar clave",
+            "range": "Periodo",
+            "ranges": {
+                "24h": "24 horas",
+                "7d": "7 días",
+                "30d": "30 días",
+                "90d": "90 días"
+            },
+            "calls": "Llamadas",
+            "success": "Correctas",
+            "clientErrors": "Errores cliente",
+            "serverErrors": "Errores servidor",
+            "p50": "Tiempo medio",
+            "p95": "Percentil 95",
+            "ms": "{ms} ms",
+            "over": "más de {ms} ms",
+            "overTime": "Llamadas",
+            "errorsOverTime": "Errores",
+            "byRoute": "Por ruta",
+            "byStatus": "Por estado",
+            "route": "Ruta",
+            "status": "Estado",
+            "errors": "Errores",
+            "share": "Parte",
+            "lastUsed": "Último uso",
+            "neverUsed": "Sin usar aún",
+            "lastFrom": "{device} desde {ip}",
+            "empty": "Sin llamadas en este periodo",
+            "emptyHint": "Las llamadas con esta clave aparecen aquí en menos de un minuto.",
+            "failed": "No se pudo cargar el uso. Revisa tu conexión y vuelve a intentarlo.",
+            "retry": "Reintentar",
+            "other": "Otras rutas",
+            "kept": "Contado por horas y guardado 90 días.",
+            "openRoute": "Abrir {route} en la referencia de la API",
+            "classes": {
+                "success": "Correcta",
+                "client": "Error cliente",
+                "server": "Error servidor"
             }
         }
     },

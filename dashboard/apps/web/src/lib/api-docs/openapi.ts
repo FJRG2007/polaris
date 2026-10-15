@@ -5,6 +5,7 @@
  */
 
 import type { ZodTypeAny } from "zod";
+import { curlCommand } from "./curl";
 import { DOCUMENTED_ROUTES, type DocumentedRoute } from "./routes";
 import { isOptional, toJsonSchema, type JsonSchema } from "./json-schema";
 
@@ -136,14 +137,8 @@ export function buildOpenApi(baseUrl: string, routes: readonly DocumentedRoute[]
 
 /** A curl line for one route, with the placeholder key and example path values. */
 export function curlExample(route: DocumentedRoute, baseUrl: string): string {
-    const path = route.path.replace(/\{([^}]+)\}/g, (_, name: string) => `<${name}>`);
-    const lines = [`curl -X ${route.method} "${baseUrl}${path}"`, `  -H "Authorization: Bearer ${PLACEHOLDER_KEY}"`];
-    if (route.body) {
-        lines.push("  -H \"Content-Type: application/json\"", `  -d '${JSON.stringify(exampleOf(toJsonSchema(route.body)))}'`);
-    } else if (route.binaryBody) {
-        lines.push(`  -H "Content-Type: ${route.binaryBody.contentType}"`, "  --data-binary @image.tar.gz");
-    }
-    return lines.join(" \\\n");
+    const bodyExample = route.body ? JSON.stringify(exampleOf(toJsonSchema(route.body))) : null;
+    return curlCommand({ method: route.method, path: route.path, bodyExample, binaryType: route.binaryBody?.contentType }, baseUrl, PLACEHOLDER_KEY);
 }
 
 /** A minimal example value for a JSON schema: required fields only, defaults where given. */

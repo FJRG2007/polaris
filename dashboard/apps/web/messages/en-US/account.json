@@ -262,7 +262,9 @@
             "cli": {
                 "badge": "CLI",
                 "title": "Made by plr login on a computer. It is also listed under Sessions, where it can be signed out; plr logout revokes it too."
-            }
+            },
+            "reference": "API reference",
+            "usage": "Usage"
         },
         "form": {
             "neverExpires": "Never expires",
@@ -335,6 +337,71 @@
                 "tasks": "Tasks",
                 "inbox": "Inbox",
                 "administration": "Administration"
+            }
+        },
+        "reference": {
+            "title": "API reference",
+            "intro": "Every call an API key can make. A key does what its scopes allow, and never more than its owner can.",
+            "back": "API keys",
+            "download": "OpenAPI file",
+            "auth": "Authentication",
+            "authBody": "Send the key in the Authorization header as a bearer token. The examples use a placeholder; put your own key in its place.",
+            "changes": "Changes data",
+            "parameters": "Parameters",
+            "body": "Request body",
+            "binaryBody": "Raw file ({type})",
+            "responses": "Responses",
+            "example": "Example",
+            "required": "required",
+            "textToo": "also plain text",
+            "contents": "Contents",
+            "where": {
+                "path": "path",
+                "query": "query",
+                "header": "header"
+            }
+        },
+        "usage": {
+            "title": "Usage of {name}",
+            "back": "API keys",
+            "edit": "Edit key",
+            "range": "Period",
+            "ranges": {
+                "24h": "24 hours",
+                "7d": "7 days",
+                "30d": "30 days",
+                "90d": "90 days"
+            },
+            "calls": "Calls",
+            "success": "Successful",
+            "clientErrors": "Client errors",
+            "serverErrors": "Server errors",
+            "p50": "Median time",
+            "p95": "95th percentile",
+            "ms": "{ms} ms",
+            "over": "over {ms} ms",
+            "overTime": "Calls",
+            "errorsOverTime": "Errors",
+            "byRoute": "By route",
+            "byStatus": "By status",
+            "route": "Route",
+            "status": "Status",
+            "errors": "Errors",
+            "share": "Share",
+            "lastUsed": "Last used",
+            "neverUsed": "Not used yet",
+            "lastFrom": "{device} from {ip}",
+            "empty": "No calls in this period",
+            "emptyHint": "Calls made with this key show up here within a minute.",
+            "failed": "Usage could not be loaded. Check your connection and try again.",
+            "retry": "Try again",
+            "other": "Other routes",
+            "kept": "Counted by the hour and kept for 90 days.",
+            "openRoute": "Open {route} in the API reference",
+            "classes": {
+                "success": "Success",
+                "client": "Client error",
+                "server": "Server error"
             }
         }
     },
