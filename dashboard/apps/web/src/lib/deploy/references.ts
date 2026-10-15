@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { slugify } from "@polaris/deploy";
 import { scopeValues } from "./env-values";
+import { groupLayers } from "./variable-groups";
 import { currentReleaseRef } from "./releases";
 import { containerPortOf, referencedDomain } from "./private-names";
 
@@ -139,7 +140,10 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
             (one) => one.slug === name || slugify(one.name) === name
         );
         if (application) {
+            // Its linked groups underneath its own variables, as it runs with them.
+            const grouped = Object.assign({}, ...(await groupLayers(application.id)).map((layer) => layer.values));
             remember(name, {
+                ...grouped,
                 ...(await scopeValues("application", application.id)),
                 ...(await describeService(application))
             });

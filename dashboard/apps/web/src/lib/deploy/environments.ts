@@ -28,6 +28,7 @@ import { slugify } from "@polaris/deploy";
 import { copyWafRule } from "../waf-service";
 import { setSetting } from "../setting-store";
 import { copyScopeValues } from "./env-values";
+import { copyGroupLinks } from "./variable-groups";
 import * as activity from "../activity/activity";
 import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
@@ -241,7 +242,13 @@ export async function cloneEnvironment(
                 { scopeType: "application", scopeId: created.id },
                 { secrets }
             );
-            withheldByService.push({ applicationId: created.id, keys: own.withheld });
+            // The copy reads the same variable groups; a preview skips any
+            // group holding a secret, the way it is not given the service's own.
+            const linked = await copyGroupLinks(application.id, created.id, { secrets });
+            withheldByService.push({
+                applicationId: created.id,
+                keys: [...new Set([...own.withheld, ...linked.withheld])]
+            });
             for (const volume of application.volumes) {
                 await createVolume(ownerId, {
                     applicationId: created.id,

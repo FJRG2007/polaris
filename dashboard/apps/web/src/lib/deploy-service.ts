@@ -8,7 +8,7 @@
 
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
-import { groupLayers } from "@/lib/deploy/variable-groups";
+import { copyGroupLinks, groupLayers } from "@/lib/deploy/variable-groups";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
@@ -2669,6 +2669,7 @@ export async function duplicateApplication(
         { scopeType: "application", scopeId: app.id },
         { scopeType: "application", scopeId: created.id }
     );
+    await copyGroupLinks(app.id, created.id);
     return created.id;
 }
 

@@ -324,6 +324,45 @@ export async function groupLayers(applicationId: string): Promise<core.VariableL
     });
 }
 
+/**
+ * Give a copy of a service the same linked groups, in the same order. A copy
+ * whose code is not trusted with secrets (`secrets: false`, a preview) skips
+ * every group that holds one, and answers those secrets' keys as withheld, so
+ * a preview cannot read a group's secret through the link.
+ */
+export async function copyGroupLinks(
+    fromApplicationId: string,
+    toApplicationId: string,
+    options: { secrets?: boolean } = {}
+): Promise<{ withheld: string[] }> {
+    const links = await prisma.variableGroupLink.findMany({
+        where: { applicationId: fromApplicationId },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { groupId: true, position: true, createdById: true }
+    });
+    if (links.length === 0) return { withheld: [] };
+    const secretRows =
+        options.secrets === false
+            ? await prisma.envVar.findMany({
+                  where: { scopeType: "group", scopeId: { in: links.map((link) => link.groupId) }, isSecret: true },
+                  select: { scopeId: true, key: true }
+              })
+            : [];
+    const withheld: string[] = [];
+    const kept = links.filter((link) => {
+        const secrets = secretRows.filter((row) => row.scopeId === link.groupId);
+        withheld.push(...secrets.map((row) => row.key));
+        return secrets.length === 0;
+    });
+    if (kept.length > 0) {
+        await prisma.variableGroupLink.createMany({
+            data: kept.map((link) => ({ ...link, applicationId: toApplicationId })),
+            skipDuplicates: true
+        });
+    }
+    return { withheld: [...new Set(withheld)] };
+}
+
 /** The deployed services that link a group: what a change to it reaches. */
 export async function deployedServicesLinking(groupId: string): Promise<string[]> {
     const rows = await prisma.variableGroupLink.findMany({
