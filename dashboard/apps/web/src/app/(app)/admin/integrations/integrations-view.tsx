@@ -330,15 +330,10 @@ export function IntegrationsView({
                                                     is the one thing on this grid worth reading
                                                     before "On": it is on, and it is not working. */}
                                                 {card.failure ? (
-                                                    <span className="flex shrink-0 items-center gap-1">
-                                                        <Badge variant="warning">
-                                                            {t("integrations.grid.needsAttention")}
-                                                        </Badge>
-                                                        <MarkSeenButton
-                                                            slug={card.slug}
-                                                            name={card.name}
-                                                        />
-                                                    </span>
+                                                    <AttentionBadge
+                                                        slug={card.slug}
+                                                        name={card.name}
+                                                    />
                                                 ) : card.enabled ? (
                                                     <Badge variant="success">
                                                         {t("integrations.grid.on")}
@@ -719,14 +714,6 @@ function SetupSteps({
     );
 }
 
-/**
- * What the last authorization failed with.
- *
- * The operator is the only person who can act on it and the only one who never
- * sees it happen: it fails in somebody else's browser, against a console only
- * this account can open. The alert says the same thing - this is here for
- * whoever arrives at the screen afterwards.
- */
 function useMarkSeen(slug: string) {
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -747,31 +734,50 @@ function useMarkSeen(slug: string) {
     return { pending, error, markSeen };
 }
 
-/** The same "seen" from the grid, so a card can be cleared without opening it. */
-function MarkSeenButton({ slug, name }: { slug: string; name: string }) {
+/** The grid's "Needs attention", with the same "seen" next to it so a card can
+ *  be cleared without opening it. */
+function AttentionBadge({ slug, name }: { slug: string; name: string }) {
     const t = useTranslations("admin");
     const { pending, error, markSeen } = useMarkSeen(slug);
     const label = t("integrations.attention.seenNamed", { name });
 
     return (
-        <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground hover:text-success size-7 shrink-0 p-0"
-            aria-label={label}
-            title={error ?? label}
-            disabled={pending}
-            onClick={markSeen}
-        >
-            {pending ? (
-                <Loader2 className="size-3.5 shrink-0 animate-spin" />
-            ) : (
-                <Check className="size-3.5 shrink-0" />
-            )}
-        </Button>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className="flex items-center gap-1">
+                <Badge variant="warning">{t("integrations.grid.needsAttention")}</Badge>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-success size-11 shrink-0 p-0 sm:size-7"
+                    aria-label={label}
+                    title={label}
+                    disabled={pending}
+                    onClick={markSeen}
+                >
+                    {pending ? (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                    ) : (
+                        <Check className="size-3.5 shrink-0" />
+                    )}
+                </Button>
+            </span>
+            {error ? (
+                <span role="alert" className="text-danger max-w-40 text-right text-xs">
+                    {error}
+                </span>
+            ) : null}
+        </span>
     );
 }
 
+/**
+ * What the last authorization failed with.
+ *
+ * The operator is the only person who can act on it and the only one who never
+ * sees it happen: it fails in somebody else's browser, against a console only
+ * this account can open. The alert says the same thing - this is here for
+ * whoever arrives at the screen afterwards.
+ */
 function AttentionNotice({
     failure,
     name,
@@ -783,17 +789,32 @@ function AttentionNotice({
 }) {
     const t = useTranslations("admin");
     const { pending, error, markSeen: onSeen } = useMarkSeen(slug);
+    const apiOff = failure.kind === "api-off";
 
     return (
         <div className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">{t("integrations.attention.title")}</span>
-                <span className="text-muted-foreground">
-                    {t("integrations.attention.reason", { name, reason: failure.reason })}
+                <span className="text-sm font-medium">
+                    {apiOff
+                        ? t("integrations.attention.apiOffTitle", { name })
+                        : t("integrations.attention.title")}
                 </span>
-                <span className="text-muted-foreground">{t("integrations.attention.clears")}</span>
-                {error ? <span className="text-danger">{error}</span> : null}
+                <span className="text-muted-foreground">
+                    {apiOff
+                        ? t("integrations.attention.apiOffReason", { reason: failure.reason })
+                        : t("integrations.attention.reason", { name, reason: failure.reason })}
+                </span>
+                <span className="text-muted-foreground">
+                    {apiOff
+                        ? t("integrations.attention.apiOffClears")
+                        : t("integrations.attention.clears")}
+                </span>
+                {error ? (
+                    <span role="alert" className="text-danger">
+                        {error}
+                    </span>
+                ) : null}
                 <Button
                     size="sm"
                     variant="secondary"

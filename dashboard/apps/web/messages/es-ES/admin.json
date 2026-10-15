@@ -1400,7 +1400,10 @@
             "reason": "Se rechazó el último intento. {name} dijo: {reason}",
             "clears": "Desaparece en cuanto una autorización se complete.",
             "seen": "Marcar visto",
-            "seenNamed": "Marcar {name} como visto"
+            "seenNamed": "Marcar {name} como visto",
+            "apiOffTitle": "Una API que {name} necesita está desactivada",
+            "apiOffReason": "Se rechazó la última petición: {reason}",
+            "apiOffClears": "Márcalo como visto cuando esté activada."
         },
         "signIn": {
             "label": "Permitir iniciar sesión con {name}",

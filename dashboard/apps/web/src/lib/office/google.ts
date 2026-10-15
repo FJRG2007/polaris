@@ -203,7 +203,7 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
         // Nothing the reader can do: the switch is in the operator's Google
         // Cloud project. Recorded on the integration and raised to whoever may
         // configure it, once an hour however many people run into it.
-        await recordConnectionFailure("google", DRIVE_OFF_REASON, {
+        await recordConnectionFailure("google", DRIVE_OFF_REASON, "api-off", {
             // i18n-ignore the fallback; each operator reads `say` in their language
             title: "Google Drive is turned off for Polaris",
             body: DRIVE_OFF_REASON,

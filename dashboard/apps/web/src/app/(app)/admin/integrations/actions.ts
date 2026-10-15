@@ -129,7 +129,8 @@ export async function dismissConnectionFailureAction(provider: string): Promise<
     if (typeof provider !== "string" || !findConnectionProvider(provider))
         return { error: t("integrations.errors.unknownService") };
 
-    await clearConnectionFailure(provider);
+    if (!(await clearConnectionFailure(provider)))
+        return { error: t("integrations.errors.notSaved") };
     await recordAudit({
         actorId: user.id,
         action: "integration.configure",

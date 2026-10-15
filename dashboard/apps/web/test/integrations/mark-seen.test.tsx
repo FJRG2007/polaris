@@ -52,7 +52,11 @@ describe("marking a refused service seen from the grid", () => {
         const [first, second] = SERVICE_INTEGRATIONS;
         if (!first || !second) throw new Error("catalogue too small");
         const failing = card(first.slug, {
-            failure: { at: "2026-10-15T10:00:00.000Z", reason: "invalid_client" }
+            failure: {
+                at: "2026-10-15T10:00:00.000Z",
+                reason: "invalid_client",
+                kind: "refusal"
+            }
         });
         render(withMessages(<IntegrationsView cards={[failing, card(second.slug)]} />, "en-US"));
 
@@ -63,5 +67,18 @@ describe("marking a refused service seen from the grid", () => {
         await userEvent.click(buttons[0]!);
         await waitFor(() => expect(refresh).toHaveBeenCalled());
         expect(dismiss).toHaveBeenCalledWith(first.slug);
+    });
+
+    it("says on the card when it could not be marked", async () => {
+        const [first] = SERVICE_INTEGRATIONS;
+        if (!first) throw new Error("catalogue too small");
+        dismiss.mockResolvedValueOnce({ error: "That could not be saved" });
+        const failing = card(first.slug, {
+            failure: { at: "2026-10-15T10:00:00.000Z", reason: "x", kind: "refusal" }
+        });
+        render(withMessages(<IntegrationsView cards={[failing]} />, "en-US"));
+
+        await userEvent.click(screen.getByRole("button", { name: /as seen$/ }));
+        expect((await screen.findByRole("alert")).textContent).toBe("That could not be saved");
     });
 });

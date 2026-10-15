@@ -47,12 +47,18 @@ export function attentionHref(provider: string): string {
 /** How often one service may raise this. */
 const ALERT_WINDOW_MS = 60 * 60 * 1000;
 
+/** What kind of trouble it is: somebody refused at authorization, or an API the
+ *  application relies on switched off in the provider's console. Only the first
+ *  is answered by an authorization completing. */
+export type FailureKind = "refusal" | "api-off";
+
 /** What went wrong the last time somebody tried to authorize. */
 export interface ConnectionFailure {
     /** ISO timestamp. */
     at: string;
     /** The provider's reason, as far as it gave one. */
     reason: string;
+    kind: FailureKind;
 }
 
 /** The failure held on a stored config, or null when there is none to read. */
@@ -61,9 +67,10 @@ export function readConnectionFailure(
 ): ConnectionFailure | null {
     const held = config?.[FAILURE];
     if (!held || typeof held !== "object") return null;
-    const { at, reason } = held as Record<string, unknown>;
+    const { at, reason, kind } = held as Record<string, unknown>;
     if (typeof at !== "string" || typeof reason !== "string") return null;
-    return { at, reason };
+    // Failures recorded before they carried a kind were all refusals.
+    return { at, reason, kind: kind === "api-off" ? "api-off" : "refusal" };
 }
 
 /** What the last authorization failed with, for the screen that configures it. */
@@ -90,11 +97,13 @@ export function describeFailure(caught: unknown): string {
  * redirect must still land somewhere. Answers whether the reason was recorded.
  *
  * `notice` replaces the alert's words, for a failure that is not somebody
- * connecting an account - a linked account the provider stopped serving.
+ * connecting an account - a linked account the provider stopped serving. Each
+ * kind is throttled on its own, so one does not silence the other.
  */
 export async function recordConnectionFailure(
     provider: string,
     reason: string,
+    kind: FailureKind = "refusal",
     notice?: Pick<OperatorAlert, "title" | "body" | "say">
 ): Promise<boolean> {
     let recorded = false;
@@ -106,12 +115,20 @@ export async function recordConnectionFailure(
         await upsertIntegration(provider, {
             config: {
                 ...state.config,
-                [FAILURE]: { at: new Date().toISOString(), reason } satisfies ConnectionFailure
+                [FAILURE]: {
+                    at: new Date().toISOString(),
+                    reason,
+                    kind
+                } satisfies ConnectionFailure
             }
         });
         recorded = true;
 
-        const throttle = await rateLimit(`integration-attention:${provider}`, 1, ALERT_WINDOW_MS);
+        const throttle = await rateLimit(
+            `integration-attention:${provider}:${kind}`,
+            1,
+            ALERT_WINDOW_MS
+        );
         if (!throttle.ok) return recorded;
 
         const name = findConnectionProvider(provider)?.name ?? provider;
@@ -136,19 +153,25 @@ export async function recordConnectionFailure(
     return recorded;
 }
 
-/** Forget the last failure, on an authorization that completed. What it answers
- *  is whether this service needs attention now, and one that just took somebody
- *  all the way through does not. */
-export async function clearConnectionFailure(provider: string): Promise<void> {
+/** Forget the last failure: on an authorization that completed, which only
+ *  answers a refusal (`only`), or on an operator marking it seen, which answers
+ *  any. Answers whether nothing is left to clear - false when the write failed. */
+export async function clearConnectionFailure(
+    provider: string,
+    only?: FailureKind
+): Promise<boolean> {
     try {
         const state = await getIntegrationState(provider);
-        if (!state || !readConnectionFailure(state.config)) return;
+        const failure = state ? readConnectionFailure(state.config) : null;
+        if (!state || !failure || (only && failure.kind !== only)) return true;
         const config = { ...state.config };
         delete config[FAILURE];
         await upsertIntegration(provider, { config });
         await answerAlerts(provider);
+        return true;
     } catch (error) {
         console.error("polaris: could not clear the connection failure:", error);
+        return false;
     }
 }
 

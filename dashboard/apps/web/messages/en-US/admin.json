@@ -1400,7 +1400,10 @@
             "reason": "The last attempt was refused. {name} said: {reason}",
             "clears": "It clears itself as soon as one authorization completes.",
             "seen": "Mark as seen",
-            "seenNamed": "Mark {name} as seen"
+            "seenNamed": "Mark {name} as seen",
+            "apiOffTitle": "An API {name} needs is turned off",
+            "apiOffReason": "The last request was turned away: {reason}",
+            "apiOffClears": "Mark it as seen once it is turned on."
         },
         "signIn": {
             "label": "Allow signing in with {name}",

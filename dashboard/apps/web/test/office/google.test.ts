@@ -255,6 +255,7 @@ describe("what Google's refusals mean", () => {
         expect(recordConnectionFailure).toHaveBeenCalledWith(
             "google",
             expect.stringContaining("Google Drive API"),
+            "api-off",
             expect.objectContaining({ say: expect.any(Function) })
         );
     });
