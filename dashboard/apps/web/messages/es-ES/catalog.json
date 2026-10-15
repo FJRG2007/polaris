@@ -124,7 +124,7 @@
         },
         "status-pages": {
             "summary": "Páginas públicas que muestran si tus servicios funcionan.",
-            "description": "Publica una página que muestra si tus servicios funcionan, con 90 días de disponibilidad a partir de comprobaciones HTTP, TCP, DNS y de latencia que hace el propio Polaris. Publica incidencias según avanzan y programa mantenimientos con antelación. Apunta las comprobaciones a tus apps desplegadas o a cualquier dirección. Al desinstalarla se detienen las comprobaciones y se conservan todas las páginas."
+            "description": "Publica una página que muestra si tus servicios funcionan, con 90 días de disponibilidad a partir de pruebas HTTP, TCP, DNS y de latencia que hace el propio Polaris. Publica incidencias según avanzan y programa mantenimientos con antelación. Apunta las pruebas a tus apps desplegadas o a cualquier dirección. Al desinstalarla se detienen las pruebas y se conservan todas las páginas."
         },
         "crm": {
             "summary": "Empresas, personas y los tratos que llevas, en un solo embudo.",

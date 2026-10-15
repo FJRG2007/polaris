@@ -2300,7 +2300,7 @@
             "inbox": "Bandeja",
             "management": "Gestión",
             "crm": "CRM",
-            "statusPages": "Páginas de estado"
+            "statusPages": "Estado público"
         },
         "permissions": {
             "drive": {
@@ -2390,7 +2390,7 @@
                 "manage": "Versiones, copias y mantenimiento"
             },
             "status": {
-                "manage": "Gestionar páginas de estado y sus comprobaciones"
+                "manage": "Gestionar páginas de estado y sus pruebas"
             },
             "crm": {
                 "use": "Llevar empresas, personas y tratos"

@@ -182,11 +182,31 @@ async function probeDns(spec: CheckSpec, timeoutMs: number, started: number): Pr
     }
 }
 
+/** Whether the check's host, when it is a literal address, may be dialed.
+ *  A name is checked at connect time by `guardedLookup` instead. */
+export function literalAllowed(spec: Pick<CheckSpec, "kind" | "target">): boolean {
+    let host = spec.target;
+    if (spec.kind === "http") {
+        try {
+            host = new URL(spec.target).hostname;
+        } catch {
+            return false;
+        }
+    }
+    const bare = host.replace(/^\[|\]$/g, "");
+    return !net.isIP(bare) || addressAllowed(bare);
+}
+
 /** Runs one check once. Never throws: every failure is a result. */
 export async function probe(spec: CheckSpec): Promise<ProbeResult> {
     const timeoutMs = clampTimeout(spec.timeoutMs);
     const started = Date.now();
     try {
+        // Node skips `lookup` when the host is already an address, so a typed
+        // address is held to the same rule here, before any socket opens.
+        if (spec.kind !== "dns" && !literalAllowed(spec)) {
+            return { kind: "error", error: "blocked", latencyMs: null };
+        }
         switch (spec.kind) {
             case "http":
                 return await probeHttp(spec, timeoutMs, started);
