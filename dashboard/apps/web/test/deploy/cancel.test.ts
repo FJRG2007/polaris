@@ -26,6 +26,12 @@ const deploymentUpdateMany = vi.fn(async (args: unknown) => {
     void args;
     return { count: 1 };
 });
+/** Services with a current release, served one page per read. */
+let appPages: Array<Array<{ id: string; currentDeploymentId: string }>> = [];
+const applicationFindMany = vi.fn(async (args: unknown) => {
+    void args;
+    return appPages.shift() ?? [];
+});
 const notifyDeployFinished = vi.fn(async () => undefined);
 const noteOnDeploy = vi.fn(async (id: string, line: string) => {
     void id;
@@ -40,6 +46,7 @@ vi.mock("@polaris/db", () => ({
             findMany: vi.fn(async () => inFlight),
             updateMany: deploymentUpdateMany
         },
+        application: { findMany: applicationFindMany, updateMany },
         domain: { deleteMany: vi.fn(async () => ({ count: 0 })) }
     }
 }));
@@ -60,6 +67,8 @@ beforeEach(() => {
     deploymentUpdateMany.mockClear();
     deploymentUpdateMany.mockResolvedValue({ count: 1 });
     updateMany.mockClear();
+    appPages = [];
+    applicationFindMany.mockClear();
     notifyDeployFinished.mockClear();
     noteOnDeploy.mockClear();
 });
@@ -135,6 +144,22 @@ describe("recovering after a restart", () => {
         await cancelDeployment("dep-1", "owner-1");
         const [args] = deploymentUpdateMany.mock.calls[0] as [{ data: { error: string } }];
         expect(args.data.error).toBe(CANCELED_REASON);
+    });
+
+    it("checks the services' current releases a page at a time", async () => {
+        const app = (i: number) => ({
+            id: `app-${String(i).padStart(4, "0")}`,
+            currentDeploymentId: `rel-${i}`
+        });
+        appPages = [Array.from({ length: 500 }, (_, i) => app(i)), [app(500)]];
+        await recoverAbandonedDeployments();
+        const reads = applicationFindMany.mock.calls.map(
+            ([args]) => args as { where: { id?: { gt: string } }; take: number }
+        );
+        expect(reads).toHaveLength(2);
+        expect(reads[0]?.take).toBe(500);
+        expect(reads[0]?.where.id).toBeUndefined();
+        expect(reads[1]?.where.id?.gt).toBe("app-0499");
     });
 
     it("writes nothing when nothing was in flight", async () => {

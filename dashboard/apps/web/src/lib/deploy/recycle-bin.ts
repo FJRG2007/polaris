@@ -14,32 +14,131 @@
  * Hiding is done once, in the database client (`hidingBinned` in @polaris/db):
  * every top-level read of these three models leaves binned rows out unless it
  * names `binnedAt`, which is what this module does with `INCLUDING_BINNED`.
+ *
+ * Whether there is a bin at all, and how long it keeps things, belongs to whoever
+ * the project belongs to: the person for a personal project, the organization for
+ * one on its shelf. With the bin off, deleting removes for good straight away.
+ * Nothing has to be configured: unset, the bin is on and keeps things for the
+ * instance-wide number of days an earlier version stored, else 30.
  */
 
-import { z } from "zod";
+import {
+    DEFAULT_BIN_DAYS,
+    binDaysSchema,
+    binPolicySchema,
+    type BinPolicy
+} from "@/lib/deploy/recycle-bin-policy";
 import { INCLUDING_BINNED, prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import * as restorePoints from "@/lib/restore-points/service";
 import { managedProjectWhere } from "@/lib/deploy-project-access";
 
+/** The instance-wide retention an earlier version kept; now only the default. */
 export const BIN_RETENTION_KEY = "deploy.recycleBin.days";
-export const DEFAULT_BIN_DAYS = 30;
-export const binDaysSchema = z.coerce.number().int().min(1).max(365);
+export { DEFAULT_BIN_DAYS, binDaysSchema, binPolicySchema, type BinPolicy };
 /** Items purged per scheduled pass, so one pass never runs for long. */
 const PURGE_BATCH = 10;
+/** Stored policies read per page during a purge pass. */
+const POLICY_SCAN = 5000;
+const ORG_POLICY_PREFIX = "deploy.recycleBin.org.";
+const USER_POLICY_PREFIX = "deploy.recycleBin.user.";
 
 export type BinKind = "application" | "database" | "project";
 
+/** Whose bin it is: an organization's, or the person's own for a personal project. */
+export interface BinScope {
+    readonly orgId: string | null;
+    readonly userId: string;
+}
+
+export function policyKey(scope: BinScope): string {
+    return scope.orgId
+        ? `${ORG_POLICY_PREFIX}${scope.orgId}`
+        : `${USER_POLICY_PREFIX}${scope.userId}`;
+}
+
+/** What a scope that never chose gets: on, for the instance's old number of days. */
+export async function defaultBinPolicy(): Promise<BinPolicy> {
+    return { enabled: true, days: await binRetentionDays() };
+}
+
+/**
+ * The instance-wide number of days, now only the default for a scope that never
+ * chose its own.
+ * @deprecated Read a scope's policy with `binPolicyFor`.
+ */
 export async function binRetentionDays(): Promise<number> {
     const parsed = binDaysSchema.safeParse(await getSetting(BIN_RETENTION_KEY));
     return parsed.success ? parsed.data : DEFAULT_BIN_DAYS;
 }
 
+/**
+ * Change the instance-wide default.
+ * @deprecated Each owner sets their own with `setBinPolicy`.
+ */
 export async function setBinRetentionDays(days: number): Promise<void> {
     await setSetting(BIN_RETENTION_KEY, String(binDaysSchema.parse(days)));
 }
 
-/** Take a service off its server and into the bin. Its volumes are untouched. */
+/** Read a stored policy, falling back to the default for anything unreadable. */
+export function parseBinPolicy(stored: string | null, fallback: BinPolicy): BinPolicy {
+    if (!stored) return fallback;
+    try {
+        const parsed = binPolicySchema.safeParse(JSON.parse(stored));
+        return parsed.success ? parsed.data : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+export async function binPolicyFor(scope: BinScope): Promise<BinPolicy> {
+    const [stored, fallback] = await Promise.all([
+        getSetting(policyKey(scope)),
+        defaultBinPolicy()
+    ]);
+    return parseBinPolicy(stored, fallback);
+}
+
+export async function setBinPolicy(scope: BinScope, policy: BinPolicy): Promise<BinPolicy> {
+    const parsed = binPolicySchema.parse(policy);
+    await setSetting(policyKey(scope), JSON.stringify(parsed));
+    return parsed;
+}
+
+/** The policy a project's deletes follow, binned or not. */
+export async function binPolicyOfProject(projectId: string): Promise<BinPolicy> {
+    const project = await prisma.project.findFirst({
+        where: { id: projectId, ...INCLUDING_BINNED },
+        select: { ownerId: true, orgId: true }
+    });
+    return project
+        ? binPolicyFor({ orgId: project.orgId, userId: project.ownerId })
+        : defaultBinPolicy();
+}
+
+/** Remembers each scope's policy for one listing or purge pass. */
+function policyCache(): (scope: BinScope) => Promise<BinPolicy> {
+    const seen = new Map<string, Promise<BinPolicy>>();
+    return (scope) => {
+        const key = policyKey(scope);
+        let policy = seen.get(key);
+        if (!policy) {
+            policy = binPolicyFor(scope);
+            seen.set(key, policy);
+        }
+        return policy;
+    };
+}
+
+/** When an item binned at `binnedAt` goes for good under `policy`. */
+export function purgeDate(binnedAt: Date, policy: BinPolicy): Date {
+    return new Date(binnedAt.getTime() + policy.days * 86_400_000);
+}
+
+/**
+ * Delete a service: into the bin with its volumes untouched, or for good when
+ * its owner keeps no bin.
+ */
 export async function binApplication(
     applicationId: string,
     ownerId: string,
@@ -48,9 +147,23 @@ export async function binApplication(
 ): Promise<void> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
-        select: { id: true }
+        select: { id: true, environment: { select: { projectId: true } } }
     });
     if (!app) throw new Error("Application not found");
+    if (!(await binPolicyOfProject(app.environment.projectId)).enabled) {
+        const deploy = await import("@/lib/deploy-service");
+        await deploy.deleteApplication(applicationId, ownerId, { deleteData: true });
+        return;
+    }
+    await moveApplicationToBin(applicationId, ownerId, actorId, at);
+}
+
+async function moveApplicationToBin(
+    applicationId: string,
+    ownerId: string,
+    actorId: string,
+    at: Date
+): Promise<void> {
     const deploy = await import("@/lib/deploy-service");
     // The routes as they were, so a restore turns back on exactly the names that answered.
     await restorePoints.capture("routes", restorePoints.restoreKeys.routes(applicationId), {
@@ -67,7 +180,10 @@ export async function binApplication(
     });
 }
 
-/** Take a database's container down and into the bin. Its data volume stays. */
+/**
+ * Delete a database: its container down and into the bin with its data volume
+ * kept, or for good when its owner keeps no bin.
+ */
 export async function binDatabase(
     databaseId: string,
     ownerId: string,
@@ -76,12 +192,27 @@ export async function binDatabase(
 ): Promise<void> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        select: { id: true, parentId: true }
+        select: { id: true, parentId: true, environment: { select: { projectId: true } } }
     });
     if (!db) throw new Error("Database not found");
+    if (!(await binPolicyOfProject(db.environment.projectId)).enabled) {
+        const { deleteDatabase } = await import("@/lib/database-service");
+        await deleteDatabase(databaseId, ownerId);
+        return;
+    }
+    await moveDatabaseToBin(databaseId, db.parentId, ownerId, actorId, at);
+}
+
+async function moveDatabaseToBin(
+    databaseId: string,
+    parentId: string | null,
+    ownerId: string,
+    actorId: string,
+    at: Date
+): Promise<void> {
     // A database inside another instance has no container of its own; its data
     // lives in the instance and stays exactly where it is.
-    if (!db.parentId) {
+    if (!parentId) {
         const { stopDatabaseForBin } = await import("@/lib/database-service");
         await stopDatabaseForBin(databaseId, ownerId).catch((error: unknown) => {
             console.error(`recycle-bin: could not stop database ${databaseId}:`, error);
@@ -93,7 +224,10 @@ export async function binDatabase(
     });
 }
 
-/** Bin a project and everything it runs, all under the same moment. */
+/**
+ * Delete a project and everything it runs: into the bin all under the same
+ * moment, or for good when its owner keeps no bin.
+ */
 export async function binProject(
     projectId: string,
     ownerId: string,
@@ -101,21 +235,27 @@ export async function binProject(
 ): Promise<void> {
     const project = await prisma.project.findFirst({
         where: { id: projectId, ownerId },
-        select: { id: true }
+        select: { id: true, orgId: true }
     });
     if (!project) throw new Error("Only the project's owner can delete it");
+    if (!(await binPolicyFor({ orgId: project.orgId, userId: ownerId })).enabled) {
+        const deploy = await import("@/lib/deploy-service");
+        await deploy.deleteProject(projectId, ownerId);
+        return;
+    }
     const at = new Date();
     const [databases, applications] = await Promise.all([
         prisma.managedDatabase.findMany({
             where: { environment: { projectId } },
             orderBy: { parentId: "desc" },
-            select: { id: true }
+            select: { id: true, parentId: true }
         }),
         prisma.application.findMany({ where: { environment: { projectId } }, select: { id: true } })
     ]);
     for (const application of applications)
-        await binApplication(application.id, ownerId, actorId, at);
-    for (const database of databases) await binDatabase(database.id, ownerId, actorId, at);
+        await moveApplicationToBin(application.id, ownerId, actorId, at);
+    for (const database of databases)
+        await moveDatabaseToBin(database.id, database.parentId, ownerId, actorId, at);
     await prisma.project.update({
         where: { id: projectId },
         data: { binnedAt: at, binnedById: actorId }
@@ -138,55 +278,55 @@ export interface BinEntry {
  * by one: they come back and go together.
  */
 export async function listBin(userId: string): Promise<BinEntry[]> {
-    const [days, manages] = await Promise.all([binRetentionDays(), managedProjectWhere(userId)]);
+    const manages = await managedProjectWhere(userId);
     const binned = { binnedAt: { not: null } };
+    const scope = { ownerId: true, orgId: true } as const;
+    const throughProject = {
+        id: true,
+        name: true,
+        binnedAt: true,
+        environment: { select: { project: { select: { name: true, ...scope } } } }
+    } as const;
     const [projects, applications, databases] = await Promise.all([
         prisma.project.findMany({
             where: { ...manages, ...binned },
-            select: { id: true, name: true, binnedAt: true },
+            select: { id: true, name: true, binnedAt: true, ...scope },
             take: 200
         }),
         prisma.application.findMany({
             where: { ...binned, environment: { project: { ...manages, binnedAt: null } } },
-            select: {
-                id: true,
-                name: true,
-                binnedAt: true,
-                environment: { select: { project: { select: { name: true } } } }
-            },
+            select: throughProject,
             take: 200
         }),
         prisma.managedDatabase.findMany({
             where: { ...binned, environment: { project: { ...manages, binnedAt: null } } },
-            select: {
-                id: true,
-                name: true,
-                binnedAt: true,
-                environment: { select: { project: { select: { name: true } } } }
-            },
+            select: throughProject,
             take: 200
         })
     ]);
-    const entry = (
+    const policyOf = policyCache();
+    const entry = async (
         kind: BinKind,
         row: { id: string; name: string; binnedAt: Date | null },
-        projectName: string | null
-    ): BinEntry => {
+        project: { name: string | null; ownerId: string; orgId: string | null }
+    ): Promise<BinEntry> => {
         const at = row.binnedAt ?? new Date();
+        const policy = await policyOf({ orgId: project.orgId, userId: project.ownerId });
         return {
             kind,
             id: row.id,
             name: row.name,
-            projectName,
+            projectName: project.name,
             binnedAt: at.toISOString(),
-            purgeAt: new Date(at.getTime() + days * 86_400_000).toISOString()
+            purgeAt: purgeDate(at, policy).toISOString()
         };
     };
-    return [
-        ...projects.map((row) => entry("project", row, null)),
-        ...applications.map((row) => entry("application", row, row.environment.project.name)),
-        ...databases.map((row) => entry("database", row, row.environment.project.name))
-    ].sort((a, b) => b.binnedAt.localeCompare(a.binnedAt));
+    const entries = await Promise.all([
+        ...projects.map((row) => entry("project", row, { ...row, name: null })),
+        ...applications.map((row) => entry("application", row, row.environment.project)),
+        ...databases.map((row) => entry("database", row, row.environment.project))
+    ]);
+    return entries.sort((a, b) => b.binnedAt.localeCompare(a.binnedAt));
 }
 
 async function restoreApplicationRow(
@@ -242,31 +382,6 @@ async function restoreDatabaseRow(
     await deployDatabase(databaseId, ownerId, actorId).catch((error: unknown) => {
         console.error(`recycle-bin: restored database ${databaseId} did not redeploy:`, error);
     });
-}
-
-async function ownerOf(kind: BinKind, id: string): Promise<string | null> {
-    if (kind === "project") {
-        return (
-            (
-                await prisma.project.findFirst({
-                    where: { id, ...INCLUDING_BINNED },
-                    select: { ownerId: true }
-                })
-            )?.ownerId ?? null
-        );
-    }
-    const where = { id, ...INCLUDING_BINNED };
-    const row =
-        kind === "application"
-            ? await prisma.application.findFirst({
-                  where,
-                  select: { environment: { select: { project: { select: { ownerId: true } } } } }
-              })
-            : await prisma.managedDatabase.findFirst({
-                  where,
-                  select: { environment: { select: { project: { select: { ownerId: true } } } } }
-              });
-    return row?.environment.project.ownerId ?? null;
 }
 
 /**
@@ -357,34 +472,141 @@ export async function deleteForever(kind: BinKind, id: string, userId: string): 
     return deploy.deleteProject(id, ownerId);
 }
 
-/** The scheduled purge: what has sat in the bin past the retention period. Bounded. */
+/** Which projects a retention applies to, as a project filter. */
+type ProjectScopeWhere = Record<string, unknown>;
+
+export interface RetentionGroup {
+    readonly days: number;
+    readonly project: ProjectScopeWhere;
+}
+
+function scopeClauses(orgIds: readonly string[], userIds: readonly string[]): ProjectScopeWhere[] {
+    return [
+        ...(orgIds.length > 0 ? [{ orgId: { in: [...orgIds] } }] : []),
+        ...(userIds.length > 0 ? [{ orgId: null, ownerId: { in: [...userIds] } }] : [])
+    ];
+}
+
+/**
+ * The stored policies, grouped by how long they keep things, each with the
+ * projects it covers; plus the default for every scope that never chose. A bin
+ * switched off still lets what is already in it run out its days.
+ */
+export function retentionGroups(
+    stored: readonly { key: string; value: string }[],
+    fallback: BinPolicy
+): RetentionGroup[] {
+    const byDays = new Map<number, { orgIds: string[]; userIds: string[] }>();
+    const allOrgs: string[] = [];
+    const allUsers: string[] = [];
+    for (const row of stored) {
+        const isOrg = row.key.startsWith(ORG_POLICY_PREFIX);
+        const isUser = row.key.startsWith(USER_POLICY_PREFIX);
+        if (!isOrg && !isUser) continue;
+        const id = row.key.slice((isOrg ? ORG_POLICY_PREFIX : USER_POLICY_PREFIX).length);
+        if (!id) continue;
+        const { days } = parseBinPolicy(row.value, fallback);
+        const group = byDays.get(days) ?? { orgIds: [], userIds: [] };
+        (isOrg ? group.orgIds : group.userIds).push(id);
+        (isOrg ? allOrgs : allUsers).push(id);
+        byDays.set(days, group);
+    }
+    return [
+        ...[...byDays].map(([days, group]) => ({
+            days,
+            project: { OR: scopeClauses(group.orgIds, group.userIds) }
+        })),
+        { days: fallback.days, project: unchosenScopes(allOrgs, allUsers) }
+    ];
+}
+
+/** Every project whose owner has no policy of its own, never negating a nullable column. */
+function unchosenScopes(orgIds: readonly string[], userIds: readonly string[]): ProjectScopeWhere {
+    if (orgIds.length === 0 && userIds.length === 0) return {};
+    return {
+        OR: [
+            { orgId: orgIds.length > 0 ? { not: null, notIn: [...orgIds] } : { not: null } },
+            userIds.length > 0 ? { orgId: null, ownerId: { notIn: [...userIds] } } : { orgId: null }
+        ]
+    };
+}
+
+/** Every stored policy, read in pages so no owner is left to the default. */
+async function storedPolicies(): Promise<{ key: string; value: string }[]> {
+    const rows: { key: string; value: string }[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+        const page = await prisma.setting.findMany({
+            where: {
+                OR: [
+                    { key: { startsWith: ORG_POLICY_PREFIX } },
+                    { key: { startsWith: USER_POLICY_PREFIX } }
+                ],
+                ...(cursor ? { key: { gt: cursor } } : {})
+            },
+            select: { key: true, value: true },
+            orderBy: { key: "asc" },
+            take: POLICY_SCAN
+        });
+        rows.push(...page);
+        if (page.length < POLICY_SCAN) return rows;
+        cursor = page[page.length - 1]?.key;
+    }
+}
+
+/**
+ * The scheduled purge: what has sat in its owner's bin past that owner's
+ * retention. Bounded: a few items per pass, a few reads per retention in use.
+ */
 export async function purgeRecycleBin(now = new Date()): Promise<{ purged: number }> {
-    const cutoff = new Date(now.getTime() - (await binRetentionDays()) * 86_400_000);
-    const expired = { binnedAt: { lt: cutoff } };
-    const [projects, applications, databases] = await Promise.all([
-        prisma.project.findMany({ where: expired, select: { id: true }, take: PURGE_BATCH }),
-        prisma.application.findMany({
-            where: { ...expired, environment: { project: { binnedAt: null } } },
-            select: { id: true },
-            take: PURGE_BATCH
-        }),
-        prisma.managedDatabase.findMany({
-            where: { ...expired, environment: { project: { binnedAt: null } } },
-            select: { id: true },
-            take: PURGE_BATCH
-        })
-    ]);
-    const queue: Array<[BinKind, string]> = [
-        ...projects.map((row): [BinKind, string] => ["project", row.id]),
-        ...applications.map((row): [BinKind, string] => ["application", row.id]),
-        ...databases.map((row): [BinKind, string] => ["database", row.id])
-    ].slice(0, PURGE_BATCH);
+    const [stored, fallback] = await Promise.all([storedPolicies(), defaultBinPolicy()]);
+    const queue: Array<[BinKind, string, string]> = [];
+    const ownerOf = {
+        environment: { select: { project: { select: { ownerId: true } } } }
+    } as const;
+    for (const group of retentionGroups(stored, fallback)) {
+        if (queue.length >= PURGE_BATCH) break;
+        const expired = { binnedAt: { lt: new Date(now.getTime() - group.days * 86_400_000) } };
+        const take = PURGE_BATCH - queue.length;
+        const inProject = { environment: { project: { ...group.project, binnedAt: null } } };
+        const [projects, applications, databases] = await Promise.all([
+            prisma.project.findMany({
+                where: { ...group.project, ...expired },
+                select: { id: true, ownerId: true },
+                orderBy: { binnedAt: "asc" },
+                take
+            }),
+            prisma.application.findMany({
+                where: { ...expired, ...inProject },
+                select: { id: true, ...ownerOf },
+                orderBy: { binnedAt: "asc" },
+                take
+            }),
+            prisma.managedDatabase.findMany({
+                where: { ...expired, ...inProject },
+                select: { id: true, ...ownerOf },
+                orderBy: { binnedAt: "asc" },
+                take
+            })
+        ]);
+        queue.push(
+            ...projects.map((row): [BinKind, string, string] => ["project", row.id, row.ownerId]),
+            ...applications.map((row): [BinKind, string, string] => [
+                "application",
+                row.id,
+                row.environment.project.ownerId
+            ]),
+            ...databases.map((row): [BinKind, string, string] => [
+                "database",
+                row.id,
+                row.environment.project.ownerId
+            ])
+        );
+    }
     let purged = 0;
-    for (const [kind, id] of queue) {
-        const owner = await ownerOf(kind, id);
-        if (!owner) continue;
+    for (const [kind, id, ownerId] of queue.slice(0, PURGE_BATCH)) {
         try {
-            await deleteForever(kind, id, owner);
+            await deleteForever(kind, id, ownerId);
             purged += 1;
         } catch (error) {
             console.error(`recycle-bin: could not purge ${kind} ${id}:`, error);

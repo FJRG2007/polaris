@@ -15,9 +15,8 @@ const ONLINE_DB_STATES = new Set(["running", "active", "healthy", "ready"]);
 
 export default async function DeployPage() {
     const user = await requirePermission("deploy.read");
-    const [canManage, canSetBinDays, orgId] = await Promise.all([
+    const [canManage, orgId] = await Promise.all([
         userHasManage(user, "deploy.manage"),
-        userHasManage(user, "system.manage"),
         scopeOrgIdFor(user.id)
     ]);
 
@@ -107,7 +106,6 @@ export default async function DeployPage() {
             // The instance's administrator is who sees every install land here;
             // for them the list opens on their own projects.
             hideManagedByDefault={user.isAdmin}
-            canSetBinDays={canSetBinDays}
             canCreateHere={canCreateHere}
         />
     );

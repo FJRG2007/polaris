@@ -393,12 +393,11 @@ function depBadge(deployment: DepSummary): {
         | "badge.removed";
     variant: "success" | "danger" | "warning" | "neutral";
 } {
+    // Stopped is not failed, and never the active release whatever points at it.
+    if (deployment.status === "cancelled") return { label: "badge.cancelled", variant: "neutral" };
     if (deployment.isCurrent) return { label: "badge.active", variant: "success" };
     if (UNSUCCESSFUL_DEPLOY_STATUSES.includes(deployment.status))
-        return {
-            label: deployment.status === "cancelled" ? "badge.cancelled" : "badge.failed",
-            variant: "danger"
-        };
+        return { label: "badge.failed", variant: "danger" };
     if (["queued", "deploying"].includes(deployment.status))
         return {
             label: deployment.status === "queued" ? "badge.queued" : "badge.deploying",
@@ -983,9 +982,11 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             {historyOpen && (
                                 <ul className="flex flex-col gap-2">
                                     {history.map((deployment) => {
-                                        const failed = UNSUCCESSFUL_DEPLOY_STATUSES.includes(
-                                            deployment.status
-                                        );
+                                        const failed =
+                                            deployment.status !== "cancelled" &&
+                                            UNSUCCESSFUL_DEPLOY_STATUSES.includes(
+                                                deployment.status
+                                            );
                                         return (
                                             <li
                                                 key={deployment.id}
@@ -1630,16 +1631,25 @@ function RuntimeLogView({
     const t = useTranslations("deployService");
     const pending = deployment !== null && !isSettled(deployment);
     const failed = deployment !== null && UNSUCCESSFUL_DEPLOY_STATUSES.includes(deployment.status);
+    const stopped = deployment?.status === "cancelled";
 
     if (pending || failed) {
         return (
             <div className="flex flex-col items-center gap-3 py-10 text-center">
                 <p className="text-sm text-muted-foreground">
-                    {pending ? t("logs.stillBuilding") : t("logs.neverStarted")}
+                    {pending
+                        ? t("logs.stillBuilding")
+                        : stopped
+                          ? t("logs.stoppedEarly")
+                          : t("logs.neverStarted")}
                 </p>
                 <Button size="sm" variant="outline" onClick={onSeeBuild}>
                     <ScrollText className="size-4" />
-                    {pending ? t("logs.watchBuild") : t("logs.seeWhatWentWrong")}
+                    {pending
+                        ? t("logs.watchBuild")
+                        : stopped
+                          ? t("logs.seeBuild")
+                          : t("logs.seeWhatWentWrong")}
                 </Button>
             </div>
         );

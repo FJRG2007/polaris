@@ -153,7 +153,9 @@
         "stillBuilding": "Aún no hay nada en marcha - este despliegue se sigue compilando.",
         "neverStarted": "Este despliegue nunca arrancó. Falló durante la compilación.",
         "watchBuild": "Ver la compilación",
-        "seeWhatWentWrong": "Ver qué falló"
+        "seeWhatWentWrong": "Ver qué falló",
+        "stoppedEarly": "Este despliegue se detuvo antes de terminar y nunca llegó a ejecutarse. Lo que servía antes siguió sirviendo.",
+        "seeBuild": "Ver el registro"
     },
     "cancel": {
         "label": "Parar despliegue",
@@ -460,7 +462,7 @@
         "failedTitle": "Por qué falló",
         "stoppedTitle": "Por qué se detuvo",
         "restarted": "La compilación se cortó porque Polaris se reinició, por ejemplo durante una actualización. El servicio no tiene la culpa: vuelve a desplegarlo para compilarlo de nuevo.",
-        "canceled": "Alguien lo detuvo antes de que terminara.",
+        "canceled": "Alguien lo detuvo antes de que terminara. Lo que servía antes siguió sirviendo.",
         "timedOut": "Se detuvo tras {minutes} minutos sin terminar.",
         "noReason": "Falló sin dar un motivo. El registro de compilación muestra hasta dónde llegó."
     },

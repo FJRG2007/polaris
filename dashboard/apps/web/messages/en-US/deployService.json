@@ -153,7 +153,9 @@
         "stillBuilding": "Nothing is running yet - this deployment is still being built.",
         "neverStarted": "This deployment never started. It failed while it was being built.",
         "watchBuild": "Watch the build",
-        "seeWhatWentWrong": "See what went wrong"
+        "seeWhatWentWrong": "See what went wrong",
+        "stoppedEarly": "This deployment was stopped before it finished, so it never ran. Whatever was serving before kept serving.",
+        "seeBuild": "See the build log"
     },
     "cancel": {
         "label": "Stop this deploy",
@@ -460,7 +462,7 @@
         "failedTitle": "Why it failed",
         "stoppedTitle": "Why it stopped",
         "restarted": "The build was cut off because Polaris restarted, for example during an update. Nothing in the service caused it: redeploy to build it again.",
-        "canceled": "Someone stopped it before it finished.",
+        "canceled": "Someone stopped it before it finished. Whatever was serving before kept serving.",
         "timedOut": "It was stopped after {minutes} minutes without finishing.",
         "noReason": "It failed without giving a reason. The build log shows how far it got."
     },

@@ -13,6 +13,7 @@ import { getWafRule } from "@/lib/waf-service";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import * as recycleBin from "@/lib/deploy/recycle-bin";
+import { openShelfBinPolicy } from "@/lib/deploy/recycle-bin-access";
 import * as restorePoints from "@/lib/restore-points/service";
 import { requireApplicationAccess, requireEnvironmentAccess } from "@/lib/deploy-project-access";
 
@@ -135,16 +136,19 @@ const binItemSchema = z.object({
 
 export async function listBinAction(): Promise<{
     entries?: recycleBin.BinEntry[];
+    /** The open shelf's bin: off means deletes there skip it. */
+    policy?: recycleBin.BinPolicy;
+    /** @deprecated Each entry carries its own `purgeAt`; read `policy.days`. */
     days?: number;
     error?: string;
 }> {
     try {
         const user = await requirePermission("deploy.read");
-        const [entries, days] = await Promise.all([
+        const [entries, view] = await Promise.all([
             recycleBin.listBin(user.id),
-            recycleBin.binRetentionDays()
+            openShelfBinPolicy(user)
         ]);
-        return { entries, days };
+        return { entries, policy: view.policy, days: view.policy.days };
     } catch (error) {
         console.error("polaris: could not list the recycle bin:", error);
         return { error: "unavailable" };
@@ -178,6 +182,10 @@ export async function binItemAction(
     }
 }
 
+/**
+ * The instance-wide default for owners that never chose.
+ * @deprecated The bin is set per owner with `setBinPolicyAction`.
+ */
 export async function setBinDaysAction(days: number): Promise<{ error?: string }> {
     try {
         const user = await requirePermission("system.manage");
@@ -191,5 +199,30 @@ export async function setBinDaysAction(days: number): Promise<{ error?: string }
         return {};
     } catch {
         return { error: "daysInvalid" };
+    }
+}
+
+/** Switch the open shelf's bin on or off and set how long it keeps things. */
+export async function setBinPolicyAction(
+    input: unknown
+): Promise<{ policy?: recycleBin.BinPolicy; error?: "invalid" | "forbidden" | "failed" }> {
+    const parsed = recycleBin.binPolicySchema.safeParse(input);
+    if (!parsed.success) return { error: "invalid" };
+    const user = await requirePermission("deploy.read");
+    try {
+        const view = await openShelfBinPolicy(user);
+        if (view.lock) return { error: "forbidden" };
+        const policy = await recycleBin.setBinPolicy(view.scope, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.bin.policy",
+            ...(view.scope.orgId ? { orgId: view.scope.orgId } : {}),
+            metadata: { enabled: policy.enabled, days: policy.days }
+        });
+        revalidatePath("/apps/deploy/settings");
+        return { policy };
+    } catch (error) {
+        console.error("polaris: could not save the recycle bin policy:", error);
+        return { error: "failed" };
     }
 }

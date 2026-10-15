@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import { open } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { deployLogPath } from "./log-file";
+import { stoppedByHand } from "./failure-reason";
 import { setEnvVar } from "@/lib/env-var-service";
 import type { DeployFixInput } from "@polaris/core";
 import { diagnoseDeploy, normalizeRoot, type Diagnosis } from "@polaris/deploy";
@@ -22,6 +23,12 @@ const LOG_TAIL_BYTES = 256 * 1024;
 
 /** The deploy statuses a diagnosis is offered for. */
 const FAILED = new Set(["failed", "cancelled"]);
+
+/** A deploy somebody stopped on purpose has nothing to diagnose; one stopped by
+ *  its deadline may well have, so it is still offered. */
+export function diagnosable(status: string, error: string | null): boolean {
+    return FAILED.has(status) && !stoppedByHand(status, error);
+}
 
 /** The last `LOG_TAIL_BYTES` of a deploy's log, or "" when there is none. */
 async function logTail(deploymentId: string): Promise<string> {
@@ -45,7 +52,7 @@ async function failedDeployment(deploymentId: string) {
         where: { id: deploymentId },
         select: { id: true, status: true, error: true, deployableType: true, deployableId: true }
     });
-    return deployment && FAILED.has(deployment.status) ? deployment : null;
+    return deployment && diagnosable(deployment.status, deployment.error) ? deployment : null;
 }
 
 type FailedDeployment = NonNullable<Awaited<ReturnType<typeof failedDeployment>>>;
@@ -80,7 +87,10 @@ async function failedApplicationDeployment(deploymentId: string, ownerId: string
 }
 
 /** Why this failed deploy failed, when its log says; null when it does not. */
-export async function diagnoseDeployment(deploymentId: string, ownerId: string): Promise<Diagnosis | null> {
+export async function diagnoseDeployment(
+    deploymentId: string,
+    ownerId: string
+): Promise<Diagnosis | null> {
     const deployment = await failedDeployment(deploymentId);
     if (!deployment) return null;
     const app = await applicationOf(deployment, ownerId);
@@ -97,7 +107,9 @@ export async function diagnoseDeployment(deploymentId: string, ownerId: string):
 
 /** A secret a framework accepts. Laravel's key has a shape of its own. */
 function generatedSecret(name: string): string {
-    return name === "APP_KEY" ? `base64:${randomBytes(32).toString("base64")}` : randomBytes(32).toString("base64url");
+    return name === "APP_KEY"
+        ? `base64:${randomBytes(32).toString("base64")}`
+        : randomBytes(32).toString("base64url");
 }
 
 /**

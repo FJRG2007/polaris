@@ -52,7 +52,8 @@ export function DeployFailureLine({
         <p
             title={line}
             className={cn(
-                "truncate text-xs text-danger-ink",
+                "truncate text-xs",
+                reason.kind === "canceled" ? "text-muted-foreground" : "text-danger-ink",
                 reason.kind === "text" && "font-mono",
                 className
             )}
@@ -81,19 +82,30 @@ export function DeployFailureNote({
     const t = useTranslations("deployService");
     const reason = deployFailureReason(status, error);
     if (!reason) return null;
+    // Stopped on purpose: said plainly, not in the colours of a failure.
+    const calm = reason.kind === "canceled";
     return (
         <div
             role="status"
-            className="flex flex-wrap items-start gap-3 rounded-lg border border-danger-edge bg-danger-soft px-3 py-2.5"
+            className={cn(
+                "flex flex-wrap items-start gap-3 rounded-lg border px-3 py-2.5",
+                calm ? "border-border bg-muted/40" : "border-danger-edge bg-danger-soft"
+            )}
         >
-            <CircleAlert className="mt-0.5 size-4 shrink-0 text-danger-ink" />
+            <CircleAlert
+                className={cn(
+                    "mt-0.5 size-4 shrink-0",
+                    calm ? "text-muted-foreground" : "text-danger-ink"
+                )}
+            />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <p className="text-sm font-medium text-foreground">
                     {status === "failed" ? t("failure.failedTitle") : t("failure.stoppedTitle")}
                 </p>
                 <p
                     className={cn(
-                        "whitespace-pre-wrap break-words text-sm text-danger-ink",
+                        "whitespace-pre-wrap break-words text-sm",
+                        calm ? "text-muted-foreground" : "text-danger-ink",
                         reason.kind === "text" &&
                             "max-h-40 overflow-y-auto overscroll-contain font-mono text-xs"
                     )}

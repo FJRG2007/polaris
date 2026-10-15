@@ -23,7 +23,7 @@
     "bin": {
         "open": "Recycle bin",
         "title": "Recycle bin",
-        "description": "Deleted services, databases and projects stay here for {days, plural, one {# day} other {# days}}, then are removed for good.",
+        "description": "Deleted services, databases and projects wait here until the date shown, then are removed for good.",
         "empty": "Nothing deleted recently.",
         "unavailable": "Could not load the recycle bin. Reload the page and try again.",
         "kindApplication": "Service",
@@ -37,11 +37,10 @@
         "cancel": "Cancel",
         "binRestoreFailed": "Could not restore it. Its project may be in the bin too - restore that first.",
         "binDeleteFailed": "Could not delete it. Try again in a moment.",
-        "days": "Keep deleted items for",
         "daysUnit": "days",
-        "daysSave": "Save",
-        "daysSaved": "Saved.",
-        "daysInvalid": "Use a number of days between 1 and 365."
+        "daysInvalid": "Use a number of days between 1 and 365.",
+        "off": "The recycle bin is off here: deleting removes things for good straight away.",
+        "settingsLink": "Recycle bin settings"
     },
     "importSite": {
         "open": "Import site",
@@ -97,5 +96,22 @@
             "leavesFolder": "The backup contains a path that leaves its folder.",
             "controlCharacters": "The backup contains a file name with control characters."
         }
+    },
+    "binSettings": {
+        "open": "Settings",
+        "pageTitle": "Deploy settings",
+        "personalScope": "Applies to your personal projects.",
+        "orgScope": "Applies to every project of {org}.",
+        "back": "Projects",
+        "title": "Recycle bin",
+        "intro": "Deleted services, databases and projects wait in the bin before they are removed for good.",
+        "enabled": "Keep deleted items in the recycle bin",
+        "offHint": "Off: deleting removes it for good straight away. Items already in the bin keep their date.",
+        "days": "Keep deleted items for",
+        "save": "Save",
+        "saved": "Saved.",
+        "failed": "Could not save it. Try again in a moment.",
+        "lockNoDeploy": "Changing this needs permission to manage Deploy.",
+        "lockNotOrgAdmin": "Only the owners and admins of {org} can change this."
     }
 }

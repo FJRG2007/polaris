@@ -4125,7 +4125,8 @@ export async function listDeployments(
         status: row.status,
         error: row.error,
         createdAt: row.createdAt.toISOString(),
-        isCurrent: row.id === app.currentDeploymentId,
+        // A cancelled deploy is never the active release, whatever points at it.
+        isCurrent: row.id === app.currentDeploymentId && row.status !== "cancelled",
         commitMessage: row.commitMessage,
         commitSha: row.commitSha,
         authorName: row.authorName,
@@ -4765,6 +4766,65 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
         await notifyDeployFinished({ deploymentId, ownerId, ok: false }).catch(() => undefined);
 }
 
+/** Services read per page when repairing pointers at startup. */
+const REPOINT_BATCH = 500;
+
+/**
+ * Put back the release a cancelled deploy displaced on record.
+ *
+ * A cancel racing the runner's own verdict could leave the service pointing at the
+ * cancelled row, so it read as failed and switched off while the release before it
+ * went on serving. Each such service points again at its newest release that is
+ * still running; one with none keeps the pointer and reads as not running.
+ */
+async function repointCancelledReleases(): Promise<void> {
+    let cursor: string | undefined;
+    for (;;) {
+        const apps = await prisma.application.findMany({
+            where: {
+                currentDeploymentId: { not: null },
+                ...(cursor ? { id: { gt: cursor } } : {})
+            },
+            select: { id: true, currentDeploymentId: true },
+            orderBy: { id: "asc" },
+            take: REPOINT_BATCH
+        });
+        if (apps.length === 0) return;
+        cursor = apps[apps.length - 1]?.id;
+        await repointBatch(apps);
+        if (apps.length < REPOINT_BATCH) return;
+    }
+}
+
+async function repointBatch(
+    apps: readonly { id: string; currentDeploymentId: string | null }[]
+): Promise<void> {
+    const cancelled = new Set(
+        (
+            await prisma.deployment.findMany({
+                where: {
+                    id: { in: apps.map((app) => app.currentDeploymentId as string) },
+                    status: "cancelled"
+                },
+                select: { id: true }
+            })
+        ).map((row) => row.id)
+    );
+    for (const app of apps) {
+        if (!cancelled.has(app.currentDeploymentId as string)) continue;
+        const serving = await prisma.deployment.findFirst({
+            where: { deployableType: "application", deployableId: app.id, status: "running" },
+            orderBy: { createdAt: "desc" },
+            select: { id: true }
+        });
+        if (!serving) continue;
+        await prisma.application.updateMany({
+            where: { id: app.id, currentDeploymentId: app.currentDeploymentId },
+            data: { currentDeploymentId: serving.id }
+        });
+    }
+}
+
 /**
  * Fail whatever was still in flight when this process started.
  *
@@ -4773,6 +4833,9 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
  * still going, which is the state an operator waits on instead of retrying.
  */
 export async function recoverAbandonedDeployments(): Promise<void> {
+    await repointCancelledReleases().catch((error) => {
+        console.error("polaris: could not repair services pointing at a cancelled deploy:", error);
+    });
     // Read before the write, because the ids are needed afterwards: any of these
     // that reached GitHub is sitting in a repository reading "in progress", and
     // nothing will ever move it - the runner behind it died with the last process.
@@ -4933,7 +4996,7 @@ export async function executeDeployment(
             await settleCancelled(deploymentId, ownerId, controller.signal.reason);
             return;
         }
-        await settleDeployment(deploymentId, {
+        const settled = await settleDeployment(deploymentId, {
             status: result.ok ? "running" : "failed",
             imageTag: result.imageTag,
             // Kept only when what ran is a pinned release image; a release that
@@ -4943,6 +5006,14 @@ export async function executeDeployment(
             error: result.ok ? result.error : result.error?.trim() || NO_REASON,
             finishedAt: new Date()
         });
+        // A cancel that reached the row first owns the verdict. The runner can only
+        // find out here, after its own build already came back, and promoting it
+        // anyway is what left a cancelled deploy marked as the service's release
+        // while the one before it still served.
+        if (!settled) {
+            await abandonRelease(deploymentId, ports).catch(() => undefined);
+            return;
+        }
         if (result.ok && scaledRelease) await settleScaleInPlace(deploymentId, scaledRelease);
         else if (result.ok) await promoteDeployment(deploymentId);
         else await abandonRelease(deploymentId, ports).catch(() => undefined);
@@ -5033,9 +5104,11 @@ async function settleCancelled(
 async function promoteDeployment(deploymentId: string): Promise<void> {
     const dep = await prisma.deployment.findUnique({
         where: { id: deploymentId },
-        select: { deployableType: true, deployableId: true }
+        select: { deployableType: true, deployableId: true, status: true }
     });
     if (dep?.deployableType !== "application") return;
+    // Only a release that finished: a stopped or failed one never takes traffic.
+    if (dep.status !== "running") return;
     promoting.add(dep.deployableId);
     try {
         await promoteRelease(deploymentId, dep);
