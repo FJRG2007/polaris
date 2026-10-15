@@ -33,12 +33,14 @@ const officeGoogleFile = {
 };
 
 class OfficeImportError extends Error {}
+class GoogleAuthExpiredError extends Error {}
 
 vi.mock("@polaris/db", () => ({ prisma: { officeGoogleFile } }));
 vi.mock("@/lib/connections/store", () => ({ getConnection, listConnections, readCredential }));
 vi.mock("@/lib/google-calendar/service", () => ({
     GOOGLE_DRIVE_READ_SCOPE: READ,
     GOOGLE_DRIVE_FILE_SCOPE: WRITE,
+    GoogleAuthExpiredError,
     getGoogleOAuthClient,
     googleAccessToken
 }));
@@ -185,6 +187,30 @@ describe("listing", () => {
         ).rejects.toMatchObject({
             reason: "relink"
         });
+    });
+
+    it("asks for the account again only when Google turned the authorization down", async () => {
+        googleAccessToken.mockRejectedValueOnce(new GoogleAuthExpiredError());
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
+            reason: "relink"
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("says Google did not answer when the token request times out, not to link again", async () => {
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        googleAccessToken.mockRejectedValueOnce(
+            new DOMException("The operation was aborted due to timeout", "TimeoutError")
+        );
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
+            reason: "failed"
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+        error.mockRestore();
     });
 
     it("turns Google's 401 into a relink rather than a failure", async () => {

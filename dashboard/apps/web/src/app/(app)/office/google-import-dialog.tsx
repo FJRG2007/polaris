@@ -11,7 +11,7 @@
 
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -52,9 +52,23 @@ const MIME_ICONS: Record<GoogleOfficeFile["mime"], typeof FileText> = {
     "application/vnd.google-apps.presentation": Presentation
 };
 
+/**
+ * How long an answer may take before the dialog says it failed. The server
+ * gives up on Google well inside this, so it only fires when the answer itself
+ * never arrives - a dropped connection, or a request the browser lost - which
+ * would otherwise leave the skeleton up for good.
+ */
+export const GOOGLE_ANSWER_DEADLINE_MS = 60_000;
+
+/** A server action's answer, or a rejection once the deadline passes. */
+function inTime<T>(answer: Promise<T>): Promise<T> {
+    return core.withTimeout(answer, GOOGLE_ANSWER_DEADLINE_MS, "Google answer timed out");
+}
+
 type State =
     | { status: "loading" }
     | { status: "unavailable" }
+    | { status: "failed"; error: string }
     | { status: "ready"; accounts: OfficeGoogleAccount[] };
 
 export function GoogleImportDialog({
@@ -76,23 +90,37 @@ export function GoogleImportDialog({
     const [failure, setFailure] = useState<{ error: string; relink: boolean } | null>(null);
     const [more, setMore] = useState(false);
     const [opening, setOpening] = useState<string | null>(null);
+    // Which list request is the current one: an answer to an older search, or
+    // to an account no longer chosen, is dropped rather than shown.
+    const asked = useRef(0);
+    const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
         let live = true;
-        void officeGoogleStateAction().then((answer) => {
-            if (!live) return;
-            if (answer.error || !answer.available) {
-                setState({ status: "unavailable" });
-                return;
+        setState({ status: "loading" });
+        void (async () => {
+            try {
+                const answer = await inTime(officeGoogleStateAction());
+                if (!live) return;
+                if (answer.error) {
+                    setState({ status: "failed", error: answer.error });
+                    return;
+                }
+                if (!answer.available) {
+                    setState({ status: "unavailable" });
+                    return;
+                }
+                const accounts = answer.accounts ?? [];
+                setState({ status: "ready", accounts });
+                setAccountId(accounts.find((account) => account.canImport)?.id ?? null);
+            } catch {
+                if (live) setState({ status: "failed", error: t("google.errors.failed") });
             }
-            const accounts = answer.accounts ?? [];
-            setState({ status: "ready", accounts });
-            setAccountId(accounts.find((account) => account.canImport)?.id ?? null);
-        });
+        })();
         return () => {
             live = false;
         };
-    }, []);
+    }, [attempt, t]);
 
     const usable =
         state.status === "ready" ? state.accounts.filter((account) => account.canImport) : [];
@@ -100,11 +128,16 @@ export function GoogleImportDialog({
     const load = useCallback(
         async (page: string | null) => {
             if (!accountId) return;
-            const answer = await listGoogleFilesAction({
-                connectionId: accountId,
-                search,
-                pageToken: page
-            });
+            const request = ++asked.current;
+            let answer: Awaited<ReturnType<typeof listGoogleFilesAction>>;
+            try {
+                answer = await inTime(
+                    listGoogleFilesAction({ connectionId: accountId, search, pageToken: page })
+                );
+            } catch {
+                answer = { error: t("google.errors.failed") };
+            }
+            if (request !== asked.current) return;
             if (answer.error) {
                 setFailure({ error: answer.error, relink: Boolean(answer.relink) });
                 if (!page) setFiles([]);
@@ -114,12 +147,13 @@ export function GoogleImportDialog({
             setFiles((held) => [...(page ? (held ?? []) : []), ...(answer.files ?? [])]);
             setNext(answer.next ?? null);
         },
-        [accountId, search]
+        [accountId, search, t]
     );
 
     // Searched as they type, after a beat, like the document list.
     useEffect(() => {
         if (!accountId) return;
+        asked.current++;
         setFiles(null);
         const timer = setTimeout(() => void load(null), search ? 300 : 0);
         return () => clearTimeout(timer);
@@ -128,11 +162,16 @@ export function GoogleImportDialog({
     async function open(file: GoogleOfficeFile): Promise<void> {
         if (!accountId || opening) return;
         setOpening(file.id);
-        const answer = await importGoogleFileAction({
-            connectionId: accountId,
-            fileId: file.id,
-            orgId
-        });
+        let answer: Awaited<ReturnType<typeof importGoogleFileAction>>;
+        try {
+            answer = await importGoogleFileAction({
+                connectionId: accountId,
+                fileId: file.id,
+                orgId
+            });
+        } catch {
+            answer = { error: t("google.errors.failed") };
+        }
         setOpening(null);
         if (answer.error || !answer.id || !answer.kind) {
             toast.show({ title: answer.error ?? t("google.errors.failed") });
@@ -154,6 +193,18 @@ export function GoogleImportDialog({
                     <Skeleton className="h-9 w-full" />
                 ) : state.status === "unavailable" ? (
                     <p className="text-sm text-foreground-muted">{t("google.unavailable")}</p>
+                ) : state.status === "failed" ? (
+                    <div className="space-y-2" role="alert">
+                        <p className="text-sm text-danger">{state.error}</p>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setAttempt((count) => count + 1)}
+                        >
+                            <RefreshCw className="size-4 shrink-0" aria-hidden />
+                            {t("google.retry")}
+                        </Button>
+                    </div>
                 ) : usable.length === 0 ? (
                     <div className="space-y-3">
                         <p className="text-sm text-foreground-muted">
@@ -208,20 +259,25 @@ export function GoogleImportDialog({
                         {failure ? (
                             <div className="space-y-2" role="alert">
                                 <p className="text-sm text-danger">{failure.error}</p>
-                                {failure.relink ? (
-                                    <Button asChild size="sm" variant="secondary">
-                                        <a href={OFFICE_GOOGLE_LINK}>{t("google.connect")}</a>
-                                    </Button>
-                                ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {failure.relink ? (
+                                        <Button asChild size="sm" variant="secondary">
+                                            <a href={OFFICE_GOOGLE_LINK}>{t("google.connect")}</a>
+                                        </Button>
+                                    ) : null}
                                     <Button
                                         size="sm"
-                                        variant="secondary"
-                                        onClick={() => void load(null)}
+                                        variant={failure.relink ? "ghost" : "secondary"}
+                                        onClick={() => {
+                                            setFailure(null);
+                                            setFiles(null);
+                                            void load(null);
+                                        }}
                                     >
                                         <RefreshCw className="size-4 shrink-0" aria-hidden />
                                         {t("google.retry")}
                                     </Button>
-                                )}
+                                </div>
                             </div>
                         ) : null}
 

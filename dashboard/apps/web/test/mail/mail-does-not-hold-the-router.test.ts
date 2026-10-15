@@ -96,9 +96,10 @@ const CHANGES_THE_MAILBOX = [
 
 describe("what a live frame does", () => {
     it("pulls the lists and the rail, and never the router", () => {
-        const handler = shell.slice(shell.indexOf("const onFrame = useCallback"));
-        const body = handler.slice(0, handler.indexOf("}, [refreshMailbox]);"));
-        expect(body).toContain("refreshMailbox();");
+        // Gathered by `settleFrames`, which runs whatever was handed to it.
+        const handler = shell.slice(shell.indexOf("const latestRefresh = useRef(refreshMailbox);"));
+        const body = handler.slice(0, handler.indexOf("useMailStream(onFrame);"));
+        expect(body).toContain("settleFrames(() => latestRefresh.current()");
         expect(body).not.toContain("router.refresh");
         // Nor through the wrapper that calls it.
         expect(body).not.toMatch(/(?<!pull|reload|Mailbox)refresh\(\)/);
