@@ -41,6 +41,11 @@ const SFTP_CAPABILITIES: StorageDriverCapabilities = {
 interface SftpDriverBase {
     readonly id: string;
     readonly root: string;
+    /** Hand every file and folder this driver creates to the owner of the folder
+     *  it lands in. Set for a session that runs as root, so what an administrator
+     *  uploads or extracts into a service's folder stays that service's to change
+     *  instead of becoming root's. */
+    readonly inheritOwner?: boolean;
 }
 
 /** Options for a driver that owns its connection: it opens one on `connect` and
@@ -214,11 +219,13 @@ export class SftpDriver implements StorageDriver {
             options?.offset && options.offset > 0
                 ? { flags: "r+" as const, start: options.offset }
                 : { flags: "w" as const };
+        const created = this.options.inheritOwner === true && writeOptions.flags === "w" && !(await this.exists(abs));
         const out = this.channel().createWriteStream(abs, writeOptions);
         await pipeAndClose(
             Readable.fromWeb(body as import("node:stream/web").ReadableStream),
             out
         );
+        if (created) await this.adoptParentOwner(abs, this.resolve(parentOf(rel)));
         return this.stat(rel);
     }
 
@@ -265,10 +272,31 @@ export class SftpDriver implements StorageDriver {
         for (const segment of segments) {
             current = current === "" ? segment : `${current}/${segment}`;
             const abs = this.resolve(current);
-            await new Promise<void>((resolve) => {
-                this.channel().mkdir(abs, () => resolve());
+            const made = await new Promise<boolean>((resolve) => {
+                this.channel().mkdir(abs, (error) => resolve(!error));
             });
+            if (made && this.options.inheritOwner) await this.adoptParentOwner(abs, this.resolve(parentOf(current)));
         }
+    }
+
+    private async exists(abs: string): Promise<boolean> {
+        return new Promise<boolean>((resolve) => {
+            this.channel().stat(abs, (error) => resolve(!error));
+        });
+    }
+
+    /** Give a path the owner and group of its folder. Best effort: a session that
+     *  may not chown leaves the entry as it was written, which is what it was
+     *  before this existed. */
+    private async adoptParentOwner(abs: string, parentAbs: string): Promise<void> {
+        const sftp = this.channel();
+        const parent = await new Promise<Stats | undefined>((resolve) => {
+            sftp.stat(parentAbs, (error, stats) => resolve(error ? undefined : (stats as never)));
+        });
+        if (!parent || typeof parent.uid !== "number" || typeof parent.gid !== "number") return;
+        await new Promise<void>((resolve) => {
+            sftp.chown(abs, parent.uid, parent.gid, () => resolve());
+        });
     }
 
     private async rmdir(abs: string): Promise<void> {
@@ -288,6 +316,8 @@ export class SftpDriver implements StorageDriver {
 interface Stats {
     size: number;
     mtime: number;
+    uid: number;
+    gid: number;
     isDirectory(): boolean;
     isSymbolicLink(): boolean;
 }

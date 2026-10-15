@@ -150,7 +150,7 @@ export async function borrowSmb(
  * credential instead of reusing a session opened with the old one.
  */
 export function dropSshConnections(machineId: string): void {
-    for (const purpose of ["drive", "exec", "docker"] satisfies SshPurpose[]) {
+    for (const purpose of ["drive", "drive-root", "exec", "docker"] satisfies SshPurpose[]) {
         pool.evict(`${purpose}:${machineId}`);
     }
 }

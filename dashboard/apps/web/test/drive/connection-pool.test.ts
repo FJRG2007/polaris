@@ -44,6 +44,33 @@ describe("borrowed SFTP channels", () => {
         third.release();
         expect(client.sftp).toHaveBeenCalledTimes(2);
     });
+
+    it("forgets a server's root connection along with its others", async () => {
+        const clients: Array<EventEmitter & { end: ReturnType<typeof vi.fn> }> = [];
+        const openSshClient = vi.fn(async () => {
+            const client = Object.assign(new EventEmitter(), { end: vi.fn() });
+            clients.push(client);
+            return client;
+        });
+        vi.doMock("@polaris/ssh", async (importOriginal) => {
+            const actual = await importOriginal<typeof import("@polaris/ssh")>();
+            return { ...actual, openSshClient, openRootSftp: vi.fn(async () => new EventEmitter()) };
+        });
+        const { borrowSftp, dropSshConnections } = await import("@/lib/connection-pool");
+        const options = {
+            host: "h",
+            port: 22,
+            username: "u",
+            auth: { method: "password" as const, password: "p" }
+        };
+
+        (await borrowSftp("drive-root", "host-a", options)).release();
+        dropSshConnections("host-a");
+        expect(clients[0]?.end).toHaveBeenCalled();
+
+        (await borrowSftp("drive-root", "host-a", options)).release();
+        expect(openSshClient).toHaveBeenCalledTimes(2);
+    });
 });
 
 describe("borrowed SMB sessions", () => {

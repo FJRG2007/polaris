@@ -128,6 +128,7 @@ async function sftpDriverFor(conn: HostConnection, asRoot = false): Promise<Stor
     const driver = new SftpDriver({
         id: `${HOST_CONNECTION_PREFIX}${conn.id}`,
         root: "/",
+        inheritOwner: asRoot && conn.sudo,
         session: async () => {
             if (asRoot && conn.sudo) {
                 // A server whose sudo was taken back since enrollment still
