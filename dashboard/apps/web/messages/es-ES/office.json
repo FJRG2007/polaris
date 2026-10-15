@@ -553,7 +553,7 @@
             "failed": "No se pudo vincular Google Drive. Reintenta."
         },
         "errors": {
-            "no-client": "Google aún no está conectado a este Polaris. Un admin puede añadirlo en Integraciones.",
+            "no-client": "Google Drive aún no está listo aquí. Pídeselo a un admin.",
             "no-account": "Esa cuenta de Google ya no está vinculada. Vincúlala otra vez.",
             "relink": "Google pide que vuelvas a vincular la cuenta para compartir archivos de Drive.",
             "not-supported": "Aquí solo se abren y guardan Docs y Sheets de Google.",
@@ -561,7 +561,7 @@
             "not-found": "Ese archivo ya no está, o esta cuenta no puede verlo.",
             "denied": "Google lo rechazó. Revisa que el archivo esté compartido con esta cuenta.",
             "failed": "Google no respondió. Reintenta en un momento.",
-            "api-off": "La API de Google Drive está apagada en el proyecto de Google de Polaris. Un admin puede activarla en Integraciones.",
+            "api-off": "Google Drive no está disponible aquí ahora. Ya se ha avisado a un admin.",
             "busy": "Google está ocupado ahora. Reintenta en un minuto."
         }
     },

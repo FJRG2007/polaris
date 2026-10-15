@@ -33,6 +33,7 @@ import type { ConnectionFailure } from "@/lib/connections/attention";
 import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
 import { isTunnelToken, type TunnelProviderSlug } from "@/lib/integrations/tunnel-token";
 import {
+    Check,
     CheckCircle2,
     Circle,
     Download,
@@ -329,9 +330,10 @@ export function IntegrationsView({
                                                     is the one thing on this grid worth reading
                                                     before "On": it is on, and it is not working. */}
                                                 {card.failure ? (
-                                                    <Badge variant="warning">
-                                                        {t("integrations.grid.needsAttention")}
-                                                    </Badge>
+                                                    <AttentionBadge
+                                                        slug={card.slug}
+                                                        name={card.name}
+                                                    />
                                                 ) : card.enabled ? (
                                                     <Badge variant="success">
                                                         {t("integrations.grid.on")}
@@ -712,6 +714,62 @@ function SetupSteps({
     );
 }
 
+function useMarkSeen(slug: string) {
+    const router = useRouter();
+    const [pending, startTransition] = useTransition();
+    const [error, setError] = useState<string | null>(null);
+
+    function markSeen() {
+        setError(null);
+        startTransition(async () => {
+            const result = await runAction(
+                () => integrationActions.dismissConnectionFailureAction(slug),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else router.refresh();
+        });
+    }
+    return { pending, error, markSeen };
+}
+
+/** The grid's "Needs attention", with the same "seen" next to it so a card can
+ *  be cleared without opening it. */
+function AttentionBadge({ slug, name }: { slug: string; name: string }) {
+    const t = useTranslations("admin");
+    const { pending, error, markSeen } = useMarkSeen(slug);
+    const label = t("integrations.attention.seenNamed", { name });
+
+    return (
+        <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className="flex items-center gap-1">
+                <Badge variant="warning">{t("integrations.grid.needsAttention")}</Badge>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-muted-foreground hover:text-success size-11 shrink-0 p-0 sm:size-7"
+                    aria-label={label}
+                    title={label}
+                    disabled={pending}
+                    onClick={markSeen}
+                >
+                    {pending ? (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                    ) : (
+                        <Check className="size-3.5 shrink-0" />
+                    )}
+                </Button>
+            </span>
+            {error ? (
+                <span role="alert" className="text-danger max-w-40 text-right text-xs">
+                    {error}
+                </span>
+            ) : null}
+        </span>
+    );
+}
+
 /**
  * What the last authorization failed with.
  *
@@ -720,18 +778,52 @@ function SetupSteps({
  * this account can open. The alert says the same thing - this is here for
  * whoever arrives at the screen afterwards.
  */
-function AttentionNotice({ failure, name }: { failure: ConnectionFailure; name: string }) {
+function AttentionNotice({
+    failure,
+    name,
+    slug
+}: {
+    failure: ConnectionFailure;
+    name: string;
+    slug: string;
+}) {
     const t = useTranslations("admin");
+    const { pending, error, markSeen: onSeen } = useMarkSeen(slug);
+    const apiOff = failure.kind === "api-off";
 
     return (
         <div className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-sm font-medium">{t("integrations.attention.title")}</span>
-                <span className="text-muted-foreground">
-                    {t("integrations.attention.reason", { name, reason: failure.reason })}
+                <span className="text-sm font-medium">
+                    {apiOff
+                        ? t("integrations.attention.apiOffTitle", { name })
+                        : t("integrations.attention.title")}
                 </span>
-                <span className="text-muted-foreground">{t("integrations.attention.clears")}</span>
+                <span className="text-muted-foreground">
+                    {apiOff
+                        ? t("integrations.attention.apiOffReason", { reason: failure.reason })
+                        : t("integrations.attention.reason", { name, reason: failure.reason })}
+                </span>
+                <span className="text-muted-foreground">
+                    {apiOff
+                        ? t("integrations.attention.apiOffClears")
+                        : t("integrations.attention.clears")}
+                </span>
+                {error ? (
+                    <span role="alert" className="text-danger">
+                        {error}
+                    </span>
+                ) : null}
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-1 self-start"
+                    disabled={pending}
+                    onClick={onSeen}
+                >
+                    {t("integrations.attention.seen")}
+                </Button>
             </div>
         </div>
     );
@@ -1352,7 +1444,7 @@ function OAuthAppDialog({ card, onClose }: { card: IntegrationCard; onClose: () 
 
                 <div className="flex flex-col gap-4">
                     {card.failure ? (
-                        <AttentionNotice failure={card.failure} name={app.name} />
+                        <AttentionNotice failure={card.failure} name={app.name} slug={card.slug} />
                     ) : null}
 
                     <SetupSteps links={card.setupLinks} values={card.setupValues} />
@@ -2290,7 +2382,7 @@ function GitHubConnected({ card, onClose }: { card: IntegrationCard; onClose: ()
                     {/* Connected and refusing people are not exclusive: the App is
                         installed, and the last person through it was turned away. */}
                     {card.failure ? (
-                        <AttentionNotice failure={card.failure} name={card.name} />
+                        <AttentionNotice failure={card.failure} name={card.name} slug={card.slug} />
                     ) : null}
 
                     <div className="flex items-center gap-2 rounded-md border border-border bg-surface/40 p-3 text-sm">
