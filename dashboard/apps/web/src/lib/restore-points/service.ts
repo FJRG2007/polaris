@@ -106,7 +106,7 @@ const cron: Adapter = {
         );
         for (const [id, item] of Object.entries(body.items)) {
             const input = item as unknown as Parameters<typeof saveServiceCron>[1];
-            await saveServiceCron(applicationId, { ...input, id: present.has(id) ? id : undefined }, actor.id);
+            await saveServiceCron(applicationId, { ...input, id: present.has(id) ? id : undefined }, actor.id, false);
         }
     }
 };
@@ -126,7 +126,14 @@ const routes: Adapter = {
     async apply(applicationId, body) {
         const hostnames = Object.keys(body.items);
         await prisma.domain.deleteMany({ where: { applicationId, kind: { not: "release" }, hostname: { notIn: hostnames } } });
+        const { dashboardHosts } = await import("@/lib/domain-edge");
+        const [dashboard, pages] = await Promise.all([
+            dashboardHosts(),
+            prisma.statusPage.findMany({ where: { customDomain: { in: hostnames } }, select: { customDomain: true } })
+        ]);
+        const reserved = new Set([...dashboard, ...pages.flatMap((page) => (page.customDomain ? [page.customDomain] : []))]);
         for (const [hostname, item] of Object.entries(body.items)) {
+            if (reserved.has(hostname.toLowerCase())) continue;
             const data = Object.fromEntries(ROUTE_FIELDS.map((field) => [field, item[field] ?? undefined])) as {
                 kind?: string;
                 targetPort: number;
@@ -196,11 +203,11 @@ const dns: Adapter = {
         const wanted = Object.values(body.items) as Array<{ id: string } & Record<string, unknown>>;
         const wantedIds = new Set(wanted.map((item) => item.id));
         for (const record of records) {
-            if (record.draft && !wantedIds.has(record.id)) await zone.deleteZoneRecord(scope, record.id);
+            if (record.draft && !wantedIds.has(record.id)) await zone.deleteZoneRecord(scope, record.id, false);
         }
         const live = new Set(records.map((record) => record.id));
         for (const { id, ...draft } of wanted) {
-            await zone.saveZoneRecord(scope, live.has(id) ? id : null, draft as never);
+            await zone.saveZoneRecord(scope, live.has(id) ? id : null, draft as never, false);
         }
     }
 };

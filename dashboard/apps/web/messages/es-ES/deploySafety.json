@@ -83,6 +83,19 @@
             "notDeploying": "{name} se importó pero no empezó a desplegarse; despliégalo desde su página.",
             "unknown": "Algo de la copia no se pudo traer.",
             "databaseUnlinked": "{name} no se conectó a ninguna base de datos; indica la conexión en sus variables."
+        },
+        "refusal": {
+            "notTarGz": "No es una copia .tar.gz.",
+            "notCpanel": "No es una copia de cuenta de cPanel.",
+            "homeUnreadable": "No se pudo leer la carpeta personal de la copia.",
+            "empty": "La copia está vacía.",
+            "tooManyFiles": "La copia tiene más de {max, number} archivos.",
+            "tooLarge": "La copia ocupa más de {gb, number} GB al desempaquetarla.",
+            "specialFiles": "La copia contiene enlaces o archivos especiales, que no se importan.",
+            "unreadableListing": "No se pudo leer la lista de archivos de la copia.",
+            "absolutePath": "La copia contiene una ruta absoluta.",
+            "leavesFolder": "La copia contiene una ruta que sale de su carpeta.",
+            "controlCharacters": "La copia contiene un nombre de archivo con caracteres de control."
         }
     }
 }

@@ -83,6 +83,19 @@
             "notDeploying": "{name} was imported but did not start deploying; deploy it from its page.",
             "unknown": "Something in the backup could not be carried over.",
             "databaseUnlinked": "{name} was not pointed at a database; set its connection in its variables."
+        },
+        "refusal": {
+            "notTarGz": "That is not a .tar.gz backup.",
+            "notCpanel": "That is not a cPanel account backup.",
+            "homeUnreadable": "The backup's home folder could not be read.",
+            "empty": "The backup is empty.",
+            "tooManyFiles": "The backup has more than {max, number} files.",
+            "tooLarge": "The backup unpacks to more than {gb, number} GB.",
+            "specialFiles": "The backup contains links or special files, which are not imported.",
+            "unreadableListing": "The backup's file list could not be read.",
+            "absolutePath": "The backup contains an absolute path.",
+            "leavesFolder": "The backup contains a path that leaves its folder.",
+            "controlCharacters": "The backup contains a file name with control characters."
         }
     }
 }

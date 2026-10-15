@@ -63,6 +63,16 @@ export type PromotionSkipReason =
     | "otherRepository"
     | "notDeployed";
 
+/** A promotion refused before it starts, as words the screen says in the reader's language. */
+export class PromotionRefusal extends Error {
+    constructor(
+        readonly key: "environment.notFound" | "environment.promoteBusy" | "environment.promoteNothingInCommon",
+        readonly params: Record<string, string> = {}
+    ) {
+        super(`promotion refused: ${key}`);
+    }
+}
+
 /** A promotion still marked running after this long died with its process. */
 const ABANDONED_AFTER_MS = 3 * 60 * 60_000;
 
@@ -94,7 +104,7 @@ async function loadPair(projectId: string, ownerId: string, sourceId: string, ta
     });
     const source = environments.find((environment) => environment.id === sourceId);
     const target = environments.find((environment) => environment.id === targetId);
-    if (!source || !target) throw new Error("Environment not found");
+    if (!source || !target) throw new PromotionRefusal("environment.notFound");
     return { source, target };
 }
 
@@ -149,13 +159,13 @@ export async function startPromotion(input: {
     includeData: boolean;
 }): Promise<{ id: string }> {
     const { source, target } = await loadPair(input.projectId, input.ownerId, input.sourceId, input.targetId);
-    if (await runningInto(target.id)) throw new Error(`${target.name} is already being promoted into. Wait for that to finish.`);
+    if (await runningInto(target.id)) throw new PromotionRefusal("environment.promoteBusy", { target: target.name });
     const plan = planPromotion(
         { services: source.applications, databases: source.databases },
         { services: target.applications, databases: target.databases }
     );
     if (plan.services.length === 0 && (!input.includeData || plan.databases.length === 0))
-        throw new Error(`${target.name} has nothing in common with ${source.name} to promote.`);
+        throw new PromotionRefusal("environment.promoteNothingInCommon", { target: target.name, source: source.name });
     const row = await prisma.environmentPromotion.create({
         data: {
             projectId: input.projectId,
@@ -213,7 +223,7 @@ async function runPromotion(
                 copied.push(pair.targetId);
                 steps.push({ kind: "database", name: pair.name, outcome: "copied" });
             } catch (error) {
-                steps.push({ kind: "database", name: pair.name, outcome: "failed", detail: readable(error) });
+                steps.push({ kind: "database", name: pair.name, outcome: "failed", ...readable(error) });
             }
             await save();
         }
@@ -258,7 +268,7 @@ async function runPromotion(
                 });
             }
         } catch (error) {
-            steps.push({ kind: "service", name: pair.name, outcome: "failed", detail: readable(error) });
+            steps.push({ kind: "service", name: pair.name, outcome: "failed", ...readable(error) });
         }
         await save();
     }
@@ -469,12 +479,12 @@ async function rewriteStoredValues(
     }
 }
 
-/** A message written for the screen, or a generic one: anything else can name
+/** A message written for the screen, or none: anything else can name
  *  internals, and is logged instead. */
-function readable(error: unknown): string {
-    if (error instanceof Error && error.name === "DatabaseOperationError") return error.message;
+function readable(error: unknown): { detail?: string } {
+    if (error instanceof Error && error.name === "DatabaseOperationError") return { detail: error.message };
     console.error("polaris: a promotion step failed:", error);
-    return "it did not go through";
+    return {};
 }
 
 export interface PromotionView {

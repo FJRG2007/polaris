@@ -20,7 +20,9 @@
         "stageFailed": "Could not set what the environment is for",
         "promoteFailed": "Could not promote the environment",
         "promoteCannotDeploy": "You cannot deploy to that environment, so you cannot promote into it.",
-        "promoteCannotCopyData": "You cannot manage the databases in that environment, so its data cannot be replaced. Leave the data out and try again."
+        "promoteCannotCopyData": "You cannot manage the databases in that environment, so its data cannot be replaced. Leave the data out and try again.",
+        "promoteBusy": "{target} is already being promoted into. Wait for that to finish.",
+        "promoteNothingInCommon": "{target} has nothing in common with {source} to promote."
     },
     "service": {
         "templateUnknown": "That template is not in the list",

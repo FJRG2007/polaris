@@ -240,7 +240,9 @@ export async function zoneRecords(scope: DnsScope): Promise<ZoneRecords> {
 export async function saveZoneRecord(
     scope: DnsScope,
     recordId: string | null,
-    draft: DnsRecordDraft
+    draft: DnsRecordDraft,
+    /** False when the caller already kept a restore point for the whole batch. */
+    snapshot = true
 ): Promise<DnsRecordView> {
     const zone = await zoneFor(scope);
     const existing = await scopedRecords(zone);
@@ -254,7 +256,7 @@ export async function saveZoneRecord(
         for (const field of checked.missing) problems[field] ??= t("problems.required");
         throw new DnsEditError(t("errors.checkFields"), problems);
     }
-    await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
+    if (snapshot) await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
     return viewOf(await saveDnsRecord(zone.token, zone.id, recordId, checked.record), zone.name);
 }
 
@@ -266,10 +268,15 @@ async function requireOwnRecord(zone: Zone, recordId: string): Promise<{ type: s
     return current;
 }
 
-export async function deleteZoneRecord(scope: DnsScope, recordId: string): Promise<void> {
+export async function deleteZoneRecord(
+    scope: DnsScope,
+    recordId: string,
+    /** False when the caller already kept a restore point for the whole batch. */
+    snapshot = true
+): Promise<void> {
     const zone = await zoneFor(scope);
     await requireOwnRecord(zone, recordId);
-    await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
+    if (snapshot) await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
     await deleteDnsRecord(zone.token, zone.id, recordId);
 }
 

@@ -832,7 +832,6 @@ export async function addApplicationDomain(
         subdomain?: string;
     }
 ): Promise<string> {
-    await restorePoints.capture("routes", restorePoints.restoreKeys.routes(applicationId));
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: {
@@ -841,6 +840,7 @@ export async function addApplicationDomain(
         }
     });
     if (!app) throw new Error("Application not found");
+    await restorePoints.capture("routes", restorePoints.restoreKeys.routes(applicationId));
     const owner = domainOwnerOf(app.environment.project);
     // A remote-server app's auto domain comes from THAT server - its own wildcard
     // domain, or failing that its IP - and is served by its own edge, never from the
@@ -1855,13 +1855,16 @@ export async function applicationDomainHealth(
 }
 
 /** Keep a domain's service's routes as a restore point before one of them changes. */
-async function keepRoutesOf(domainId: string): Promise<void> {
-    const row = await prisma.domain.findUnique({ where: { id: domainId }, select: { applicationId: true } });
+async function keepRoutesOf(domainId: string, ownerId: string): Promise<void> {
+    const row = await prisma.domain.findFirst({
+        where: { id: domainId, application: { environment: { project: { ownerId } } } },
+        select: { applicationId: true }
+    });
     if (row) await restorePoints.capture("routes", restorePoints.restoreKeys.routes(row.applicationId));
 }
 
 export async function removeApplicationDomain(domainId: string, ownerId: string): Promise<void> {
-    await keepRoutesOf(domainId);
+    await keepRoutesOf(domainId, ownerId);
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
@@ -1878,7 +1881,7 @@ export async function setApplicationDomainEnabled(
     ownerId: string,
     enabled: boolean
 ): Promise<void> {
-    await keepRoutesOf(domainId);
+    await keepRoutesOf(domainId, ownerId);
     const result = await prisma.domain.updateMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
         data: { enabled }

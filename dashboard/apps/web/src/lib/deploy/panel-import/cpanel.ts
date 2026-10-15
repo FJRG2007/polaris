@@ -22,8 +22,28 @@ import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 
-/** A reason a backup was refused, worded for whoever uploaded it. */
-export class BackupRefusal extends Error {}
+/** Why a backup was refused, as a code the screen words in the reader's language. */
+export const BACKUP_REFUSAL_CODES = [
+    "notTarGz",
+    "notCpanel",
+    "homeUnreadable",
+    "empty",
+    "tooManyFiles",
+    "tooLarge",
+    "specialFiles",
+    "unreadableListing",
+    "absolutePath",
+    "leavesFolder",
+    "controlCharacters"
+] as const;
+export type BackupRefusalCode = (typeof BACKUP_REFUSAL_CODES)[number];
+
+/** A reason a backup was refused, for whoever uploaded it. */
+export class BackupRefusal extends Error {
+    constructor(readonly code: BackupRefusalCode) {
+        super(`backup refused: ${code}`);
+    }
+}
 
 /** The most a backup may unpack to, and how many entries it may hold. */
 export const MAX_BACKUP_BYTES = 20 * 1024 ** 3;
@@ -73,23 +93,21 @@ export interface CpanelPlan {
  * What is wrong with one entry of the archive's verbose listing (`tar -tvzf`),
  * or null when it may be unpacked. Only regular files and folders are taken.
  */
-export function listingProblem(line: string): string | null {
+export function listingProblem(line: string): BackupRefusalCode | null {
     const type = line.charAt(0);
-    if (type !== "-" && type !== "d") return "The backup contains links or special files, which are not imported.";
+    if (type !== "-" && type !== "d") return "specialFiles";
     // "drwxr-xr-x user/group 0 2026-01-01 00:00 path" - the path is everything after the time.
     const match = /^\S+\s+\S+\s+\d+\s+\S+\s+\S+\s(.+)$/.exec(line);
-    if (!match) return "The backup's file list could not be read.";
+    if (!match) return "unreadableListing";
     return entryNameProblem(match[1] ?? "");
 }
 
 /** Whether an entry's name stays inside the folder it is unpacked into. */
-export function entryNameProblem(name: string): string | null {
+export function entryNameProblem(name: string): BackupRefusalCode | null {
     const unified = name.replace(/\\/g, "/");
-    if (unified.startsWith("/") || /^[a-zA-Z]:/.test(unified)) return "The backup contains an absolute path.";
-    if (unified.split("/").some((segment) => segment === "..")) return "The backup contains a path that leaves its folder.";
-    if ([...unified].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) {
-        return "The backup contains a file name with control characters.";
-    }
+    if (unified.startsWith("/") || /^[a-zA-Z]:/.test(unified)) return "absolutePath";
+    if (unified.split("/").some((segment) => segment === "..")) return "leavesFolder";
+    if ([...unified].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)) return "controlCharacters";
     return null;
 }
 
@@ -102,14 +120,14 @@ export function listingBytes(line: string): number {
 /** Checks a whole verbose listing and answers how much it unpacks to. */
 export function checkListing(listing: string): { entries: number; bytes: number } {
     const lines = listing.split("\n").filter((line) => line.trim().length > 0);
-    if (lines.length === 0) throw new BackupRefusal("The backup is empty.");
-    if (lines.length > MAX_BACKUP_ENTRIES) throw new BackupRefusal(`The backup has more than ${MAX_BACKUP_ENTRIES} files.`);
+    if (lines.length === 0) throw new BackupRefusal("empty");
+    if (lines.length > MAX_BACKUP_ENTRIES) throw new BackupRefusal("tooManyFiles");
     let bytes = 0;
     for (const line of lines) {
         const problem = listingProblem(line);
         if (problem) throw new BackupRefusal(problem);
         bytes += listingBytes(line);
-        if (bytes > MAX_BACKUP_BYTES) throw new BackupRefusal(`The backup unpacks to more than ${MAX_BACKUP_BYTES / 1024 ** 3} GB.`);
+        if (bytes > MAX_BACKUP_BYTES) throw new BackupRefusal("tooLarge");
     }
     return { entries: lines.length, bytes };
 }
@@ -210,7 +228,7 @@ async function backupRoot(dir: string): Promise<string> {
         if (!entry.isDirectory()) continue;
         for (const marker of MARKERS) if (await exists(join(dir, entry.name, marker))) return join(dir, entry.name);
     }
-    throw new BackupRefusal("That is not a cPanel account backup.");
+    throw new BackupRefusal("notCpanel");
 }
 
 /**
@@ -226,7 +244,7 @@ async function unpackHomeTar(root: string): Promise<void> {
     try {
         listing = await run("tar", ["-tvf", tar]);
     } catch {
-        throw new BackupRefusal("The backup's home folder could not be read.");
+        throw new BackupRefusal("homeUnreadable");
     }
     checkListing(listing);
     await mkdir(home, { recursive: true });
@@ -243,7 +261,7 @@ export async function inspectCpanelBackup(archive: string): Promise<{ dir: strin
     try {
         listing = await run("tar", ["-tvzf", archive]);
     } catch {
-        throw new BackupRefusal("That is not a .tar.gz backup.");
+        throw new BackupRefusal("notTarGz");
     }
     checkListing(listing);
     const dir = await mkdtemp(join(tmpdir(), "polaris-panel-import-"));

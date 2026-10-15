@@ -305,8 +305,8 @@ export async function deleteEnvVar(
         select: { scopeId: true, scopeType: true }
     });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
-    await restorePoints.capture("env", restorePoints.restoreKeys.env(row.scopeType, row.scopeId));
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    await restorePoints.capture("env", restorePoints.restoreKeys.env(row.scopeType, row.scopeId));
     await prisma.envVar.delete({ where: { id } });
     return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
 }

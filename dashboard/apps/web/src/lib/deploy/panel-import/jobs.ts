@@ -14,8 +14,9 @@
 
 import { prisma } from "@polaris/db";
 import { rm } from "node:fs/promises";
-import { BackupRefusal } from "./cpanel";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { recordDeployAudit } from "@/lib/deploy-audit";
+import * as cpanel from "./cpanel";
 import { importCpanelBackup, type CpanelImportResult, type ImportStep } from "./import";
 
 /** How long a running import may go without a step before it counts as cut short.
@@ -66,7 +67,19 @@ interface Row {
     readonly updatedAt: Date;
 }
 
-function viewOf(row: Row, now = Date.now()): ImportView {
+type Words = Awaited<ReturnType<typeof readerWords<"deploySafety">>>;
+
+/** A stored refusal code in the reader's words; null for one this server has no words for. */
+function refusalWords(code: string | null, t: Words): string | null {
+    const known = cpanel.BACKUP_REFUSAL_CODES.find((candidate) => candidate === code);
+    if (!known) return null;
+    return t(`importSite.refusal.${known}`, {
+        max: cpanel.MAX_BACKUP_ENTRIES,
+        gb: cpanel.MAX_BACKUP_BYTES / 1024 ** 3
+    });
+}
+
+function viewOf(row: Row, t: Words, now = Date.now()): ImportView {
     const stale = row.status === "running" && now - row.updatedAt.getTime() > STALE_MS;
     return {
         id: row.id,
@@ -76,7 +89,7 @@ function viewOf(row: Row, now = Date.now()): ImportView {
         total: row.total,
         projectId: row.projectId,
         result: (row.result as CpanelImportResult | null) ?? null,
-        error: stale ? null : row.error,
+        error: stale ? null : refusalWords(row.error, t),
         startedAt: row.startedAt.toISOString()
     };
 }
@@ -84,7 +97,7 @@ function viewOf(row: Row, now = Date.now()): ImportView {
 /** One import of this person's. */
 export async function getImport(id: string, ownerId: string): Promise<ImportView | null> {
     const row = await prisma.deployImport.findFirst({ where: { id, ownerId }, select: VIEW });
-    return row ? viewOf(row) : null;
+    return row ? viewOf(row, await readerWords("deploySafety")) : null;
 }
 
 /** This person's imports of the last day, newest first. */
@@ -95,7 +108,8 @@ export async function recentImports(ownerId: string): Promise<ImportView[]> {
         take: 5,
         select: VIEW
     });
-    return rows.map((row) => viewOf(row));
+    const t = await readerWords("deploySafety");
+    return rows.map((row) => viewOf(row, t));
 }
 
 export interface StartImportInput {
@@ -149,8 +163,9 @@ async function runImport(id: string, input: StartImportInput): Promise<void> {
             metadata: { services: result.services, databases: result.databases, domains: result.domains.length }
         }).catch((error: unknown) => console.error("panel-import: the import was not audited:", error));
     } catch (error) {
-        // Worded for the sender; anything else names internals, so it stays in the log.
-        const refusal = error instanceof BackupRefusal ? error.message : null;
+        // A refusal is kept as its code and worded for whoever reads it; anything else
+        // names internals, so it stays in the log.
+        const refusal = error instanceof cpanel.BackupRefusal ? error.code : null;
         if (!refusal) console.error(`panel-import: import ${id} failed:`, error);
         await update({ status: "failed", error: refusal, finishedAt: new Date() });
     } finally {

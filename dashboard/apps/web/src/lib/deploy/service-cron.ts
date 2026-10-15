@@ -117,9 +117,11 @@ export async function listServiceCrons(applicationId: string): Promise<ServiceCr
 export async function saveServiceCron(
     applicationId: string,
     input: ServiceCronInput,
-    userId: string
+    userId: string,
+    /** False when the caller already kept a restore point for the whole batch. */
+    snapshot = true
 ): Promise<ServiceCronView> {
-    await restorePoints.capture("cron", restorePoints.restoreKeys.cron(applicationId), { actorId: userId });
+    if (snapshot) await restorePoints.capture("cron", restorePoints.restoreKeys.cron(applicationId), { actorId: userId });
     const data = {
         name: input.name,
         schedule: input.schedule,

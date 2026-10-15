@@ -20,7 +20,9 @@
         "stageFailed": "No se pudo indicar para qué es el entorno",
         "promoteFailed": "No se pudo promover el entorno",
         "promoteCannotDeploy": "No puedes desplegar en ese entorno, así que no puedes promover a él.",
-        "promoteCannotCopyData": "No puedes gestionar las bases de datos de ese entorno, así que sus datos no se pueden reemplazar. Deja fuera los datos e inténtalo de nuevo."
+        "promoteCannotCopyData": "No puedes gestionar las bases de datos de ese entorno, así que sus datos no se pueden reemplazar. Deja fuera los datos e inténtalo de nuevo.",
+        "promoteBusy": "Ya se está promoviendo a {target}. Espera a que termine.",
+        "promoteNothingInCommon": "{target} no tiene nada en común con {source} que promover."
     },
     "service": {
         "templateUnknown": "Esa plantilla no está en la lista",

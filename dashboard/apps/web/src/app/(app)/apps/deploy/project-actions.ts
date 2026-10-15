@@ -79,6 +79,7 @@ async function attempt<T>(
     try {
         return await body();
     } catch (caught) {
+        if (caught instanceof promotion.PromotionRefusal) return { error: await reply(caught.key, caught.params) };
         return { error: caught instanceof Error ? caught.message : await reply(fallback) };
     }
 }
@@ -894,6 +895,7 @@ export async function promoteEnvironmentAction(input: PromotionRequest): Promise
         });
         await recordDeployAudit({
             actorId: user.id,
+            orgId: access.orgId ?? undefined,
             action: "deploy.env.promote",
             targetType: "environment",
             targetId: parsed.data.targetEnvironmentId,

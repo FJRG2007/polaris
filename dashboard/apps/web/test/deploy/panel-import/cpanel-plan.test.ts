@@ -18,17 +18,17 @@ describe("cPanel backup listing", () => {
     });
 
     it("refuses links, parent steps and absolute paths", () => {
-        expect(listingProblem("lrwxrwxrwx user/user 0 2026-01-01 00:00 backup/x -> /etc/passwd")).toMatch(/links/);
-        expect(listingProblem("hrw-r--r-- user/user 0 2026-01-01 00:00 backup/x link to y")).toMatch(/links/);
-        expect(listingProblem(file("backup/../../etc/cron.d/x"))).toMatch(/leaves/);
-        expect(listingProblem(file("/etc/passwd"))).toMatch(/absolute/);
-        expect(entryNameProblem("C:/Windows/x")).toMatch(/absolute/);
+        expect(listingProblem("lrwxrwxrwx user/user 0 2026-01-01 00:00 backup/x -> /etc/passwd")).toBe("specialFiles");
+        expect(listingProblem("hrw-r--r-- user/user 0 2026-01-01 00:00 backup/x link to y")).toBe("specialFiles");
+        expect(listingProblem(file("backup/../../etc/cron.d/x"))).toBe("leavesFolder");
+        expect(listingProblem(file("/etc/passwd"))).toBe("absolutePath");
+        expect(entryNameProblem("C:/Windows/x")).toBe("absolutePath");
         expect(() => checkListing(file("a/../../b"))).toThrow(BackupRefusal);
     });
 
     it("refuses a backup that unpacks past the cap, and an empty one", () => {
-        expect(() => checkListing(file("big", 21 * 1024 ** 3))).toThrow(/unpacks to more/);
-        expect(() => checkListing("\n")).toThrow(/empty/);
+        expect(() => checkListing(file("big", 21 * 1024 ** 3))).toThrow(expect.objectContaining({ code: "tooLarge" }));
+        expect(() => checkListing("\n")).toThrow(expect.objectContaining({ code: "empty" }));
     });
 });
 
