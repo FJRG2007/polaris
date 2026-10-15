@@ -13,7 +13,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const reachForOlder = vi.fn(async () => true);
 const olderOnServer = vi.fn(async () => true);
 const held = { id: "t1", pinned: false, size: 100, lastMessageAt: "2026-01-02T00:00:00.000Z" };
-const listThreads = vi.fn(async (..._: unknown[]) => ({ threads: [held] as (typeof held)[], cursor: "" }));
+const listThreads = vi.fn(async (..._: unknown[]) => ({
+    threads: [held] as (typeof held)[],
+    cursor: ""
+}));
 
 vi.mock("@/lib/api-session", () => ({ apiPermission: async () => ({ id: "u1" }) }));
 vi.mock("@/lib/mailbox/shelf", () => ({ mailShelfFor: async () => null }));
@@ -23,8 +26,9 @@ vi.mock("@/lib/mailbox/access", () => ({
 }));
 vi.mock("@/lib/mailbox/sync", () => ({ reachForOlder, olderOnServer }));
 vi.mock("@/lib/mailbox/views", async () => ({
-    EMPTY_QUERY: (await vi.importActual<typeof import("@/lib/mailbox/views")>("@/lib/mailbox/views"))
-        .EMPTY_QUERY,
+    EMPTY_QUERY: (
+        await vi.importActual<typeof import("@/lib/mailbox/views")>("@/lib/mailbox/views")
+    ).EMPTY_QUERY,
     listThreads
 }));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
