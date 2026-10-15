@@ -202,34 +202,105 @@ export function quarantineSpec(
     );
 }
 
-/** Vulnerabilities of an image, read from its registry, as JSON. */
-export function vulnSpec(imageRef: string): ComposeSpec {
+/* -------------------------------------------------------------------------- */
+/* Images                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * An image is scanned from an archive of it, never through the engine's
+ * socket: the host saves the image the app runs into a short-lived volume of
+ * this name, the tools read `/in/image.tar`, and the volume is removed after.
+ * That covers images built on the server, which no registry has.
+ */
+export const EXPORT_VOLUME_PREFIX = "polaris-secscan-image-";
+export const ARCHIVE_SOURCE = "docker-archive:/in/image.tar";
+/** Room kept free beyond the archive itself. */
+export const EXPORT_HEADROOM = 1024 * 1024 * 1024;
+
+/** The export volume of one scan: the prefix and 16 hex of its id. */
+export function exportVolumeName(scanId: string): string {
+    const hex = scanId.toLowerCase().replace(/[^0-9a-f]/g, "");
+    if (hex.length < 16) throw new Error("A scan id is needed to name its export");
+    return `${EXPORT_VOLUME_PREFIX}${hex.slice(-16)}`;
+}
+
+export function isExportVolume(name: string): boolean {
+    return /^polaris-secscan-image-[0-9a-f]{8,32}$/.test(name);
+}
+
+/** The free bytes `df -Pk` reports on its one filesystem line. */
+export function parseDfFree(output: string): number | null {
+    const kib = Number(output.split("\n")[1]?.trim().split(/\s+/)[3]);
+    return Number.isSafeInteger(kib) && kib >= 0 ? kib * 1024 : null;
+}
+
+export function hasRoom(size: number, free: number): boolean {
+    return size + EXPORT_HEADROOM <= free;
+}
+
+/** The commands an export is made of, the same ones the host daemon runs
+ *  locally, for the SSH path. Each is an argument list. */
+export function exportArgv(image: string, volume: string) {
+    const run = (interactive: boolean, tail: readonly string[]) => [
+        "docker",
+        "run",
+        "--rm",
+        ...(interactive ? ["-i"] : []),
+        "--network",
+        "none",
+        "-v",
+        `${volume}:/in`,
+        TOOLS_IMAGE,
+        ...tail
+    ];
+    return {
+        size: ["docker", "image", "inspect", "--format", "{{.Size}}", image],
+        free: run(false, ["df", "-Pk", "/in"]),
+        save: ["docker", "save", image],
+        write: run(true, ["/bin/sh", "-c", "cat > /in/image.tar"]),
+        check: run(false, ["/bin/sh", "-c", "tar -tf /in/image.tar >/dev/null"]),
+        remove: ["docker", "volume", "rm", "-f", volume]
+    };
+}
+
+function imageToolSpec(
+    name: string,
+    image: string,
+    volume: string,
+    output: string,
+    env: Record<string, string>
+): ComposeSpec {
+    if (!isExportVolume(volume)) throw new Error("Not an export volume");
     return spec(
         PROJECTS.images,
-        service("polaris-secscan-match", VULN_IMAGE, {
-            command: [`registry:${imageRef}`, "-o", "json", "-q"],
-            env: { GRYPE_DB_CACHE_DIR: "/cache/vulnerabilities", GRYPE_CHECK_FOR_APP_UPDATE: "false" },
-            volumes: [{ source: "cache", target: "/cache", kind: "volume" }],
+        service(name, image, {
+            command: [ARCHIVE_SOURCE, "-o", output, "-q"],
+            env,
+            volumes: [
+                { source: "cache", target: "/cache", kind: "volume" },
+                { source: volume, target: "/in", kind: "volume" }
+            ],
             memoryMb: 2048
         }),
         ["cache"],
-        []
+        [volume]
     );
 }
 
-/** An image's bill of materials, as CycloneDX JSON. */
-export function sbomSpec(imageRef: string): ComposeSpec {
-    return spec(
-        PROJECTS.images,
-        service("polaris-secscan-inventory", SBOM_IMAGE, {
-            command: [`registry:${imageRef}`, "-o", "cyclonedx-json", "-q"],
-            env: { SYFT_CHECK_FOR_APP_UPDATE: "false", SYFT_CACHE_DIR: "/cache/inventory" },
-            volumes: [{ source: "cache", target: "/cache", kind: "volume" }],
-            memoryMb: 2048
-        }),
-        ["cache"],
-        []
-    );
+/** Vulnerabilities of an exported image, as JSON. */
+export function vulnSpec(volume: string): ComposeSpec {
+    return imageToolSpec("polaris-secscan-match", VULN_IMAGE, volume, "json", {
+        GRYPE_DB_CACHE_DIR: "/cache/vulnerabilities",
+        GRYPE_CHECK_FOR_APP_UPDATE: "false"
+    });
+}
+
+/** An exported image's bill of materials, as CycloneDX JSON. */
+export function sbomSpec(volume: string): ComposeSpec {
+    return imageToolSpec("polaris-secscan-inventory", SBOM_IMAGE, volume, "cyclonedx-json", {
+        SYFT_CHECK_FOR_APP_UPDATE: "false",
+        SYFT_CACHE_DIR: "/cache/inventory"
+    });
 }
 
 /* -------------------------------------------------------------------------- */

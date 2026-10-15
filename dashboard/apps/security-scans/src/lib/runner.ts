@@ -8,7 +8,7 @@
 import { host } from "@polaris/app-host";
 import { HostdClient } from "@polaris/hostd-client";
 import { openSshClient, execCommand } from "@polaris/ssh";
-import { hostArgv, type HostAction } from "../model/specs";
+import { exportArgv, hasRoom, hostArgv, parseDfFree, type HostAction } from "../model/specs";
 import { parseContainerState, quoteArgv, type ComposeSpec, type RuntimePorts } from "@polaris/deploy";
 
 /** The server a scan runs on, as the runtime needs it. */
@@ -114,4 +114,72 @@ export async function runHostAction(
     } finally {
         client.end();
     }
+}
+
+type SshClient = Awaited<ReturnType<typeof openSshClient>>;
+
+/** Run one command over an open SSH client, keeping what it printed. */
+async function sshRun(client: SshClient, command: string): Promise<{ code: number; output: string }> {
+    const parts: Buffer[] = [];
+    const result = await execCommand(client, command, {
+        onStdout: (chunk) => void parts.push(chunk)
+    });
+    return { code: result.code, output: Buffer.concat(parts).toString("utf8") };
+}
+
+async function withSsh<T>(target: ScanTarget, work: (client: SshClient) => Promise<T>): Promise<T> {
+    const connection = await host.hostService.getHostConnection(target.hostId!, target.ownerId);
+    const client = await openSshClient({
+        host: connection.address,
+        port: connection.port,
+        username: connection.username,
+        auth: connection.auth,
+        pinnedHostKey: connection.hostKey
+    });
+    try {
+        return await work(client);
+    } finally {
+        client.end();
+    }
+}
+
+/**
+ * Save the image an app runs into `volume` as `/in/image.tar`, after checking
+ * the disk has room for it. Locally the daemon does it; over SSH the same
+ * commands run, each an argument list quoted word by word.
+ */
+export async function exportImage(target: ScanTarget, image: string, volume: string): Promise<void> {
+    if (target.kind === "local" || !target.hostId) {
+        const result = await new HostdClient().hostImageExport(image, volume);
+        if (result === null) throw new ScanFailure("daemonOutdated");
+        if (typeof result === "string") throw new ScanFailure(result);
+        return;
+    }
+    const argv = exportArgv(image, volume);
+    await withSsh(target, async (client) => {
+        const size = await sshRun(client, quoteArgv(argv.size));
+        const bytes = Number(size.output.trim());
+        if (size.code !== 0 || !Number.isSafeInteger(bytes)) throw new ScanFailure("imageMissing");
+        const free = await sshRun(client, quoteArgv(argv.free));
+        const room = parseDfFree(free.output);
+        if (free.code !== 0 || room === null) throw new ScanFailure("scanError");
+        if (!hasRoom(bytes, room)) throw new ScanFailure("noRoom");
+        // A pipe's status is its last command's, so a save that failed part way
+        // is caught by reading the archive back rather than by the pipe.
+        const save = await sshRun(client, `${quoteArgv(argv.save)} | ${quoteArgv(argv.write)}`);
+        const check = await sshRun(client, quoteArgv(argv.check));
+        if (save.code !== 0 || check.code !== 0) throw new ScanFailure("scanError");
+    });
+}
+
+/** Remove an export volume and the archive in it. */
+export async function removeExport(target: ScanTarget, volume: string): Promise<void> {
+    if (target.kind === "local" || !target.hostId) {
+        await new HostdClient().hostImageRemove(volume);
+        return;
+    }
+    await withSsh(target, async (client) => {
+        const result = await sshRun(client, quoteArgv(exportArgv("unused", volume).remove));
+        if (result.code !== 0) throw new Error(`volume removal exited ${result.code}`);
+    });
 }

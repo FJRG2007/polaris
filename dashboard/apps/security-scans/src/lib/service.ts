@@ -13,7 +13,15 @@ import * as parse from "../model/parse";
 import * as specs from "../model/specs";
 import { gunzip, gzip } from "node:zlib";
 import { shortHash } from "@polaris/deploy";
-import { portsFor, runHostAction, runOneShot, ScanFailure, type ScanTarget } from "./runner";
+import {
+    exportImage,
+    portsFor,
+    removeExport,
+    runHostAction,
+    runOneShot,
+    ScanFailure,
+    type ScanTarget
+} from "./runner";
 
 const zip = promisify(gzip);
 const unzip = promisify(gunzip);
@@ -311,7 +319,7 @@ async function execute(scanId: string): Promise<void> {
                   ? await runFiles(scan.target, input)
                   : scan.kind === "audit"
                     ? await runAudit(scan.target)
-                    : await runImage(scan.target, input);
+                    : await runImage(scan.target, input, scan.id);
         await prisma.$transaction([
             prisma.securityFinding.createMany({
                 data: result.findings.slice(0, MAX_FINDINGS).map((finding, position) => ({
@@ -448,15 +456,30 @@ async function runAudit(target: ScanTarget): Promise<ScanResult> {
     };
 }
 
-async function runImage(target: ScanTarget, input: Record<string, unknown>): Promise<ScanResult> {
+async function runImage(
+    target: ScanTarget,
+    input: Record<string, unknown>,
+    scanId: string
+): Promise<ScanResult> {
+    // Only the image this app's own running release names is ever exported.
     const image = await imageOf(String(input.applicationId ?? ""));
     if (!image) throw new ScanFailure("notRunning");
-    if (!parse.isRegistryRef(image)) throw new ScanFailure("localImage");
+    if (!parse.isImageRef(image)) throw new ScanFailure("imageMissing");
+    const volume = specs.exportVolumeName(scanId);
     const ports = await portsFor(target);
-    const vuln = await runOneShot(ports, specs.vulnSpec(image));
+    let vuln: { log: string };
+    let sbom: { log: string };
+    try {
+        await exportImage(target, image, volume);
+        vuln = await runOneShot(ports, specs.vulnSpec(volume));
+        sbom = await runOneShot(ports, specs.sbomSpec(volume));
+    } finally {
+        await removeExport(target, volume).catch((caught) =>
+            console.error(`polaris: security scan ${scanId} left its export volume:`, caught)
+        );
+    }
     const report = parse.parseVulnJson(parse.jsonOf(vuln.log));
-    if (!report) throw new ScanFailure("imageUnreachable");
-    const sbom = await runOneShot(ports, specs.sbomSpec(image));
+    if (!report) throw new ScanFailure("scanError");
     const sbomJson = parse.jsonOf(sbom.log);
     const inventory = parse.summarizeSbom(sbomJson);
     const payload = inventory ? await zip(JSON.stringify(sbomJson)) : undefined;

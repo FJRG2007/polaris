@@ -181,12 +181,13 @@ describe("image vulnerabilities", () => {
         expect(parse.summarizeSbom({ spdxVersion: "SPDX-2.3" })).toBeNull();
     });
 
-    it("only asks a registry for a plain reference", () => {
-        expect(parse.isRegistryRef("ghcr.io/acme/app:1.2")).toBe(true);
-        expect(parse.isRegistryRef(`nginx@sha256:${HASH_A}`)).toBe(true);
-        expect(parse.isRegistryRef("polaris-abc:build")).toBe(false);
-        expect(parse.isRegistryRef("x; rm -rf /")).toBe(false);
-        expect(parse.isRegistryRef("-o=evil")).toBe(false);
+    it("only exports a plain image reference, built here or pulled", () => {
+        expect(parse.isImageRef("ghcr.io/acme/app:1.2")).toBe(true);
+        expect(parse.isImageRef(`nginx@sha256:${HASH_A}`)).toBe(true);
+        expect(parse.isImageRef("polaris-0123abcd:build-7")).toBe(true);
+        expect(parse.isImageRef("x; rm -rf /")).toBe(false);
+        expect(parse.isImageRef("-o=evil")).toBe(false);
+        expect(parse.isImageRef("a b")).toBe(false);
     });
 });
 
@@ -224,13 +225,58 @@ describe("one-off specs", () => {
         }
     });
 
-    it("keeps the image tools' cache in one project volume", () => {
-        const vuln = specs.vulnSpec("nginx:1.27");
-        const sbom = specs.sbomSpec("nginx:1.27");
+    const SCAN_ID = "0190a5f2-8c3e-7d4a-9b1c-2e3f4a5b6c7d";
+    const VOLUME = specs.exportVolumeName(SCAN_ID);
+
+    it("names one export volume per scan, in the shape the daemon accepts", () => {
+        expect(VOLUME).toBe("polaris-secscan-image-9b1c2e3f4a5b6c7d");
+        expect(specs.isExportVolume(VOLUME)).toBe(true);
+        expect(specs.isExportVolume("polaris-abcd_data")).toBe(false);
+        expect(() => specs.exportVolumeName("x")).toThrow();
+    });
+
+    it("reads the image from its exported archive, with the cache in one project volume", () => {
+        const vuln = specs.vulnSpec(VOLUME);
+        const sbom = specs.sbomSpec(VOLUME);
         expect(vuln.project).toBe(sbom.project);
         expect(vuln.volumes).toEqual(["cache"]);
-        expect(vuln.services[0]!.command).toEqual(["registry:nginx:1.27", "-o", "json", "-q"]);
-        expect(sbom.services[0]!.command).toEqual(["registry:nginx:1.27", "-o", "cyclonedx-json", "-q"]);
+        expect(vuln.externalVolumes).toEqual([VOLUME]);
+        expect(vuln.services[0]!.volumes.map((v) => v.target)).toEqual(["/cache", "/in"]);
+        expect(vuln.services[0]!.command).toEqual(["docker-archive:/in/image.tar", "-o", "json", "-q"]);
+        expect(sbom.services[0]!.command).toEqual([
+            "docker-archive:/in/image.tar",
+            "-o",
+            "cyclonedx-json",
+            "-q"
+        ]);
+        expect(() => specs.vulnSpec("polaris-abcd_data")).toThrow();
+    });
+
+    it("exports without the engine socket, and checks the room first", () => {
+        const argv = specs.exportArgv("polaris-0123abcd:build-7", VOLUME);
+        expect(argv.save).toEqual(["docker", "save", "polaris-0123abcd:build-7"]);
+        expect(argv.write).toContain("-i");
+        expect(argv.write).toContain(`${VOLUME}:/in`);
+        for (const command of Object.values(argv)) {
+            expect(command.join(" ")).not.toContain("docker.sock");
+        }
+        expect(argv.remove).toEqual(["docker", "volume", "rm", "-f", VOLUME]);
+        const df = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 100 50 2097152 50% /in\n";
+        expect(specs.parseDfFree(df)).toBe(2 * 1024 ** 3);
+        expect(specs.parseDfFree("nonsense")).toBeNull();
+        expect(specs.hasRoom(1024, 2 * 1024 ** 3)).toBe(true);
+        expect(specs.hasRoom(1024 ** 3 + 1, 2 * 1024 ** 3)).toBe(false);
+    });
+
+    it("exports with the same commands the daemon runs", () => {
+        const rust = readFileSync(
+            new URL("../../../../../../crates/polaris-hostd/src/host_security.rs", import.meta.url),
+            "utf8"
+        );
+        expect(rust).toContain(`"${specs.EXPORT_VOLUME_PREFIX}"`);
+        expect(rust).toContain('"cat > /in/image.tar"');
+        expect(rust).toContain("1024 * 1024 * 1024");
+        expect(specs.EXPORT_HEADROOM).toBe(1024 * 1024 * 1024);
     });
 
     it("audits the host read-only, and only the updates switch is privileged", () => {

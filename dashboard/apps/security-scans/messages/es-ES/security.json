@@ -96,8 +96,6 @@
         "noBaseline": "Registra antes una referencia para esta carpeta.",
         "noApp": "Esa app ya no está en este servidor.",
         "notRunning": "Esta app no tiene ninguna versión en ejecución que analizar.",
-        "localImage": "La imagen de esta app se construyó en el servidor y no está en un registro, así que no se puede comprobar.",
-        "imageUnreachable": "No se pudo descargar la imagen desde su registro.",
         "noSignatures": "No se pudieron descargar las firmas de malware. Comprueba que el servidor tiene acceso a internet.",
         "scanError": "El análisis se detuvo con un error. Inténtalo de nuevo.",
         "tooManyFiles": "Demasiados archivos para registrarlos aquí. Elige una carpeta más pequeña.",
@@ -111,6 +109,8 @@
         "fileGone": "El archivo ya no está ahí.",
         "pathTaken": "Ya existe un archivo donde se restauraría este.",
         "quarantineFailed": "No se pudo mover el archivo. Inténtalo de nuevo.",
-        "updatesFailed": "No se pudieron leer ni cambiar las actualizaciones automáticas en este servidor."
+        "updatesFailed": "No se pudieron leer ni cambiar las actualizaciones automáticas en este servidor.",
+        "imageMissing": "La imagen que ejecuta esta app ya no está en el servidor. Vuelve a desplegar la app y analiza de nuevo.",
+        "noRoom": "No hay espacio libre suficiente en el servidor para comprobar esta imagen. Libera espacio e inténtalo de nuevo."
     }
 }

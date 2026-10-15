@@ -96,8 +96,6 @@
         "noBaseline": "Record a baseline for this folder first.",
         "noApp": "That app is no longer on this server.",
         "notRunning": "This app has no running release to scan.",
-        "localImage": "This app's image was built on the server and is not in a registry, so it cannot be checked.",
-        "imageUnreachable": "The image could not be fetched from its registry.",
         "noSignatures": "Malware signatures could not be downloaded. Check that the server reaches the internet.",
         "scanError": "The scan stopped with an error. Try again.",
         "tooManyFiles": "Too many files to record here. Pick a smaller folder.",
@@ -111,6 +109,8 @@
         "fileGone": "The file is no longer there.",
         "pathTaken": "A file already exists where this one would be restored.",
         "quarantineFailed": "The file could not be moved. Try again.",
-        "updatesFailed": "Could not read or change automatic updates on this server."
+        "updatesFailed": "Could not read or change automatic updates on this server.",
+        "imageMissing": "The image this app runs is no longer on the server. Redeploy the app, then scan again.",
+        "noRoom": "Not enough free disk on the server to check this image. Free some space, then try again."
     }
 }

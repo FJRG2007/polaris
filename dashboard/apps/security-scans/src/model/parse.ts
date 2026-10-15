@@ -353,10 +353,10 @@ export function summarizeSbom(value: unknown): SbomSummary | null {
     };
 }
 
-/** An image reference as a registry can be asked for it: no shell words, no
+/** An image reference as the host may be asked to save it: no shell words, no
  *  spaces, the shape `name[:tag][@sha256:...]`. */
 const IMAGE_REF = /^[a-z0-9][a-z0-9._\-/:]{0,250}(@sha256:[0-9a-f]{64})?$/;
 
-export function isRegistryRef(ref: string): boolean {
-    return IMAGE_REF.test(ref) && !ref.includes("//") && !ref.startsWith("polaris-");
+export function isImageRef(ref: string): boolean {
+    return IMAGE_REF.test(ref) && !ref.includes("//");
 }

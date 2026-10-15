@@ -130,9 +130,211 @@ pub fn run(action: HostAction) -> io::Result<Option<HostRun>> {
     }))
 }
 
+/* ------------------------------------------------------------------------ */
+/* Image export, for scanning an image built on this host                    */
+/* ------------------------------------------------------------------------ */
+
+/// Prefix of the short-lived volume an image is exported into. Nothing else
+/// may be named: the endpoint never creates or removes any other volume.
+pub const EXPORT_VOLUME_PREFIX: &str = "polaris-secscan-image-";
+
+/// Room kept free beyond the archive itself.
+pub const EXPORT_HEADROOM: u64 = 1024 * 1024 * 1024;
+
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ExportAction {
+    Export,
+    Remove,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ImageExportRequest {
+    pub action: ExportAction,
+    pub volume: String,
+    #[serde(default)]
+    pub image: Option<String>,
+}
+
+/// `polaris-secscan-image-` and 8 to 32 lowercase hex characters.
+pub fn valid_export_volume(name: &str) -> bool {
+    name.strip_prefix(EXPORT_VOLUME_PREFIX).is_some_and(|rest| {
+        (8..=32).contains(&rest.len())
+            && rest
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    })
+}
+
+/// An image reference as the deploy spec accepts one, that can never read as
+/// a flag.
+pub fn valid_export_image(image: &str) -> bool {
+    crate::deploy::valid_image(image) && !image.starts_with('-')
+}
+
+/// The free bytes `df -Pk` reports on its one filesystem line.
+pub fn parse_df_free(output: &str) -> Option<u64> {
+    let line = output.lines().nth(1)?;
+    let kib: u64 = line.split_whitespace().nth(3)?.parse().ok()?;
+    kib.checked_mul(1024)
+}
+
+/// Whether an archive of `size` bytes fits in `free` with the headroom kept.
+pub fn has_room(size: u64, free: u64) -> bool {
+    size.checked_add(EXPORT_HEADROOM)
+        .is_some_and(|need| need <= free)
+}
+
+pub fn inspect_size_argv(image: &str) -> Vec<String> {
+    ["image", "inspect", "--format", "{{.Size}}", image]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Mounts the export volume in a throwaway container; `tail` runs inside it.
+pub fn volume_run_argv(volume: &str, interactive: bool, tail: &[&str]) -> Vec<String> {
+    let mount = format!("{volume}:/in");
+    let mut args = vec!["run", "--rm"];
+    if interactive {
+        args.push("-i");
+    }
+    args.extend(["--network", "none", "-v", &mount, TOOLS_IMAGE]);
+    args.extend(tail);
+    args.into_iter().map(String::from).collect()
+}
+
+pub const FREE_TAIL: &[&str] = &["df", "-Pk", "/in"];
+pub const WRITE_TAIL: &[&str] = &["/bin/sh", "-c", "cat > /in/image.tar"];
+
+/// Why an export did not happen.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ExportError {
+    Busy,
+    NoImage,
+    NoRoom,
+    Failed,
+}
+
+fn docker_output(args: &[String]) -> io::Result<(bool, String)> {
+    let out = Command::new("docker")
+        .args(args)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()?;
+    Ok((
+        out.status.success(),
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+    ))
+}
+
+/// Save `image` into `volume` as `/in/image.tar`, after checking it fits.
+/// Shares the host action lock, so it never overlaps another host scan.
+pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
+    let Ok(_guard) = RUNNING.try_lock() else {
+        return Err(ExportError::Busy);
+    };
+    let (ok, size) = docker_output(&inspect_size_argv(image)).map_err(|_| ExportError::Failed)?;
+    let size: u64 = match size.trim().parse() {
+        Ok(size) if ok => size,
+        _ => return Err(ExportError::NoImage),
+    };
+    let (ok, df) = docker_output(&volume_run_argv(volume, false, FREE_TAIL))
+        .map_err(|_| ExportError::Failed)?;
+    match parse_df_free(&df) {
+        Some(free) if ok && has_room(size, free) => {}
+        Some(_) if ok => return Err(ExportError::NoRoom),
+        _ => return Err(ExportError::Failed),
+    }
+    let mut save = Command::new("docker")
+        .args(["save", image])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| ExportError::Failed)?;
+    let stdout = save.stdout.take().ok_or(ExportError::Failed)?;
+    let write = Command::new("docker")
+        .args(volume_run_argv(volume, true, WRITE_TAIL))
+        .stdin(Stdio::from(stdout))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| ExportError::Failed)?;
+    let saved = save.wait().map_err(|_| ExportError::Failed)?;
+    if !write.success() || !saved.success() {
+        return Err(ExportError::Failed);
+    }
+    Ok(size)
+}
+
+/// Remove an export volume and the archive in it.
+pub fn remove_export(volume: &str) -> bool {
+    let args: Vec<String> = ["volume", "rm", "-f", volume]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    docker_output(&args).map(|(ok, _)| ok).unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_volume_names_are_confined() {
+        assert!(valid_export_volume("polaris-secscan-image-0123abcd"));
+        assert!(!valid_export_volume("polaris-secscan-image-0123ABCD"));
+        assert!(!valid_export_volume("polaris-secscan-image-123"));
+        assert!(!valid_export_volume("polaris-abc_data"));
+        assert!(!valid_export_volume("polaris-secscan-image-0123abcd/../x"));
+    }
+
+    #[test]
+    fn export_images_cannot_be_flags_or_shell() {
+        assert!(valid_export_image("polaris-0123abcd:build-7"));
+        assert!(valid_export_image("ghcr.io/acme/app@sha256:abc"));
+        assert!(!valid_export_image("-o=/etc/passwd"));
+        assert!(!valid_export_image("x; rm -rf /"));
+        assert!(!valid_export_image(""));
+    }
+
+    #[test]
+    fn reads_free_space_and_keeps_headroom() {
+        let df = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 100 50 2097152 50% /in\n";
+        assert_eq!(parse_df_free(df), Some(2 * 1024 * 1024 * 1024));
+        assert_eq!(parse_df_free("garbage"), None);
+        assert!(has_room(1024, 2 * 1024 * 1024 * 1024));
+        assert!(!has_room(1024 * 1024 * 1024 + 1, 2 * 1024 * 1024 * 1024));
+        assert!(!has_room(u64::MAX, u64::MAX));
+    }
+
+    #[test]
+    fn export_containers_have_no_network_and_only_the_volume() {
+        let args = volume_run_argv("polaris-secscan-image-0123abcd", true, WRITE_TAIL);
+        assert!(args.contains(&"-i".to_string()));
+        assert!(args.contains(&"none".to_string()));
+        assert!(args.contains(&"polaris-secscan-image-0123abcd:/in".to_string()));
+        assert!(!args.iter().any(|a| a.contains("docker.sock")));
+        assert_eq!(
+            inspect_size_argv("img:1").last().map(String::as_str),
+            Some("img:1")
+        );
+    }
+
+    #[test]
+    fn export_requests_are_closed() {
+        let ok: ImageExportRequest = serde_json::from_str(
+            r#"{"action":"export","volume":"polaris-secscan-image-0123abcd","image":"x:1"}"#,
+        )
+        .unwrap();
+        assert_eq!(ok.action, ExportAction::Export);
+        assert!(serde_json::from_str::<ImageExportRequest>(
+            r#"{"action":"export","volume":"v","image":"x","cmd":"y"}"#
+        )
+        .is_err());
+    }
 
     #[test]
     fn parses_only_known_actions() {
