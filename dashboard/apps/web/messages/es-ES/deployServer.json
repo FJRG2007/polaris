@@ -309,6 +309,7 @@
     "variableGroups": {
         "notFound": "Ese grupo de variables ya no existe.",
         "readOnly": "Puedes usar este grupo, pero no cambiarlo.",
+        "secretLink": "Este grupo guarda secretos: solo lo enlaza quien puede cambiarlo.",
         "otherShelf": "Solo se enlazan grupos del espacio del proyecto.",
         "tooMany": "Un servicio enlaza como mucho 10 grupos.",
         "taken": "Ya hay un grupo con ese nombre aquí.",

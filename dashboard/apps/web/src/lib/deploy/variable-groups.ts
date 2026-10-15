@@ -9,9 +9,12 @@
  *
  * Who may do what:
  * - A personal group is its owner's alone: only they read, edit or link it.
- * - An organization's group is read (names, plain values, linking) by any of
- *   its members, and edited - secrets revealed included - by
- *   anyone holding deploy.manage there.
+ * - An organization's group is read (names, plain values) by any of its
+ *   members, and edited - secrets revealed included - by anyone holding
+ *   deploy.manage there. Linking needs the read right, or the edit right when
+ *   the group holds a secret: a link hands every value to the service's code.
+ * - A preview (an environment made for a pull request) is never given a
+ *   group's secret, whenever it was linked or added (groupLayers).
  * - A service links only a group on its own project's shelf (groupFitsProject),
  *   so a group's values never reach a project run by people outside its circle.
  */
@@ -36,7 +39,7 @@ export interface GroupRights {
 
 /** Thrown for anything the caller may say on screen as it is. */
 export class VariableGroupError extends Error {
-    constructor(readonly code: "notFound" | "readOnly" | "otherShelf" | "tooMany" | "taken") {
+    constructor(readonly code: "notFound" | "readOnly" | "secretLink" | "otherShelf" | "tooMany" | "taken") {
         super(code);
         this.name = "VariableGroupError";
     }
@@ -178,25 +181,29 @@ export async function updateGroup(
     actor: OrgActor,
     groupId: string,
     input: core.VariableGroupInput
-): Promise<void> {
+): Promise<{ orgId: string | null }> {
     const group = await requireGroup(actor, groupId, "edit");
     await assertNameFree(group.ownerId, group.orgId, input.name, group.id);
     await prisma.variableGroup.update({
         where: { id: group.id },
         data: { name: input.name, description: input.description }
     });
+    return { orgId: group.orgId };
 }
 
 /** Remove a group, its variables and every link to it, in one transaction.
  *  Answers the services that read it, so the caller can say what changed. */
-export async function deleteGroup(actor: OrgActor, groupId: string): Promise<{ linked: number }> {
+export async function deleteGroup(
+    actor: OrgActor,
+    groupId: string
+): Promise<{ linked: number; orgId: string | null }> {
     const group = await requireGroup(actor, groupId, "edit");
     const linked = await prisma.variableGroupLink.count({ where: { groupId: group.id } });
     await prisma.$transaction([
         prisma.envVar.deleteMany({ where: { scopeType: "group", scopeId: group.id } }),
         prisma.variableGroup.delete({ where: { id: group.id } })
     ]);
-    return { linked };
+    return { linked, orgId: group.orgId };
 }
 
 /** Bump the group's updatedAt after its variables changed, so the list orders
@@ -255,7 +262,7 @@ async function serviceShelf(applicationId: string): Promise<{ ownerId: string; o
 }
 
 /** Groups this actor could link to the service: on its project's shelf, readable
- *  by them, and not linked yet. */
+ *  by them - editable when it holds a secret - and not linked yet. */
 export async function linkableGroups(
     actor: OrgActor,
     applicationId: string
@@ -263,7 +270,7 @@ export async function linkableGroups(
     const shelf = await serviceShelf(applicationId);
     const rights = await rightsOn(actor, { ownerId: shelf.orgId === null ? shelf.ownerId : actor.id, orgId: shelf.orgId });
     if (!rights.canRead) return [];
-    return prisma.variableGroup.findMany({
+    const rows = await prisma.variableGroup.findMany({
         where: {
             ...(shelf.orgId === null ? { ownerId: shelf.ownerId, orgId: null } : { orgId: shelf.orgId }),
             links: { none: { applicationId } }
@@ -272,15 +279,31 @@ export async function linkableGroups(
         take: 200,
         select: { id: true, name: true }
     });
+    if (rights.canEdit || rows.length === 0) return rows;
+    const holding = new Set(await groupsHoldingSecrets(rows.map((row) => row.id)));
+    return rows.filter((row) => !holding.has(row.id));
+}
+
+/** Which of these groups hold at least one secret. */
+async function groupsHoldingSecrets(groupIds: string[]): Promise<string[]> {
+    const rows = await prisma.envVar.findMany({
+        where: { scopeType: "group", scopeId: { in: groupIds }, isSecret: true },
+        distinct: ["scopeId"],
+        select: { scopeId: true }
+    });
+    return rows.map((row) => row.scopeId);
 }
 
 /**
  * Link a group to a service, layered above the groups it already links. The
  * caller has already checked the right to change the service's variables;
- * this refuses a group the actor cannot read or one off the project's shelf.
+ * this refuses a group the actor cannot read, one holding a secret they could
+ * not reveal, and one off the project's shelf.
  */
 export async function linkGroup(actor: OrgActor, applicationId: string, groupId: string): Promise<void> {
     const group = await requireGroup(actor, groupId, "read");
+    if (!group.canEdit && (await groupsHoldingSecrets([group.id])).length > 0)
+        throw new VariableGroupError("secretLink");
     const shelf = await serviceShelf(applicationId);
     if (!core.groupFitsProject(group, shelf)) throw new VariableGroupError("otherShelf");
     const existing = await prisma.variableGroupLink.findMany({
@@ -302,7 +325,9 @@ export async function unlinkGroup(applicationId: string, groupId: string): Promi
 }
 
 /** Every linked group's variables decrypted, as layers in link order. For the
- *  deploy pipeline only - nothing here reaches a screen. */
+ *  deploy pipeline only - nothing here reaches a screen. A preview's code is
+ *  not trusted with secrets, so a service in one gets every group's plain
+ *  values and none of its secrets, however the link or the secret came about. */
 export async function groupLayers(applicationId: string): Promise<core.VariableLayer[]> {
     const links = await prisma.variableGroupLink.findMany({
         where: { applicationId },
@@ -310,8 +335,17 @@ export async function groupLayers(applicationId: string): Promise<core.VariableL
         select: { group: { select: { id: true, name: true } } }
     });
     if (links.length === 0) return [];
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { environment: { select: { pullRequest: true } } }
+    });
+    const preview = !app || app.environment.pullRequest !== null;
     const rows = await prisma.envVar.findMany({
-        where: { scopeType: "group", scopeId: { in: links.map((link) => link.group.id) } }
+        where: {
+            scopeType: "group",
+            scopeId: { in: links.map((link) => link.group.id) },
+            ...(preview ? { isSecret: false } : {})
+        }
     });
     return links.map((link) => {
         const values: Record<string, string> = {};
@@ -372,30 +406,83 @@ export async function deployedServicesLinking(groupId: string): Promise<string[]
     return rows.map((row) => row.applicationId);
 }
 
+export interface LinkingService {
+    applicationId: string;
+    name: string;
+    projectId: string;
+    projectName: string;
+    environmentName: string;
+    deployed: boolean;
+}
+
+/** The services linking a group that this actor may see, and how many more
+ *  link it that they may not - so nobody learns a stranger's service names. */
+export async function servicesLinking(
+    actor: OrgActor,
+    groupId: string
+): Promise<{ services: LinkingService[]; hidden: number }> {
+    const rows = await prisma.variableGroupLink.findMany({
+        where: { groupId, application: { binnedAt: null } },
+        orderBy: { createdAt: "asc" },
+        take: 200,
+        select: {
+            application: {
+                select: {
+                    id: true,
+                    name: true,
+                    currentDeploymentId: true,
+                    environment: { select: { name: true, project: { select: { id: true, name: true } } } }
+                }
+            }
+        }
+    });
+    const services: LinkingService[] = [];
+    let hidden = 0;
+    for (const { application } of rows) {
+        const access = await requireApplicationAccess(application.id, actor.id, "project.read").catch(
+            () => null
+        );
+        if (!access) {
+            hidden += 1;
+            continue;
+        }
+        services.push({
+            applicationId: application.id,
+            name: application.name,
+            projectId: application.environment.project.id,
+            projectName: application.environment.project.name,
+            environmentName: application.environment.name,
+            deployed: application.currentDeploymentId !== null
+        });
+    }
+    return { services, hidden };
+}
+
 /**
  * Restart every deployed service linking the group that this actor may deploy,
  * with the variables as they now are. Services they may not deploy are left
- * alone and counted, so the screen can say how many were skipped.
+ * alone and counted, so the screen can say how many were skipped. Answers once
+ * the counts are known; the restarts carry on one after another behind it.
  */
 export async function redeployLinked(
     actor: OrgActor,
     groupId: string,
     restart: (applicationId: string, ownerId: string) => Promise<void>
 ): Promise<{ started: number; skipped: number }> {
-    let started = 0;
+    const targets: Array<{ applicationId: string; ownerId: string }> = [];
     let skipped = 0;
     for (const applicationId of await deployedServicesLinking(groupId)) {
         const access = await requireApplicationAccess(applicationId, actor.id, "deploy.run").catch(
             () => null
         );
-        if (!access) {
-            skipped += 1;
-            continue;
-        }
-        await restart(applicationId, access.ownerId).catch(() => undefined);
-        started += 1;
+        if (access) targets.push({ applicationId, ownerId: access.ownerId });
+        else skipped += 1;
     }
-    return { started, skipped };
+    void (async () => {
+        for (const target of targets)
+            await restart(target.applicationId, target.ownerId).catch(() => undefined);
+    })();
+    return { started: targets.length, skipped };
 }
 
 /**

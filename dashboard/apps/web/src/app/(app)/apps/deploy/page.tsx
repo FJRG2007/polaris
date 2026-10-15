@@ -92,7 +92,14 @@ export default async function DeployPage() {
                 apps.filter((app) => isInFlightStatus(statuses[app.id])).length +
                 databases.filter((database) => isInFlightStatus(database.status)).length,
             total: apps.length + databases.length,
-            tags: parseTags(project.tags)
+            tags: parseTags(project.tags),
+            serviceTags: [
+                ...new Set(
+                    project.environments.flatMap((one) =>
+                        one.applications.flatMap((app) => parseTags(app.tags))
+                    )
+                )
+            ]
         };
     });
 

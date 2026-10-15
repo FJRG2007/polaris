@@ -85,7 +85,8 @@ const card = (id: string, name: string, managed: boolean) => ({
     online: 0,
     deploying: 0,
     total: 0,
-    tags: [] as string[]
+    tags: [] as string[],
+    serviceTags: [] as string[]
 });
 
 const projects = [

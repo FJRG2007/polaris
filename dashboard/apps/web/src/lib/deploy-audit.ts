@@ -44,6 +44,15 @@ export async function deployTargetOrgId(
             );
         case "application":
             return applicationOrgId(targetId);
+        case "variable-group":
+            return (
+                (
+                    await prisma.variableGroup.findUnique({
+                        where: { id: targetId },
+                        select: { orgId: true }
+                    })
+                )?.orgId ?? null
+            );
         case "database":
             return (
                 (

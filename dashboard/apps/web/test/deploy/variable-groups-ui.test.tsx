@@ -134,6 +134,15 @@ describe("filterByTag", () => {
         expect(filterByTag(projects, "production").map((one) => one.id)).toEqual(["a"]);
         expect(filterByTag(projects, "missing")).toEqual([]);
     });
+
+    it("finds a project by a tag on one of its services", () => {
+        const withServices = [
+            { id: "a", tags: [], serviceTags: ["payments"] },
+            { id: "b", tags: ["payments"], serviceTags: [] },
+            { id: "c", tags: [], serviceTags: [] }
+        ];
+        expect(filterByTag(withServices, "payments").map((one) => one.id)).toEqual(["a", "b"]);
+    });
 });
 
 describe("the projects list", () => {
@@ -146,7 +155,8 @@ describe("the projects list", () => {
         online: 0,
         deploying: 0,
         total: 0,
-        tags
+        tags,
+        serviceTags: [] as string[]
     });
 
     it("narrows to the projects carrying the tag picked", async () => {

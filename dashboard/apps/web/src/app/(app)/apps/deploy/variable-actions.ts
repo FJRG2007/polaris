@@ -39,21 +39,23 @@ const DEPLOY_PATH = "/apps/deploy";
 
 const scopeSchema = variableScopeSchema;
 
-/** Redeploy what a scope's variables reach: a service, an environment's
- *  services, or every deployed service linking a group that the actor may deploy. */
+/** Start redeploying what a scope's variables reach: a service, an environment's
+ *  services, or every deployed service linking a group that the actor may deploy.
+ *  Answers how many of a group's services were skipped for lack of that right. */
 async function redeployScope(
     actor: { id: string; isAdmin: boolean },
     scope: EnvScope,
     scopeId: string,
     ownerId: string
-): Promise<void> {
+): Promise<{ skipped: number }> {
     if (scope === "group") {
-        await groups.redeployLinked(actor, scopeId, (applicationId, appOwnerId) =>
+        const { skipped } = await groups.redeployLinked(actor, scopeId, (applicationId, appOwnerId) =>
             redeployForEnvScope("application", applicationId, appOwnerId, actor.id)
         );
-        return;
+        return { skipped };
     }
-    await redeployForEnvScope(scope, scopeId, ownerId, actor.id);
+    void redeployForEnvScope(scope, scopeId, ownerId, actor.id).catch(() => undefined);
+    return { skipped: 0 };
 }
 
 async function audit(
@@ -82,7 +84,7 @@ async function audit(
  */
 export async function saveEnvVarChangesAction(
     input: unknown
-): Promise<{ error?: string; saved?: number; redeployed?: boolean }> {
+): Promise<{ error?: string; saved?: number; redeployed?: boolean; skipped?: number }> {
     const user = await requirePermission("deploy.manage");
     const parsed = variableChangesSchema.safeParse(input);
     if (!parsed.success) {
@@ -166,10 +168,16 @@ export async function saveEnvVarChangesAction(
         }
 
         if (scope === "group") await groups.touchGroup(scopeId);
-        if (redeploy)
-            void redeployScope(user, scope, scopeId, access.ownerId).catch(() => undefined);
+        const skipped = redeploy
+            ? (await redeployScope(user, scope, scopeId, access.ownerId).catch(() => ({ skipped: 0 })))
+                  .skipped
+            : 0;
         revalidatePath(DEPLOY_PATH);
-        return { saved: set.length + secrecy.length + remove.length, redeployed: redeploy };
+        return {
+            saved: set.length + secrecy.length + remove.length,
+            redeployed: redeploy,
+            ...(skipped > 0 ? { skipped } : {})
+        };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : await reply("variables.saveFailed")
@@ -178,7 +186,9 @@ export async function saveEnvVarChangesAction(
 }
 
 /** Redeploy what a scope's variables reach, after changes were saved without one. */
-export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: string }> {
+export async function redeployEnvScopeAction(
+    input: unknown
+): Promise<{ error?: string; skipped?: number }> {
     const user = await requirePermission("deploy.manage");
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return { error: await reply("variables.nothingToRedeploy") };
@@ -189,11 +199,14 @@ export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: 
             user,
             "deploy.run"
         );
-        void redeployScope(user, parsed.data.scope, parsed.data.scopeId, access.ownerId).catch(
-            () => undefined
+        const { skipped } = await redeployScope(
+            user,
+            parsed.data.scope,
+            parsed.data.scopeId,
+            access.ownerId
         );
         revalidatePath(DEPLOY_PATH);
-        return {};
+        return skipped > 0 ? { skipped } : {};
     } catch (caught) {
         return {
             error:

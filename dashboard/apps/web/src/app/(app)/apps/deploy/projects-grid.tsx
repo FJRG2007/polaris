@@ -78,16 +78,25 @@ export interface ProjectCardData {
     total: number;
     /** Normalized labels the list filters on. */
     tags: string[];
+    /** Its services' labels, which find the project too. */
+    serviceTags: string[];
 }
 
-/** The projects carrying a tag, or all of them when none is picked. */
-export function filterByTag<T extends { tags: string[] }>(items: readonly T[], tag: string | null): T[] {
-    return tag === null ? [...items] : items.filter((item) => item.tags.includes(tag));
+/** The projects carrying a tag, themselves or on a service, or all of them
+ *  when none is picked. */
+export function filterByTag<T extends { tags: string[]; serviceTags?: string[] }>(
+    items: readonly T[],
+    tag: string | null
+): T[] {
+    return tag === null
+        ? [...items]
+        : items.filter((item) => item.tags.includes(tag) || (item.serviceTags ?? []).includes(tag));
 }
 
 const PROJECT_FIELDS: readonly SearchField<ProjectCardData>[] = [
     { text: (project) => project.name },
-    { text: (project) => project.tags.join(" ") }
+    { text: (project) => project.tags.join(" ") },
+    { text: (project) => project.serviceTags.join(" ") }
 ];
 
 export function ProjectsGrid({
@@ -162,7 +171,7 @@ export function ProjectsGrid({
         [kept, showManaged]
     );
     const allTags = useMemo(
-        () => [...new Set(kept.flatMap((project) => project.tags))].sort(),
+        () => [...new Set(kept.flatMap((project) => [...project.tags, ...project.serviceTags]))].sort(),
         [kept]
     );
     // A tag that no project carries any more stops filtering instead of emptying the list.

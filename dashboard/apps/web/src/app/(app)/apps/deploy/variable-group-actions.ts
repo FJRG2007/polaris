@@ -55,7 +55,7 @@ export async function listVariableGroupsAction(): Promise<Result<VariableGroupsV
 }
 
 export async function createVariableGroupAction(input: unknown): Promise<Result<{ id: string }>> {
-    const user = await requirePermission("deploy.read");
+    const user = await requirePermission("deploy.manage");
     const parsed = groupInput.safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.nameRequired") };
     try {
@@ -76,13 +76,14 @@ export async function createVariableGroupAction(input: unknown): Promise<Result<
 }
 
 export async function updateVariableGroupAction(input: unknown): Promise<Result> {
-    const user = await requirePermission("deploy.read");
+    const user = await requirePermission("deploy.manage");
     const parsed = groupUpdate.safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.nameRequired") };
     try {
-        await groups.updateGroup(user, parsed.data.groupId, parsed.data);
+        const { orgId } = await groups.updateGroup(user, parsed.data.groupId, parsed.data);
         await recordDeployAudit({
             actorId: user.id,
+            orgId: orgId ?? undefined,
             action: "deploy.variable-group.update",
             targetType: "variable-group",
             targetId: parsed.data.groupId
@@ -95,20 +96,21 @@ export async function updateVariableGroupAction(input: unknown): Promise<Result>
 }
 
 export async function deleteVariableGroupAction(input: unknown): Promise<Result<{ linked: number }>> {
-    const user = await requirePermission("deploy.read");
+    const user = await requirePermission("deploy.manage");
     const parsed = z.object({ groupId: id }).safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.notFound") };
     try {
-        const result = await groups.deleteGroup(user, parsed.data.groupId);
+        const { linked, orgId } = await groups.deleteGroup(user, parsed.data.groupId);
         await recordDeployAudit({
             actorId: user.id,
+            orgId: orgId ?? undefined,
             action: "deploy.variable-group.delete",
             targetType: "variable-group",
             targetId: parsed.data.groupId,
-            metadata: { linked: result.linked }
+            metadata: { linked }
         });
         revalidatePath(DEPLOY_PATH);
-        return result;
+        return { linked };
     } catch (caught) {
         return failure(caught);
     }
@@ -155,7 +157,7 @@ async function changeLink(
     change: (actor: { id: string; isAdmin: boolean }, applicationId: string, groupId: string) => Promise<void>,
     action: string
 ): Promise<Result> {
-    const user = await requirePermission("deploy.read");
+    const user = await requirePermission("deploy.manage");
     const parsed = linkInput.safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.notFound") };
     try {
@@ -189,18 +191,27 @@ export async function unlinkVariableGroupAction(input: unknown): Promise<Result>
     );
 }
 
-/** The services a group reaches that are running, so its editor can say a
- *  change waits for a redeploy. Group readers only. */
-export async function variableGroupReachAction(
-    input: unknown
-): Promise<Result<{ deployed: number; canEdit: boolean }>> {
+/** The services a group reaches: those the reader may see, how many more they
+ *  may not, and how many are running, so its editor can say a change waits
+ *  for a redeploy. Group readers only. */
+export async function variableGroupReachAction(input: unknown): Promise<
+    Result<{
+        deployed: number;
+        canEdit: boolean;
+        services: groups.LinkingService[];
+        hidden: number;
+    }>
+> {
     const user = await requirePermission("deploy.read");
     const parsed = z.object({ groupId: id }).safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.notFound") };
     try {
         const rights = await groups.requireGroup(user, parsed.data.groupId, "read");
-        const deployed = await groups.deployedServicesLinking(rights.id);
-        return { deployed: deployed.length, canEdit: rights.canEdit };
+        const [deployed, linking] = await Promise.all([
+            groups.deployedServicesLinking(rights.id),
+            groups.servicesLinking(user, rights.id)
+        ]);
+        return { deployed: deployed.length, canEdit: rights.canEdit, ...linking };
     } catch (caught) {
         return failure(caught);
     }

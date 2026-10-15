@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
     linkGroup: vi.fn(),
     unlinkGroup: vi.fn(),
     createGroup: vi.fn(),
+    deleteGroup: vi.fn(),
+    updateGroup: vi.fn(),
+    requirePermission: vi.fn(),
     recordDeployAudit: vi.fn(),
     projectUpdate: vi.fn()
 }));
@@ -23,7 +26,7 @@ class VariableGroupError extends Error {
 }
 
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
-vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: "user-1", isAdmin: false }) }));
+vi.mock("@/lib/session", () => ({ requirePermission: mocks.requirePermission }));
 vi.mock("@/lib/workspace-scope", () => ({ scopeOrgIdFor: async () => "org-1" }));
 vi.mock("@/lib/deploy-audit", () => ({ recordDeployAudit: mocks.recordDeployAudit }));
 vi.mock("@/app/(app)/apps/deploy/reply", () => ({ reply: async (key: string) => `words:${key}` }));
@@ -37,13 +40,43 @@ vi.mock("@/lib/deploy/variable-groups", () => ({
     VariableGroupError,
     linkGroup: mocks.linkGroup,
     unlinkGroup: mocks.unlinkGroup,
-    createGroup: mocks.createGroup
+    createGroup: mocks.createGroup,
+    deleteGroup: mocks.deleteGroup,
+    updateGroup: mocks.updateGroup
 }));
 
 const actions = await import("@/app/(app)/apps/deploy/variable-group-actions");
 
 beforeEach(() => {
     for (const fn of Object.values(mocks)) fn.mockReset();
+    mocks.requirePermission.mockResolvedValue({ id: "user-1", isAdmin: false });
+});
+
+describe("the instance permission", () => {
+    it("is deploy.manage for every change to a group or a link", async () => {
+        mocks.requireApplicationAccess.mockResolvedValue({ ownerId: "owner-1" });
+        mocks.createGroup.mockResolvedValue({ id: "g-new" });
+        mocks.deleteGroup.mockResolvedValue({ linked: 0, orgId: null });
+        mocks.updateGroup.mockResolvedValue({ orgId: null });
+        await actions.createVariableGroupAction({ name: "Payments", description: "" });
+        await actions.updateVariableGroupAction({ groupId: "g-1", name: "Payments", description: "" });
+        await actions.deleteVariableGroupAction({ groupId: "g-1" });
+        await actions.linkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" });
+        await actions.unlinkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" });
+        expect(mocks.requirePermission.mock.calls.map((call) => call[0])).toEqual(
+            Array.from({ length: 5 }, () => "deploy.manage")
+        );
+    });
+});
+
+describe("deleting", () => {
+    it("names the group's organization in the audit, read before the row went", async () => {
+        mocks.deleteGroup.mockResolvedValue({ linked: 2, orgId: "org-7" });
+        expect(await actions.deleteVariableGroupAction({ groupId: "g-1" })).toEqual({ linked: 2 });
+        expect(mocks.recordDeployAudit).toHaveBeenCalledWith(
+            expect.objectContaining({ action: "deploy.variable-group.delete", orgId: "org-7" })
+        );
+    });
 });
 
 describe("linking", () => {

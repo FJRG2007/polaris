@@ -9,6 +9,7 @@
  * "group", so secrets are masked and revealed exactly as they are there.
  */
 
+import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { normalizeTag, TAGS_MAX } from "@polaris/core/variable-groups";
 import { useCallback, useEffect, useState, useTransition } from "react";
@@ -31,6 +32,7 @@ import { VariablesEditor } from "./variables-editor";
 import { redeployEnvScopeAction } from "./variable-actions";
 import * as groupActions from "./variable-group-actions";
 import type { ServiceGroupsView, VariableGroupsView } from "./variable-group-actions";
+import type { LinkingService } from "@/lib/deploy/variable-groups";
 import type { VariableSource } from "@polaris/core/variable-groups";
 
 const ICON_BUTTON =
@@ -180,15 +182,17 @@ function GroupDetail({
     const [name, setName] = useState(group.name);
     const [description, setDescription] = useState(group.description);
     const [deployed, setDeployed] = useState(0);
+    const [usedBy, setUsedBy] = useState<{ services: LinkingService[]; hidden: number } | null>(null);
     const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const dirty = name.trim() !== group.name || description.trim() !== group.description;
 
     useEffect(() => {
-        void groupActions.variableGroupReachAction({ groupId: group.id }).then((result) =>
-            setDeployed(result.deployed ?? 0)
-        );
+        void groupActions.variableGroupReachAction({ groupId: group.id }).then((result) => {
+            setDeployed(result.deployed ?? 0);
+            setUsedBy({ services: result.services ?? [], hidden: result.hidden ?? 0 });
+        });
     }, [group.id]);
 
     function save(): void {
@@ -280,6 +284,7 @@ function GroupDetail({
                     {t("groups.reachesRunning", { count: deployed })}
                 </p>
             )}
+            {group.linkCount > 0 && <UsedBy usedBy={usedBy} />}
             <div className="max-h-[55vh] min-w-0 overflow-y-auto">
                 <VariablesEditor
                     scope="group"
@@ -306,6 +311,49 @@ function GroupDetail({
                 onConfirm={remove}
             />
         </div>
+    );
+}
+
+/** The services linking a group that the reader may see, each opening it. */
+function UsedBy({ usedBy }: { usedBy: { services: LinkingService[]; hidden: number } | null }) {
+    const t = useTranslations("deployConfig");
+    return (
+        <section className="flex min-w-0 flex-col gap-1.5" aria-label={t("groups.usedBy")}>
+            <h3 className="text-xs font-medium text-muted-foreground">{t("groups.usedBy")}</h3>
+            {usedBy === null ? (
+                <div className="h-8 animate-pulse rounded-md bg-muted" aria-busy="true" />
+            ) : (
+                <>
+                    {usedBy.services.length > 0 && (
+                        <ul className="flex max-h-40 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+                            {usedBy.services.map((one) => (
+                                <li key={one.applicationId}>
+                                    <Link
+                                        href={`/apps/deploy/${one.projectId}?service=${encodeURIComponent(one.applicationId)}`}
+                                        className="flex min-w-0 items-center justify-between gap-3 px-3 py-1.5 text-sm hover:bg-muted/60"
+                                    >
+                                        <span className="min-w-0 truncate" title={one.name}>
+                                            {one.name}
+                                        </span>
+                                        <span
+                                            className="min-w-0 shrink truncate text-xs text-muted-foreground"
+                                            title={`${one.projectName} / ${one.environmentName}`}
+                                        >
+                                            {one.projectName} / {one.environmentName}
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {usedBy.hidden > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                            {t("groups.usedByHidden", { count: usedBy.hidden })}
+                        </p>
+                    )}
+                </>
+            )}
+        </section>
     );
 }
 

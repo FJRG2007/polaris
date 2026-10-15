@@ -94,7 +94,9 @@ describe("resolution order", () => {
             row("group", "g-b", "REGION", "us"),
             row("group", "g-b", "STRIPE_KEY", "sk_test_fixture", true)
         ]);
+        db.application.findUnique.mockResolvedValue({ environment: { pullRequest: null } });
         const layers = await groups.groupLayers("app-1");
+        expect(db.envVar.findMany.mock.calls[0][0].where).not.toHaveProperty("isSecret");
         expect(layers.map((layer) => layer.source)).toEqual([
             { kind: "group", id: "g-a", name: "Database" },
             { kind: "group", id: "g-b", name: "Payments" }
@@ -112,6 +114,19 @@ describe("resolution order", () => {
             DATABASE_URL: "postgres://shared",
             STRIPE_KEY: "sk_test_fixture"
         });
+    });
+
+    it("gives a preview's service no group secret, however it was linked", async () => {
+        db.variableGroupLink.findMany.mockResolvedValue([{ group: { id: "g-b", name: "Payments" } }]);
+        db.application.findUnique.mockResolvedValue({ environment: { pullRequest: 42 } });
+        db.envVar.findMany.mockResolvedValue([row("group", "g-b", "REGION", "us")]);
+        const layers = await groups.groupLayers("app-1");
+        expect(db.envVar.findMany.mock.calls[0][0].where).toEqual({
+            scopeType: "group",
+            scopeId: { in: ["g-b"] },
+            isSecret: false
+        });
+        expect(layers[0].values).toEqual({ REGION: "us" });
     });
 
     it("answers nothing, without a query for rows, for a service with no groups", async () => {
@@ -221,6 +236,7 @@ describe("linking a group", () => {
             environment: { project: { ownerId: "user-1", orgId: "org-1" } }
         });
         db.variableGroupLink.findMany.mockResolvedValue([{ groupId: "other", position: 2 }]);
+        db.envVar.findMany.mockResolvedValue([]);
         await groups.linkGroup(ME, "app-1", "group-1");
         expect(db.variableGroupLink.upsert.mock.calls[0][0].create).toMatchObject({
             groupId: "group-1",
@@ -229,12 +245,46 @@ describe("linking a group", () => {
         });
     });
 
+    it("refuses a group holding a secret to a reader who could not reveal it", async () => {
+        member(false);
+        db.variableGroup.findUnique.mockResolvedValue(ORG_GROUP);
+        db.envVar.findMany.mockResolvedValue([{ scopeId: "group-1" }]);
+        await expect(groups.linkGroup(ME, "app-1", "group-1")).rejects.toMatchObject({ code: "secretLink" });
+        expect(db.variableGroupLink.upsert).not.toHaveBeenCalled();
+    });
+
+    it("lets the group's editor link it with its secrets", async () => {
+        member(true);
+        db.variableGroup.findUnique.mockResolvedValue(ORG_GROUP);
+        db.application.findUnique.mockResolvedValue({
+            environment: { project: { ownerId: "user-1", orgId: "org-1" } }
+        });
+        db.variableGroupLink.findMany.mockResolvedValue([]);
+        await groups.linkGroup(ME, "app-1", "group-1");
+        expect(db.envVar.findMany).not.toHaveBeenCalled();
+        expect(db.variableGroupLink.upsert).toHaveBeenCalled();
+    });
+
+    it("offers a reader only the groups without a secret", async () => {
+        member(false);
+        db.application.findUnique.mockResolvedValue({
+            environment: { project: { ownerId: "user-1", orgId: "org-1" } }
+        });
+        db.variableGroup.findMany.mockResolvedValue([
+            { id: "g-plain", name: "Plain" },
+            { id: "g-secret", name: "Keys" }
+        ]);
+        db.envVar.findMany.mockResolvedValue([{ scopeId: "g-secret" }]);
+        expect(await groups.linkableGroups(ME, "app-1")).toEqual([{ id: "g-plain", name: "Plain" }]);
+    });
+
     it("stops at the most groups a service may link", async () => {
         member(false);
         db.variableGroup.findUnique.mockResolvedValue(ORG_GROUP);
         db.application.findUnique.mockResolvedValue({
             environment: { project: { ownerId: "user-1", orgId: "org-1" } }
         });
+        db.envVar.findMany.mockResolvedValue([]);
         db.variableGroupLink.findMany.mockResolvedValue(
             Array.from({ length: core.VARIABLE_GROUP_LINKS_MAX }, (_, index) => ({
                 groupId: `g-${index}`,
@@ -265,6 +315,38 @@ describe("what a change to a group reaches", () => {
         expect(await groups.redeployLinked(ME, "group-1", restart)).toEqual({ started: 1, skipped: 1 });
         expect(restart).toHaveBeenCalledWith("a", "owner-a");
         expect(access.requireApplicationAccess).toHaveBeenCalledWith("a", "user-1", "deploy.run");
+    });
+});
+
+describe("where a group is used", () => {
+    it("lists the services the reader may open and only counts the rest", async () => {
+        const service = (id: string, deployed: boolean) => ({
+            application: {
+                id,
+                name: `svc-${id}`,
+                currentDeploymentId: deployed ? "d" : null,
+                environment: { name: "production", project: { id: `p-${id}`, name: `Project ${id}` } }
+            }
+        });
+        db.variableGroupLink.findMany.mockResolvedValue([service("a", true), service("b", false)]);
+        access.requireApplicationAccess.mockImplementation(async (applicationId: string) => {
+            if (applicationId === "b") throw new Error("no");
+            return { ownerId: "owner-a" };
+        });
+        expect(await groups.servicesLinking(ME, "group-1")).toEqual({
+            services: [
+                {
+                    applicationId: "a",
+                    name: "svc-a",
+                    projectId: "p-a",
+                    projectName: "Project a",
+                    environmentName: "production",
+                    deployed: true
+                }
+            ],
+            hidden: 1
+        });
+        expect(access.requireApplicationAccess).toHaveBeenCalledWith("a", "user-1", "project.read");
     });
 });
 
