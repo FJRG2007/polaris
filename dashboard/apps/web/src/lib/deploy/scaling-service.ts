@@ -14,6 +14,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as quotas from "@/lib/orgs/quotas";
+import * as quota from "@/lib/orgs/quota-service";
 import type { ActivityLine } from "@/lib/activity/activity";
 import { restartFromKeptImage, syncAppRoutes } from "@/lib/deploy-service";
 import {
@@ -157,6 +159,21 @@ export async function setServiceScaling(
     // Sleeping is for one copy on this machine, judged as the service will be set.
     const sleepBlocked = input.sleepAfterMinutes === null ? null : sleepRefusal({ ...app, replicas, autoscale: input.autoscale ? "on" : null });
     if (sleepBlocked) throw new Error(sleepBlocked);
+    // What it reserves is its limits times the most copies it may run, so an
+    // autoscaler cannot grow it past the organization's caps either.
+    const copies = Math.max(replicas, input.autoscale?.max ?? 0);
+    await quota.assertOrgReservation(
+        await quota.orgIdOfApplication(applicationId),
+        {
+            cpus: quotas.reservationOf(app.cpuLimit, app.replicas),
+            memoryMb: quotas.reservationOf(app.memoryLimitMb, app.replicas)
+        },
+        {
+            cpus: quotas.reservationOf(input.limits.cpus, copies),
+            memoryMb: quotas.reservationOf(input.limits.memoryMb, copies)
+        },
+        { applicationId }
+    );
     const edge = parseAppEdgeConfig(app.edgeConfig);
     await prisma.application.update({
         where: { id: applicationId },

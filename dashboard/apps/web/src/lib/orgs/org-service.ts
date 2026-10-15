@@ -14,6 +14,8 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
+import { roomForOne } from "./quotas";
+import { getOrgQuota, quotaRefusal } from "./quota-service";
 import { OrgAccessError, OrgError } from "./errors";
 import { contactLines } from "@/lib/privacy-service";
 import { discardAvatars } from "@/lib/avatar-service";
@@ -1073,13 +1075,15 @@ export async function removeOrgMember(orgId: string, userId: string): Promise<vo
 }
 
 export async function createTeam(orgId: string, input: core.TeamInput): Promise<string> {
-    const policy = await organizationPolicy();
+    const [policy, orgQuota] = await Promise.all([organizationPolicy(), getOrgQuota(orgId)]);
     const count = await prisma.team.count({ where: { orgId } });
     if (!core.withinLimit(policy.maxTeams, count)) {
         throw new OrgError(
             `This organization is at the ${policy.maxTeams}-team limit for this Polaris`
         );
     }
+    const teamCap = orgQuota?.teams ?? null;
+    if (teamCap !== null && !roomForOne(teamCap, count)) throw await quotaRefusal("teams", teamCap);
     const clash = await prisma.team.findUnique({
         where: { orgId_slug: { orgId, slug: input.slug } },
         select: { id: true }

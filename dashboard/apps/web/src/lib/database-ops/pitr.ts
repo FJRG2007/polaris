@@ -21,6 +21,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { assertEnvironmentRoom } from "@/lib/orgs/quota-service";
 import { shortHash, slugify } from "@polaris/deploy";
 import { deployDatabase, deployDatabaseAndWait } from "@/lib/database-service";
 import {
@@ -288,6 +289,7 @@ export async function recoverToTime(
         select: { name: true }
     });
     if (clash) throw new DatabaseOperationError(`This environment already has a database called ${clash.name}.`);
+    await assertEnvironmentRoom(source.environmentId, "databases");
 
     // The recovered instance starts from the source's own files, so it keeps the
     // source's accounts: its stored credentials are the source's, copied.

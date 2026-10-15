@@ -6,6 +6,8 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as quotas from "@/lib/orgs/quotas";
+import * as quota from "@/lib/orgs/quota-service";
 import { ensureMongoReplicaSet } from "./provision";
 import type { RuntimePorts } from "@polaris/deploy";
 import type { RedisMode, ResourceLimitsInput } from "@polaris/core";
@@ -162,11 +164,23 @@ export async function setDatabaseLimits(
 ): Promise<{ deploymentId: string | null }> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        select: { parentId: true, containerName: true, cpuLimit: true, memoryLimitMb: true }
+        select: { parentId: true, containerName: true, cpuLimit: true, memoryLimitMb: true, members: true }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
     if (row.parentId) throw new DatabaseOperationError("This database lives inside another instance; change the instance.");
     if (row.cpuLimit === limits.cpus && row.memoryLimitMb === limits.memoryMb) return { deploymentId: null };
+    await quota.assertOrgReservation(
+        await quota.orgIdOfDatabase(databaseId),
+        {
+            cpus: quotas.reservationOf(row.cpuLimit, row.members),
+            memoryMb: quotas.reservationOf(row.memoryLimitMb, row.members)
+        },
+        {
+            cpus: quotas.reservationOf(limits.cpus, row.members),
+            memoryMb: quotas.reservationOf(limits.memoryMb, row.members)
+        },
+        { databaseId }
+    );
     await prisma.managedDatabase.update({
         where: { id: databaseId },
         data: { cpuLimit: limits.cpus, memoryLimitMb: limits.memoryMb }
