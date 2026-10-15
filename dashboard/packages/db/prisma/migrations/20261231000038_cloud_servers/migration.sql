@@ -45,17 +45,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS "CloudServer_accountId_providerId_key" ON "Clo
 CREATE INDEX IF NOT EXISTS "CloudServer_ownerId_destroyedAt_idx" ON "CloudServer"("ownerId", "destroyedAt");
 CREATE INDEX IF NOT EXISTS "CloudServer_accountId_destroyedAt_idx" ON "CloudServer"("accountId", "destroyedAt");
 
-DO $$ BEGIN
-    ALTER TABLE "CloudAccount" ADD CONSTRAINT "CloudAccount_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "CloudAccount" DROP CONSTRAINT IF EXISTS "CloudAccount_ownerId_fkey";
+ALTER TABLE "CloudAccount" ADD CONSTRAINT "CloudAccount_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "CloudServer" ADD CONSTRAINT "CloudServer_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "CloudAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "CloudServer" DROP CONSTRAINT IF EXISTS "CloudServer_accountId_fkey";
+ALTER TABLE "CloudServer" ADD CONSTRAINT "CloudServer_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "CloudAccount"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "CloudServer" ADD CONSTRAINT "CloudServer_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "Host"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "CloudServer" DROP CONSTRAINT IF EXISTS "CloudServer_hostId_fkey";
+ALTER TABLE "CloudServer" ADD CONSTRAINT "CloudServer_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "Host"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 CREATE TABLE IF NOT EXISTS "CloudPrice" (
     "id" UUID NOT NULL,

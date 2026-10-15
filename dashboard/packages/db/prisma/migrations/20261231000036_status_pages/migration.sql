@@ -118,30 +118,23 @@ CREATE INDEX IF NOT EXISTS "StatusIncident_pageId_resolvedAt_idx" ON "StatusInci
 CREATE INDEX IF NOT EXISTS "StatusIncidentUpdate_incidentId_createdAt_idx" ON "StatusIncidentUpdate"("incidentId", "createdAt");
 CREATE INDEX IF NOT EXISTS "StatusMaintenance_pageId_endsAt_idx" ON "StatusMaintenance"("pageId", "endsAt");
 
-DO $$ BEGIN
-    ALTER TABLE "StatusComponent" ADD CONSTRAINT "StatusComponent_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "StatusPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusComponent" DROP CONSTRAINT IF EXISTS "StatusComponent_pageId_fkey";
+ALTER TABLE "StatusComponent" ADD CONSTRAINT "StatusComponent_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "StatusPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "StatusCheck" ADD CONSTRAINT "StatusCheck_componentId_fkey" FOREIGN KEY ("componentId") REFERENCES "StatusComponent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusCheck" DROP CONSTRAINT IF EXISTS "StatusCheck_componentId_fkey";
+ALTER TABLE "StatusCheck" ADD CONSTRAINT "StatusCheck_componentId_fkey" FOREIGN KEY ("componentId") REFERENCES "StatusComponent"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "StatusSample" ADD CONSTRAINT "StatusSample_checkId_fkey" FOREIGN KEY ("checkId") REFERENCES "StatusCheck"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusSample" DROP CONSTRAINT IF EXISTS "StatusSample_checkId_fkey";
+ALTER TABLE "StatusSample" ADD CONSTRAINT "StatusSample_checkId_fkey" FOREIGN KEY ("checkId") REFERENCES "StatusCheck"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "StatusDay" ADD CONSTRAINT "StatusDay_checkId_fkey" FOREIGN KEY ("checkId") REFERENCES "StatusCheck"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusDay" DROP CONSTRAINT IF EXISTS "StatusDay_checkId_fkey";
+ALTER TABLE "StatusDay" ADD CONSTRAINT "StatusDay_checkId_fkey" FOREIGN KEY ("checkId") REFERENCES "StatusCheck"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "StatusIncident" ADD CONSTRAINT "StatusIncident_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "StatusPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusIncident" DROP CONSTRAINT IF EXISTS "StatusIncident_pageId_fkey";
+ALTER TABLE "StatusIncident" ADD CONSTRAINT "StatusIncident_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "StatusPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "StatusIncidentUpdate" ADD CONSTRAINT "StatusIncidentUpdate_incidentId_fkey" FOREIGN KEY ("incidentId") REFERENCES "StatusIncident"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusIncidentUpdate" DROP CONSTRAINT IF EXISTS "StatusIncidentUpdate_incidentId_fkey";
+ALTER TABLE "StatusIncidentUpdate" ADD CONSTRAINT "StatusIncidentUpdate_incidentId_fkey" FOREIGN KEY ("incidentId") REFERENCES "StatusIncident"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "StatusMaintenance" ADD CONSTRAINT "StatusMaintenance_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "StatusPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "StatusMaintenance" DROP CONSTRAINT IF EXISTS "StatusMaintenance_pageId_fkey";
+ALTER TABLE "StatusMaintenance" ADD CONSTRAINT "StatusMaintenance_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "StatusPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
