@@ -381,6 +381,7 @@ model User {
     crmPeopleUpdated        CrmPerson[]      @relation("CrmPersonUpdatedBy")
     crmOpportunitiesUpdated CrmOpportunity[] @relation("CrmOpportunityUpdatedBy")
     crmViews                CrmView[]        @relation("CrmViewShelf")
+    cloudAccounts           CloudAccount[]
     crmFields               CrmField[]       @relation("CrmFieldShelf")
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
     crmLinks                CrmLink[]        @relation("CrmLinkShelf")
@@ -2117,6 +2118,7 @@ model Host {
     groups        HostGroupMember[]
     backupDestinations BackupDestination[]
     agentSessions AgentSession[]
+    cloudServer   CloudServer?
     // Database connections tunnelled through this server, directly or as a jump.
     dataTunnels   DataConnection[] @relation("DataConnectionSshHost")
     dataJumps     DataConnection[] @relation("DataConnectionSshJump")
@@ -13306,4 +13308,62 @@ model CrmRoleRule {
     org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
     @@unique([orgId, role, object])
+}
+
+// A cloud provider account connected to the Cloud servers app. The credential
+// (a token, a key pair, a service-account file) is sealed with the master key
+// like every other stored credential and never leaves the server.
+model CloudAccount {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    // digitalocean | hetzner | vultr | linode | aws | azure | gcp | ionos
+    provider        String
+    name            String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    // The last refusal the provider answered with, shown on the account.
+    lastError       String?
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    owner   User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    servers CloudServer[]
+
+    @@index([ownerId])
+}
+
+// A server the Cloud servers app created. Kept after it is destroyed
+// (`destroyedAt`) so the month's cost still counts the hours it ran.
+model CloudServer {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    accountId    String    @db.Uuid
+    ownerId      String    @db.Uuid
+    // The provider's own id for it (for IONOS, "<datacenter>/<server>").
+    providerId   String
+    name         String
+    region       String
+    size         String
+    image        String
+    // creating | enrolling | running | off | failed | destroyed, as last read.
+    status       String    @default("creating")
+    ipv4         String?
+    // The Polaris server it became, once the machine enrolled.
+    hostId       String?   @unique @db.Uuid
+    enrollmentId String?   @db.Uuid
+    // Prices as the provider published them; null when it publishes none.
+    priceHourly  Float?
+    priceMonthly Float?
+    currency     String?
+    error        String?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    destroyedAt  DateTime?
+
+    account CloudAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    host    Host?        @relation(fields: [hostId], references: [id], onDelete: SetNull)
+
+    @@unique([accountId, providerId])
+    @@index([ownerId, destroyedAt])
+    @@index([accountId, destroyedAt])
 }

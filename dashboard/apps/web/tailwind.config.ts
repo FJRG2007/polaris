@@ -14,7 +14,8 @@ const config: Config = {
         "../places/src/**/*.{ts,tsx}",
         "../game-servers/src/**/*.{ts,tsx}",
         "../calendar/src/**/*.{ts,tsx}",
-        "../crm/src/**/*.{ts,tsx}"
+        "../crm/src/**/*.{ts,tsx}",
+        "../cloud-servers/src/**/*.{ts,tsx}"
     ]
 };
 

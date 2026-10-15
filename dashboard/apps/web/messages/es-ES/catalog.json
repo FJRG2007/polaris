@@ -125,6 +125,10 @@
         "crm": {
             "summary": "Empresas, personas y los tratos que llevas, en un solo embudo.",
             "description": "Guarda las empresas con las que trabajas, las personas que hay en ellas y cada oportunidad desde la primera llamada hasta el trato firmado, en tablas que se editan en el sitio y con totales bajo cada columna. Un CRM personal para ti, o uno compartido para una organización con sus propios roles. Instalarlo no ejecuta nada; desinstalarlo conserva cada registro para cuando vuelva."
+        },
+        "cloud-servers": {
+            "summary": "Crea servidores en tus proveedores cloud, listos en Polaris al arrancar.",
+            "description": "Conecta DigitalOcean, Hetzner Cloud, Vultr, Linode, AWS, Azure, Google Cloud o IONOS y crea servidores desde aquí. Cada uno se une a tus servidores de Polaris en su primer arranque. Enciéndelos y apágalos, reinicia, cambia su tamaño y destrúyelos, y consulta lo que cuesta cada uno cuando el proveedor publica sus precios."
         }
     },
     "help": {

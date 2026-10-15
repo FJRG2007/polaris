@@ -150,6 +150,9 @@
         },
         "crm": {
             "description": "Companies, people and the deals you are working"
+        },
+        "cloud-servers": {
+            "description": "Create and run servers at your cloud providers"
         }
     },
     "labels": {

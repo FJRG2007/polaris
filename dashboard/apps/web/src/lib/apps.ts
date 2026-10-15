@@ -42,6 +42,7 @@ import {
     Gamepad2,
     Gauge,
     Handshake,
+    Cloud,
     GitPullRequest,
     Globe,
     HardDrive,
@@ -392,6 +393,22 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: FileStack,
         href: "/office",
         permission: "office.use"
+    },
+    {
+        /**
+         * Servers at cloud providers, created, sized, switched and destroyed
+         * from here, each enrolled as a Polaris server as it boots.
+         *
+         * Installable: a Polaris that rents nothing carries no menu entry for it.
+         */
+        id: "cloud-servers",
+        category: "infrastructure",
+        label: "Cloud servers", // i18n-ignore
+        description: "Create and run servers at your cloud providers", // i18n-ignore
+        icon: Cloud,
+        href: "/cloud-servers",
+        permission: "system.manage",
+        requiresApp: "cloud-servers"
     },
     {
         id: "watch",
