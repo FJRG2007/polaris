@@ -51,6 +51,10 @@ const CAMERA = /^\/readme-media\/camera\/([\w-]+)$/;
 const ITEM_ICON = /^\/api\/app-bundles\/game-servers\/current\/assets\/mcicons\/([\w-]+)\.png$/;
 const ITEM_LIST = "/api/app-bundles/game-servers/current/assets/mcicons/items.json";
 const itemIcons = join(root, "resources", "mcicons", "icons");
+/** Where it serves the game's own default skins, from the set it vendors. */
+const DEFAULT_SKIN =
+    /^\/api\/app-bundles\/game-servers\/current\/assets\/default-skins\/(slim|wide)\/([\w-]+)\.png$/;
+const defaultSkins = join(root, "resources", "default-skins");
 const output = resolve(root, "..", MEDIA_DIR);
 const require = createRequire(join(root, "package.json"));
 const { chromium } = require("playwright");
@@ -110,6 +114,12 @@ function serve() {
         const icon = item ? join(itemIcons, `${item}.png`) : null;
         if (icon && existsSync(icon)) {
             res.writeHead(200, { "content-type": "image/png" }).end(readFileSync(icon));
+            return;
+        }
+        const worn = DEFAULT_SKIN.exec(path);
+        const skin = worn ? join(defaultSkins, worn[1], `${worn[2]}.png`) : null;
+        if (skin && existsSync(skin)) {
+            res.writeHead(200, { "content-type": "image/png" }).end(readFileSync(skin));
             return;
         }
         const sent = MEDIA_ROUTES.map((route) => route.exec(path)?.[1]).find(Boolean);
@@ -300,6 +310,18 @@ async function run() {
                                     delays.push(
                                         await page.evaluate((i) => window.__scene.hold(i), index)
                                     );
+                                }
+                                // A step that opened a screen the scene did not answer,
+                                // or that threw, is the same failure as one at the start.
+                                const late = await page.evaluate(
+                                    () => globalThis.__MISSING__ ?? []
+                                );
+                                for (const what of new Set(late))
+                                    problems.push(`not answered: ${what}`);
+                                if (problems.length > 0) {
+                                    failures.push({ name, problems });
+                                    await context.close();
+                                    continue;
                                 }
                                 const animated = sharp(shots, { join: { animated: true } }).webp({
                                     quality: 75,

@@ -1,6 +1,8 @@
 /** One game server, managed: who is playing, what they carry, events, the console. */
 
 import { Chrome } from "../runtime/chrome";
+import type { AppSlot } from "@/lib/app-extensions/types";
+import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import { defineScene, type SceneContext, type SceneDefinition } from "../runtime/scene";
 import { visibleGameTabs } from "@/app/(app)/apps/installed/[id]/tabs";
 import { InstalledAppDashboard } from "@/app/(app)/apps/installed/[id]/installed-app-dashboard";
@@ -17,19 +19,42 @@ import {
     survivalSlot
 } from "../fixtures/game-server";
 
-/** The page `/apps/installed/<id>/<tab>` draws for the Survival server. */
-function Server({ ctx }: { ctx: SceneContext }) {
+/** The page `/apps/installed/<id>/<tab>` draws for one server, Survival unless
+ *  another is named. */
+export function Server({
+    ctx,
+    app = survivalApp(ctx),
+    settings = SURVIVAL_SETTINGS,
+    slot = survivalSlot(ctx)
+}: {
+    ctx: SceneContext;
+    app?: InstalledAppDetail;
+    settings?: InstalledAppSetting[];
+    slot?: AppSlot;
+}) {
     return (
         <Chrome>
             <InstalledAppDashboard
-                app={survivalApp(ctx)}
-                settings={SURVIVAL_SETTINGS}
-                slot={survivalSlot(ctx)}
+                app={app}
+                settings={settings}
+                slot={slot}
                 held={SERVER_GRANTS}
                 duplicate={{ allowed: true }}
             />
         </Chrome>
     );
+}
+
+/** What every tab of the Survival server asks, whichever tab it is. */
+export function survivalApi(ctx: SceneContext) {
+    return {
+        "GET /api/apps/installed/:id/minecraft": () => survivalReading(ctx),
+        "GET /api/apps/installed/:id/nav": () => ({
+            name: survivalApp(ctx).name,
+            tabs: visibleGameTabs(SERVER_GRANTS, "minecraft").map((one) => one.slug),
+            labels: {}
+        })
+    };
 }
 
 /** One tab of the Survival server, answered from the same fixtures. */
@@ -46,15 +71,7 @@ function serverScene(
             redeployStrategyAction: () => null,
             ...extra.actions?.(ctx)
         }),
-        api: (ctx) => ({
-            "GET /api/apps/installed/:id/minecraft": () => survivalReading(ctx),
-            "GET /api/apps/installed/:id/nav": () => ({
-                name: survivalApp(ctx).name,
-                tabs: visibleGameTabs(SERVER_GRANTS, "minecraft").map((one) => one.slug),
-                labels: {}
-            }),
-            ...extra.api?.(ctx)
-        }),
+        api: (ctx) => ({ ...survivalApi(ctx), ...extra.api?.(ctx) }),
         streams: extra.streams,
         prepare: extra.prepare,
         render: (ctx) => <Server ctx={ctx} />
@@ -62,13 +79,13 @@ function serverScene(
 }
 
 /** The server's id does not depend on the locale, only its name does. */
-function survivalIdFor(): string {
+export function survivalIdFor(): string {
     return survival({ locale: "en-US", theme: "dark", now: 0, say: (en) => en }).seed.id;
 }
 
 /** Resolve once `find` finds something. Watches the page rather than a timer,
  *  because the capture holds the clock still while a scene is prepared. */
-function appeared<T>(find: () => T | null | undefined): Promise<T> {
+export function appeared<T>(find: () => T | null | undefined): Promise<T> {
     const now = find();
     if (now) return Promise.resolve(now);
     return new Promise((resolve) => {
@@ -85,7 +102,7 @@ function appeared<T>(find: () => T | null | undefined): Promise<T> {
 const visible = (element: HTMLElement) => element.offsetParent !== null;
 
 /** Open one player's row menu and pick the entry that reads `entry`. */
-async function playerMenu(player: string, entry: RegExp): Promise<void> {
+export async function playerMenu(player: string, entry: RegExp): Promise<void> {
     const trigger = await appeared(() =>
         [...document.querySelectorAll<HTMLElement>("[aria-haspopup=menu]")].find(
             (element) => element.getAttribute("aria-label")?.endsWith(player) && visible(element)
