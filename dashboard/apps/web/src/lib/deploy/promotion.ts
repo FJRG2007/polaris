@@ -86,8 +86,10 @@ async function loadPair(projectId: string, ownerId: string, sourceId: string, ta
             name: true,
             stage: true,
             isDefault: true,
-            applications: { select: SERVICE_SELECT, take: 500 },
-            databases: { select: DATABASE_SELECT, take: 500 }
+            // What is in the recycle bin is neither promoted nor overwritten:
+            // restoring it later must give back what was deleted.
+            applications: { where: { binnedAt: null }, select: SERVICE_SELECT, take: 500 },
+            databases: { where: { binnedAt: null }, select: DATABASE_SELECT, take: 500 }
         }
     });
     const source = environments.find((environment) => environment.id === sourceId);
