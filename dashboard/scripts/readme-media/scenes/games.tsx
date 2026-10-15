@@ -8,13 +8,14 @@
  * step switches, with the route moved to that view's before it draws.
  */
 
-import { Fragment, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { Chrome } from "../runtime/chrome";
 import { scenePath } from "../runtime/route";
 import { defineScene, type SceneContext } from "../runtime/scene";
 import { visibleGameTabs } from "@/app/(app)/apps/installed/[id]/tabs";
 import { GamesView } from "../../../apps/game-servers/src/screens/games-view";
 import { gameFacts, gameLive, gameServers } from "../fixtures/games";
+import { gameMessage } from "../../../apps/game-servers/src/lib/game-message";
 import { SERVER_GRANTS } from "../fixtures/game-server";
 import * as tour from "../fixtures/game-tour";
 import {
@@ -119,8 +120,30 @@ function show(index: number) {
     for (const watcher of watchers) watcher();
 }
 
+/** The view React has put on screen, which trails `shown` by a render. */
+let mounted = 0;
+const mountWatchers = new Set<() => void>();
+
+/** Resolves once view `index` is the one on screen: a hand reaching for a
+ *  button before then finds the previous view's, on its way out. */
+function mountedAt(index: number): Promise<void> {
+    if (mounted === index) return Promise.resolve();
+    return new Promise((resolve) => {
+        const check = () => {
+            if (mounted !== index) return;
+            mountWatchers.delete(check);
+            resolve();
+        };
+        mountWatchers.add(check);
+    });
+}
+
 function Tour({ ctx }: { ctx: SceneContext }) {
     const index = useSyncExternalStore(subscribe, () => shown);
+    useEffect(() => {
+        mounted = index;
+        for (const watcher of [...mountWatchers]) watcher();
+    }, [index]);
     // A new key per view: every screen mounts fresh at its own route, the way
     // following a link to it would.
     return <Fragment key={index}>{TOUR[index]!.render(ctx)}</Fragment>;
@@ -135,7 +158,39 @@ export const games = defineScene({
         readSkinAction: () => tour.survivalSkin(),
         previewSkinAction: () => ({ png: tour.SKIN_TEXTURE, model: "slim" }),
         readSeasonalAction: () => tour.survivalSeasonal(),
-        readGameStorageAction: () => tour.gameStorage()
+        readGameStorageAction: () => tour.gameStorage(),
+        // What the Settings tab reads for itself: a Paper server, so no mod
+        // loader to hold and no login mod on, with memory the plan already covers.
+        readLoaderPinAction: () => ({ view: { pin: { state: "none" }, updating: false } }),
+        readMemoryPlanAction: () => ({
+            plan: {
+                mode: "auto",
+                ceilingMb: 8192,
+                currentMb: 6144,
+                plannedMb: 6144,
+                reason: gameMessage("games", "lib.memory.reason", {
+                    cost: "plugins",
+                    mods: 0,
+                    players: 12
+                })
+            }
+        }),
+        loginStateAction: () => ({
+            state: {
+                on: false,
+                build: null,
+                foreign: null,
+                reachable: true,
+                health: "waiting",
+                seenAt: null,
+                modVersion: null,
+                currentVersion: null,
+                outdated: false,
+                players: []
+            }
+        }),
+        minecraftReleasesAction: () => ["1.21.4", "1.21.3", "1.21.1", "1.20.6", "1.20.4"],
+        readGameRestartAction: () => ({ pending: null })
     }),
     api: (ctx) => ({
         "GET /api/apps/games": () => ({ servers: gameFacts(ctx) }),
@@ -160,6 +215,7 @@ export const games = defineScene({
         frames: TOUR.length,
         step: async (index) => {
             if (index > 0) show(index);
+            await mountedAt(index);
             await TOUR[index]!.then?.();
         },
         hold: (index) => TOUR[index]!.hold,

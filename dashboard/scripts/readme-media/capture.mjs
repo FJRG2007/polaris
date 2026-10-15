@@ -76,6 +76,10 @@ const only = onlyAt >= 0 ? new Set(args[onlyAt + 1].split(",")) : null;
 /** One variant (dark, English, desktop) instead of all eight: for working on a scene. */
 const quick = args.includes("--quick");
 const jobsAt = args.indexOf("--jobs");
+/** How many quarter seconds of the scene's clock a tour step may take. */
+const STEP_TICKS = 120;
+/** How long one variant may take before it counts as stuck. */
+const VARIANT_LIMIT = 180_000;
 /** How many variants are taken at once. */
 const jobs = Math.max(
     1,
@@ -207,6 +211,30 @@ async function settle(page) {
     await page.waitForTimeout(300);
 }
 
+/**
+ * Wait for something done inside the page while its frozen clock moves.
+ *
+ * A hand in a scene waits on the screen it opened, and that screen only draws
+ * as the clock moves: awaited with the clock still, it never finishes. The clock
+ * runs `first` milliseconds, then a quarter second at a time until `work` is
+ * done - or the failure says which `what` never was.
+ */
+async function ticking(page, work, first, what) {
+    let finished = false;
+    const settled = work.finally(() => {
+        finished = true;
+    });
+    // Read after a variant that passed its limit is closed under it.
+    settled.catch(() => undefined);
+    await page.clock.runFor(first);
+    for (let ticks = 0; !finished && ticks < STEP_TICKS; ticks++) {
+        await page.clock.runFor(250);
+        await page.waitForTimeout(20);
+    }
+    if (!finished) throw new Error(`${what} never finished`);
+    await settled;
+}
+
 async function picture(page, scene, viewport) {
     const shot = await page.screenshot({
         type: "png",
@@ -271,8 +299,12 @@ async function run() {
             await page.goto(`${base}/index.html?scene=${scene.id}&theme=${theme}&locale=${locale}`);
             try {
                 await settle(page);
-                await page.evaluate(() => window.__scene.prepare());
-                await page.clock.runFor(2000);
+                await ticking(
+                    page,
+                    page.evaluate(() => window.__scene.prepare()),
+                    2000,
+                    "prepare"
+                );
                 await page.waitForTimeout(300);
             } catch (caught) {
                 problems.push(`never settled: ${caught.message}`);
@@ -298,10 +330,14 @@ async function run() {
             const shots = [];
             const delays = [];
             for (let index = 0; index < frames; index++) {
-                await page.evaluate((i) => window.__scene.step(i), index);
-                await page.clock.runFor(
-                    await page.evaluate((i) => window.__scene.advance(i), index)
+                const advance = await page.evaluate((i) => window.__scene.advance(i), index);
+                await ticking(
+                    page,
+                    page.evaluate((i) => window.__scene.step(i), index),
+                    advance,
+                    `step ${index}`
                 );
+                await page.clock.runFor(advance);
                 await page.waitForTimeout(120);
                 if (check) continue;
                 shots.push(
@@ -337,18 +373,52 @@ async function run() {
                 reducedMotion: "reduce"
             });
             const problems = [];
+            const started = Date.now();
+            // One variant that never finishes would hold the whole run until the
+            // workflow is cancelled, with nothing in the log to say which: each
+            // one has a limit, fails by name when it passes it, and reports its
+            // time.
+            let timer;
+            const limit = new Promise((_, fail) => {
+                timer = setTimeout(
+                    () => fail(new Error(`took longer than ${VARIANT_LIMIT / 1000}s`)),
+                    VARIANT_LIMIT
+                );
+            });
+            const shooting = shoot(context, problems, {
+                scene,
+                short,
+                locale,
+                theme,
+                viewport,
+                file
+            });
+            // What a variant past its limit throws once its context is closed
+            // under it is already counted.
+            shooting.catch(() => undefined);
             try {
-                await shoot(context, problems, { scene, short, locale, theme, viewport, file });
+                await Promise.race([shooting, limit]);
             } catch (caught) {
-                problems.push(`thrown: ${caught.message}`);
+                problems.push(
+                    caught.message.startsWith("took longer")
+                        ? caught.message
+                        : `thrown: ${caught.message}`
+                );
             } finally {
+                clearTimeout(timer);
                 await context.close();
             }
             if (problems.length > 0) failures.push({ name, problems });
             else if (!check) saved++;
+            done++;
+            process.stdout.write(
+                `[readme-media] ${done}/${variants.length} ${name} ${((Date.now() - started) / 1000).toFixed(1)}s
+`
+            );
         };
 
         let next = 0;
+        let done = 0;
         const worker = async () => {
             while (next < variants.length) await take(variants[next++]);
         };

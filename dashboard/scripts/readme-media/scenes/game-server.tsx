@@ -116,6 +116,9 @@ export async function playerMenu(player: string, entry: RegExp): Promise<void> {
             entry.test(element.textContent?.trim() ?? "")
         )
     );
+    // A menu takes its first ticks to finish opening, and a click before then
+    // is dropped: the hand waits a beat of the scene's clock, as a hand would.
+    await new Promise((resolve) => setTimeout(resolve, 300));
     item.click();
 }
 
