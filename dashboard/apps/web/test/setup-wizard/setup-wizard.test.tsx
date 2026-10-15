@@ -23,7 +23,12 @@ function draw({
     onFinish = vi.fn(),
     locale = "en-US" as "en-US" | "es-ES"
 } = {}) {
-    render(withMessages(<SetupWizard installed={installed} install={install} onFinish={onFinish} />, locale));
+    render(
+        withMessages(
+            <SetupWizard installed={installed} install={install} onFinish={onFinish} />,
+            locale
+        )
+    );
     return { install, onFinish };
 }
 
@@ -56,9 +61,13 @@ describe("the setup screen", () => {
         }
         expect((boxes[0] as HTMLButtonElement).disabled).toBe(true);
         expect((boxes[0] as HTMLInputElement).checked).toBe(true);
-        expect((screen.getByRole("button", { name: "Install 2 apps" }) as HTMLButtonElement).disabled).toBe(false);
+        expect(
+            (screen.getByRole("button", { name: "Install 2 apps" }) as HTMLButtonElement).disabled
+        ).toBe(false);
         await user.click(boxes[1] as HTMLElement);
-        expect((screen.getByRole("button", { name: "Install 1 app" }) as HTMLButtonElement).disabled).toBe(false);
+        expect(
+            (screen.getByRole("button", { name: "Install 1 app" }) as HTMLButtonElement).disabled
+        ).toBe(false);
     });
 
     it("installs only what is ticked, one line each, and retries the one that failed", async () => {
@@ -105,7 +114,9 @@ describe("the setup screen", () => {
         await user.click(screen.getByRole("checkbox", { name: /Running game servers/ }));
         await user.click(screen.getByRole("button", { name: "Next" }));
         expect(screen.getByLabelText("Checking what is installed")).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Skip for now" }) as HTMLButtonElement).disabled).toBe(false);
+        expect(
+            (screen.getByRole("button", { name: "Skip for now" }) as HTMLButtonElement).disabled
+        ).toBe(false);
     });
 
     it("speaks Spanish", () => {

@@ -75,7 +75,9 @@ describe("installing from the setup", () => {
 
     it("installs only an app the setup offers", async () => {
         expect(await installSetupAppAction("vault")).toEqual({ error: "errors.unknownApp" });
-        expect(await installSetupAppAction({ id: "calendar" })).toEqual({ error: "errors.unknownApp" });
+        expect(await installSetupAppAction({ id: "calendar" })).toEqual({
+            error: "errors.unknownApp"
+        });
         expect(installApp).not.toHaveBeenCalled();
     });
 
@@ -137,7 +139,10 @@ describe("finishing the setup", () => {
     it("remembers a skip for everybody", async () => {
         await finishSetupAction("skipped");
         expect(upsert).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { key: "setup.wizard" }, update: { value: "skipped" } })
+            expect.objectContaining({
+                where: { key: "setup.wizard" },
+                update: { value: "skipped" }
+            })
         );
     });
 

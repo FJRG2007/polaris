@@ -39,8 +39,12 @@ describe("sidebar presets", () => {
 
     it("calls an edited list Custom", () => {
         expect(matchPreset({ favorites: ["chat"], order: [] })).toBe("custom");
-        expect(matchPreset({ favorites: [...SIDEBAR_PRESETS.team].reverse(), order: [] })).toBe("custom");
-        expect(matchPreset({ favorites: [...SIDEBAR_PRESETS.team], order: ["chat"] })).toBe("custom");
+        expect(matchPreset({ favorites: [...SIDEBAR_PRESETS.team].reverse(), order: [] })).toBe(
+            "custom"
+        );
+        expect(matchPreset({ favorites: [...SIDEBAR_PRESETS.team], order: ["chat"] })).toBe(
+            "custom"
+        );
     });
 
     it("draws only the preset apps the reader can open, in the preset's order", () => {
@@ -58,7 +62,11 @@ describe("sidebar presets", () => {
 
 describe("setup recommendations", () => {
     it("maps each use to its apps", () => {
-        expect(recommendApps(["hosting"])).toEqual(["status-pages", "security-scans", "cloud-servers"]);
+        expect(recommendApps(["hosting"])).toEqual([
+            "status-pages",
+            "security-scans",
+            "cloud-servers"
+        ]);
         expect(recommendApps(["team"])).toEqual(["calendar", "crm"]);
         expect(recommendApps(["games"])).toEqual(["game-servers"]);
         expect(recommendApps(["homelab"])).toEqual(["security-scans", "home", "tools"]);
@@ -83,7 +91,13 @@ describe("setup recommendations", () => {
 });
 
 describe("when the setup opens by itself", () => {
-    const fresh = { isAdmin: true, viewingAs: false, mark: null, accounts: 1, appsInstalled: false };
+    const fresh = {
+        isAdmin: true,
+        viewingAs: false,
+        mark: null,
+        accounts: 1,
+        appsInstalled: false
+    };
 
     it("opens for the only administrator of a new Polaris", () => {
         expect(shouldOfferSetup(fresh)).toBe(true);

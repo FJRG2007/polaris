@@ -11,6 +11,7 @@
  */
 
 import { Check } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import { Card, CardBody, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
@@ -31,6 +32,19 @@ export function SidebarPresetCard() {
         replacePrefs(presetPrefs(id));
     }
 
+    // A radio group is one stop for Tab; the arrows move between its options and
+    // pick the one they land on, as native radios do.
+    function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+        const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        const from = Math.max(0, SIDEBAR_PRESET_IDS.indexOf(current as SidebarPresetId));
+        const count = SIDEBAR_PRESET_IDS.length;
+        const id = SIDEBAR_PRESET_IDS[(from + step + count) % count] as SidebarPresetId;
+        event.currentTarget.querySelector<HTMLElement>(`[data-preset="${id}"]`)?.focus();
+        pick(id);
+    }
+
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -46,6 +60,7 @@ export function SidebarPresetCard() {
                 <div
                     role="radiogroup"
                     aria-label={t("presets.title")}
+                    onKeyDown={onKeyDown}
                     className="grid gap-2 sm:grid-cols-2"
                 >
                     {SIDEBAR_PRESET_IDS.map((id) => {
@@ -56,6 +71,10 @@ export function SidebarPresetCard() {
                                 type="button"
                                 role="radio"
                                 aria-checked={chosen}
+                                data-preset={id}
+                                tabIndex={
+                                    chosen || (current === "custom" && id === "default") ? 0 : -1
+                                }
                                 onClick={() => pick(id)}
                                 className={cn(
                                     "flex min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors",
