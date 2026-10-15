@@ -31,12 +31,13 @@ export function pathParams(path: string): string[] {
     return [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1]!);
 }
 
-/** The operationId: the method and the path's literal segments, camel-cased. */
+/** The operationId: the method and the path's segments, camel-cased, `{id}` read as "ById". */
 export function operationId(route: DocumentedRoute): string {
     const words = route.path
         .replace(/^\/api\/(v1\/)?/, "")
         .split("/")
-        .filter((part) => part && !part.startsWith("{"))
+        .filter(Boolean)
+        .map((part) => (part.startsWith("{") ? `by-${part.slice(1, -1)}` : part))
         .flatMap((part) => part.split(/[^A-Za-z0-9]+/))
         .filter(Boolean);
     return [route.method.toLowerCase(), ...words.map((word) => word[0]!.toUpperCase() + word.slice(1))].join("");
