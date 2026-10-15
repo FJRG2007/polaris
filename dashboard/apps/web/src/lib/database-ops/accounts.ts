@@ -12,7 +12,14 @@
 
 import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
-import { DatabaseOperationError, instanceContext, lastLine, runWithin, withPorts, type InstanceContext } from "./ops";
+import {
+    DatabaseOperationError,
+    instanceContext,
+    lastLine,
+    runWithin,
+    withPorts,
+    type InstanceContext
+} from "./ops";
 
 /** One statement is a quick thing; a container that does not answer in this long is not going to. */
 const STATEMENT_LIMIT_MS = 30_000;
@@ -36,7 +43,11 @@ export async function accountScope(databaseId: string, ownerId: string): Promise
     }
     return {
         context,
-        target: { engine: context.engine, adminUser: context.admin.username, adminPassword: context.admin.password }
+        target: {
+            engine: context.engine,
+            adminUser: context.admin.username,
+            adminPassword: context.admin.password
+        }
     };
 }
 
@@ -50,10 +61,18 @@ export async function runCommands(
     return withPorts(scope.context, async (ports) => {
         const outputs: string[] = [];
         for (const command of commands) {
-            const result = await runWithin(ports, scope.context.container, command.argv, STATEMENT_LIMIT_MS);
+            const result = await runWithin(
+                ports,
+                scope.context.container,
+                command.argv,
+                STATEMENT_LIMIT_MS
+            );
             if (result.code !== 0) {
                 const said = lastLine(result.output, masked);
-                throw new DatabaseOperationError(said ? "databases.statementFailed" : "databases.statementFailedQuiet", { said });
+                throw new DatabaseOperationError(
+                    said ? "databases.statementFailed" : "databases.statementFailedQuiet",
+                    { said }
+                );
             }
             outputs.push(result.output);
         }
@@ -71,13 +90,19 @@ export async function listAccounts(databaseId: string, ownerId: string): Promise
     const scope = await accountScope(databaseId, ownerId);
     const [accounts = "", databases = ""] = await runCommands(scope, [
         core.listAccountsCommand(scope.target),
-        core.listDatabasesCommand(scope.target.engine, scope.target.adminUser, scope.target.adminPassword)
+        core.listDatabasesCommand(
+            scope.target.engine,
+            scope.target.adminUser,
+            scope.target.adminPassword
+        )
     ]);
     const own = scope.context.own.username;
     return {
         accounts: core
             .parseAccounts(scope.target.engine, accounts, scope.target.adminUser)
-            .map((account) => (account.username === own ? { ...account, protected: true } : account)),
+            .map((account) =>
+                account.username === own ? { ...account, protected: true } : account
+            ),
         databases: core.unknownNames(scope.target.engine, databases, [])
     };
 }
@@ -98,11 +123,19 @@ export async function createAccount(
     const scope = await accountScope(databaseId, ownerId);
     refuseProtected(scope, username);
     const password = randomBytes(24).toString("base64url");
-    await runCommands(scope, [core.createAccountCommand(scope.target, username, password)], [password]);
+    await runCommands(
+        scope,
+        [core.createAccountCommand(scope.target, username, password)],
+        [password]
+    );
     return { username, password };
 }
 
-export async function dropAccount(databaseId: string, ownerId: string, username: string): Promise<void> {
+export async function dropAccount(
+    databaseId: string,
+    ownerId: string,
+    username: string
+): Promise<void> {
     const scope = await accountScope(databaseId, ownerId);
     refuseProtected(scope, username);
     await runCommands(scope, [core.dropAccountCommand(scope.target, username)]);
@@ -128,13 +161,20 @@ export async function revokeAccount(
     await runCommands(scope, core.revokeAccountCommands(scope.target, revoke));
 }
 
-export async function listProcesses(databaseId: string, ownerId: string): Promise<core.DbProcess[]> {
+export async function listProcesses(
+    databaseId: string,
+    ownerId: string
+): Promise<core.DbProcess[]> {
     const scope = await accountScope(databaseId, ownerId);
     const [output = ""] = await runCommands(scope, [core.processListCommand(scope.target)]);
     return core.parseProcessList(scope.target.engine, output);
 }
 
-export async function killProcess(databaseId: string, ownerId: string, processId: number): Promise<void> {
+export async function killProcess(
+    databaseId: string,
+    ownerId: string,
+    processId: number
+): Promise<void> {
     const scope = await accountScope(databaseId, ownerId);
     await runCommands(scope, [core.killProcessCommand(scope.target, processId)]);
 }

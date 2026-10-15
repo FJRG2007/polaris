@@ -32,30 +32,64 @@ function decodeAccounts(value: string): string[][] {
 
 describe("fileAccessAccountSchema", () => {
     it("normalizes the name and accepts a password", () => {
-        const parsed = core.fileAccessAccountSchema.parse({ username: "  Deploy_1 ", password: "correct-horse-battery" });
-        expect(parsed).toEqual({ username: "deploy_1", password: "correct-horse-battery", publicKey: undefined, readOnly: false });
+        const parsed = core.fileAccessAccountSchema.parse({
+            username: "  Deploy_1 ",
+            password: "correct-horse-battery"
+        });
+        expect(parsed).toEqual({
+            username: "deploy_1",
+            password: "correct-horse-battery",
+            publicKey: undefined,
+            readOnly: false
+        });
     });
 
     it("asks for a password or a key", () => {
         expect(core.fileAccessAccountSchema.safeParse({ username: "deploy" }).success).toBe(false);
-        expect(core.fileAccessAccountSchema.safeParse({ username: "deploy", password: "" }).success).toBe(false);
+        expect(
+            core.fileAccessAccountSchema.safeParse({ username: "deploy", password: "" }).success
+        ).toBe(false);
     });
 
     it("refuses reserved names, short passwords, and passwords holding the name", () => {
-        expect(core.fileAccessAccountSchema.safeParse({ username: "root", password: "correct-horse-battery" }).success).toBe(false);
-        expect(core.fileAccessAccountSchema.safeParse({ username: "deploy", password: "short" }).success).toBe(false);
-        expect(core.fileAccessAccountSchema.safeParse({ username: "deploy", password: "my-deploy-password" }).success).toBe(false);
-        expect(core.fileAccessAccountSchema.safeParse({ username: "deploy", password: "line\nbreak-password" }).success).toBe(false);
+        expect(
+            core.fileAccessAccountSchema.safeParse({
+                username: "root",
+                password: "correct-horse-battery"
+            }).success
+        ).toBe(false);
+        expect(
+            core.fileAccessAccountSchema.safeParse({ username: "deploy", password: "short" })
+                .success
+        ).toBe(false);
+        expect(
+            core.fileAccessAccountSchema.safeParse({
+                username: "deploy",
+                password: "my-deploy-password"
+            }).success
+        ).toBe(false);
+        expect(
+            core.fileAccessAccountSchema.safeParse({
+                username: "deploy",
+                password: "line\nbreak-password"
+            }).success
+        ).toBe(false);
     });
 
     it("takes one OpenSSH key line, pasted over several lines or not", () => {
         const parsed = core.fileAccessAccountSchema.parse({
             username: "deploy",
-            publicKey: "ssh-ed25519\nAAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBody0000000000000000000000000000  me@laptop\n",
+            publicKey:
+                "ssh-ed25519\nAAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBody0000000000000000000000000000  me@laptop\n",
             readOnly: true
         });
-        expect(parsed.publicKey).toBe("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBody0000000000000000000000000000 me@laptop");
-        expect(core.fileAccessAccountSchema.safeParse({ username: "deploy", publicKey: "not a key" }).success).toBe(false);
+        expect(parsed.publicKey).toBe(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBody0000000000000000000000000000 me@laptop"
+        );
+        expect(
+            core.fileAccessAccountSchema.safeParse({ username: "deploy", publicKey: "not a key" })
+                .success
+        ).toBe(false);
     });
 });
 
@@ -72,7 +106,11 @@ describe("fileAccessSpec", () => {
 
     it("mounts each volume under /srv by a unique folder, the named ones external", () => {
         expect(server.volumes).toEqual([
-            { source: expect.stringMatching(/^polaris-[0-9a-f]{8}_uploads$/), target: "/srv/uploads", kind: "volume" },
+            {
+                source: expect.stringMatching(/^polaris-[0-9a-f]{8}_uploads$/),
+                target: "/srv/uploads",
+                kind: "volume"
+            },
             { source: "sites/shop", target: "/srv/uploads-2", kind: "bind" },
             { source: "c1/media", target: "/srv/media", kind: "nas" },
             { source: "keys", target: "/etc/ssh/polaris-keys", kind: "volume" }
@@ -104,7 +142,12 @@ describe("fileAccessSpec", () => {
 
 describe("fileAccessMounts", () => {
     it("refuses a server folder Polaris keeps for itself, as the deploy does", () => {
-        const reserved = { id: service.id, volumes: [{ name: "homes", kind: "bind", source: "agent-homes/someone", connectionId: null }] };
+        const reserved = {
+            id: service.id,
+            volumes: [
+                { name: "homes", kind: "bind", source: "agent-homes/someone", connectionId: null }
+            ]
+        };
         expect(() => fileAccessMounts(reserved)).toThrow(/belongs to Polaris/);
     });
 });
@@ -114,7 +157,9 @@ describe("sha512Crypt", () => {
         expect(sha512Crypt("Hello world!", "saltstring")).toBe(
             "$6$saltstring$svn8UoSVapNtMuq1ukKS4tPQd8iKwSMHWjl/O817G3uBnIFNjnQJuesI68u4OTLiBFdcbYEdFCoEOfaS35inz1"
         );
-        expect(sha512Crypt("correct-horse-battery")).toMatch(/^\$6\$[./0-9A-Za-z]{16}\$[./0-9A-Za-z]{86}$/);
+        expect(sha512Crypt("correct-horse-battery")).toMatch(
+            /^\$6\$[./0-9A-Za-z]{16}\$[./0-9A-Za-z]{86}$/
+        );
         expect(sha512Crypt("correct-horse-battery")).not.toBe(sha512Crypt("correct-horse-battery"));
     });
 });
@@ -123,6 +168,8 @@ describe("ports", () => {
     it("stays inside the range and wraps", () => {
         expect(core.fileAccessPortFor(123456)).toBeGreaterThanOrEqual(core.FILE_ACCESS_PORTS.from);
         expect(core.fileAccessPortFor(123456)).toBeLessThanOrEqual(core.FILE_ACCESS_PORTS.to);
-        expect(core.nextFileAccessPort(core.FILE_ACCESS_PORTS.to)).toBe(core.FILE_ACCESS_PORTS.from);
+        expect(core.nextFileAccessPort(core.FILE_ACCESS_PORTS.to)).toBe(
+            core.FILE_ACCESS_PORTS.from
+        );
     });
 });

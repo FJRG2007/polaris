@@ -21,7 +21,14 @@ const app = {
     id: "0190f3a2-7c41-7000-8000-000000000001",
     slug: "web",
     environment: { project: { slug: "shop" } },
-    target: { id: "t1", kind: "local", hostId: null, runtime: "docker", proxyNetwork: null, host: null },
+    target: {
+        id: "t1",
+        kind: "local",
+        hostId: null,
+        runtime: "docker",
+        proxyNetwork: null,
+        host: null
+    },
     volumes: []
 };
 
@@ -43,8 +50,12 @@ describe("takeDownFileAccess", () => {
     it("takes the server's project down and forgets it", async () => {
         db.fileAccessServer.findUnique.mockResolvedValue({ applicationId: app.id });
         await takeDownFileAccess(app.id, "owner");
-        expect(ports.composeDown).toHaveBeenCalledWith(expect.stringMatching(/^polaris-sftp-[0-9a-f]{8}$/));
-        expect(db.fileAccessServer.deleteMany).toHaveBeenCalledWith({ where: { applicationId: app.id } });
+        expect(ports.composeDown).toHaveBeenCalledWith(
+            expect.stringMatching(/^polaris-sftp-[0-9a-f]{8}$/)
+        );
+        expect(db.fileAccessServer.deleteMany).toHaveBeenCalledWith({
+            where: { applicationId: app.id }
+        });
         expect(ports.dispose).toHaveBeenCalled();
     });
 

@@ -28,11 +28,19 @@ interface Confirmation {
 }
 type Ask = (confirmation: Confirmation) => void;
 
-type Listing = NonNullable<Awaited<ReturnType<typeof actions.listDatabaseAccountsAction>>["accounts"]>;
-type Process = NonNullable<Awaited<ReturnType<typeof actions.listDatabaseProcessesAction>>["processes"]>[number];
+type Listing = NonNullable<
+    Awaited<ReturnType<typeof actions.listDatabaseAccountsAction>>["accounts"]
+>;
+type Process = NonNullable<
+    Awaited<ReturnType<typeof actions.listDatabaseProcessesAction>>["processes"]
+>[number];
 
 /** The engines and layouts these tabs work on. */
-export function hasAccountTabs(overview: { engine: string; hosted: boolean; topology: unknown }): boolean {
+export function hasAccountTabs(overview: {
+    engine: string;
+    hosted: boolean;
+    topology: unknown;
+}): boolean {
     return core.isAccountEngine(overview.engine) && !overview.hosted && !overview.topology;
 }
 
@@ -53,7 +61,15 @@ function LoadError({ message, onRetry }: { message: string; onRetry: () => void 
 // Users
 // ---------------------------------------------------------------------------
 
-export function UsersSection({ databaseId, manage, ask }: { databaseId: string; manage: boolean; ask: Ask }) {
+export function UsersSection({
+    databaseId,
+    manage,
+    ask
+}: {
+    databaseId: string;
+    manage: boolean;
+    ask: Ask;
+}) {
     const t = useTranslations("deployData");
     const [accounts, setAccounts] = useState<Listing | null>(null);
     const [databases, setDatabases] = useState<string[]>([]);
@@ -89,7 +105,10 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
         if (!parsed.success) return;
         setCreateError(null);
         startTransition(async () => {
-            const result = await actions.createDatabaseAccountAction({ databaseId, username: parsed.data.username });
+            const result = await actions.createDatabaseAccountAction({
+                databaseId,
+                username: parsed.data.username
+            });
             if (result.error || !result.username || !result.password) {
                 setCreateError(result.error ?? t("database.users.unreadable"));
                 return;
@@ -138,8 +157,17 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
                         />
                         {nameIssue ? <p className="text-xs text-danger">{nameIssue}</p> : null}
                     </div>
-                    <Button type="submit" size="sm" disabled={pending || !parsed.success} aria-disabled={!parsed.success}>
-                        {pending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                    <Button
+                        type="submit"
+                        size="sm"
+                        disabled={pending || !parsed.success}
+                        aria-disabled={!parsed.success}
+                    >
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Plus className="size-4" />
+                        )}
                         {t("database.users.add")}
                     </Button>
                 </form>
@@ -149,7 +177,9 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
             {created ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
                     <div className="flex items-start justify-between gap-2">
-                        <p className="min-w-0">{t("database.users.created", { name: created.username })}</p>
+                        <p className="min-w-0">
+                            {t("database.users.created", { name: created.username })}
+                        </p>
                         <button
                             type="button"
                             className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -180,10 +210,15 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
                     {accounts.map((account) => (
                         <li key={account.username} className="flex flex-col gap-2 p-3">
                             <div className="flex items-center gap-2">
-                                <span className="min-w-0 truncate font-mono text-sm" title={account.username}>
+                                <span
+                                    className="min-w-0 truncate font-mono text-sm"
+                                    title={account.username}
+                                >
                                     {account.username}
                                 </span>
-                                {account.protected ? <Badge>{t("database.users.protected")}</Badge> : null}
+                                {account.protected ? (
+                                    <Badge>{t("database.users.protected")}</Badge>
+                                ) : null}
                                 <span className="flex-1" />
                                 {manage && !account.protected ? (
                                     <>
@@ -191,23 +226,43 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
                                             size="sm"
                                             variant="ghost"
                                             disabled={databases.length === 0}
-                                            title={databases.length === 0 ? t("database.users.noDatabases") : undefined}
-                                            onClick={() => setGranting(granting === account.username ? null : account.username)}
+                                            title={
+                                                databases.length === 0
+                                                    ? t("database.users.noDatabases")
+                                                    : undefined
+                                            }
+                                            onClick={() =>
+                                                setGranting(
+                                                    granting === account.username
+                                                        ? null
+                                                        : account.username
+                                                )
+                                            }
                                         >
                                             {t("database.users.grant")}
                                         </Button>
                                         <button
                                             type="button"
                                             className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-danger"
-                                            aria-label={t("database.users.remove", { name: account.username })}
-                                            title={t("database.users.remove", { name: account.username })}
+                                            aria-label={t("database.users.remove", {
+                                                name: account.username
+                                            })}
+                                            title={t("database.users.remove", {
+                                                name: account.username
+                                            })}
                                             onClick={() =>
                                                 confirmThen({
-                                                    title: t("database.users.removeTitle", { name: account.username }),
+                                                    title: t("database.users.removeTitle", {
+                                                        name: account.username
+                                                    }),
                                                     body: t("database.users.removeBody"),
                                                     label: t("database.users.removeConfirm"),
                                                     danger: true,
-                                                    run: () => actions.dropDatabaseAccountAction({ databaseId, username: account.username })
+                                                    run: () =>
+                                                        actions.dropDatabaseAccountAction({
+                                                            databaseId,
+                                                            username: account.username
+                                                        })
                                                 })
                                             }
                                         >
@@ -230,20 +285,31 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
                                                 <button
                                                     type="button"
                                                     className="shrink-0 text-muted-foreground hover:text-danger"
-                                                    aria-label={t("database.users.revoke", { database })}
+                                                    aria-label={t("database.users.revoke", {
+                                                        database
+                                                    })}
                                                     title={t("database.users.revoke", { database })}
                                                     onClick={() =>
                                                         confirmThen({
-                                                            title: t("database.users.revokeTitle", { database }),
-                                                            body: t("database.users.revokeBody", { name: account.username, database }),
-                                                            label: t("database.users.revokeConfirm"),
+                                                            title: t("database.users.revokeTitle", {
+                                                                database
+                                                            }),
+                                                            body: t("database.users.revokeBody", {
+                                                                name: account.username,
+                                                                database
+                                                            }),
+                                                            label: t(
+                                                                "database.users.revokeConfirm"
+                                                            ),
                                                             danger: true,
                                                             run: () =>
-                                                                actions.revokeDatabaseAccountAction({
-                                                                    databaseId,
-                                                                    username: account.username,
-                                                                    database
-                                                                })
+                                                                actions.revokeDatabaseAccountAction(
+                                                                    {
+                                                                        databaseId,
+                                                                        username: account.username,
+                                                                        database
+                                                                    }
+                                                                )
                                                         })
                                                     }
                                                 >
@@ -254,7 +320,9 @@ export function UsersSection({ databaseId, manage, ask }: { databaseId: string; 
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-xs text-muted-foreground">{t("database.users.noAccess")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("database.users.noAccess")}
+                                </p>
                             )}
                             {granting === account.username ? (
                                 <GrantForm
@@ -312,7 +380,10 @@ function GrantForm({
                     aria-label={t("database.users.access")}
                     value={privileges}
                     onValueChange={(value) => setPrivileges(value as core.DbPrivilege)}
-                    options={core.DB_PRIVILEGES.map((value) => ({ value, label: privilegeLabel[value] }))}
+                    options={core.DB_PRIVILEGES.map((value) => ({
+                        value,
+                        label: privilegeLabel[value]
+                    }))}
                 />
             </div>
             <Button
@@ -320,7 +391,12 @@ function GrantForm({
                 disabled={pending || !database}
                 onClick={() =>
                     startTransition(async () => {
-                        const result = await actions.grantDatabaseAccountAction({ databaseId, username, database, privileges });
+                        const result = await actions.grantDatabaseAccountAction({
+                            databaseId,
+                            username,
+                            database,
+                            privileges
+                        });
                         if (result.error) setError(result.error);
                         else await onDone();
                     })
@@ -341,7 +417,15 @@ function GrantForm({
 /** How often the list is read again while the tab is open. */
 const PROCESS_REFRESH_MS = 5000;
 
-export function ProcessesSection({ databaseId, manage, ask }: { databaseId: string; manage: boolean; ask: Ask }) {
+export function ProcessesSection({
+    databaseId,
+    manage,
+    ask
+}: {
+    databaseId: string;
+    manage: boolean;
+    ask: Ask;
+}) {
     const t = useTranslations("deployData");
     const [processes, setProcesses] = useState<Process[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -386,22 +470,37 @@ export function ProcessesSection({ databaseId, manage, ask }: { databaseId: stri
                         <li key={process.id} className="flex items-start gap-2 p-3 text-sm">
                             <div className="flex min-w-0 flex-1 flex-col gap-1">
                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                    <span className="font-mono text-xs text-muted-foreground">#{process.id}</span>
-                                    <span className="min-w-0 truncate font-medium" title={process.user}>
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                        #{process.id}
+                                    </span>
+                                    <span
+                                        className="min-w-0 truncate font-medium"
+                                        title={process.user}
+                                    >
                                         {process.user || t("database.processes.system")}
                                     </span>
                                     {process.database ? (
-                                        <span className="min-w-0 truncate text-muted-foreground" title={process.database}>
+                                        <span
+                                            className="min-w-0 truncate text-muted-foreground"
+                                            title={process.database}
+                                        >
                                             {process.database}
                                         </span>
                                     ) : null}
-                                    {process.self ? <Badge>{t("database.processes.self")}</Badge> : null}
+                                    {process.self ? (
+                                        <Badge>{t("database.processes.self")}</Badge>
+                                    ) : null}
                                     {process.state ? <Badge>{process.state}</Badge> : null}
                                     <span className="text-xs text-muted-foreground">
-                                        {t("database.processes.seconds", { seconds: process.seconds })}
+                                        {t("database.processes.seconds", {
+                                            seconds: process.seconds
+                                        })}
                                     </span>
                                 </div>
-                                <span className="truncate text-xs text-muted-foreground" title={process.client}>
+                                <span
+                                    className="truncate text-xs text-muted-foreground"
+                                    title={process.client}
+                                >
                                     {process.client}
                                 </span>
                                 {process.query ? (
@@ -416,17 +515,20 @@ export function ProcessesSection({ databaseId, manage, ask }: { databaseId: stri
                                     variant="ghost"
                                     onClick={() =>
                                         ask({
-                                            title: t("database.processes.killTitle", { id: process.id }),
+                                            title: t("database.processes.killTitle", {
+                                                id: process.id
+                                            }),
                                             body: t("database.processes.killBody", {
                                                 user: process.user || t("database.processes.system")
                                             }),
                                             label: t("database.processes.killConfirm"),
                                             danger: true,
                                             run: async () => {
-                                                const result = await actions.killDatabaseProcessAction({
-                                                    databaseId,
-                                                    processId: process.id
-                                                });
+                                                const result =
+                                                    await actions.killDatabaseProcessAction({
+                                                        databaseId,
+                                                        processId: process.id
+                                                    });
                                                 if (!result.error) await load();
                                                 return result;
                                             }

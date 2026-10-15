@@ -17,7 +17,8 @@ import { z } from "zod";
  * The image the server runs, pinned to a digest so a republished tag cannot
  * change what holds the account passwords. Pulled on the first account, never before.
  */
-export const FILE_ACCESS_IMAGE = "atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f";
+export const FILE_ACCESS_IMAGE =
+    "atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f";
 
 /** Where the service's volumes appear to an account. */
 export const FILE_ACCESS_ROOT = "/srv";
@@ -69,23 +70,33 @@ export const fileAccessAccountSchema = z
             .refine((value) => !/[\r\n\0]/.test(value), "fileAccess.issues.passwordLineBreak")
             .optional()
             .transform((value) => (value ? value : undefined))
-            .refine((value) => value === undefined || value.length >= 12, "fileAccess.issues.passwordShort"),
+            .refine(
+                (value) => value === undefined || value.length >= 12,
+                "fileAccess.issues.passwordShort"
+            ),
         publicKey: z
             .string()
             .max(4000, "fileAccess.issues.keyLong")
             .optional()
             .transform((value) => (value ? normalizePublicKey(value) : undefined))
-            .refine((value) => value === undefined || PUBLIC_KEY.test(value), "fileAccess.issues.keyShape"),
+            .refine(
+                (value) => value === undefined || PUBLIC_KEY.test(value),
+                "fileAccess.issues.keyShape"
+            ),
         readOnly: z.boolean().default(false)
     })
     .refine((account) => account.password !== undefined || account.publicKey !== undefined, {
         message: "fileAccess.issues.needOne",
         path: ["password"]
     })
-    .refine((account) => !account.password || !account.password.toLowerCase().includes(account.username), {
-        message: "fileAccess.issues.passwordHasName",
-        path: ["password"]
-    });
+    .refine(
+        (account) =>
+            !account.password || !account.password.toLowerCase().includes(account.username),
+        {
+            message: "fileAccess.issues.passwordHasName",
+            path: ["password"]
+        }
+    );
 
 export type FileAccessAccountInput = z.input<typeof fileAccessAccountSchema>;
 export type FileAccessAccount = z.output<typeof fileAccessAccountSchema>;
@@ -101,7 +112,10 @@ export interface FileAccessLogin {
 
 /** A folder name for a volume under `/srv`: its name, made safe for a path. */
 export function fileAccessFolder(name: string): string {
-    const safe = name.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "");
+    const safe = name
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-")
+        .replace(/^[-.]+|[-.]+$/g, "");
     return safe || "volume";
 }
 
@@ -166,7 +180,7 @@ export const FILE_ACCESS_BOOT_SCRIPT = [
     'ALLOW=""',
     'READONLY=""',
     'echo "$POLARIS_SFTP_ACCOUNTS" | base64 -d > /tmp/polaris-accounts',
-    'echo >> /tmp/polaris-accounts',
+    "echo >> /tmp/polaris-accounts",
     "while IFS=\"$(printf '\\t')\" read -r NAME MODE PASS KEY; do",
     '  [ -n "$NAME" ] || continue',
     '  sed -i "/^$NAME:/d" /etc/passwd /etc/shadow /etc/group 2>/dev/null || true',

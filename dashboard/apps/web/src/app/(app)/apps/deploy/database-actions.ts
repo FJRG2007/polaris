@@ -636,23 +636,36 @@ export async function createDatabaseAccountAction(
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.databaseId);
-        const created = await accounts.createAccount(parsed.data.databaseId, ownerId, parsed.data.username);
-        await audit(userId, "deploy.db.account.create", parsed.data.databaseId, { username: created.username });
+        const created = await accounts.createAccount(
+            parsed.data.databaseId,
+            ownerId,
+            parsed.data.username
+        );
+        await audit(userId, "deploy.db.account.create", parsed.data.databaseId, {
+            username: created.username
+        });
         return created;
     } catch (caught) {
         return failure(caught, "databases.accountFailed");
     }
 }
 
-const accountDropSchema = z.object({ databaseId: z.string().uuid(), username: core.dbAccountGrantSchema.shape.username });
+const accountDropSchema = z.object({
+    databaseId: z.string().uuid(),
+    username: core.dbAccountGrantSchema.shape.username
+});
 
-export async function dropDatabaseAccountAction(input: z.input<typeof accountDropSchema>): Promise<Result> {
+export async function dropDatabaseAccountAction(
+    input: z.input<typeof accountDropSchema>
+): Promise<Result> {
     const parsed = accountDropSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.databaseId);
         await accounts.dropAccount(parsed.data.databaseId, ownerId, parsed.data.username);
-        await audit(userId, "deploy.db.account.drop", parsed.data.databaseId, { username: parsed.data.username });
+        await audit(userId, "deploy.db.account.drop", parsed.data.databaseId, {
+            username: parsed.data.username
+        });
         return {};
     } catch (caught) {
         return failure(caught, "databases.accountFailed");
@@ -661,7 +674,9 @@ export async function dropDatabaseAccountAction(input: z.input<typeof accountDro
 
 const accountGrantSchema = core.dbAccountGrantSchema.extend({ databaseId: z.string().uuid() });
 
-export async function grantDatabaseAccountAction(input: z.input<typeof accountGrantSchema>): Promise<Result> {
+export async function grantDatabaseAccountAction(
+    input: z.input<typeof accountGrantSchema>
+): Promise<Result> {
     const parsed = accountGrantSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -677,7 +692,9 @@ export async function grantDatabaseAccountAction(input: z.input<typeof accountGr
 
 const accountRevokeSchema = core.dbAccountRevokeSchema.extend({ databaseId: z.string().uuid() });
 
-export async function revokeDatabaseAccountAction(input: z.input<typeof accountRevokeSchema>): Promise<Result> {
+export async function revokeDatabaseAccountAction(
+    input: z.input<typeof accountRevokeSchema>
+): Promise<Result> {
     const parsed = accountRevokeSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
@@ -706,13 +723,17 @@ export async function listDatabaseProcessesAction(
 
 const processKillSchema = core.dbProcessKillSchema.extend({ databaseId: z.string().uuid() });
 
-export async function killDatabaseProcessAction(input: z.input<typeof processKillSchema>): Promise<Result> {
+export async function killDatabaseProcessAction(
+    input: z.input<typeof processKillSchema>
+): Promise<Result> {
     const parsed = processKillSchema.safeParse(input);
     if (!parsed.success) return invalid(parsed.error);
     try {
         const { userId, ownerId } = await manage(parsed.data.databaseId);
         await accounts.killProcess(parsed.data.databaseId, ownerId, parsed.data.processId);
-        await audit(userId, "deploy.db.process.kill", parsed.data.databaseId, { processId: parsed.data.processId });
+        await audit(userId, "deploy.db.process.kill", parsed.data.databaseId, {
+            processId: parsed.data.processId
+        });
         return {};
     } catch (caught) {
         return failure(caught, "databases.killFailed");
@@ -722,7 +743,9 @@ export async function killDatabaseProcessAction(input: z.input<typeof processKil
 // Tuning
 // ---------------------------------------------------------------------------
 
-export async function databaseTuningAction(databaseId: string): Promise<Result<{ tuning: tuning.TuningView }>> {
+export async function databaseTuningAction(
+    databaseId: string
+): Promise<Result<{ tuning: tuning.TuningView }>> {
     const parsed = z.string().uuid().safeParse(databaseId);
     if (!parsed.success) return invalid(parsed.error);
     try {

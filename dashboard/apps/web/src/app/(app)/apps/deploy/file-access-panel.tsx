@@ -15,7 +15,15 @@ import { useEffect, useState, useTransition } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { KeyRound, Loader2, Lock, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, ConfirmDeleteDialog, CopyButton, Input, Switch, Textarea } from "@polaris/ui";
+import {
+    Badge,
+    Button,
+    ConfirmDeleteDialog,
+    CopyButton,
+    Input,
+    Switch,
+    Textarea
+} from "@polaris/ui";
 import {
     createFileAccessAccountAction,
     deleteFileAccessAccountAction,
@@ -55,7 +63,11 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
     const touched = form.username !== "" || form.password !== "" || form.publicKey !== "";
     const parsed = core.fileAccessAccountSchema.safeParse(form);
     const issueKey = touched && !parsed.success ? parsed.error.issues[0]?.message : null;
-    const issue = issueKey ? (t.has(issueKey) ? t(issueKey as NamespaceKey<"deployData">) : t("fileAccess.issues.invalid")) : null;
+    const issue = issueKey
+        ? t.has(issueKey)
+            ? t(issueKey as NamespaceKey<"deployData">)
+            : t("fileAccess.issues.invalid")
+        : null;
 
     function submit() {
         if (!parsed.success) return;
@@ -92,7 +104,10 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
     const address = view?.server?.host ? `sftp://${view.server.host}:${view.server.port}` : null;
 
     return (
-        <section className="flex min-w-0 flex-col gap-3 border-t border-border pt-4" aria-labelledby={`sftp-${applicationId}`}>
+        <section
+            className="flex min-w-0 flex-col gap-3 border-t border-border pt-4"
+            aria-labelledby={`sftp-${applicationId}`}
+        >
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                     <h3 id={`sftp-${applicationId}`} className="text-sm font-medium">
@@ -108,7 +123,9 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
             </div>
 
             {loadError ? <p className="text-sm text-danger">{loadError}</p> : null}
-            {!view && !loadError ? <div className="h-10 animate-pulse rounded-md bg-muted" /> : null}
+            {!view && !loadError ? (
+                <div className="h-10 animate-pulse rounded-md bg-muted" />
+            ) : null}
 
             {view && view.folders.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("fileAccess.noVolumes")}</p>
@@ -167,7 +184,9 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
                             value={form.publicKey}
                             // i18n-ignore: an example key line
                             placeholder="ssh-ed25519 AAAA..."
-                            onChange={(event) => setForm({ ...form, publicKey: event.target.value })}
+                            onChange={(event) =>
+                                setForm({ ...form, publicKey: event.target.value })
+                            }
                         />
                     </label>
                     <div className="flex items-center gap-2 text-sm">
@@ -180,12 +199,26 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
                     </div>
                     {issue ? <p className="text-xs text-danger">{issue}</p> : null}
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
-                    {!view?.server ? <p className="text-xs text-muted-foreground">{t("fileAccess.firstStarts")}</p> : null}
+                    {!view?.server ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("fileAccess.firstStarts")}
+                        </p>
+                    ) : null}
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setAdding(false)}
+                        >
                             {t("fileAccess.cancel")}
                         </Button>
-                        <Button type="submit" size="sm" disabled={pending || !parsed.success} aria-disabled={!parsed.success}>
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={pending || !parsed.success}
+                            aria-disabled={!parsed.success}
+                        >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                             {t("fileAccess.create")}
                         </Button>
@@ -196,29 +229,45 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
             {view && view.accounts.length > 0 ? (
                 <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
                     {view.accounts.map((account) => (
-                        <li key={account.id} className="flex min-w-0 items-center gap-2 px-3 py-2 text-sm">
-                            <span className="min-w-0 flex-1 truncate font-mono" title={account.username}>
+                        <li
+                            key={account.id}
+                            className="flex min-w-0 items-center gap-2 px-3 py-2 text-sm"
+                        >
+                            <span
+                                className="min-w-0 flex-1 truncate font-mono"
+                                title={account.username}
+                            >
                                 {account.username}
                             </span>
                             {account.hasPassword ? (
-                                <span title={t("fileAccess.withPassword")} aria-label={t("fileAccess.withPassword")}>
+                                <span
+                                    title={t("fileAccess.withPassword")}
+                                    aria-label={t("fileAccess.withPassword")}
+                                >
                                     <Lock className="size-4 shrink-0 text-muted-foreground" />
                                 </span>
                             ) : null}
                             {account.hasKey ? (
-                                <span title={t("fileAccess.withKey")} aria-label={t("fileAccess.withKey")}>
+                                <span
+                                    title={t("fileAccess.withKey")}
+                                    aria-label={t("fileAccess.withKey")}
+                                >
                                     <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                                 </span>
                             ) : null}
                             <Badge className="shrink-0">
-                                {account.readOnly ? t("fileAccess.readOnlyBadge") : t("fileAccess.readWriteBadge")}
+                                {account.readOnly
+                                    ? t("fileAccess.readOnlyBadge")
+                                    : t("fileAccess.readWriteBadge")}
                             </Badge>
                             {write ? (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     title={t("fileAccess.remove")}
-                                    aria-label={t("fileAccess.removeNamed", { name: account.username })}
+                                    aria-label={t("fileAccess.removeNamed", {
+                                        name: account.username
+                                    })}
                                     onClick={() => {
                                         setRemoveError(null);
                                         setRemoving(account);
@@ -240,7 +289,9 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
                     onOpenChange={(open) => !open && setRemoving(null)}
                     name={removing.username}
                     kind={t("fileAccess.kind")}
-                    description={view && view.accounts.length === 1 ? t("fileAccess.lastStops") : undefined}
+                    description={
+                        view && view.accounts.length === 1 ? t("fileAccess.lastStops") : undefined
+                    }
                     onConfirm={remove}
                     error={removeError}
                     pending={pending}

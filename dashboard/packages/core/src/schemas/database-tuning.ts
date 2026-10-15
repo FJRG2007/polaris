@@ -14,9 +14,27 @@
 import type { AccountCommand, AccountTarget } from "./database-accounts.js";
 
 export const TUNING_SETTINGS = {
-    postgres: ["shared_buffers", "effective_cache_size", "work_mem", "maintenance_work_mem", "max_connections"],
-    mysql: ["innodb_buffer_pool_size", "innodb_log_buffer_size", "max_connections", "tmp_table_size", "max_heap_table_size"],
-    mariadb: ["innodb_buffer_pool_size", "innodb_log_buffer_size", "max_connections", "tmp_table_size", "max_heap_table_size"]
+    postgres: [
+        "shared_buffers",
+        "effective_cache_size",
+        "work_mem",
+        "maintenance_work_mem",
+        "max_connections"
+    ],
+    mysql: [
+        "innodb_buffer_pool_size",
+        "innodb_log_buffer_size",
+        "max_connections",
+        "tmp_table_size",
+        "max_heap_table_size"
+    ],
+    mariadb: [
+        "innodb_buffer_pool_size",
+        "innodb_log_buffer_size",
+        "max_connections",
+        "tmp_table_size",
+        "max_heap_table_size"
+    ]
 } as const;
 
 export interface TuningSuggestion {
@@ -53,7 +71,10 @@ export function suggestTuning(engine: AccountTarget["engine"], ramMb: number): T
     // rounded down, never past the share of the memory it was given.
     const share = ram >= 2048 ? 0.7 : 0.5;
     const wanted = Math.floor(ram * share);
-    const pool = wanted >= 1024 ? Math.floor(wanted / 1024) * 1024 : Math.max(128, Math.floor(wanted / 128) * 128);
+    const pool =
+        wanted >= 1024
+            ? Math.floor(wanted / 1024) * 1024
+            : Math.max(128, Math.floor(wanted / 128) * 128);
     const temp = ram >= 4096 ? 64 : ram >= 1024 ? 32 : 16;
     return [
         { name: "innodb_buffer_pool_size", value: String(pool * MB) },
@@ -72,7 +93,10 @@ export function parseMemInfo(output: string): number | null {
     return mb > 0 ? mb : null;
 }
 
-export const MEMINFO_COMMAND: AccountCommand = { argv: ["cat", "/proc/meminfo"], describe: "Reading the memory" };
+export const MEMINFO_COMMAND: AccountCommand = {
+    argv: ["cat", "/proc/meminfo"],
+    describe: "Reading the memory"
+};
 
 /** What MariaDB cannot do that the apply needs. */
 export const MARIADB_APPLY_REFUSAL =
@@ -112,7 +136,10 @@ export function readTuningCommand(target: AccountTarget): AccountCommand {
     };
 }
 
-export function parseTuning(engine: AccountTarget["engine"], output: string): Record<string, string> {
+export function parseTuning(
+    engine: AccountTarget["engine"],
+    output: string
+): Record<string, string> {
     const separator = engine === "postgres" ? "|" : "\t";
     const known = new Set<string>(TUNING_SETTINGS[engine]);
     const current: Record<string, string> = {};
@@ -131,12 +158,16 @@ const MYSQL_VALUE = /^\d{1,15}$/;
  * `SET PERSIST_ONLY` for MySQL 8. Only the names this module tunes, with
  * values of the shape the engine takes, reach a statement.
  */
-export function applyTuningCommands(target: AccountTarget, settings: readonly TuningSuggestion[]): AccountCommand[] {
+export function applyTuningCommands(
+    target: AccountTarget,
+    settings: readonly TuningSuggestion[]
+): AccountCommand[] {
     if (target.engine === "mariadb") throw new Error(MARIADB_APPLY_REFUSAL);
     const known = new Set<string>(TUNING_SETTINGS[target.engine]);
     const shape = target.engine === "postgres" ? POSTGRES_VALUE : MYSQL_VALUE;
     for (const setting of settings) {
-        if (!known.has(setting.name)) throw new Error(`Polaris does not tune ${setting.name.slice(0, 64)}.`);
+        if (!known.has(setting.name))
+            throw new Error(`Polaris does not tune ${setting.name.slice(0, 64)}.`);
         if (!shape.test(setting.value)) throw new Error(`That is not a value for ${setting.name}.`);
     }
     if (target.engine === "postgres") {
@@ -165,7 +196,9 @@ export function applyTuningCommands(target: AccountTarget, settings: readonly Tu
                 "-uroot",
                 `-p${target.adminPassword}`,
                 "-e",
-                settings.map((setting) => `SET PERSIST_ONLY ${setting.name} = ${setting.value};`).join(" ")
+                settings
+                    .map((setting) => `SET PERSIST_ONLY ${setting.name} = ${setting.value};`)
+                    .join(" ")
             ],
             describe: "Saving the settings"
         }

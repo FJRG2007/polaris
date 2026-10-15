@@ -18,7 +18,9 @@ vi.mock("@/lib/database-ops/ops", async (original) => {
     return {
         ...real,
         instanceContext: vi.fn(async () => state.context),
-        withPorts: vi.fn(async (_context: unknown, work: (ports: unknown) => Promise<unknown>) => work({ runIn: state.runIn }))
+        withPorts: vi.fn(async (_context: unknown, work: (ports: unknown) => Promise<unknown>) =>
+            work({ runIn: state.runIn })
+        )
     };
 });
 
@@ -47,11 +49,17 @@ beforeEach(() => {
 describe("which instances", () => {
     it("refuses other engines, hosted databases and clusters", async () => {
         state.context = context({ engine: "redis" });
-        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow("databases.accountsEngine");
+        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow(
+            "databases.accountsEngine"
+        );
         state.context = context({ hosted: true });
-        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow("databases.accountsHosted");
+        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow(
+            "databases.accountsHosted"
+        );
         state.context = context({ engine: "mysql", topology: { kind: "replicas", replicas: 1 } });
-        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow("databases.accountsCluster");
+        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow(
+            "databases.accountsCluster"
+        );
         expect(state.runIn).not.toHaveBeenCalled();
     });
 });
@@ -77,8 +85,13 @@ describe("accounts", () => {
     });
 
     it("masks passwords in an engine's error", async () => {
-        state.runIn.mockImplementation(async (_container, argv) => ({ code: 1, output: `ERROR: near ${argv.at(-1)} own-password-0000` }));
-        const error = await accounts.createAccount(DB, "owner", "reporting").catch((caught: Error) => caught);
+        state.runIn.mockImplementation(async (_container, argv) => ({
+            code: 1,
+            output: `ERROR: near ${argv.at(-1)} own-password-0000`
+        }));
+        const error = await accounts
+            .createAccount(DB, "owner", "reporting")
+            .catch((caught: Error) => caught);
         expect(error).toBeInstanceOf(DatabaseOperationError);
         const said = String((error as DatabaseOperationError).params?.said);
         expect((error as Error).message).toBe("databases.statementFailed");
@@ -88,13 +101,25 @@ describe("accounts", () => {
     });
 
     it("never drops or regrants the account Polaris signs in with", async () => {
-        await expect(accounts.dropAccount(DB, "owner", "shop")).rejects.toThrow("databases.accountProtected");
-        await expect(accounts.grantAccount(DB, "owner", { username: "shop", database: "shop", privileges: "readonly" })).rejects.toThrow();
+        await expect(accounts.dropAccount(DB, "owner", "shop")).rejects.toThrow(
+            "databases.accountProtected"
+        );
+        await expect(
+            accounts.grantAccount(DB, "owner", {
+                username: "shop",
+                database: "shop",
+                privileges: "readonly"
+            })
+        ).rejects.toThrow();
         expect(state.runIn).not.toHaveBeenCalled();
     });
 
     it("grants in the database's own connection after the database-level grant", async () => {
-        await accounts.grantAccount(DB, "owner", { username: "reporting", database: "shop", privileges: "readwrite" });
+        await accounts.grantAccount(DB, "owner", {
+            username: "reporting",
+            database: "shop",
+            privileges: "readwrite"
+        });
         expect(state.runIn).toHaveBeenCalledTimes(2);
         const second = state.runIn.mock.calls[1][1];
         expect(second[second.indexOf("-d") + 1]).toBe("shop");
@@ -103,7 +128,10 @@ describe("accounts", () => {
 
 describe("processes", () => {
     it("lists and kills by id", async () => {
-        state.runIn.mockResolvedValueOnce({ code: 0, output: "41|shop|postgres|local|active|0|1|SELECT 1\n" });
+        state.runIn.mockResolvedValueOnce({
+            code: 0,
+            output: "41|shop|postgres|local|active|0|1|SELECT 1\n"
+        });
         const processes = await accounts.listProcesses(DB, "owner");
         expect(processes[0]).toMatchObject({ id: 41, self: true });
         await accounts.killProcess(DB, "owner", 7);

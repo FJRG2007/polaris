@@ -33,15 +33,21 @@ export type TuningRefusal = "mariadb" | "mysqlOld" | "noLimit";
 
 function engineRefusal(scope: AccountScope): TuningRefusal | null {
     if (scope.target.engine === "mariadb") return "mariadb";
-    if (scope.target.engine === "mysql" && Number.parseInt(scope.context.version, 10) < 8) return "mysqlOld";
+    if (scope.target.engine === "mysql" && Number.parseInt(scope.context.version, 10) < 8)
+        return "mysqlOld";
     return null;
 }
 
-function applyRefusal(scope: AccountScope, ramSource: TuningView["ramSource"]): TuningRefusal | null {
+function applyRefusal(
+    scope: AccountScope,
+    ramSource: TuningView["ramSource"]
+): TuningRefusal | null {
     return engineRefusal(scope) ?? (ramSource === "limit" ? null : "noLimit");
 }
 
-async function memoryOf(scope: AccountScope): Promise<{ ramMb: number; ramSource: "limit" | "container" }> {
+async function memoryOf(
+    scope: AccountScope
+): Promise<{ ramMb: number; ramSource: "limit" | "container" }> {
     const row = await prisma.managedDatabase.findUnique({
         where: { id: scope.context.id },
         select: { memoryLimitMb: true }
@@ -74,12 +80,16 @@ export async function tuningView(databaseId: string, ownerId: string): Promise<T
  * Save the suggestion and restart the database so it takes effect. The values
  * applied are the ones suggested for its memory now, never ones sent in.
  */
-export async function applyTuning(databaseId: string, ownerId: string): Promise<core.TuningSuggestion[]> {
+export async function applyTuning(
+    databaseId: string,
+    ownerId: string
+): Promise<core.TuningSuggestion[]> {
     const scope = await accountScope(databaseId, ownerId);
     const refused = engineRefusal(scope);
     if (refused) throw new DatabaseOperationError(`databases.tuningRefused.${refused}`);
     const memory = await memoryOf(scope);
-    if (memory.ramSource !== "limit") throw new DatabaseOperationError("databases.tuningRefused.noLimit");
+    if (memory.ramSource !== "limit")
+        throw new DatabaseOperationError("databases.tuningRefused.noLimit");
     const settings = core.suggestTuning(scope.target.engine, memory.ramMb);
     await runCommands(scope, core.applyTuningCommands(scope.target, settings));
     await withPorts(scope.context, async (ports) => {

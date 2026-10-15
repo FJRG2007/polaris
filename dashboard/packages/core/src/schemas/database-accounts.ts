@@ -55,7 +55,12 @@ const RESERVED = new Set([
 ]);
 
 export function isReservedAccount(username: string): boolean {
-    return RESERVED.has(username) || username.startsWith("pg_") || username.startsWith("mysql.") || username.startsWith("mariadb.");
+    return (
+        RESERVED.has(username) ||
+        username.startsWith("pg_") ||
+        username.startsWith("mysql.") ||
+        username.startsWith("mariadb.")
+    );
 }
 
 export const dbAccountCreateSchema = z.object({
@@ -121,7 +126,15 @@ function psql(target: AccountTarget, database: string, statement: string): strin
 
 /** One batch of MySQL / MariaDB statements, tab-separated with no header. */
 function mysql(target: AccountTarget, statements: string): string[] {
-    return [target.engine === "mysql" ? "mysql" : "mariadb", "-uroot", `-p${target.adminPassword}`, "-N", "-B", "-e", statements];
+    return [
+        target.engine === "mysql" ? "mysql" : "mariadb",
+        "-uroot",
+        `-p${target.adminPassword}`,
+        "-N",
+        "-B",
+        "-e",
+        statements
+    ];
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +173,11 @@ export function listAccountsCommand(target: AccountTarget): AccountCommand {
     return { argv: mysql(target, statement), describe: "Listing the accounts" };
 }
 
-export function parseAccounts(engine: AccountEngine, output: string, adminUser: string): DbAccount[] {
+export function parseAccounts(
+    engine: AccountEngine,
+    output: string,
+    adminUser: string
+): DbAccount[] {
     const separator = engine === "postgres" ? "|" : "\t";
     return output
         .split(/\r?\n/)
@@ -178,19 +195,30 @@ export function parseAccounts(engine: AccountEngine, output: string, adminUser: 
 }
 
 /** Create a login account with a generated password and no database yet. */
-export function createAccountCommand(target: AccountTarget, username: string, password: string): AccountCommand {
+export function createAccountCommand(
+    target: AccountTarget,
+    username: string,
+    password: string
+): AccountCommand {
     checkUsername(username);
     if (isReservedAccount(username)) throw new Error("databases.issues.engineAccount");
     if (!GENERATED_PASSWORD.test(password)) throw new Error("databases.issues.generatedPassword");
     const describe = `Creating the account ${username}`;
     if (target.engine === "postgres") {
         return {
-            argv: psql(target, "postgres", `CREATE ROLE ${quoteIdent(username)} WITH LOGIN PASSWORD ${quoteLiteral(password)}`),
+            argv: psql(
+                target,
+                "postgres",
+                `CREATE ROLE ${quoteIdent(username)} WITH LOGIN PASSWORD ${quoteLiteral(password)}`
+            ),
             describe
         };
     }
     return {
-        argv: mysql(target, `CREATE USER ${mysqlAccount(username)} IDENTIFIED BY ${quoteLiteral(password)}; FLUSH PRIVILEGES;`),
+        argv: mysql(
+            target,
+            `CREATE USER ${mysqlAccount(username)} IDENTIFIED BY ${quoteLiteral(password)}; FLUSH PRIVILEGES;`
+        ),
         describe
     };
 }
@@ -201,9 +229,15 @@ export function dropAccountCommand(target: AccountTarget, username: string): Acc
     if (isReservedAccount(username)) throw new Error("databases.issues.engineAccount");
     const describe = `Removing the account ${username}`;
     if (target.engine === "postgres") {
-        return { argv: psql(target, "postgres", `DROP ROLE IF EXISTS ${quoteIdent(username)}`), describe };
+        return {
+            argv: psql(target, "postgres", `DROP ROLE IF EXISTS ${quoteIdent(username)}`),
+            describe
+        };
     }
-    return { argv: mysql(target, `DROP USER IF EXISTS ${mysqlAccount(username)}; FLUSH PRIVILEGES;`), describe };
+    return {
+        argv: mysql(target, `DROP USER IF EXISTS ${mysqlAccount(username)}; FLUSH PRIVILEGES;`),
+        describe
+    };
 }
 
 function mysqlPrivileges(privileges: DbPrivilege): string {
@@ -255,7 +289,11 @@ function postgresSchemaRevokes(user: string): string[] {
  */
 export function grantAccountCommands(
     target: AccountTarget,
-    grant: { readonly username: string; readonly database: string; readonly privileges: DbPrivilege }
+    grant: {
+        readonly username: string;
+        readonly database: string;
+        readonly privileges: DbPrivilege;
+    }
 ): AccountCommand[] {
     const username = checkUsername(grant.username);
     const database = checkDatabase(grant.database);
@@ -276,7 +314,14 @@ export function grantAccountCommands(
                 describe
             },
             {
-                argv: psql(target, database, [...postgresSchemaRevokes(user), ...postgresSchemaGrants(user, grant.privileges)].join(" ")),
+                argv: psql(
+                    target,
+                    database,
+                    [
+                        ...postgresSchemaRevokes(user),
+                        ...postgresSchemaGrants(user, grant.privileges)
+                    ].join(" ")
+                ),
                 describe
             }
         ];
@@ -307,7 +352,14 @@ export function revokeAccountCommands(
         const user = quoteIdent(username);
         return [
             { argv: psql(target, database, postgresSchemaRevokes(user).join(" ")), describe },
-            { argv: psql(target, "postgres", `REVOKE ALL ON DATABASE ${quoteIdent(database)} FROM ${user}`), describe }
+            {
+                argv: psql(
+                    target,
+                    "postgres",
+                    `REVOKE ALL ON DATABASE ${quoteIdent(database)} FROM ${user}`
+                ),
+                describe
+            }
         ];
     }
     // MySQL refuses a REVOKE for a grant that does not exist; a USAGE grant first makes it one that does.
@@ -315,7 +367,10 @@ export function revokeAccountCommands(
     const db = quoteBacktick(database);
     return [
         {
-            argv: mysql(target, `GRANT USAGE ON ${db}.* TO ${account}; REVOKE ALL PRIVILEGES ON ${db}.* FROM ${account}; FLUSH PRIVILEGES;`),
+            argv: mysql(
+                target,
+                `GRANT USAGE ON ${db}.* TO ${account}; REVOKE ALL PRIVILEGES ON ${db}.* FROM ${account}; FLUSH PRIVILEGES;`
+            ),
             describe
         }
     ];
@@ -390,15 +445,23 @@ export function parseProcessList(engine: AccountEngine, output: string): DbProce
 }
 
 export const dbProcessKillSchema = z.object({
-    processId: z.number({ message: "databases.issues.connectionId" }).int("databases.issues.connectionId").positive("databases.issues.connectionId").max(2 ** 53 - 1, "databases.issues.connectionId")
+    processId: z
+        .number({ message: "databases.issues.connectionId" })
+        .int("databases.issues.connectionId")
+        .positive("databases.issues.connectionId")
+        .max(2 ** 53 - 1, "databases.issues.connectionId")
 });
 
 /** End one connection, by its numeric id only. */
 export function killProcessCommand(target: AccountTarget, processId: number): AccountCommand {
-    if (!Number.isSafeInteger(processId) || processId <= 0) throw new Error("databases.issues.connectionId");
+    if (!Number.isSafeInteger(processId) || processId <= 0)
+        throw new Error("databases.issues.connectionId");
     const describe = `Ending connection ${processId}`;
     if (target.engine === "postgres") {
-        return { argv: psql(target, "postgres", `SELECT pg_terminate_backend(${processId})`), describe };
+        return {
+            argv: psql(target, "postgres", `SELECT pg_terminate_backend(${processId})`),
+            describe
+        };
     }
     return { argv: mysql(target, `KILL ${processId}`), describe };
 }

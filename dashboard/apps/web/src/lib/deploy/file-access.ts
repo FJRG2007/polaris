@@ -70,7 +70,12 @@ export interface FileAccessView {
 interface ServiceRow {
     readonly id: string;
     readonly target: TargetRow & { readonly host: { readonly address: string } | null };
-    readonly volumes: { readonly name: string; readonly kind: string; readonly source: string | null; readonly connectionId: string | null }[];
+    readonly volumes: {
+        readonly name: string;
+        readonly kind: string;
+        readonly source: string | null;
+        readonly connectionId: string | null;
+    }[];
 }
 
 async function serviceOf(applicationId: string, ownerId: string): Promise<ServiceRow> {
@@ -149,7 +154,10 @@ export function fileAccessSpec(input: {
                     POLARIS_FIRST_FOLDER: folders[0] ?? ""
                 },
                 ports: [{ host: input.port, container: 22, protocol: "tcp" }],
-                volumes: [...mounts, { source: "keys", target: "/etc/ssh/polaris-keys", kind: "volume" }],
+                volumes: [
+                    ...mounts,
+                    { source: "keys", target: "/etc/ssh/polaris-keys", kind: "volume" }
+                ],
                 labels: { "polaris.role": "file-access", "polaris.application": input.service.id },
                 entrypoint: ["/bin/sh", "-c", core.FILE_ACCESS_BOOT_SCRIPT],
                 networks: [],
@@ -167,7 +175,11 @@ function sealPassword(password: string) {
 }
 
 /** The sealed password, opened only to be hashed for the server's `/etc/shadow`. */
-function passwordHash(row: { passwordCipher: Uint8Array | null; passwordNonce: Uint8Array | null; passwordKeyId: string | null }): string | undefined {
+function passwordHash(row: {
+    passwordCipher: Uint8Array | null;
+    passwordNonce: Uint8Array | null;
+    passwordKeyId: string | null;
+}): string | undefined {
     if (!row.passwordCipher || !row.passwordNonce) return undefined;
     const password = decryptSecret(
         {
@@ -184,17 +196,29 @@ function passwordHash(row: { passwordCipher: Uint8Array | null; passwordNonce: U
 async function hostFor(service: ServiceRow): Promise<string | null> {
     if (service.target.host) return service.target.host.address;
     const addresses = await reachableAddresses().catch(() => []);
-    const pick = addresses.find((entry) => entry.kind === "local") ?? addresses.find((entry) => entry.kind === "domain");
+    const pick =
+        addresses.find((entry) => entry.kind === "local") ??
+        addresses.find((entry) => entry.kind === "domain");
     return pick ? pick.host.replace(/:\d+$/, "") : null;
 }
 
-export async function fileAccessView(applicationId: string, ownerId: string): Promise<FileAccessView> {
+export async function fileAccessView(
+    applicationId: string,
+    ownerId: string
+): Promise<FileAccessView> {
     const service = await serviceOf(applicationId, ownerId);
     const [accounts, server] = await Promise.all([
         prisma.fileAccessAccount.findMany({
             where: { applicationId },
             orderBy: { createdAt: "asc" },
-            select: { id: true, username: true, readOnly: true, passwordCipher: true, publicKey: true, createdAt: true }
+            select: {
+                id: true,
+                username: true,
+                readOnly: true,
+                passwordCipher: true,
+                publicKey: true,
+                createdAt: true
+            }
         }),
         prisma.fileAccessServer.findUnique({ where: { applicationId } })
     ]);
@@ -231,7 +255,8 @@ async function portFor(service: ServiceRow): Promise<number> {
     );
     let port = core.fileAccessPortFor(parseInt(shortHash(service.id, 4), 16));
     const span = core.FILE_ACCESS_PORTS.to - core.FILE_ACCESS_PORTS.from + 1;
-    for (let tries = 0; tries < span && taken.has(port); tries++) port = core.nextFileAccessPort(port);
+    for (let tries = 0; tries < span && taken.has(port); tries++)
+        port = core.nextFileAccessPort(port);
     if (taken.has(port)) throw new FileAccessError("fileAccess.portsFull");
     return port;
 }
@@ -250,7 +275,11 @@ function oneAtATime(applicationId: string, work: () => Promise<void>): Promise<v
 }
 
 /** Take a service's server down on one target. */
-async function composeDownOn(target: TargetRow, applicationId: string, ownerId: string): Promise<void> {
+async function composeDownOn(
+    target: TargetRow,
+    applicationId: string,
+    ownerId: string
+): Promise<void> {
     const ports = await getPorts(target, ownerId);
     try {
         await ports.composeDown(core.fileAccessProject(shortHash(applicationId, 8)));
@@ -267,7 +296,11 @@ async function composeDownOn(target: TargetRow, applicationId: string, ownerId: 
  * `without` is an account about to be removed: the server is started without
  * it first, so its row goes only once it can no longer sign in.
  */
-export async function syncFileAccess(applicationId: string, ownerId: string, without?: string): Promise<void> {
+export async function syncFileAccess(
+    applicationId: string,
+    ownerId: string,
+    without?: string
+): Promise<void> {
     const service = await serviceOf(applicationId, ownerId);
     const accounts = await prisma.fileAccessAccount.findMany({
         where: { applicationId, ...(without ? { id: { not: without } } : {}) },
@@ -283,7 +316,10 @@ export async function syncFileAccess(applicationId: string, ownerId: string, wit
         });
         if (previous) {
             await composeDownOn(previous, applicationId, ownerId).catch((error) =>
-                console.error(`polaris: the SFTP server of service ${applicationId} was not taken down on its old server:`, error)
+                console.error(
+                    `polaris: the SFTP server of service ${applicationId} was not taken down on its old server:`,
+                    error
+                )
             );
         }
         await prisma.fileAccessServer.deleteMany({ where: { applicationId } });
@@ -302,13 +338,18 @@ export async function syncFileAccess(applicationId: string, ownerId: string, wit
         if (refusal) {
             if (existing) {
                 await ports.composeDown(project);
-                await prisma.fileAccessServer.update({ where: { applicationId }, data: { lastError: refusal, startedAt: null } });
+                await prisma.fileAccessServer.update({
+                    where: { applicationId },
+                    data: { lastError: refusal, startedAt: null }
+                });
             }
             throw new FileAccessError(refusal);
         }
         const port = existing?.port ?? (await portFor(service));
         if (!existing) {
-            await prisma.fileAccessServer.create({ data: { applicationId, targetId: service.target.id, port } });
+            await prisma.fileAccessServer.create({
+                data: { applicationId, targetId: service.target.id, port }
+            });
         }
         const spec = fileAccessSpec({
             service,
@@ -324,7 +365,10 @@ export async function syncFileAccess(applicationId: string, ownerId: string, wit
             await ports.composeUp(spec);
         } catch (error) {
             console.error("polaris: the SFTP server did not start:", error);
-            await prisma.fileAccessServer.update({ where: { applicationId }, data: { lastError: FILE_ACCESS_START_FAILED } });
+            await prisma.fileAccessServer.update({
+                where: { applicationId },
+                data: { lastError: FILE_ACCESS_START_FAILED }
+            });
             throw new FileAccessError(FILE_ACCESS_START_FAILED, { port });
         }
         await prisma.fileAccessServer.update({
@@ -343,10 +387,16 @@ export async function syncFileAccess(applicationId: string, ownerId: string, wit
  */
 export async function refreshFileAccess(applicationId: string, ownerId: string): Promise<void> {
     try {
-        const running = await prisma.fileAccessServer.findUnique({ where: { applicationId }, select: { applicationId: true } });
+        const running = await prisma.fileAccessServer.findUnique({
+            where: { applicationId },
+            select: { applicationId: true }
+        });
         if (running) await oneAtATime(applicationId, () => syncFileAccess(applicationId, ownerId));
     } catch (error) {
-        console.error(`polaris: the SFTP server of service ${applicationId} was not started again:`, error);
+        console.error(
+            `polaris: the SFTP server of service ${applicationId} was not started again:`,
+            error
+        );
     }
 }
 
@@ -357,7 +407,10 @@ export async function refreshFileAccess(applicationId: string, ownerId: string):
  * logged and never holds up the delete.
  */
 export async function takeDownFileAccess(applicationId: string, ownerId: string): Promise<void> {
-    const running = await prisma.fileAccessServer.findUnique({ where: { applicationId }, select: { applicationId: true } });
+    const running = await prisma.fileAccessServer.findUnique({
+        where: { applicationId },
+        select: { applicationId: true }
+    });
     if (!running) return;
     try {
         await oneAtATime(applicationId, async () => {
@@ -366,7 +419,10 @@ export async function takeDownFileAccess(applicationId: string, ownerId: string)
             await prisma.fileAccessServer.deleteMany({ where: { applicationId } });
         });
     } catch (error) {
-        console.error(`polaris: the SFTP server of service ${applicationId} was not taken down:`, error);
+        console.error(
+            `polaris: the SFTP server of service ${applicationId} was not taken down:`,
+            error
+        );
     }
 }
 
@@ -404,9 +460,13 @@ export async function createFileAccessAccount(
         } catch (error) {
             // The first account of a server that never started is not kept: it
             // would read as access that does not exist.
-            const others = await prisma.fileAccessAccount.count({ where: { applicationId, id: { not: created.id } } });
+            const others = await prisma.fileAccessAccount.count({
+                where: { applicationId, id: { not: created.id } }
+            });
             if (others === 0) {
-                await prisma.fileAccessAccount.delete({ where: { id: created.id } }).catch(() => undefined);
+                await prisma.fileAccessAccount
+                    .delete({ where: { id: created.id } })
+                    .catch(() => undefined);
                 await syncFileAccess(applicationId, ownerId).catch(() => undefined);
             }
             throw error;
@@ -419,9 +479,16 @@ export async function createFileAccessAccount(
  * after, so an account the server could not be told about stays listed - it
  * can still sign in - and can be removed again.
  */
-export async function deleteFileAccessAccount(applicationId: string, ownerId: string, accountId: string): Promise<void> {
+export async function deleteFileAccessAccount(
+    applicationId: string,
+    ownerId: string,
+    accountId: string
+): Promise<void> {
     await oneAtATime(applicationId, async () => {
-        const account = await prisma.fileAccessAccount.findFirst({ where: { id: accountId, applicationId }, select: { id: true } });
+        const account = await prisma.fileAccessAccount.findFirst({
+            where: { id: accountId, applicationId },
+            select: { id: true }
+        });
         if (!account) throw new FileAccessError("fileAccess.accountGone");
         try {
             await syncFileAccess(applicationId, ownerId, account.id);

@@ -25,16 +25,24 @@ describe("suggestTuning", () => {
         expect(small.shared_buffers).toBe("64MB");
         expect(small.work_mem).toBe("4MB");
         expect(small.maintenance_work_mem).toBe("16MB");
-        expect(byName(tuning.suggestTuning("postgres", 262144)).maintenance_work_mem).toBe("2048MB");
+        expect(byName(tuning.suggestTuning("postgres", 262144)).maintenance_work_mem).toBe(
+            "2048MB"
+        );
     });
 
     it("sizes InnoDB's pool in 128 MB chunks below 1 GB and whole gigabytes above, so the engine never rounds it up", () => {
         const values = byName(tuning.suggestTuning("mysql", 8192));
         expect(Number(values.innodb_buffer_pool_size) / (1024 * 1024)).toBe(5120);
         expect(Number(values.innodb_buffer_pool_size) % (8 * 128 * 1024 * 1024)).toBe(0);
-        expect(byName(tuning.suggestTuning("mysql", 2048)).innodb_buffer_pool_size).toBe(String(1024 * 1024 * 1024));
-        expect(byName(tuning.suggestTuning("mysql", 1536)).innodb_buffer_pool_size).toBe(String(768 * 1024 * 1024));
-        expect(byName(tuning.suggestTuning("mysql", 512)).innodb_buffer_pool_size).toBe(String(256 * 1024 * 1024));
+        expect(byName(tuning.suggestTuning("mysql", 2048)).innodb_buffer_pool_size).toBe(
+            String(1024 * 1024 * 1024)
+        );
+        expect(byName(tuning.suggestTuning("mysql", 1536)).innodb_buffer_pool_size).toBe(
+            String(768 * 1024 * 1024)
+        );
+        expect(byName(tuning.suggestTuning("mysql", 512)).innodb_buffer_pool_size).toBe(
+            String(256 * 1024 * 1024)
+        );
     });
 });
 
@@ -46,8 +54,12 @@ describe("reading", () => {
 
     it("reads only the tuned settings", () => {
         expect(tuning.readTuningCommand(pg).argv.at(-1)).toContain("'shared_buffers'");
-        expect(tuning.parseTuning("postgres", "shared_buffers|128MB\nfsync|on\n")).toEqual({ shared_buffers: "128MB" });
-        expect(tuning.parseTuning("mysql", "max_connections\t151\n")).toEqual({ max_connections: "151" });
+        expect(tuning.parseTuning("postgres", "shared_buffers|128MB\nfsync|on\n")).toEqual({
+            shared_buffers: "128MB"
+        });
+        expect(tuning.parseTuning("mysql", "max_connections\t151\n")).toEqual({
+            max_connections: "151"
+        });
     });
 });
 
@@ -64,15 +76,27 @@ describe("applyTuningCommands", () => {
     });
 
     it("uses SET PERSIST_ONLY on MySQL and refuses MariaDB", () => {
-        const [command] = tuning.applyTuningCommands(my, [{ name: "max_connections", value: "151" }]);
+        const [command] = tuning.applyTuningCommands(my, [
+            { name: "max_connections", value: "151" }
+        ]);
         expect(command.argv.at(-1)).toBe("SET PERSIST_ONLY max_connections = 151;");
-        expect(() => tuning.applyTuningCommands(maria, [{ name: "max_connections", value: "151" }])).toThrow(/MariaDB/);
+        expect(() =>
+            tuning.applyTuningCommands(maria, [{ name: "max_connections", value: "151" }])
+        ).toThrow(/MariaDB/);
     });
 
     it("refuses names it does not tune and values of the wrong shape", () => {
-        expect(() => tuning.applyTuningCommands(pg, [{ name: "archive_command", value: "1" }])).toThrow();
-        expect(() => tuning.applyTuningCommands(pg, [{ name: "work_mem", value: "4MB'; DROP" }])).toThrow();
-        expect(() => tuning.applyTuningCommands(my, [{ name: "max_connections", value: "1; DROP" }])).toThrow();
-        expect(() => tuning.applyTuningCommands(my, [{ name: "max_connections", value: "64MB" }])).toThrow();
+        expect(() =>
+            tuning.applyTuningCommands(pg, [{ name: "archive_command", value: "1" }])
+        ).toThrow();
+        expect(() =>
+            tuning.applyTuningCommands(pg, [{ name: "work_mem", value: "4MB'; DROP" }])
+        ).toThrow();
+        expect(() =>
+            tuning.applyTuningCommands(my, [{ name: "max_connections", value: "1; DROP" }])
+        ).toThrow();
+        expect(() =>
+            tuning.applyTuningCommands(my, [{ name: "max_connections", value: "64MB" }])
+        ).toThrow();
     });
 });

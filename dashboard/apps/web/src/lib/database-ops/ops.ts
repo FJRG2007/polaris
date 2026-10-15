@@ -15,7 +15,11 @@ import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import type { RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
-import { databaseClusterNodes, databaseCredentials, type DbCredentials } from "@/lib/database-service";
+import {
+    databaseClusterNodes,
+    databaseCredentials,
+    type DbCredentials
+} from "@/lib/database-service";
 import {
     readinessCommand,
     isManagedEngine,
@@ -73,13 +77,23 @@ export class DatabaseOperationError extends Error {
  * Resolve an instance the owner holds, with its container and both accounts.
  * Refuses one that has never been deployed: there is no container to act in.
  */
-export async function instanceContext(databaseId: string, ownerId: string): Promise<InstanceContext> {
+export async function instanceContext(
+    databaseId: string,
+    ownerId: string
+): Promise<InstanceContext> {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
         include: {
             target: true,
             parent: {
-                select: { id: true, containerName: true, topology: true, members: true, shards: true, readReplicas: true }
+                select: {
+                    id: true,
+                    containerName: true,
+                    topology: true,
+                    members: true,
+                    shards: true,
+                    readReplicas: true
+                }
             }
         }
     });
@@ -88,7 +102,8 @@ export async function instanceContext(databaseId: string, ownerId: string): Prom
         throw new DatabaseOperationError(`Polaris cannot look after a ${row.engine} instance.`);
     }
     const container = row.parent ? row.parent.containerName : row.containerName;
-    if (!container) throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
+    if (!container)
+        throw new DatabaseOperationError("Deploy this database first - it has no container yet.");
     const own = await databaseCredentials(row.id, ownerId);
     const admin = row.parent ? await databaseCredentials(row.parent.id, ownerId) : own;
     const topology = resolveTopology(row.parent ?? row);
@@ -151,7 +166,10 @@ export async function runWithin(
 ): Promise<{ code: number; output: string }> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`It did not finish within ${limitMs / 60_000} minutes.`)), limitMs);
+        timer = setTimeout(
+            () => reject(new Error(`It did not finish within ${limitMs / 60_000} minutes.`)),
+            limitMs
+        );
     });
     try {
         return await Promise.race([
@@ -221,7 +239,9 @@ export async function stageInto(
     onProgress?: (done: number, total: number) => void
 ): Promise<void> {
     if (!ports.writeFile) {
-        throw new DatabaseOperationError("This server cannot receive files yet. Update Polaris and try again.");
+        throw new DatabaseOperationError(
+            "This server cannot receive files yet. Update Polaris and try again."
+        );
     }
     const { size } = await stat(localPath);
     const body = createReadStream(localPath);
@@ -298,7 +318,10 @@ export async function startOperation(
         progress: async (done, total) => {
             await prisma.databaseOperation.update({
                 where: { id: row.id },
-                data: { doneBytes: BigInt(Math.max(0, Math.floor(done))), ...(total != null ? { totalBytes: BigInt(total) } : {}) }
+                data: {
+                    doneBytes: BigInt(Math.max(0, Math.floor(done))),
+                    ...(total != null ? { totalBytes: BigInt(total) } : {})
+                }
             });
         },
         succeed: async () => {

@@ -17,8 +17,12 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 
-async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
-    if (caught instanceof access.FileAccessError) return { error: await refusal(caught.message, caught.params) ?? (await reply(fallback)) };
+async function failure(
+    caught: unknown,
+    fallback: NamespaceKey<"deployServer">
+): Promise<{ error: string }> {
+    if (caught instanceof access.FileAccessError)
+        return { error: (await refusal(caught.message, caught.params)) ?? (await reply(fallback)) };
     console.error("polaris: an SFTP account action failed:", caught);
     return { error: await reply(fallback) };
 }
@@ -33,7 +37,9 @@ async function refusal(key: string, params?: core.MessageParams): Promise<string
 async function accountIssue(error: { issues: readonly { message: string }[] }): Promise<string> {
     const t = await getTranslations("deployData");
     const key = error.issues[0]?.message;
-    return key && t.has(key) ? t(key as NamespaceKey<"deployData">) : reply("fileAccess.saveFailed");
+    return key && t.has(key)
+        ? t(key as NamespaceKey<"deployData">)
+        : reply("fileAccess.saveFailed");
 }
 
 const idSchema = z.string().uuid();
@@ -49,7 +55,9 @@ export async function fileAccessAction(
         const view = await access.fileAccessView(parsed.data, granted.ownerId);
         const lastError = view.server?.lastError;
         if (!view.server || !lastError) return { view };
-        const said = (await refusal(lastError, { port: view.server.port })) ?? (await reply("fileAccess.startFailed", { port: view.server.port }));
+        const said =
+            (await refusal(lastError, { port: view.server.port })) ??
+            (await reply("fileAccess.startFailed", { port: view.server.port }));
         return { view: { ...view, server: { ...view.server, lastError: said } } };
     } catch (caught) {
         return failure(caught, "fileAccess.loadFailed");
@@ -90,12 +98,22 @@ export async function deleteFileAccessAccountAction(
     applicationId: string,
     accountId: string
 ): Promise<{ error?: string }> {
-    const parsed = z.object({ applicationId: idSchema, accountId: idSchema }).safeParse({ applicationId, accountId });
+    const parsed = z
+        .object({ applicationId: idSchema, accountId: idSchema })
+        .safeParse({ applicationId, accountId });
     if (!parsed.success) return { error: await reply("fileAccess.removeFailed") };
     try {
         const user = await requirePermission("deploy.manage");
-        const granted = await requireApplicationAccess(parsed.data.applicationId, user.id, "files.write");
-        await access.deleteFileAccessAccount(parsed.data.applicationId, granted.ownerId, parsed.data.accountId);
+        const granted = await requireApplicationAccess(
+            parsed.data.applicationId,
+            user.id,
+            "files.write"
+        );
+        await access.deleteFileAccessAccount(
+            parsed.data.applicationId,
+            granted.ownerId,
+            parsed.data.accountId
+        );
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.fileAccess.delete",

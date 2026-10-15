@@ -16,7 +16,14 @@ vi.mock("@/app/(app)/apps/deploy/file-access-actions", () => ({
     fileAccessAction: async () => ({
         view: {
             accounts: [
-                { id: "a1", username: "deploy", readOnly: true, hasPassword: true, hasKey: false, createdAt: "2026-10-01T00:00:00.000Z" }
+                {
+                    id: "a1",
+                    username: "deploy",
+                    readOnly: true,
+                    hasPassword: true,
+                    hasKey: false,
+                    createdAt: "2026-10-01T00:00:00.000Z"
+                }
             ],
             folders: ["uploads"],
             server: { host: "192.168.1.10", port: 42222, lastError: null, startedAt: null }

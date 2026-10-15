@@ -76,7 +76,8 @@ export function TuningSection({
         void load();
     }, [load]);
 
-    const differs = (entry: View["settings"][number]) => settingDiffers(entry.current, entry.suggested);
+    const differs = (entry: View["settings"][number]) =>
+        settingDiffers(entry.current, entry.suggested);
     const changes = view ? view.settings.filter(differs) : [];
     const memory = view ? readableSetting(String(view.ramMb * 1024 * 1024)) : "";
 
@@ -108,20 +109,30 @@ export function TuningSection({
                         <table className="w-full text-sm">
                             <thead className="text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="p-2 font-medium">{t("database.tuning.setting")}</th>
-                                    <th className="p-2 font-medium">{t("database.tuning.current")}</th>
-                                    <th className="p-2 font-medium">{t("database.tuning.suggested")}</th>
+                                    <th className="p-2 font-medium">
+                                        {t("database.tuning.setting")}
+                                    </th>
+                                    <th className="p-2 font-medium">
+                                        {t("database.tuning.current")}
+                                    </th>
+                                    <th className="p-2 font-medium">
+                                        {t("database.tuning.suggested")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {view.settings.map((entry) => (
                                     <tr key={entry.name}>
-                                        <td className="break-all p-2 font-mono text-xs">{entry.name}</td>
+                                        <td className="break-all p-2 font-mono text-xs">
+                                            {entry.name}
+                                        </td>
                                         <td className="p-2">{readableSetting(entry.current)}</td>
                                         <td className="p-2">
                                             <span className="inline-flex flex-wrap items-center gap-2">
                                                 {readableSetting(entry.suggested)}
-                                                {differs(entry) ? <Badge>{t("database.tuning.changes")}</Badge> : null}
+                                                {differs(entry) ? (
+                                                    <Badge>{t("database.tuning.changes")}</Badge>
+                                                ) : null}
                                             </span>
                                         </td>
                                     </tr>
@@ -138,14 +149,17 @@ export function TuningSection({
                             <Button
                                 size="sm"
                                 disabled={changes.length === 0}
-                                title={changes.length === 0 ? t("database.tuning.upToDate") : undefined}
+                                title={
+                                    changes.length === 0 ? t("database.tuning.upToDate") : undefined
+                                }
                                 onClick={() =>
                                     ask({
                                         title: t("database.tuning.applyTitle"),
                                         body: t("database.tuning.applyBody"),
                                         label: t("database.tuning.applyConfirm"),
                                         run: async () => {
-                                            const result = await actions.applyDatabaseTuningAction(databaseId);
+                                            const result =
+                                                await actions.applyDatabaseTuningAction(databaseId);
                                             if (!result.error) await load();
                                             return result;
                                         }
