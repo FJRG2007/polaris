@@ -597,3 +597,32 @@ describe("moveForgettable", () => {
         expect(plan.moveForgettable({ ...failed, copySettled: true })).toBe(true);
     });
 });
+
+describe("which volumes still reach a moved original", () => {
+    it("scopes a named volume to its own app, so another app's \"data\" is not the same files", () => {
+        const where = plan.volumesReaching(
+            { kind: "volume", source: "data", connectionId: null },
+            { applicationId: "app-ark", dockerName: "polaris-dad2fc8a_data" }
+        );
+        expect(where).toEqual({
+            kind: "volume",
+            connectionId: null,
+            OR: [
+                {
+                    applicationId: "app-ark",
+                    OR: [{ source: { in: ["data"] } }, { source: null, name: { in: ["data"] } }]
+                },
+                { source: "polaris-dad2fc8a_data" }
+            ]
+        });
+    });
+
+    it("still matches folders by path, whichever app mounts them", () => {
+        const where = plan.volumesReaching(
+            { kind: "nas", source: "games/ark", connectionId: "nas-1" },
+            { applicationId: "app-ark", dockerName: undefined }
+        );
+        expect(where.OR).not.toContainEqual(expect.objectContaining({ applicationId: "app-ark" }));
+        expect(where.OR).toContainEqual({ source: { startsWith: "games/ark/" } });
+    });
+});
