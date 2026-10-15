@@ -111,6 +111,20 @@ describe("cancelling a deploy that is running", () => {
         expect(updates.some((update) => update.data.status === "cancelled")).toBe(true);
     });
 
+    it("never promotes a release whose cancel reached the row before its own verdict", async () => {
+        // The cancel landed between the runner's abort check and its write - or came
+        // from a process whose signal this one never sees. The row already says
+        // cancelled, so the runner's verdict is refused, and promoting anyway is what
+        // left a cancelled deploy marked as the service's active release.
+        const finished = executeDeployment("dep-4", TARGET as never, "owner-1", async () => {
+            if (row) row.status = "cancelled";
+            return { ok: true, imageTag: "img:4" };
+        });
+        await finished;
+
+        expect(promoted).not.toHaveBeenCalled();
+    });
+
     it("does not start a deploy that was cancelled while it waited its turn", async () => {
         // The queue is FIFO per target, so a deploy can be cancelled before anything has
         // happened. Starting it then would ignore the operator outright.

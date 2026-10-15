@@ -75,6 +75,18 @@ describe("serviceRunState", () => {
         expect(serviceRunState({ ...base, deployStatus: null })).toBe("never");
         expect(serviceRunState({ ...base, deployStatus: "failed" })).toBe("failed");
     });
+
+    it("reads a cancelled release with nothing before it as not running, never as failed", () => {
+        expect(serviceRunState({ ...base, deployStatus: "cancelled", lastSampleAt: null })).toBe(
+            "stopped"
+        );
+    });
+
+    it("reads the release that serves, not a newer deploy somebody stopped", () => {
+        // The deploy statuses hand over the serving release once the build is no
+        // longer in flight: a cancelled newer row changes nothing about it.
+        expect(serviceRunState({ ...base, deployStatus: "running" })).toBe("running");
+    });
 });
 
 describe("deployOutcome", () => {

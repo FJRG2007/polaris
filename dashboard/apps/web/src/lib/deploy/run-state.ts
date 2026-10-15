@@ -60,8 +60,10 @@ export function serviceRunState(input: RunStateInput): ServiceRunState {
     if (input.desiredState === "stopped") return "stopped";
     if (input.asleep) return "sleeping";
     const status = input.deployStatus.toLowerCase();
-    if (status === "stopped" || status === "removed") return "stopped";
-    if (FAILED_DEPLOY_STATUSES.includes(status) || status === "cancelled") return "failed";
+    // A cancelled release was never promoted, so a service only reads it when no
+    // earlier release serves: nothing is running, and nothing went wrong either.
+    if (status === "stopped" || status === "removed" || status === "cancelled") return "stopped";
+    if (FAILED_DEPLOY_STATUSES.includes(status)) return "failed";
     if (!input.collectorAlive) return "running";
     if (input.lastSampleAt && input.now - input.lastSampleAt.getTime() < RECENT_SAMPLE_MS)
         return "running";

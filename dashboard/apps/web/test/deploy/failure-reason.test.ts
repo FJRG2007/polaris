@@ -13,8 +13,17 @@ import {
     deployFailureReason,
     NO_REASON,
     RESTARTED_REASON,
+    stoppedByHand,
     timedOutReason
 } from "@/lib/deploy/failure-reason";
+
+describe("a deploy stopped by hand", () => {
+    it("is a cancel with the cancel's reason, not one a deadline stopped", () => {
+        expect(stoppedByHand("cancelled", CANCELED_REASON)).toBe(true);
+        expect(stoppedByHand("cancelled", timedOutReason(60))).toBe(false);
+        expect(stoppedByHand("failed", CANCELED_REASON)).toBe(false);
+    });
+});
 
 describe("reading a stored deploy reason", () => {
     it("recognises a deploy cut off by a restart, as old rows stored it", () => {

@@ -41,6 +41,14 @@ export const UNSUCCESSFUL_DEPLOY_STATUSES: readonly string[] = [
 ];
 
 /**
+ * Whether a deployment was stopped on purpose by someone, rather than by a
+ * deadline or a fault: nothing went wrong, so nothing is offered to fix.
+ */
+export function stoppedByHand(status: string, error: string | null | undefined): boolean {
+    return status === "cancelled" && (error?.trim() ?? "") === CANCELED_REASON;
+}
+
+/**
  * Read a deployment's stored reason. Null when the deployment did not fail, or when
  * it ended without going live for a reason it does not carry and no wording is
  * owed (a rollback that never wrote one).

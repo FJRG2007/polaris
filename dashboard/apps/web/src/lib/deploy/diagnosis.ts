@@ -12,6 +12,7 @@ import { prisma } from "@polaris/db";
 import { open } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { deployLogPath } from "./log-file";
+import { stoppedByHand } from "./failure-reason";
 import { setEnvVar } from "@/lib/env-var-service";
 import type { DeployFixInput } from "@polaris/core";
 import { diagnoseDeploy, normalizeRoot, type Diagnosis } from "@polaris/deploy";
@@ -22,6 +23,12 @@ const LOG_TAIL_BYTES = 256 * 1024;
 
 /** The deploy statuses a diagnosis is offered for. */
 const FAILED = new Set(["failed", "cancelled"]);
+
+/** A deploy somebody stopped on purpose has nothing to diagnose; one stopped by
+ *  its deadline may well have, so it is still offered. */
+export function diagnosable(status: string, error: string | null): boolean {
+    return FAILED.has(status) && !stoppedByHand(status, error);
+}
 
 /** The last `LOG_TAIL_BYTES` of a deploy's log, or "" when there is none. */
 async function logTail(deploymentId: string): Promise<string> {
@@ -45,7 +52,7 @@ async function failedDeployment(deploymentId: string) {
         where: { id: deploymentId },
         select: { id: true, status: true, error: true, deployableType: true, deployableId: true }
     });
-    return deployment && FAILED.has(deployment.status) ? deployment : null;
+    return deployment && diagnosable(deployment.status, deployment.error) ? deployment : null;
 }
 
 type FailedDeployment = NonNullable<Awaited<ReturnType<typeof failedDeployment>>>;
