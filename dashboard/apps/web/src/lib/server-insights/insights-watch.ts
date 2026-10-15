@@ -9,9 +9,11 @@
  * rollups are written - no timer of its own. Each unusual stretch is told once,
  * when it starts: a watermark of the latest start already told is kept in
  * settings, and on the very first run only the last few hours count, so turning
- * this on does not replay a week of history into the bell. A disk forecast is
- * told when it first crosses the warning line and again only after it has gone
- * back above it.
+ * this on does not replay a week of history into the bell. A metric that keeps
+ * flapping on one server is told at most once per cooldown, however many new
+ * stretches it starts. A disk forecast is told when it first crosses the warning
+ * line and again only once it has gone well back above it, so a forecast
+ * wavering around the line is not told every hour.
  */
 
 import { formatBytes } from "@polaris/core";
@@ -21,14 +23,27 @@ import { getLocalServerName, LOCAL_SERVER_FALLBACK_NAME } from "@/lib/local-serv
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { hostRouteId, LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
-import { readServerInsights, type InsightAnomaly, type InsightMetric, type ServerInsight } from "./insights";
+import {
+    FORECAST_WARN_DAYS,
+    readServerInsights,
+    type InsightAnomaly,
+    type InsightMetric,
+    type ServerInsight
+} from "./insights";
 
 const WATERMARK_KEY = "servers.insights.watermark";
 const WARNED_KEY = "servers.insights.diskWarned";
+const TOLD_KEY = "servers.insights.lastTold";
 const HOUR_MS = 3_600_000;
 
 /** How far back the first run looks, so a fresh install is not told a week at once. */
 const FIRST_RUN_MS = 3 * HOUR_MS;
+
+/** The least time between two notices about the same metric on the same server. */
+export const ANOMALY_COOLDOWN_MS = 6 * HOUR_MS;
+
+/** A disk warning, once told, is only cleared past this many days to full. */
+const FORECAST_CLEAR_DAYS = FORECAST_WARN_DAYS * 2;
 
 /** A metric's value as it is said in a notice. */
 function sayValue(metric: InsightMetric, value: number): string {
@@ -49,6 +64,51 @@ export function freshAnomalies(
         }
     }
     return fresh;
+}
+
+/** At most one stretch per metric per server, the newest, and none for a metric
+ *  told within the cooldown. Pure. */
+export function throttleAnomalies(
+    subject: string,
+    anomalies: readonly InsightAnomaly[],
+    lastTold: ReadonlyMap<string, number>,
+    now: number
+): InsightAnomaly[] {
+    const newest = new Map<InsightMetric, InsightAnomaly>();
+    for (const anomaly of anomalies) {
+        const kept = newest.get(anomaly.metric);
+        if (!kept || anomaly.start > kept.start) newest.set(anomaly.metric, anomaly);
+    }
+    return [...newest.values()].filter((anomaly) => {
+        const told = lastTold.get(`${subject}:${anomaly.metric}`);
+        return told === undefined || now - told >= ANOMALY_COOLDOWN_MS;
+    });
+}
+
+/** Whether a disk warned about before still counts as warned: until its forecast
+ *  is comfortably clear of the line, not merely a day past it. Pure. */
+export function stillWarned(insight: ServerInsight, warnedBefore: boolean): boolean {
+    if (insight.diskWarning) return true;
+    if (!warnedBefore) return false;
+    return insight.forecast.kind === "filling" && insight.forecast.days <= FORECAST_CLEAR_DAYS;
+}
+
+async function readLastTold(now: number): Promise<Map<string, number>> {
+    const raw = await getSetting(TOLD_KEY).catch(() => null);
+    const told = new Map<string, number>();
+    try {
+        const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            for (const [key, value] of Object.entries(parsed)) {
+                // Past the cooldown an entry decides nothing, so it is dropped here
+                // and the setting stays the size of what is currently cooling down.
+                if (typeof value === "number" && now - value < ANOMALY_COOLDOWN_MS) told.set(key, value);
+            }
+        }
+    } catch {
+        // A damaged record only costs a cooldown.
+    }
+    return told;
 }
 
 async function readWarned(): Promise<Set<string>> {
@@ -127,6 +187,7 @@ export async function watchServerInsights(now = new Date()): Promise<void> {
     const rawMark = await getSetting(WATERMARK_KEY).catch(() => null);
     const watermark = rawMark && Number.isFinite(Number(rawMark)) ? Number(rawMark) : null;
     const warned = await readWarned();
+    const lastTold = await readLastTold(now.getTime());
     const admins = (
         await prisma.user.findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } }).catch(() => [])
     ).map((user) => user.id);
@@ -147,9 +208,13 @@ export async function watchServerInsights(now = new Date()): Promise<void> {
         const insights = await readServerInsights(subjects.slice(index, index + CHUNK), now);
         const fresh = freshAnomalies(insights, watermark, now.getTime());
         for (const insight of insights) {
-            if (insight.diskWarning) nextWarned.push(insight.subject);
-            const anomalies = fresh.filter((one) => one.subject === insight.subject).map((one) => one.anomaly);
-            for (const anomaly of anomalies) latest = Math.max(latest, anomaly.start);
+            if (stillWarned(insight, warned.has(insight.subject))) nextWarned.push(insight.subject);
+            const started = fresh.filter((one) => one.subject === insight.subject).map((one) => one.anomaly);
+            // Everything that started moves the watermark, told or not: a stretch
+            // held back by the cooldown is not told later either.
+            for (const anomaly of started) latest = Math.max(latest, anomaly.start);
+            const anomalies = throttleAnomalies(insight.subject, started, lastTold, now.getTime());
+            for (const anomaly of anomalies) lastTold.set(`${insight.subject}:${anomaly.metric}`, now.getTime());
             const forecast = insight.diskWarning && !warned.has(insight.subject) ? insight.forecast : null;
             if (anomalies.length === 0 && !forecast) continue;
             const server = names.get(insight.subject) ?? "";
@@ -162,4 +227,5 @@ export async function watchServerInsights(now = new Date()): Promise<void> {
 
     await setSetting(WATERMARK_KEY, String(latest));
     await setSetting(WARNED_KEY, JSON.stringify(nextWarned));
+    await setSetting(TOLD_KEY, JSON.stringify(Object.fromEntries(lastTold)));
 }

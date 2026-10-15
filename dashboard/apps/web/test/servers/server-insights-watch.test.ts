@@ -43,6 +43,7 @@ vi.mock("@/lib/setting-store", () => ({
     }
 }));
 vi.mock("@/lib/server-insights/insights", () => ({
+    FORECAST_WARN_DAYS: 14,
     readServerInsights: async (subjects: string[]) => insights.filter((one) => subjects.includes(one.subject))
 }));
 
@@ -116,5 +117,32 @@ describe("watchServerInsights", () => {
         insights = [insight(HOST, [], true)];
         await watchServerInsights(NOW);
         expect(told.filter((one) => one.event === "server.forecast")).toHaveLength(2);
+    });
+
+    it("tells a flapping metric once per cooldown, and the newest stretch of a run only", async () => {
+        insights = [insight(HOST, [NOW.getTime() - 2 * HOUR, NOW.getTime() - HOUR])];
+        await watchServerInsights(NOW);
+        expect(told.filter((one) => one.event === "server.anomaly")).toHaveLength(1);
+        insights = [insight(HOST, [NOW.getTime() + HOUR])];
+        await watchServerInsights(new Date(NOW.getTime() + 2 * HOUR));
+        expect(told.filter((one) => one.event === "server.anomaly")).toHaveLength(1);
+        insights = [insight(HOST, [NOW.getTime() + 7 * HOUR])];
+        await watchServerInsights(new Date(NOW.getTime() + 8 * HOUR));
+        expect(told.filter((one) => one.event === "server.anomaly")).toHaveLength(2);
+    });
+
+    it("does not warn again while a forecast wavers just past the line", async () => {
+        insights = [insight(HOST, [], true)];
+        await watchServerInsights(NOW);
+        insights = [
+            {
+                ...insight(HOST, [], false),
+                forecast: { kind: "filling", usedBytes: 80, totalBytes: 100, bytesPerDay: 1, spanDays: 5, days: 16 }
+            }
+        ];
+        await watchServerInsights(NOW);
+        insights = [insight(HOST, [], true)];
+        await watchServerInsights(NOW);
+        expect(told.filter((one) => one.event === "server.forecast")).toHaveLength(1);
     });
 });
