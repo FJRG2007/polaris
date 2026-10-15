@@ -5,6 +5,7 @@
  * The archive's layout, as cPanel writes it:
  *
  *   homedir/ or homedir.tar   the account's home; each site's document root is in it
+ *                             (a homedir.tar is checked and unpacked into homedir/)
  *   mysql/<db>.sql            one dump per database
  *   userdata/main             main_domain, addon and sub domains
  *   userdata/<domain>         one domain's settings, `documentroot:` among them
@@ -19,7 +20,7 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 
 /** A reason a backup was refused, worded for whoever uploaded it. */
 export class BackupRefusal extends Error {}
@@ -203,6 +204,27 @@ async function backupRoot(dir: string): Promise<string> {
 }
 
 /**
+ * A home folder the backup carries as `homedir.tar` instead of a folder: checked
+ * the same way as the backup itself, then unpacked into `<root>/homedir`, and the
+ * tar dropped so the scratch folder does not hold the site twice.
+ */
+async function unpackHomeTar(root: string): Promise<void> {
+    const tar = join(root, "homedir.tar");
+    const home = join(root, "homedir");
+    if (!(await exists(tar)) || (await exists(home))) return;
+    let listing: string;
+    try {
+        listing = await run("tar", ["-tvf", tar]);
+    } catch {
+        throw new BackupRefusal("The backup's home folder could not be read.");
+    }
+    checkListing(listing);
+    await mkdir(home, { recursive: true });
+    await run("tar", ["-xf", tar, "-C", home, "--no-same-owner", "--no-same-permissions"]);
+    await rm(tar, { force: true });
+}
+
+/**
  * Check and unpack a backup into a new scratch folder and answer its plan and
  * where its root is. The caller removes `dir` when it is done with it.
  */
@@ -236,6 +258,7 @@ export async function inspectCpanelBackup(archive: string): Promise<{ dir: strin
             dumps,
             hasHome: (await exists(join(root, "homedir"))) || (await exists(join(root, "homedir.tar")))
         });
+        await unpackHomeTar(root);
         return { dir, root, plan };
     } catch (error) {
         await rm(dir, { recursive: true, force: true });
