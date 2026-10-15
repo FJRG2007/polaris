@@ -17,6 +17,8 @@ import { Check, Copy, Download, Loader2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
 import { PROJECT_VISIBILITIES, type ProjectVisibility } from "@polaris/core";
+import { TagsEditor } from "../variable-groups";
+import { setProjectTagsAction } from "../variable-group-actions";
 import { exportProjectTemplateAction, setProjectVisibilityAction, updateProjectGeneralAction } from "../project-actions";
 
 const VISIBILITY_LABELS = {
@@ -32,6 +34,7 @@ const VISIBILITY_HINTS = {
 export function GeneralSection({ settings, canManage }: { settings: ProjectSettingsView; canManage: boolean }) {
     const router = useRouter();
     const t = useTranslations("deploySettings");
+    const tc = useTranslations("deployConfig");
     const [name, setName] = useState(settings.name);
     const [description, setDescription] = useState(settings.description);
     const [visibility, setVisibility] = useState<ProjectVisibility>(settings.visibility);
@@ -129,6 +132,14 @@ export function GeneralSection({ settings, canManage }: { settings: ProjectSetti
                         </div>
                     )}
                 </div>
+            </SettingsCard>
+
+            <SettingsCard title={tc("tags.title")}>
+                <TagsEditor
+                    tags={settings.tags}
+                    canEdit={canManage}
+                    onSave={(tags) => setProjectTagsAction({ projectId: settings.id, tags })}
+                />
             </SettingsCard>
 
             <SettingsCard title={t("general.visibility.title")} description={t(VISIBILITY_HINTS[visibility])}>

@@ -1,4 +1,5 @@
 import type { ServiceKind } from "./deploy-view";
+import { parseTags } from "@polaris/core";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { capabilitiesFor } from "@/lib/host-capabilities";
@@ -90,7 +91,8 @@ export default async function DeployPage() {
             deploying:
                 apps.filter((app) => isInFlightStatus(statuses[app.id])).length +
                 databases.filter((database) => isInFlightStatus(database.status)).length,
-            total: apps.length + databases.length
+            total: apps.length + databases.length,
+            tags: parseTags(project.tags)
         };
     });
 

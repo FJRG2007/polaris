@@ -77,7 +77,7 @@ import {
     type VariableDraft
 } from "@/lib/deploy/variable-changes";
 
-type Scope = "application" | "environment";
+type Scope = "application" | "environment" | "group";
 
 const NO_ROWS: EnvVarView[] = [];
 

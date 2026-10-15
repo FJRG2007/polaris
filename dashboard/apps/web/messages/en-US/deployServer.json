@@ -305,5 +305,16 @@
         "nameTaken": "This service already has an account with that name.",
         "breached": "That password appears in known data breaches. Pick another.",
         "accountGone": "That account is not there any more."
+    },
+    "variableGroups": {
+        "notFound": "That variable group is not there any more.",
+        "readOnly": "You can use this group but not change it.",
+        "otherShelf": "Only groups in this project's workspace can be linked.",
+        "tooMany": "A service can link up to 10 groups.",
+        "taken": "A group with that name already exists here.",
+        "failed": "That did not work. Try again.",
+        "nameRequired": "Give the group a name of up to 60 characters.",
+        "tagsInvalid": "Use up to 12 tags of up to 32 characters.",
+        "tagsFailed": "The tags were not saved. Try again."
     }
 }

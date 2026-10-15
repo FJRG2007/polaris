@@ -397,3 +397,75 @@ export const variableScopeSchema = z.object({
 export function variableTargetType(scope: "application" | "environment" | "group"): string {
     return scope === "group" ? "variable-group" : scope;
 }
+
+/** One resolved variable as a screen may show it: a secret's value never
+ *  travels, and neither does a group's value the reader may not read. */
+export type ResolvedVariableView = core.ResolvedVariable & { readonly isSecret: boolean };
+
+/**
+ * What one service runs with, layer by layer, as the screen shows it: linked
+ * groups in link order, then the environment's shared variables, then the
+ * service's own - the same order `mergedEnv` builds a container's environment
+ * in. Values come back only where they are plain and the reader may read their
+ * layer; everything else keeps its key and loses its value.
+ */
+export async function resolvedVariables(
+    actor: OrgActor,
+    applicationId: string,
+    environmentId: string
+): Promise<ResolvedVariableView[]> {
+    const links = await prisma.variableGroupLink.findMany({
+        where: { applicationId },
+        orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        select: { group: { select: { id: true, name: true, ownerId: true, orgId: true } } }
+    });
+    const rows = await prisma.envVar.findMany({
+        where: {
+            OR: [
+                { scopeType: "group", scopeId: { in: links.map((link) => link.group.id) } },
+                { scopeType: "environment", scopeId: environmentId },
+                { scopeType: "application", scopeId: applicationId }
+            ]
+        },
+        select: { scopeType: true, scopeId: true, key: true, value: true, isSecret: true }
+    });
+    const secret = new Set<string>();
+    const layerOf = (
+        source: core.VariableSource,
+        match: (row: (typeof rows)[number]) => boolean,
+        readable: boolean
+    ): core.VariableLayer => {
+        const values: Record<string, string | null> = {};
+        for (const row of rows) {
+            if (!match(row)) continue;
+            values[row.key] = row.isSecret || !readable ? null : row.value;
+        }
+        return { source, values };
+    };
+    const layers: core.VariableLayer[] = [];
+    for (const link of links) {
+        const rights = await rightsOn(actor, link.group);
+        layers.push(
+            layerOf(
+                { kind: "group", id: link.group.id, name: link.group.name },
+                (row) => row.scopeType === "group" && row.scopeId === link.group.id,
+                rights.canRead
+            )
+        );
+    }
+    layers.push(layerOf({ kind: "environment" }, (row) => row.scopeType === "environment", true));
+    layers.push(layerOf({ kind: "service" }, (row) => row.scopeType === "application", true));
+    // Whether the winning row is a secret, keyed by the layer it came from.
+    const sourceKey = (source: core.VariableSource): string =>
+        source.kind === "group" ? `group:${source.id}` : source.kind;
+    for (const row of rows) {
+        if (!row.isSecret) continue;
+        const kind =
+            row.scopeType === "group" ? `group:${row.scopeId}` : row.scopeType === "environment" ? "environment" : "service";
+        secret.add(`${kind}\u0000${row.key}`);
+    }
+    return core.layerVariables(layers).map((one) => ({
+        ...one,
+        isSecret: secret.has(`${sourceKey(one.source)}\u0000${one.key}`)
+    }));
+}

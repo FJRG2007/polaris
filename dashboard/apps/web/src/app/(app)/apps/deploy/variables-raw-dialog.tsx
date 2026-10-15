@@ -62,7 +62,7 @@ export function VariablesRawDialog({
     onClose,
     onUpdate
 }: {
-    scope: "application" | "environment";
+    scope: "application" | "environment" | "group";
     scopeId: string;
     rows: readonly VariableRow[];
     /** The changes staged so far, written into the text so Update keeps them. */
