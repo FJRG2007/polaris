@@ -127,14 +127,6 @@ function Tour({ ctx }: { ctx: SceneContext }) {
     return <Fragment key={index}>{TOUR[index]!.render(ctx)}</Fragment>;
 }
 
-/** A texture file as a server action hands it back: base64 PNG. */
-async function texture(): Promise<string> {
-    const bytes = new Uint8Array(await (await fetch(tour.SKIN_TEXTURE)).arrayBuffer());
-    let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return btoa(binary);
-}
-
 export const games = defineScene({
     id: "games",
     path: "/apps/games",
@@ -142,7 +134,7 @@ export const games = defineScene({
         ...gameInventory.actions?.(ctx),
         ...gameEvents.actions?.(ctx),
         readSkinAction: () => tour.survivalSkin(),
-        previewSkinAction: async () => ({ png: await texture(), model: "slim" }),
+        previewSkinAction: () => ({ png: tour.SKIN_TEXTURE, model: "slim" }),
         readSeasonalAction: () => tour.survivalSeasonal(),
         readGameStorageAction: () => tour.gameStorage()
     }),
@@ -156,7 +148,7 @@ export const games = defineScene({
         // Every server's page asks for its own tab bar.
         "GET /api/apps/installed/:id/nav": ({ url }) => {
             const id = url.pathname.split("/")[4];
-            const seed = gameServers(ctx).find((one) => one.id === id)!;
+            const seed = gameServers(ctx).find((one) => one.id === id) ?? gameServers(ctx)[0]!;
             return {
                 name: seed.name,
                 tabs: visibleGameTabs(SERVER_GRANTS, seed.game).map((one) => one.slug),

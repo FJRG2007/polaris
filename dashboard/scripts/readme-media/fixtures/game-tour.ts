@@ -11,6 +11,7 @@ import { translatorFor } from "@/lib/i18n/translate";
 import { localizeSetting } from "@/lib/apps/app-words";
 import type { AppSlot } from "@/lib/app-extensions/types";
 import { findApp, tunableEnvVars } from "@/lib/apps/catalog";
+import skinTexture from "../../../resources/default-skins/slim/ari.png";
 import { NO_SCHEDULE } from "../../../apps/game-servers/src/lib/minecraft/schedule";
 import type { InstalledAppDetail, InstalledAppSetting } from "@/lib/apps/install-service";
 import type { GameContext } from "../../../apps/game-servers/src/screens/installed/game-context";
@@ -233,6 +234,6 @@ export function survivalSkin() {
     };
 }
 
-/** The texture behind that skin: one of the game's own defaults, which the
- *  capture serves where the app stages them. */
-export const SKIN_TEXTURE = "/api/app-bundles/game-servers/current/assets/default-skins/slim/ari.png";
+/** The texture behind that skin: one of the game's own defaults, as base64 -
+ *  the bundler inlines the file as a data URL, so reading it needs no fetch. */
+export const SKIN_TEXTURE = skinTexture.slice(skinTexture.indexOf(",") + 1);
