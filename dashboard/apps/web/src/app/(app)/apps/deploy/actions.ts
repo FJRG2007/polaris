@@ -6,6 +6,7 @@
  * the owner's local target lazily, so a first deploy works with no server setup.
  */
 
+import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { z } from "zod";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
@@ -212,7 +213,7 @@ export async function deleteProjectAction(projectId: string): Promise<{ error?: 
         // thing itself.
         // Read before the delete: afterwards nothing is left to say whose it was.
         const orgId = (await deployTargetOrgId("project", projectId)) ?? undefined;
-        await deployService.deleteProject(projectId, user.id);
+        await recycleBin.binProject(projectId, user.id, user.id);
         await recordDeployAudit({
             actorId: user.id,
             orgId,
@@ -1144,7 +1145,7 @@ export async function deleteApplicationAction(applicationId: string): Promise<{ 
     const user = await requirePermission("deploy.manage");
     try {
         const access = await requireApplicationAccess(applicationId, user.id, "service.delete");
-        await deployService.deleteApplication(applicationId, access.ownerId);
+        await recycleBin.binApplication(applicationId, access.ownerId, user.id);
         await recordDeployAudit({
             actorId: user.id,
             orgId: access.orgId ?? undefined,

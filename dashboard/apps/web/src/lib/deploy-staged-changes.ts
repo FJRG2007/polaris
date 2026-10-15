@@ -19,9 +19,8 @@
  * the reason attached.
  */
 
+import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { prisma } from "@polaris/db";
-import { deleteDatabase } from "./database-service";
-import { deleteApplication } from "./deploy-service";
 import { deleteVolume } from "./deploy-volume-service";
 import {
     parseProjectFlags,
@@ -155,11 +154,11 @@ export async function discardAllStagedChanges(environmentId: string): Promise<vo
 /** Carry out one parked change against the real infrastructure. */
 async function applyOne(change: StagedChangeView, ownerId: string): Promise<void> {
     if (change.kind === "service.delete") {
-        await deleteApplication(change.targetId, ownerId);
+        await recycleBin.binApplication(change.targetId, ownerId, ownerId);
         return;
     }
     if (change.kind === "database.delete") {
-        await deleteDatabase(change.targetId, ownerId);
+        await recycleBin.binDatabase(change.targetId, ownerId, ownerId);
         return;
     }
     if (change.kind === "volume.delete") {

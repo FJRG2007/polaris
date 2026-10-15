@@ -148,7 +148,7 @@ const firewall: Adapter = {
     async capture(objectKey) {
         const [scopeType, scopeId] = splitKey(objectKey);
         const row = await prisma.wafRule.findUnique({ where: { scopeType_scopeId: { scopeType, scopeId } } });
-        if (!row) return { items: {} };
+        if (!row) return { items: {} as Body["items"] };
         const { id: _id, createdAt: _c, updatedAt: _u, scopeType: _t, scopeId: _s, ...rule } = row;
         const parsed = Object.fromEntries(
             Object.entries(rule).map(([field, value]) => {
@@ -160,7 +160,7 @@ const firewall: Adapter = {
                 }
             })
         );
-        return { items: { rule: parsed } };
+        return { items: { rule: parsed } as Body["items"] };
     },
     async apply(objectKey, body, actor) {
         const [scopeType, scopeId] = splitKey(objectKey);
@@ -171,7 +171,8 @@ const firewall: Adapter = {
         } else {
             await waf.setWafRule(actor.ownerId, scopeType as Parameters<typeof waf.setWafRule>[1], scopeId, rule as never);
         }
-        const { syncAppRoutes, syncDashboardRoute } = await import("@/lib/deploy-service");
+        const { syncAppRoutes } = await import("@/lib/deploy-service");
+        const { syncDashboardRoute } = await import("@/lib/domain-edge");
         if (scopeType === "polaris") await syncDashboardRoute().catch(() => undefined);
         else await syncAppRoutes().catch(() => undefined);
     }

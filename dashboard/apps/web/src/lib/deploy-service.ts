@@ -490,6 +490,10 @@ export async function getVolumeOwner(
  * container that outlived its project is exactly where this started.
  */
 async function tearDownEnvironment(environmentId: string, ownerId: string): Promise<void> {
+    // Whatever of it sits in the recycle bin goes too: its data is on the same
+    // servers, and the rows are about to cascade away with the environment.
+    await prisma.application.updateMany({ where: { environmentId }, data: { binnedAt: null, binnedById: null } });
+    await prisma.managedDatabase.updateMany({ where: { environmentId }, data: { binnedAt: null, binnedById: null } });
     const [databases, applications] = await Promise.all([
         prisma.managedDatabase.findMany({
             where: { environmentId },

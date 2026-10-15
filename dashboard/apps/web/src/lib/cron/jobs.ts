@@ -14,6 +14,8 @@
  * screens that sweep them lazily.
  */
 
+import { purgeRecycleBin } from "@/lib/deploy/recycle-bin";
+import { pruneOldRestorePoints } from "@/lib/restore-points/service";
 import { withLease } from "./lease";
 import { sweepTrash } from "@/lib/mailbox/trash";
 import { wakeSnoozed } from "@/lib/mailbox/messages";
@@ -251,6 +253,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: Number(process.env.POLARIS_APP_STORAGE_MS) || 5 * MINUTE,
         leaseMs: 10 * MINUTE,
         run: sweepAppStorage
+    },
+    {
+        key: "deploy-recycle-bin",
+        // Hourly. Retention is counted in days; a purge an hour late frees the
+        // same data. Each pass purges a bounded handful, so a large bin drains
+        // over several passes instead of holding one for long.
+        everyMs: HOUR,
+        leaseMs: 30 * MINUTE,
+        run: async () => ({ ...(await purgeRecycleBin()), ...(await pruneOldRestorePoints()) })
     },
     {
         key: "drive-jobs-prune",

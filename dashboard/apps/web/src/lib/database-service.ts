@@ -879,6 +879,24 @@ export async function deployDatabaseAndWait(
  * container by mistake can still get it back - `docker volume rm` is one command
  * away when they mean it, and unrecoverable when Polaris runs it for them.
  */
+/**
+ * Stop a database's own container for the recycle bin: the compose project comes
+ * down without its volumes, so the data is there when it is restored.
+ */
+export async function stopDatabaseForBin(databaseId: string, ownerId: string): Promise<void> {
+    const db = await prisma.managedDatabase.findFirst({
+        where: { id: databaseId, environment: { project: { ownerId } } },
+        include: { target: true }
+    });
+    if (!db) throw new Error("Database not found");
+    const ports = await getPorts(db.target as TargetRow, ownerId);
+    try {
+        await ports.composeDown(`polaris-db-${shortHash(db.id, 8)}`);
+    } finally {
+        await ports.dispose();
+    }
+}
+
 export async function deleteDatabase(databaseId: string, ownerId: string): Promise<void> {
     const db = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
