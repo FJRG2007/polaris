@@ -643,11 +643,22 @@
             },
             "library": {
                 "blank": "Vacía",
+                "sshHardened": "SSH reforzado",
+                "securityUpdates": "Parches seguridad",
                 "webServer": "Servidor web",
                 "database": "Base de datos",
                 "dockerHost": "Host Docker",
                 "bruteForce": "Protección login",
                 "hardened": "Kernel reforzado"
+            },
+            "libraryAbout": {
+                "sshHardened": "SSH solo con clave, root solo con clave y menos intentos. Úsala solo si Polaris entra con clave. Se aplica al reiniciar SSH.",
+                "securityUpdates": "Las actualizaciones de seguridad se instalan solas cada día.",
+                "webServer": "nginx con certbot, activo al arrancar, y el firewall abierto en 22, 80 y 443.",
+                "database": "PostgreSQL activo al arrancar, con solo SSH abierto en el firewall.",
+                "dockerHost": "Docker activo al arrancar, con el reenvío IP activado para sus redes.",
+                "bruteForce": "fail2ban activo al arrancar, bloquea direcciones que fallan al entrar.",
+                "hardened": "Ajustes del kernel que rechazan redirecciones ICMP, resisten SYN floods y ocultan direcciones."
             }
         },
         "invalid": {

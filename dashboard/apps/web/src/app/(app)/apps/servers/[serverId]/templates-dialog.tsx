@@ -10,7 +10,7 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TemplateView } from "@/lib/server-templates/service";
-import { TEMPLATE_LIBRARY, type LibraryKey } from "@/lib/server-templates/library";
+import { LIBRARY_KEYS, librarySpec, type LibraryKey } from "@/lib/server-templates/library";
 import { hostTemplateInputSchema, type HostTemplateInput, type TemplateSpec } from "@polaris/core";
 import { deleteTemplateAction, listTemplatesAction, saveTemplateAction } from "../template-actions";
 import {
@@ -336,7 +336,7 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
                                 <Select
                                     value={start}
                                     onValueChange={(value) => setStart(value as LibraryKey)}
-                                    options={(Object.keys(TEMPLATE_LIBRARY) as LibraryKey[]).map((key) => ({
+                                    options={LIBRARY_KEYS.map((key) => ({
                                         value: key,
                                         label: t(`templates.editor.library.${key}`)
                                     }))}
@@ -349,8 +349,8 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
                                         id: null,
                                         draft: draftOf(
                                             start === "blank" ? "" : t(`templates.editor.library.${start}`),
-                                            "",
-                                            TEMPLATE_LIBRARY[start] as Partial<TemplateSpec>
+                                            start === "blank" ? "" : t(`templates.editor.libraryAbout.${start}`),
+                                            librarySpec(start)
                                         )
                                     })
                                 }
@@ -358,6 +358,9 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
                                 <Plus className="size-3.5" /> {t("templates.editor.new")}
                             </Button>
                         </div>
+                        {start === "blank" ? null : (
+                            <p className="text-xs text-muted-foreground">{t(`templates.editor.libraryAbout.${start}`)}</p>
+                        )}
                         {error ? (
                             <p role="alert" className="text-sm text-destructive">
                                 {t(`templates.errors.${error}` as Parameters<T>[0])}

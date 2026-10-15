@@ -643,11 +643,22 @@
             },
             "library": {
                 "blank": "Blank",
+                "sshHardened": "Hardened SSH",
+                "securityUpdates": "Security updates",
                 "webServer": "Web server",
                 "database": "Database server",
                 "dockerHost": "Docker host",
                 "bruteForce": "Login protection",
                 "hardened": "Hardened kernel"
+            },
+            "libraryAbout": {
+                "sshHardened": "Key-only SSH sign-in, root only with a key, fewer attempts. Use it only where Polaris signs in with a key. It applies when SSH next restarts.",
+                "securityUpdates": "Security updates install themselves every day, unattended.",
+                "webServer": "nginx with certbot, running at boot, and the firewall open on 22, 80 and 443.",
+                "database": "PostgreSQL running at boot, with only SSH open in the firewall.",
+                "dockerHost": "Docker running at boot, with IP forwarding on for its networks.",
+                "bruteForce": "fail2ban running at boot, banning addresses that keep failing to sign in.",
+                "hardened": "Kernel settings that refuse ICMP redirects, resist SYN floods and hide kernel addresses."
             }
         },
         "invalid": {
