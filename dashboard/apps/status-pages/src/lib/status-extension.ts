@@ -1,5 +1,6 @@
 /**
- * Status pages as the dashboard sees it: two scheduled jobs, and nothing else.
+ * Status pages as the dashboard sees it: two scheduled jobs, and the routes for
+ * pages served at a custom domain, written again at boot.
  * Its screens live under `/status-pages` and its public pages under `/status`,
  * served from its routes.
  *
@@ -32,7 +33,18 @@ export const statusExtension: AppExtension = {
             key: "status-prune",
             everyMs: 60 * MINUTE,
             leaseMs: 10 * MINUTE,
-            run: async () => (await import("./runner")).pruneStatusHistory()
+            // Also writes the custom-domain routes again, so a file emptied or
+            // lost by anything else is back within the hour.
+            run: async () => {
+                await (await import("./runner")).pruneStatusHistory();
+                await (await import("./edge")).trySyncStatusEdge();
+            }
         }
-    ]
+    ],
+
+    // The custom-domain routes, written once at boot so they repair themselves
+    // after an update. Not awaited: the server is still starting.
+    onBoot: () => {
+        void import("./edge").then((edge) => edge.trySyncStatusEdge());
+    }
 };

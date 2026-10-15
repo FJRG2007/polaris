@@ -128,3 +128,39 @@ export const maintenanceInput = z
     });
 
 export const idInput = z.object({ id });
+
+/** Names that never get a public certificate, so they cannot serve a page. */
+const PRIVATE_SUFFIXES = [".local", ".internal", ".localhost", ".lan", ".home.arpa"];
+
+/** A typed domain as a bare hostname: no scheme, path, port or trailing dot. */
+export function normalizeHostname(value: string): string {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+        .replace(/[/?#].*$/, "")
+        .replace(/:\d+$/, "")
+        .replace(/\.$/, "");
+}
+
+/** Whether a hostname can be a page's public address: a full public name, no
+ *  wildcard, no IP, no private suffix. */
+export function isCustomHostname(value: string): boolean {
+    if (value.length > 253) return false;
+    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(value)) {
+        return false;
+    }
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) return false;
+    if (!/[a-z]/.test(value.slice(value.lastIndexOf(".") + 1))) return false;
+    return !PRIVATE_SUFFIXES.some((suffix) => value.endsWith(suffix));
+}
+
+export const customDomainInput = z.object({
+    id,
+    domain: z
+        .preprocess(
+            (value) => (typeof value === "string" ? normalizeHostname(value) : value),
+            z.string().refine(isCustomHostname, { message: "hostname" })
+        )
+        .nullable()
+});

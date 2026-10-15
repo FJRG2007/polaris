@@ -127,6 +127,9 @@ export async function appUninstalled(id: string): Promise<void> {
     if (!knownApps().includes(id)) return;
     unloadBundle(id);
     state.failures.delete(id);
+    // Whatever the app routed at the edge goes with it: a hostname left pointing
+    // at a page whose code is gone would answer with the dashboard's 404.
+    await (await import("@/lib/app-edge")).clearAppEdge(id);
     await removeBundle(id).catch((error: unknown) =>
         console.error(`polaris: ${id}'s code could not be removed:`, error)
     );

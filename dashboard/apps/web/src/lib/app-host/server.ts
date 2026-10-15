@@ -125,6 +125,7 @@ const load = {
     deployRuntime: once(() => import("@/lib/deploy/runtime")),
     deployService: once(() => import("@/lib/deploy-service")),
     domainDns: once(() => import("@/lib/domain-dns")),
+    appEdge: once(() => import("@/lib/app-edge")),
     domainService: once(() => import("@/lib/domain-service")),
     domainZones: once(() => import("@/lib/domain-zones")),
     envVarService: once(() => import("@/lib/env-var-service")),
@@ -371,6 +372,13 @@ export const serverHost = {
     },
     domainDns: {
         provisionHostnameDns: later(load.domainDns, "provisionHostnameDns")
+    },
+    // The one edge file an app may write, its own, routing hostnames it owns to
+    // the dashboard. Emptied by core when the app is uninstalled.
+    appEdge: {
+        appEdgeOrigin: later(load.appEdge, "appEdgeOrigin"),
+        edgeHostnameTaken: later(load.appEdge, "edgeHostnameTaken"),
+        writeAppEdge: later(load.appEdge, "writeAppEdge")
     },
     domainService: {
         appBaseUrl: later(load.domainService, "appBaseUrl"),

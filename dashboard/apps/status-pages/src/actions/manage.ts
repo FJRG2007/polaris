@@ -12,6 +12,7 @@ import { publicStatusPage, type PublicStatusPage } from "../lib/public";
 import {
     checkInput,
     componentInput,
+    customDomainInput,
     idInput,
     incidentInput,
     incidentUpdateInput,
@@ -130,6 +131,18 @@ export async function deleteMaintenanceAction(input: unknown): Promise<Outcome<o
         await manage.deleteMaintenance(parsed.data.id);
         return {};
     });
+}
+
+export async function setCustomDomainAction(input: unknown): Promise<Outcome<{ status: manage.DomainStatus | null }>> {
+    const parsed = customDomainInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({ status: await manage.setCustomDomain(parsed.data.id, parsed.data.domain) }));
+}
+
+export async function checkCustomDomainAction(input: unknown): Promise<Outcome<{ status: manage.DomainStatus | null }>> {
+    const parsed = idInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    return outcome(async () => ({ status: await manage.checkCustomDomain(parsed.data.id) }));
 }
 
 export async function deployedTargetsAction(): Promise<Outcome<{ targets: { label: string; url: string }[] }>> {

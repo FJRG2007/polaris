@@ -18,7 +18,10 @@
         "slug": "Usa minúsculas, números y guiones, hasta 50 caracteres.",
         "endsBeforeStart": "Debe ser posterior al inicio.",
         "loadFailed": "Error al cargar",
-        "deleteFailed": "No eliminado"
+        "deleteFailed": "No eliminado",
+        "domainTaken": "Ese nombre ya está en uso aquí.",
+        "hostname": "Escribe un nombre público completo, como status.example.com. Sin comodines ni direcciones IP.",
+        "edgeWrite": "El dominio se ha guardado, pero no se ha podido escribir su ruta. Polaris lo reintenta en menos de una hora."
     },
     "list": {
         "title": "Estado público",
@@ -193,5 +196,25 @@
         "check": "prueba",
         "incident": "incidencia",
         "maintenance": "mantenimiento"
+    },
+    "domain": {
+        "heading": "Dominio propio",
+        "description": "Sirve esta página en la raíz de un nombre de host tuyo.",
+        "add": "Añadir",
+        "remove": "Quitar dominio",
+        "check": "Comprobar",
+        "unpublished": "El dominio no muestra nada hasta que publiques la página.",
+        "type": "Tipo",
+        "name": "Nombre",
+        "value": "Valor",
+        "state": {
+            "ready": "El DNS apunta aquí. El certificado se emite en la primera visita.",
+            "created": "Polaris ha añadido el registro DNS. Puede tardar unos minutos en responder.",
+            "conflict": "Un registro DNS de este nombre apunta a otro sitio. Cámbialo al valor de abajo.",
+            "manual": "Añade este registro en tu proveedor de DNS. Esta pantalla se actualiza cuando empiece a funcionar."
+        },
+        "conflict": "Ahora apunta a {current}.",
+        "noIp": "Polaris no ha podido detectar la dirección pública de este servidor. Apunta el nombre a la dirección que llega a este servidor.",
+        "notRouted": "Aún no se ha podido escribir la ruta de este dominio. Polaris lo reintenta en menos de una hora."
     }
 }

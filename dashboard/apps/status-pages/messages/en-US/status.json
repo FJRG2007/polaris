@@ -18,7 +18,10 @@
         "slug": "Use lowercase letters, numbers and dashes, up to 50 characters.",
         "endsBeforeStart": "Must be after the start.",
         "loadFailed": "Could not load",
-        "deleteFailed": "Not deleted"
+        "deleteFailed": "Not deleted",
+        "domainTaken": "That hostname is already in use here.",
+        "hostname": "Enter a full public hostname, like status.example.com. No wildcards or IP addresses.",
+        "edgeWrite": "The domain was saved, but its route could not be written. Polaris retries within the hour."
     },
     "list": {
         "title": "Status pages",
@@ -193,5 +196,25 @@
         "check": "check",
         "incident": "incident",
         "maintenance": "maintenance"
+    },
+    "domain": {
+        "heading": "Custom domain",
+        "description": "Serve this page at the root of a hostname of your own.",
+        "add": "Add domain",
+        "remove": "Remove domain",
+        "check": "Check again",
+        "unpublished": "The domain shows nothing until the page is published.",
+        "type": "Type",
+        "name": "Name",
+        "value": "Value",
+        "state": {
+            "ready": "DNS points here. The certificate is issued on the first visit.",
+            "created": "Polaris added the DNS record. It can take a few minutes to answer.",
+            "conflict": "A DNS record for this name points somewhere else. Change it to the value below.",
+            "manual": "Add this record at your DNS provider. This screen updates when it starts working."
+        },
+        "conflict": "It currently points to {current}.",
+        "noIp": "Polaris could not detect this server's public address. Point the name at the address that reaches this server.",
+        "notRouted": "The route for this domain could not be written yet. Polaris retries within the hour."
     }
 }

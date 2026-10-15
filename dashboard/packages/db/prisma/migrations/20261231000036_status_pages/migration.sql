@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS "StatusPage" (
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
     "published" BOOLEAN NOT NULL DEFAULT false,
+    "customDomain" TEXT,
     "createdById" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS "StatusMaintenance" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS "StatusPage_slug_key" ON "StatusPage"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "StatusPage_customDomain_key" ON "StatusPage"("customDomain");
 CREATE INDEX IF NOT EXISTS "StatusPage_createdAt_idx" ON "StatusPage"("createdAt");
 CREATE INDEX IF NOT EXISTS "StatusComponent_pageId_position_idx" ON "StatusComponent"("pageId", "position");
 CREATE INDEX IF NOT EXISTS "StatusCheck_enabled_nextRunAt_idx" ON "StatusCheck"("enabled", "nextRunAt");

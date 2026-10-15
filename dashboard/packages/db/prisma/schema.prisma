@@ -13318,6 +13318,8 @@ model StatusPage {
     description String   @default("")
     // An unpublished page answers 404 publicly.
     published   Boolean  @default(false)
+    // A hostname of the operator's own that serves this page at its root.
+    customDomain String? @unique
     createdById String?  @db.Uuid
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt

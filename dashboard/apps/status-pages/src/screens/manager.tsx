@@ -23,6 +23,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { StatusView } from "./status-view";
+import { DomainSection } from "./domain-section";
 import { readCache, unwrap, useStatusLocale, useStatusT, writeCache } from "./i18n";
 import { CheckDialog, ComponentDialog, IncidentDialog, MaintenanceDialog, PageDialog, UpdateDialog } from "./forms";
 import {
@@ -485,6 +486,8 @@ function PageEditor({ pageId }: { pageId: string }) {
                     </ul>
                 )}
             </section>
+
+            <DomainSection pageId={page.id} domain={page.customDomain} published={page.published} onChanged={load} />
 
             <section className="mt-10 rounded-lg border border-danger/40 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">

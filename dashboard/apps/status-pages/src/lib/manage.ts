@@ -7,7 +7,9 @@
  */
 
 import { prisma } from "@polaris/db";
+import { host } from "@polaris/app-host";
 import { StatusRefusal } from "./outcome";
+import { trySyncStatusEdge } from "./edge";
 import type { CheckInput, PageInput } from "../model/schemas";
 import { transition, type IncidentState } from "../model/incidents";
 
@@ -66,6 +68,7 @@ export interface PageDetail {
     readonly title: string;
     readonly description: string;
     readonly published: boolean;
+    readonly customDomain: string | null;
     readonly components: readonly {
         readonly id: string;
         readonly name: string;
@@ -101,6 +104,7 @@ export async function pageDetail(id: string): Promise<PageDetail> {
             title: true,
             description: true,
             published: true,
+            customDomain: true,
             components: {
                 orderBy: [{ position: "asc" }, { createdAt: "asc" }],
                 select: {
@@ -185,6 +189,8 @@ export async function savePage(id: string | null, input: PageInput, userId: stri
     try {
         if (id) {
             await prisma.statusPage.update({ where: { id }, data: input });
+            // Publishing, unpublishing or a new slug changes what its domain serves.
+            await trySyncStatusEdge();
             return { id };
         }
         const page = await prisma.statusPage.create({ data: { ...input, createdById: userId }, select: { id: true } });
@@ -197,6 +203,71 @@ export async function savePage(id: string | null, input: PageInput, userId: stri
 
 export async function deletePage(id: string): Promise<void> {
     await prisma.statusPage.deleteMany({ where: { id } });
+    await trySyncStatusEdge();
+}
+
+/** How a page's custom domain stands: the record it needs, and whether it
+ *  already points here. */
+export interface DomainStatus {
+    readonly domain: string;
+    /** `ready` - the name answers with this server's address.
+     *  `created` - Polaris just wrote the record through the connected DNS account.
+     *  `conflict` - a record exists and points elsewhere (`current`).
+     *  `manual` - the operator adds the record; `ip` is what it must name, null
+     *  when this server does not know its own public address. */
+    readonly state: "ready" | "created" | "conflict" | "manual";
+    readonly ip: string | null;
+    readonly current: string | null;
+    /** Whether the edge file was written with this domain in it. */
+    readonly routed: boolean;
+}
+
+/** Asks DNS (and the connected DNS account, when there is one) about a domain. */
+export async function domainStatus(domain: string, routed: boolean): Promise<DomainStatus> {
+    const result = await host.domainDns.provisionHostnameDns(domain);
+    return {
+        domain,
+        state: result.status === "unchanged" ? "ready" : result.status,
+        ip: result.ip,
+        current: result.content ?? null,
+        routed
+    };
+}
+
+/** Sets or removes a page's custom domain and rewrites the edge. */
+export async function setCustomDomain(id: string, domain: string | null): Promise<DomainStatus | null> {
+    if (domain) {
+        const [taken, other] = await Promise.all([
+            host.appEdge.edgeHostnameTaken(domain),
+            prisma.statusPage.findFirst({
+                where: { customDomain: domain, NOT: { id } },
+                select: { id: true }
+            })
+        ]);
+        if (taken || other) throw new StatusRefusal("errors.domainTaken");
+    }
+    try {
+        await prisma.statusPage.update({ where: { id }, data: { customDomain: domain } });
+    } catch (caught) {
+        if (isUniqueViolation(caught)) throw new StatusRefusal("errors.domainTaken");
+        throw caught;
+    }
+    const routed = await trySyncStatusEdge();
+    if (!domain) {
+        if (!routed) throw new StatusRefusal("errors.edgeWrite");
+        return null;
+    }
+    return domainStatus(domain, routed);
+}
+
+/** Checks a page's domain again, rewriting the edge on the way so a missed
+ *  write repairs itself from here. */
+export async function checkCustomDomain(id: string): Promise<DomainStatus | null> {
+    const page = await prisma.statusPage.findUnique({ where: { id }, select: { customDomain: true } });
+    if (!page) throw new StatusRefusal("errors.pageGone");
+    if (!page.customDomain) return null;
+    const routed = await trySyncStatusEdge();
+    return domainStatus(page.customDomain, routed);
 }
 
 export async function addComponent(input: { pageId: string; name: string; description: string }) {
