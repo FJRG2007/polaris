@@ -6,16 +6,21 @@
  */
 
 import type { ZodTypeAny } from "zod";
+import { getTranslations } from "@/lib/i18n/request";
 import { requireUser } from "@/lib/session";
 import { isOptional, toJsonSchema } from "@/lib/api-docs/json-schema";
 import { DOCUMENTED_ROUTES } from "@/lib/api-docs/routes";
+import { referenceCopy } from "@/lib/api-docs/reference-copy";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { ApiReferenceView, type ReferenceEntry } from "./api-reference-view";
 import { operationId, exampleOf, PLACEHOLDER_KEY } from "@/lib/api-docs/openapi";
 
 export const dynamic = "force-dynamic";
 
-function entries(): ReferenceEntry[] {
+function entries(t: NamespaceTranslator<"account">): ReferenceEntry[] {
     return DOCUMENTED_ROUTES.map((route) => {
+        const id = operationId(route);
+        const copy = referenceCopy(t, route, id);
         const query = Object.entries((route.query?.shape ?? {}) as Record<string, ZodTypeAny>);
         const parameters = [
             ...Object.entries(route.params ?? {}).map(([name, schema]) => ({ name, where: "path" as const, schema: toJsonSchema(schema) })),
@@ -30,16 +35,19 @@ function entries(): ReferenceEntry[] {
             where: parameter.where,
             required: parameter.where === "path" || (parameter.where === "query" && !isOptional(route.query!.shape[parameter.name]!)),
             type: describeType(parameter.schema),
-            description: typeof parameter.schema.description === "string" ? parameter.schema.description : null
+            description: copy.parameter(
+                parameter.name,
+                typeof parameter.schema.description === "string" ? parameter.schema.description : null
+            )
         }));
         const body = route.body ? toJsonSchema(route.body) : null;
         return {
-            id: operationId(route),
+            id,
             method: route.method,
             path: route.path,
-            tag: route.tag,
-            summary: route.summary,
-            description: route.description ?? null,
+            tag: copy.tag,
+            summary: copy.summary,
+            description: copy.description,
             changes: route.changes,
             parameters,
             body: body ? JSON.stringify(body, null, 2) : null,
@@ -47,7 +55,7 @@ function entries(): ReferenceEntry[] {
             binaryType: route.binaryBody?.contentType ?? null,
             responses: Object.entries(route.responses).map(([status, response]) => ({
                 status: Number(status),
-                description: response.description,
+                description: copy.response(status, response.description),
                 schema: response.schema ? JSON.stringify(toJsonSchema(response.schema), null, 2) : null,
                 text: Boolean(response.text)
             }))
@@ -66,5 +74,6 @@ function describeType(schema: Record<string, unknown>): string {
 
 export default async function ApiReferencePage() {
     await requireUser();
-    return <ApiReferenceView entries={entries()} placeholder={PLACEHOLDER_KEY} />;
+    const t = await getTranslations("account");
+    return <ApiReferenceView entries={entries(t)} placeholder={PLACEHOLDER_KEY} />;
 }

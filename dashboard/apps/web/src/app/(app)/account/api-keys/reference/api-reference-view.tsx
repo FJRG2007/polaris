@@ -75,6 +75,7 @@ export function ApiReferenceView({ entries, placeholder }: { entries: ReferenceE
                 <h2 className="text-sm font-semibold">{t("apiKeys.reference.auth")}</h2>
                 <p className="text-sm text-muted-foreground">{t("apiKeys.reference.authBody")}</p>
                 <div className="flex items-start gap-2">
+                    {/* i18n-ignore: an HTTP header, typed as is */}
                     <pre className={cn(CODE, "min-w-0 flex-1")}>{`Authorization: Bearer ${placeholder}`}</pre>
                     <CopyButton value={`Authorization: Bearer ${placeholder}`} />
                 </div>

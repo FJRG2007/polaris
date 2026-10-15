@@ -359,9 +359,132 @@
                 "path": "path",
                 "query": "query",
                 "header": "header"
+            },
+            "tags": {
+                "Account": "Account",
+                "Deploy": "Deploy",
+                "MCP": "MCP"
+            },
+            "statuses": {
+                "200": "OK",
+                "201": "Created",
+                "202": "Accepted"
+            },
+            "params": {
+                "format": "text answers in plain text instead of JSON",
+                "id": "A service id, or project/service, or project/environment/service",
+                "x-polaris-commit": "The commit the image was built from",
+                "x-polaris-message": "The commit message, URI-encoded"
+            },
+            "ops": {
+                "getMe": {
+                    "summary": "Who this key acts as",
+                    "description": "Needs no scope. Use it to check that a key works."
+                },
+                "deleteCliSession": {
+                    "summary": "End a CLI sign-in",
+                    "description": "Only a key issued by `plr login` can end itself; any other key is answered 409.",
+                    "responses": {
+                        "204": "Signed out",
+                        "409": "This key is not a CLI sign-in"
+                    }
+                },
+                "postMcp": {
+                    "summary": "Model Context Protocol endpoint",
+                    "description": "JSON-RPC 2.0 over streamable HTTP: one message or a batch of up to 20. The tools offered follow the key's scopes."
+                },
+                "getDeployProjects": {
+                    "summary": "List projects"
+                },
+                "getDeployServices": {
+                    "summary": "Find a service"
+                },
+                "getDeployServicesById": {
+                    "summary": "Read a service"
+                },
+                "postDeployServicesByIdDeploy": {
+                    "summary": "Deploy a service"
+                },
+                "getDeployServicesByIdDeployments": {
+                    "summary": "List deployments"
+                },
+                "getDeployServicesByIdDomains": {
+                    "summary": "List domains"
+                },
+                "postDeployServicesByIdDomains": {
+                    "summary": "Add a domain"
+                },
+                "getDeployServicesByIdEnv": {
+                    "summary": "List variable names"
+                },
+                "putDeployServicesByIdEnvByName": {
+                    "summary": "Create or replace a variable"
+                },
+                "deleteDeployServicesByIdEnvByName": {
+                    "summary": "Remove a variable by name"
+                },
+                "getDeployServicesByIdImage": {
+                    "summary": "Where to tag an uploaded image"
+                },
+                "postDeployServicesByIdImage": {
+                    "summary": "Deploy an uploaded image",
+                    "description": "The body is a gzipped image archive of at most 16 GB."
+                },
+                "getDeployServicesByIdLogs": {
+                    "summary": "Read a service's logs"
+                },
+                "postDeployServicesByIdRestart": {
+                    "summary": "Restart a service"
+                },
+                "postDeployServicesByIdStart": {
+                    "summary": "Start a service"
+                },
+                "postDeployServicesByIdStop": {
+                    "summary": "Stop a service"
+                },
+                "getDeployServicesByIdVariables": {
+                    "summary": "List variables",
+                    "description": "Secret values are withheld."
+                },
+                "postDeployServicesByIdVariables": {
+                    "summary": "Set a variable"
+                },
+                "postDeployServicesByIdVariablesImport": {
+                    "summary": "Import a .env file"
+                },
+                "getDeployEnvironmentsByIdVariables": {
+                    "summary": "List variables",
+                    "description": "Secret values are withheld."
+                },
+                "postDeployEnvironmentsByIdVariables": {
+                    "summary": "Set a variable"
+                },
+                "postDeployEnvironmentsByIdVariablesImport": {
+                    "summary": "Import a .env file"
+                },
+                "deleteDeployVariablesById": {
+                    "summary": "Remove a variable"
+                },
+                "getDeployVariablesByIdValue": {
+                    "summary": "Reveal a variable's value"
+                },
+                "getDeployDeploymentsById": {
+                    "summary": "Read a deployment's build log",
+                    "description": "With follow=1 the log is streamed as text/plain until the build ends."
+                },
+                "postDeployDeploymentsByIdCancel": {
+                    "summary": "Cancel a deployment"
+                },
+                "postDeployDeploymentsByIdRollback": {
+                    "summary": "Roll back to a deployment"
+                },
+                "deleteDeployDomainsById": {
+                    "summary": "Remove a domain"
+                }
             }
         },
         "usage": {
+            "utcDay": "{date} UTC",
             "title": "Usage of {name}",
             "back": "API keys",
             "edit": "Edit key",

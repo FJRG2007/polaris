@@ -21,5 +21,5 @@ export function curlCommand(input: CurlInput, baseUrl: string, key: string): str
     } else if (input.binaryType) {
         lines.push(`  -H "Content-Type: ${input.binaryType}"`, "  --data-binary @image.tar.gz");
     }
-    return lines.join(" \\n");
+    return lines.join(" \\\n");
 }

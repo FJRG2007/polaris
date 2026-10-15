@@ -8,11 +8,11 @@
  */
 
 import Link from "next/link";
-import { describeDevice } from "@polaris/core";
-import { useEffect, useRef, useState } from "react";
+import { createDisplayFormat, describeDevice } from "@polaris/core";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { useDisplayFormat } from "@/components/display-format";
+import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { keyUsageAction, type KeyUsage } from "@/app/(app)/account/api-keys/usage-actions";
 import { ArrowLeft, BookOpen, Pencil, RotateCw } from "lucide-react";
@@ -372,9 +372,12 @@ const CHART_HEIGHT = 120;
 function CallsChart({ usage }: { usage: KeyUsage }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
+    const preferences = useDisplayPreferences();
+    const utc = useMemo(() => createDisplayFormat({ ...preferences, timeZone: "UTC" }), [preferences]);
     const peak = Math.max(...usage.series.map((point) => point.calls), 1);
     const width = usage.series.length;
-    const when = (time: number) => (usage.bucket === "day" ? format.date(time) : format.dateTime(time));
+    const when = (time: number) =>
+        usage.bucket === "day" ? t("apiKeys.usage.utcDay", { date: utc.date(time) }) : format.dateTime(time);
     const first = usage.series[0];
     const last = usage.series[usage.series.length - 1];
 

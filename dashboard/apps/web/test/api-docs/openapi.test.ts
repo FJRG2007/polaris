@@ -70,6 +70,10 @@ describe("the API reference", () => {
             const curl = curlExample(route, "https://polaris.example.test");
             expect(curl).toContain(`Bearer ${PLACEHOLDER_KEY}`);
             expect(curl).toContain(`-X ${route.method}`);
+            const lines = curl.split("\n");
+            expect(lines.length).toBeGreaterThan(1);
+            for (const line of lines.slice(0, -1)) expect(line.endsWith(" \\")).toBe(true);
+            expect(curl).not.toContain("\\n");
         }
     });
 

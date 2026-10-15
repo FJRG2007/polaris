@@ -10,7 +10,7 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { operationId } from "@/lib/api-docs/openapi";
-import { matchDocumentedRoute } from "@/lib/api-docs/routes";
+import { DOCUMENTED_ROUTES } from "@/lib/api-docs/routes";
 import { USAGE_RANGES, keyUsageReport, type KeyUsageReport } from "@/lib/api-usage/report";
 
 const inputSchema = z.object({ keyId: z.string().uuid(), range: z.enum(USAGE_RANGES) });
@@ -31,8 +31,8 @@ export async function keyUsageAction(input: unknown): Promise<{ usage?: KeyUsage
     if (!key) return { error: "notFound" };
     const report = await keyUsageReport(key.id, parsed.data.range);
     const anchors = report.routes.map((row) => {
-        const route = matchDocumentedRoute(row.method, row.route.replace(/\{[^}]+\}/g, "x"));
-        return route && route.path === row.route ? operationId(route) : null;
+        const route = DOCUMENTED_ROUTES.find((r) => r.method === row.method && r.path === row.route);
+        return route ? operationId(route) : null;
     });
     return { usage: { ...report, anchors } };
 }

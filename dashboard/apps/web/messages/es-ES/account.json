@@ -359,9 +359,132 @@
                 "path": "ruta",
                 "query": "consulta",
                 "header": "cabecera"
+            },
+            "tags": {
+                "Account": "Cuenta",
+                "Deploy": "Deploy",
+                "MCP": "MCP"
+            },
+            "statuses": {
+                "200": "OK",
+                "201": "Creado",
+                "202": "Aceptado"
+            },
+            "params": {
+                "format": "text responde en texto plano en lugar de JSON",
+                "id": "El id de un servicio, o proyecto/servicio, o proyecto/entorno/servicio",
+                "x-polaris-commit": "El commit con el que se construyó la imagen",
+                "x-polaris-message": "Mensaje del commit, codificado URI"
+            },
+            "ops": {
+                "getMe": {
+                    "summary": "Quién es esta clave",
+                    "description": "No necesita permisos. Sirve para comprobar que una clave funciona."
+                },
+                "deleteCliSession": {
+                    "summary": "Cerrar sesión CLI",
+                    "description": "Solo una clave emitida por `plr login` puede cerrarse a sí misma; cualquier otra recibe un 409.",
+                    "responses": {
+                        "204": "Desconectado",
+                        "409": "Esta clave no es una sesión de la CLI"
+                    }
+                },
+                "postMcp": {
+                    "summary": "Endpoint de Model Context Protocol",
+                    "description": "JSON-RPC 2.0 sobre HTTP en streaming: un mensaje o un lote de hasta 20. Las herramientas que se ofrecen dependen de los permisos de la clave."
+                },
+                "getDeployProjects": {
+                    "summary": "Listar proyectos"
+                },
+                "getDeployServices": {
+                    "summary": "Buscar un servicio"
+                },
+                "getDeployServicesById": {
+                    "summary": "Leer un servicio"
+                },
+                "postDeployServicesByIdDeploy": {
+                    "summary": "Desplegar servicio"
+                },
+                "getDeployServicesByIdDeployments": {
+                    "summary": "Listar despliegues"
+                },
+                "getDeployServicesByIdDomains": {
+                    "summary": "Listar dominios"
+                },
+                "postDeployServicesByIdDomains": {
+                    "summary": "Añadir dominio"
+                },
+                "getDeployServicesByIdEnv": {
+                    "summary": "Nombres de variables"
+                },
+                "putDeployServicesByIdEnvByName": {
+                    "summary": "Crear o sustituir una variable"
+                },
+                "deleteDeployServicesByIdEnvByName": {
+                    "summary": "Quitar una variable por nombre"
+                },
+                "getDeployServicesByIdImage": {
+                    "summary": "Dónde etiquetar una imagen subida"
+                },
+                "postDeployServicesByIdImage": {
+                    "summary": "Desplegar una imagen subida",
+                    "description": "El cuerpo es un archivo de imagen comprimido con gzip de 16 GB como máximo."
+                },
+                "getDeployServicesByIdLogs": {
+                    "summary": "Logs de un servicio"
+                },
+                "postDeployServicesByIdRestart": {
+                    "summary": "Reiniciar servicio"
+                },
+                "postDeployServicesByIdStart": {
+                    "summary": "Iniciar servicio"
+                },
+                "postDeployServicesByIdStop": {
+                    "summary": "Detener servicio"
+                },
+                "getDeployServicesByIdVariables": {
+                    "summary": "Listar variables",
+                    "description": "Los valores secretos no se muestran."
+                },
+                "postDeployServicesByIdVariables": {
+                    "summary": "Fijar una variable"
+                },
+                "postDeployServicesByIdVariablesImport": {
+                    "summary": "Importar archivo .env"
+                },
+                "getDeployEnvironmentsByIdVariables": {
+                    "summary": "Listar variables",
+                    "description": "Los valores secretos no se muestran."
+                },
+                "postDeployEnvironmentsByIdVariables": {
+                    "summary": "Fijar una variable"
+                },
+                "postDeployEnvironmentsByIdVariablesImport": {
+                    "summary": "Importar archivo .env"
+                },
+                "deleteDeployVariablesById": {
+                    "summary": "Quitar una variable"
+                },
+                "getDeployVariablesByIdValue": {
+                    "summary": "Ver el valor de una variable"
+                },
+                "getDeployDeploymentsById": {
+                    "summary": "Leer el log de compilación",
+                    "description": "Con follow=1 el log se envía en streaming como text/plain hasta que termina la compilación."
+                },
+                "postDeployDeploymentsByIdCancel": {
+                    "summary": "Cancelar un despliegue"
+                },
+                "postDeployDeploymentsByIdRollback": {
+                    "summary": "Volver a un despliegue"
+                },
+                "deleteDeployDomainsById": {
+                    "summary": "Quitar un dominio"
+                }
             }
         },
         "usage": {
+            "utcDay": "{date} UTC",
             "title": "Uso de {name}",
             "back": "Claves API",
             "edit": "Editar",
