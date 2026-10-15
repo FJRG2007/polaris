@@ -43,6 +43,20 @@ export type CutoverPhase = (typeof CUTOVER_PHASES)[number];
  */
 export type CutoverMode = "edge" | "cloudflare" | "manual";
 
+/**
+ * Which edge answers a service's hostname: this machine's for a service that runs
+ * here or that was pointed at Polaris, else the edge of the server it runs on. Two
+ * services with the same key are reached at the same address, so moving a name
+ * between them needs no DNS change.
+ */
+export function edgeKey(
+    target: { readonly kind: string; readonly hostId: string | null },
+    servedBy: string
+): string {
+    if (target.kind === "local" || servedBy === "polaris" || !target.hostId) return "local";
+    return `host:${target.hostId}`;
+}
+
 /** The TTL a record is lowered to before the switch, in seconds. */
 export const LOWERED_TTL = 60;
 /** The longest the lowering waits for an old TTL to run out: one day. */
