@@ -69,7 +69,7 @@ export interface AccountListing {
 
 export async function listAccounts(databaseId: string, ownerId: string): Promise<AccountListing> {
     const scope = await accountScope(databaseId, ownerId);
-    const [accounts, databases] = await runCommands(scope, [
+    const [accounts = "", databases = ""] = await runCommands(scope, [
         core.listAccountsCommand(scope.target),
         core.listDatabasesCommand(scope.target.engine, scope.target.adminUser, scope.target.adminPassword)
     ]);
@@ -130,7 +130,7 @@ export async function revokeAccount(
 
 export async function listProcesses(databaseId: string, ownerId: string): Promise<core.DbProcess[]> {
     const scope = await accountScope(databaseId, ownerId);
-    const [output] = await runCommands(scope, [core.processListCommand(scope.target)]);
+    const [output = ""] = await runCommands(scope, [core.processListCommand(scope.target)]);
     return core.parseProcessList(scope.target.engine, output);
 }
 

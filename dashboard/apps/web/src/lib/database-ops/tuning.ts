@@ -36,7 +36,7 @@ async function memoryOf(scope: AccountScope): Promise<{ ramMb: number; ramSource
         select: { memoryLimitMb: true }
     });
     if (row?.memoryLimitMb) return { ramMb: row.memoryLimitMb, ramSource: "limit" };
-    const [output] = await runCommands(scope, [core.MEMINFO_COMMAND]);
+    const [output = ""] = await runCommands(scope, [core.MEMINFO_COMMAND]);
     const ramMb = core.parseMemInfo(output);
     if (!ramMb) throw new DatabaseOperationError("The container did not say how much memory it has.");
     return { ramMb, ramSource: "container" };
@@ -45,7 +45,7 @@ async function memoryOf(scope: AccountScope): Promise<{ ramMb: number; ramSource
 export async function tuningView(databaseId: string, ownerId: string): Promise<TuningView> {
     const scope = await accountScope(databaseId, ownerId);
     const memory = await memoryOf(scope);
-    const [output] = await runCommands(scope, [core.readTuningCommand(scope.target)]);
+    const [output = ""] = await runCommands(scope, [core.readTuningCommand(scope.target)]);
     const current = core.parseTuning(scope.target.engine, output);
     return {
         engine: scope.target.engine,
