@@ -6189,6 +6189,7 @@ model Organization {
     banner   OrganizationBanner?
     successor OrganizationSuccessor?
     budget   OrganizationBudget?
+    quota    OrganizationQuota?
     crmCompanies     CrmCompany[]
     crmPeople        CrmPerson[]
     crmOpportunities CrmOpportunity[]
@@ -6288,6 +6289,27 @@ model OrganizationBudget {
     alertedMonth String?
     alertedLevel Int      @default(0)
     updatedAt    DateTime @updatedAt
+
+    org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// What one organization may hold, set by a platform administrator. Every column
+// is a cap and null is no cap, so an organization with no row - every one that
+// existed before this - is exactly as unlimited as it was. A cap is checked when
+// something is created or grown; what already exists past it is never removed.
+model OrganizationQuota {
+    orgId     String   @id @db.Uuid
+    // Roster size counting the owner, alongside the instance-wide cap.
+    members   Int?
+    teams     Int?
+    // Deploy projects, and the services and databases inside them.
+    projects  Int?
+    services  Int?
+    databases Int?
+    // CPU cores and memory reserved by the limits set on services and databases.
+    cpus      Float?
+    memoryMb  Int?
+    updatedAt DateTime @updatedAt
 
     org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
