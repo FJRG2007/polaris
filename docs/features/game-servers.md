@@ -13,11 +13,13 @@ follows your light or dark setting. Phone-sized versions are in
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/games-light-en-desktop.webp">
-  <img src="../assets/media/games-dark-en-desktop.webp" alt="Every game server with its address, players and state">
+  <img src="../assets/media/games-dark-en-desktop.webp" alt="Every server, then one walked through: its players, a player's inventory and skin, its events and settings, and the other games' own settings">
 </picture>
 
 Every server shows whether it is up, who is playing and the address players
-type. A server can be started, stopped, duplicated or archived from here.
+type. A server can be started, stopped, duplicated or archived from here. The
+picture goes on into one of them: its players, a player's inventory and skin,
+the events running, and the settings for Minecraft, ARK and FiveM.
 
 ## Players
 
