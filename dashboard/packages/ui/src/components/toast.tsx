@@ -335,7 +335,9 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                     // what the note points at.
                     <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
                         {sent ? (
-                            <span className="block text-xs text-muted-foreground">{words.sent}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {words.sent}
+                            </span>
                         ) : choosing ? (
                             <span className="flex flex-wrap items-center gap-1">
                                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-foreground">

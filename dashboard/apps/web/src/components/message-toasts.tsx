@@ -148,7 +148,11 @@ const NOTE_MUTES = [
 
 /** Mute one conversation from its note, the way a phone's notification does.
  *  Answers why it could not, or null. */
-async function muteFromNotice(t: Translate, channelId: string, minutes: number): Promise<string | null> {
+async function muteFromNotice(
+    t: Translate,
+    channelId: string,
+    minutes: number
+): Promise<string | null> {
     const result = await setMutedAction(channelId, minutes).catch(() => ({
         error: t("messageToasts.muteFailed")
     }));
