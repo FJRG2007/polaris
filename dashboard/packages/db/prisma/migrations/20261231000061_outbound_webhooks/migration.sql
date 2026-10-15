@@ -24,11 +24,9 @@ CREATE TABLE IF NOT EXISTS "OutboundWebhook" (
 
 CREATE INDEX IF NOT EXISTS "OutboundWebhook_userId_idx" ON "OutboundWebhook"("userId");
 
-DO $$ BEGIN
-    ALTER TABLE "OutboundWebhook" ADD CONSTRAINT "OutboundWebhook_userId_fkey"
+ALTER TABLE "OutboundWebhook" DROP CONSTRAINT IF EXISTS "OutboundWebhook_userId_fkey";
+ALTER TABLE "OutboundWebhook" ADD CONSTRAINT "OutboundWebhook_userId_fkey"
         FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
 
 CREATE TABLE IF NOT EXISTS "OutboundWebhookDelivery" (
     "id" UUID NOT NULL,
@@ -50,8 +48,6 @@ CREATE INDEX IF NOT EXISTS "OutboundWebhookDelivery_webhookId_createdAt_idx" ON 
 CREATE INDEX IF NOT EXISTS "OutboundWebhookDelivery_status_nextAttemptAt_idx" ON "OutboundWebhookDelivery"("status", "nextAttemptAt");
 CREATE INDEX IF NOT EXISTS "OutboundWebhookDelivery_createdAt_idx" ON "OutboundWebhookDelivery"("createdAt");
 
-DO $$ BEGIN
-    ALTER TABLE "OutboundWebhookDelivery" ADD CONSTRAINT "OutboundWebhookDelivery_webhookId_fkey"
+ALTER TABLE "OutboundWebhookDelivery" DROP CONSTRAINT IF EXISTS "OutboundWebhookDelivery_webhookId_fkey";
+ALTER TABLE "OutboundWebhookDelivery" ADD CONSTRAINT "OutboundWebhookDelivery_webhookId_fkey"
         FOREIGN KEY ("webhookId") REFERENCES "OutboundWebhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;

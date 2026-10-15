@@ -20,17 +20,13 @@ CREATE TABLE IF NOT EXISTS "InboundWebhook" (
 CREATE INDEX IF NOT EXISTS "InboundWebhook_userId_idx" ON "InboundWebhook"("userId");
 CREATE INDEX IF NOT EXISTS "InboundWebhook_applicationId_idx" ON "InboundWebhook"("applicationId");
 
-DO $$ BEGIN
-    ALTER TABLE "InboundWebhook" ADD CONSTRAINT "InboundWebhook_userId_fkey"
+ALTER TABLE "InboundWebhook" DROP CONSTRAINT IF EXISTS "InboundWebhook_userId_fkey";
+ALTER TABLE "InboundWebhook" ADD CONSTRAINT "InboundWebhook_userId_fkey"
         FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
 
-DO $$ BEGIN
-    ALTER TABLE "InboundWebhook" ADD CONSTRAINT "InboundWebhook_applicationId_fkey"
+ALTER TABLE "InboundWebhook" DROP CONSTRAINT IF EXISTS "InboundWebhook_applicationId_fkey";
+ALTER TABLE "InboundWebhook" ADD CONSTRAINT "InboundWebhook_applicationId_fkey"
         FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
 
 CREATE TABLE IF NOT EXISTS "InboundWebhookReceipt" (
     "id" UUID NOT NULL,
@@ -44,8 +40,6 @@ CREATE TABLE IF NOT EXISTS "InboundWebhookReceipt" (
 CREATE UNIQUE INDEX IF NOT EXISTS "InboundWebhookReceipt_hookId_deliveryId_key" ON "InboundWebhookReceipt"("hookId", "deliveryId");
 CREATE INDEX IF NOT EXISTS "InboundWebhookReceipt_expiresAt_idx" ON "InboundWebhookReceipt"("expiresAt");
 
-DO $$ BEGIN
-    ALTER TABLE "InboundWebhookReceipt" ADD CONSTRAINT "InboundWebhookReceipt_hookId_fkey"
+ALTER TABLE "InboundWebhookReceipt" DROP CONSTRAINT IF EXISTS "InboundWebhookReceipt_hookId_fkey";
+ALTER TABLE "InboundWebhookReceipt" ADD CONSTRAINT "InboundWebhookReceipt_hookId_fkey"
         FOREIGN KEY ("hookId") REFERENCES "InboundWebhook"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
