@@ -39,7 +39,8 @@ env:
 jobs:
   capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Room for the full set: well over the half hour a single-file run took.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
