@@ -1,0 +1,124 @@
+{
+    "page": {
+        "title": "Diagnóstico",
+        "description": "Comprobaciones del servidor, su velocidad y un paquete para compartir al pedir ayuda."
+    },
+    "status": {
+        "pass": "Bien",
+        "warn": "Aviso",
+        "fail": "Problema",
+        "unknown": "Sin datos",
+        "skip": "No aplica",
+        "timeout": "No respondió a tiempo.",
+        "failedToRun": "No se pudo comprobar."
+    },
+    "checks": {
+        "heading": "Comprobaciones",
+        "runAll": "Comprobar",
+        "summary": "{fail, plural, =0 {Sin problemas} one {# problema} other {# problemas}}, {warn, plural, =0 {sin avisos} one {# aviso} other {# avisos}}",
+        "database": {
+            "title": "Base de datos",
+            "ok": "Responde en {ms} ms.",
+            "slow": "Responde, pero lenta: {ms} ms.",
+            "unreachable": "No responde. Las páginas con datos fallarán hasta que vuelva. Si dura unos minutos, reinicia la máquina donde corre Polaris; si sigue, envía el paquete de soporte al pedir ayuda."
+        },
+        "hostAgent": {
+            "title": "Agente",
+            "ok": "Edición completa, agente {version}.",
+            "limited": "Edición limitada: no hay actualizaciones, despliegues ni limpieza de disco desde aquí.",
+            "silent": "El agente del servidor no responde; actualizaciones y despliegues en pausa. Suele volver en un minuto. Si no, reinicia la máquina donde corre Polaris; si sigue, envía el paquete de soporte al pedir ayuda."
+        },
+        "updates": {
+            "title": "Versiones",
+            "ok": "Al día ({version}).",
+            "behind": "{behind, plural, =0 {Hay una versión nueva} one {# versión por detrás} other {# versiones por detrás}}. Usas {version}.",
+            "unreachable": "No se pudo buscar versiones ahora."
+        },
+        "disk": {
+            "title": "Disco",
+            "ok": "{freeGb} GB libres, {percent}% usado.",
+            "low": "Queda poco: {freeGb} GB libres, {percent}% usado.",
+            "critical": "Casi lleno: {freeGb} GB libres. Despliegues y versiones pueden fallar.",
+            "unreadable": "No se pudo leer el disco desde aquí."
+        },
+        "edge": {
+            "title": "Rutas",
+            "ok": "{count, plural, one {# fichero de rutas} other {# ficheros de rutas}} en su sitio.",
+            "empty": "Fichero de rutas vacío: {files}. Sus direcciones están caídas hasta reescribirlo.",
+            "unreadable": "No se pudieron leer las rutas desde aquí."
+        },
+        "addresses": {
+            "title": "Direcciones",
+            "ok": "{count, plural, =0 {Sin direcciones} one {La dirección responde} other {Las # direcciones responden}}.",
+            "someDown": "No responden: {hosts}.",
+            "allDown": "Ninguna responde: {hosts}.",
+            "unreachable": "No se pudieron comprobar ahora."
+        },
+        "certificate": {
+            "title": "Certificado",
+            "ok": "{host}: válido {days} días más.",
+            "expiring": "{host}: caduca en {days, plural, one {# día} other {# días}}.",
+            "expired": "{host}: caducó hace {days, plural, one {# día} other {# días}}.",
+            "untrusted": "{host}: los navegadores no confían en él.",
+            "unreachable": "{host}: no se pudo alcanzar desde el servidor para leer el certificado.",
+            "noDomain": "Este panel no tiene un dominio público."
+        },
+        "dns": {
+            "title": "DNS",
+            "ok": "{host} apunta a {address}.",
+            "unresolved": "{host} no resuelve. Revisa su registro DNS.",
+            "noDomain": "Este panel no tiene un dominio público."
+        },
+        "clock": {
+            "title": "Hora",
+            "ok": "En hora (margen de {seconds} s).",
+            "skewed": "Desfase de {seconds} s. Códigos y certificados pueden fallar. Activa la hora automática (NTP) en la máquina donde corre Polaris.",
+            "unreachable": "Sin internet para comparar la hora."
+        }
+    },
+    "fix": {
+        "republishRoutes": "Rehacer rutas",
+        "freeSpace": "Liberar espacio",
+        "openSettings": "Abrir ajustes",
+        "openDomains": "Abrir dominios",
+        "done": "Hecho. Se volvió a comprobar.",
+        "failed": "No funcionó. La comprobación muestra cómo está."
+    },
+    "speed": {
+        "heading": "Velocidad",
+        "description": "Medida desde este servidor a un servicio público (Cloudflare), no desde tu navegador. Usa unos 12 MB.",
+        "run": "Medir velocidad",
+        "running": "Midiendo...",
+        "download": "Bajada",
+        "upload": "Subida",
+        "latency": "Latencia",
+        "mbps": "{value} Mbps",
+        "ms": "{value} ms",
+        "none": "Sin medir",
+        "never": "Aún no se ha medido.",
+        "lastRun": "Última",
+        "busy": "Ya hay una medición.",
+        "limited": "Límite alcanzado. Prueba en {minutes, plural, one {# minuto} other {# minutos}}.",
+        "failed": "No se pudo medir."
+    },
+    "bundle": {
+        "heading": "Paquete de soporte",
+        "description": "Un zip para compartir al pedir ayuda. Nunca incluye contraseñas, claves ni tokens.",
+        "contents": "Qué contiene",
+        "download": "Descargar paquete",
+        "preparing": "Preparando...",
+        "limited": "Límite alcanzado. Prueba en {minutes, plural, one {# minuto} other {# minutos}}.",
+        "failed": "No se pudo generar el paquete. Inténtalo de nuevo.",
+        "files": {
+            "manifest": "Versiones, edición y datos del sistema",
+            "diagnosis": "El resultado de las comprobaciones",
+            "errors": "Errores recientes del propio Polaris",
+            "config": "Ajustes: valores seguros enteros, el resto solo el nombre",
+            "speed": "La última medición"
+        },
+        "included": "Incluidos con su valor",
+        "withheld": "Solo el nombre",
+        "loading": "Cargando contenido...",
+        "loadFailed": "No se pudo cargar."
+    }
+}

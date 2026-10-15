@@ -1,0 +1,124 @@
+{
+    "page": {
+        "title": "Diagnostics",
+        "description": "Checks on this server, its speed, and a bundle to share when asking for help."
+    },
+    "status": {
+        "pass": "OK",
+        "warn": "Warning",
+        "fail": "Problem",
+        "unknown": "Unknown",
+        "skip": "Not applicable",
+        "timeout": "Did not answer in time.",
+        "failedToRun": "Could not run this check."
+    },
+    "checks": {
+        "heading": "Health checks",
+        "runAll": "Check again",
+        "summary": "{fail, plural, =0 {No problems} one {# problem} other {# problems}}, {warn, plural, =0 {no warnings} one {# warning} other {# warnings}}",
+        "database": {
+            "title": "Database server",
+            "ok": "Answering in {ms} ms.",
+            "slow": "Answering, but slowly: {ms} ms.",
+            "unreachable": "Not answering. Pages that read data will fail until it does. If this lasts a few minutes, restart the machine Polaris runs on; if it persists, send the support bundle when asking for help."
+        },
+        "hostAgent": {
+            "title": "Host agent",
+            "ok": "Full edition, agent version {version}.",
+            "limited": "Limited edition: updates, deploys and disk cleanup are not available from here.",
+            "silent": "The host agent stopped answering, so updates and deploys are paused. It usually recovers within a minute. If not, restart the machine Polaris runs on; if it persists, send the support bundle when asking for help."
+        },
+        "updates": {
+            "title": "Updates",
+            "ok": "Up to date ({version}).",
+            "behind": "{behind, plural, =0 {An update is available} one {# update behind} other {# updates behind}}. Running {version}.",
+            "unreachable": "Could not check for updates right now."
+        },
+        "disk": {
+            "title": "Disk space",
+            "ok": "{freeGb} GB free, {percent}% used.",
+            "low": "Running low: {freeGb} GB free, {percent}% used.",
+            "critical": "Almost full: {freeGb} GB free. Deploys and updates may fail.",
+            "unreadable": "The disk could not be read from here."
+        },
+        "edge": {
+            "title": "Routing",
+            "ok": "{count, plural, one {# route file} other {# route files}} in place.",
+            "empty": "Empty route file: {files}. Every address it serves is down until it is written again.",
+            "unreadable": "The route files could not be read from here."
+        },
+        "addresses": {
+            "title": "Addresses",
+            "ok": "{count, plural, =0 {No addresses to check} one {The address answers} other {All # addresses answer}}.",
+            "someDown": "Not answering: {hosts}.",
+            "allDown": "No address answers: {hosts}.",
+            "unreachable": "Could not check the addresses right now."
+        },
+        "certificate": {
+            "title": "Certificate",
+            "ok": "{host}: valid for {days} more days.",
+            "expiring": "{host}: expires in {days, plural, one {# day} other {# days}}.",
+            "expired": "{host}: expired {days, plural, one {# day} other {# days}} ago.",
+            "untrusted": "{host}: browsers do not trust this certificate.",
+            "unreachable": "{host}: could not reach it from this server to read the certificate.",
+            "noDomain": "No public domain is set for this dashboard."
+        },
+        "dns": {
+            "title": "DNS",
+            "ok": "{host} points to {address}.",
+            "unresolved": "{host} does not resolve. Check its DNS record.",
+            "noDomain": "No public domain is set for this dashboard."
+        },
+        "clock": {
+            "title": "Clock",
+            "ok": "In sync (within {seconds} s).",
+            "skewed": "Off by {seconds} s. Sign-in codes and certificates can fail. Turn on automatic time sync (NTP) on the machine Polaris runs on.",
+            "unreachable": "Could not reach the internet to compare the time."
+        }
+    },
+    "fix": {
+        "republishRoutes": "Republish routes",
+        "freeSpace": "Free up space",
+        "openSettings": "Open settings",
+        "openDomains": "Open domains",
+        "done": "Done. The check was run again.",
+        "failed": "That did not work. The check below shows where it stands."
+    },
+    "speed": {
+        "heading": "Speed test",
+        "description": "Measured from this server to a public test service (Cloudflare), not from your browser. Uses about 12 MB.",
+        "run": "Run speed test",
+        "running": "Testing...",
+        "download": "Download",
+        "upload": "Upload",
+        "latency": "Latency",
+        "mbps": "{value} Mbps",
+        "ms": "{value} ms",
+        "none": "Not measured",
+        "never": "No test has run yet.",
+        "lastRun": "Last run",
+        "busy": "A test is already running.",
+        "limited": "Limit reached. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+        "failed": "The test could not run."
+    },
+    "bundle": {
+        "heading": "Support bundle",
+        "description": "A zip file to share when asking for help. Passwords, keys and tokens are never included.",
+        "contents": "What it contains",
+        "download": "Download bundle",
+        "preparing": "Preparing...",
+        "limited": "Limit reached. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+        "failed": "The bundle could not be built. Try again.",
+        "files": {
+            "manifest": "Versions, edition and system details",
+            "diagnosis": "The results of the checks above",
+            "errors": "Recent errors in Polaris itself",
+            "config": "Settings: safe values in full, the rest by name only",
+            "speed": "The last speed test"
+        },
+        "included": "Included with their value",
+        "withheld": "Included by name only",
+        "loading": "Loading contents...",
+        "loadFailed": "Could not load the contents."
+    }
+}
