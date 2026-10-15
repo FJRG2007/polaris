@@ -68,6 +68,15 @@ export async function subjectBelongsToOwner(
     return connection != null;
 }
 
+/** Whether every one of these server subjects is the owner's, in one read
+ *  rather than one per server. The box Polaris runs on is everybody's, as above. */
+export async function hostsBelongToOwner(subjectIds: readonly string[], ownerId: string): Promise<boolean> {
+    const ids = [...new Set(subjectIds)].filter((id) => id !== LOCAL_HOST_SUBJECT);
+    if (ids.length === 0) return true;
+    const owned = await prisma.host.count({ where: { id: { in: ids }, ownerId } });
+    return owned === ids.length;
+}
+
 function num(value: bigint | null): number | null {
     return value == null ? null : Number(value);
 }

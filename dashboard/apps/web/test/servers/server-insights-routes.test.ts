@@ -29,8 +29,8 @@ vi.mock("@/lib/metrics-history-service", () => ({
         seriesRead.push(input);
         return input.subjectId === THEIRS ? null : [{ t: 1, cpuPercent: 5 }];
     },
-    subjectBelongsToOwner: async (_type: string, subject: string, owner: string) =>
-        subject !== THEIRS && owner === OWNER
+    hostsBelongToOwner: async (subjects: string[], owner: string) =>
+        !subjects.includes(THEIRS) && owner === OWNER
 }));
 vi.mock("@/lib/server-insights/insights", () => ({
     readServerInsights: async (subjects: string[]) => {

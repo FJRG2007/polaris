@@ -1,7 +1,7 @@
 import { apiPermission } from "@/lib/api-session";
 import { hostSubject } from "@/lib/metrics-shared";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { subjectBelongsToOwner } from "@/lib/metrics-history-service";
+import { hostsBelongToOwner } from "@/lib/metrics-history-service";
 import { readServerInsights } from "@/lib/server-insights/insights";
 import { INSIGHTS_MAX, serverIdsSchema } from "@/lib/server-insights/request";
 
@@ -18,8 +18,7 @@ export async function GET(request: Request): Promise<Response> {
     const ids = serverIdsSchema(INSIGHTS_MAX).safeParse(new URL(request.url).searchParams.get("ids") ?? "");
     if (!ids.success) return Response.json({ error: t("errors.invalidRequest") }, { status: 400 });
     const subjects = ids.data.map(hostSubject);
-    const owned = await Promise.all(subjects.map((subject) => subjectBelongsToOwner("host", subject, user.id)));
-    if (owned.includes(false)) return Response.json({ error: t("errors.notFound") }, { status: 404 });
+    if (!(await hostsBelongToOwner(subjects, user.id))) return Response.json({ error: t("errors.notFound") }, { status: 404 });
     const insights = await readServerInsights(subjects);
     return Response.json({
         servers: insights.map((insight, index) => ({ ...insight, id: ids.data[index]! }))
