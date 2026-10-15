@@ -675,5 +675,62 @@
             "required": "Obligatorio",
             "other": "No es válido"
         }
+    },
+    "metrics": {
+        "cpu": "CPU",
+        "memory": "Memoria",
+        "disk": "Disco",
+        "network": "Red"
+    },
+    "compare": {
+        "heading": "Comparar servidores",
+        "description": "Elige de dos a cuatro servidores y lee su carga en los mismos ejes.",
+        "pick": "Servidores a comparar",
+        "picked": "{count} de {max} elegidos",
+        "maxReached": "Hasta {max} servidores a la vez. Quita uno para añadir otro.",
+        "needTwo": "Elige al menos dos servidores para compararlos.",
+        "onlyOne": "Por ahora solo hay un servidor. Añade otro en Servidores para compararlos.",
+        "range": "Periodo",
+        "now": "Ahora mismo",
+        "server": "Servidor",
+        "noReading": "Sin lectura",
+        "failed": "No se pudo leer el historial: {reason}",
+        "retry": "Reintentar"
+    },
+    "insights": {
+        "heading": "Análisis de servidores",
+        "description": "Tramos inusuales en la carga de cada servidor, y cuándo se llena su disco al ritmo actual.",
+        "failed": "No se pudo leer el análisis: {reason}",
+        "forecast": {
+            "heading": "Previsión de disco",
+            "filling": "Lleno en unos {days, plural, one {# día} other {# días}}",
+            "soon": "Lleno en menos de un día",
+            "full": "Lleno ya",
+            "steady": "No está creciendo",
+            "insufficient": "Aún no hay historial suficiente. Una previsión necesita {needed} días de lecturas.",
+            "growing": "Crece {rate} al día",
+            "shrinking": "Se reduce {rate} al día",
+            "used": "{used} de {total} en uso",
+            "basis": "Tendencia de {days, plural, one {el último día} other {los últimos # días}}",
+            "warn": "Se llena pronto"
+        },
+        "anomalies": {
+            "heading": "Actividad inusual",
+            "hint": "Cada hora se compara con el día anterior, y aparece si se aleja de la mediana al menos 3,5 veces la variación habitual.",
+            "none": "Nada inusual en los últimos 7 días.",
+            "when": "Cuándo",
+            "metric": "Métrica",
+            "reading": "Lectura",
+            "distance": "Distancia",
+            "high": "Inusualmente alto",
+            "low": "Inusualmente bajo",
+            "value": "{value}, lo normal es {usual}",
+            "score": "{score}x la variación normal",
+            "lasted": "hasta {time}",
+            "warning": "Notable",
+            "danger": "Grave",
+            "allServers": "Todos",
+            "filter": "Ver anomalías de"
+        }
     }
 }

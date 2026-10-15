@@ -316,5 +316,19 @@
     "webhooks": {
         "disabledTitle": "Webhook desactivado: {name}",
         "disabledBody": "Sus últimas cinco entregas fallaron, así que Polaris dejó de enviarle. Arregla el destino y vuelve a activarlo en Webhooks."
+    },
+    "serverInsights": {
+        "highTitle": "{server}: {metric} inusualmente alto",
+        "lowTitle": "{server}: {metric} inusualmente bajo",
+        "anomalyBody": "Llegó a {value}, cuando lo normal ronda {usual}.",
+        "fillsTitle": "El disco de {server} se llena en unos {days, plural, one {# día} other {# días}}",
+        "fullTitle": "El disco de {server} está lleno",
+        "fillsBody": "Ha crecido {rate} al día y quedan {free}. Abre el servidor para ver qué lo ocupa.",
+        "metrics": {
+            "cpu": "CPU",
+            "memory": "Memoria",
+            "disk": "Disco",
+            "network": "Tráfico de red"
+        }
     }
 }

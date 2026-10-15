@@ -400,6 +400,14 @@
             "label": "A server is running out of room",
             "description": "Polaris freed everything nothing was using and the disk is still nearly full."
         },
+        "serverAnomaly": {
+            "label": "A server is behaving unusually",
+            "description": "A server's CPU, memory, disk or traffic moved far from what it usually is."
+        },
+        "serverForecast": {
+            "label": "A server's disk will fill soon",
+            "description": "At the rate it has been growing, a server's disk fills within two weeks."
+        },
         "mailserverInbound": {
             "label": "Mail matched a rule",
             "description": "A message arrived at a mail server you run and matched one of its rules."

@@ -316,5 +316,19 @@
     "webhooks": {
         "disabledTitle": "Webhook switched off: {name}",
         "disabledBody": "Its last five deliveries failed, so Polaris stopped sending to it. Fix the endpoint, then switch it back on in Webhooks."
+    },
+    "serverInsights": {
+        "highTitle": "{server}: {metric} is unusually high",
+        "lowTitle": "{server}: {metric} is unusually low",
+        "anomalyBody": "It reached {value}, where it usually sits around {usual}.",
+        "fillsTitle": "{server}'s disk fills in about {days, plural, one {# day} other {# days}}",
+        "fullTitle": "{server}'s disk is full",
+        "fillsBody": "It has been growing {rate} a day and {free} is left. Open the server to see what is using it.",
+        "metrics": {
+            "cpu": "CPU",
+            "memory": "Memory",
+            "disk": "Disk",
+            "network": "Network traffic"
+        }
     }
 }

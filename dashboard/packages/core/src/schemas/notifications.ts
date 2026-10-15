@@ -621,6 +621,24 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "server.anomaly",
+        group: "deploy",
+        label: "A server is behaving unusually",
+        description: "A server's CPU, memory, disk or traffic moved far from what it usually is.",
+        level: "warning",
+        // In the bell only: an unusual hour is worth a look, not a mail, and a
+        // busy machine can have several of them in a day.
+        defaults: { inapp: true, email: false }
+    },
+    {
+        id: "server.forecast",
+        group: "deploy",
+        label: "A server's disk will fill soon",
+        description: "At the rate it has been growing, a server's disk fills within two weeks.",
+        level: "warning",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "mailserver.inbound",
         group: "mail",
         label: "Mail matched a rule",
