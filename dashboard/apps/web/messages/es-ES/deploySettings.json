@@ -359,7 +359,9 @@
         "copy": "Copiar enlace",
         "done": "Hecho",
         "actionCount": "{count, plural, one {# acción} other {# acciones}}",
-        "lastRun": "última vez {date}",
+        "neverRan": "Sin ejecutar",
+        "showRuns": "Ver historial",
+        "hideRuns": "Ocultar historial",
         "summary": {
             "webhook": "llamado en su propia dirección",
             "eventOn": "{event} en {service}"
@@ -396,6 +398,15 @@
             "creator": "No se ejecutó: quien lo guardó ya no puede desplegar lo que toca. Guárdalo de nuevo para que actúe como tú.",
             "busy": "No se ejecutó: la anterior seguía en curso.",
             "noActions": "No se ejecutó: no tiene acciones que se puedan leer."
+        },
+        "reasons": {
+            "gone": "El servicio ya no está en este proyecto.",
+            "failed": "No se pudo hacer la acción.",
+            "notRunning": "El servicio no está en marcha, así que no había dónde ejecutar el comando.",
+            "unreachable": "No se pudo contactar con el servidor donde corre el servicio.",
+            "timedOut": "El comando se detuvo al llegar a su tiempo límite.",
+            "exited": "El comando terminó con un error.",
+            "notStarted": "No se pudo iniciar el comando."
         },
         "issues": {
             "name": "Ponle un nombre, de hasta 64 caracteres.",

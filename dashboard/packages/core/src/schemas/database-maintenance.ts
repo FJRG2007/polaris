@@ -310,6 +310,9 @@ export interface RestoreTarget {
     /** For a MongoDB replica set of several members, its seed list: the load
      *  goes to whichever member is primary, not to the container it runs in. */
     readonly seeds?: string;
+    /** For MongoDB, collections a copy left out of its dump: dropped before the
+     *  load, since `--drop` only replaces the collections the dump holds. */
+    readonly dropCollections?: readonly string[];
 }
 
 /**
@@ -455,7 +458,32 @@ export function restoreCommands(target: RestoreTarget): MaintenanceCommand[] {
     const from = target.sourceDatabase ?? target.database;
     const rename =
         from !== target.database ? [`--nsFrom=${from}.*`, `--nsTo=${target.database}.*`] : [];
+    const dropped = target.dropCollections ?? [];
+    for (const name of dropped)
+        if (!COPY_TABLE_PATTERN.test(name)) throw new Error("A collection name is letters, digits and underscores");
+    const drop: MaintenanceCommand[] =
+        dropped.length > 0
+            ? [
+                  {
+                      argv: [
+                          "mongosh",
+                          "--quiet",
+                          ...(target.seeds ? [`--host=${target.seeds}`] : []),
+                          "-u",
+                          target.adminUser,
+                          "-p",
+                          target.adminPassword,
+                          "--authenticationDatabase",
+                          "admin",
+                          "--eval",
+                          `const target = db.getSiblingDB(${JSON.stringify(target.database)}); for (const name of ${JSON.stringify(dropped)}) target.getCollection(name).drop();`
+                      ],
+                      describe: "Removing the collections left out"
+                  }
+              ]
+            : [];
     return [
+        ...drop,
         {
             argv: [
                 "mongorestore",

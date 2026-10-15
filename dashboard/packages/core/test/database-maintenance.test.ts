@@ -88,6 +88,25 @@ describe("restoreCommands", () => {
         expect(load!.argv).toContain("--nsTo=shop.*");
         expect(load!.argv).toContain("--drop");
     });
+
+    it("drops the MongoDB collections a copy left out before loading, so none of their old documents stay", () => {
+        const steps = core.restoreCommands({
+            ...POSTGRES,
+            engine: "mongo",
+            dropCollections: ["sessions", "audit_log"]
+        });
+        expect(steps).toHaveLength(2);
+        const [drop, load] = steps;
+        expect(drop!.argv[0]).toBe("mongosh");
+        expect(drop!.argv.at(-1)).toBe(
+            'const target = db.getSiblingDB("shop"); for (const name of ["sessions","audit_log"]) target.getCollection(name).drop();'
+        );
+        expect(load!.argv[0]).toBe("mongorestore");
+        expect(core.restoreCommands({ ...POSTGRES, engine: "mongo" })).toHaveLength(1);
+        expect(() =>
+            core.restoreCommands({ ...POSTGRES, engine: "mongo", dropCollections: ['x"]); db.dropDatabase(); //'] })
+        ).toThrow();
+    });
 });
 
 describe("readinessCommand", () => {

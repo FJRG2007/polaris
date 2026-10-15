@@ -212,7 +212,13 @@ async function copyFromManaged(
         await restoreDumpInto(
             into,
             { local: artifact.path },
-            { operation, sourceDatabase: from.own.database }
+            {
+                operation,
+                sourceDatabase: from.own.database,
+                ...(from.engine === "mongo" && tables
+                    ? { dropCollections: [...tables.skip, ...tables.structureOnly] }
+                    : {})
+            }
         );
     } finally {
         await artifact.cleanup();

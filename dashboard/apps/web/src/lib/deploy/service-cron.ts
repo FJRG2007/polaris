@@ -310,12 +310,16 @@ async function startRun(
 const WRAPPER =
     'if command -v timeout >/dev/null 2>&1; then exec timeout "$2" sh -c "$1"; else exec sh -c "$1"; fi';
 
+/** Why a command in a service did not succeed, as a code a screen words itself. */
+export type ServiceCommandFailure = "notRunning" | "unreachable" | "timedOut" | "exited" | "notStarted";
+
 /** What one command run inside a service's container came to. */
 export interface ServiceCommandOutcome {
     readonly status: "succeeded" | "failed" | "timed_out";
     readonly exitCode: number | null;
     readonly output: string;
     readonly error: string | null;
+    readonly reason: ServiceCommandFailure | null;
 }
 
 /**
@@ -334,14 +338,17 @@ export async function runInService(
     let exitCode: number | null = null;
     let output = "";
     let error: string | null = null;
+    let reason: ServiceCommandFailure | null = null;
 
     if (!app.currentDeploymentId || app.desiredState !== "running") {
         error = "The service is not running, so there was nothing to run the command in.";
+        reason = "notRunning";
     } else {
         const release = await currentReleaseRef(app);
         const ports = await getPorts(app.target as TargetRow, ownerId).catch(() => null);
         if (!ports) {
             error = "The server the service runs on could not be reached.";
+            reason = "unreachable";
         } else {
             let timer: ReturnType<typeof setTimeout> | undefined;
             try {
@@ -364,6 +371,7 @@ export async function runInService(
                 if (outcome === "timeout") {
                     status = "timed_out";
                     error = `Stopped after ${timeoutSeconds} seconds.`;
+                    reason = "timedOut";
                 } else {
                     exitCode = outcome.code;
                     output = outcome.output.slice(-CRON_OUTPUT_LIMIT);
@@ -374,20 +382,25 @@ export async function runInService(
                             : outcome.code === 124
                               ? "timed_out"
                               : "failed";
-                    if (status === "timed_out")
+                    if (status === "timed_out") {
                         error = `Stopped after ${timeoutSeconds} seconds.`;
-                    else if (status === "failed") error = `Exited with code ${outcome.code}.`;
+                        reason = "timedOut";
+                    } else if (status === "failed") {
+                        error = `Exited with code ${outcome.code}.`;
+                        reason = "exited";
+                    }
                 }
             } catch (caught) {
                 error =
                     caught instanceof Error ? caught.message : "The command could not be started.";
+                reason = "notStarted";
             } finally {
                 if (timer) clearTimeout(timer);
                 await ports.dispose().catch(() => undefined);
             }
         }
     }
-    return { status, exitCode, output, error };
+    return { status, exitCode, output, error, reason };
 }
 
 async function execute(runId: string): Promise<void> {

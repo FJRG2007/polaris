@@ -41,12 +41,13 @@ const REDIS_SYNC_WAIT_MS = 30 * 60_000;
  * dumped straight there. Either way the file inside is removed afterwards.
  *
  * `sourceDatabase` names the database a MongoDB dump was taken from when it is
- * not the one being restored into - a copy between databases.
+ * not the one being restored into - a copy between databases, and
+ * `dropCollections` the MongoDB collections that copy left out of its dump.
  */
 export async function restoreDumpInto(
     context: InstanceContext,
     file: { readonly local: string } | { readonly inside: string },
-    options: { operation: OperationHandle; sourceDatabase?: string }
+    options: { operation: OperationHandle; sourceDatabase?: string; dropCollections?: readonly string[] }
 ): Promise<void> {
     const engine = context.engine;
     if (engine === "seaweedfs") {
@@ -90,7 +91,8 @@ export async function restoreDumpInto(
                 hosted: context.hosted,
                 file: inside,
                 ...(options.sourceDatabase ? { sourceDatabase: options.sourceDatabase } : {}),
-                ...(context.mongoSeeds ? { seeds: context.mongoSeeds } : {})
+                ...(context.mongoSeeds ? { seeds: context.mongoSeeds } : {}),
+                ...(options.dropCollections ? { dropCollections: options.dropCollections } : {})
             });
             for (const step of steps) {
                 await operation.step(step.describe);

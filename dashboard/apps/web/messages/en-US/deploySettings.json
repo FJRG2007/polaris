@@ -359,7 +359,9 @@
         "copy": "Copy address",
         "done": "Done",
         "actionCount": "{count, plural, one {# action} other {# actions}}",
-        "lastRun": "last run {date}",
+        "neverRan": "Never ran",
+        "showRuns": "Show run history",
+        "hideRuns": "Hide run history",
         "summary": {
             "webhook": "called at its own address",
             "eventOn": "{event} on {service}"
@@ -396,6 +398,15 @@
             "creator": "Did not run: whoever saved it can no longer deploy what it touches. Save it again to run it as you.",
             "busy": "Did not run: the previous run was still going.",
             "noActions": "Did not run: it has no actions it can still read."
+        },
+        "reasons": {
+            "gone": "The service is no longer in this project.",
+            "failed": "The action could not be done.",
+            "notRunning": "The service is not running, so there was nothing to run the command in.",
+            "unreachable": "The server the service runs on could not be reached.",
+            "timedOut": "The command was stopped at its time limit.",
+            "exited": "The command ended with an error.",
+            "notStarted": "The command could not be started."
         },
         "issues": {
             "name": "Give it a name, up to 64 characters.",

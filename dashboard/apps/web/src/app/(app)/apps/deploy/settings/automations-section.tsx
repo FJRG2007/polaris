@@ -21,9 +21,11 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type {
     AutomationServiceOption,
+    AutomationStepReason,
     DeployAutomationRunView,
     DeployAutomationView
 } from "@/lib/deploy/automations";
+import * as rules from "@polaris/ui/automation-rules";
 import {
     AddMenu,
     Field,
@@ -46,13 +48,11 @@ import {
     Input,
     Select,
     Skeleton,
-    Switch,
-    Textarea,
-    cn
+    Textarea
 } from "@polaris/ui";
 import {
-    ChevronRight,
     Clock,
+    History,
     Loader2,
     Pencil,
     Play,
@@ -96,6 +96,16 @@ const ACTION_LABELS = {
     notify: "automations.actions.notify"
 } as const satisfies Record<core.DeployAutomationActionType, Key>;
 
+const REASON_LABELS = {
+    gone: "automations.reasons.gone",
+    failed: "automations.reasons.failed",
+    notRunning: "automations.reasons.notRunning",
+    unreachable: "automations.reasons.unreachable",
+    timedOut: "automations.reasons.timedOut",
+    exited: "automations.reasons.exited",
+    notStarted: "automations.reasons.notStarted"
+} as const satisfies Record<AutomationStepReason, Key>;
+
 /** A schema complaint, by the field it is about, in the reader's language. */
 const ISSUE_LABELS: Record<string, Key> = {
     name: "automations.issues.name",
@@ -110,12 +120,12 @@ const ISSUE_LABELS: Record<string, Key> = {
     actions: "automations.issues.actions"
 };
 
-const STATUS_CLASS: Record<string, string> = {
-    succeeded: "text-success",
-    failed: "text-danger",
-    timed_out: "text-danger",
-    running: "text-primary",
-    skipped: "text-muted-foreground"
+const STATUS_TONES: Record<string, rules.RuleTone> = {
+    succeeded: "success",
+    failed: "danger",
+    timed_out: "danger",
+    running: "active",
+    skipped: "muted"
 };
 
 const ANY_SERVICE = "any";
@@ -368,99 +378,112 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
 
             {error && <p className="text-sm text-danger">{error}</p>}
 
-            <div className="overflow-hidden rounded-md border border-border/60">
-                {loadError ? (
-                    <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
-                        <p className="text-sm text-danger">{loadError}</p>
-                        <Button size="sm" variant="outline" onClick={load}>
-                            {t("automations.retry")}
-                        </Button>
-                    </div>
-                ) : data === null ? (
-                    <div className="flex flex-col gap-2 p-3" aria-busy="true">
-                        <Skeleton className="h-10 w-full" />
-                        <Skeleton className="h-10 w-full" />
-                    </div>
-                ) : data.automations.length === 0 ? (
-                    <div className="flex flex-col items-center gap-1 px-3 py-8 text-center">
-                        <Workflow className="size-5 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">{t("automations.empty")}</p>
-                    </div>
-                ) : (
-                    data.automations.map((rule) => (
-                        <div key={rule.id} className="border-b border-border/40 last:border-0">
-                            <div className="flex flex-wrap items-center gap-3 px-3 py-2.5">
-                                <button
-                                    type="button"
-                                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                                    aria-expanded={open === rule.id}
-                                    onClick={() => setOpen((held) => (held === rule.id ? null : rule.id))}
-                                >
-                                    <ChevronRight
-                                        className={cn(
-                                            "size-4 shrink-0 text-muted-foreground transition-transform",
-                                            open === rule.id && "rotate-90"
-                                        )}
+            {loadError ? (
+                <div className="flex flex-col items-center gap-2 rounded-md border border-border/60 px-3 py-8 text-center">
+                    <p className="text-sm text-danger">{loadError}</p>
+                    <Button size="sm" variant="outline" onClick={load}>
+                        {t("automations.retry")}
+                    </Button>
+                </div>
+            ) : data === null ? (
+                <div className="flex flex-col gap-2" aria-busy="true">
+                    <Skeleton className="h-14 w-full" />
+                    <Skeleton className="h-14 w-full" />
+                </div>
+            ) : data.automations.length === 0 ? (
+                <div className="flex flex-col items-center gap-1 rounded-md border border-border/60 px-3 py-8 text-center">
+                    <Workflow className="size-5 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{t("automations.empty")}</p>
+                </div>
+            ) : (
+                <rules.RuleList label={t("automations.title")}>
+                    {data.automations.map((rule) => (
+                        <rules.RuleRow
+                            key={rule.id}
+                            name={rule.name}
+                            summary={
+                                <>
+                                    {t(TRIGGER_LABELS[rule.trigger])}: {triggerSummary(rule, t, services)}
+                                    {" / "}
+                                    {t("automations.actionCount", { count: rule.actions.length })}
+                                </>
+                            }
+                            enabled={rule.enabled}
+                            onToggle={(checked) => toggle(rule, checked)}
+                            toggleLabel={t("automations.enabled")}
+                            toggleDisabled={!canEdit || pending}
+                            open={
+                                canEdit
+                                    ? ({ className, children }) => (
+                                          <button
+                                              type="button"
+                                              className={className}
+                                              title={t("automations.edit")}
+                                              onClick={() => setEditing(draftFrom(rule))}
+                                          >
+                                              {children}
+                                          </button>
+                                      )
+                                    : undefined
+                            }
+                            last={rule.lastRunAt ? outcomeOf(rule.lastStatus ?? "running", t) : null}
+                            lastRun={rule.lastRunAt ? display.dateTime(rule.lastRunAt) : null}
+                            neverRan={t("automations.neverRan")}
+                            detail={
+                                open === rule.id ? (
+                                    <RunHistory
+                                        key={runsKey}
+                                        projectId={projectId}
+                                        automationId={rule.id}
+                                        services={services}
                                     />
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-sm font-medium" title={rule.name}>
-                                            {rule.name}
-                                        </span>
-                                        <span className="block truncate text-xs text-muted-foreground">
-                                            {t(TRIGGER_LABELS[rule.trigger])}: {triggerSummary(rule, t, services)}
-                                            {" / "}
-                                            {t("automations.actionCount", { count: rule.actions.length })}
-                                            {rule.lastRunAt && (
-                                                <>
-                                                    {" / "}
-                                                    <span className={STATUS_CLASS[rule.lastStatus ?? ""]}>
-                                                        {t("automations.lastRun", {
-                                                            date: display.dateTime(rule.lastRunAt)
-                                                        })}
-                                                    </span>
-                                                </>
+                                ) : null
+                            }
+                            actions={
+                                <>
+                                    <rules.RuleAction
+                                        label={open === rule.id ? t("automations.hideRuns") : t("automations.showRuns")}
+                                        onClick={() => setOpen((held) => (held === rule.id ? null : rule.id))}
+                                    >
+                                        <History className="size-4" />
+                                    </rules.RuleAction>
+                                    {canEdit && (
+                                        <>
+                                            <rules.RuleAction
+                                                label={t("automations.runNow")}
+                                                disabled={pending}
+                                                onClick={() => run(rule)}
+                                            >
+                                                <Play className="size-4" />
+                                            </rules.RuleAction>
+                                            {rule.trigger === "webhook" && (
+                                                <rules.RuleAction
+                                                    label={t("automations.rotate")}
+                                                    onClick={() => setRotating(rule)}
+                                                >
+                                                    <RefreshCw className="size-4" />
+                                                </rules.RuleAction>
                                             )}
-                                        </span>
-                                    </span>
-                                </button>
-                                <Switch
-                                    checked={rule.enabled}
-                                    disabled={!canEdit || pending}
-                                    aria-label={t("automations.enabled")}
-                                    onChange={(checked) => toggle(rule, checked)}
-                                />
-                                {canEdit && (
-                                    <span className="flex shrink-0 items-center">
-                                        <IconButton label={t("automations.runNow")} disabled={pending} onClick={() => run(rule)}>
-                                            <Play className="size-4" />
-                                        </IconButton>
-                                        {rule.trigger === "webhook" && (
-                                            <IconButton label={t("automations.rotate")} onClick={() => setRotating(rule)}>
-                                                <RefreshCw className="size-4" />
-                                            </IconButton>
-                                        )}
-                                        <IconButton label={t("automations.edit")} onClick={() => setEditing(draftFrom(rule))}>
-                                            <Pencil className="size-4" />
-                                        </IconButton>
-                                        <IconButton label={t("automations.delete")} onClick={() => setDeleting(rule)}>
-                                            <Trash2 className="size-4" />
-                                        </IconButton>
-                                    </span>
-                                )}
-                            </div>
-                            {open === rule.id && (
-                                <RunHistory
-                                    key={runsKey}
-                                    projectId={projectId}
-                                    automationId={rule.id}
-                                    services={services}
-                                />
-                            )}
-                        </div>
-                    ))
-                )}
-            </div>
-
+                                            <rules.RuleAction
+                                                label={t("automations.edit")}
+                                                onClick={() => setEditing(draftFrom(rule))}
+                                            >
+                                                <Pencil className="size-4" />
+                                            </rules.RuleAction>
+                                            <rules.RuleAction
+                                                label={t("automations.delete")}
+                                                onClick={() => setDeleting(rule)}
+                                            >
+                                                <Trash2 className="size-4" />
+                                            </rules.RuleAction>
+                                        </>
+                                    )}
+                                </>
+                            }
+                        />
+                    ))}
+                </rules.RuleList>
+            )}
             {editing && data && (
                 <AutomationEditor
                     projectId={projectId}
@@ -528,30 +551,9 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
     );
 }
 
-function IconButton({
-    label,
-    disabled,
-    onClick,
-    children
-}: {
-    label: string;
-    disabled?: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <Button
-            size="sm"
-            variant="ghost"
-            className="size-8 p-0"
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            onClick={onClick}
-        >
-            {children}
-        </Button>
-    );
+/** A run's or a step's outcome, as the shared rule pieces draw it. */
+function outcomeOf(status: string, t: T): rules.RuleOutcome {
+    return { text: t(statusKey(status)), tone: STATUS_TONES[status] ?? "muted" };
 }
 
 /** A rule's recent runs, newest first, refreshed while one is still going. */
@@ -568,6 +570,7 @@ function RunHistory({
     const display = useDisplayFormat();
     const [runs, setRuns] = useState<DeployAutomationRunView[] | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState<string | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
@@ -582,6 +585,7 @@ function RunHistory({
                 const next = result.runs ?? [];
                 setError(null);
                 setRuns(next);
+                setExpanded((held) => held ?? next[0]?.id ?? null);
                 if (next.some((entry) => entry.status === "running")) timer.current = setTimeout(fetchRuns, 3000);
             });
         }
@@ -594,46 +598,48 @@ function RunHistory({
 
     const serviceName = (id: string | null) => services.find((entry) => entry.id === id)?.name ?? null;
 
-    if (error) return <p className="px-3 pb-3 text-sm text-danger">{error}</p>;
+    if (error) return <p className="text-sm text-danger">{error}</p>;
     if (runs === null) {
         return (
-            <div className="px-3 pb-3" aria-busy="true">
-                <Skeleton className="h-8 w-full" />
+            <div aria-busy="true">
+                <Skeleton className="h-9 w-full" />
             </div>
         );
     }
-    if (runs.length === 0) {
-        return <p className="px-3 pb-3 text-xs text-muted-foreground">{t("automations.runs.empty")}</p>;
-    }
+    if (runs.length === 0) return <p className="text-muted-foreground">{t("automations.runs.empty")}</p>;
     return (
-        <ol className="flex flex-col gap-2 px-3 pb-3" aria-label={t("automations.runs.title")}>
+        <rules.RunList label={t("automations.runs.title")}>
             {runs.map((entry) => (
-                <li key={entry.id} className="rounded-md bg-muted/40 px-3 py-2 text-xs">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        {entry.status === "running" && <Loader2 className="size-3.5 shrink-0 animate-spin" />}
-                        <span className={cn("font-medium", STATUS_CLASS[entry.status])}>
-                            {t(statusKey(entry.status))}
-                        </span>
-                        <span className="text-muted-foreground">{t(runTriggerKey(entry.trigger))}</span>
-                        <span className="text-muted-foreground">{display.dateTime(entry.startedAt)}</span>
-                    </div>
-                    {entry.note && <p className="mt-1 text-muted-foreground">{t(noteKey(entry.note))}</p>}
+                <rules.RunRow
+                    key={entry.id}
+                    outcome={outcomeOf(entry.status, t)}
+                    cause={t(runTriggerKey(entry.trigger))}
+                    at={display.dateTime(entry.startedAt)}
+                    expanded={expanded === entry.id}
+                    onToggle={() => setExpanded((held) => (held === entry.id ? null : entry.id))}
+                >
+                    {entry.note && <p className="text-xs text-muted-foreground">{t(noteKey(entry.note))}</p>}
                     {entry.steps.length > 0 && (
-                        <ol className="mt-1.5 flex flex-col gap-1">
+                        <ol className="flex flex-col gap-1.5 text-xs">
                             {entry.steps.map((step, index) => (
-                                <li key={index} className="min-w-0">
-                                    <p className="truncate">
-                                        <span className={STATUS_CLASS[step.status]}>{t(statusKey(step.status))}</span>
-                                        {" / "}
-                                        {t(ACTION_LABELS[step.type])}
-                                        {serviceName(step.applicationId) ? ` / ${serviceName(step.applicationId)}` : ""}
-                                        {step.exitCode !== undefined && step.exitCode !== null
-                                            ? ` / ${t("automations.runs.exit", { code: step.exitCode })}`
-                                            : ""}
-                                    </p>
-                                    {step.detail && <p className="break-words text-danger">{step.detail}</p>}
+                                <li key={index} className="flex min-w-0 flex-col gap-1">
+                                    <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                        <rules.OutcomeBadge outcome={outcomeOf(step.status, t)} />
+                                        <span className="min-w-0 truncate">
+                                            {t(ACTION_LABELS[step.type])}
+                                            {serviceName(step.applicationId) ? ` / ${serviceName(step.applicationId)}` : ""}
+                                            {step.exitCode !== undefined && step.exitCode !== null
+                                                ? ` / ${t("automations.runs.exit", { code: step.exitCode })}`
+                                                : ""}
+                                        </span>
+                                    </span>
+                                    {step.reason && (
+                                        <span className="break-words text-danger">
+                                            {t(REASON_LABELS[step.reason])}
+                                        </span>
+                                    )}
                                     {step.output && (
-                                        <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 font-mono text-[0.6875rem]">
+                                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 font-mono text-[0.6875rem]">
                                             {step.output}
                                         </pre>
                                     )}
@@ -641,12 +647,11 @@ function RunHistory({
                             ))}
                         </ol>
                     )}
-                </li>
+                </rules.RunRow>
             ))}
-        </ol>
+        </rules.RunList>
     );
 }
-
 function statusKey(status: string): Key {
     switch (status) {
         case "succeeded":

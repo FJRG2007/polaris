@@ -22,7 +22,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { runInService } from "./service-cron";
+import { runInService, type ServiceCommandFailure } from "./service-cron";
 import { userHasPermission } from "@polaris/auth";
 import { appBaseUrl } from "@/lib/domain-service";
 import * as deployService from "@/lib/deploy-service";
@@ -51,13 +51,26 @@ export type AutomationRunTrigger = "schedule" | "webhook" | "event" | "manual";
 /** Why a run did nothing at all, when it did nothing. */
 export type AutomationRunNote = "creator" | "busy" | "empty" | null;
 
+/** Why one action did not succeed, as a code the screen and the notice word. */
+export type AutomationStepReason = "gone" | "failed" | ServiceCommandFailure;
+
+export const AUTOMATION_STEP_REASONS: readonly AutomationStepReason[] = [
+    "gone",
+    "failed",
+    "notRunning",
+    "unreachable",
+    "timedOut",
+    "exited",
+    "notStarted"
+];
+
 /** One action of a run, as it went. */
 export interface AutomationStep {
     readonly type: core.DeployAutomationActionType;
     readonly applicationId: string | null;
     readonly status: "succeeded" | "failed" | "timed_out" | "skipped";
-    /** Why it failed, in the words of whatever refused it. */
-    readonly detail: string | null;
+    /** Why it did not succeed. */
+    readonly reason: AutomationStepReason | null;
     /** A command's exit code and the end of what it printed. */
     readonly exitCode?: number | null;
     readonly output?: string;
@@ -158,7 +171,14 @@ export function readRunLog(stored: string): { note: AutomationRunNote; steps: Au
         const raw = JSON.parse(stored) as { note?: unknown; steps?: unknown };
         const note =
             raw.note === "creator" || raw.note === "busy" || raw.note === "empty" ? raw.note : null;
-        return { note, steps: Array.isArray(raw.steps) ? (raw.steps as AutomationStep[]) : [] };
+        const steps = Array.isArray(raw.steps) ? (raw.steps as AutomationStep[]) : [];
+        return {
+            note,
+            steps: steps.map((step) => ({
+                ...step,
+                reason: AUTOMATION_STEP_REASONS.includes(step.reason as AutomationStepReason) ? step.reason : null
+            }))
+        };
     } catch {
         return { note: null, steps: [] };
     }
@@ -394,7 +414,10 @@ export async function listAutomationRuns(
 /** The services an automation would touch and whether it runs commands. */
 function reachOf(stored: { actions: string; eventApplicationId: string | null }) {
     const actions = core.readAutomationActions(stored.actions);
-    return { services: namedServices({ actions }), console: needsConsole(actions) };
+    return {
+        services: namedServices({ actions, eventApplicationId: stored.eventApplicationId }),
+        console: needsConsole(actions)
+    };
 }
 
 /**
@@ -672,8 +695,7 @@ export async function runAction(
                 where: { id: applicationId, binnedAt: null, environment: { projectId: context.project.id } },
                 select: { id: true }
             });
-            if (!inProject)
-                return { ...step, status: "failed", detail: "The service is no longer in this project." };
+            if (!inProject) return { ...step, status: "failed", reason: "gone" };
         }
         switch (action.type) {
             case "redeploy": {
@@ -683,22 +705,22 @@ export async function runAction(
                     context.actorId,
                     { trigger: "automation", audit: { automationId: context.automation.id } }
                 );
-                return { ...step, status: "succeeded", detail: null, deploymentId };
+                return { ...step, status: "succeeded", reason: null, deploymentId };
             }
             case "restart":
                 await deployService.restartApplication(action.applicationId, context.ownerId);
-                return { ...step, status: "succeeded", detail: null };
+                return { ...step, status: "succeeded", reason: null };
             case "command": {
                 const app = await prisma.application.findUnique({
                     where: { id: action.applicationId },
                     include: { target: true, environment: { select: { project: { select: { slug: true } } } } }
                 });
-                if (!app) return { ...step, status: "failed", detail: "The service is no longer in this project." };
+                if (!app) return { ...step, status: "failed", reason: "gone" };
                 const outcome = await runInService(app, context.ownerId, action.command, action.timeoutSeconds);
                 return {
                     ...step,
                     status: outcome.status,
-                    detail: outcome.error,
+                    reason: outcome.reason,
                     exitCode: outcome.exitCode,
                     output: outcome.output.slice(-AUTOMATION_OUTPUT_LIMIT)
                 };
@@ -715,15 +737,12 @@ export async function runAction(
                         metadata: { automationId: context.automation.id }
                     });
                 }
-                return { ...step, status: "succeeded", detail: null };
+                return { ...step, status: "succeeded", reason: null };
             }
         }
     } catch (caught) {
-        return {
-            ...step,
-            status: "failed",
-            detail: caught instanceof Error ? caught.message : "The action could not be done."
-        };
+        console.error(`polaris: automation ${context.automation.id} could not ${action.type}:`, caught);
+        return { ...step, status: "failed", reason: "failed" };
     }
 }
 
@@ -775,7 +794,7 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
                     type: action.type,
                     applicationId: "applicationId" in action ? action.applicationId : null,
                     status: "skipped",
-                    detail: null
+                    reason: null
                 });
                 continue;
             }
@@ -802,12 +821,17 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
     });
     await pruneRuns(automation.id);
 
-    // A manual run is being watched; anything else that failed is worth saying.
-    if (status === "failed" && run.trigger !== "manual") {
+    // A manual run is being watched; anything else that failed is worth saying,
+    // once: a maker who lost their access is said the first time, not on every
+    // firing until somebody saves the rule again.
+    const repeated = note === "creator" && (await refusedBefore(automation.id, runId));
+    if (status === "failed" && run.trigger !== "manual" && !repeated) {
         const people = new Set([project.ownerId]);
         if (automation.createdById) people.add(automation.createdById);
         for (const userId of people) {
             const t = await wordsFor(userId, "notices");
+            const reason = failedStep?.reason ?? null;
+            const reasons = reason ? await wordsFor(userId, "deploySettings") : null;
             await notify({
                 userId,
                 event: "deploy.automation.failed",
@@ -815,7 +839,9 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
                 body:
                     note === "creator"
                         ? t("automations.creatorBody")
-                        : (failedStep?.detail ?? t("automations.failedBody")),
+                        : reason && reasons
+                          ? reasons(`automations.reasons.${reason}`)
+                          : t("automations.failedBody"),
                 href: automationsHref(project.id),
                 shelf: { orgId: project.orgId },
                 actionRequired: true,
@@ -823,6 +849,16 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
             }).catch(() => undefined);
         }
     }
+}
+
+/** Whether the run before this one was already refused for its maker's reach. */
+async function refusedBefore(automationId: string, runId: string): Promise<boolean> {
+    const previous = await prisma.deployAutomationRun.findFirst({
+        where: { automationId, id: { not: runId } },
+        orderBy: { startedAt: "desc" },
+        select: { log: true }
+    });
+    return previous !== null && readRunLog(previous.log).note === "creator";
 }
 
 /** Keep the newest runs of a rule and drop the rest. */

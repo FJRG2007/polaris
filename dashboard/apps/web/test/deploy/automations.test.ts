@@ -47,6 +47,7 @@ const OWNER = "00000000-0000-4000-8000-0000000000c0";
 let rules: RuleRow[] = [];
 let runs: RunRow[] = [];
 let goneServices = new Set<string>();
+let environments: Record<string, string> = {};
 let users: Record<string, { id: string; isAdmin: boolean; bannedAt: Date | null; disabledAt: Date | null }> = {};
 
 const matches = (row: Record<string, unknown>, where: Record<string, unknown>): boolean =>
@@ -54,7 +55,8 @@ const matches = (row: Record<string, unknown>, where: Record<string, unknown>): 
         if (key === "project" || key === "automation") return true;
         const value = row[key];
         if (wanted && typeof wanted === "object" && !(wanted instanceof Date)) {
-            const cond = wanted as { lte?: Date; gt?: Date };
+            const cond = wanted as { lte?: Date; gt?: Date; not?: unknown };
+            if ("not" in cond) return value !== cond.not;
             if (cond.lte) return value instanceof Date && value <= cond.lte;
             if (cond.gt) return value instanceof Date && value > cond.gt;
             return true;
@@ -101,8 +103,10 @@ vi.mock("@polaris/db", () => ({
                 runs.push(row);
                 return row;
             },
-            findFirst: async ({ where }: { where: Record<string, unknown> }) =>
-                runs.find((row) => matches(row as never, where)) ?? null,
+            findFirst: async ({ where, orderBy }: { where: Record<string, unknown>; orderBy?: unknown }) =>
+                [...runs]
+                    .sort((a, b) => (orderBy ? b.startedAt.getTime() - a.startedAt.getTime() : 0))
+                    .find((row) => matches(row as never, where)) ?? null,
             findUnique: async ({ where }: { where: { id: string } }) => {
                 const run = runs.find((one) => one.id === where.id);
                 if (!run) return null;
@@ -129,7 +133,8 @@ vi.mock("@polaris/db", () => ({
             findFirst: async ({ where }: { where: { id: string } }) =>
                 goneServices.has(where.id) ? null : { id: where.id },
             findUnique: async ({ where }: { where: { id: string } }) => ({ id: where.id, name: "web" }),
-            findMany: async () => []
+            findMany: async ({ where }: { where: { id?: { in?: string[] } } }) =>
+                (where.id?.in ?? []).map((id) => ({ id, environmentId: environments[id] ?? "env-production" }))
         },
         user: {
             findUnique: async ({ where }: { where: { id: string } }) => users[where.id] ?? null
@@ -164,7 +169,8 @@ vi.mock("@/lib/deploy-project-access", () => ({
             : null,
     accessCan: (access: { capabilities: string[] }, capability: string) =>
         access.capabilities.includes(capability),
-    accessInEnvironment: () => true
+    accessInEnvironment: (access: { environmentIds: string[] | null }, environmentId: string) =>
+        access.environmentIds === null || access.environmentIds.includes(environmentId)
 }));
 
 const automations = await import("@/lib/deploy/automations");
@@ -207,6 +213,7 @@ beforeEach(() => {
     capabilities = ["project.read", "deploy.run", "console.use"];
     hasAccess = true;
     goneServices = new Set();
+    environments = {};
     runInService.mockReset();
     deployApplication.mockReset().mockResolvedValue("deployment-1");
     restartApplication.mockReset().mockResolvedValue(undefined);
@@ -298,7 +305,7 @@ describe("a run's actions", () => {
                 { type: "redeploy", applicationId: WORKER }
             ])
         });
-        runInService.mockResolvedValue({ status: "succeeded", error: null, exitCode: 0, output: "migrated 3" });
+        runInService.mockResolvedValue({ status: "succeeded", error: null, reason: null, exitCode: 0, output: "migrated 3" });
         await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
         await settled();
         expect(runInService).toHaveBeenCalledWith(expect.objectContaining({ id: WEB }), OWNER, "npm run migrate", 60);
@@ -315,7 +322,7 @@ describe("a run's actions", () => {
                 { type: "restart", applicationId: WEB }
             ])
         });
-        runInService.mockResolvedValue({ status: "failed", error: "exit 1", exitCode: 1, output: "boom" });
+        runInService.mockResolvedValue({ status: "failed", error: "exit 1", reason: "exited", exitCode: 1, output: "boom" });
         await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
         await settled();
         expect(restartApplication).not.toHaveBeenCalled();
@@ -323,8 +330,13 @@ describe("a run's actions", () => {
         const log = automations.readRunLog(runs[0]!.log);
         expect(log.steps.map((step) => step.status)).toEqual(["failed", "skipped"]);
         expect(notify).toHaveBeenCalledWith(
-            expect.objectContaining({ userId: OWNER, event: "deploy.automation.failed", body: "exit 1" })
+            expect.objectContaining({
+                userId: OWNER,
+                event: "deploy.automation.failed",
+                body: "automations.reasons.exited"
+            })
         );
+        expect(log.steps[0]).toMatchObject({ status: "failed", reason: "exited" });
     });
 
     it("do not run for somebody who may no longer deploy the project", async () => {
@@ -335,6 +347,37 @@ describe("a run's actions", () => {
         expect(restartApplication).not.toHaveBeenCalled();
         expect(runs[0]?.status).toBe("failed");
         expect(automations.readRunLog(runs[0]!.log).note).toBe("creator");
+    });
+
+    it("say once, not on every firing, that the maker may no longer deploy", async () => {
+        const due = rule({ trigger: "schedule", event: null, schedule: "* * * * *", nextRunAt: new Date() });
+        hasAccess = false;
+        await automations.tickDeployAutomations(new Date());
+        await settled();
+        expect(notify).toHaveBeenCalledTimes(2);
+        due.nextRunAt = new Date();
+        await automations.tickDeployAutomations(new Date(Date.now() + 60_000));
+        await settled();
+        expect(runs).toHaveLength(2);
+        expect(runs.every((run) => automations.readRunLog(run.log).note === "creator")).toBe(true);
+        expect(notify).toHaveBeenCalledTimes(2);
+    });
+
+    it("do not run once the service the rule follows is outside the maker's environments", async () => {
+        const one = rule({
+            eventApplicationId: WORKER,
+            actions: JSON.stringify([{ type: "notify", message: "Worker failed" }])
+        });
+        environments = { [WORKER]: "env-staging" };
+        const access = {
+            projectId: PROJECT,
+            ownerId: OWNER,
+            orgId: null,
+            capabilities: ["deploy.run"],
+            environmentIds: ["env-production"]
+        };
+        expect(await automations.accessReaches(access as never, one)).toBe(false);
+        expect(await automations.accessReaches({ ...access, environmentIds: ["env-staging"] } as never, one)).toBe(true);
     });
 
     it("do not run a command once the maker loses the console", async () => {
@@ -412,19 +455,20 @@ describe("the actions themselves", () => {
         await settled();
         expect(restartApplication).not.toHaveBeenCalled();
         const [step] = automations.readRunLog(runs[0]!.log).steps;
-        expect(step).toMatchObject({ status: "failed", detail: "The service is no longer in this project." });
+        expect(step).toMatchObject({ status: "failed", reason: "gone" });
     });
 
     it("turn a thrown error into a failed step instead of a lost run", async () => {
         rule();
-        restartApplication.mockRejectedValue(new Error("The server did not answer"));
+        restartApplication.mockRejectedValue(new Error("connect ECONNREFUSED /var/run/polaris.sock"));
+        const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
         await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
         await settled();
         expect(runs[0]?.status).toBe("failed");
-        expect(automations.readRunLog(runs[0]!.log).steps[0]).toMatchObject({
-            status: "failed",
-            detail: "The server did not answer"
-        });
+        expect(automations.readRunLog(runs[0]!.log).steps[0]).toMatchObject({ status: "failed", reason: "failed" });
+        expect(runs[0]!.log).not.toContain("ECONNREFUSED");
+        expect(logged).toHaveBeenCalled();
+        logged.mockRestore();
     });
 
     it("keep only the end of a long command's output", async () => {
@@ -432,7 +476,7 @@ describe("the actions themselves", () => {
             actions: JSON.stringify([{ type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }])
         });
         const output = `${"x".repeat(automations.AUTOMATION_OUTPUT_LIMIT)}the reason`;
-        runInService.mockResolvedValue({ status: "succeeded", error: null, exitCode: 0, output });
+        runInService.mockResolvedValue({ status: "succeeded", error: null, reason: null, exitCode: 0, output });
         await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
         await settled();
         const kept = automations.readRunLog(runs[0]!.log).steps[0]?.output ?? "";
@@ -536,7 +580,7 @@ describe("a manual run", () => {
 describe("the run history", () => {
     it("reads newest first, with each step", async () => {
         const one = rule();
-        const step = { type: "restart", applicationId: WEB, status: "succeeded", detail: null };
+        const step = { type: "restart", applicationId: WEB, status: "succeeded", reason: null };
         runs.push(
             {
                 id: "older",

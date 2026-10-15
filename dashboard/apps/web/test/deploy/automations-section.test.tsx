@@ -18,10 +18,11 @@ const PROJECT = "00000000-0000-4000-8000-000000000001";
 const WEB = "00000000-0000-4000-8000-0000000000a1";
 
 const listAutomationsAction = vi.fn();
+const listAutomationRunsAction = vi.fn();
 
 vi.mock("@/app/(app)/apps/deploy/automation-actions", () => ({
     listAutomationsAction: (projectId: string) => listAutomationsAction(projectId),
-    listAutomationRunsAction: vi.fn(async () => ({ runs: [] })),
+    listAutomationRunsAction: (input: unknown) => listAutomationRunsAction(input),
     saveAutomationAction: vi.fn(async () => ({})),
     setAutomationEnabledAction: vi.fn(async () => ({})),
     rotateAutomationWebhookAction: vi.fn(async () => ({})),
@@ -43,6 +44,7 @@ vi.mock("@/app/(app)/apps/deploy/project-settings", () => ({
 afterEach(() => {
     cleanup();
     listAutomationsAction.mockReset();
+    listAutomationRunsAction.mockReset();
 });
 
 const services = [{ id: WEB, name: "web", environmentId: "env-1", environmentName: "production" }];
@@ -110,6 +112,29 @@ describe("the Automations section", () => {
         expect(screen.getByText("Then")).toBeDefined();
         expect(screen.getByRole("button", { name: /Add action/ })).toBeDefined();
         expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+    });
+
+    it("shows a run's steps and why one failed, in the reader's words", async () => {
+        loaded({ automations: [rule({ lastRunAt: "2026-10-15T03:00:00.000Z", lastStatus: "failed" })] });
+        listAutomationRunsAction.mockResolvedValue({
+            runs: [
+                {
+                    id: "run-1",
+                    trigger: "event",
+                    status: "failed",
+                    note: null,
+                    steps: [{ type: "restart", applicationId: WEB, status: "failed", reason: "unreachable" }],
+                    startedAt: "2026-10-15T03:00:00.000Z",
+                    finishedAt: "2026-10-15T03:00:05.000Z"
+                }
+            ]
+        });
+        render(<AutomationsSection projectId={PROJECT} />, { wrapper: MessagesWrapper });
+        await screen.findByText("Restart after a failed deploy");
+        fireEvent.click(screen.getByRole("button", { name: "Show run history" }));
+        expect(await screen.findByText("The server the service runs on could not be reached.")).toBeDefined();
+        expect(screen.getByRole("list", { name: "Recent runs" })).toBeDefined();
+        expect(screen.getByRole("button", { name: "Hide run history" })).toBeDefined();
     });
 
     it("offers to try again when the list could not be read", async () => {

@@ -1259,8 +1259,7 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                     ) : null}
                     {!tablesCheck.success ? (
                         <p className="text-xs text-danger">
-                            {tablesCheck.error.issues[0]?.path.includes("structureOnly") &&
-                            tablesCheck.error.issues[0]?.message.includes("not both")
+                            {tablesCheck.error.issues.some((issue) => issue.code === "custom")
                                 ? t("database.copy.tablesTwice")
                                 : t("database.copy.tablesInvalid")}
                         </p>
