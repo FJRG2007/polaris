@@ -3231,7 +3231,7 @@
             "noSpaceSized": "The destination has {free} free and the data needs {needed}. Nothing was changed.",
             "mismatch": "The copy did not match the original, so the service stayed on the original.",
             "mismatchFile": "The copy of {file} did not match the original, so the service stayed on the original.",
-            "noLinks": "The destination could not store the link {file}, so nothing was copied. Links work on a NAS after the machine running Polaris restarts.",
+            "noLinks": "The destination could not store the link {file}, so nothing was copied. Try again: Polaris turns links on for the NAS first. If it still fails, links work there after the machine running Polaris restarts.",
             "unreadable": "Polaris could not read the original files. Nothing was changed.",
             "unwritable": "Polaris could not write to the destination. Check that the share's account can write there.",
             "mount": "Polaris could not mount the share. Test it under Locations.",

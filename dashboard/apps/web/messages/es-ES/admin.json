@@ -3231,7 +3231,7 @@
             "noSpaceSized": "El destino tiene {free} libres y los datos ocupan {needed}. No se cambió nada.",
             "mismatch": "La copia no coincidía con el original, así que el servicio siguió en el original.",
             "mismatchFile": "La copia de {file} no coincidía con el original, así que el servicio siguió en el original.",
-            "noLinks": "El destino no pudo guardar el enlace {file}, así que no se copió nada. Los enlaces funcionan en un NAS cuando se reinicia el equipo donde corre Polaris.",
+            "noLinks": "El destino no pudo guardar el enlace {file}, así que no se copió nada. Vuelve a intentarlo: Polaris activa antes los enlaces en el NAS. Si sigue fallando, los enlaces funcionan allí cuando se reinicia el equipo donde corre Polaris.",
             "unreadable": "Polaris no pudo leer los archivos originales. No se cambió nada.",
             "unwritable": "Polaris no pudo escribir en el destino. Comprueba que la cuenta del recurso puede escribir ahí.",
             "mount": "Polaris no pudo montar el recurso. Pruébalo en Ubicaciones.",

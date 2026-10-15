@@ -1484,8 +1484,6 @@ enum MountError {
 /// reboot) and act on it - a boot reconcile restarts the apps bound to it.
 #[cfg(unix)]
 fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, MountError> {
-    use std::process::Command;
-
     // Idempotent: a live mountpoint is already what the caller wants. Re-mounting
     // would stack mounts (SMB) or fail; deploys call this on every redeploy.
     //
@@ -1496,6 +1494,7 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     // lands on `create_dir_all` below, far from the cause.
     if is_mountpoint(target) {
         if mount_answers(target) {
+            apply_missing_flags(request, target);
             return Ok(false);
         }
         force_unmount(target)?;
@@ -1509,6 +1508,26 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
             "could not create the mount point".to_string(),
         ));
     }
+    let output = mount_command(request, target, false)?;
+    if output.status.success() {
+        return Ok(true);
+    }
+    Err(MountError::Failed(format!(
+        "mounting {} failed: {}",
+        request.source,
+        command_message(&output)
+    )))
+}
+
+/// Run `mount` for `request` onto `target`, or `-o remount` it in place.
+#[cfg(unix)]
+fn mount_command(
+    request: &MountRequest,
+    target: &std::path::Path,
+    remount: bool,
+) -> Result<std::process::Output, MountError> {
+    use std::process::Command;
+
     let fstype = match request.kind {
         MountKind::Smb => "cifs",
         MountKind::Nfs => "nfs",
@@ -1517,6 +1536,9 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     // pass `credentials=<file>` - so the password never shows in `ps`/argv or the
     // mount table. Removed right after the mount call (the kernel keeps the session).
     let mut opts: Vec<String> = Vec::new();
+    if remount {
+        opts.push("remount".to_string());
+    }
     let mut creds_file: Option<std::path::PathBuf> = None;
     if let (MountKind::Smb, Some(user), Some(pass)) =
         (&request.kind, &request.username, &request.password)
@@ -1548,18 +1570,102 @@ fn run_mount(request: &MountRequest, target: &std::path::Path) -> Result<bool, M
     if let Some(path) = creds_file {
         let _ = std::fs::remove_file(path);
     }
-    match output {
-        Ok(output) if output.status.success() => Ok(true),
-        Ok(output) => Err(MountError::Failed(format!(
-            "mounting {} failed: {}",
-            request.source,
-            command_message(&output)
-        ))),
-        Err(error) => {
-            eprintln!("could not run mount for {}: {error}", request.source);
-            Err(MountError::Failed("could not run mount".to_string()))
-        }
+    output.map_err(|error| {
+        eprintln!("could not run mount for {}: {error}", request.source);
+        MountError::Failed("could not run mount".to_string())
+    })
+}
+
+/// Re-apply, in place, the flags a live mount was asked for but does not carry.
+///
+/// A share mounted before Polaris asked for a flag keeps the options it was
+/// mounted with until something mounts it again, and nothing does while it
+/// answers. `mfsymlinks` is the one that made this matter: a share mounted
+/// without it refuses every link with "Not supported", so a game server's world
+/// could not move to the NAS until the machine restarted. A remount changes the
+/// superblock every container's bind of the share sees, without detaching it.
+///
+/// Tried once per share and option set for the daemon's lifetime: a flag the
+/// filesystem accepts but never lists would otherwise remount on every call. A
+/// remount the kernel refuses leaves the mount as it was, and is only logged:
+/// the share still works for everything but the missing flag.
+#[cfg(unix)]
+fn apply_missing_flags(request: &MountRequest, target: &std::path::Path) {
+    let Some(options) = request.options.as_deref() else {
+        return;
+    };
+    let Ok(table) = std::fs::read_to_string("/proc/self/mountinfo") else {
+        return;
+    };
+    let Some(shown) = mountinfo_options(&table, &target.to_string_lossy()) else {
+        return;
+    };
+    let missing = missing_flags(options, &shown);
+    if missing.is_empty() || !first_remount(&request.id, options) {
+        return;
     }
+    match mount_command(request, target, true) {
+        Ok(output) if output.status.success() => {
+            eprintln!("remounted {} to apply {}", request.id, missing.join(","))
+        }
+        Ok(output) => eprintln!(
+            "remounting {} to apply {} failed: {}",
+            request.id,
+            missing.join(","),
+            command_message(&output)
+        ),
+        Err(_) => {}
+    }
+}
+
+/// Whether this is the first remount of share `id` with `options`.
+#[cfg(unix)]
+fn first_remount(id: &str, options: &str) -> bool {
+    use std::collections::HashSet;
+    use std::sync::OnceLock;
+    static TRIED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    TRIED
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(format!("{id}\n{options}"))
+}
+
+/// The options a `/proc/self/mountinfo` table shows for mount point `point`: the
+/// per-mount ones and the filesystem's own, after the `-` separator. The last
+/// line wins, since that is the mount stacked on top. None when it is not listed.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn mountinfo_options(table: &str, point: &str) -> Option<Vec<String>> {
+    table
+        .lines()
+        .rev()
+        .map(|line| line.split(' ').collect::<Vec<_>>())
+        .find(|fields| fields.get(4).map(|f| f.replace("\\040", " ")).as_deref() == Some(point))
+        .map(|fields| {
+            let separator = fields.iter().position(|field| *field == "-");
+            let own = separator.and_then(|at| fields.get(at + 3)).copied();
+            [fields.get(5).copied(), own]
+                .into_iter()
+                .flatten()
+                .flat_map(|list| list.split(','))
+                .map(str::to_string)
+                .collect()
+        })
+}
+
+/// The bare flags (options without a value, like `mfsymlinks`) in a requested
+/// option string that a mount's `shown` options do not carry. Valued options are
+/// left out: the kernel prints many of them in another form than the one asked
+/// for, or not at all, and none of them is what a missing feature hangs on.
+#[cfg_attr(not(unix), allow(dead_code))]
+fn missing_flags(requested: &str, shown: &[String]) -> Vec<String> {
+    requested
+        .split(',')
+        .map(str::trim)
+        .filter(|option| !option.is_empty() && !option.contains('='))
+        .filter(|option| !shown.iter().any(|have| have == option))
+        .map(str::to_string)
+        .collect()
 }
 
 /// What a failed `mount`/`umount` said, as one line fit to show an operator.
@@ -1845,6 +1951,30 @@ mod tests {
         // A path under a mount point is not itself one.
         assert!(!mountinfo_lists(table, "/mnt/polaris/nas-1/sub"));
         assert!(!mountinfo_lists(table, "/mnt/polaris"));
+    }
+
+    /// A share mounted before `mfsymlinks` was asked for is remounted with it,
+    /// and one that already has every flag is left alone.
+    #[test]
+    fn a_live_mount_missing_a_requested_flag_is_found() {
+        let table = concat!(
+            "31 30 0:29 / /mnt/polaris/nas-1 rw,relatime - cifs //nas/share rw,vers=3.0,uid=0,nobrl\n",
+            "32 30 0:30 / /mnt/polaris/nas-2 rw,relatime - cifs //nas/other rw,vers=3.0,nobrl,mfsymlinks\n"
+        );
+        let requested = "vers=3.0,uid=0,gid=0,file_mode=0666,dir_mode=0777,nobrl,mfsymlinks";
+        let old = mountinfo_options(table, "/mnt/polaris/nas-1").unwrap();
+        assert_eq!(missing_flags(requested, &old), vec!["mfsymlinks"]);
+        let current = mountinfo_options(table, "/mnt/polaris/nas-2").unwrap();
+        assert!(missing_flags(requested, &current).is_empty());
+        assert!(mountinfo_options(table, "/mnt/polaris/nas-3").is_none());
+        // Per-mount options count too, and stacked mounts read as the top one.
+        let stacked = concat!(
+            "31 30 0:29 / /mnt/x rw - cifs //a/b rw\n",
+            "33 31 0:31 / /mnt/x ro,noatime - nfs a:/b rw,hard\n"
+        );
+        let top = mountinfo_options(stacked, "/mnt/x").unwrap();
+        assert!(missing_flags("noatime,hard", &top).is_empty());
+        assert_eq!(missing_flags("soft", &top), vec!["soft"]);
     }
 
     #[cfg(unix)]
