@@ -563,7 +563,7 @@ function GithubDialog(props: {
                         </Link>
                     </p>
                 ) : (
-                    <div className="flex max-h-80 flex-col gap-3 overflow-y-auto">
+                    <div className="flex max-h-80 flex-col gap-3 overflow-y-auto overscroll-contain">
                         {state.accounts.map((account) => (
                             <div key={account.login} className="flex flex-col gap-1">
                                 <span className="text-sm font-medium">{account.login}</span>
