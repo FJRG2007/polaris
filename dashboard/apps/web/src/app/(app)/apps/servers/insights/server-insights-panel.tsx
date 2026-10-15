@@ -28,7 +28,11 @@ import { formatMetric } from "./insight-format";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ANOMALY_MIN_HISTORY, FORECAST_DEFAULTS, type DiskForecast } from "@/lib/server-insights/stats";
+import {
+    ANOMALY_MIN_HISTORY,
+    FORECAST_DEFAULTS,
+    type DiskForecast
+} from "@/lib/server-insights/stats";
 import type { InsightAnomaly, ServerInsight } from "@/lib/server-insights/insights";
 
 /** The rollups behind this change once an hour; five minutes is plenty. */
@@ -84,29 +88,43 @@ function ForecastCard({
                     </Link>
                 ) : null}
                 {insight.diskWarning ? (
-                    <Badge variant={forecast.kind === "full" ? "danger" : "warning"} className="ml-auto shrink-0">
+                    <Badge
+                        variant={forecast.kind === "full" ? "danger" : "warning"}
+                        className="ml-auto shrink-0"
+                    >
                         {t("insights.forecast.warn")}
                     </Badge>
                 ) : null}
             </div>
-            <p className={forecast.kind === "insufficient" ? "text-xs text-muted-foreground" : "text-sm"}>
+            <p
+                className={
+                    forecast.kind === "insufficient" ? "text-xs text-muted-foreground" : "text-sm"
+                }
+            >
                 {forecastHeadline(forecast, t)}
             </p>
             {used != null && total != null ? (
                 <p className="text-xs text-muted-foreground">
-                    {t("insights.forecast.used", { used: formatBytes(used), total: formatBytes(total) })}
+                    {t("insights.forecast.used", {
+                        used: formatBytes(used),
+                        total: formatBytes(total)
+                    })}
                 </p>
             ) : null}
             {rate != null && forecast.kind !== "full" && Math.abs(rate) >= 1 ? (
                 <p className="text-xs text-muted-foreground">
                     {rate > 0
                         ? t("insights.forecast.growing", { rate: formatBytes(Math.round(rate)) })
-                        : t("insights.forecast.shrinking", { rate: formatBytes(Math.round(-rate)) })}
+                        : t("insights.forecast.shrinking", {
+                              rate: formatBytes(Math.round(-rate))
+                          })}
                 </p>
             ) : null}
             {"spanDays" in forecast && forecast.kind !== "insufficient" ? (
                 <p className="text-xs text-muted-foreground">
-                    {t("insights.forecast.basis", { days: Math.max(1, Math.round(forecast.spanDays)) })}
+                    {t("insights.forecast.basis", {
+                        days: Math.max(1, Math.round(forecast.spanDays))
+                    })}
                 </p>
             ) : null}
         </li>
@@ -129,12 +147,23 @@ function AnomalyRow({
     return (
         <li className="flex min-w-0 flex-col gap-1 py-2.5">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <Badge variant={anomaly.severity === "danger" ? "danger" : "warning"} className="shrink-0">
-                    {t(anomaly.severity === "danger" ? "insights.anomalies.danger" : "insights.anomalies.warning")}
+                <Badge
+                    variant={anomaly.severity === "danger" ? "danger" : "warning"}
+                    className="shrink-0"
+                >
+                    {t(
+                        anomaly.severity === "danger"
+                            ? "insights.anomalies.danger"
+                            : "insights.anomalies.warning"
+                    )}
                 </Badge>
                 <span className="text-sm font-medium">
                     {t(`metrics.${anomaly.metric}`)} -{" "}
-                    {t(anomaly.direction === "high" ? "insights.anomalies.high" : "insights.anomalies.low")}
+                    {t(
+                        anomaly.direction === "high"
+                            ? "insights.anomalies.high"
+                            : "insights.anomalies.low"
+                    )}
                 </span>
                 {showName ? (
                     <Link
@@ -147,8 +176,12 @@ function AnomalyRow({
                 ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-                <time dateTime={new Date(anomaly.start).toISOString()}>{display.dateTime(anomaly.start)}</time>
-                {anomaly.end > anomaly.start ? ` ${t("insights.anomalies.lasted", { time: display.time(anomaly.end) })}` : null}
+                <time dateTime={new Date(anomaly.start).toISOString()}>
+                    {display.dateTime(anomaly.start)}
+                </time>
+                {anomaly.end > anomaly.start
+                    ? ` ${t("insights.anomalies.lasted", { time: display.time(anomaly.end) })}`
+                    : null}
                 {" - "}
                 {t("insights.anomalies.value", { value, usual })}
             </p>
@@ -168,7 +201,9 @@ export function ServerInsightsPanel({
     const ids = servers.map((server) => server.id).join(",");
     const single = servers.length === 1;
     const [filter, setFilter] = useState<string | null>(
-        initialFilter && servers.some((server) => server.id === initialFilter) ? initialFilter : null
+        initialFilter && servers.some((server) => server.id === initialFilter)
+            ? initialFilter
+            : null
     );
     const { data, error, stale, loading, refresh } = useLiveResource<Answer>({
         url: `/api/servers/insights?ids=${encodeURIComponent(ids)}`,
@@ -184,9 +219,13 @@ export function ServerInsightsPanel({
     // An answer cached before the field existed counts as enough history.
     const tooNew =
         inScope.length > 0 &&
-        inScope.every((insight) => (insight.historyHours ?? Number.POSITIVE_INFINITY) <= ANOMALY_MIN_HISTORY);
+        inScope.every(
+            (insight) => (insight.historyHours ?? Number.POSITIVE_INFINITY) <= ANOMALY_MIN_HISTORY
+        );
     const anomalies = inScope
-        .flatMap((insight) => insight.anomalies.map((anomaly) => ({ anomaly, server: byId.get(insight.id)! })))
+        .flatMap((insight) =>
+            insight.anomalies.map((anomaly) => ({ anomaly, server: byId.get(insight.id)! }))
+        )
         .sort((a, b) => b.anomaly.start - a.anomaly.start);
     const failure = error ?? (data === null ? stale : null);
     const filterName = filter ? byId.get(filter)?.name : null;
@@ -213,7 +252,11 @@ export function ServerInsightsPanel({
                         ))}
                     </ul>
                 ) : (
-                    <ul className={single ? "grid gap-2" : "grid gap-2 sm:grid-cols-2 lg:grid-cols-3"}>
+                    <ul
+                        className={
+                            single ? "grid gap-2" : "grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                        }
+                    >
                         {answered.map((insight) => (
                             <ForecastCard
                                 key={insight.id}
@@ -247,13 +290,21 @@ export function ServerInsightsPanel({
                                     <ChevronDown className="size-4 shrink-0" aria-hidden />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto overscroll-y-contain">
+                            <DropdownMenuContent
+                                align="end"
+                                className="max-h-72 overflow-y-auto overscroll-y-contain"
+                            >
                                 <DropdownMenuItem onSelect={() => setFilter(null)}>
                                     {t("insights.anomalies.allServers")}
                                 </DropdownMenuItem>
                                 {servers.map((server) => (
-                                    <DropdownMenuItem key={server.id} onSelect={() => setFilter(server.id)}>
-                                        <span className="min-w-0 truncate" title={server.name}>{server.name}</span>
+                                    <DropdownMenuItem
+                                        key={server.id}
+                                        onSelect={() => setFilter(server.id)}
+                                    >
+                                        <span className="min-w-0 truncate" title={server.name}>
+                                            {server.name}
+                                        </span>
                                     </DropdownMenuItem>
                                 ))}
                             </DropdownMenuContent>

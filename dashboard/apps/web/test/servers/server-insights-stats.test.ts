@@ -12,7 +12,11 @@ import {
     slopePerDay,
     type ValuePoint
 } from "../../src/lib/server-insights/stats";
-import { forecastWarns, insightFromRows, type RollupRow } from "../../src/lib/server-insights/insights";
+import {
+    forecastWarns,
+    insightFromRows,
+    type RollupRow
+} from "../../src/lib/server-insights/insights";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -33,7 +37,15 @@ describe("bucketize", () => {
     });
 
     it("sorts its output and refuses a zero bucket", () => {
-        expect(bucketize([{ t: 2 * HOUR, v: 1 }, { t: 0, v: 2 }], HOUR).map((point) => point.t)).toEqual([0, 2 * HOUR]);
+        expect(
+            bucketize(
+                [
+                    { t: 2 * HOUR, v: 1 },
+                    { t: 0, v: 2 }
+                ],
+                HOUR
+            ).map((point) => point.t)
+        ).toEqual([0, 2 * HOUR]);
         expect(() => bucketize([], 0)).toThrow();
     });
 
@@ -52,7 +64,10 @@ describe("median", () => {
 
 /** A noisy but steady hourly series around `level`. */
 function steady(hours: number, level: number): ValuePoint[] {
-    return Array.from({ length: hours }, (_, index) => ({ t: index * HOUR, v: level + ((index * 7) % 5) - 2 }));
+    return Array.from({ length: hours }, (_, index) => ({
+        t: index * HOUR,
+        v: level + ((index * 7) % 5) - 2
+    }));
 }
 
 const OPTIONS = { window: 24, minHistory: 12, threshold: 3.5, minDelta: 15 };
@@ -67,7 +82,12 @@ describe("detectAnomalies", () => {
         points[40] = { t: 40 * HOUR, v: 95 };
         const found = detectAnomalies(points, OPTIONS);
         expect(found).toHaveLength(1);
-        expect(found[0]).toMatchObject({ start: 40 * HOUR, end: 40 * HOUR, direction: "high", peakValue: 95 });
+        expect(found[0]).toMatchObject({
+            start: 40 * HOUR,
+            end: 40 * HOUR,
+            direction: "high",
+            peakValue: 95
+        });
         expect(found[0]!.baseline).toBeGreaterThan(17);
         expect(found[0]!.baseline).toBeLessThan(23);
         expect(found[0]!.score).toBeGreaterThan(3.5);
@@ -80,7 +100,12 @@ describe("detectAnomalies", () => {
         points[32] = { t: 32 * HOUR, v: 75 };
         const found = detectAnomalies(points, OPTIONS);
         expect(found).toHaveLength(1);
-        expect(found[0]).toMatchObject({ start: 30 * HOUR, end: 32 * HOUR, peakAt: 31 * HOUR, peakValue: 90 });
+        expect(found[0]).toMatchObject({
+            start: 30 * HOUR,
+            end: 32 * HOUR,
+            peakAt: 31 * HOUR,
+            peakValue: 90
+        });
     });
 
     it("flags a drop as low", () => {
@@ -149,7 +174,13 @@ describe("forecastDisk", () => {
     });
 
     it("computes an exact least-squares slope", () => {
-        expect(slopePerDay([{ t: 0, used: 0 }, { t: DAY, used: 10 }, { t: 2 * DAY, used: 20 }])).toBeCloseTo(10);
+        expect(
+            slopePerDay([
+                { t: 0, used: 0 },
+                { t: DAY, used: 10 },
+                { t: 2 * DAY, used: 20 }
+            ])
+        ).toBeCloseTo(10);
         expect(slopePerDay([{ t: 0, used: 5 }])).toBe(0);
     });
 });

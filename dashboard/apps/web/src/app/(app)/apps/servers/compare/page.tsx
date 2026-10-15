@@ -14,13 +14,18 @@ export const dynamic = "force-dynamic";
 export default async function CompareServersPage({
     searchParams
 }: {
-    searchParams: Promise<{ ids?: string | string[]; range?: string | string[] }>
+    searchParams: Promise<{ ids?: string | string[]; range?: string | string[] }>;
 }) {
     const user = await requirePermission("system.manage");
-    const [rows, t, params] = await Promise.all([listServerRows(user.id), getTranslations("servers"), searchParams]);
+    const [rows, t, params] = await Promise.all([
+        listServerRows(user.id),
+        getTranslations("servers"),
+        searchParams
+    ]);
     const servers = rows.map((row) => ({ id: row.id, name: row.name }));
     const known = new Set(servers.map((server) => server.id));
-    const asked = typeof params.ids === "string" ? params.ids.split(",").filter((id) => known.has(id)) : [];
+    const asked =
+        typeof params.ids === "string" ? params.ids.split(",").filter((id) => known.has(id)) : [];
     const initialIds = [...new Set(asked)].slice(0, COMPARE_MAX);
     const range =
         typeof params.range === "string" && (RANGE_ORDER as string[]).includes(params.range)
@@ -31,7 +36,11 @@ export default async function CompareServersPage({
             <PageHeader title={t("compare.heading")} description={t("compare.description")} />
             <CompareView
                 servers={servers}
-                initialIds={initialIds.length > 0 ? initialIds : servers.slice(0, 2).map((server) => server.id)}
+                initialIds={
+                    initialIds.length > 0
+                        ? initialIds
+                        : servers.slice(0, 2).map((server) => server.id)
+                }
                 initialRange={range}
             />
         </>

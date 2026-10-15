@@ -19,7 +19,10 @@ const SERVERS = [
     { id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a51", name: "web-1" },
     { id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a52", name: "web-2" },
     { id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a53", name: "db-1" },
-    { id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a54", name: "a-server-with-a-very-long-name-that-has-to-truncate" }
+    {
+        id: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a54",
+        name: "a-server-with-a-very-long-name-that-has-to-truncate"
+    }
 ];
 
 const fetched: string[] = [];
@@ -43,14 +46,21 @@ afterEach(() => {
 describe("CompareView", () => {
     it("paints the picker, range and table headings before the history answers", () => {
         const { container } = render(
-            <CompareView servers={SERVERS} initialIds={["local", SERVERS[1]!.id]} initialRange="1d" />,
+            <CompareView
+                servers={SERVERS}
+                initialIds={["local", SERVERS[1]!.id]}
+                initialRange="1d"
+            />,
             { wrapper: MessagesWrapper }
         );
         expect(screen.getByText("Servers to compare")).toBeTruthy();
         expect(screen.getByText("2 of 4 chosen")).toBeTruthy();
         expect(screen.getByRole("radiogroup", { name: "Time range" })).toBeTruthy();
         expect(screen.getByRole("columnheader", { name: "CPU" })).toBeTruthy();
-        expect(screen.getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual(["polaris-box", "web-1"]);
+        expect(screen.getAllByRole("rowheader").map((cell) => cell.textContent)).toEqual([
+            "polaris-box",
+            "web-1"
+        ]);
         // Only the waiting regions are skeletons: four charts and eight cells.
         expect(container.querySelectorAll(".animate-pulse").length).toBe(12);
         expect(fetched[0]).toContain("/api/servers/compare?ids=local%2C");
@@ -67,22 +77,33 @@ describe("CompareView", () => {
 
     it("stops at four servers and says why", () => {
         render(
-            <CompareView servers={SERVERS} initialIds={SERVERS.slice(0, 4).map((one) => one.id)} initialRange="7d" />,
+            <CompareView
+                servers={SERVERS}
+                initialIds={SERVERS.slice(0, 4).map((one) => one.id)}
+                initialRange="7d"
+            />,
             { wrapper: MessagesWrapper }
         );
         const fifth = screen.getByRole("button", { name: /a-server-with-a-very-long-name/ });
         expect(fifth.getAttribute("aria-disabled")).toBe("true");
         fireEvent.click(fifth);
         expect(fifth.getAttribute("aria-pressed")).toBe("false");
-        expect(screen.getAllByText("Up to 4 servers at once. Remove one to add another.").length).toBeGreaterThan(0);
+        expect(
+            screen.getAllByText("Up to 4 servers at once. Remove one to add another.").length
+        ).toBeGreaterThan(0);
     });
 
     it("tells a reader with one server how to get another", () => {
-        render(<CompareView servers={SERVERS.slice(0, 1)} initialIds={["local"]} initialRange="1d" />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <CompareView servers={SERVERS.slice(0, 1)} initialIds={["local"]} initialRange="1d" />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(
-            screen.getByText("There is only one server so far. Add another under Servers to compare them.")
+            screen.getByText(
+                "There is only one server so far. Add another under Servers to compare them."
+            )
         ).toBeTruthy();
     });
 });
@@ -120,7 +141,12 @@ describe("ServerInsightsPanel", () => {
                             id: "local",
                             subject: "local",
                             anomalies: [],
-                            forecast: { kind: "insufficient", spanDays: 0.5, usedBytes: null, totalBytes: null },
+                            forecast: {
+                                kind: "insufficient",
+                                spanDays: 0.5,
+                                usedBytes: null,
+                                totalBytes: null
+                            },
                             diskWarning: false,
                             historyHours: 12
                         },
@@ -158,7 +184,9 @@ describe("ServerInsightsPanel", () => {
         render(<ServerInsightsPanel servers={SERVERS.slice(0, 2)} />, { wrapper: MessagesWrapper });
         // The headings are there before the answer.
         expect(screen.getByText("Disk forecast")).toBeTruthy();
-        expect(await screen.findByText("Not enough history yet. A forecast needs 2 days of readings.")).toBeTruthy();
+        expect(
+            await screen.findByText("Not enough history yet. A forecast needs 2 days of readings.")
+        ).toBeTruthy();
         expect(screen.getByText("Full in about 5 days")).toBeTruthy();
         expect(screen.getByText("Fills soon")).toBeTruthy();
         expect(screen.getByText("Severe")).toBeTruthy();
@@ -176,7 +204,12 @@ describe("ServerInsightsPanel", () => {
                             id: "local",
                             subject: "local",
                             anomalies: [],
-                            forecast: { kind: "insufficient", spanDays: 0.2, usedBytes: null, totalBytes: null },
+                            forecast: {
+                                kind: "insufficient",
+                                spanDays: 0.2,
+                                usedBytes: null,
+                                totalBytes: null
+                            },
                             diskWarning: false,
                             historyHours: 5
                         }
@@ -186,7 +219,9 @@ describe("ServerInsightsPanel", () => {
         );
         render(<ServerInsightsPanel servers={SERVERS.slice(0, 1)} />, { wrapper: MessagesWrapper });
         expect(
-            await screen.findByText("Not enough history yet. Unusual activity is spotted after 13 hours of readings.")
+            await screen.findByText(
+                "Not enough history yet. Unusual activity is spotted after 13 hours of readings."
+            )
         ).toBeTruthy();
         expect(screen.queryByText("Nothing unusual in the last 7 days.")).toBeNull();
     });

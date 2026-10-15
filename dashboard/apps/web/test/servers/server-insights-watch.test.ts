@@ -52,9 +52,17 @@ vi.mock("@/lib/server-insights/insights", () => ({
     }
 }));
 
-const { freshAnomalies, watchServerInsights } = await import("../../src/lib/server-insights/insights-watch");
+const { freshAnomalies, watchServerInsights } = await import(
+    "../../src/lib/server-insights/insights-watch"
+);
 
-const steady = { kind: "steady", usedBytes: 10, totalBytes: 100, bytesPerDay: 0, spanDays: 5 } as const;
+const steady = {
+    kind: "steady",
+    usedBytes: 10,
+    totalBytes: 100,
+    bytesPerDay: 0,
+    spanDays: 5
+} as const;
 
 function insight(subject: string, starts: number[], diskWarning = false): ServerInsight {
     return {
@@ -71,7 +79,14 @@ function insight(subject: string, starts: number[], diskWarning = false): Server
             severity: "danger"
         })),
         forecast: diskWarning
-            ? { kind: "filling", usedBytes: 90, totalBytes: 100, bytesPerDay: 5, spanDays: 5, days: 2 }
+            ? {
+                  kind: "filling",
+                  usedBytes: 90,
+                  totalBytes: 100,
+                  bytesPerDay: 5,
+                  spanDays: 5,
+                  days: 2
+              }
             : steady,
         diskWarning,
         historyHours: 200
@@ -87,7 +102,11 @@ beforeEach(() => {
 
 describe("freshAnomalies", () => {
     it("on a first run looks back only a few hours", () => {
-        const fresh = freshAnomalies([insight(HOST, [NOW.getTime() - 2 * HOUR, NOW.getTime() - 48 * HOUR])], null, NOW.getTime());
+        const fresh = freshAnomalies(
+            [insight(HOST, [NOW.getTime() - 2 * HOUR, NOW.getTime() - 48 * HOUR])],
+            null,
+            NOW.getTime()
+        );
         expect(fresh.map((one) => one.anomaly.start)).toEqual([NOW.getTime() - 2 * HOUR]);
     });
 
@@ -103,8 +122,18 @@ describe("watchServerInsights", () => {
         insights = [insight(HOST, [NOW.getTime() - HOUR]), insight(LOCAL, [NOW.getTime() - HOUR])];
         await watchServerInsights(NOW);
         expect(told).toEqual([
-            expect.objectContaining({ userId: "owner", event: "server.anomaly", level: "danger", audience: "you" }),
-            expect.objectContaining({ userId: "admin", event: "server.anomaly", level: "danger", audience: "admins" })
+            expect.objectContaining({
+                userId: "owner",
+                event: "server.anomaly",
+                level: "danger",
+                audience: "you"
+            }),
+            expect.objectContaining({
+                userId: "admin",
+                event: "server.anomaly",
+                level: "danger",
+                audience: "admins"
+            })
         ]);
     });
 
@@ -145,7 +174,14 @@ describe("watchServerInsights", () => {
         insights = [
             {
                 ...insight(HOST, [], false),
-                forecast: { kind: "filling", usedBytes: 80, totalBytes: 100, bytesPerDay: 1, spanDays: 5, days: 16 }
+                forecast: {
+                    kind: "filling",
+                    usedBytes: 80,
+                    totalBytes: 100,
+                    bytesPerDay: 1,
+                    spanDays: 5,
+                    days: 16
+                }
             }
         ];
         await watchServerInsights(NOW);
@@ -161,7 +197,10 @@ describe("watchServerInsights", () => {
             ownerId: "owner"
         }));
         hosts = [{ id: HOST, name: "web-1", ownerId: "owner" }, ...others];
-        insights = [insight(HOST, [NOW.getTime() - HOUR], true), insight(LOCAL, [NOW.getTime() - HOUR])];
+        insights = [
+            insight(HOST, [NOW.getTime() - HOUR], true),
+            insight(LOCAL, [NOW.getTime() - HOUR])
+        ];
         failAfter = 1;
         await expect(watchServerInsights(NOW)).rejects.toThrow("rollups unavailable");
         expect(told.map((one) => one.event).sort()).toEqual(["server.anomaly", "server.forecast"]);

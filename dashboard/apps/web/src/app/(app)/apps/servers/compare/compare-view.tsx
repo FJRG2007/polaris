@@ -30,7 +30,12 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { InsightMetric } from "@/lib/server-insights/insights";
-import { LIVE_INTERVAL_MS, RANGE_ORDER, type MetricPoint, type RangePreset } from "@/lib/metrics-shared";
+import {
+    LIVE_INTERVAL_MS,
+    RANGE_ORDER,
+    type MetricPoint,
+    type RangePreset
+} from "@/lib/metrics-shared";
 
 export interface CompareServer {
     id: string;
@@ -144,7 +149,9 @@ export function CompareView({
     const failure = error ?? (answer === null ? stale : null);
     const full = ids.length >= COMPARE_MAX;
     const formatTime = (at: number) =>
-        answer && answer.to - answer.from > 36 * 3_600_000 ? `${display.date(at)} ${display.time(at)}` : display.time(at);
+        answer && answer.to - answer.from > 36 * 3_600_000
+            ? `${display.date(at)} ${display.time(at)}`
+            : display.time(at);
 
     return (
         <div className="flex flex-col gap-5">
@@ -168,7 +175,11 @@ export function CompareView({
                                 type="button"
                                 aria-pressed={on}
                                 aria-disabled={blocked}
-                                title={blocked ? t("compare.maxReached", { max: COMPARE_MAX }) : server.name}
+                                title={
+                                    blocked
+                                        ? t("compare.maxReached", { max: COMPARE_MAX })
+                                        : server.name
+                                }
                                 onClick={() => (blocked ? undefined : toggle(server.id))}
                                 className={cn(
                                     "flex min-w-0 max-w-full items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
@@ -179,14 +190,18 @@ export function CompareView({
                                 )}
                             >
                                 {on ? <Swatch index={index} /> : null}
-                                <span className="min-w-0 truncate" title={server.name}>{server.name}</span>
+                                <span className="min-w-0 truncate" title={server.name}>
+                                    {server.name}
+                                </span>
                                 {on ? <Check className="size-3.5 shrink-0" aria-hidden /> : null}
                             </button>
                         );
                     })}
                 </div>
                 {full ? (
-                    <p className="text-xs text-muted-foreground">{t("compare.maxReached", { max: COMPARE_MAX })}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("compare.maxReached", { max: COMPARE_MAX })}
+                    </p>
                 ) : null}
             </section>
 
@@ -224,7 +239,11 @@ export function CompareView({
                                             {t("compare.server")}
                                         </th>
                                         {METRICS.map((metric) => (
-                                            <th key={metric} scope="col" className="py-1.5 pr-3 text-right font-medium">
+                                            <th
+                                                key={metric}
+                                                scope="col"
+                                                className="py-1.5 pr-3 text-right font-medium"
+                                            >
                                                 {t(`metrics.${metric}`)}
                                             </th>
                                         ))}
@@ -233,27 +252,40 @@ export function CompareView({
                                 <tbody className="divide-y divide-border">
                                     {ids.map((id, index) => {
                                         const server = byId.get(id);
-                                        const points = answer?.servers.find((one) => one.id === id)?.points ?? null;
+                                        const points =
+                                            answer?.servers.find((one) => one.id === id)?.points ??
+                                            null;
                                         return (
                                             <tr key={id}>
-                                                <th scope="row" className="max-w-[10rem] py-2 pr-3 text-left font-normal">
+                                                <th
+                                                    scope="row"
+                                                    className="max-w-[10rem] py-2 pr-3 text-left font-normal"
+                                                >
                                                     <Link
                                                         href={`/apps/servers/${encodeURIComponent(id)}`}
                                                         className="flex min-w-0 items-center gap-1.5 hover:underline"
                                                         title={server?.name}
                                                     >
                                                         <Swatch index={index} />
-                                                        <span className="min-w-0 truncate">{server?.name ?? id}</span>
+                                                        <span className="min-w-0 truncate">
+                                                            {server?.name ?? id}
+                                                        </span>
                                                     </Link>
                                                 </th>
                                                 {METRICS.map((metric) => (
-                                                    <td key={metric} className="py-2 pr-3 text-right tabular-nums">
+                                                    <td
+                                                        key={metric}
+                                                        className="py-2 pr-3 text-right tabular-nums"
+                                                    >
                                                         {points === null ? (
                                                             loading ? (
                                                                 <Skeleton className="ml-auto h-4 w-12" />
                                                             ) : null
                                                         ) : (
-                                                            (formatMetric(metric, latestOf(points, metric)) ?? (
+                                                            (formatMetric(
+                                                                metric,
+                                                                latestOf(points, metric)
+                                                            ) ?? (
                                                                 <span className="text-xs text-muted-foreground">
                                                                     {t("compare.noReading")}
                                                                 </span>
@@ -275,13 +307,17 @@ export function CompareView({
                                 ? ids.map((id) => ({
                                       key: id,
                                       label: byId.get(id)?.name ?? id,
-                                      points: (answer.servers.find((one) => one.id === id)?.points ?? []).map(
-                                          (point) => ({ t: point.t, v: metricAt(point, metric) })
-                                      )
+                                      points: (
+                                          answer.servers.find((one) => one.id === id)?.points ?? []
+                                      ).map((point) => ({ t: point.t, v: metricAt(point, metric) }))
                                   }))
                                 : [];
                             return (
-                                <section key={metric} className="min-w-0" aria-label={t(`metrics.${metric}`)}>
+                                <section
+                                    key={metric}
+                                    className="min-w-0"
+                                    aria-label={t(`metrics.${metric}`)}
+                                >
                                     {answer ? (
                                         <MultiSeriesChart
                                             series={series}
@@ -300,7 +336,9 @@ export function CompareView({
                                         // The chart's own frame and title, so the heading is
                                         // there before the history and does not move after.
                                         <div className="rounded-lg border border-border/60 p-3">
-                                            <span className="text-sm font-medium">{t(`metrics.${metric}`)}</span>
+                                            <span className="text-sm font-medium">
+                                                {t(`metrics.${metric}`)}
+                                            </span>
                                             <Skeleton className="mt-2 h-[132px] w-full" />
                                         </div>
                                     )}

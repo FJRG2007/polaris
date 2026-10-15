@@ -9,7 +9,11 @@ import { LOCAL_HOST_SUBJECT } from "@/lib/metrics-shared";
 const MINE = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
 const ALSO_MINE = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5d";
 const THEIRS = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c";
-const OWNED: Record<string, string> = { [MINE]: "owner", [ALSO_MINE]: "owner", [THEIRS]: "someone-else" };
+const OWNED: Record<string, string> = {
+    [MINE]: "owner",
+    [ALSO_MINE]: "owner",
+    [THEIRS]: "someone-else"
+};
 
 const reads: unknown[] = [];
 

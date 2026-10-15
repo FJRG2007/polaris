@@ -93,11 +93,16 @@ export interface AnomalyEpisode {
  * on the same side merge into one episode, reported by its worst point, so a
  * three-hour surge is one line rather than three.
  */
-export function detectAnomalies(points: readonly ValuePoint[], options: AnomalyOptions): AnomalyEpisode[] {
+export function detectAnomalies(
+    points: readonly ValuePoint[],
+    options: AnomalyOptions
+): AnomalyEpisode[] {
     const episodes: AnomalyEpisode[] = [];
     let current: AnomalyEpisode | null = null;
     for (let index = options.minHistory; index < points.length; index += 1) {
-        const history = points.slice(Math.max(0, index - options.window), index).map((point) => point.v);
+        const history = points
+            .slice(Math.max(0, index - options.window), index)
+            .map((point) => point.v);
         const point = points[index]!;
         const center = median(history);
         const spread = median(history.map((value) => Math.abs(value - center))) * MAD_SCALE;
@@ -154,17 +159,39 @@ export interface ForecastOptions {
     flatShare: number;
 }
 
-export const FORECAST_DEFAULTS: ForecastOptions = { minSpanDays: 2, minPoints: 24, flatShare: 0.0005 };
+export const FORECAST_DEFAULTS: ForecastOptions = {
+    minSpanDays: 2,
+    minPoints: 24,
+    flatShare: 0.0005
+};
 
 export type DiskForecast =
     /** Too little history to draw a line through. */
-    | { kind: "insufficient"; spanDays: number; usedBytes: number | null; totalBytes: number | null }
+    | {
+          kind: "insufficient";
+          spanDays: number;
+          usedBytes: number | null;
+          totalBytes: number | null;
+      }
     /** Already full. */
     | { kind: "full"; usedBytes: number; totalBytes: number; bytesPerDay: number }
     /** Not growing, or shrinking. */
-    | { kind: "steady"; usedBytes: number; totalBytes: number; bytesPerDay: number; spanDays: number }
+    | {
+          kind: "steady";
+          usedBytes: number;
+          totalBytes: number;
+          bytesPerDay: number;
+          spanDays: number;
+      }
     /** Growing: full in `days` if the trend holds. */
-    | { kind: "filling"; usedBytes: number; totalBytes: number; bytesPerDay: number; spanDays: number; days: number };
+    | {
+          kind: "filling";
+          usedBytes: number;
+          totalBytes: number;
+          bytesPerDay: number;
+          spanDays: number;
+          days: number;
+      };
 
 /**
  * When a disk fills, by least-squares line through its readings.
@@ -196,7 +223,13 @@ export function forecastDisk(
         return { kind: "full", usedBytes: last.used, totalBytes: last.total, bytesPerDay };
     }
     if (bytesPerDay <= last.total * options.flatShare) {
-        return { kind: "steady", usedBytes: last.used, totalBytes: last.total, bytesPerDay, spanDays };
+        return {
+            kind: "steady",
+            usedBytes: last.used,
+            totalBytes: last.total,
+            bytesPerDay,
+            spanDays
+        };
     }
     return {
         kind: "filling",

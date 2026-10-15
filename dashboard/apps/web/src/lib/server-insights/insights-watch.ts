@@ -102,7 +102,8 @@ async function readLastTold(now: number): Promise<Map<string, number>> {
             for (const [key, value] of Object.entries(parsed)) {
                 // Past the cooldown an entry decides nothing, so it is dropped here
                 // and the setting stays the size of what is currently cooling down.
-                if (typeof value === "number" && now - value < ANOMALY_COOLDOWN_MS) told.set(key, value);
+                if (typeof value === "number" && now - value < ANOMALY_COOLDOWN_MS)
+                    told.set(key, value);
             }
         }
     } catch {
@@ -115,7 +116,11 @@ async function readWarned(): Promise<Set<string>> {
     const raw = await getSetting(WARNED_KEY).catch(() => null);
     try {
         const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-        return new Set(Array.isArray(parsed) ? parsed.filter((one): one is string => typeof one === "string") : []);
+        return new Set(
+            Array.isArray(parsed)
+                ? parsed.filter((one): one is string => typeof one === "string")
+                : []
+        );
     } catch {
         return new Set();
     }
@@ -127,7 +132,11 @@ const CHUNK = 25;
 
 /** Who hears about a server: its owner, or every administrator for the box
  *  Polaris runs on, which has no owner of its own. */
-function recipientsFor(subject: string, owners: Map<string, string>, admins: readonly string[]): string[] {
+function recipientsFor(
+    subject: string,
+    owners: Map<string, string>,
+    admins: readonly string[]
+): string[] {
     if (subject === LOCAL_HOST_SUBJECT) return [...admins];
     const owner = owners.get(subject);
     return owner ? [owner] : [];
@@ -145,10 +154,15 @@ async function tell(
         await notify({
             userId,
             event: "server.anomaly",
-            title: t(anomaly.direction === "high" ? "serverInsights.highTitle" : "serverInsights.lowTitle", {
-                server,
-                metric: t(`serverInsights.metrics.${anomaly.metric}`)
-            }),
+            title: t(
+                anomaly.direction === "high"
+                    ? "serverInsights.highTitle"
+                    : "serverInsights.lowTitle",
+                {
+                    server,
+                    metric: t(`serverInsights.metrics.${anomaly.metric}`)
+                }
+            ),
             body: t("serverInsights.anomalyBody", {
                 value: sayValue(anomaly.metric, anomaly.peakValue),
                 usual: sayValue(anomaly.metric, anomaly.baseline)
@@ -157,7 +171,9 @@ async function tell(
             audience: subject === LOCAL_HOST_SUBJECT ? "admins" : "you",
             href: `/apps/servers/insights?server=${encodeURIComponent(hostRouteId(subject))}`,
             metadata: { subject, metric: anomaly.metric, start: anomaly.start }
-        }).catch((error: unknown) => console.error("polaris: could not report a server anomaly:", error));
+        }).catch((error: unknown) =>
+            console.error("polaris: could not report a server anomaly:", error)
+        );
     }
     if (!forecast || (forecast.kind !== "filling" && forecast.kind !== "full")) return;
     await notify({
@@ -166,7 +182,10 @@ async function tell(
         title:
             forecast.kind === "full"
                 ? t("serverInsights.fullTitle", { server })
-                : t("serverInsights.fillsTitle", { server, days: Math.max(1, Math.round(forecast.days)) }),
+                : t("serverInsights.fillsTitle", {
+                      server,
+                      days: Math.max(1, Math.round(forecast.days))
+                  }),
         body: t("serverInsights.fillsBody", {
             rate: formatBytes(Math.max(0, Math.round(forecast.bytesPerDay))),
             free: formatBytes(Math.max(0, forecast.totalBytes - forecast.usedBytes))
@@ -175,28 +194,38 @@ async function tell(
         audience: subject === LOCAL_HOST_SUBJECT ? "admins" : "you",
         actionRequired: true,
         href: `/apps/servers/${encodeURIComponent(hostRouteId(subject))}`
-    }).catch((error: unknown) => console.error("polaris: could not report a disk forecast:", error));
+    }).catch((error: unknown) =>
+        console.error("polaris: could not report a disk forecast:", error)
+    );
 }
 
 export async function watchServerInsights(now = new Date()): Promise<void> {
     const hosts = await prisma.host.findMany({ select: { id: true, name: true, ownerId: true } });
     const names = new Map<string, string>(hosts.map((host) => [host.id, host.name]));
     const owners = new Map<string, string>(hosts.map((host) => [host.id, host.ownerId]));
-    names.set(LOCAL_HOST_SUBJECT, (await getLocalServerName().catch(() => null)) || LOCAL_SERVER_FALLBACK_NAME);
+    names.set(
+        LOCAL_HOST_SUBJECT,
+        (await getLocalServerName().catch(() => null)) || LOCAL_SERVER_FALLBACK_NAME
+    );
 
     const rawMark = await getSetting(WATERMARK_KEY).catch(() => null);
     const watermark = rawMark && Number.isFinite(Number(rawMark)) ? Number(rawMark) : null;
     const warned = await readWarned();
     const lastTold = await readLastTold(now.getTime());
     const admins = (
-        await prisma.user.findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } }).catch(() => [])
+        await prisma.user
+            .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
+            .catch(() => [])
     ).map((user) => user.id);
     // An owner who was removed or hidden is not told; nor is anybody in their place.
     const visible = new Set([
         ...admins,
         ...(
             await prisma.user
-                .findMany({ where: { id: { in: [...new Set(owners.values())] }, ...VISIBLE_USER }, select: { id: true } })
+                .findMany({
+                    where: { id: { in: [...new Set(owners.values())] }, ...VISIBLE_USER },
+                    select: { id: true }
+                })
                 .catch(() => [])
         ).map((user) => user.id)
     ]);
@@ -210,14 +239,24 @@ export async function watchServerInsights(now = new Date()): Promise<void> {
             const insights = await readServerInsights(subjects.slice(read, read + CHUNK), now);
             const fresh = freshAnomalies(insights, watermark, now.getTime());
             for (const insight of insights) {
-                if (stillWarned(insight, warned.has(insight.subject))) nextWarned.push(insight.subject);
-                const started = fresh.filter((one) => one.subject === insight.subject).map((one) => one.anomaly);
+                if (stillWarned(insight, warned.has(insight.subject)))
+                    nextWarned.push(insight.subject);
+                const started = fresh
+                    .filter((one) => one.subject === insight.subject)
+                    .map((one) => one.anomaly);
                 // Everything that started moves the watermark, told or not: a stretch
                 // held back by the cooldown is not told later either.
                 for (const anomaly of started) latest = Math.max(latest, anomaly.start);
-                const anomalies = throttleAnomalies(insight.subject, started, lastTold, now.getTime());
-                for (const anomaly of anomalies) lastTold.set(`${insight.subject}:${anomaly.metric}`, now.getTime());
-                const forecast = insight.diskWarning && !warned.has(insight.subject) ? insight.forecast : null;
+                const anomalies = throttleAnomalies(
+                    insight.subject,
+                    started,
+                    lastTold,
+                    now.getTime()
+                );
+                for (const anomaly of anomalies)
+                    lastTold.set(`${insight.subject}:${anomaly.metric}`, now.getTime());
+                const forecast =
+                    insight.diskWarning && !warned.has(insight.subject) ? insight.forecast : null;
                 if (anomalies.length === 0 && !forecast) continue;
                 const server = names.get(insight.subject) ?? "";
                 for (const userId of recipientsFor(insight.subject, owners, admins)) {

@@ -18,7 +18,14 @@ const serverId = z.union([z.literal(LOCAL_SERVER_ID), z.string().uuid()]);
 export function serverIdsSchema(max: number) {
     return z
         .string()
-        .transform((raw) => [...new Set(raw.split(",").map((part) => part.trim()).filter(Boolean))])
+        .transform((raw) => [
+            ...new Set(
+                raw
+                    .split(",")
+                    .map((part) => part.trim())
+                    .filter(Boolean)
+            )
+        ])
         .pipe(z.array(serverId).min(1).max(max));
 }
 

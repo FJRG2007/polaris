@@ -48,7 +48,13 @@ export function RadialGauge({
 
     return (
         <div className={cn("flex flex-col items-center gap-1", className)}>
-            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label}>
+            <svg
+                width={size}
+                height={size}
+                viewBox={`0 0 ${size} ${size}`}
+                role="img"
+                aria-label={label}
+            >
                 <circle
                     cx={center}
                     cy={center}
@@ -169,7 +175,12 @@ export function TimeSeriesChart({
     if (run.length > 0) runs.push(run);
 
     const linePath = (segment: { t: number; v: number }[]): string =>
-        segment.map((point, index) => `${index === 0 ? "M" : "L"}${x(point.t).toFixed(1)} ${y(point.v).toFixed(1)}`).join(" ");
+        segment
+            .map(
+                (point, index) =>
+                    `${index === 0 ? "M" : "L"}${x(point.t).toFixed(1)} ${y(point.v).toFixed(1)}`
+            )
+            .join(" ");
     const areaPath = (segment: { t: number; v: number }[]): string => {
         if (segment.length === 0) return "";
         const start = x(segment[0]!.t).toFixed(1);
@@ -199,7 +210,8 @@ export function TimeSeriesChart({
         const target = from + ratio * span;
         let nearest = 0;
         for (let index = 1; index < points.length; index += 1) {
-            if (Math.abs(points[index]!.t - target) < Math.abs(points[nearest]!.t - target)) nearest = index;
+            if (Math.abs(points[index]!.t - target) < Math.abs(points[nearest]!.t - target))
+                nearest = index;
         }
         setHoverIndex(nearest);
     }
@@ -208,7 +220,12 @@ export function TimeSeriesChart({
     const hoverLeft = hovered ? Math.max(0, Math.min(100, ((hovered.t - from) / span) * 100)) : 0;
     const hoverTop = hovered && hovered.v != null ? y(hovered.v) : null;
     // Keep the readout inside the plot at both edges.
-    const readoutShift = hoverLeft < 22 ? "translateX(0)" : hoverLeft > 78 ? "translateX(-100%)" : "translateX(-50%)";
+    const readoutShift =
+        hoverLeft < 22
+            ? "translateX(0)"
+            : hoverLeft > 78
+              ? "translateX(-100%)"
+              : "translateX(-50%)";
 
     return (
         <div className={cn("rounded-lg border border-border/60 p-3", className)}>
@@ -272,7 +289,11 @@ export function TimeSeriesChart({
                             />
                         ))}
                         {runs.map((segment, index) => (
-                            <path key={`a${index}`} d={areaPath(segment)} fill={`url(#${gradientId})`} />
+                            <path
+                                key={`a${index}`}
+                                d={areaPath(segment)}
+                                fill={`url(#${gradientId})`}
+                            />
                         ))}
                         {runs.map((segment, index) => (
                             <path
@@ -289,7 +310,10 @@ export function TimeSeriesChart({
                     </svg>
                     {hovered && (
                         <div className="pointer-events-none absolute inset-0" aria-hidden>
-                            <div className="absolute inset-y-0 w-px bg-foreground/25" style={{ left: `${hoverLeft}%` }} />
+                            <div
+                                className="absolute inset-y-0 w-px bg-foreground/25"
+                                style={{ left: `${hoverLeft}%` }}
+                            />
                             {hoverTop != null && (
                                 <div
                                     className="absolute size-2.5 rounded-full border-2 bg-card"
@@ -309,7 +333,9 @@ export function TimeSeriesChart({
                                     <span className="font-medium text-foreground">
                                         {hovered.v != null ? format(hovered.v) : words.noData}
                                     </span>
-                                    <span className="text-muted-foreground">{stamp(hovered.t)}</span>
+                                    <span className="text-muted-foreground">
+                                        {stamp(hovered.t)}
+                                    </span>
                                 </span>
                                 {hovered.note ? (
                                     <span className="text-muted-foreground">{hovered.note}</span>
@@ -427,13 +453,20 @@ export function MultiSeriesChart({
     }
 
     const hoverLeft = hoverAt == null ? 0 : ((hoverAt - from) / span) * 100;
-    const readoutShift = hoverLeft < 22 ? "translateX(0)" : hoverLeft > 78 ? "translateX(-100%)" : "translateX(-50%)";
+    const readoutShift =
+        hoverLeft < 22
+            ? "translateX(0)"
+            : hoverLeft > 78
+              ? "translateX(-100%)"
+              : "translateX(-50%)";
 
     return (
         <div className={cn("min-w-0 rounded-lg border border-border/60 p-3", className)}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
                 <span className="text-sm font-medium">{label}</span>
-                {anyPresent ? <span className="text-xs text-muted-foreground/70">{format(yMax)}</span> : null}
+                {anyPresent ? (
+                    <span className="text-xs text-muted-foreground/70">{format(yMax)}</span>
+                ) : null}
             </div>
             {!anyPresent ? (
                 <div
@@ -490,7 +523,10 @@ export function MultiSeriesChart({
                     </svg>
                     {hoverAt != null && (
                         <div className="pointer-events-none absolute inset-0" aria-hidden>
-                            <div className="absolute inset-y-0 w-px bg-foreground/25" style={{ left: `${hoverLeft}%` }} />
+                            <div
+                                className="absolute inset-y-0 w-px bg-foreground/25"
+                                style={{ left: `${hoverLeft}%` }}
+                            />
                             <div
                                 className="absolute top-1 z-10 flex flex-col gap-0.5 whitespace-nowrap rounded-md border border-border-strong bg-elevated px-2 py-1 text-xs shadow-popover"
                                 style={{ left: `${hoverLeft}%`, transform: readoutShift }}
@@ -502,7 +538,10 @@ export function MultiSeriesChart({
                                         <span key={line.key} className="flex items-center gap-1.5">
                                             <span
                                                 className="size-2 shrink-0 rounded-full"
-                                                style={{ background: SERIES_COLORS[index % SERIES_COLORS.length] }}
+                                                style={{
+                                                    background:
+                                                        SERIES_COLORS[index % SERIES_COLORS.length]
+                                                }}
                                             />
                                             <span className="max-w-[10rem] truncate text-muted-foreground">
                                                 {line.label}

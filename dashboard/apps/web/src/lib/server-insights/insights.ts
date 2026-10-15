@@ -51,7 +51,11 @@ const MIN_DELTA: Record<InsightMetric, number> = {
 
 /** The day before a point is its normal; a modified z-score of 3.5 is the usual
  *  cut-off for "an outlier" with this measure. */
-const DETECTION: Omit<AnomalyOptions, "minDelta"> = { window: 24, minHistory: ANOMALY_MIN_HISTORY, threshold: 3.5 };
+const DETECTION: Omit<AnomalyOptions, "minDelta"> = {
+    window: 24,
+    minHistory: ANOMALY_MIN_HISTORY,
+    threshold: 3.5
+};
 
 /** Twice the threshold is no longer a wobble. */
 const DANGER_SCORE = DETECTION.threshold * 2;
@@ -106,18 +110,35 @@ function metricValue(row: RollupRow, metric: InsightMetric): number | null {
 
 /** Whether a forecast is close enough to full to warn about. */
 export function forecastWarns(forecast: DiskForecast): boolean {
-    return forecast.kind === "full" || (forecast.kind === "filling" && forecast.days <= FORECAST_WARN_DAYS);
+    return (
+        forecast.kind === "full" ||
+        (forecast.kind === "filling" && forecast.days <= FORECAST_WARN_DAYS)
+    );
 }
 
 /** One server's insights from its rollup rows (sorted by bucket). Pure. */
-export function insightFromRows(subject: string, rows: readonly RollupRow[], now: number): ServerInsight {
+export function insightFromRows(
+    subject: string,
+    rows: readonly RollupRow[],
+    now: number
+): ServerInsight {
     const anomalies: InsightAnomaly[] = [];
     for (const metric of INSIGHT_METRICS) {
-        const series: SeriesPoint[] = rows.map((row) => ({ t: row.bucket.getTime(), v: metricValue(row, metric) }));
-        const episodes = detectAnomalies(bucketize(series, HOUR_MS), { ...DETECTION, minDelta: MIN_DELTA[metric] });
+        const series: SeriesPoint[] = rows.map((row) => ({
+            t: row.bucket.getTime(),
+            v: metricValue(row, metric)
+        }));
+        const episodes = detectAnomalies(bucketize(series, HOUR_MS), {
+            ...DETECTION,
+            minDelta: MIN_DELTA[metric]
+        });
         for (const episode of episodes) {
             if (episode.end < now - ANOMALY_LOOKBACK_MS) continue;
-            anomalies.push({ ...episode, metric, severity: episode.score >= DANGER_SCORE ? "danger" : "warning" });
+            anomalies.push({
+                ...episode,
+                metric,
+                severity: episode.score >= DANGER_SCORE ? "danger" : "warning"
+            });
         }
     }
     anomalies.sort((a, b) => b.start - a.start);
@@ -125,7 +146,11 @@ export function insightFromRows(subject: string, rows: readonly RollupRow[], now
     const disk: DiskPoint[] = [];
     for (const row of rows) {
         if (row.diskUsedBytesAvg == null || row.diskTotalBytesAvg == null) continue;
-        disk.push({ t: row.bucket.getTime(), used: Number(row.diskUsedBytesAvg), total: Number(row.diskTotalBytesAvg) });
+        disk.push({
+            t: row.bucket.getTime(),
+            used: Number(row.diskUsedBytesAvg),
+            total: Number(row.diskTotalBytesAvg)
+        });
     }
     const forecast = forecastDisk(disk);
     return {
@@ -139,7 +164,10 @@ export function insightFromRows(subject: string, rows: readonly RollupRow[], now
 
 /** Insights for the given server subjects, in one read of their rollups. The
  *  caller has already established that the reader may see each of them. */
-export async function readServerInsights(subjects: readonly string[], now = new Date()): Promise<ServerInsight[]> {
+export async function readServerInsights(
+    subjects: readonly string[],
+    now = new Date()
+): Promise<ServerInsight[]> {
     if (subjects.length === 0) return [];
     const rows = await prisma.metricRollup.findMany({
         where: {
@@ -166,5 +194,7 @@ export async function readServerInsights(subjects: readonly string[], now = new 
         if (list) list.push(row);
         else bySubject.set(row.subjectId, [row]);
     }
-    return subjects.map((subject) => insightFromRows(subject, bySubject.get(subject) ?? [], now.getTime()));
+    return subjects.map((subject) =>
+        insightFromRows(subject, bySubject.get(subject) ?? [], now.getTime())
+    );
 }

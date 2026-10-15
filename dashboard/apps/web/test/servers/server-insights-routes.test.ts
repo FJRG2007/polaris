@@ -25,7 +25,12 @@ vi.mock("@/lib/api-session", () => ({
 }));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 vi.mock("@/lib/metrics-history-service", () => ({
-    getMetricSeries: async (input: { subjectId: string; ownerId: string; from: Date; to: Date }) => {
+    getMetricSeries: async (input: {
+        subjectId: string;
+        ownerId: string;
+        from: Date;
+        to: Date;
+    }) => {
         seriesRead.push(input);
         return input.subjectId === THEIRS ? null : [{ t: 1, cpuPercent: 5 }];
     },
@@ -71,7 +76,10 @@ describe("GET /api/servers/compare", () => {
     it.each([
         ["no ids", "/api/servers/compare"],
         ["an id that is neither local nor a uuid", "/api/servers/compare?ids=local,web-1"],
-        ["more than four servers", `/api/servers/compare?ids=local,${MINE},${THEIRS},${MINE.slice(0, -1)}d,${MINE.slice(0, -1)}e`],
+        [
+            "more than four servers",
+            `/api/servers/compare?ids=local,${MINE},${THEIRS},${MINE.slice(0, -1)}d,${MINE.slice(0, -1)}e`
+        ],
         ["a range that is not offered", `/api/servers/compare?ids=local,${MINE}&range=2y`]
     ])("refuses %s with a 400 before reading", async (_name, path) => {
         const res = await compare.GET(get(path));
@@ -105,7 +113,11 @@ describe("GET /api/servers/insights", () => {
     });
 
     it("refuses a malformed list with a 400", async () => {
-        for (const path of ["/api/servers/insights", "/api/servers/insights?ids=,,", "/api/servers/insights?ids=../etc"]) {
+        for (const path of [
+            "/api/servers/insights",
+            "/api/servers/insights?ids=,,",
+            "/api/servers/insights?ids=../etc"
+        ]) {
             const res = await insights.GET(get(path));
             expect(res.status).toBe(400);
         }

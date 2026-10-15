@@ -15,10 +15,13 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiPermission("system.manage");
     if (user instanceof Response) return user;
     const t = await readerWords("api");
-    const ids = serverIdsSchema(INSIGHTS_MAX).safeParse(new URL(request.url).searchParams.get("ids") ?? "");
+    const ids = serverIdsSchema(INSIGHTS_MAX).safeParse(
+        new URL(request.url).searchParams.get("ids") ?? ""
+    );
     if (!ids.success) return Response.json({ error: t("errors.invalidRequest") }, { status: 400 });
     const subjects = ids.data.map(hostSubject);
-    if (!(await hostsBelongToOwner(subjects, user.id))) return Response.json({ error: t("errors.notFound") }, { status: 404 });
+    if (!(await hostsBelongToOwner(subjects, user.id)))
+        return Response.json({ error: t("errors.notFound") }, { status: 404 });
     const insights = await readServerInsights(subjects);
     return Response.json({
         servers: insights.map((insight, index) => ({ ...insight, id: ids.data[index]! }))
