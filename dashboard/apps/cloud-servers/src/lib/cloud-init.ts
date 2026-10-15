@@ -13,12 +13,13 @@
  */
 
 /**
- * The only command shape accepted, the one `enrollmentCommand` builds: a URL
- * with no quote, space or shell character in it, piped into `sh` with the two
- * grants. Anything else is refused rather than embedded in a root script.
+ * The only command shape accepted, the one `enrollmentCommand` builds: an HTTPS
+ * URL with no quote, space or shell character in it, piped into `sh` with the
+ * two grants. Anything else is refused rather than embedded in a root script,
+ * plain HTTP included: the machine fetches it unattended across the internet.
  */
 const ENROLL_COMMAND =
-    /^curl -sSL https?:\/\/[A-Za-z0-9.\-:[\]]+(\/[A-Za-z0-9._~\-/]*)? \| sudo sh -s -- --docker --root$/;
+    /^curl -sSL https:\/\/[A-Za-z0-9.\-:[\]]+(\/[A-Za-z0-9._~\-/]*)? \| sudo sh -s -- --docker --root$/;
 
 /** Where the script marks a finished enrollment, so a later boot does nothing. */
 export const ENROLLED_MARK = "/var/lib/polaris-cloud-enrolled";

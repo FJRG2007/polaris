@@ -28,6 +28,7 @@ describe("first-boot script", () => {
             "curl -sSL https://a.test/$(id) | sudo sh -s -- --docker --root",
             "curl -sSL 'https://a.test/x' | sudo sh -s -- --docker --root",
             "wget https://a.test/x | sh",
+            "curl -sSL http://a.test/x | sudo sh -s -- --docker --root",
             `${COMMAND}\nreboot`
         ]) {
             expect(() => renderFirstBoot(bad), bad).toThrow();

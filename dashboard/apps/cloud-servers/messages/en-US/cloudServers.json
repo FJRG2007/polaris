@@ -107,6 +107,7 @@
         "accountHasServers": "Destroy this account's servers first.",
         "nameTaken": "A server with that name already exists in this account.",
         "notReachable": "A new server could not reach this Polaris: its address is only valid on your local network. Give Polaris a public domain in Management > Domains, then try again.",
+        "notHttps": "A new server would fetch its setup from this Polaris without encryption. Give Polaris a domain with HTTPS in Management > Domains, then try again.",
         "enrollmentExpired": "The server did not join Polaris in time. Destroy it and create it again.",
         "goneAtProvider": "The provider no longer has this server.",
         "noResize": "This provider does not resize servers through its API.",

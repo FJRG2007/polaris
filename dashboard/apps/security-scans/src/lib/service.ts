@@ -21,6 +21,7 @@ import {
     runHostAction,
     runOneShot,
     ScanFailure,
+    TIMEOUT_MS,
     type ScanTarget
 } from "./runner";
 
@@ -32,7 +33,12 @@ export type ScanKind = "malware" | "files" | "audit" | "image";
 const MAX_FINDINGS = 500;
 const KEEP_PER_KIND = 30;
 const HISTORY_MS = 90 * 24 * 60 * 60_000;
-const STALE_MS = 4 * 60 * 60_000;
+/** Past every deadline a scan runs under (one-shots share `TIMEOUT_MS`, the
+ *  daemon stops an export within the hour), so only a scan nothing is running
+ *  any more is ever marked lost. */
+const STALE_MS = TIMEOUT_MS + 3 * 60 * 60_000;
+/** Scans running at once in this process, each on a different server. */
+const MAX_PARALLEL = 4;
 /** A baseline or inventory past this, compressed, is refused, not stored. */
 const MAX_PAYLOAD = 8 * 1024 * 1024;
 
@@ -274,36 +280,59 @@ async function claim(scanId: string): Promise<boolean> {
     }
 }
 
+const active = new Set<string>();
 let draining: Promise<void> | null = null;
+let again = false;
 
-/** Start every queued scan whose server is free, oldest first. */
+/**
+ * Start every queued scan whose server is free, oldest first, up to
+ * `MAX_PARALLEL` at once. Resolves once they are started, not finished; each
+ * one that ends drains again.
+ */
 export function drain(): Promise<void> {
-    draining ??= (async () => {
+    if (draining) {
+        again = true;
+        return draining;
+    }
+    draining = (async () => {
         try {
-            for (;;) {
-                const queued = await prisma.securityScan.findMany({
-                    where: { state: "queued" },
-                    orderBy: { createdAt: "asc" },
-                    take: 20,
-                    select: { id: true, targetId: true }
-                });
-                const busy = new Set(
-                    (
-                        await prisma.securityScan.findMany({
-                            where: { state: "running" },
-                            select: { targetId: true }
-                        })
-                    ).map((row) => row.targetId)
-                );
-                const next = queued.find((scan) => !busy.has(scan.targetId));
-                if (!next || !(await claim(next.id))) return;
-                await execute(next.id);
-            }
+            do {
+                again = false;
+                await startFree();
+            } while (again);
         } finally {
             draining = null;
         }
     })();
     return draining;
+}
+
+async function startFree(): Promise<void> {
+    while (active.size < MAX_PARALLEL) {
+        const queued = await prisma.securityScan.findMany({
+            where: { state: "queued" },
+            orderBy: { createdAt: "asc" },
+            take: 50,
+            select: { id: true, targetId: true }
+        });
+        const busy = new Set(
+            (
+                await prisma.securityScan.findMany({
+                    where: { state: "running" },
+                    select: { targetId: true }
+                })
+            ).map((row) => row.targetId)
+        );
+        const next = queued.find((scan) => !busy.has(scan.targetId));
+        if (!next || !(await claim(next.id))) return;
+        active.add(next.id);
+        void execute(next.id)
+            .catch((caught) => console.error(`polaris: security scan ${next.id}:`, caught))
+            .finally(() => {
+                active.delete(next.id);
+                void drain().catch((caught) => console.error("polaris: security scans:", caught));
+            });
+    }
 }
 
 async function execute(scanId: string): Promise<void> {
@@ -471,9 +500,10 @@ async function runImage(
     let vuln: { log: string };
     let sbom: { log: string };
     try {
+        const deadline = Date.now() + TIMEOUT_MS;
         await exportImage(target, image, volume);
-        vuln = await runOneShot(ports, specs.vulnSpec(volume));
-        sbom = await runOneShot(ports, specs.sbomSpec(volume));
+        vuln = await runOneShot(ports, specs.vulnSpec(volume), deadline);
+        sbom = await runOneShot(ports, specs.sbomSpec(volume), deadline);
     } finally {
         await removeExport(target, volume).catch((caught) =>
             console.error(`polaris: security scan ${scanId} left its export volume:`, caught)

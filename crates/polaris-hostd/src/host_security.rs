@@ -12,8 +12,10 @@
 //! reads this file and fails when the two drift.
 
 use std::io::{self, Read};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::Mutex;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 
@@ -101,6 +103,39 @@ pub fn argv(action: HostAction) -> Vec<String> {
 
 static RUNNING: Mutex<()> = Mutex::new(());
 
+/// Longest a host action may run before it is stopped, so a stuck package
+/// manager or audit never holds the lock until the daemon restarts.
+pub const ACTION_DEADLINE: Duration = Duration::from_secs(30 * 60);
+
+/// Longest an image export may run before it is stopped.
+pub const EXPORT_DEADLINE: Duration = Duration::from_secs(60 * 60);
+
+const POLL: Duration = Duration::from_millis(250);
+
+/// Wait for every child to exit by `deadline`. Past it, every one still
+/// running is killed and the answer is `None`.
+fn wait_all(children: &mut [&mut Child], deadline: Instant) -> io::Result<Option<Vec<ExitStatus>>> {
+    let mut statuses: Vec<Option<ExitStatus>> = vec![None; children.len()];
+    loop {
+        for (child, status) in children.iter_mut().zip(statuses.iter_mut()) {
+            if status.is_none() {
+                *status = child.try_wait()?;
+            }
+        }
+        if statuses.iter().all(Option::is_some) {
+            return Ok(Some(statuses.into_iter().flatten().collect()));
+        }
+        if Instant::now() >= deadline {
+            for child in children.iter_mut() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            return Ok(None);
+        }
+        thread::sleep(POLL);
+    }
+}
+
 /// The outcome of one action: docker's exit code and what it printed, capped.
 #[derive(Debug)]
 pub struct HostRun {
@@ -108,26 +143,53 @@ pub struct HostRun {
     pub output: String,
 }
 
-/// Run an action to the end. `Ok(None)` when another one is still running.
-pub fn run(action: HostAction) -> io::Result<Option<HostRun>> {
+/// Why an action gave no outcome.
+#[derive(Debug, PartialEq, Eq)]
+pub enum RunError {
+    Busy,
+    TimedOut,
+}
+
+/// Run an action to the end. `Err(Busy)` when another one is still running,
+/// `Err(TimedOut)` when it outlived `ACTION_DEADLINE` and was stopped.
+pub fn run(action: HostAction) -> io::Result<Result<HostRun, RunError>> {
     let Ok(_guard) = RUNNING.try_lock() else {
-        return Ok(None);
+        return Ok(Err(RunError::Busy));
     };
+    let deadline = Instant::now() + ACTION_DEADLINE;
     let mut child = Command::new("docker")
         .args(argv(action))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()?;
-    let mut output = Vec::new();
-    if let Some(stdout) = child.stdout.take() {
-        stdout.take(MAX_OUTPUT as u64).read_to_end(&mut output)?;
+    let reader = child.stdout.take().map(|stdout| {
+        thread::spawn(move || {
+            let mut output = Vec::new();
+            let _ = stdout.take(MAX_OUTPUT as u64).read_to_end(&mut output);
+            output
+        })
+    });
+    let finished = wait_all(&mut [&mut child], deadline)?;
+    if finished.is_none() {
+        // Killing the client leaves the container running; it goes by name.
+        let _ = docker_output(&rm_host_container_argv());
     }
-    let status = child.wait()?;
-    Ok(Some(HostRun {
-        exit_code: status.code().unwrap_or(-1),
+    let output = reader.and_then(|r| r.join().ok()).unwrap_or_default();
+    let Some(statuses) = finished else {
+        return Ok(Err(RunError::TimedOut));
+    };
+    Ok(Ok(HostRun {
+        exit_code: statuses[0].code().unwrap_or(-1),
         output: String::from_utf8_lossy(&output).into_owned(),
     }))
+}
+
+fn rm_host_container_argv() -> Vec<String> {
+    ["rm", "-f", HOST_CONTAINER]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /* ------------------------------------------------------------------------ */
@@ -217,6 +279,7 @@ pub enum ExportError {
     Busy,
     NoImage,
     NoRoom,
+    TimedOut,
     Failed,
 }
 
@@ -238,6 +301,7 @@ pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
     let Ok(_guard) = RUNNING.try_lock() else {
         return Err(ExportError::Busy);
     };
+    let deadline = Instant::now() + EXPORT_DEADLINE;
     let (ok, size) = docker_output(&inspect_size_argv(image)).map_err(|_| ExportError::Failed)?;
     let size: u64 = match size.trim().parse() {
         Ok(size) if ok => size,
@@ -258,18 +322,25 @@ pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
         .spawn()
         .map_err(|_| ExportError::Failed)?;
     let stdout = save.stdout.take().ok_or(ExportError::Failed)?;
-    let write = Command::new("docker")
+    let mut write = match Command::new("docker")
         .args(volume_run_argv(volume, true, WRITE_TAIL))
         .stdin(Stdio::from(stdout))
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .map_err(|_| ExportError::Failed)?;
-    let saved = save.wait().map_err(|_| ExportError::Failed)?;
-    if !write.success() || !saved.success() {
-        return Err(ExportError::Failed);
+        .spawn()
+    {
+        Ok(write) => write,
+        Err(_) => {
+            let _ = save.kill();
+            let _ = save.wait();
+            return Err(ExportError::Failed);
+        }
+    };
+    match wait_all(&mut [&mut save, &mut write], deadline) {
+        Ok(Some(statuses)) if statuses.iter().all(ExitStatus::success) => Ok(size),
+        Ok(None) => Err(ExportError::TimedOut),
+        _ => Err(ExportError::Failed),
     }
-    Ok(size)
 }
 
 /// Remove an export volume and the archive in it.
@@ -310,6 +381,24 @@ pub fn remove_export(volume: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn stops_children_past_the_deadline() {
+        let mut quick = Command::new("true").spawn().unwrap();
+        let done = wait_all(&mut [&mut quick], Instant::now() + Duration::from_secs(5)).unwrap();
+        assert!(done.is_some_and(|s| s[0].success()));
+        let mut stuck = Command::new("sleep").arg("30").spawn().unwrap();
+        let started = Instant::now();
+        let done = wait_all(
+            &mut [&mut stuck],
+            Instant::now() + Duration::from_millis(300),
+        )
+        .unwrap();
+        assert!(done.is_none());
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert!(stuck.try_wait().unwrap().is_some());
+    }
 
     #[test]
     fn lists_only_export_volumes() {

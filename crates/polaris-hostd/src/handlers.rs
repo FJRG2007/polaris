@@ -1332,12 +1332,19 @@ fn host_security_run<R: Read>(req: &Request, body: &mut R) -> Response {
         Err(_) => return Response::bad_request("invalid host security request"),
     };
     match host_security::run(request.action) {
-        Ok(Some(run)) => Response::json(
+        Ok(Ok(run)) => Response::json(
             200,
             "OK",
             &serde_json::json!({ "exitCode": run.exit_code, "output": run.output }),
         ),
-        Ok(None) => Response::text(409, "Conflict", "another host scan is still running"),
+        Ok(Err(host_security::RunError::Busy)) => {
+            Response::text(409, "Conflict", "another host scan is still running")
+        }
+        Ok(Err(host_security::RunError::TimedOut)) => Response::text(
+            504,
+            "Gateway Timeout",
+            "the host scan took too long and was stopped",
+        ),
         Err(_) => Response::text(502, "Bad Gateway", "could not start the host scan"),
     }
 }
@@ -1388,6 +1395,11 @@ fn host_security_image<R: Read>(req: &Request, body: &mut R) -> Response {
                 Err(host_security::ExportError::NoRoom) => {
                     Response::text(507, "Insufficient Storage", "not enough free disk")
                 }
+                Err(host_security::ExportError::TimedOut) => Response::text(
+                    504,
+                    "Gateway Timeout",
+                    "the image export took too long and was stopped",
+                ),
                 Err(host_security::ExportError::Failed) => {
                     Response::text(502, "Bad Gateway", "could not export the image")
                 }

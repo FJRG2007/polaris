@@ -107,6 +107,7 @@
         "accountHasServers": "Destruye primero los servidores de esta cuenta.",
         "nameTaken": "Ya existe un servidor con ese nombre en esta cuenta.",
         "notReachable": "Un servidor nuevo no podría llegar a este Polaris: su dirección solo vale en tu red local. Dale a Polaris un dominio público en Gestión > Dominios y vuelve a intentarlo.",
+        "notHttps": "Un servidor nuevo descargaría su configuración de este Polaris sin cifrar. Dale a Polaris un dominio con HTTPS en Gestión > Dominios y vuelve a intentarlo.",
         "enrollmentExpired": "El servidor no se unió a Polaris a tiempo. Destrúyelo y vuelve a crearlo.",
         "goneAtProvider": "El proveedor ya no tiene este servidor.",
         "noResize": "Este proveedor no cambia el tamaño de los servidores desde su API.",

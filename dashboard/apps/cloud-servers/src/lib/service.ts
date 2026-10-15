@@ -300,6 +300,7 @@ export async function createServer(
     const adapter = await adapterOf(account);
     const enrollment = await host.cloudServersHost.openCloudEnrollment(userId, input.name);
     if (!reachableFromCloud(enrollment.command)) await refuse("errors.notReachable");
+    if (!enrollment.command.includes(" https://")) await refuse("errors.notHttps");
     const price = await cachedPrice(account.provider, adapter, input.region, input.size);
     const machine = await adapter
         .create({ ...input, userData: renderFirstBoot(enrollment.command) })
@@ -427,6 +428,17 @@ export async function destroyServer(userId: string, serverId: string, typedName:
 
 // ---- The hourly job ----------------------------------------------------------
 
+/** Take out of Polaris the server a machine gone at its provider became; the
+ *  reason when that could not be done, or null. */
+async function removeGoneHost(ownerId: string, hostId: string): Promise<string | null> {
+    try {
+        return await host.cloudServersHost.removeCloudHost(ownerId, hostId);
+    } catch (caught) {
+        console.error("polaris: cloud-servers could not remove a server gone at its provider:", caught);
+        return (await cloudT())("errors.generic");
+    }
+}
+
 /**
  * Read every live server's state and price from its provider. One account at a
  * time, one call after another, bounded; an account that refuses is marked and
@@ -455,6 +467,9 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
                     prices.set(key, await cachedPrice(first.account.provider, adapter, server.region, machine.size));
                 }
                 const price = prices.get(key);
+                // Gone at the provider: the Polaris server it became goes too,
+                // or it stays enrolled with nothing left on this screen to remove it.
+                const leftover = !machine && server.hostId ? await removeGoneHost(server.ownerId, server.hostId) : null;
                 await prisma.cloudServer.update({
                     where: { id: server.id },
                     data: machine
@@ -468,7 +483,12 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
                           }
                         : // Gone at the provider without going through here: it no
                           // longer costs anything, so its month ends now.
-                          { status: "destroyed", destroyedAt: new Date() }
+                          {
+                              status: "destroyed",
+                              destroyedAt: new Date(),
+                              hostId: leftover ? server.hostId : null,
+                              error: leftover
+                          }
                 });
                 read++;
             }

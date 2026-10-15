@@ -32,7 +32,7 @@ export interface ScanTarget {
 const MAX_LOG = 64 * 1024 * 1024;
 const POLL_MS = 3_000;
 /** A scan that has not ended in this long is stopped and failed. */
-const TIMEOUT_MS = 3 * 60 * 60_000;
+export const TIMEOUT_MS = 3 * 60 * 60_000;
 
 export class ScanFailure extends Error {
     constructor(readonly code: string) {
@@ -61,15 +61,16 @@ async function logsOf(ports: RuntimePorts, name: string): Promise<string> {
 }
 
 /** Bring a one-off container up, wait for it to exit, read what it printed and
- *  take it down. The project's own volumes (the caches) stay. */
+ *  take it down. The project's own volumes (the caches) stay. A container
+ *  still running at `deadline` (epoch ms) is stopped and the scan failed. */
 export async function runOneShot(
     ports: RuntimePorts,
-    spec: ComposeSpec
+    spec: ComposeSpec,
+    deadline = Date.now() + TIMEOUT_MS
 ): Promise<{ exitCode: number; log: string }> {
     const name = spec.services[0]!.name;
     await ports.composeDown(spec.project).catch(() => undefined);
     await ports.composeUp(spec);
-    const started = Date.now();
     let missing = 0;
     try {
         for (;;) {
@@ -80,7 +81,7 @@ export async function runOneShot(
             }
             if (state.status === "unknown" && ++missing >= 5) throw new ScanFailure("lost");
             if (state.status !== "unknown") missing = 0;
-            if (Date.now() - started > TIMEOUT_MS) throw new ScanFailure("timeout");
+            if (Date.now() > deadline) throw new ScanFailure("timeout");
         }
     } finally {
         await ports.composeDown(spec.project).catch(() => undefined);
@@ -96,7 +97,7 @@ export async function runHostAction(
     if (target.kind === "local" || !target.hostId) {
         const result = await new HostdClient().hostSecurity(action);
         if (result === null) throw new ScanFailure("daemonOutdated");
-        if (result === "busy") throw new ScanFailure("busy");
+        if (result === "busy" || result === "timeout") throw new ScanFailure(result);
         return result;
     }
     const connection = await host.hostService.getHostConnection(target.hostId, target.ownerId);

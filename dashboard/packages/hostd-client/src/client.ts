@@ -233,14 +233,16 @@ export class HostdClient {
     /**
      * Run one of the daemon's fixed host security actions to the end: the
      * hardening audit or the automatic security updates switch. Null from a
-     * daemon that predates the call, "busy" while another is running.
+     * daemon that predates the call, "busy" while another is running, "timeout"
+     * when it ran too long and the daemon stopped it.
      */
     public async hostSecurity(
         action: "audit" | "updates-status" | "updates-on" | "updates-off"
-    ): Promise<{ exitCode: number; output: string } | "busy" | null> {
+    ): Promise<{ exitCode: number; output: string } | "busy" | "timeout" | null> {
         const response = await this.call("POST", "/v1/host/security", JSON.stringify({ action }));
         if (response.status === 404) return null;
         if (response.status === 409) return "busy";
+        if (response.status === 504) return "timeout";
         if (response.status !== 200) {
             throw new Error(`hostd host security failed (${response.status}): ${response.body}`);
         }
@@ -259,7 +261,7 @@ export class HostdClient {
     public async hostImageExport(
         image: string,
         volume: string
-    ): Promise<{ size: number } | "busy" | "imageMissing" | "noRoom" | null> {
+    ): Promise<{ size: number } | "busy" | "imageMissing" | "noRoom" | "timeout" | null> {
         const response = await this.call(
             "POST",
             "/v1/host/security/image",
@@ -269,6 +271,7 @@ export class HostdClient {
         if (response.status === 404) return "imageMissing";
         if (response.status === 409) return "busy";
         if (response.status === 507) return "noRoom";
+        if (response.status === 504) return "timeout";
         if (response.status !== 200) {
             throw new Error(`hostd image export failed (${response.status}): ${response.body}`);
         }

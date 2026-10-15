@@ -25,8 +25,9 @@ export const statusExtension: AppExtension = {
             // due is one indexed query that returns no rows.
             everyMs: 30 * SECOND,
             // Leased: two passes would run the same checks twice and count each
-            // run twice in the day's uptime.
-            leaseMs: 2 * MINUTE,
+            // run twice in the day's uptime. A full pass is 100 checks, 8 at
+            // once, 15 seconds each at worst: a little over three minutes.
+            leaseMs: 6 * MINUTE,
             run: async () => (await import("./runner")).runDueChecks()
         },
         {
