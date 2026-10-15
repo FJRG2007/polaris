@@ -538,5 +538,30 @@
             "noAddress": "Publicada en el puerto {port}, pero Polaris no conoce la dirección de este servidor. Ponla en Dominios.",
             "hostedPrivate": "Esta base de datos vive dentro de otra instancia. Publica esa instancia para llegar desde fuera."
         }
+    },
+    "fileAccess": {
+        "title": "Acceso SFTP",
+        "intro": "Cuentas que acceden a los volúmenes de este servicio desde un cliente SFTP, y a nada más.",
+        "add": "Añadir cuenta",
+        "address": "Dirección",
+        "port": "Puerto {port} de este servidor",
+        "username": "Usuario",
+        "password": "Contraseña",
+        "publicKey": "Clave pública",
+        "readOnly": "Solo lectura",
+        "readOnlyBadge": "Solo lectura",
+        "readWriteBadge": "Lee y escribe",
+        "cancel": "Cancelar",
+        "create": "Crear cuenta",
+        "withPassword": "Entra con contraseña",
+        "withKey": "Entra con clave",
+        "remove": "Quitar cuenta",
+        "removeNamed": "Quitar {name}",
+        "kind": "cuenta SFTP",
+        "empty": "Aún no hay cuentas. Nada se ejecuta hasta que añadas una.",
+        "noVolumes": "Este servicio no tiene volúmenes. Añade uno para acceder a sus archivos por SFTP.",
+        "firstStarts": "La primera cuenta inicia el servidor SFTP, que puede tardar un minuto mientras se descarga.",
+        "lastStops": "Es la última cuenta, así que el servidor SFTP también se detiene.",
+        "unreadable": "No se pudieron leer las cuentas SFTP."
     }
 }

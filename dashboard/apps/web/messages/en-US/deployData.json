@@ -538,5 +538,30 @@
             "noAddress": "Published on port {port}, but Polaris does not know this server's address. Set it under Domains.",
             "hostedPrivate": "This database lives inside another instance. Publish that instance to reach it from outside."
         }
+    },
+    "fileAccess": {
+        "title": "SFTP access",
+        "intro": "Accounts that reach this service's volumes from an SFTP client, and nothing else.",
+        "add": "Add account",
+        "address": "Address",
+        "port": "Port {port} on this server",
+        "username": "Username",
+        "password": "Password",
+        "publicKey": "Public key",
+        "readOnly": "Read only",
+        "readOnlyBadge": "Read only",
+        "readWriteBadge": "Read and write",
+        "cancel": "Cancel",
+        "create": "Create account",
+        "withPassword": "Signs in with a password",
+        "withKey": "Signs in with a key",
+        "remove": "Remove account",
+        "removeNamed": "Remove {name}",
+        "kind": "SFTP account",
+        "empty": "No accounts yet. Nothing runs until you add one.",
+        "noVolumes": "This service has no volumes. Add one to reach its files over SFTP.",
+        "firstStarts": "The first account starts the SFTP server, which can take a minute while it downloads.",
+        "lastStops": "This is the last account, so the SFTP server stops too.",
+        "unreadable": "Could not read the SFTP accounts."
     }
 }

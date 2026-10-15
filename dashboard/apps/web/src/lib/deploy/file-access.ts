@@ -21,6 +21,7 @@ import { shortHash, type ComposeSpec } from "@polaris/deploy";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import { reachableAddresses } from "@/lib/deployment-addresses";
+import { passwordIsBreached } from "@/lib/pwned-passwords";
 
 /** Raised for a refusal whose words are meant for the screen. */
 export class FileAccessError extends Error {
@@ -297,6 +298,8 @@ export async function createFileAccessAccount(
             where: { applicationId_username: { applicationId, username: input.username } }
         });
         if (clash) throw new FileAccessError("This service already has an account with that name.");
+        if (input.password && (await passwordIsBreached(input.password).catch(() => false)))
+            throw new FileAccessError("That password appears in known data breaches. Pick another.");
         const sealed = input.password ? sealPassword(input.password) : null;
         const created = await prisma.fileAccessAccount.create({
             data: {
