@@ -68,7 +68,7 @@ export function listingProblem(line: string): string | null {
     // "drwxr-xr-x user/group 0 2026-01-01 00:00 path" - the path is everything after the time.
     const match = /^\S+\s+\S+\s+\d+\s+\S+\s+\S+\s(.+)$/.exec(line);
     if (!match) return "The backup's file list could not be read.";
-    return entryNameProblem(match[1]);
+    return entryNameProblem(match[1] ?? "");
 }
 
 /** Whether an entry's name stays inside the folder it is unpacked into. */
