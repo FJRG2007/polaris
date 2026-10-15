@@ -28,6 +28,7 @@ interface DueCheck {
     dnsExpect: string;
     intervalSec: number;
     timeoutMs: number;
+    nextRunAt: Date;
 }
 
 export function specOf(row: DueCheck): CheckSpec {
@@ -43,7 +44,23 @@ export function specOf(row: DueCheck): CheckSpec {
     };
 }
 
+/**
+ * Takes the check for this pass, or says another pass already has.
+ *
+ * Moves `nextRunAt` on only if it still holds the value this pass read, so two
+ * passes that read the same due row - a lease that ran out, a second replica -
+ * cannot both probe it and count the run twice in the day's uptime.
+ */
+async function claim(row: DueCheck): Promise<boolean> {
+    const { count } = await prisma.statusCheck.updateMany({
+        where: { id: row.id, nextRunAt: row.nextRunAt },
+        data: { nextRunAt: nextRunAt(new Date(), row.intervalSec) }
+    });
+    return count === 1;
+}
+
 async function runOne(row: DueCheck): Promise<void> {
+    if (!(await claim(row))) return;
     const outcome = evaluate(specOf(row), await probe(specOf(row)));
     const at = new Date();
     const day = dayStart(at);
@@ -95,7 +112,8 @@ export async function runDueChecks(now = new Date()): Promise<number> {
             dnsType: true,
             dnsExpect: true,
             intervalSec: true,
-            timeoutMs: true
+            timeoutMs: true,
+            nextRunAt: true
         }
     });
     let next = 0;
@@ -105,8 +123,8 @@ export async function runDueChecks(now = new Date()): Promise<number> {
             try {
                 await runOne(row);
             } catch (caught) {
-                // A check deleted mid-run, or a database hiccup: the next pass
-                // picks it up again, since nextRunAt did not move.
+                // A check deleted mid-run, or a database hiccup: the claim
+                // already moved nextRunAt, so it runs again at its next interval.
                 console.warn(
                     `[status-pages] check ${row.id} not recorded:`,
                     (caught as Error).message
