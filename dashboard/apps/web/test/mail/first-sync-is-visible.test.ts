@@ -55,8 +55,10 @@ describe("which folder is read first", () => {
 describe("what the list says while it waits", () => {
     it("reads the server's own count off the folder, which is right before the first envelope", async () => {
         const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        expect(view).toContain("feeding.some((folder) => folder.total > 0)");
-        expect(view).toContain("threads.length === 0");
+        expect(view).toContain("shown: threads.length,");
+        expect(view).toContain("feeding,");
+        const wait = await readFile(`${SRC}app/(app)/mail/list-wait.ts`, "utf8");
+        expect(wait).toContain("input.feeding.some((folder) => folder.total > 0)");
     });
 
     it("draws the rows that are coming rather than an empty state", async () => {
@@ -75,6 +77,8 @@ describe("what the list says while it waits", () => {
         expect(view).toContain(
             'const narrowed = Boolean(page.query) || filter !== "" || category !== "";'
         );
-        expect(view).toContain("!narrowed && threads.length === 0");
+        expect(view).toContain("narrowed,");
+        const wait = await readFile(`${SRC}app/(app)/mail/list-wait.ts`, "utf8");
+        expect(wait).toContain("!input.narrowed && empty");
     });
 });

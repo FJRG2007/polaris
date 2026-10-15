@@ -21,6 +21,8 @@ import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { useLiveRead } from "@/components/use-live-resource";
 import { settleFrames } from "@/app/(app)/mail/stream-settle";
+import { LIST_NOT_LOADED } from "@/app/(app)/mail/use-mail-list";
+import { listWait, nextCursor } from "@/app/(app)/mail/list-wait";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -153,33 +155,85 @@ describe("frames gathered into a refresh", () => {
 });
 
 describe("the skeleton that says mail is still being fetched", () => {
-    it("holds only while something is still on its way", async () => {
-        const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        expect(view).toContain(
-            "const stillFetching = !narrowed && threads.length === 0 && serverHolds && waitingOnServer;"
-        );
-        expect(view).toContain(
-            'const waitingOnServer = firstPass || (cursor !== "" && !olderFailed);'
-        );
-        expect(view).toContain("account.lastSyncAt === null");
+    const inbox = { accountId: "account-1", total: 120 };
+    const synced = { id: "account-1", lastSyncAt: "2026-10-15T09:00:00.000Z" };
+    const syncing = { id: "account-1", lastSyncAt: null };
+    const base = {
+        narrowed: false,
+        shown: 0,
+        feeding: [inbox],
+        accounts: [synced],
+        cursor: "",
+        olderFailed: false,
+        listFailed: null
+    };
+
+    it("holds while a mailbox feeding the list is on its first pass", () => {
+        expect(listWait({ ...base, accounts: [syncing] })).toEqual({
+            failed: null,
+            fetching: true
+        });
     });
 
-    it("turns a failed reach for older mail into a failure with a retry, not a wait", async () => {
-        const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        const reach = view.slice(view.indexOf("const loadMore = useCallback"));
-        const body = reach.slice(0, reach.indexOf("}, [cursor,"));
-        expect(body).toContain("if (!response.ok) throw new Error(LIST_NOT_LOADED);");
-        expect(body).toContain("setOlderFailed(true);");
-        expect(view).toContain(
-            "list.failed ?? (olderFailed && threads.length === 0 ? LIST_NOT_LOADED : null)"
+    it("lets go once the first pass is over and the server has nothing more", () => {
+        expect(listWait(base)).toEqual({ failed: null, fetching: false });
+    });
+
+    it("ignores a first pass on a mailbox that does not feed this list", () => {
+        const other = { id: "account-2", lastSyncAt: null };
+        expect(listWait({ ...base, accounts: [synced, other] }).fetching).toBe(false);
+    });
+
+    it("holds while the server says there is more to bring down", () => {
+        expect(listWait({ ...base, cursor: "page-2" }).fetching).toBe(true);
+    });
+
+    it("never holds over an empty folder, rows on screen, or a narrowed list", () => {
+        const syncingBase = { ...base, accounts: [syncing], cursor: "page-2" };
+        expect(listWait({ ...syncingBase, feeding: [{ ...inbox, total: 0 }] }).fetching).toBe(
+            false
         );
+        expect(listWait({ ...syncingBase, shown: 3 }).fetching).toBe(false);
+        expect(listWait({ ...syncingBase, narrowed: true }).fetching).toBe(false);
+    });
+
+    it("turns a failed reach for older mail into a failure, not a wait", () => {
+        expect(listWait({ ...base, cursor: "page-2", olderFailed: true })).toEqual({
+            failed: LIST_NOT_LOADED,
+            fetching: false
+        });
+    });
+
+    it("says nothing over rows when a reach for older mail fails", () => {
+        expect(listWait({ ...base, cursor: "page-2", olderFailed: true, shown: 5 })).toEqual({
+            failed: null,
+            fetching: false
+        });
+    });
+
+    it("reports the list's own failure first", () => {
+        expect(listWait({ ...base, listFailed: "refused", olderFailed: true }).failed).toBe(
+            "refused"
+        );
+    });
+
+    it("retries the list itself, or the reach for older mail, whichever failed", async () => {
+        const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
         expect(view).toContain("onClick={list.failed ? refresh : loadMore}");
     });
+});
 
-    it("ends a reach that answered the same question the same way", async () => {
-        const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        expect(view).toContain(
-            'setCursor(fresh.length === 0 && outcome.cursor === cursor ? "" : outcome.cursor);'
-        );
+describe("the cursor after a reach for older mail", () => {
+    it("ends a reach that answered the same question the same way", () => {
+        expect(nextCursor("page-2", "page-2", 0)).toBe("");
+    });
+
+    it("keeps a cursor that came back with new rows", () => {
+        expect(nextCursor("page-2", "page-2", 4)).toBe("page-2");
+    });
+
+    it("moves to the cursor the server gave", () => {
+        expect(nextCursor("page-2", "page-3", 0)).toBe("page-3");
+        expect(nextCursor("page-2", "", 2)).toBe("");
     });
 });

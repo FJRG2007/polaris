@@ -76,6 +76,7 @@ import {
     type RefObject
 } from "react";
 import { useBusy } from "./use-busy";
+import { listWait, nextCursor } from "./list-wait";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import { readMessage, warmMessage } from "./message-store";
 import {
@@ -479,11 +480,7 @@ export function MailView({
                     const shown = new Set(held.map((thread) => thread.id));
                     return [...held, ...fresh.filter((thread) => !shown.has(thread.id))];
                 });
-                // The same cursor back with nothing new is the same question
-                // answered the same way. The marker would never fire again for
-                // it - it has not moved - so it is the end of this list until
-                // the next refresh says otherwise.
-                setCursor(fresh.length === 0 && outcome.cursor === cursor ? "" : outcome.cursor);
+                setCursor(nextCursor(cursor, outcome.cursor, fresh.length));
             } catch {
                 // The bottom of the list stays where it is and the observer will
                 // ask again the next time it comes into view. Nothing is said
@@ -1419,17 +1416,15 @@ export function MailView({
     // the skeleton is what goes and gets it. Once both have answered, an empty
     // list is an empty list: the count alone kept this skeleton up for ever
     // over a mailbox whose mail Polaris could not bring down.
-    const serverHolds = feeding.some((folder) => folder.total > 0);
-    const firstPass = accounts.some(
-        (account) =>
-            account.lastSyncAt === null && feeding.some((folder) => folder.accountId === account.id)
-    );
-    const waitingOnServer = firstPass || (cursor !== "" && !olderFailed);
-    const stillFetching = !narrowed && threads.length === 0 && serverHolds && waitingOnServer;
-    /** Why there is nothing to draw, when it is a failure: the list itself, or
-     *  the reach for the mail it has not got yet. */
-    const listFailed =
-        list.failed ?? (olderFailed && threads.length === 0 ? LIST_NOT_LOADED : null);
+    const { failed: listFailed, fetching: stillFetching } = listWait({
+        narrowed,
+        shown: threads.length,
+        feeding,
+        accounts,
+        cursor,
+        olderFailed,
+        listFailed: list.failed
+    });
 
     const allPicked = threads.length > 0 && selected.length === threads.length;
     /**
