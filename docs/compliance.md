@@ -95,9 +95,10 @@ where copies of keys are kept outside the instance, and the organization's own p
 
 ## Encryption
 
-- **Secrets at rest**: secret variables, runner secrets, backup source credentials and
-  the private keys of uploaded certificates are encrypted with the instance's master
-  key, which is not stored in the database. Revealing a secret is recorded. The evidence counts secret variables stored
+- **Secrets at rest**: secret variables, runner secrets, backup source credentials,
+  cloud provider credentials (Cloud servers) and the private keys of uploaded
+  certificates are encrypted with the instance's master key, which is not stored in
+  the database. Revealing a secret is recorded. The evidence counts secret variables stored
   encrypted and any that are not.
 - **Backups**: every copy that leaves the thing it protects is encrypted with AES-256-GCM
   under a backup key, which can be kept elsewhere as a recovery key. Copies kept on the
