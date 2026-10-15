@@ -13,7 +13,8 @@
 import * as quotas from "./quotas";
 import { OrgError } from "./errors";
 import { prisma } from "@polaris/db";
-import { getTranslations } from "@/lib/i18n/request";
+import { DEFAULT_LOCALE } from "@polaris/core";
+import { translatorFor } from "@/lib/i18n/translate";
 
 /** A create or a change turned down because the organization is at a cap. The
  *  message is the reader's, in their language; the fields are for code. */
@@ -28,8 +29,20 @@ export class OrgQuotaError extends OrgError {
     }
 }
 
+/** The refusal in the reader's language. Loaded only when one is thrown, since
+ *  the request's locale reaches into the session; outside a request (a sweep, a
+ *  queued job) it falls back to the default language rather than failing. */
+async function refusalWords() {
+    try {
+        const { getTranslations } = await import("@/lib/i18n/request");
+        return await getTranslations("accountOrgs");
+    } catch {
+        return translatorFor(DEFAULT_LOCALE, "accountOrgs");
+    }
+}
+
 export async function quotaRefusal(dimension: quotas.OrgQuotaDimension, limit: number): Promise<OrgQuotaError> {
-    const t = await getTranslations("accountOrgs");
+    const t = await refusalWords();
     return new OrgQuotaError(t(`quotas.refused.${dimension}`, { limit }), dimension, limit);
 }
 
