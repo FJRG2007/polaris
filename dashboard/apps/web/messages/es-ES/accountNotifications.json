@@ -477,5 +477,95 @@
         "critical": "Dejar pasar alertas críticas",
         "invalid": "Escribe ambas horas como HH:MM.",
         "save": "Guardar"
+    },
+    "webhooks": {
+        "page": {
+            "title": "Webhooks",
+            "intro": "Polaris envía los eventos que elijas a tus propios destinos, firmados para que sepan que vienen de aquí."
+        },
+        "list": {
+            "title": "Destinos",
+            "add": "Añadir destino",
+            "empty": "Aún no hay destinos. Añade uno para que Polaris le envíe eventos.",
+            "limit": "Tienes el máximo de {max} destinos. Quita uno para añadir otro.",
+            "eventCount": "{count, plural, one {# evento} other {# eventos}}",
+            "off": "Parado",
+            "switchedOff": "Se desactivó tras cinco entregas fallidas seguidas. Arregla el destino y vuelve a activarlo.",
+            "lastDelivery": "Última entrega {time}",
+            "neverDelivered": "Nada entregado aún",
+            "switchOn": "Activar",
+            "switchOff": "Desactivar",
+            "test": "Enviar una prueba",
+            "editEvents": "Cambiar eventos",
+            "rotate": "Nuevo secreto",
+            "remove": "Quitar destino",
+            "log": "Entregas",
+            "testSent": "Evento de prueba entregado.",
+            "testFailed": "La prueba falló: {reason}"
+        },
+        "form": {
+            "title": "Añadir un destino",
+            "description": "Polaris envía un POST con un cuerpo JSON a esta dirección por cada evento que elijas.",
+            "name": "Nombre",
+            "namePlaceholder": "Bot de deploy",
+            "url": "URL",
+            "events": "Eventos",
+            "selectAll": "Todos",
+            "selectNone": "Ninguno",
+            "eventsPicked": "{count, plural, one {# evento elegido} other {# eventos elegidos}}",
+            "save": "Guardar",
+            "editTitle": "Eventos de {name}",
+            "editDescription": "Polaris solo envía estos eventos a este destino."
+        },
+        "secret": {
+            "title": "Secreto de firma",
+            "description": "Cópialo ahora. Solo se muestra esta vez; si lo pierdes, crea otro.",
+            "verify": "Cada petición lleva X-Polaris-Timestamp y X-Polaris-Signature: sha256= seguido del HMAC-SHA256 en hex de la marca de tiempo, un punto y el cuerpo, con este secreto.",
+            "done": "Ya lo he copiado"
+        },
+        "rotate": {
+            "title": "¿Crear un secreto nuevo?",
+            "question": "Las peticiones a {name} se firman con el secreto nuevo desde ya, y el anterior deja de valer.",
+            "confirm": "Crear secreto"
+        },
+        "remove": {
+            "question": "¿Quitar {name}? Su registro de entregas se borra y Polaris deja de enviarle.",
+            "confirm": "Quitar"
+        },
+        "deliveries": {
+            "title": "Entregas a {name}",
+            "description": "Los últimos 30 días, lo más reciente primero.",
+            "empty": "Nada enviado a este destino en los últimos 30 días.",
+            "loadFailed": "No se pudo cargar el registro.",
+            "retry": "Reintentar",
+            "more": "Cargar más",
+            "redeliver": "Reenviar",
+            "redelivered": "Enviado de nuevo.",
+            "attempts": "{count, plural, one {# intento} other {# intentos}}",
+            "nextTry": "Próximo intento {time}",
+            "took": "{ms} ms",
+            "status": {
+                "pending": "Pendiente",
+                "sent": "Entregado",
+                "failed": "Fallido"
+            },
+            "errors": {
+                "refused": "La dirección no es pública, así que Polaris no le envía.",
+                "redirect": "Respondió con una redirección ({status}). Usa la dirección final.",
+                "http": "Respondió {status}.",
+                "timeout": "No respondió en 10 segundos.",
+                "network": "No se pudo contactar.",
+                "unreadable": "No se pudo leer la dirección guardada. Quita el destino y vuelve a añadirlo.",
+                "disabled": "No enviado: el destino estaba desactivado."
+            }
+        },
+        "errors": {
+            "limit": "Tienes el máximo de {max} destinos.",
+            "rateLimited": "Demasiados intentos. Espera unos minutos y vuelve a probar.",
+            "unreachable": "Esa dirección no es pública, así que Polaris no puede enviarle.",
+            "notFound": "Ese destino ya no existe.",
+            "invalid": "Revisa el formulario: un nombre, una URL completa y al menos un evento.",
+            "notSaved": "No se guardó. Vuelve a probar."
+        }
     }
 }

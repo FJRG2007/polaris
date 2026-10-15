@@ -477,5 +477,95 @@
         "critical": "Let critical alerts through",
         "invalid": "Enter both times as HH:MM.",
         "save": "Save"
+    },
+    "webhooks": {
+        "page": {
+            "title": "Webhooks",
+            "intro": "Polaris posts the events you pick to your own endpoints, signed so they can tell it came from here."
+        },
+        "list": {
+            "title": "Endpoints",
+            "add": "Add endpoint",
+            "empty": "No endpoints yet. Add one to have Polaris post events to it.",
+            "limit": "You have the maximum of {max} endpoints. Remove one to add another.",
+            "eventCount": "{count, plural, one {# event} other {# events}}",
+            "off": "Off",
+            "switchedOff": "Switched off after five failed deliveries in a row. Fix the endpoint, then switch it back on.",
+            "lastDelivery": "Last delivered {time}",
+            "neverDelivered": "Nothing delivered yet",
+            "switchOn": "Switch on",
+            "switchOff": "Switch off",
+            "test": "Send a test event",
+            "editEvents": "Change events",
+            "rotate": "New signing secret",
+            "remove": "Remove endpoint",
+            "log": "Delivery log",
+            "testSent": "Test event delivered.",
+            "testFailed": "Test event failed: {reason}"
+        },
+        "form": {
+            "title": "Add an endpoint",
+            "description": "Polaris sends a POST with a JSON body to this address for every event you pick.",
+            "name": "Name",
+            "namePlaceholder": "Deploy bot",
+            "url": "URL",
+            "events": "Events",
+            "selectAll": "Select all",
+            "selectNone": "Clear",
+            "eventsPicked": "{count, plural, one {# event picked} other {# events picked}}",
+            "save": "Save",
+            "editTitle": "Events for {name}",
+            "editDescription": "Polaris posts only these events to this endpoint."
+        },
+        "secret": {
+            "title": "Signing secret",
+            "description": "Copy it now. It is shown only this once; if you lose it, make a new one.",
+            "verify": "Each request carries X-Polaris-Timestamp and X-Polaris-Signature: sha256= followed by the hex HMAC-SHA256 of the timestamp, a dot and the raw body, keyed with this secret.",
+            "done": "I have copied it"
+        },
+        "rotate": {
+            "title": "Make a new signing secret?",
+            "question": "Requests to {name} are signed with the new secret straight away, and the old one stops matching.",
+            "confirm": "Make new secret"
+        },
+        "remove": {
+            "question": "Remove {name}? Its delivery log goes with it, and Polaris stops posting to it.",
+            "confirm": "Remove"
+        },
+        "deliveries": {
+            "title": "Deliveries to {name}",
+            "description": "The last 30 days, newest first.",
+            "empty": "Nothing sent to this endpoint in the last 30 days.",
+            "loadFailed": "The log could not be loaded.",
+            "retry": "Try again",
+            "more": "Load more",
+            "redeliver": "Redeliver",
+            "redelivered": "Sent again.",
+            "attempts": "{count, plural, one {# try} other {# tries}}",
+            "nextTry": "Next try {time}",
+            "took": "{ms} ms",
+            "status": {
+                "pending": "Retrying",
+                "sent": "Delivered",
+                "failed": "Failed"
+            },
+            "errors": {
+                "refused": "The address is not public, so Polaris will not post to it.",
+                "redirect": "It answered with a redirect ({status}). Use the final address.",
+                "http": "It answered {status}.",
+                "timeout": "It did not answer within 10 seconds.",
+                "network": "It could not be reached.",
+                "unreadable": "The stored address could not be read. Remove the endpoint and add it again.",
+                "disabled": "Not sent: the endpoint was switched off."
+            }
+        },
+        "errors": {
+            "limit": "You have the maximum of {max} endpoints.",
+            "rateLimited": "Too many tries. Wait a few minutes and try again.",
+            "unreachable": "That address is not public, so Polaris cannot post to it.",
+            "notFound": "That endpoint no longer exists.",
+            "invalid": "Check the form: a name, a full URL and at least one event.",
+            "notSaved": "That did not save. Try again."
+        }
     }
 }
