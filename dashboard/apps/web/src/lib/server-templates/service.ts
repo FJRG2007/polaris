@@ -14,7 +14,7 @@
 
 import { prisma, Prisma } from "@polaris/db";
 import { execCommand, openSshClient } from "@polaris/ssh";
-import { getHostConnection, type HostConnection } from "@/lib/host-service";
+import { getHostConnection, HostCredentialsError, type HostConnection } from "@/lib/host-service";
 import {
     hostTemplateInputSchema,
     templateSpecSchema,
@@ -27,7 +27,7 @@ import { CHECK_SCRIPT, FIX_SCRIPT, computeDrift, fixWords, parseReport, planItem
 
 /** A refusal the screen words, by code. */
 export class TemplateRefusal extends Error {
-    constructor(readonly code: "notFound" | "nameTaken" | "noRoot" | "unreachable" | "failed" | "nothingToFix" | "local") {
+    constructor(readonly code: "notFound" | "nameTaken" | "noRoot" | "unreachable" | "failed" | "nothingToFix" | "local" | "credentials") {
         super(code);
     }
 }
@@ -236,7 +236,8 @@ async function runScript(
 async function connectionFor(hostId: string, ownerId: string): Promise<HostConnection> {
     try {
         return await getHostConnection(hostId, ownerId);
-    } catch {
+    } catch (error) {
+        if (error instanceof HostCredentialsError) throw new TemplateRefusal("credentials");
         throw new TemplateRefusal("notFound");
     }
 }
@@ -299,6 +300,9 @@ export async function fixAssignment(ownerId: string, id: string, keys?: readonly
 const CHECK_EVERY_MS = Number(process.env.POLARIS_TEMPLATE_CHECK_MS) || 6 * 60 * 60_000;
 /** Servers read per pass, so one pass never holds many SSH sessions for long. */
 const PER_PASS = 20;
+/** No new server is started after this, so the slowest one still finishes
+ *  before the scheduler would take the pass for stuck and start another. */
+const PASS_BUDGET_MS = 5 * 60_000;
 
 /** The scheduled pass: re-read the assignments checked longest ago, and put
  *  drift back where the assignment asks for that. */
@@ -309,7 +313,11 @@ export async function runTemplateSweep(): Promise<number> {
         orderBy: { checkedAt: { sort: "asc", nulls: "first" } },
         take: PER_PASS
     });
+    const deadline = Date.now() + PASS_BUDGET_MS;
+    let done = 0;
     for (const row of due) {
+        if (Date.now() > deadline) break;
+        done += 1;
         const ownerId = row.template.ownerId;
         try {
             const checked = await checkAssignment(ownerId, row.id);
@@ -323,5 +331,5 @@ export async function runTemplateSweep(): Promise<number> {
             console.error("[server-templates] sweep failed for an assignment", error);
         }
     }
-    return due.length;
+    return done;
 }

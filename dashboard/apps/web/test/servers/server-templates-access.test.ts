@@ -12,6 +12,7 @@ const ID = "8d6c3f1e-2b4a-4c7d-9e0f-1a2b3c4d5e6f";
 
 let allowed = true;
 let connection = { username: "deploy", sudo: false };
+let unsealable = false;
 const ssh = vi.fn();
 const updates: unknown[] = [];
 
@@ -24,9 +25,16 @@ vi.mock("@/lib/session", () => ({
     }
 }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => {} }));
-vi.mock("@/lib/host-service", () => ({
-    getHostConnection: async () => ({ address: "198.51.100.7", port: 22, auth: {}, hostKey: null, ...connection })
-}));
+vi.mock("@/lib/host-service", () => {
+    class HostCredentialsError extends Error {}
+    return {
+        HostCredentialsError,
+        getHostConnection: async () => {
+            if (unsealable) throw new HostCredentialsError("web-1");
+            return { address: "198.51.100.7", port: 22, auth: {}, hostKey: null, ...connection };
+        }
+    };
+});
 vi.mock("@polaris/ssh", () => ({
     openSshClient: async (...args: unknown[]) => {
         ssh(...args);
@@ -66,6 +74,7 @@ const service = await import("@/lib/server-templates/service");
 beforeEach(() => {
     allowed = true;
     connection = { username: "deploy", sudo: false };
+    unsealable = false;
     ssh.mockClear();
     updates.length = 0;
 });
@@ -118,5 +127,11 @@ describe("with it", () => {
         connection = { username: "deploy", sudo: true };
         expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({ ok: false, error: "unreachable" });
         expect(ssh).toHaveBeenCalledTimes(1);
+    });
+
+    it("says the saved login cannot be read rather than that the server is gone", async () => {
+        unsealable = true;
+        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({ ok: false, error: "credentials" });
+        expect(ssh).not.toHaveBeenCalled();
     });
 });

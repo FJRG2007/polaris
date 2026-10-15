@@ -25,7 +25,7 @@ export const templateServiceSchema = z.object({
     enabled: z.boolean().default(true)
 });
 
-/** Most of a file a template may carry. It travels as one argument. */
+/** Most of a file a template may carry. It travels on stdin, base64-encoded. */
 export const TEMPLATE_FILE_MAX = 32 * 1024;
 
 export const templateFileSchema = z.object({

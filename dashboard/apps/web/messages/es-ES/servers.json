@@ -600,7 +600,8 @@
             "nothingToFix": "No queda nada que corregir. Revisa otra vez para actualizar.",
             "partial": "Algunos elementos no se pudieron corregir. Siguen en la lista.",
             "invalid": "Algunos campos no son válidos.",
-            "local": "Este servidor no tiene acceso SSH, así que no se puede revisar."
+            "local": "Este servidor no tiene acceso SSH, así que no se puede revisar.",
+            "credentials": "Polaris no puede leer el acceso guardado de este servidor. Vuelve a añadirlo en Servidores."
         },
         "editor": {
             "new": "Nueva plantilla",

@@ -600,7 +600,8 @@
             "nothingToFix": "Nothing left to fix. Check again to refresh.",
             "partial": "Some items could not be fixed. They are still listed.",
             "invalid": "Some fields are not valid.",
-            "local": "This server has no SSH login, so it cannot be checked."
+            "local": "This server has no SSH login, so it cannot be checked.",
+            "credentials": "Polaris cannot read the login saved for this server. Add the server again under Servers."
         },
         "editor": {
             "new": "New template",

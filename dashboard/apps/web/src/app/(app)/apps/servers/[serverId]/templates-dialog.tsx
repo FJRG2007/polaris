@@ -141,7 +141,7 @@ function Editor({ id, initial, onDone }: { id: string | null; initial: Draft; on
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const issues = useMemo(() => issuesOf(t, draft), [t, draft]);
-    const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+    const dirty = id === null || JSON.stringify(draft) !== JSON.stringify(initial);
     // An empty box is unfinished rather than wrong, so it is not called invalid.
     const shown = (path: string, value: string) => (value.trim() ? issues.get(path) : undefined);
     const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -383,9 +383,11 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
                                             <span className="block truncate text-sm font-medium" title={template.name}>
                                                 {template.name}
                                             </span>
-                                            <span className="block truncate text-xs text-muted-foreground" title={template.description}>
-                                                {template.description || t("templates.editor.servers", { count: template.servers })}
-                                            </span>
+                                            {template.description ? (
+                                                <span className="block truncate text-xs text-muted-foreground" title={template.description}>
+                                                    {template.description}
+                                                </span>
+                                            ) : null}
                                         </button>
                                         <span className="shrink-0 text-xs text-muted-foreground">
                                             {t("templates.editor.servers", { count: template.servers })}
