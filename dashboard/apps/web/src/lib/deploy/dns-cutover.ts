@@ -152,6 +152,39 @@ export function stagesRoute(mode: CutoverMode, phase: CutoverPhase): boolean {
     return mode !== "edge" && (canSwitch(phase) || phase === "propagating" || phase === "finishing");
 }
 
+/** An open cutover, as the edge reads it. */
+export interface StagedCutover {
+    readonly domainId: string;
+    readonly targetApplicationId: string;
+    readonly phase: string;
+    readonly mode: string;
+}
+
+type EdgeTarget = { readonly kind: string; readonly hostId: string | null };
+
+/**
+ * Which hostnames are routed a second time, on the edge of the service they are
+ * moving to, and to which service: each open cutover whose phase stages a route,
+ * whose domain is published, and whose two services sit behind different edges -
+ * behind one, two routers for one name would collide, and the cutover moves the
+ * route itself instead. The edge's route file is rendered from what this returns.
+ */
+export function stagedRoutes<
+    R extends { readonly id: string; readonly servedBy: string; readonly application: { readonly target: EdgeTarget } },
+    T extends { readonly target: EdgeTarget }
+>(rows: readonly R[], staged: readonly StagedCutover[], targets: ReadonlyMap<string, T>): { row: R; target: T }[] {
+    const routed: { row: R; target: T }[] = [];
+    for (const entry of staged) {
+        if (!stagesRoute(readMode(entry.mode), readPhase(entry.phase))) continue;
+        const row = rows.find((candidate) => candidate.id === entry.domainId);
+        const target = targets.get(entry.targetApplicationId);
+        if (!row || !target) continue;
+        if (edgeKey(row.application.target, row.servedBy) === edgeKey(target.target, row.servedBy)) continue;
+        routed.push({ row, target });
+    }
+    return routed;
+}
+
 export interface CutoverRow {
     readonly phase: CutoverPhase;
     readonly mode: CutoverMode;

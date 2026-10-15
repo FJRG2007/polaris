@@ -228,3 +228,50 @@ describe("reading a stored row", () => {
         });
     });
 });
+
+describe("the routes a cutover stages on the edge", () => {
+    const here = { kind: "local", hostId: null };
+    const away = { kind: "host", hostId: "host-2" };
+    const rows = [
+        { id: "d1", servedBy: "auto", application: { target: here } },
+        { id: "d2", servedBy: "auto", application: { target: here } }
+    ];
+    const targets = new Map([
+        ["far", { id: "far", target: away }],
+        ["near", { id: "near", target: here }]
+    ]);
+
+    it("routes a moving name on the target's edge while it is open", () => {
+        const staged = cutover.stagedRoutes(
+            rows,
+            [{ domainId: "d1", targetApplicationId: "far", phase: "propagating", mode: "cloudflare" }],
+            targets
+        );
+        expect(staged.map(({ row, target }) => [row.id, target.id])).toEqual([["d1", "far"]]);
+    });
+
+    it("routes nothing twice behind one edge, once closed, or for a missing row", () => {
+        expect(
+            cutover.stagedRoutes(
+                rows,
+                [
+                    { domainId: "d1", targetApplicationId: "near", phase: "ready", mode: "manual" },
+                    { domainId: "d2", targetApplicationId: "far", phase: "done", mode: "manual" },
+                    { domainId: "gone", targetApplicationId: "far", phase: "ready", mode: "manual" },
+                    { domainId: "d2", targetApplicationId: "missing", phase: "ready", mode: "manual" },
+                    { domainId: "d2", targetApplicationId: "far", phase: "ready", mode: "edge" }
+                ],
+                targets
+            )
+        ).toEqual([]);
+    });
+
+    it("gives the same routes every time it is asked", () => {
+        const staged = [
+            { domainId: "d2", targetApplicationId: "far", phase: "lowering", mode: "manual" }
+        ];
+        expect(cutover.stagedRoutes(rows, staged, targets)).toEqual(
+            cutover.stagedRoutes(rows, staged, targets)
+        );
+    });
+});

@@ -1350,23 +1350,14 @@ async function stagedCutoverRoutes(rows: readonly RouteDomain[]): Promise<RouteD
             })
         ).map((app) => [app.id, app])
     );
-    const routed: RouteDomain[] = [];
-    for (const entry of staged) {
-        const row = rows.find((candidate) => candidate.id === entry.domainId);
-        const target = targets.get(entry.targetApplicationId);
-        if (!row || !target) continue;
-        const sourceEdge = dnsCutover.edgeKey(row.application.target, row.servedBy);
-        if (sourceEdge === dnsCutover.edgeKey(target.target, row.servedBy)) continue;
-        routed.push({
-            ...row,
-            applicationId: target.id,
-            deploymentId: null,
-            portPinned: false,
-            targetPort: containerPortOf(target),
-            application: target
-        });
-    }
-    return routed;
+    return dnsCutover.stagedRoutes(rows, staged, targets).map(({ row, target }) => ({
+        ...row,
+        applicationId: target.id,
+        deploymentId: null,
+        portPinned: false,
+        targetPort: containerPortOf(target),
+        application: target
+    }));
 }
 
 async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
