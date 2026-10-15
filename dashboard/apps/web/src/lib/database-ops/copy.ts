@@ -33,6 +33,7 @@ import {
     externalDumpCommand,
     parseExternalSource,
     SHARDED_DUMP_REFUSAL,
+    type CopyTables,
     type ManagedEngine
 } from "@polaris/core";
 import {
@@ -68,6 +69,8 @@ export async function copyInto(
         alwaysBackUp?: boolean;
         /** Answer once the copy has finished, and throw if it failed. */
         wait?: boolean;
+        /** From a managed database only: tables left out, or copied empty. */
+        tables?: CopyTables;
     } = {}
 ): Promise<{ operationId: string }> {
     const into = await instanceContext(databaseId, ownerId);
@@ -128,7 +131,7 @@ export async function copyInto(
                 operation,
                 options.alwaysBackUp === true
             );
-            if (from) await copyFromManaged(from, into, ownerId, operation);
+            if (from) await copyFromManaged(from, into, ownerId, operation, options.tables);
             else if (external) await copyFromExternal(external, into, operation);
             else if (saved) await copyFromSaved(saved, into, operation);
             await operation.succeed();
@@ -181,7 +184,8 @@ async function copyFromManaged(
     from: InstanceContext,
     into: InstanceContext,
     ownerId: string,
-    operation: OperationHandle
+    operation: OperationHandle,
+    tables?: CopyTables
 ): Promise<void> {
     if (!isDumpableEngine(from.engine))
         throw new DatabaseOperationError("That source cannot be dumped.");
@@ -196,7 +200,8 @@ async function copyFromManaged(
         password: from.own.password,
         authDatabase: from.hosted ? from.own.database : "admin",
         label: from.slug,
-        ...(from.mongoSeeds ? { mongoSeeds: from.mongoSeeds } : {})
+        ...(from.mongoSeeds ? { mongoSeeds: from.mongoSeeds } : {}),
+        ...(tables ? { tables } : {})
     }).catch((error: unknown) => {
         throw new DatabaseOperationError(
             `Copying out ${from.name} failed${error instanceof Error ? `: ${error.message}` : ""}`
@@ -207,7 +212,13 @@ async function copyFromManaged(
         await restoreDumpInto(
             into,
             { local: artifact.path },
-            { operation, sourceDatabase: from.own.database }
+            {
+                operation,
+                sourceDatabase: from.own.database,
+                ...(from.engine === "mongo" && tables
+                    ? { dropCollections: [...tables.skip, ...tables.structureOnly] }
+                    : {})
+            }
         );
     } finally {
         await artifact.cleanup();

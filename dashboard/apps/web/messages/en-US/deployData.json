@@ -165,7 +165,15 @@
             "openDatabases": "Add one in Databases",
             "savedViaSsh": "{name} (through SSH via {server})",
             "throughSsh": "Polaris opens the SSH tunnel and hands it to this database's container only, so nothing has to be published.",
-            "sshNeedsLocal": "Connections through SSH can only be copied into a database on the machine Polaris runs on."
+            "sshNeedsLocal": "Connections through SSH can only be copied into a database on the machine Polaris runs on.",
+            "skipTables": "Leave out these tables",
+            "emptyTables": "Copy these tables empty",
+            "tablesPlaceholder": "sessions, audit_log",
+            "skipHint": "Not copied at all. Separate names with commas.",
+            "emptyHint": "Copied with their columns and indexes, but no rows - sessions, logs and queues, say.",
+            "tablesInvalid": "Use table names: letters, digits and underscores, or schema.name.",
+            "tablesTwice": "A table is either left out or copied empty, not both.",
+            "confirmTables": "Left out: {skipped} tables. Copied empty: {emptied} tables."
         },
         "running": "Running",
         "failed": "Failed",

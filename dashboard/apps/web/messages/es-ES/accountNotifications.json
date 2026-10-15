@@ -212,6 +212,14 @@
             "label": "Falló una tarea programada",
             "description": "El comando programado de un servicio falló en su último intento o se quedó sin tiempo."
         },
+        "deployAutomationFailed": {
+            "label": "Falló una automatización",
+            "description": "Una automatización del proyecto se detuvo en una acción que no funcionó."
+        },
+        "deployAutomationNotice": {
+            "label": "Una automatización del proyecto te avisa",
+            "description": "Un paso de una automatización del proyecto pidió avisarte."
+        },
         "domainDown": {
             "label": "Un dominio dejó de servir",
             "description": "Un dominio que apunta a uno de tus servicios ha dejado de responder."

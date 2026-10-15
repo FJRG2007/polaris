@@ -36,6 +36,7 @@ import { sweepUploads } from "@/lib/chat/uploads";
 import { sweepEmptyGroups } from "@/lib/chat/chat-service";
 import { probeAllDomains } from "@/lib/watch/health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
+import { tickDeployAutomations } from "@/lib/deploy/automations";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
 import { expireTransfers } from "@/lib/drive-transfer-service";
@@ -406,6 +407,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: MINUTE,
         leaseMs: null,
         run: tickServiceCrons
+    },
+    {
+        key: "deploy-automations",
+        // Every minute, a cron's finest grain. Leased, so one process walks the
+        // due rules; each firing is also claimed by a compare-and-swap on the
+        // rule's own `nextRunAt`, so the on-demand route cannot start it twice.
+        everyMs: MINUTE,
+        leaseMs: 5 * MINUTE,
+        run: () => tickDeployAutomations()
     },
     {
         key: "service-autoscale",

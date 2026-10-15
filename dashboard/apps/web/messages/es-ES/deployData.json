@@ -165,7 +165,15 @@
             "openDatabases": "Ir a Bases de datos",
             "savedViaSsh": "{name} (por SSH a través de {server})",
             "throughSsh": "Polaris abre el túnel SSH y se lo da solo al contenedor de esta base, así que no hay que publicar nada.",
-            "sshNeedsLocal": "Las conexiones por SSH solo se pueden copiar en una base de datos de la máquina donde corre Polaris."
+            "sshNeedsLocal": "Las conexiones por SSH solo se pueden copiar en una base de datos de la máquina donde corre Polaris.",
+            "skipTables": "Excluir estas tablas",
+            "emptyTables": "Copiar vacías estas tablas",
+            "tablesPlaceholder": "sessions, audit_log",
+            "skipHint": "No se copian. Separa los nombres con comas.",
+            "emptyHint": "Se copian sus columnas e índices, sin filas: sesiones, logs o colas.",
+            "tablesInvalid": "Usa nombres de tabla: letras, dígitos y guiones bajos, o esquema.nombre.",
+            "tablesTwice": "Una tabla se excluye o se copia vacía, no ambas.",
+            "confirmTables": "Excluidas: {skipped} tablas. Copiadas vacías: {emptied} tablas."
         },
         "running": "En curso",
         "failed": "Fallida",

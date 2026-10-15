@@ -265,9 +265,20 @@ export async function notifyDomainHealthChanged(input: DomainHealthChange): Prom
             url: context.href,
             level: down ? "danger" : "success"
         });
+        await raiseDomainAutomations(context.projectId, event);
     } catch (error) {
         console.error("polaris: could not raise the domain notification:", error);
     }
+}
+
+/** Start the project's automations that follow its domains. Loaded when
+ *  needed, so the health poller does not pull the deploy service in up front. */
+async function raiseDomainAutomations(
+    projectId: string,
+    event: "domain.down" | "domain.up"
+): Promise<void> {
+    const { raiseAutomationEvent } = await import("@/lib/deploy/automations");
+    await raiseAutomationEvent({ projectId, event, applicationId: null });
 }
 
 /** One domain that moved, with the context the message is built from. */
@@ -389,6 +400,10 @@ export async function notifyDomainHealthChanges(
                     url: one?.context.href ?? SWEEP_HREF,
                     level: status === "down" ? "danger" : "success"
                 });
+                await raiseDomainAutomations(
+                    projectId,
+                    status === "down" ? "domain.down" : "domain.up"
+                );
             }
         }
     } catch (error) {

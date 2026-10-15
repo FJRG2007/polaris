@@ -170,6 +170,10 @@
             "label": "Webhooks",
             "hint": "Where this project reports its deploys"
         },
+        "automations": {
+            "label": "Automations",
+            "hint": "Schedules, webhooks and events that act on its services"
+        },
         "flags": {
             "label": "Feature flags",
             "hint": "How this project behaves"
@@ -328,5 +332,132 @@
         "notes": {
             "tagOnly": "its image tag was pulled again: the exact build the source runs could not be read, so it may differ"
         }
+    },
+    "automations": {
+        "title": "Automations",
+        "description": "When something happens in this project, do these things in order.",
+        "new": "New automation",
+        "readOnly": "You can see the automations here, but changing them needs the right to deploy this project.",
+        "atLimit": "This project has reached its {limit} automations.",
+        "retry": "Try again",
+        "loadFailed": "Could not read the automations",
+        "saveFailed": "Could not save the automation",
+        "rotateFailed": "Could not give the webhook a new address",
+        "empty": "No automations yet. Redeploy on a schedule, run a command when a deploy finishes, or start one from another system.",
+        "enabled": "Switched on",
+        "runNow": "Run now",
+        "rotate": "New address",
+        "edit": "Edit",
+        "delete": "Delete",
+        "kind": "automation",
+        "deleteHint": "Its run history goes with it. A webhook address it had stops working.",
+        "rotateTitle": "Give the webhook a new address?",
+        "rotateQuestion": "The address {name} answers at now stops working at once. Anything that calls it needs the new one.",
+        "addressTitle": "Webhook address",
+        "addressHint": "Copy it now: it is shown only this once. Give it a new one if it is lost.",
+        "addressUse": "Send a POST to it to start the automation. Whatever the request carries is ignored.",
+        "copy": "Copy address",
+        "done": "Done",
+        "actionCount": "{count, plural, one {# action} other {# actions}}",
+        "neverRan": "Never ran",
+        "showRuns": "Show run history",
+        "hideRuns": "Hide run history",
+        "summary": {
+            "webhook": "called at its own address",
+            "eventOn": "{event} on {service}"
+        },
+        "triggers": {
+            "schedule": "Schedule",
+            "webhook": "Webhook",
+            "event": "Event"
+        },
+        "events": {
+            "deploySucceeded": "A deploy finished",
+            "deployFailed": "A deploy failed",
+            "domainDown": "A domain went down",
+            "domainUp": "A domain came back"
+        },
+        "actions": {
+            "redeploy": "Redeploy",
+            "restart": "Restart",
+            "command": "Run a command",
+            "notify": "Notify me"
+        },
+        "status": {
+            "succeeded": "Succeeded",
+            "failed": "Failed",
+            "timedOut": "Timed out",
+            "running": "Running",
+            "skipped": "Skipped"
+        },
+        "runs": {
+            "title": "Recent runs",
+            "empty": "It has not run yet.",
+            "manual": "Run by hand",
+            "exit": "exit {code}",
+            "creator": "Did not run: whoever saved it can no longer deploy what it touches. Save it again to run it as you.",
+            "busy": "Did not run: the previous run was still going.",
+            "noActions": "Did not run: it has no actions it can still read."
+        },
+        "reasons": {
+            "gone": "The service is no longer in this project.",
+            "failed": "The action could not be done.",
+            "notRunning": "The service is not running, so there was nothing to run the command in.",
+            "unreachable": "The server the service runs on could not be reached.",
+            "timedOut": "The command was stopped at its time limit.",
+            "exited": "The command ended with an error.",
+            "notStarted": "The command could not be started."
+        },
+        "issues": {
+            "name": "Give it a name, up to 64 characters.",
+            "schedule": "Write a schedule with five fields, like 0 3 * * *.",
+            "timezone": "Use a time zone like Europe/Madrid or UTC.",
+            "event": "Pick an event.",
+            "eventService": "That event is not about one service.",
+            "service": "Pick a service.",
+            "command": "Write a command, up to 4000 characters.",
+            "timeout": "Between 10 and 3600 seconds.",
+            "message": "Write the message, up to 300 characters.",
+            "actions": "Add at least one action, up to 10."
+        },
+        "presets": {
+            "hourly": "Every hour",
+            "daily": "Daily at 03:00",
+            "mondays": "Mondays at 09:00"
+        },
+        "newTitle": "New automation",
+        "editTitle": "Edit automation",
+        "editorHint": "Saving it makes you the person it acts as.",
+        "name": "Name",
+        "namePlaceholder": "Nightly redeploy",
+        "when": "When",
+        "whenHint": "what starts it",
+        "then": "Then",
+        "thenHint": "in this order; a step that fails stops the rest",
+        "trigger": "Trigger",
+        "schedule": "Schedule",
+        "timezone": "Time zone",
+        "nextRun": "next {date}",
+        "webhookMinted": "Saving it gives it an address of its own, shown once.",
+        "webhookKept": "It keeps its address. Use New address in the list to replace it.",
+        "event": "Event",
+        "eventService": "Of service",
+        "anyService": "Any service",
+        "move": "Move action",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "removeAction": "Remove action",
+        "actionKind": "Action",
+        "service": "Service",
+        "pickService": "Pick a service",
+        "timeout": "Time limit (seconds)",
+        "command": "Command",
+        "commandPlaceholder": "npm run migrate",
+        "message": "Message",
+        "addAction": "Add action",
+        "noServices": "This project has no services yet, so it can only notify.",
+        "noCommands": "Running a command needs console access to this project.",
+        "cancel": "Cancel",
+        "save": "Save"
     }
 }

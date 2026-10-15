@@ -3613,7 +3613,9 @@ export type DeploymentTrigger =
     | "settings"
     | "scale"
     | "upload"
-    | "promotion";
+    | "promotion"
+    /** One of the project's automations asked for it. */
+    | "automation";
 
 /** What a run of a kept image carries over from the release it runs. */
 export interface RollbackSource {

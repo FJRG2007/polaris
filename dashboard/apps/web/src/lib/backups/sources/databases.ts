@@ -21,7 +21,7 @@ import { createWriteStream } from "node:fs";
 import { prisma, Prisma } from "@polaris/db";
 import { pipeline } from "node:stream/promises";
 import { getPorts } from "@/lib/deploy/runtime";
-import { SHARDED_DUMP_REFUSAL } from "@polaris/core";
+import { filteredDumpArgv, SHARDED_DUMP_REFUSAL, type CopyTables } from "@polaris/core";
 import { restoreDumpInto } from "@/lib/database-ops/restore";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
@@ -42,7 +42,15 @@ import {
 const DUMPERS = {
     postgres: {
         extension: "sql.gz",
-        argv: (db: string, user: string) => ["pg_dump", "--no-owner", "--no-acl", "-U", user, "-d", db]
+        argv: (db: string, user: string) => [
+            "pg_dump",
+            "--no-owner",
+            "--no-acl",
+            "-U",
+            user,
+            "-d",
+            db
+        ]
     },
     mysql: {
         extension: "sql.gz",
@@ -137,7 +145,10 @@ export const polarisDatabaseSource: BackupSource = {
         const fileName = `polaris-${stamp(at)}.json.gz`;
         const target = join(dir, fileName);
 
-        const client = prisma as unknown as Record<string, { findMany?: (args?: unknown) => Promise<unknown[]> }>;
+        const client = prisma as unknown as Record<
+            string,
+            { findMany?: (args?: unknown) => Promise<unknown[]> }
+        >;
         const tables: Record<string, unknown[]> = {};
         for (const model of Prisma.dmmf.datamodel.models) {
             const key = model.name.charAt(0).toLowerCase() + model.name.slice(1);
@@ -174,23 +185,28 @@ export const managedDatabaseSource: BackupSource = {
             },
             take: 500
         });
-        return rows
-            // A sharded cluster cannot be copied consistently yet, so it is not
-            // offered; its Manage panel says so.
-            .filter((row) => isEngine(row.engine) && (row.parent ?? row).topology !== "sharded")
-            .map((row) => ({
-                kind: "managed-database" as const,
-                selector: buildSelector("managed-database", [row.id]),
-                name: row.name,
-                context: `${row.environment.project.name} / ${row.environment.name}`,
-                target: { kind: "managed-database", databaseId: row.id }
-            }));
+        return (
+            rows
+                // A sharded cluster cannot be copied consistently yet, so it is not
+                // offered; its Manage panel says so.
+                .filter((row) => isEngine(row.engine) && (row.parent ?? row).topology !== "sharded")
+                .map((row) => ({
+                    kind: "managed-database" as const,
+                    selector: buildSelector("managed-database", [row.id]),
+                    name: row.name,
+                    context: `${row.environment.project.name} / ${row.environment.name}`,
+                    target: { kind: "managed-database", databaseId: row.id }
+                }))
+        );
     },
 
     async resolveName(resource: SourceResource): Promise<string | null> {
         const id = resource.selector.split(":")[1];
         if (!id) return null;
-        const row = await prisma.managedDatabase.findUnique({ where: { id }, select: { name: true } });
+        const row = await prisma.managedDatabase.findUnique({
+            where: { id },
+            select: { name: true }
+        });
         return row?.name ?? null;
     },
 
@@ -214,7 +230,8 @@ export const managedDatabaseSource: BackupSource = {
         if (!isEngine(row.engine)) {
             throw new SourceUnavailableError(`Polaris cannot dump a ${row.engine} database yet`);
         }
-        if ((row.parent ?? row).topology === "sharded") throw new SourceUnavailableError(SHARDED_DUMP_REFUSAL);
+        if ((row.parent ?? row).topology === "sharded")
+            throw new SourceUnavailableError(SHARDED_DUMP_REFUSAL);
         const connection = await databaseConnection(id, resource.ownerId);
         const nodes = databaseClusterNodes(row);
         if (nodes && row.clusterMasters) {
@@ -244,7 +261,9 @@ export const managedDatabaseSource: BackupSource = {
             password: connection.password,
             authDatabase: row.parentId ? connection.database : "admin",
             label: resource.name || row.name,
-            ...(connection.replicaSet && connection.hosts.length > 1 ? { mongoSeeds: seedsOf(connection) } : {})
+            ...(connection.replicaSet && connection.hosts.length > 1
+                ? { mongoSeeds: seedsOf(connection) }
+                : {})
         });
     },
 
@@ -267,7 +286,10 @@ export const managedDatabaseSource: BackupSource = {
         if (!id) throw new SourceUnavailableError("This database's id is missing from its record");
         // Refused before the safety copy: neither can go anywhere, and a copy
         // taken for a restore that never happens is only noise in the history.
-        const row = await prisma.managedDatabase.findUnique({ where: { id }, select: { clusterMasters: true } });
+        const row = await prisma.managedDatabase.findUnique({
+            where: { id },
+            select: { clusterMasters: true }
+        });
         if (row?.clusterMasters) {
             throw new SourceUnavailableError(
                 "A Redis cluster cannot be restored in place: each master holds its own share of the keys. Nothing was changed."
@@ -279,9 +301,14 @@ export const managedDatabaseSource: BackupSource = {
             );
         }
         const { runBackup } = await import("../service");
-        const safety = await runBackup(resource.id, { trigger: "pre-restore", actorUserId: actorId });
+        const safety = await runBackup(resource.id, {
+            trigger: "pre-restore",
+            actorUserId: actorId
+        });
         if (safety.status === "failed") {
-            const why = safety.failures.map((failure) => `${failure.destination}: ${failure.reason}`).join("; ");
+            const why = safety.failures
+                .map((failure) => `${failure.destination}: ${failure.reason}`)
+                .join("; ");
             throw new SourceUnavailableError(
                 `Nothing was restored: a copy of what is there now could not be taken first${why ? ` (${why})` : ""}.`
             );
@@ -290,18 +317,25 @@ export const managedDatabaseSource: BackupSource = {
         const dir = await stageDir();
         const staged = join(dir, "restore");
         try {
-            await pipeline(Readable.fromWeb(body as import("node:stream/web").ReadableStream), createWriteStream(staged));
+            await pipeline(
+                Readable.fromWeb(body as import("node:stream/web").ReadableStream),
+                createWriteStream(staged)
+            );
             const context = await instanceContext(id, resource.ownerId);
             const operation = await startOperation(id, "restore", actorId);
             try {
-                await restoreDumpInto(context, { local: staged }, {
-                    operation,
-                    // Only MongoDB names the database inside the dump; a copy of
-                    // the same database restores into itself either way.
-                    ...(typeof metadata.database === "string" && metadata.database
-                        ? { sourceDatabase: metadata.database }
-                        : {})
-                });
+                await restoreDumpInto(
+                    context,
+                    { local: staged },
+                    {
+                        operation,
+                        // Only MongoDB names the database inside the dump; a copy of
+                        // the same database restores into itself either way.
+                        ...(typeof metadata.database === "string" && metadata.database
+                            ? { sourceDatabase: metadata.database }
+                            : {})
+                    }
+                );
                 await operation.succeed();
             } catch (error) {
                 throw new SourceUnavailableError(await operation.fail(error));
@@ -328,10 +362,17 @@ export interface DumpRequest {
     /** MongoDB only: a replica set of several members as a seed list, so the
      *  dump is read from a secondary. */
     readonly mongoSeeds?: string;
+    /** A copy's choice of tables to leave out or copy empty. A backup never
+     *  sets this: it takes everything. */
+    readonly tables?: CopyTables;
 }
 
 /** A replica set connection as the seed list the database tools' `--host` reads. */
-function seedsOf(connection: { hosts: readonly string[]; replicaSet: string | null; port: number }): string {
+function seedsOf(connection: {
+    hosts: readonly string[];
+    replicaSet: string | null;
+    port: number;
+}): string {
     return `${connection.replicaSet}/${connection.hosts.map((host) => `${host}:${connection.port}`).join(",")}`;
 }
 
@@ -349,6 +390,19 @@ export function isDumpableEngine(value: unknown): value is Engine {
  * file is removed whether the read succeeded or not - a failed backup that fills
  * the database's own disk is worse than no backup.
  */
+/** The shell line that writes a dump into `file`, with any table choices. */
+function filteredDumpShell(request: DumpRequest, argv: readonly string[], file: string): string {
+    if (request.engine === "redis") return `${argv.map(shellQuote).join(" ")} > ${file}`;
+    const { main, schemaPass } = filteredDumpArgv(
+        request.engine,
+        request.database,
+        argv,
+        request.tables
+    );
+    const first = `${main.map(shellQuote).join(" ")} > ${file}`;
+    return schemaPass ? `${first} && ${schemaPass.map(shellQuote).join(" ")} >> ${file}` : first;
+}
+
 export async function dumpInContainer(request: DumpRequest): Promise<StagedArtifact> {
     const dumper = DUMPERS[request.engine];
     const at = new Date();
@@ -360,7 +414,8 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         where: { id: request.targetId },
         select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
     });
-    if (!target) throw new SourceUnavailableError("The server this database runs on is not registered");
+    if (!target)
+        throw new SourceUnavailableError("The server this database runs on is not registered");
 
     const ports = await getPorts(target, request.ownerId);
     const container = request.container;
@@ -381,8 +436,12 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         // a refused SAVE must not be followed by copying a stale snapshot.
         const command =
             request.engine === "redis"
-                ? ["sh", "-c", `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`]
-                : ["sh", "-c", `${argv.map(shellQuote).join(" ")} > ${inContainer}`];
+                ? [
+                      "sh",
+                      "-c",
+                      `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`
+                  ]
+                : ["sh", "-c", filteredDumpShell(request, argv, inContainer)];
         // Redis is started with `--requirepass`, so an unauthenticated SAVE was
         // refused and the copy that followed was whatever snapshot Redis had last
         // written on its own schedule - or nothing at all.
@@ -395,7 +454,11 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         const result = await ports.runIn(
             container,
             Object.keys(environment).length > 0
-                ? ["env", ...Object.entries(environment).map(([key, value]) => `${key}=${value}`), ...command]
+                ? [
+                      "env",
+                      ...Object.entries(environment).map(([key, value]) => `${key}=${value}`),
+                      ...command
+                  ]
                 : command
         );
         if (result.code !== 0) {
@@ -458,7 +521,8 @@ export async function dumpRedisCluster(request: ClusterDumpRequest): Promise<Sta
         where: { id: request.targetId },
         select: { id: true, kind: true, hostId: true, runtime: true, proxyNetwork: true }
     });
-    if (!target) throw new SourceUnavailableError("The server this database runs on is not registered");
+    if (!target)
+        throw new SourceUnavailableError("The server this database runs on is not registered");
 
     const ports = await getPorts(target, request.ownerId);
     const auth = `REDISCLI_AUTH=${request.password}`;
@@ -468,8 +532,11 @@ export async function dumpRedisCluster(request: ClusterDumpRequest): Promise<Sta
         // fails over, so it is asked rather than assumed.
         const masters: string[] = [];
         for (const node of request.nodes) {
-            const role = await ports.runIn(node, ["env", auth, "redis-cli", "--no-auth-warning", "ROLE"]).catch(() => null);
-            if (role?.code === 0 && role.output.trim().split(/\r?\n/)[0]?.trim() === "master") masters.push(node);
+            const role = await ports
+                .runIn(node, ["env", auth, "redis-cli", "--no-auth-warning", "ROLE"])
+                .catch(() => null);
+            if (role?.code === 0 && role.output.trim().split(/\r?\n/)[0]?.trim() === "master")
+                masters.push(node);
         }
         if (masters.length !== request.masters) {
             throw new SourceUnavailableError(
@@ -492,7 +559,14 @@ export async function dumpRedisCluster(request: ClusterDumpRequest): Promise<Sta
                 );
             }
         }
-        const topology = await ports.runIn(first, ["env", auth, "redis-cli", "--no-auth-warning", "CLUSTER", "NODES"]);
+        const topology = await ports.runIn(first, [
+            "env",
+            auth,
+            "redis-cli",
+            "--no-auth-warning",
+            "CLUSTER",
+            "NODES"
+        ]);
         const nodesText = Buffer.from(topology.code === 0 ? topology.output : "");
 
         const sources: ZipSource[] = [
@@ -524,7 +598,8 @@ export async function dumpRedisCluster(request: ClusterDumpRequest): Promise<Sta
             takenAt: at.toISOString()
         });
     } finally {
-        for (const node of written) await ports.runIn(node, ["rm", "-f", "--", inContainer]).catch(() => undefined);
+        for (const node of written)
+            await ports.runIn(node, ["rm", "-f", "--", inContainer]).catch(() => undefined);
         await ports.dispose();
     }
 }

@@ -343,7 +343,8 @@ export async function copyIntoDatabaseAction(
                 ? { fromDatabaseId: parsed.data.fromDatabaseId }
                 : parsed.data.fromConnectionId
                   ? { fromConnectionId: parsed.data.fromConnectionId }
-                  : { fromUrl: parsed.data.fromUrl ?? "" }
+                  : { fromUrl: parsed.data.fromUrl ?? "" },
+            parsed.data.tables ? { tables: parsed.data.tables } : {}
         );
         // The connection string carries a password: only where the copy came
         // from is recorded, never the string itself.
@@ -352,7 +353,10 @@ export async function copyIntoDatabaseAction(
                 parsed.data.fromDatabaseId ??
                 (parsed.data.fromConnectionId
                     ? `saved connection ${parsed.data.fromConnectionId}`
-                    : "connection string")
+                    : "connection string"),
+            ...(parsed.data.tables
+                ? { skipped: parsed.data.tables.skip, emptied: parsed.data.tables.structureOnly }
+                : {})
         });
         return {};
     } catch (caught) {
