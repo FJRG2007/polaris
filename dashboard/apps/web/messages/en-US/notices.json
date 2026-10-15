@@ -305,5 +305,9 @@
         "backBody": "The volumes of {service} ({volumes}) on {storage} answer again.",
         "reconnectedTitle": "{service} was reconnected to its NAS volumes",
         "reconnectedBody": "The connection to {storage} had dropped, so {service} could not read its volumes ({volumes}). Polaris reconnected it and restarted the service."
+    },
+    "webhooks": {
+        "disabledTitle": "Webhook switched off: {name}",
+        "disabledBody": "Its last five deliveries failed, so Polaris stopped sending to it. Fix the endpoint, then switch it back on in Webhooks."
     }
 }

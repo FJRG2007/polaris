@@ -305,5 +305,9 @@
         "backBody": "Los volúmenes de {service} ({volumes}) en {storage} vuelven a responder.",
         "reconnectedTitle": "{service} se reconectó a sus volúmenes NAS",
         "reconnectedBody": "La conexión con {storage} se había caído, así que {service} no podía leer sus volúmenes ({volumes}). Polaris la ha restablecido y ha reiniciado el servicio."
+    },
+    "webhooks": {
+        "disabledTitle": "Webhook desactivado: {name}",
+        "disabledBody": "Sus últimas cinco entregas fallaron, así que Polaris dejó de enviarle. Arregla el destino y vuelve a activarlo en Webhooks."
     }
 }
