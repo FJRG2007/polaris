@@ -239,6 +239,7 @@ model User {
     dockerConnections DockerConnection[]
     dataConnections   DataConnection[]
     hosts             Host[]
+    hostTemplates     HostTemplate[]
     hostGroups        HostGroup[]
     shares            Share[]
     shareInvites      ShareInvite[]
@@ -2125,6 +2126,7 @@ model Host {
     backupDestinations BackupDestination[]
     agentSessions AgentSession[]
     cloudServer   CloudServer?
+    templateAssignments HostTemplateAssignment[]
     // Database connections tunnelled through this server, directly or as a jump.
     dataTunnels   DataConnection[] @relation("DataConnectionSshHost")
     dataJumps     DataConnection[] @relation("DataConnectionSshJump")
@@ -13954,4 +13956,49 @@ model FileAccessServer {
     application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
     @@unique([targetId, port])
+}
+
+// The state a server is expected to be in - packages, services, files, kernel
+// settings, accounts and firewall openings - kept as one validated JSON document
+// (`hostTemplateInputSchema` in @polaris/core), since it is only ever read and
+// written whole.
+model HostTemplate {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    ownerId     String   @db.Uuid
+    name        String
+    description String   @default("")
+    spec        Json
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    owner       User                       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    assignments HostTemplateAssignment[]
+
+    @@unique([ownerId, name])
+    @@index([ownerId])
+}
+
+// A template applied to one server, with what its last check found.
+model HostTemplateAssignment {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    templateId String    @db.Uuid
+    hostId     String    @db.Uuid
+    // Put drift back as soon as a scheduled check finds it.
+    autoFix    Boolean   @default(false)
+    // unknown | compliant | drifted | failed
+    status     String    @default("unknown")
+    // DriftItem[] from the last check that reached the server.
+    drift      Json?
+    // Why the last check or fix did not complete, as a code the screen words.
+    error      String?
+    checkedAt  DateTime?
+    fixedAt    DateTime?
+    createdAt  DateTime  @default(now())
+
+    template HostTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+    host     Host           @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+    @@unique([templateId, hostId])
+    @@index([hostId])
+    @@index([checkedAt])
 }
