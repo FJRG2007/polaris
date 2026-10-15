@@ -1885,6 +1885,11 @@
         "web/src/components/seasonal/seasonal-frame.tsx",
         "web/src/app/(app)/account/preferences/seasonal-actions.ts",
         "web/src/app/(app)/admin/settings/seasonal-actions.ts",
-        "web/src/app/(app)/admin/settings/seasonal-card.tsx"
+        "web/src/app/(app)/admin/settings/seasonal-card.tsx",
+        "web/src/lib/deploy/panel-import/cpanel.ts",
+        "web/src/lib/deploy/panel-import/jobs.ts",
+        "web/src/lib/deploy/promotion.ts",
+        "web/src/lib/restore-points/service.ts",
+        "web/src/lib/env-var-service.ts"
     ]
 }

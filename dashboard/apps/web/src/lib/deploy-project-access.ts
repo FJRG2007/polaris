@@ -19,6 +19,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { requireOrgPermission, type OrgActor } from "@/lib/orgs/org-service";
 import { canOn, grantedResourceIds } from "@polaris/auth";
 import {
     memberOrgIds,
@@ -353,6 +354,17 @@ export async function requireEnvScopeAccess(
         : requireApplicationAccess(scopeId, userId, capability);
 }
 
+/**
+ * The clause matching every project this user runs: their own, and every one on
+ * the shelf of an organization where they hold `deploy.manage` - the same rule
+ * `projectAccess` applies to one project. For the queries that have to reach
+ * rows `projectAccess` cannot load, such as what sits in the recycle bin.
+ */
+export async function managedProjectWhere(userId: string) {
+    const runs = await orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage");
+    return { OR: [{ ownerId: userId }, ...(runs.length > 0 ? [{ orgId: { in: runs } }] : [])] };
+}
+
 /** Ids of every project the user may at least read. Used to widen the Deploy
  *  landing beyond what they own without loading each project to check. */
 export async function visibleProjectIds(userId: string): Promise<string[]> {
@@ -382,4 +394,18 @@ export async function visibleProjectIds(userId: string): Promise<string[]> {
         orderBy: { createdAt: "asc" }
     });
     return rows.map((row) => row.id);
+}
+
+/**
+ * Whether this actor may make a project on the shelf `orgId` (null: their own).
+ * Their own shelf takes only the `deploy.manage` the caller has already checked;
+ * an organization's takes being allowed to run its services. The import route
+ * refuses on this, and the projects screen disables Import site on it.
+ */
+export async function mayCreateProjectIn(actor: OrgActor, orgId: string | null): Promise<boolean> {
+    if (!orgId) return true;
+    return requireOrgPermission(actor, orgId, "deploy.manage").then(
+        () => true,
+        () => false
+    );
 }

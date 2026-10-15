@@ -10,6 +10,8 @@ import { searchItems, type SearchField } from "@polaris/core/search-text";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
+import { RecycleBinButton } from "./recycle-bin";
+import { ImportSiteButton } from "./import-site";
 import { RegistryCredentialsButton } from "./registry-credentials";
 import { useShowManaged } from "./show-managed";
 import { createProjectAction, deleteProjectAction } from "./actions";
@@ -79,7 +81,9 @@ export function ProjectsGrid({
     canManage,
     localReady,
     viewerId,
-    hideManagedByDefault = false
+    hideManagedByDefault = false,
+    canSetBinDays = false,
+    canCreateHere = canManage
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
@@ -88,6 +92,10 @@ export function ProjectsGrid({
     viewerId: string;
     /** Whether the projects Polaris runs for itself start hidden. */
     hideManagedByDefault?: boolean;
+    /** Whether the reader may change how long the recycle bin keeps things. */
+    canSetBinDays?: boolean;
+    /** Whether the reader may make a project on the open shelf - the import's own check. */
+    canCreateHere?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("deploy");
@@ -147,12 +155,16 @@ export function ProjectsGrid({
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("projects.title")}
                 </h1>
-                {canManage && (
-                    <div data-tour="deploy.create" className="flex flex-wrap items-center gap-2">
-                        <RegistryCredentialsButton />
-                        <CreateProjectButton />
-                    </div>
-                )}
+                <div data-tour="deploy.create" className="flex flex-wrap items-center gap-2">
+                    <RecycleBinButton canManage={canManage} isAdmin={canSetBinDays} />
+                    {canManage && (
+                        <>
+                            <ImportSiteButton allowed={canCreateHere} />
+                            <RegistryCredentialsButton />
+                            <CreateProjectButton />
+                        </>
+                    )}
+                </div>
             </div>
 
             {failure && (

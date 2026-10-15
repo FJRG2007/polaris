@@ -24,6 +24,8 @@ import {
     detectWebhookFormat,
     maskWebhookUrl,
     parseProjectFlags,
+    effectiveStage,
+    type EnvironmentStage,
     projectRoleFor,
     parseEnvironmentScope,
     parseProjectCapabilities,
@@ -65,6 +67,8 @@ export interface ProjectEnvironmentView {
     networkMode: EnvironmentNetworkMode;
     /** How many links its canvas holds - in "links" mode, the connections made. */
     linkCount: number;
+    /** What it is for; an unmarked default environment reads as production. */
+    stage: EnvironmentStage | null;
 }
 
 export interface ProjectSettingsView {
@@ -102,7 +106,13 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
                     previewRepo: true,
                     networkMode: true,
                     layout: true,
-                    _count: { select: { applications: true, databases: true } }
+                    stage: true,
+                    _count: {
+                        select: {
+                            applications: { where: { binnedAt: null } },
+                            databases: { where: { binnedAt: null } }
+                        }
+                    }
                 }
             }
         }
@@ -119,7 +129,8 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         pullRequest: environment.pullRequest,
         previewRepo: environment.previewRepo,
         networkMode: networkModeOf(environment.networkMode),
-        linkCount: linksOfLayout(environment.layout).length
+        linkCount: linksOfLayout(environment.layout).length,
+        stage: effectiveStage(environment)
     }));
     return {
         id: project.id,
@@ -833,6 +844,7 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
                 orderBy: { createdAt: "asc" },
                 include: {
                     applications: {
+                        where: { binnedAt: null },
                         select: {
                             id: true,
                             name: true,
@@ -840,7 +852,10 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
                             volumes: { select: { id: true } }
                         }
                     },
-                    databases: { select: { id: true, name: true, status: true } }
+                    databases: {
+                        where: { binnedAt: null },
+                        select: { id: true, name: true, status: true }
+                    }
                 }
             }
         }
@@ -993,13 +1008,14 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
                 orderBy: { createdAt: "asc" },
                 include: {
                     applications: {
+                        where: { binnedAt: null },
                         orderBy: { createdAt: "asc" },
                         include: {
                             volumes: true,
                             domains: { select: { kind: true, targetPort: true } }
                         }
                     },
-                    databases: { orderBy: { createdAt: "asc" } }
+                    databases: { where: { binnedAt: null }, orderBy: { createdAt: "asc" } }
                 }
             }
         }

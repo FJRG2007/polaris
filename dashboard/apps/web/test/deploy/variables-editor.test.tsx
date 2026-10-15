@@ -35,6 +35,10 @@ vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     listEnvVarsAction: mocks.listEnvVarsAction,
     revealEnvVarAction: mocks.revealEnvVarAction
 }));
+vi.mock("@/app/(app)/apps/deploy/restore-actions", () => ({
+    listHistoryAction: async () => ({ points: [] }),
+    restoreHistoryAction: async () => ({})
+}));
 vi.mock("@/app/(app)/apps/deploy/variable-actions", () => ({
     variableLinksAction: async () => ({}),
     redeployEnvScopeAction: async () => ({}),
