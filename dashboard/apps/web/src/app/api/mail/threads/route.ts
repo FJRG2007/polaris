@@ -23,11 +23,19 @@ import { NextResponse } from "next/server";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { apiPermission } from "@/lib/api-session";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
-import { reachForOlder } from "@/lib/mailbox/sync";
+import { olderOnServer, reachForOlder } from "@/lib/mailbox/sync";
 import { reachesForOlder } from "@/lib/mailbox/folder-window";
 import { EMPTY_QUERY, listThreads } from "@/lib/mailbox/views";
 import { everyAccountId, unifiedAccountIds } from "@/lib/mailbox/access";
 import { readerWords } from "@/lib/i18n/reader-words";
+
+/**
+ * The cursor of a page that ended on what is held here while the server holds
+ * more. It reads as no cursor to the list (`mailCursorWhere`), so asking with it
+ * lists from the top again - the rows already drawn are dropped by the list -
+ * after the server has been asked for the next older batch.
+ */
+const OLDER_ON_SERVER = "older";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,11 +65,24 @@ export async function GET(request: Request): Promise<Response> {
     // The end of what is held here: the sync keeps only a folder's newest
     // messages, so the scroll reaching the bottom is what brings down the next
     // older page from the server - and then the same page again, with it in.
+    //
+    // Never for the first page. Going to the server waits on the mailbox's own
+    // sync pass and then on a connection of its own, and a Trash holding a few
+    // rows here sat on its skeleton for twenty seconds every time it was opened.
+    // The first page answers with what is held and a cursor saying there is
+    // more, and the list's own bottom-of-the-list fetch - already on screen for
+    // a short list - is what goes and gets it.
     if (page.cursor === "" && reachesForOlder(list)) {
         const accountIds = narrow.accountId
             ? (await everyAccountId(user.id)).filter((id) => id === narrow.accountId)
             : await unifiedAccountIds(user.id, shelf);
-        if (await reachForOlder(accountIds, narrow)) page = await listThreads(user.id, list, shelf);
+        if (cursor === "") {
+            if (await olderOnServer(accountIds, narrow)) page = { ...page, cursor: OLDER_ON_SERVER };
+        } else if (await reachForOlder(accountIds, narrow)) {
+            page = await listThreads(user.id, list, shelf);
+            if (page.cursor === "" && (await olderOnServer(accountIds, narrow)))
+                page = { ...page, cursor: OLDER_ON_SERVER };
+        }
     }
     return NextResponse.json(page, {
         headers: { "cache-control": "private, no-store" }
