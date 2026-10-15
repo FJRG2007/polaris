@@ -1928,28 +1928,34 @@ export async function setApplicationDomainPrivate(
 }
 
 /**
- * The private rule on the address a visitor is headed for, with the project it
- * belongs to - what `/edge/authorize` decides a private address against. Exact name
- * first, then the wildcard that covers it, the same order the edge matches in.
+ * Every private rule on the host a visitor is headed for, with the project each one
+ * belongs to - what `/edge/authorize` decides a private address against.
+ *
+ * All of them, not the best match: the token minted for a host is good on every
+ * path of it and under both the exact name and the wildcard that covers it, so one
+ * public row beside a private one (a public `/` and a private `/admin`, or a public
+ * `api.example.com/v1` under a private `*.example.com`) must not decide the host as
+ * public. Empty when nothing on the host is private.
  */
-export async function privateDomainForHost(
+export async function privateDomainsForHost(
     host: string
-): Promise<{ access: PrivateAccess; projectId: string } | null> {
+): Promise<{ access: PrivateAccess; projectId: string }[]> {
     const name = host.trim().toLowerCase();
-    if (!name) return null;
+    if (!name) return [];
     const dot = name.indexOf(".");
     const names = dot > 0 ? [name, `*.${name.slice(dot + 1)}`] : [name];
     const rows = await prisma.domain.findMany({
-        where: { enabled: true, hostname: { in: names } },
+        where: { enabled: true, hostname: { in: names }, privateAccess: { not: null } },
         select: {
-            hostname: true,
             privateAccess: true,
             application: { select: { environment: { select: { projectId: true } } } }
-        }
+        },
+        take: 100
     });
-    const row = rows.find((entry) => entry.hostname === name) ?? rows[0];
-    const access = parsePrivateAccess(row?.privateAccess);
-    return row && access ? { access, projectId: row.application.environment.projectId } : null;
+    return rows.flatMap((row) => {
+        const access = parsePrivateAccess(row.privateAccess);
+        return access ? [{ access, projectId: row.application.environment.projectId }] : [];
+    });
 }
 
 /**

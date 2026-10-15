@@ -24,8 +24,8 @@ import { resolveWaf } from "@/lib/waf-service";
 import { clientIp } from "@/lib/request-context";
 import { principalsOfUser } from "@polaris/auth";
 import { projectAccess } from "@/lib/deploy-project-access";
-import { PRIVATE_TOKEN_TTL_SECONDS, privateVerdict } from "@/lib/deploy/private-domain";
-import { deployAppIdForHost, privateDomainForHost } from "@/lib/deploy-service";
+import { PRIVATE_TOKEN_TTL_SECONDS, privateHostVerdict } from "@/lib/deploy/private-domain";
+import { deployAppIdForHost, privateDomainsForHost } from "@/lib/deploy-service";
 import { edgeSigningKey } from "@/lib/edge-signing-key";
 import {
     EDGE_TOKEN_TTL_SECONDS,
@@ -86,10 +86,10 @@ export async function GET(request: Request): Promise<Response> {
 
     const userId = session.id;
     const now = Math.floor(Date.now() / 1000);
-    const [waf, principals, privateRule] = await Promise.all([
+    const [waf, principals, privateRules] = await Promise.all([
         resolveWaf(applicationId),
         principalsOfUser(userId),
-        privateDomainForHost(appOrigin.host)
+        privateDomainsForHost(appOrigin.host)
     ]);
     const held = new Set(principals.map((entry) => `${entry.principalType}:${entry.principalId}`));
     // Signed in, but this service's firewall names who may reach it and this account is
@@ -105,13 +105,13 @@ export async function GET(request: Request): Promise<Response> {
     // A private address answers the project's members, the people it names, or both -
     // and membership is only knowable here, live, never at the edge. Asked only when
     // the firewall has not already refused, so a blocked account costs no lookup.
+    const isPrivate = privateRules.length > 0;
     const verdict =
-        firewallVerdict === "admitted" && privateRule
-            ? privateVerdict(
-                  privateRule.access,
+        firewallVerdict === "admitted" && isPrivate
+            ? await privateHostVerdict(
+                  privateRules,
                   held,
-                  privateRule.access.members &&
-                      (await projectAccess(privateRule.projectId, userId)) !== null,
+                  async (projectId) => (await projectAccess(projectId, userId)) !== null,
                   now
               )
             : firewallVerdict;
@@ -141,7 +141,7 @@ export async function GET(request: Request): Promise<Response> {
         // The hard expiry: however long Polaris is unreachable, the token stops here.
         // A private address keeps it to minutes: membership was decided just now and
         // is not re-decided at the edge, so this is how long a removal takes to land.
-        exp: now + (privateRule ? PRIVATE_TOKEN_TTL_SECONDS : EDGE_TOKEN_TTL_SECONDS),
+        exp: now + (isPrivate ? PRIVATE_TOKEN_TTL_SECONDS : EDGE_TOKEN_TTL_SECONDS),
         // When these principals were true. What lets the guard tell a token that
         // predates a membership change from one that reflects it.
         iat: now,

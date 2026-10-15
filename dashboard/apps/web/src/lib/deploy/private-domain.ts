@@ -91,6 +91,27 @@ export function withPrivateAccess(route: AppRoute, access: PrivateAccess | null)
     };
 }
 
+/** Whether a signed-in account may open a host whose addresses carry these private
+ *  rules. A login token is good for the whole host, not one path on it, so every rule
+ *  on the host has to admit the account - a host with a public `/` and a private
+ *  `/admin` must not hand a non-member a token the `/admin` router would accept.
+ *  `isMember` answers for one project; it is only asked when a rule admits members. */
+export async function privateHostVerdict(
+    rules: readonly { readonly access: PrivateAccess; readonly projectId: string }[],
+    held: ReadonlySet<string>,
+    isMember: (projectId: string) => Promise<boolean>,
+    now: number
+): Promise<"admitted" | "refused" | "not-admitted"> {
+    let verdict: "admitted" | "refused" | "not-admitted" = "admitted";
+    for (const rule of rules) {
+        const member = rule.access.members ? await isMember(rule.projectId) : false;
+        const one = privateVerdict(rule.access, held, member, now);
+        if (one === "refused") return "refused";
+        if (one === "not-admitted") verdict = "not-admitted";
+    }
+    return verdict;
+}
+
 /** Whether a signed-in account may open a private address. `isMember` is the live
  *  project check; it is only asked when the address admits members. */
 export function privateVerdict(
