@@ -334,7 +334,7 @@ async function run() {
                 await ticking(
                     page,
                     page.evaluate((i) => window.__scene.step(i), index),
-                    advance,
+                    0,
                     `step ${index}`
                 );
                 await page.clock.runFor(advance);
