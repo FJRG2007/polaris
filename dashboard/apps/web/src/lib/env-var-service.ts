@@ -6,6 +6,7 @@
  * project.
  */
 
+import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
@@ -169,9 +170,12 @@ export async function setEnvVar(
     scope: EnvScope,
     scopeId: string,
     ownerId: string,
-    input: { key: string; value: string; isSecret: boolean }
+    input: { key: string; value: string; isSecret: boolean },
+    /** False when the caller already kept a restore point for the whole batch. */
+    snapshot = true
 ): Promise<{ created: boolean }> {
     await assertOwnsScope(scope, scopeId, ownerId);
+    if (snapshot) await restorePoints.capture("env", restorePoints.restoreKeys.env(scope, scopeId));
     const key = input.key.trim();
     if (!VALID_KEY.test(key))
         throw new Error("Key must be letters, digits and underscores, not starting with a digit");
@@ -211,6 +215,14 @@ export async function promoteEnvVar(input: {
 }): Promise<boolean> {
     await assertOwnsScope("application", input.serviceId, input.serviceOwnerId);
     await assertOwnsScope("environment", input.environmentId, input.environmentOwnerId);
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env("environment", input.environmentId)
+    );
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env("application", input.serviceId)
+    );
     const shared = storedValue(input.value, input.isSecret);
     const reference = storedValue(`\${{shared.${input.key}}}`, false);
     try {
@@ -276,10 +288,11 @@ export async function setEnvVars(
     vars: Array<{ key: string; value: string; isSecret: boolean }>
 ): Promise<number> {
     await assertOwnsScope(scope, scopeId, ownerId);
+    await restorePoints.capture("env", restorePoints.restoreKeys.env(scope, scopeId));
     let saved = 0;
     for (const item of vars) {
         try {
-            await setEnvVar(scope, scopeId, ownerId, item);
+            await setEnvVar(scope, scopeId, ownerId, item, false);
             saved += 1;
         } catch {
             // Skip an invalid key; import the rest.
@@ -299,6 +312,7 @@ export async function deleteEnvVar(
     });
     if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
+    await restorePoints.capture("env", restorePoints.restoreKeys.env(row.scopeType, row.scopeId));
     await prisma.envVar.delete({ where: { id } });
     return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
 }

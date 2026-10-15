@@ -125,6 +125,23 @@ export class HostdPorts implements RuntimePorts {
         );
     }
 
+    /**
+     * The registry digests (`repo@sha256:...`) a local image was pulled by, read
+     * from the disk-usage listing - the one image listing the daemon's allowlist
+     * opens. Empty when the image was built here or is not known.
+     */
+    public async imageRepoDigests(imageId: string): Promise<string[]> {
+        const response = await this.client.dockerRequest("GET", "/system/df?type=image");
+        if (response.status < 200 || response.status >= 300) return [];
+        const parsed = JSON.parse(response.body) as {
+            Images?: { Id?: unknown; RepoDigests?: unknown }[] | null;
+        };
+        const image = (parsed.Images ?? []).find((entry) => entry.Id === imageId);
+        return Array.isArray(image?.RepoDigests)
+            ? image.RepoDigests.filter((digest): digest is string => typeof digest === "string")
+            : [];
+    }
+
     /** Through the daemon's allowlist, which reaches only images under the release
      *  repository - checked here as well, so a refusal is ours and says why. A 404
      *  is success: the image the caller wanted gone is gone. */

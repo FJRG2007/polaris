@@ -19,9 +19,8 @@
  * the reason attached.
  */
 
+import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { prisma } from "@polaris/db";
-import { deleteDatabase } from "./database-service";
-import { deleteApplication } from "./deploy-service";
 import { deleteVolume } from "./deploy-volume-service";
 import {
     parseProjectFlags,
@@ -83,7 +82,10 @@ function toView(row: {
 /** Whether this project parks its destructive changes at all. Turning the flag
  *  off is a deliberate choice to have deletes take effect as they are clicked. */
 export async function projectStagesChanges(projectId: string): Promise<boolean> {
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { flags: true } });
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { flags: true }
+    });
     return parseProjectFlags(project?.flags).stageDestructiveChanges;
 }
 
@@ -155,11 +157,11 @@ export async function discardAllStagedChanges(environmentId: string): Promise<vo
 /** Carry out one parked change against the real infrastructure. */
 async function applyOne(change: StagedChangeView, ownerId: string): Promise<void> {
     if (change.kind === "service.delete") {
-        await deleteApplication(change.targetId, ownerId);
+        await recycleBin.binApplication(change.targetId, ownerId, ownerId);
         return;
     }
     if (change.kind === "database.delete") {
-        await deleteDatabase(change.targetId, ownerId);
+        await recycleBin.binDatabase(change.targetId, ownerId, ownerId);
         return;
     }
     if (change.kind === "volume.delete") {
@@ -175,7 +177,10 @@ async function applyOne(change: StagedChangeView, ownerId: string): Promise<void
  * the work that did not happen still staged - re-pressing deploy retries that and
  * nothing else.
  */
-export async function applyStagedChanges(environmentId: string, ownerId: string): Promise<ApplyResult> {
+export async function applyStagedChanges(
+    environmentId: string,
+    ownerId: string
+): Promise<ApplyResult> {
     const changes = await listStagedChanges(environmentId);
     const failures: ApplyResult["failures"] = [];
     let applied = 0;
@@ -193,7 +198,10 @@ export async function applyStagedChanges(environmentId: string, ownerId: string)
         } catch (caught) {
             failures.push({
                 targetName: change.targetName,
-                error: caught instanceof Error ? caught.message : (await readerWords("api"))("refusals.deploy.changeFailed")
+                error:
+                    caught instanceof Error
+                        ? caught.message
+                        : (await readerWords("api"))("refusals.deploy.changeFailed")
             });
         }
     }
@@ -218,10 +226,19 @@ export async function prunePhantomChanges(environmentId: string): Promise<void> 
     for (const row of rows) {
         const exists =
             row.targetType === "application"
-                ? await prisma.application.findUnique({ where: { id: row.targetId }, select: { id: true } })
+                ? await prisma.application.findUnique({
+                      where: { id: row.targetId },
+                      select: { id: true }
+                  })
                 : row.targetType === "database"
-                  ? await prisma.managedDatabase.findUnique({ where: { id: row.targetId }, select: { id: true } })
-                  : await prisma.volume.findUnique({ where: { id: row.targetId }, select: { id: true } });
+                  ? await prisma.managedDatabase.findUnique({
+                        where: { id: row.targetId },
+                        select: { id: true }
+                    })
+                  : await prisma.volume.findUnique({
+                        where: { id: row.targetId },
+                        select: { id: true }
+                    });
         if (!exists) await prisma.stagedChange.deleteMany({ where: { id: row.id } });
     }
 }

@@ -18,7 +18,7 @@ import { DangerSection } from "./settings/danger-section";
 import { GeneralSection } from "./settings/general-section";
 import { MembersSection } from "./settings/members-section";
 import { WebhooksSection } from "./settings/webhooks-section";
-import { EnvironmentsSection } from "./settings/environments-section";
+import { EnvironmentsSection, type PromotionReach } from "./settings/environments-section";
 import { IntegrationsSection } from "./settings/integrations-section";
 import { FeatureFlagsSection } from "./settings/feature-flags-section";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
@@ -28,7 +28,8 @@ export function ProjectSettings({
     settings,
     section,
     canManage,
-    isOwner
+    isOwner,
+    promotion
 }: {
     settings: ProjectSettingsView;
     section: string;
@@ -36,10 +37,14 @@ export function ProjectSettings({
     canManage: boolean;
     /** Only the owner may delete or hand over the project itself. */
     isOwner: boolean;
+    /** Where the reader may promote: environments they can deploy into, and
+     *  whether they may replace data on the way. */
+    promotion: PromotionReach;
 }) {
     const t = useTranslations("deploySettings");
     const base = `/apps/deploy/${settings.id}/settings`;
-    const current = SETTINGS_SECTIONS.find((entry) => entry.slug === section) ?? SETTINGS_SECTIONS[0]!;
+    const current =
+        SETTINGS_SECTIONS.find((entry) => entry.slug === section) ?? SETTINGS_SECTIONS[0]!;
 
     return (
         <div className="flex w-full flex-col gap-4">
@@ -47,7 +52,10 @@ export function ProjectSettings({
 
             <div className="flex flex-col gap-5 md:flex-row md:gap-6">
                 <nav className="md:w-48 md:shrink-0">
-                    <ScrollRow as="ul" className="-mx-1 flex gap-1 px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0">
+                    <ScrollRow
+                        as="ul"
+                        className="-mx-1 flex gap-1 px-1 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0 md:pb-0"
+                    >
                         {SETTINGS_SECTIONS.map((entry) => {
                             const href = entry.slug === "general" ? base : `${base}/${entry.slug}`;
                             const active = entry.slug === current.slug;
@@ -76,19 +84,37 @@ export function ProjectSettings({
                 </nav>
 
                 <div className="min-w-0 flex-1">
-                    {current.slug === "general" && <GeneralSection settings={settings} canManage={canManage} />}
+                    {current.slug === "general" && (
+                        <GeneralSection settings={settings} canManage={canManage} />
+                    )}
                     {current.slug === "usage" && <UsageSection projectId={settings.id} />}
                     {current.slug === "environments" && (
-                        <EnvironmentsSection settings={settings} canManage={canManage} />
+                        <EnvironmentsSection
+                            settings={settings}
+                            canManage={canManage}
+                            promotion={promotion}
+                        />
                     )}
-                    {current.slug === "variables" && <SharedVariablesSection settings={settings} canManage={canManage} />}
+                    {current.slug === "variables" && (
+                        <SharedVariablesSection settings={settings} canManage={canManage} />
+                    )}
                     {current.slug === "webhooks" && <WebhooksSection projectId={settings.id} />}
-                    {current.slug === "flags" && <FeatureFlagsSection settings={settings} canManage={canManage} />}
+                    {current.slug === "flags" && (
+                        <FeatureFlagsSection settings={settings} canManage={canManage} />
+                    )}
                     {current.slug === "members" && <MembersSection projectId={settings.id} />}
-                    {current.slug === "tokens" && <TokensSection projectId={settings.id} canManage={canManage} />}
-                    {current.slug === "integrations" && <IntegrationsSection projectId={settings.id} />}
+                    {current.slug === "tokens" && (
+                        <TokensSection projectId={settings.id} canManage={canManage} />
+                    )}
+                    {current.slug === "integrations" && (
+                        <IntegrationsSection projectId={settings.id} />
+                    )}
                     {current.slug === "danger" && (
-                        <DangerSection settings={settings} canManage={canManage} isOwner={isOwner} />
+                        <DangerSection
+                            settings={settings}
+                            canManage={canManage}
+                            isOwner={isOwner}
+                        />
                     )}
                 </div>
             </div>
@@ -116,8 +142,12 @@ export function SettingsCard({
             )}
         >
             <div>
-                <h2 className={cn("text-sm font-medium", tone === "danger" && "text-danger")}>{title}</h2>
-                {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
+                <h2 className={cn("text-sm font-medium", tone === "danger" && "text-danger")}>
+                    {title}
+                </h2>
+                {description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+                )}
             </div>
             {children}
         </section>

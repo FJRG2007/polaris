@@ -312,6 +312,25 @@ export class SshPorts implements RuntimePorts {
         await this.run(cutLinkNetworkScript(name).join("; "));
     }
 
+    /** The registry digests (`repo@sha256:...`) a local image was pulled by. */
+    public async imageRepoDigests(imageId: string): Promise<string[]> {
+        let out = "";
+        try {
+            await this.run(
+                `docker image inspect ${quoteArg(imageId)} --format ${quoteArg("{{json .RepoDigests}}")}`,
+                (chunk) => {
+                    out += chunk.toString("utf8");
+                }
+            );
+            const parsed = JSON.parse(out.trim() || "[]") as unknown;
+            return Array.isArray(parsed)
+                ? parsed.filter((digest): digest is string => typeof digest === "string")
+                : [];
+        } catch {
+            return [];
+        }
+    }
+
     public async inspectImage(image: string): Promise<number[]> {
         let out = "";
         try {

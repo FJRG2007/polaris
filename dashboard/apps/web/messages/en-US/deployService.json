@@ -63,7 +63,8 @@
         "disabled": "Deployment disabled",
         "status": "Status: {status}",
         "history": "History",
-        "builtOn": " - built on {machine}"
+        "builtOn": " - built on {machine}",
+        "viaPromotion": " - promoted from another environment"
     },
     "kept": {
         "rollbackTitle": "Put back from a kept image",

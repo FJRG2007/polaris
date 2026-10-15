@@ -4629,6 +4629,10 @@ model Project {
     // @polaris/core). One column rather than a table: they are read together on
     // every project load and never addressed one at a time.
     flags       String   @default("{}")
+    // Set while it sits in the recycle bin: containers removed, data kept, hidden
+    // from every list. Cleared by a restore; the row goes when it is purged.
+    binnedAt            DateTime?
+    binnedById          String?   @db.Uuid
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -4639,10 +4643,12 @@ model Project {
     webhooks     ProjectWebhook[]
     tokens       ApiKey[]
     telemetry    TelemetryProject[]
+    promotions   EnvironmentPromotion[]
 
     @@unique([ownerId, slug])
     @@index([ownerId])
     @@index([orgId])
+    @@index([binnedAt])
 }
 
 // Access to a project, held by somebody other than the owner. The owner is never
@@ -4791,6 +4797,10 @@ model Environment {
     // network, as every environment made before this was), "environment" (a
     // private network of its own), or "links" (only services linked on the canvas).
     networkMode   String   @default("shared")
+    // production | staging | development, or null when nobody said. Null reads
+    // as production on the default environment and as nothing elsewhere, so an
+    // environment made before this keeps meaning what it meant.
+    stage         String?
     createdAt DateTime @default(now())
 
     project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -4801,6 +4811,33 @@ model Environment {
 
     @@unique([projectId, slug])
     @@index([projectId])
+}
+
+// One promotion of an environment into another: each service in the target
+// redeployed with what the same service in the source runs, and - when asked -
+// each database's contents replaced with the source's, after a restore point.
+// Names are kept as they read, so the history still says what happened once
+// either environment is gone.
+model EnvironmentPromotion {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    projectId           String    @db.Uuid
+    sourceEnvironmentId String    @db.Uuid
+    targetEnvironmentId String    @db.Uuid
+    sourceName          String
+    targetName          String
+    includeData         Boolean   @default(false)
+    // running | succeeded | partial | failed
+    status              String    @default("running")
+    // JSON array of { kind, name, outcome, detail? }, one per service or database.
+    steps               String    @default("[]")
+    actorId             String?   @db.Uuid
+    createdAt           DateTime  @default(now())
+    finishedAt          DateTime?
+
+    project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    @@index([projectId, createdAt])
+    @@index([targetEnvironmentId, status])
 }
 
 // A way through from one project into another: the application `sourceId` may
@@ -4908,6 +4945,10 @@ model Application {
     // redirects and rewrites. Read whole through `parseAppEdgeConfig`, which
     // rebuilds the shape, because a row is always older than the code reading it.
     edgeConfig          String    @default("{}")
+    // Set while it sits in the recycle bin: containers removed, data kept, hidden
+    // from every list. Cleared by a restore; the row goes when it is purged.
+    binnedAt            DateTime?
+    binnedById          String?   @db.Uuid
     createdAt           DateTime  @default(now())
     updatedAt           DateTime  @updatedAt
 
@@ -4922,6 +4963,7 @@ model Application {
     @@unique([environmentId, slug])
     @@index([targetId])
     @@index([storageMode])
+    @@index([binnedAt])
 }
 
 // A command a service runs on a schedule, inside its own running container, the
@@ -5157,6 +5199,10 @@ model ManagedDatabase {
     recoveryTarget      DateTime?
     // JSON: its private names, as on an application (`Application.privateNetwork`).
     privateNetwork      String   @default("{}")
+    // Set while it sits in the recycle bin: containers removed, data kept, hidden
+    // from every list. Cleared by a restore; the row goes when it is purged.
+    binnedAt            DateTime?
+    binnedById          String?   @db.Uuid
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
@@ -5175,6 +5221,7 @@ model ManagedDatabase {
     @@index([targetId])
     @@index([parentId])
     @@index([upgradeState, upgradeAt])
+    @@index([binnedAt])
 }
 
 // One PostgreSQL base backup in an instance's point-in-time archive. The files
@@ -5196,6 +5243,36 @@ model DatabaseBaseBackup {
 
     @@unique([databaseId, label])
     @@index([databaseId, finishedAt])
+}
+
+// A site brought over from a hosting panel's backup, run after the upload has
+// been answered. Written first and closed last, like a DatabaseOperation, so one
+// cut short by a restart shows as never having finished. `projectId` is not a
+// foreign key: an import that fails removes the project it made, and its row
+// stays to say so.
+model DeployImport {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    ownerId    String    @db.Uuid
+    orgId      String?   @db.Uuid
+    actorId    String    @db.Uuid
+    // cpanel
+    source     String
+    // running | succeeded | failed
+    status     String    @default("running")
+    // unpacking | databases | sites | finishing - worded by the screen.
+    step       String    @default("unpacking")
+    done       Int       @default(0)
+    total      Int       @default(0)
+    projectId  String?   @db.Uuid
+    // What came over: counts, domains and warnings as codes with their values.
+    result     Json?
+    // A refusal worded for the reader; null when it failed on something else.
+    error      String?
+    startedAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    finishedAt DateTime?
+
+    @@index([ownerId, startedAt])
 }
 
 // Something done to a database that takes a while and that somebody watches:
@@ -13425,6 +13502,31 @@ model CrmRoleRule {
 
     @@unique([orgId, role, object])
 }
+
+// A copy of one configuration object (a service's routes, a firewall scope, a
+// service's scheduled jobs, a managed DNS zone, a scope's variables) taken just
+// before Polaris changed it, so the change can be read back and undone. Only the
+// one object's JSON is kept, a copy identical to the newest one is never written
+// twice, and each object keeps a bounded tail (see lib/restore-points). Secret
+// variables are kept as the same envelope the variable itself is stored in.
+model RestorePoint {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    // routes | firewall | cron | dns | env
+    kind      String
+    // What the object is within its kind, e.g. an application id.
+    objectKey String
+    // sha256 of the canonical JSON body, for dedup.
+    hash      String
+    body      String
+    // change | restore
+    reason    String   @default("change")
+    actorId   String?  @db.Uuid
+    createdAt DateTime @default(now())
+
+    @@index([kind, objectKey, createdAt])
+    @@index([createdAt])
+}
+
 // Status pages (apps/status-pages): public pages that say whether a set of
 // services is working, from checks Polaris runs itself, with the incidents and
 // maintenance the operator posts. Untouched by uninstalling the app.

@@ -27,6 +27,7 @@
  * on screen.
  */
 
+import { RestoreHistoryButton } from "@/components/restore-history";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { RuleList } from "./rule-list";
 import { Section } from "./page-parts";
@@ -227,6 +228,8 @@ export function WafEditor({
     const [matches, setMatches] = useState<WafRuleMatches | undefined>(undefined);
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState<"all" | "active" | "off">("all");
+    // Bumped after a restore from History, so the rule is read again.
+    const [revision, setRevision] = useState(0);
 
     useEffect(() => {
         let active = true;
@@ -255,7 +258,7 @@ export function WafEditor({
         return () => {
             active = false;
         };
-    }, [scopeType, scopeId]);
+    }, [scopeType, scopeId, revision]);
 
     /**
      * Send what is on screen until the server holds it. One save at a time, always of
@@ -589,6 +592,13 @@ export function WafEditor({
                         { value: "off", label: t("search.off") }
                     ]}
                     onValueChange={(value) => setStatus(value as "all" | "active" | "off")}
+                />
+                <RestoreHistoryButton
+                    target={{ kind: "firewall", scopeType, scopeId }}
+                    canRestore={
+                        scopeType === "polaris" || scopeType === "global" ? canOperate : true
+                    }
+                    onRestored={() => setRevision((value) => value + 1)}
                 />
             </div>
 

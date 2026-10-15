@@ -8,6 +8,7 @@ export default function DeployLayout({ children }: { children: ReactNode }) {
             namespaces={[
                 "deploy",
                 "deployConfig",
+                "deploySafety",
                 "deployData",
                 "deployPrivateNet",
                 "deployProject",
