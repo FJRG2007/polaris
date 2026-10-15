@@ -47,9 +47,7 @@ export async function serverKeysAction(input: {
     login?: string;
 }): Promise<{ view?: ServerKeysView; error?: string }> {
     const user = await requirePermission("system.manage");
-    const parsed = serverKeysTargetSchema
-        .partial({ login: true })
-        .safeParse(input);
+    const parsed = serverKeysTargetSchema.partial({ login: true }).safeParse(input);
     if (!parsed.success) return { error: await sayIssue(parsed.error.issues[0]?.message) };
     try {
         return { view: await listServerKeys(parsed.data.hostId, user.id, parsed.data.login) };
@@ -58,7 +56,9 @@ export async function serverKeysAction(input: {
     }
 }
 
-export async function addServerKeysAction(input: unknown): Promise<{ added?: number; error?: string }> {
+export async function addServerKeysAction(
+    input: unknown
+): Promise<{ added?: number; error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = addServerKeysSchema.safeParse(input);
     if (!parsed.success) return { error: await sayIssue(parsed.error.issues[0]?.message) };
@@ -125,7 +125,10 @@ export async function generateServerKeyAction(input: unknown): Promise<{
 
 /** The keys on the reader's linked GitHub accounts; `linked: false` when there
  *  are none, so the panel can say where to link one. */
-export async function githubKeysAction(): Promise<{ linked: boolean; accounts: GithubKeyAccount[] }> {
+export async function githubKeysAction(): Promise<{
+    linked: boolean;
+    accounts: GithubKeyAccount[];
+}> {
     const user = await requirePermission("system.manage");
     const accounts = await githubKeys(user.id).catch(() => []);
     return accounts === null ? { linked: false, accounts: [] } : { linked: true, accounts };

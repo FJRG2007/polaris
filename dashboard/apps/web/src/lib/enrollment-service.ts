@@ -120,7 +120,12 @@ export async function noteEnrollmentSetup(
         enrollmentId,
         outcome.ok
             ? { step: "setup", state: "done", code: "setupDone" }
-            : { step: "setup", state: "failed", code: "setupFailed", detail: outcome.error.slice(0, 500) }
+            : {
+                  step: "setup",
+                  state: "failed",
+                  code: "setupFailed",
+                  detail: outcome.error.slice(0, 500)
+              }
     );
 }
 
@@ -307,7 +312,12 @@ export async function refuseEnrollment(
         },
         data: { error: ENROLLMENT_REFUSAL_MESSAGES[reason] }
     });
-    await noteLiveToken(hashToken(token), { step: "checked", state: "failed", code: "refused", reason });
+    await noteLiveToken(hashToken(token), {
+        step: "checked",
+        state: "failed",
+        code: "refused",
+        reason
+    });
 }
 
 /** How a claim went, in the shape the waiting dialog polls for. */
@@ -544,7 +554,8 @@ export async function claimEnrollment(
         code: "registered",
         detail: payload.hostname
     });
-    if (setsUp) await noteEnrollment(row.id, { step: "setup", state: "active", code: "setupQueued" });
+    if (setsUp)
+        await noteEnrollment(row.id, { step: "setup", state: "active", code: "setupQueued" });
 
     await recordAudit({
         actorId: row.createdById,
@@ -565,7 +576,12 @@ export async function claimEnrollment(
     return {
         ok: true,
         setup: setsUp
-            ? { hostId: host.id, ownerId: row.createdById, name: payload.hostname, enrollmentId: row.id }
+            ? {
+                  hostId: host.id,
+                  ownerId: row.createdById,
+                  name: payload.hostname,
+                  enrollmentId: row.id
+              }
             : undefined
     };
 }
@@ -599,7 +615,12 @@ async function reachMachine(
     };
 
     for (const address of candidates) {
-        await noteEnrollment(enrollmentId, { step: "connect", state: "active", code: "trying", address });
+        await noteEnrollment(enrollmentId, {
+            step: "connect",
+            state: "active",
+            code: "trying",
+            address
+        });
         let hostKey: string;
         try {
             hostKey = await testAndCaptureHostKey({

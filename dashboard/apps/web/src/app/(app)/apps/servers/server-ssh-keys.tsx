@@ -105,7 +105,9 @@ export function ServerSshKeys({ hostId }: { hostId: string }) {
                         }}
                         options={(view?.logins ?? [{ name: current, self: true }]).map((entry) => ({
                             value: entry.name,
-                            label: entry.self ? t("sshKeys.selfLogin", { name: entry.name }) : entry.name
+                            label: entry.self
+                                ? t("sshKeys.selfLogin", { name: entry.name })
+                                : entry.name
                         }))}
                     />
                 </label>
@@ -161,7 +163,9 @@ export function ServerSshKeys({ hostId }: { hostId: string }) {
                                         {key.comment || t("sshKeys.noComment")}
                                     </span>
                                     <Badge variant="neutral">{key.type}</Badge>
-                                    {key.polaris ? <Badge variant="primary">{t("sshKeys.polarisKey")}</Badge> : null}
+                                    {key.polaris ? (
+                                        <Badge variant="primary">{t("sshKeys.polarisKey")}</Badge>
+                                    ) : null}
                                     {key.options ? (
                                         <Badge variant="warning" title={key.options}>
                                             {t("sshKeys.limited")}
@@ -180,7 +184,9 @@ export function ServerSshKeys({ hostId }: { hostId: string }) {
                                 size="icon"
                                 variant="ghost"
                                 aria-label={t("sshKeys.remove")}
-                                title={key.polaris ? t("sshKeys.polarisKeyHint") : t("sshKeys.remove")}
+                                title={
+                                    key.polaris ? t("sshKeys.polarisKeyHint") : t("sshKeys.remove")
+                                }
                                 disabled={key.polaris}
                                 onClick={() => setRemoving(key)}
                             >
@@ -264,7 +270,10 @@ function RemoveDialog(props: {
                 <DialogHeader>
                     <DialogTitle>{t("sshKeys.removeTitle")}</DialogTitle>
                     <DialogDescription>
-                        {t("sshKeys.removeHint", { login: props.login, name: target?.comment || target?.fingerprint || "" })}
+                        {t("sshKeys.removeHint", {
+                            login: props.login,
+                            name: target?.comment || target?.fingerprint || ""
+                        })}
                     </DialogDescription>
                 </DialogHeader>
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -295,12 +304,23 @@ function AddDialog(props: {
     const lines = text.split("\n").filter((line) => line.trim() !== "");
     // Checked as it is typed, against the same schema the server applies. An
     // empty box is incomplete, not wrong, so it only disables the button.
-    const check = lines.length === 0 ? null : addServerKeysSchema.safeParse({ hostId: props.hostId, login: props.login, keys: lines });
+    const check =
+        lines.length === 0
+            ? null
+            : addServerKeysSchema.safeParse({
+                  hostId: props.hostId,
+                  login: props.login,
+                  keys: lines
+              });
     const issue = check && !check.success ? check.error.issues[0]?.message : null;
 
     async function add() {
         setPending(true);
-        const result = await addServerKeysAction({ hostId: props.hostId, login: props.login, keys: lines });
+        const result = await addServerKeysAction({
+            hostId: props.hostId,
+            login: props.login,
+            keys: lines
+        });
         setPending(false);
         if (result.error) return setError(result.error);
         setText("");
@@ -363,7 +383,11 @@ function GenerateDialog(props: {
     const [label, setLabel] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [key, setKey] = useState<{ privateKey: string; publicKey: string; fingerprint: string } | null>(null);
+    const [key, setKey] = useState<{
+        privateKey: string;
+        publicKey: string;
+        fingerprint: string;
+    } | null>(null);
 
     function close() {
         // The private key is gone from the page as soon as the dialog closes.
@@ -375,16 +399,23 @@ function GenerateDialog(props: {
 
     async function generate() {
         setPending(true);
-        const result = await generateServerKeyAction({ hostId: props.hostId, login: props.login, label });
+        const result = await generateServerKeyAction({
+            hostId: props.hostId,
+            login: props.login,
+            label
+        });
         setPending(false);
-        if (result.error || !result.key) return setError(result.error ?? t("sshKeys.problems.failed"));
+        if (result.error || !result.key)
+            return setError(result.error ?? t("sshKeys.problems.failed"));
         setKey(result.key);
         props.onCreated();
     }
 
     function download() {
         if (!key) return;
-        const url = URL.createObjectURL(new Blob([key.privateKey], { type: "application/x-pem-file" }));
+        const url = URL.createObjectURL(
+            new Blob([key.privateKey], { type: "application/x-pem-file" })
+        );
         const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = `${props.login}-id_ed25519`;
@@ -403,8 +434,16 @@ function GenerateDialog(props: {
                 </DialogHeader>
                 {key ? (
                     <div className="flex flex-col gap-2">
-                        <Textarea readOnly value={key.privateKey} rows={8} className="font-mono text-xs" />
-                        <p className="truncate font-mono text-xs text-muted-foreground" title={key.fingerprint}>
+                        <Textarea
+                            readOnly
+                            value={key.privateKey}
+                            rows={8}
+                            className="font-mono text-xs"
+                        />
+                        <p
+                            className="truncate font-mono text-xs text-muted-foreground"
+                            title={key.fingerprint}
+                        >
                             {key.fingerprint}
                         </p>
                         <div className="flex gap-2">
@@ -455,7 +494,9 @@ function GithubDialog(props: {
     onAdded: (count: number) => void;
 }) {
     const t = useTranslations("servers");
-    const [state, setState] = useState<{ linked: boolean; accounts: GithubKeyAccount[] } | null>(null);
+    const [state, setState] = useState<{ linked: boolean; accounts: GithubKeyAccount[] } | null>(
+        null
+    );
     const [chosen, setChosen] = useState<Set<string>>(new Set());
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -472,7 +513,9 @@ function GithubDialog(props: {
             setChosen(
                 new Set(
                     result.accounts.flatMap((account) =>
-                        account.keys.filter((key) => !present.has(key.fingerprint)).map((key) => key.key)
+                        account.keys
+                            .filter((key) => !present.has(key.fingerprint))
+                            .map((key) => key.key)
                     )
                 )
             );
@@ -484,7 +527,11 @@ function GithubDialog(props: {
 
     async function add() {
         setPending(true);
-        const result = await addServerKeysAction({ hostId: props.hostId, login: props.login, keys: [...chosen] });
+        const result = await addServerKeysAction({
+            hostId: props.hostId,
+            login: props.login,
+            keys: [...chosen]
+        });
         setPending(false);
         if (result.error) return setError(result.error);
         props.onClose();
@@ -521,14 +568,21 @@ function GithubDialog(props: {
                             <div key={account.login} className="flex flex-col gap-1">
                                 <span className="text-sm font-medium">{account.login}</span>
                                 {account.failed ? (
-                                    <span className="text-xs text-danger">{t("sshKeys.githubFailed")}</span>
+                                    <span className="text-xs text-danger">
+                                        {t("sshKeys.githubFailed")}
+                                    </span>
                                 ) : account.keys.length === 0 ? (
-                                    <span className="text-xs text-muted-foreground">{t("sshKeys.githubNone")}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("sshKeys.githubNone")}
+                                    </span>
                                 ) : (
                                     account.keys.map((key) => {
                                         const already = present.has(key.fingerprint);
                                         return (
-                                            <label key={key.fingerprint} className="flex min-w-0 items-center gap-2 text-xs">
+                                            <label
+                                                key={key.fingerprint}
+                                                className="flex min-w-0 items-center gap-2 text-xs"
+                                            >
                                                 <Checkbox
                                                     checked={already || chosen.has(key.key)}
                                                     disabled={already}
@@ -541,11 +595,16 @@ function GithubDialog(props: {
                                                     }}
                                                 />
                                                 <Badge variant="neutral">{key.type}</Badge>
-                                                <span className="min-w-0 truncate font-mono" title={key.fingerprint}>
+                                                <span
+                                                    className="min-w-0 truncate font-mono"
+                                                    title={key.fingerprint}
+                                                >
                                                     {key.fingerprint}
                                                 </span>
                                                 {already ? (
-                                                    <span className="shrink-0 text-muted-foreground">{t("sshKeys.alreadyThere")}</span>
+                                                    <span className="shrink-0 text-muted-foreground">
+                                                        {t("sshKeys.alreadyThere")}
+                                                    </span>
                                                 ) : null}
                                             </label>
                                         );
@@ -561,7 +620,9 @@ function GithubDialog(props: {
                         {t("sshKeys.cancel")}
                     </Button>
                     <Button disabled={pending || chosen.size === 0} onClick={() => void add()}>
-                        {pending ? t("sshKeys.adding") : t("sshKeys.addChosen", { count: chosen.size })}
+                        {pending
+                            ? t("sshKeys.adding")
+                            : t("sshKeys.addChosen", { count: chosen.size })}
                     </Button>
                 </DialogFooter>
             </DialogContent>

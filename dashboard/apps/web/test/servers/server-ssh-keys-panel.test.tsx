@@ -15,7 +15,9 @@ const HOST = "6f1c1f5e-5b7a-4c3e-9a51-0a2b3c4d5e6f";
 let removed: unknown[] = [];
 
 vi.mock("next/link", () => ({
-    default: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a>
+    default: ({ children, href }: { children: ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    )
 }));
 vi.mock("../../src/app/(app)/apps/servers/ssh-key-actions", () => ({
     serverKeysAction: async () => ({
@@ -24,8 +26,20 @@ vi.mock("../../src/app/(app)/apps/servers/ssh-key-actions", () => ({
             root: false,
             login: "polaris",
             keys: [
-                { type: "ssh-ed25519", comment: "polaris@host", fingerprint: "SHA256:own", options: "", polaris: true },
-                { type: "ssh-ed25519", comment: "laptop", fingerprint: "SHA256:other", options: "", polaris: false }
+                {
+                    type: "ssh-ed25519",
+                    comment: "polaris@host",
+                    fingerprint: "SHA256:own",
+                    options: "",
+                    polaris: true
+                },
+                {
+                    type: "ssh-ed25519",
+                    comment: "laptop",
+                    fingerprint: "SHA256:other",
+                    options: "",
+                    polaris: false
+                }
             ]
         }
     }),
@@ -52,13 +66,19 @@ describe("server SSH keys tab", () => {
         const buttons = screen.getAllByRole("button", { name: "Remove key" });
         expect((buttons[0] as HTMLButtonElement).disabled).toBe(true);
         expect((buttons[1] as HTMLButtonElement).disabled).toBe(false);
-        expect(screen.getByText("Only Polaris's own login is listed", { exact: false })).toBeTruthy();
+        expect(
+            screen.getByText("Only Polaris's own login is listed", { exact: false })
+        ).toBeTruthy();
 
         fireEvent.click(buttons[1]!);
         const dialog = await screen.findByRole("dialog");
         expect(removed).toEqual([]);
         fireEvent.click(within(dialog).getByRole("button", { name: "Remove key" }));
-        await waitFor(() => expect(removed).toEqual([{ hostId: HOST, login: "polaris", fingerprint: "SHA256:other" }]));
+        await waitFor(() =>
+            expect(removed).toEqual([
+                { hostId: HOST, login: "polaris", fingerprint: "SHA256:other" }
+            ])
+        );
     });
 
     it("checks a pasted key as it is typed", async () => {
@@ -71,7 +91,9 @@ describe("server SSH keys tab", () => {
         fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "not a key" } });
         expect((add as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(within(dialog).getByRole("textbox"), {
-            target: { value: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC6nfRyrF9ZLkhQiv1Ro3kMlqLi+nRMTsd23qHItoXrp you@laptop" }
+            target: {
+                value: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC6nfRyrF9ZLkhQiv1Ro3kMlqLi+nRMTsd23qHItoXrp you@laptop"
+            }
         });
         expect((add as HTMLButtonElement).disabled).toBe(false);
     });

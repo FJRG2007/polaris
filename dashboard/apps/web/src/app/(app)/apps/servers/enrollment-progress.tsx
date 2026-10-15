@@ -69,7 +69,9 @@ function StepIcon({ status }: { status: EnrollmentStepView["status"] }) {
                 aria-label={label}
             />
         );
-    return <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground/50" aria-label={label} />;
+    return (
+        <Circle className="mt-0.5 size-4 shrink-0 text-muted-foreground/50" aria-label={label} />
+    );
 }
 
 /** The step's own lines, with the time each one happened. */
@@ -151,5 +153,9 @@ const FIXES = {
 function clock(at: string): string {
     const date = new Date(at);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return date.toLocaleTimeString(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
 }

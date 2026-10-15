@@ -18,7 +18,8 @@ export const serverLoginSchema = z
     .regex(/^[a-z_][a-z0-9_-]{0,31}$/, "Not a login on this server");
 
 /** The key types OpenSSH accepts in `authorized_keys`. */
-const KEY_TYPE = /^(ssh-ed25519|ssh-rsa|ssh-dss|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)$/;
+const KEY_TYPE =
+    /^(ssh-ed25519|ssh-rsa|ssh-dss|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)$/;
 
 /** Normalize a pasted key: one line, single spaces, nothing around it. */
 export function normalizeSshPublicKey(value: string): string {
@@ -38,9 +39,14 @@ export const sshPublicKeySchema = z
             .refine((line) => !/[\r\n\0]/.test(line), "Paste one key per line")
             .refine((line) => {
                 const [type, blob] = line.split(" ");
-                return Boolean(type && blob && KEY_TYPE.test(type) && /^[A-Za-z0-9+/]+={0,2}$/.test(blob));
+                return Boolean(
+                    type && blob && KEY_TYPE.test(type) && /^[A-Za-z0-9+/]+={0,2}$/.test(blob)
+                );
             }, "That is not an SSH public key")
-            .refine((line) => !/PRIVATE KEY/.test(line), "That is a private key. Paste the public one")
+            .refine(
+                (line) => !/PRIVATE KEY/.test(line),
+                "That is a private key. Paste the public one"
+            )
     );
 
 export const serverKeysTargetSchema = z.object({

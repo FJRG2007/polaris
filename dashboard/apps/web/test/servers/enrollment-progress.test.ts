@@ -29,7 +29,8 @@ vi.mock("@polaris/db", () => ({
         // The append is one raw statement; the event is its first JSON value.
         $executeRaw: async (_strings: TemplateStringsArray, ...values: unknown[]) => {
             const json = values.find((value) => typeof value === "string" && value.startsWith("["));
-            if (typeof json === "string") notes.push(...(JSON.parse(json) as Record<string, unknown>[]));
+            if (typeof json === "string")
+                notes.push(...(JSON.parse(json) as Record<string, unknown>[]));
             return 1;
         },
         enrollment: {
@@ -183,13 +184,18 @@ describe("what the exchange writes down", () => {
     });
 });
 
-function event(partial: Omit<EnrollmentEvent, "at">, at = "2026-10-15T10:00:00.000Z"): EnrollmentEvent {
+function event(
+    partial: Omit<EnrollmentEvent, "at">,
+    at = "2026-10-15T10:00:00.000Z"
+): EnrollmentEvent {
     return { ...partial, at };
 }
 
 describe("enrollmentTimeline", () => {
     it("lists every step but setup while nothing says setup applies", () => {
-        const steps = enrollmentTimeline([event({ step: "command", state: "done", code: "created" })]);
+        const steps = enrollmentTimeline([
+            event({ step: "command", state: "done", code: "created" })
+        ]);
         expect(steps.map((step) => step.step)).toEqual([
             "command",
             "fetched",
@@ -197,14 +203,25 @@ describe("enrollmentTimeline", () => {
             "connect",
             "registered"
         ]);
-        expect(steps.map((step) => step.status)).toEqual(["done", "waiting", "waiting", "waiting", "waiting"]);
+        expect(steps.map((step) => step.status)).toEqual([
+            "done",
+            "waiting",
+            "waiting",
+            "waiting",
+            "waiting"
+        ]);
     });
 
     // A machine that refused and was then fixed and re-run has a failure followed
     // by a success on the same step. The success is what happened.
     it("takes a step's status from its latest event, so a recovered refusal is not still failed", () => {
         const steps = enrollmentTimeline([
-            event({ step: "checked", state: "failed", code: "refused", reason: "ssh-not-listening" }),
+            event({
+                step: "checked",
+                state: "failed",
+                code: "refused",
+                reason: "ssh-not-listening"
+            }),
             event({ step: "checked", state: "done", code: "machineReported" })
         ]);
         const checked = steps.find((step) => step.step === "checked");
@@ -236,7 +253,9 @@ describe("enrollmentTimeline", () => {
     // Past the limit the oldest lines are the ones dropped, so a step whose lines
     // went is still ticked when a later one has moved.
     it("ticks a step whose lines were dropped once a later step has moved", () => {
-        const steps = enrollmentTimeline([event({ step: "registered", state: "done", code: "registered" })]);
+        const steps = enrollmentTimeline([
+            event({ step: "registered", state: "done", code: "registered" })
+        ]);
         expect(steps.map((step) => step.status)).toEqual(["done", "done", "done", "done", "done"]);
     });
 
@@ -254,14 +273,24 @@ describe("enrollmentTimeline", () => {
 
     it("closes a setup that has been quiet past its deadline", () => {
         const queuedAt = new Date("2026-10-15T10:00:00.000Z");
-        const queued = [event({ step: "setup", state: "active", code: "setupQueued" }, queuedAt.toISOString())];
+        const queued = [
+            event({ step: "setup", state: "active", code: "setupQueued" }, queuedAt.toISOString())
+        ];
         const soon = new Date(queuedAt.getTime() + ENROLLMENT_SETUP_DEADLINE_MS - 1000);
         expect(settleStalledSetup(queued, soon)).toBe(queued);
-        const late = settleStalledSetup(queued, new Date(queuedAt.getTime() + ENROLLMENT_SETUP_DEADLINE_MS));
+        const late = settleStalledSetup(
+            queued,
+            new Date(queuedAt.getTime() + ENROLLMENT_SETUP_DEADLINE_MS)
+        );
         expect(enrollmentStillRunning(late)).toBe(false);
         expect(enrollmentTimeline(late).at(-1)?.failure?.code).toBe("setupStalled");
         const done = [...queued, event({ step: "setup", state: "done", code: "setupDone" })];
-        expect(settleStalledSetup(done, new Date(queuedAt.getTime() + 2 * ENROLLMENT_SETUP_DEADLINE_MS))).toBe(done);
+        expect(
+            settleStalledSetup(
+                done,
+                new Date(queuedAt.getTime() + 2 * ENROLLMENT_SETUP_DEADLINE_MS)
+            )
+        ).toBe(done);
     });
 
     it("reads a column that is not a list as no log at all", () => {

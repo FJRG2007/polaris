@@ -44,11 +44,20 @@ interface Opened {
     local?: { command: string; base: string; insecureTransport: boolean };
 }
 
-export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; kind?: "server" | "local" }) {
+export function QuickEnroll({
+    onDone,
+    kind = "server"
+}: {
+    onDone: () => void;
+    kind?: "server" | "local";
+}) {
     const t = useTranslations("servers");
     const tc = useTranslations("components");
     const environmentOptions = [
-        ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: environmentWords(tc, value).label })),
+        ...ENVIRONMENT_CHOICES.map((value) => ({
+            value,
+            label: environmentWords(tc, value).label
+        })),
         { value: "unknown", label: t("host.notSure") }
     ];
     const router = useRouter();
@@ -233,7 +242,11 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                             setCopied(true);
                         }}
                     >
-                        {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                        {copied ? (
+                            <Check className="size-4 text-success" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
                     </Button>
                 </div>
 
@@ -263,9 +276,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
 
                 {showing.insecureTransport ? (
                     <Notice>
-                        {overLan && local
-                            ? t("enroll.insecureLan")
-                            : t("enroll.insecure")}
+                        {overLan && local ? t("enroll.insecureLan") : t("enroll.insecure")}
                     </Notice>
                 ) : null}
 
@@ -276,7 +287,9 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                         {/* The failed step already says this, with what to do;
                             the sentence stands alone only when there is no log. */}
                         {waitExplained &&
-                        enrollmentTimeline(progress).some((view) => view.status === "failed") ? null : (
+                        enrollmentTimeline(progress).some(
+                            (view) => view.status === "failed"
+                        ) ? null : (
                             <p className="text-sm text-danger">{waitError}</p>
                         )}
                         {stillUsable ? (
@@ -306,11 +319,9 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-                {isLocal ? (
-                    t.rich("enroll.introLocal", { code: loginCode })
-                ) : (
-                    t.rich("enroll.intro", { code: loginCode })
-                )}
+                {isLocal
+                    ? t.rich("enroll.introLocal", { code: loginCode })
+                    : t.rich("enroll.intro", { code: loginCode })}
             </p>
 
             {isLocal ? null : (
@@ -332,13 +343,13 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                         onValueChange={(value) => setEnvironment(value as ServerEnvironment)}
                         options={environmentOptions}
                     />
-                    <span className="text-xs text-muted-foreground">{environmentWords(tc, environment).routing}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {environmentWords(tc, environment).routing}
+                    </span>
                 </label>
             )}
 
-            <p className="text-xs text-muted-foreground">
-                {t("enroll.grants")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("enroll.grants")}</p>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 

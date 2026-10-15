@@ -78,12 +78,21 @@ export function keyFingerprint(blob: string): string {
 export function parseAuthorizedKeyLine(raw: string): (AuthorizedKey & { blob: string }) | null {
     const line = raw.trim();
     if (!line || line.startsWith("#")) return null;
-    const match = /(?:^|\s)((?:ssh-|ecdsa-|sk-)\S+)\s+([A-Za-z0-9+/]+={0,2})(?:\s+(.*))?$/.exec(line);
+    const match = /(?:^|\s)((?:ssh-|ecdsa-|sk-)\S+)\s+([A-Za-z0-9+/]+={0,2})(?:\s+(.*))?$/.exec(
+        line
+    );
     if (!match) return null;
     const [, type, blob, comment = ""] = match;
     if (!type || !blob || !publicKeyBlob(`${type} ${blob}`)) return null;
     const options = line.slice(0, match.index).trim();
-    return { type, blob, comment: comment.trim(), fingerprint: keyFingerprint(blob), options, polaris: false };
+    return {
+        type,
+        blob,
+        comment: comment.trim(),
+        fingerprint: keyFingerprint(blob),
+        options,
+        polaris: false
+    };
 }
 
 export function parseAuthorizedKeys(text: string, polarisBlob: string | null): AuthorizedKey[] {
@@ -150,7 +159,7 @@ export function loginsFrom(listing: string, self: string, minUid: number): Serve
 /** Every account: Linux through getent, macOS through the directory service. */
 export const LIST_LOGINS = [
     "if command -v getent >/dev/null 2>&1; then getent passwd | cut -d: -f1,3,6,7;",
-    "elif command -v dscl >/dev/null 2>&1; then dscl . -list /Users UniqueID | while read n u; do echo \"$n:$u:/Users/$n:/bin/sh\"; done; fi"
+    'elif command -v dscl >/dev/null 2>&1; then dscl . -list /Users UniqueID | while read n u; do echo "$n:$u:/Users/$n:/bin/sh"; done; fi'
 ].join(" ");
 
 /** Resolve the login's home, or exit 3 when there is no such login. */
@@ -161,7 +170,12 @@ const HOME_OF = [
     '[ -n "$h" ] || exit 3'
 ].join("\n");
 
-export const READ_KEYS = [HOME_OF, 'f="$h/.ssh/authorized_keys"', '[ -f "$f" ] || exit 0', 'cat "$f"'].join("\n");
+export const READ_KEYS = [
+    HOME_OF,
+    'f="$h/.ssh/authorized_keys"',
+    '[ -f "$f" ] || exit 0',
+    'cat "$f"'
+].join("\n");
 
 /** Replace the file with stdin, only if it still has checksum `$2`. */
 export const WRITE_KEYS = [
@@ -180,7 +194,12 @@ export const WRITE_KEYS = [
 
 /** How a script is started for a login: directly when it is Polaris's own,
  *  through sudo as that login for anyone else. */
-export function scriptCommand(script: string, login: string, self: string, extra: string[] = []): string {
+export function scriptCommand(
+    script: string,
+    login: string,
+    self: string,
+    extra: string[] = []
+): string {
     if (script.includes("'")) throw new Error("A key script must not contain a single quote");
     const sudo = login === self ? "" : `sudo -n -u ${login} `;
     return `${sudo}sh -c '${script}' sh ${[login, ...extra].join(" ")}`;
@@ -258,7 +277,11 @@ function polarisBlob(connection: HostConnection): string | null {
     return key.getPublicSSH().toString("base64");
 }
 
-async function connectionFor(hostId: string, ownerId: string, login: string): Promise<HostConnection> {
+async function connectionFor(
+    hostId: string,
+    ownerId: string,
+    login: string
+): Promise<HostConnection> {
     const connection = await getHostConnection(hostId, ownerId);
     if (login !== connection.username && !connection.sudo) throw new ServerKeysError("needsRoot");
     return connection;
@@ -270,7 +293,12 @@ async function readFile(connection: HostConnection, login: string): Promise<stri
     return ran.out;
 }
 
-async function writeFile(connection: HostConnection, login: string, before: string, after: string): Promise<void> {
+async function writeFile(
+    connection: HostConnection,
+    login: string,
+    before: string,
+    after: string
+): Promise<void> {
     const ran = await run(
         connection,
         scriptCommand(WRITE_KEYS, login, connection.username, [checksum(before)]),
@@ -356,10 +384,16 @@ export async function generateServerKey(
     const pair = generateSshKeyPair(comment);
     await addServerKeys(hostId, ownerId, login, [pair.publicKey]);
     const parsed = parseAuthorizedKeyLine(pair.publicKey);
-    return { privateKey: pair.privateKey, publicKey: pair.publicKey, fingerprint: parsed?.fingerprint ?? "" };
+    return {
+        privateKey: pair.privateKey,
+        publicKey: pair.publicKey,
+        fingerprint: parsed?.fingerprint ?? ""
+    };
 }
 
-const githubKeysSchema = z.array(z.object({ id: z.number(), key: z.string().max(16_384) })).max(100);
+const githubKeysSchema = z
+    .array(z.object({ id: z.number(), key: z.string().max(16_384) }))
+    .max(100);
 
 export interface GithubKeyAccount {
     login: string;
@@ -391,7 +425,15 @@ export async function githubKeys(userId: string): Promise<GithubKeyAccount[] | n
             const listed = githubKeysSchema.parse(await response.json());
             const keys = listed.flatMap((entry) => {
                 const parsed = parseAuthorizedKeyLine(entry.key);
-                return parsed ? [{ key: `${parsed.type} ${parsed.blob}`, fingerprint: parsed.fingerprint, type: parsed.type }] : [];
+                return parsed
+                    ? [
+                          {
+                              key: `${parsed.type} ${parsed.blob}`,
+                              fingerprint: parsed.fingerprint,
+                              type: parsed.type
+                          }
+                      ]
+                    : [];
             });
             accounts.push({ login: credential.login, keys, failed: false });
         } catch {

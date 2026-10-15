@@ -13,5 +13,7 @@ const SCHEMA_WORDS = {
 } as const;
 
 export function sshKeyIssueKey(message: string | undefined) {
-    return (message && SCHEMA_WORDS[message as keyof typeof SCHEMA_WORDS]) || "sshKeys.errors.invalid";
+    return (
+        (message && SCHEMA_WORDS[message as keyof typeof SCHEMA_WORDS]) || "sshKeys.errors.invalid"
+    );
 }

@@ -35,7 +35,11 @@ vi.mock("@polaris/ssh", async () => ({
     execCommand: async (
         _client: unknown,
         command: string,
-        options: { input?: string; onStdout?: (chunk: Buffer) => void; onStderr?: (chunk: Buffer) => void }
+        options: {
+            input?: string;
+            onStdout?: (chunk: Buffer) => void;
+            onStderr?: (chunk: Buffer) => void;
+        }
     ) => {
         commands.push(command);
         if (command.includes("getent passwd |")) {
@@ -64,7 +68,8 @@ vi.mock("@polaris/ssh", async () => ({
 
 const keys = await import("@/lib/server-ssh-keys");
 
-const OTHER = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC6nfRyrF9ZLkhQiv1Ro3kMlqLi+nRMTsd23qHItoXrp you@laptop";
+const OTHER =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC6nfRyrF9ZLkhQiv1Ro3kMlqLi+nRMTsd23qHItoXrp you@laptop";
 const OTHER_FP = "SHA256:ldyE9kHjXMW/ahlFok/HS1FocCoEh2wAhdwTchkT2Ik";
 const COMMENT = "Jos\u00e9 laptop";
 
@@ -83,7 +88,11 @@ describe("authorized_keys parsing", () => {
     it("reads options, comments and skips what is not a key", () => {
         const listed = keys.parseAuthorizedKeys(file, null);
         expect(listed).toHaveLength(2);
-        expect(listed[1]).toMatchObject({ type: "ssh-ed25519", options: 'from="10.0.0.0/8"', comment: COMMENT });
+        expect(listed[1]).toMatchObject({
+            type: "ssh-ed25519",
+            options: 'from="10.0.0.0/8"',
+            comment: COMMENT
+        });
         expect(keys.parseAuthorizedKeys("garbage\n\n#x\n", null)).toEqual([]);
     });
 
@@ -97,15 +106,23 @@ describe("authorized_keys parsing", () => {
     });
 
     it("offers real logins, never system ones, with Polaris's own first", () => {
-        const listing = "root:0:/root:/bin/bash\nbin:2:/bin:/usr/sbin/nologin\nana:1001:/h:/bin/sh\nx y:1002:/h:/bin/sh\npolaris:1000:/h:/bin/sh";
-        expect(keys.loginsFrom(listing, "polaris", 1000).map((entry) => entry.name)).toEqual(["polaris", "ana", "root"]);
+        const listing =
+            "root:0:/root:/bin/bash\nbin:2:/bin:/usr/sbin/nologin\nana:1001:/h:/bin/sh\nx y:1002:/h:/bin/sh\npolaris:1000:/h:/bin/sh";
+        expect(keys.loginsFrom(listing, "polaris", 1000).map((entry) => entry.name)).toEqual([
+            "polaris",
+            "ana",
+            "root"
+        ]);
     });
 
     it("keeps the scripts free of single quotes and runs others through sudo", () => {
-        for (const script of [keys.LIST_LOGINS, keys.READ_KEYS, keys.WRITE_KEYS]) expect(script).not.toContain("'");
+        for (const script of [keys.LIST_LOGINS, keys.READ_KEYS, keys.WRITE_KEYS])
+            expect(script).not.toContain("'");
         expect(keys.WRITE_KEYS).not.toContain("chown");
         expect(keys.scriptCommand("echo", "polaris", "polaris")).toBe("sh -c 'echo' sh polaris");
-        expect(keys.scriptCommand("echo", "ana", "polaris", ["abc"])).toBe("sudo -n -u ana sh -c 'echo' sh ana abc");
+        expect(keys.scriptCommand("echo", "ana", "polaris", ["abc"])).toBe(
+            "sudo -n -u ana sh -c 'echo' sh ana abc"
+        );
         expect(() => keys.scriptCommand("echo 'x'", "ana", "polaris")).toThrow();
     });
 });
@@ -130,7 +147,9 @@ describe("server key operations", () => {
     });
 
     it("refuses another login's keys without root", async () => {
-        await expect(keys.addServerKeys("h1", "u1", "ana", [OTHER])).rejects.toMatchObject({ problem: "needsRoot" });
+        await expect(keys.addServerKeys("h1", "u1", "ana", [OTHER])).rejects.toMatchObject({
+            problem: "needsRoot"
+        });
     });
 
     it("removes a key and refuses the one Polaris signs in with", async () => {
@@ -138,8 +157,12 @@ describe("server key operations", () => {
         expect(file).not.toContain(COMMENT);
         expect(file).toContain(polarisPair.publicKey);
         const own = keys.parseAuthorizedKeyLine(polarisPair.publicKey)!.fingerprint;
-        await expect(keys.removeServerKey("h1", "u1", "polaris", own)).rejects.toMatchObject({ problem: "protectedKey" });
-        await expect(keys.removeServerKey("h1", "u1", "polaris", OTHER_FP)).rejects.toMatchObject({ problem: "notFound" });
+        await expect(keys.removeServerKey("h1", "u1", "polaris", own)).rejects.toMatchObject({
+            problem: "protectedKey"
+        });
+        await expect(keys.removeServerKey("h1", "u1", "polaris", OTHER_FP)).rejects.toMatchObject({
+            problem: "notFound"
+        });
     });
 
     it("refuses to write over a file somebody changed meanwhile", async () => {

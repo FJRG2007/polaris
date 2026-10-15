@@ -129,7 +129,11 @@ export function enrollmentTimeline(events: readonly EnrollmentEvent[]): Enrollme
     return ENROLLMENT_STEPS.filter((step) => step !== "setup" || hasSetup).map((step, index) => {
         const own = events.filter((event) => event.step === step);
         const last = own.at(-1);
-        const status: EnrollmentStepStatus = last ? last.state : index < reached ? "done" : "waiting";
+        const status: EnrollmentStepStatus = last
+            ? last.state
+            : index < reached
+              ? "done"
+              : "waiting";
         return { step, status, events: own, failure: status === "failed" ? (last ?? null) : null };
     });
 }
@@ -147,6 +151,10 @@ export function settleStalledSetup(events: EnrollmentEvent[], now: Date): Enroll
     const setup = events.filter((event) => event.step === "setup").at(-1);
     if (setup?.state !== "active") return events;
     const since = new Date(setup.at).getTime();
-    if (Number.isFinite(since) && now.getTime() - since < ENROLLMENT_SETUP_DEADLINE_MS) return events;
-    return [...events, { step: "setup", state: "failed", code: "setupStalled", at: now.toISOString() }];
+    if (Number.isFinite(since) && now.getTime() - since < ENROLLMENT_SETUP_DEADLINE_MS)
+        return events;
+    return [
+        ...events,
+        { step: "setup", state: "failed", code: "setupStalled", at: now.toISOString() }
+    ];
 }
