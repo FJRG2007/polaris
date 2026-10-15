@@ -280,6 +280,19 @@
         "portFixed": "This domain is reached on the service's own port. Change the service's port instead.",
         "failed": "That did not go through. Try again in a moment."
     },
+    "automations": {
+        "loadFailed": "Could not read the automations",
+        "saveFailed": "Could not save the automation",
+        "removeFailed": "Could not remove the automation",
+        "runFailed": "Could not start the automation",
+        "runsFailed": "Could not read the automation's runs",
+        "rotateFailed": "Could not give the webhook a new address",
+        "checkDetails": "Check the automation's details",
+        "notFound": "That automation is not in this project.",
+        "foreignService": "One of the services it names is not in this project, or not in an environment you can deploy to.",
+        "limit": "A project can have at most {limit} automations.",
+        "reach": "You cannot do everything this automation does: it needs the right to deploy every service it names, and to open a console for a command."
+    },
     "fileAccess": {
         "loadFailed": "Could not read the SFTP accounts",
         "saveFailed": "Could not add the SFTP account",

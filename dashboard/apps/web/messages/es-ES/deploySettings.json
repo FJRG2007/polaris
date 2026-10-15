@@ -170,6 +170,10 @@
             "label": "Webhooks",
             "hint": "Adónde informa este proyecto de sus despliegues"
         },
+        "automations": {
+            "label": "Automatismos",
+            "hint": "Horarios, webhooks y eventos que actúan sobre sus servicios"
+        },
         "flags": {
             "label": "Opciones",
             "hint": "Cómo se comporta este proyecto"
@@ -328,5 +332,121 @@
         "notes": {
             "tagOnly": "se volvió a descargar la etiqueta de su imagen: no se pudo leer la versión exacta que ejecuta el origen, así que puede ser distinta"
         }
+    },
+    "automations": {
+        "title": "Automatismos",
+        "description": "Cuando pase algo en este proyecto, haz estas cosas en orden.",
+        "new": "Nuevo automatismo",
+        "readOnly": "Puedes ver los automatismos, pero cambiarlas requiere poder desplegar este proyecto.",
+        "atLimit": "Este proyecto ya tiene sus {limit} automatismos.",
+        "retry": "Reintentar",
+        "loadFailed": "No se pudieron leer los automatismos",
+        "saveFailed": "No se pudo guardar el automatismo",
+        "rotateFailed": "No se pudo cambiar la dirección del webhook",
+        "empty": "Aún no hay automatismos. Redespliega con un horario, ejecuta un comando al acabar un despliegue o inicia uno desde otro sistema.",
+        "enabled": "Encendido",
+        "runNow": "Ejecutar",
+        "rotate": "Nueva URL",
+        "edit": "Editar",
+        "delete": "Eliminar",
+        "kind": "automatismo",
+        "deleteHint": "Su historial se va con él. Su dirección de webhook deja de funcionar.",
+        "rotateTitle": "¿Dar al webhook una dirección nueva?",
+        "rotateQuestion": "La dirección actual de {name} deja de funcionar al instante. Lo que la llame necesita la nueva.",
+        "addressTitle": "URL del webhook",
+        "addressHint": "Cópiala ahora: solo se muestra esta vez. Si la pierdes, crea una nueva.",
+        "addressUse": "Envía un POST para iniciar el automatismo. Lo que lleve la petición se ignora.",
+        "copy": "Copiar enlace",
+        "done": "Hecho",
+        "actionCount": "{count, plural, one {# acción} other {# acciones}}",
+        "lastRun": "última vez {date}",
+        "summary": {
+            "webhook": "llamado en su propia dirección",
+            "eventOn": "{event} en {service}"
+        },
+        "triggers": {
+            "schedule": "Horario",
+            "webhook": "Webhook",
+            "event": "Evento"
+        },
+        "events": {
+            "deploySucceeded": "Acabó un despliegue",
+            "deployFailed": "Falló un despliegue",
+            "domainDown": "Cayó un dominio",
+            "domainUp": "Volvió un dominio"
+        },
+        "actions": {
+            "redeploy": "Redesplegar",
+            "restart": "Reiniciar",
+            "command": "Ejecutar comando",
+            "notify": "Avisarme"
+        },
+        "status": {
+            "succeeded": "Correcta",
+            "failed": "Falló",
+            "timedOut": "Sin tiempo",
+            "running": "En curso",
+            "skipped": "Omitida"
+        },
+        "runs": {
+            "title": "Historial",
+            "empty": "Aún no se ha ejecutado.",
+            "manual": "A mano",
+            "exit": "salida {code}",
+            "creator": "No se ejecutó: quien lo guardó ya no puede desplegar lo que toca. Guárdalo de nuevo para que actúe como tú.",
+            "busy": "No se ejecutó: la anterior seguía en curso.",
+            "noActions": "No se ejecutó: no tiene acciones que se puedan leer."
+        },
+        "issues": {
+            "name": "Ponle un nombre, de hasta 64 caracteres.",
+            "schedule": "Escribe un horario de cinco campos, como 0 3 * * *.",
+            "timezone": "Usa una zona horaria como Europe/Madrid o UTC.",
+            "event": "Elige un evento.",
+            "eventService": "Ese evento no es de un servicio.",
+            "service": "Elige un servicio.",
+            "command": "Escribe un comando, de hasta 4000 caracteres.",
+            "timeout": "Entre 10 y 3600 segundos.",
+            "message": "Escribe el mensaje, de hasta 300 caracteres.",
+            "actions": "Añade al menos una acción, hasta 10."
+        },
+        "presets": {
+            "hourly": "Cada hora",
+            "daily": "A diario, 03:00",
+            "mondays": "Lunes, 09:00"
+        },
+        "newTitle": "Nuevo automatismo",
+        "editTitle": "Editar automatismo",
+        "editorHint": "Al guardarlo, pasa a actuar como tú.",
+        "name": "Nombre",
+        "namePlaceholder": "Despliegue nocturno",
+        "when": "Cuando",
+        "whenHint": "lo que la inicia",
+        "then": "Después",
+        "thenHint": "en este orden; un paso que falla detiene el resto",
+        "trigger": "Disparador",
+        "schedule": "Horario",
+        "timezone": "Zona horaria",
+        "nextRun": "próxima {date}",
+        "webhookMinted": "Al guardarlo recibe una dirección propia, que se muestra una vez.",
+        "webhookKept": "Conserva su dirección. Usa Nueva URL en la lista para cambiarla.",
+        "event": "Evento",
+        "eventService": "Del servicio",
+        "anyService": "Cualquiera",
+        "move": "Mover acción",
+        "moveUp": "Subir",
+        "moveDown": "Bajar",
+        "removeAction": "Quitar acción",
+        "actionKind": "Acción",
+        "service": "Servicio",
+        "pickService": "Elige un servicio",
+        "timeout": "Límite (segundos)",
+        "command": "Comando",
+        "commandPlaceholder": "npm run migrate",
+        "message": "Mensaje",
+        "addAction": "Añadir acción",
+        "noServices": "El proyecto aún no tiene servicios, así que solo puede avisar.",
+        "noCommands": "Ejecutar un comando requiere acceso a la consola del proyecto.",
+        "cancel": "Cancelar",
+        "save": "Guardar"
     }
 }

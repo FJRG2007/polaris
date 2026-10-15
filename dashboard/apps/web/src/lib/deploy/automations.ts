@@ -29,7 +29,12 @@ import * as deployService from "@/lib/deploy-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { accessCan, accessInEnvironment, projectAccess } from "@/lib/deploy-project-access";
+import {
+    accessCan,
+    accessInEnvironment,
+    projectAccess,
+    type ProjectAccess
+} from "@/lib/deploy-project-access";
 
 /** How many runs of one rule are kept; older ones go as new ones arrive. */
 const KEPT_RUNS = 50;
@@ -241,7 +246,14 @@ export function needsConsole(actions: readonly core.DeployAutomationAction[]): b
     return actions.some((action) => action.type === "command");
 }
 
-export class AutomationError extends Error {}
+/** Why a change to a rule was refused, as a code the screen words itself. */
+export type AutomationErrorCode = "notFound" | "foreignService" | "limit" | "reach";
+
+export class AutomationError extends Error {
+    constructor(readonly code: AutomationErrorCode) {
+        super(code);
+    }
+}
 
 /**
  * Create a rule, or change one of this project's. Answers the rule, and the
@@ -266,7 +278,7 @@ export async function saveAutomation(
             select: { id: true }
         });
         if (found.length !== services.length)
-            throw new AutomationError("One of the services this automation names is not in this project.");
+            throw new AutomationError("foreignService");
     }
 
     const existing = input.id
@@ -275,13 +287,11 @@ export async function saveAutomation(
               select: { id: true, webhookTokenHash: true }
           })
         : null;
-    if (input.id && !existing) throw new AutomationError("Automation not found");
+    if (input.id && !existing) throw new AutomationError("notFound");
     if (!existing) {
         const count = await prisma.deployAutomation.count({ where: { projectId: input.projectId } });
         if (count >= core.DEPLOY_AUTOMATION_LIMIT)
-            throw new AutomationError(
-                `A project can have at most ${core.DEPLOY_AUTOMATION_LIMIT} automations.`
-            );
+            throw new AutomationError("limit");
     }
 
     // A webhook keeps its address while it stays a webhook; becoming one mints
@@ -328,7 +338,7 @@ export async function setAutomationEnabled(
     enabled: boolean
 ): Promise<DeployAutomationView> {
     const row = await prisma.deployAutomation.findFirst({ where: { id: automationId, projectId } });
-    if (!row) throw new AutomationError("Automation not found");
+    if (!row) throw new AutomationError("notFound");
     let nextRunAt: Date | null = null;
     try {
         nextRunAt = nextFiring(row.trigger, row.schedule, row.timezone, enabled);
@@ -346,7 +356,7 @@ export async function rotateAutomationWebhook(projectId: string, automationId: s
         where: { id: automationId, projectId, trigger: "webhook" },
         select: { id: true }
     });
-    if (!row) throw new AutomationError("Automation not found");
+    if (!row) throw new AutomationError("notFound");
     const minted = mintToken();
     await prisma.deployAutomation.update({
         where: { id: row.id },
@@ -358,7 +368,7 @@ export async function rotateAutomationWebhook(projectId: string, automationId: s
 /** Remove one of this project's rules and its run history. */
 export async function deleteAutomation(projectId: string, automationId: string): Promise<void> {
     const removed = await prisma.deployAutomation.deleteMany({ where: { id: automationId, projectId } });
-    if (removed.count === 0) throw new AutomationError("Automation not found");
+    if (removed.count === 0) throw new AutomationError("notFound");
 }
 
 /** A rule's recent runs, newest first. */
@@ -407,7 +417,16 @@ export async function creatorMayRun(automation: {
     if (!user || user.bannedAt || user.disabledAt) return false;
     if (!user.isAdmin && !(await userHasPermission(user.id, "deploy.manage"))) return false;
     const access = await projectAccess(automation.projectId, user.id);
-    if (!access || !accessCan(access, "deploy.run")) return false;
+    return access !== null && (await accessReaches(access, automation));
+}
+
+/** Whether a project access may do everything a rule does: deploy, open a
+ *  console when it runs commands, in the environments of every service it names. */
+export async function accessReaches(
+    access: ProjectAccess,
+    automation: { actions: string; eventApplicationId: string | null }
+): Promise<boolean> {
+    if (!accessCan(access, "deploy.run")) return false;
     const reach = reachOf(automation);
     if (reach.console && !accessCan(access, "console.use")) return false;
     if (reach.services.length === 0 || access.environmentIds === null) return true;
@@ -420,15 +439,18 @@ export async function creatorMayRun(automation: {
 
 /** Run one of this project's rules now, whatever its trigger. Answers the run. */
 export async function runAutomationNow(
-    projectId: string,
+    access: ProjectAccess,
     automationId: string,
     actorId: string
 ): Promise<string> {
     const row = await prisma.deployAutomation.findFirst({
-        where: { id: automationId, projectId },
-        select: { id: true }
+        where: { id: automationId, projectId: access.projectId },
+        select: { id: true, actions: true, eventApplicationId: true }
     });
-    if (!row) throw new AutomationError("Automation not found");
+    if (!row) throw new AutomationError("notFound");
+    // Pressing Run does the actions as the person pressing it, so it asks of
+    // them what a schedule asks of the rule's maker.
+    if (!(await accessReaches(access, row))) throw new AutomationError("reach");
     await prisma.deployAutomation.update({ where: { id: row.id }, data: { lastRunAt: new Date() } });
     return startRun(row.id, "manual", actorId);
 }

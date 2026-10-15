@@ -18,6 +18,7 @@ import {
     Users,
     Variable,
     Webhook,
+    Workflow,
     type LucideIcon
 } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -57,6 +58,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         label: "sections.webhooks.label",
         icon: Webhook,
         hint: "sections.webhooks.hint"
+    },
+    {
+        slug: "automations",
+        label: "sections.automations.label",
+        icon: Workflow,
+        hint: "sections.automations.hint"
     },
     { slug: "flags", label: "sections.flags.label", icon: Flag, hint: "sections.flags.hint" },
     {

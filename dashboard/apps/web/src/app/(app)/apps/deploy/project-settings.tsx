@@ -18,6 +18,7 @@ import { DangerSection } from "./settings/danger-section";
 import { GeneralSection } from "./settings/general-section";
 import { MembersSection } from "./settings/members-section";
 import { WebhooksSection } from "./settings/webhooks-section";
+import { AutomationsSection } from "./settings/automations-section";
 import { EnvironmentsSection, type PromotionReach } from "./settings/environments-section";
 import { IntegrationsSection } from "./settings/integrations-section";
 import { FeatureFlagsSection } from "./settings/feature-flags-section";
@@ -99,6 +100,9 @@ export function ProjectSettings({
                         <SharedVariablesSection settings={settings} canManage={canManage} />
                     )}
                     {current.slug === "webhooks" && <WebhooksSection projectId={settings.id} />}
+                    {current.slug === "automations" && (
+                        <AutomationsSection projectId={settings.id} />
+                    )}
                     {current.slug === "flags" && (
                         <FeatureFlagsSection settings={settings} canManage={canManage} />
                     )}
