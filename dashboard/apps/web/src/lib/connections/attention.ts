@@ -137,6 +137,7 @@ export async function recordConnectionFailure(
             }
         });
         recorded = true;
+        if (seenAt) return recorded;
 
         const throttle = await rateLimit(
             `integration-attention:${provider}:${kind}`,

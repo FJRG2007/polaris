@@ -272,6 +272,19 @@ describe("markConnectionFailureSeen", () => {
         expect((await connectionFailure("spotify"))?.seenAt).toBeUndefined();
     });
 
+    it("does not raise the alert again for a failure already marked seen", async () => {
+        install("spotify");
+        await recordConnectionFailure("spotify", "invalid_client");
+        await markConnectionFailureSeen("spotify");
+        alerts.length = 0;
+
+        await recordConnectionFailure("spotify", "invalid_client");
+        expect(alerts).toEqual([]);
+
+        await recordConnectionFailure("spotify", "redirect_uri_mismatch");
+        expect(alerts).toHaveLength(1);
+    });
+
     it("says so when it could not save the mark", async () => {
         install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
         vi.spyOn(console, "error").mockImplementation(() => undefined);

@@ -16,7 +16,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
-import { markConnectionFailureSeen } from "@/lib/connections/attention";
+import { connectionFailure, markConnectionFailureSeen } from "@/lib/connections/attention";
 import { dismissAdminWaiting } from "@/lib/admin-waiting";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
@@ -133,11 +133,13 @@ export async function dismissConnectionFailureAction(
     if (typeof provider !== "string" || !findConnectionProvider(provider))
         return { error: t("integrations.errors.unknownService") };
 
+    const failure = await connectionFailure(provider).catch(() => null);
     if (!(await markConnectionFailureSeen(provider)))
         return { error: t("integrations.errors.notSaved") };
     // A Google API turned off is what Integrations counts; seen here, it is
     // seen there too, until another one goes off.
-    if (provider === "google") await dismissAdminWaiting(user.id, ["apis"]).catch(() => undefined);
+    if (provider === "google" && failure?.kind === "api-off")
+        await dismissAdminWaiting(user.id, ["apis"]).catch(() => undefined);
     await recordAudit({
         actorId: user.id,
         action: "integration.configure",
