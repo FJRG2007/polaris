@@ -675,5 +675,65 @@
             "required": "Obligatorio",
             "other": "No es válido"
         }
+    },
+    "metrics": {
+        "cpu": "CPU",
+        "memory": "Memoria",
+        "disk": "Disco",
+        "network": "Red"
+    },
+    "compare": {
+        "heading": "Comparar servidores",
+        "description": "Elige de dos a cuatro servidores y lee su carga en los mismos ejes.",
+        "pick": "Servidores a comparar",
+        "picked": "{count} de {max} elegidos",
+        "maxReached": "Hasta {max} servidores a la vez. Quita uno para añadir otro.",
+        "needTwo": "Elige al menos dos servidores para compararlos.",
+        "onlyOne": "Por ahora solo hay un servidor. Añade otro en Servidores para compararlos.",
+        "range": "Periodo",
+        "now": "Ahora mismo",
+        "server": "Servidor",
+        "noReading": "Sin lectura",
+        "failed": "No se pudo leer el historial: {reason}",
+        "retry": "Reintentar",
+        "withOthers": "Comparar con otros servidores"
+    },
+    "insights": {
+        "heading": "Tendencias",
+        "description": "Tramos inusuales en la carga de cada servidor, y cuándo se llena su disco al ritmo actual.",
+        "failed": "No se pudo leer el análisis: {reason}",
+        "pages": {
+            "label": "Páginas",
+            "range": "Servidores {from}-{to} de {total}",
+            "previous": "Servidores previos",
+            "next": "Más servidores"
+        },
+        "forecast": {
+            "heading": "Llenado del disco",
+            "filling": "Lleno en unos {days, plural, one {# día} other {# días}}",
+            "soon": "Lleno en menos de un día",
+            "full": "Lleno ya",
+            "steady": "No crece",
+            "insufficient": "Aún no hay historial suficiente. Una previsión necesita {needed} días de lecturas.",
+            "growing": "Crece {rate} al día",
+            "shrinking": "Se reduce {rate} al día",
+            "used": "{used} de {total} en uso",
+            "basis": "Tendencia de {days, plural, one {el último día} other {los últimos # días}}",
+            "warn": "Casi lleno"
+        },
+        "anomalies": {
+            "heading": "Actividad inusual",
+            "hint": "Horas que se salieron de lo normal respecto al día anterior.",
+            "none": "Nada inusual en los últimos 7 días.",
+            "tooNew": "Aún no hay historial suficiente. La actividad inusual se detecta tras {hours} horas de lecturas.",
+            "high": "Inusualmente alto",
+            "low": "Inusualmente bajo",
+            "value": "{value}, lo normal es {usual}",
+            "lasted": "hasta {time}",
+            "warning": "Notable",
+            "danger": "Grave",
+            "allServers": "Todos",
+            "filter": "Ver anomalías de"
+        }
     }
 }

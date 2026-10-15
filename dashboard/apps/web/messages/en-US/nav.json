@@ -338,7 +338,9 @@
         "Forecast": "Forecast",
         "Audit log": "Audit log",
         "Security scans": "Security scans",
-        "Cloud servers": "Cloud servers"
+        "Cloud servers": "Cloud servers",
+        "Compare": "Compare",
+        "Insights": "Insights"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

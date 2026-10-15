@@ -338,7 +338,9 @@
         "Forecast": "Previsión",
         "Audit log": "Auditoría",
         "Security scans": "Seguridad",
-        "Cloud servers": "Servidores cloud"
+        "Cloud servers": "Servidores cloud",
+        "Compare": "Comparar",
+        "Insights": "Tendencias"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

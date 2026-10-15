@@ -400,6 +400,14 @@
             "label": "Un servidor se queda sin espacio",
             "description": "Polaris ha liberado todo lo que no usaba nada y el disco sigue casi lleno."
         },
+        "serverAnomaly": {
+            "label": "Un servidor actúa de forma inusual",
+            "description": "La CPU, la memoria, el disco o el tráfico de un servidor se alejó mucho de lo habitual."
+        },
+        "serverForecast": {
+            "label": "El disco de un servidor va a llenarse",
+            "description": "Al ritmo al que ha crecido, el disco de un servidor se llena en menos de dos semanas."
+        },
         "mailserverInbound": {
             "label": "Correo según regla",
             "description": "Ha llegado un mensaje a un servidor de correo que gestionas y ha coincidido con una de sus reglas."

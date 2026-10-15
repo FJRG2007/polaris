@@ -752,6 +752,14 @@ export function startMetricsCollector(): void {
             } catch (error) {
                 console.error("polaris: metrics maintenance failed:", error);
             }
+            // Read only after the hour's rollups exist, and loaded on demand: most
+            // ticks never need it, and nothing of it stays resident in between.
+            try {
+                const { watchServerInsights } = await import("./server-insights/insights-watch");
+                await watchServerInsights(now);
+            } catch (error) {
+                console.error("polaris: server insights check failed:", error);
+            }
         }
     };
     void run();

@@ -26,6 +26,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ServerMetrics } from "@/lib/server-probe";
 import { ServerSshKeys } from "../server-ssh-keys";
 import { ServerNotesPanel } from "../server-notes-panel";
+import { ServerInsightsPanel } from "../insights/server-insights-panel";
 import { ServerTemplatesPanel } from "./server-templates-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
@@ -281,6 +282,21 @@ export function ServerDetail({
                                 </button>
                             ) : null}
                         </p>
+                    </section>
+
+                    {/* Read from the same hourly history as the chart above, so
+                        it needs nothing of the machine and works while it is off. */}
+                    <section className="flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="text-sm font-medium">{t("insights.heading")}</h2>
+                            <Link
+                                href={`/apps/servers/compare?ids=${encodeURIComponent(server.id)}`}
+                                className="ml-auto text-xs text-primary hover:underline"
+                            >
+                                {t("compare.withOthers")}
+                            </Link>
+                        </div>
+                        <ServerInsightsPanel servers={[{ id: server.id, name: server.name }]} />
                     </section>
                 </div>
             ) : (

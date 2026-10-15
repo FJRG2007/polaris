@@ -675,5 +675,65 @@
             "required": "Required",
             "other": "Not valid"
         }
+    },
+    "metrics": {
+        "cpu": "CPU",
+        "memory": "Memory",
+        "disk": "Disk",
+        "network": "Network"
+    },
+    "compare": {
+        "heading": "Compare servers",
+        "description": "Pick two to four servers and read their load on the same axes.",
+        "pick": "Servers to compare",
+        "picked": "{count} of {max} chosen",
+        "maxReached": "Up to {max} servers at once. Remove one to add another.",
+        "needTwo": "Choose at least two servers to compare them.",
+        "onlyOne": "There is only one server so far. Add another under Servers to compare them.",
+        "range": "Time range",
+        "now": "Right now",
+        "server": "Server",
+        "noReading": "No reading",
+        "failed": "The history could not be read: {reason}",
+        "retry": "Try again",
+        "withOthers": "Compare with other servers"
+    },
+    "insights": {
+        "heading": "Server insights",
+        "description": "Unusual stretches in each server's load, and when its disk fills at the current pace.",
+        "failed": "Insights could not be read: {reason}",
+        "pages": {
+            "label": "Server pages",
+            "range": "Servers {from}-{to} of {total}",
+            "previous": "Previous servers",
+            "next": "Next servers"
+        },
+        "forecast": {
+            "heading": "Disk forecast",
+            "filling": "Full in about {days, plural, one {# day} other {# days}}",
+            "soon": "Full in less than a day",
+            "full": "Full now",
+            "steady": "Not growing",
+            "insufficient": "Not enough history yet. A forecast needs {needed} days of readings.",
+            "growing": "Growing {rate} a day",
+            "shrinking": "Shrinking {rate} a day",
+            "used": "{used} of {total} used",
+            "basis": "Trend over the last {days, plural, one {# day} other {# days}}",
+            "warn": "Fills soon"
+        },
+        "anomalies": {
+            "heading": "Unusual activity",
+            "hint": "Hours that stood out from the day before them.",
+            "none": "Nothing unusual in the last 7 days.",
+            "tooNew": "Not enough history yet. Unusual activity is spotted after {hours} hours of readings.",
+            "high": "Unusually high",
+            "low": "Unusually low",
+            "value": "{value}, usually {usual}",
+            "lasted": "until {time}",
+            "warning": "Notable",
+            "danger": "Severe",
+            "allServers": "All servers",
+            "filter": "Show anomalies for"
+        }
     }
 }
