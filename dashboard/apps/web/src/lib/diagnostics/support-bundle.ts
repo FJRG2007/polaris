@@ -8,10 +8,13 @@
  * is not, and a denylist would publish it the day it appeared.
  *
  * Then, over everything, a last pass that blanks the literal value of every
- * withheld variable wherever it turns up - an error message that printed a
- * connection string, a hostname that happens to be a token. The bundle is
- * read as text by people outside the deployment; this is the line that
- * promises none of those values leaves it.
+ * variable in the environment wherever it turns up - an error message that
+ * printed a connection string, a hostname that happens to be a token. That pass
+ * is an allowlist too: every value is blanked except the safe keys' and a few
+ * runtime basics (`RUNTIME_SAFE_KEYS`), so a credential stored under a name
+ * nobody thought to list is still caught. The bundle is read as text by people
+ * outside the deployment; this is the line that promises none of those values
+ * leaves it.
  *
  * Server-only.
  */
@@ -49,12 +52,32 @@ export const SAFE_CONFIG_KEYS: ReadonlySet<string> = new Set([
 
 const URL_KEYS: ReadonlySet<string> = new Set(["POLARIS_APP_URL"]);
 
+/**
+ * Runtime variables the image itself sets, whose values are paths, versions and
+ * locales. Never reported, but not scrubbed either: blanking the Node version
+ * or `/usr/local/bin` wherever it appears would spoil the manifest and every
+ * stack trace without hiding anything.
+ */
+const RUNTIME_SAFE_KEYS: ReadonlySet<string> = new Set([
+    "HOME",
+    "HOSTNAME",
+    "LANG",
+    "LC_ALL",
+    "NEXT_RUNTIME",
+    "NODE_VERSION",
+    "OLDPWD",
+    "PATH",
+    "PWD",
+    "SHELL",
+    "SHLVL",
+    "TERM",
+    "TZ",
+    "USER",
+    "YARN_VERSION"
+]);
+
 /** Which variables are reported at all: Polaris' own and the runtime's mode. */
 const REPORTED = /^(POLARIS_|NODE_ENV$)/;
-/** Variables outside Polaris' own whose name says they hold a credential -
- *  scrubbed too, since a library's error can print one. Not every variable:
- *  blanking the runtime's version wherever it appears would spoil the manifest. */
-const SECRET_NAME = /KEY|TOKEN|SECRET|PASS|AUTH|CREDENTIAL|DSN|_URL$/i;
 /** Shorter than this, a withheld value is too common a string to scrub by. */
 const MIN_SCRUB_LENGTH = 6;
 const ERROR_LIMIT = 50;
@@ -81,21 +104,30 @@ export function redactConfig(env: Readonly<Record<string, string | undefined>>):
     for (const key of Object.keys(env).sort()) {
         const value = env[key];
         if (!REPORTED.test(key) || value === undefined || value === "") continue;
-        if (SAFE_CONFIG_KEYS.has(key)) values[key] = URL_KEYS.has(key) ? originOnly(value) : value;
+        // A safe key still loses a userinfo or a `NAME=secret` somebody pasted
+        // into it: the key is vouched for, a value typed into it is not.
+        if (SAFE_CONFIG_KEYS.has(key)) values[key] = URL_KEYS.has(key) ? originOnly(value) : redactSecrets(value);
         else withheld.push(key);
     }
     return { values, withheld };
 }
 
-/** Blank every withheld value wherever it appears in `text`. Pure. */
+/**
+ * Blank the value of every variable not on an allowlist wherever it appears in
+ * `text`. A value equal to one the bundle publishes on purpose is left alone:
+ * it is already in the open, and blanking it would only blank the safe copy.
+ * Pure.
+ */
 export function scrubWithheld(text: string, env: Readonly<Record<string, string | undefined>>): string {
+    const published = new Set(Object.values(redactConfig(env).values));
     const secrets = Object.entries(env)
         .filter(
             ([key, value]) =>
-                (REPORTED.test(key) || SECRET_NAME.test(key)) &&
                 !SAFE_CONFIG_KEYS.has(key) &&
+                !RUNTIME_SAFE_KEYS.has(key) &&
                 value !== undefined &&
-                value.length >= MIN_SCRUB_LENGTH
+                value.trim().length >= MIN_SCRUB_LENGTH &&
+                !published.has(value)
         )
         .map(([, value]) => value as string)
         // Longest first, so a value that contains another is blanked whole.
