@@ -151,7 +151,7 @@ export function VariableGroupsManager() {
                     {t("groups.empty")}
                 </p>
             ) : (
-                <ul className="flex max-h-[60vh] flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+                <ul className="flex max-h-[60vh] flex-col divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
                     {view.groups.map((one) => (
                         <li key={one.id}>
                             <button
@@ -307,7 +307,7 @@ function GroupDetail({
                 </p>
             )}
             {group.linkCount > 0 && <UsedBy usedBy={usedBy} />}
-            <div className="max-h-[55vh] min-w-0 overflow-y-auto">
+            <div className="max-h-[55vh] min-w-0 overflow-y-auto overscroll-contain">
                 <VariablesEditor
                     scope="group"
                     scopeId={group.id}
@@ -347,7 +347,7 @@ function UsedBy({ usedBy }: { usedBy: { services: LinkingService[]; hidden: numb
             ) : (
                 <>
                     {usedBy.services.length > 0 && (
-                        <ul className="flex max-h-40 flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
+                        <ul className="flex max-h-40 flex-col divide-y divide-border overflow-y-auto overscroll-contain rounded-md border border-border">
                             {usedBy.services.map((one) => (
                                 <li key={one.applicationId}>
                                     <Link
@@ -464,7 +464,10 @@ export function LinkedGroupsPanel({
                                 <Plus className="size-4" /> {t("groups.link")}
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
+                        <DropdownMenuContent
+                            align="end"
+                            className="max-h-72 overflow-y-auto overscroll-contain"
+                        >
                             {view.linkable.map((one) => (
                                 <DropdownMenuItem
                                     key={one.id}
