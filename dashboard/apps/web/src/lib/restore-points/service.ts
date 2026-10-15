@@ -328,3 +328,5 @@ export const restoreKeys = {
     routes: (applicationId: string) => applicationId,
     dns: (scope: unknown) => core.canonical(scope)
 };
+
+export type RestorePointKindName = core.RestorePointKind;

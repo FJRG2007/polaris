@@ -67,7 +67,7 @@ export interface ItemChange {
     readonly fields: FieldChange[];
 }
 
-const MASK = "••••••";
+const MASK = "********";
 
 function display(field: string, value: unknown): string | null {
     if (value === undefined || value === null) return null;
@@ -118,7 +118,8 @@ export function prunable(
 /** Parses a stored body, refusing anything that is not the expected shape. */
 export function parseBody(text: string): SnapshotBody {
     const parsed = JSON.parse(text) as unknown;
-    if (!parsed || typeof parsed !== "object" || typeof (parsed as SnapshotBody).items !== "object") {
+    const items = (parsed as Partial<SnapshotBody> | null)?.items;
+    if (!parsed || typeof parsed !== "object" || !items || typeof items !== "object" || Array.isArray(items)) {
         throw new Error("Restore point body is not readable");
     }
     return parsed as SnapshotBody;

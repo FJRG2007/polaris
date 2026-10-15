@@ -10,6 +10,7 @@
  * where one is connected instead of drawing an empty picker.
  */
 
+import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -30,6 +31,8 @@ export function DnsRecordsCard() {
     const t = useTranslations("admin");
     const [zones, setZones] = useState<Zone[] | null>(null);
     const [zoneId, setZoneId] = useState("");
+    // Bumped after a restore from History, so the editor reads the zone again.
+    const [revision, setRevision] = useState(0);
     const [error, setError] = useState("");
     // Bumped by "Try again", which is what re-runs the read below.
     const [attempt, setAttempt] = useState(0);
@@ -66,15 +69,24 @@ export function DnsRecordsCard() {
             title={t("domains.records.title")}
             description={t("domains.records.description")}
             actions={
-                zones && zones.length > 1 ? (
-                    <Select
-                        value={zoneId}
-                        onValueChange={setZoneId}
-                        options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
-                        className="w-full sm:w-64"
-                        aria-label={t("domains.records.zone")}
-                    />
-                ) : null
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                    {zones && zones.length > 1 ? (
+                        <Select
+                            value={zoneId}
+                            onValueChange={setZoneId}
+                            options={zones.map((zone) => ({ value: zone.id, label: zone.name }))}
+                            className="w-full sm:w-64"
+                            aria-label={t("domains.records.zone")}
+                        />
+                    ) : null}
+                    {zoneId ? (
+                        <RestoreHistoryButton
+                            target={{ kind: "dns", zoneId }}
+                            canRestore
+                            onRestored={() => setRevision((value) => value + 1)}
+                        />
+                    ) : null}
+                </div>
             }
         >
             {error && !zones ? (
@@ -108,7 +120,7 @@ export function DnsRecordsCard() {
                     }
                 />
             ) : zoneId ? (
-                <DnsZoneEditor key={zoneId} scope={{ kind: "instance", zoneId }} />
+                <DnsZoneEditor key={`${zoneId}:${revision}`} scope={{ kind: "instance", zoneId }} />
             ) : null}
         </PageSection>
     );

@@ -34,7 +34,7 @@ export default async function DomainsPage() {
                 title={t("domains.page.title")}
                 description={t("domains.page.description")}
             />
-            <Messages namespaces={["dns"]}>
+            <Messages namespaces={["dns", "deploySafety"]}>
                 <DomainsView />
             </Messages>
             {/* Every domain Polaris knows, checked for spoofing, DNS, registration
