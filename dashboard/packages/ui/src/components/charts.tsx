@@ -322,6 +322,7 @@ export function TimeSeriesChart({
         </div>
     );
 }
+
 /** The colours a multi-series chart hands out in order. Four is as many lines as
  *  one plot stays readable with, which is also the most it is asked to draw. */
 export const SERIES_COLORS = [

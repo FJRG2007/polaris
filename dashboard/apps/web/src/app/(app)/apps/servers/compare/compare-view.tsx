@@ -281,10 +281,7 @@ export function CompareView({
                                   }))
                                 : [];
                             return (
-                                <section key={metric} className="flex min-w-0 flex-col gap-1">
-                                    <h3 className="text-xs font-medium text-muted-foreground">
-                                        {t(`metrics.${metric}`)}
-                                    </h3>
+                                <section key={metric} className="min-w-0" aria-label={t(`metrics.${metric}`)}>
                                     {answer ? (
                                         <MultiSeriesChart
                                             series={series}
@@ -300,7 +297,12 @@ export function CompareView({
                                             label={t(`metrics.${metric}`)}
                                         />
                                     ) : (
-                                        <Skeleton className="h-[132px] w-full" />
+                                        // The chart's own frame and title, so the heading is
+                                        // there before the history and does not move after.
+                                        <div className="rounded-lg border border-border/60 p-3">
+                                            <span className="text-sm font-medium">{t(`metrics.${metric}`)}</span>
+                                            <Skeleton className="mt-2 h-[132px] w-full" />
+                                        </div>
                                     )}
                                 </section>
                             );
