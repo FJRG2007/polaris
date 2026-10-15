@@ -80,7 +80,15 @@ function mailApi(ctx: SceneContext) {
             accounts: mailAccounts(ctx),
             folders: mailFolders(true),
             unread: mailUnread(true)
-        })
+        }),
+        // The shell's own count, asked again once a message has been read.
+        "GET /api/mail/unread": () => {
+            const unread = mailUnread(true);
+            return {
+                messages: unread.total,
+                mailboxes: Object.values(unread.byAccount).filter((one) => one > 0).length
+            };
+        }
     };
 }
 
