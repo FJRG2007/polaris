@@ -148,8 +148,17 @@
         "account": {
             "description": "Profile, security & API keys"
         },
+        "status-pages": {
+            "description": "Public pages that show whether your services are up"
+        },
         "crm": {
             "description": "Companies, people and the deals you are working"
+        },
+        "security-scans": {
+            "description": "Malware, file changes, host hardening and image vulnerabilities"
+        },
+        "cloud-servers": {
+            "description": "Create and run servers at your cloud providers"
         }
     },
     "labels": {
@@ -317,6 +326,7 @@
         "Games": "Games",
         "Keyboard shortcuts": "Keyboard shortcuts",
         "CRM": "CRM",
+        "Status pages": "Status pages",
         "Companies": "Companies",
         "Opportunities": "Opportunities",
         "Storage locations": "Storage locations",
@@ -325,7 +335,9 @@
         "New opportunity": "New opportunity",
         "Dashboards": "Dashboards",
         "Forecast": "Forecast",
-        "Audit log": "Audit log"
+        "Audit log": "Audit log",
+        "Security scans": "Security scans",
+        "Cloud servers": "Cloud servers"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

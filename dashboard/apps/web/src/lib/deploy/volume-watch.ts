@@ -27,6 +27,7 @@ import * as deployReleases from "./releases";
 import type { RuntimePorts } from "@polaris/deploy";
 import { getPorts, type TargetRow } from "./runtime";
 import { resolveMountTarget } from "@/lib/storage-service";
+import { nasBinding } from "./nas-binding";
 import { notifyVolumeHealth, type VolumeHealth } from "@/lib/notifications/volume-events";
 
 const FIRST_PASS_MS = 90_000;
@@ -34,12 +35,6 @@ const WATCH_INTERVAL_MS = 3 * 60_000;
 /** A NAS that is off holds a mount call for as long as the kernel's connect
  *  retries take; the pass moves on rather than waiting it out. */
 const MOUNT_WAIT_MS = 60_000;
-const LOOK_WAIT_MS = 20_000;
-
-/** What a path on a mount that died answers, in the words of the tools inside a
- *  container (coreutils and busybox) and of the kernel. */
-const DEAD_MOUNT =
-    /host is down|stale file handle|transport endpoint is not connected|input\/output error|no such device|ehostdown|estale|enotconn/i;
 
 interface Watched {
     id: string;
@@ -222,22 +217,20 @@ async function checkMachine(ports: RuntimePorts, apps: Watched[]): Promise<void>
 }
 
 /**
- * Whether the service's NAS volumes answer from inside it. Only a dead mount's own
- * answer counts against it: a container that is stopped, or an image with no `ls`
- * in it, says nothing about the volumes and is taken as fine.
+ * Whether the service's NAS volumes are on the share and answer, from inside it.
+ * A dead mount fails it, and so does a volume that is not on a network filesystem
+ * at all - a service started while the share was not mounted writes into a folder
+ * on the machine's own disk, which nothing else would ever notice. A container
+ * that is stopped, or an image that cannot be asked, says nothing about the
+ * volumes and is taken as fine.
  */
 async function answers(ports: RuntimePorts, container: string, app: Watched): Promise<boolean> {
-    try {
-        const result = await withTimeout(
-            ports.runIn(container, ["ls", "-d", ...app.volumes.map((volume) => volume.mountPath)]),
-            LOOK_WAIT_MS,
-            "the service did not answer in time"
-        );
-        return !(result.code !== 0 && DEAD_MOUNT.test(result.output));
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return !DEAD_MOUNT.test(message);
-    }
+    const binding = await nasBinding(
+        ports,
+        container,
+        app.volumes.map((volume) => volume.mountPath)
+    );
+    return binding === "share" || binding === "unknown";
 }
 
 /** Say a service's volumes are down, once for as long as they stay that way. */

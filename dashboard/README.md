@@ -3,8 +3,8 @@
 The Polaris web control plane. A minimalist, dark, unifi.ui.com-style dashboard
 that grows app by app behind a top-left app switcher. The first app is an
 advanced **Drive**, alongside a Bitwarden-compatible **Vault** (see
-[`docs/vault.md`](docs/vault.md)); future apps (Docker/Kubernetes, servers, VMs,
-home automation, deploys) plug into the same shell.
+[`docs/vault.md`](docs/vault.md)); future apps (Docker/Kubernetes, home
+automation, deploys) plug into the same shell.
 
 This pillar is a self-contained npm-workspaces monorepo living beside the Rust
 plugins. The privileged host daemon that unlocks host access lives in the root
@@ -30,6 +30,9 @@ dashboard/
 │   ├── web/        # the dashboard (Next.js App Router)
 │   ├── places/     # @polaris-app/places, an installable app: cameras, devices, people, alerts
 │   ├── calendar/   # @polaris-app/calendar, an installable app: calendars, sync, booking
+│   ├── status-pages/     # @polaris-app/status-pages, an installable app: public uptime pages, custom domains
+│   ├── security-scans/   # @polaris-app/security-scans, an installable app: one-shot scanner containers over hostd and SSH
+│   ├── cloud-servers/    # @polaris-app/cloud-servers, an installable app: create and manage VMs at outside cloud providers
 │   ├── landing/    # marketing site (Astro)
 │   └── demo/       # seeded, read-only demo of web
 └── packages/

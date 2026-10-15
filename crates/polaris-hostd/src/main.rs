@@ -16,6 +16,7 @@ mod deploy;
 mod deploy_dirs;
 mod docker;
 mod handlers;
+mod host_security;
 mod http;
 mod networks;
 mod security;

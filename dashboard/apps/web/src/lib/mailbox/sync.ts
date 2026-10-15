@@ -441,6 +441,37 @@ export async function reachForOlder(
     return settled.some((result) => result.status === "fulfilled" && result.value);
 }
 
+/**
+ * Whether any folder a list reads from holds less here than its server does -
+ * read from the database alone, so a list can say "there is more" without
+ * opening a connection. `reachForOlder` is what then goes and gets it.
+ */
+export async function olderOnServer(
+    accountIds: readonly string[],
+    narrow: { folderId: string | null; role: string | null }
+): Promise<boolean> {
+    if (accountIds.length === 0 || (!narrow.folderId && !narrow.role)) return false;
+    const folders = await prisma.mailFolder.findMany({
+        where: {
+            accountId: { in: [...accountIds] },
+            ...(narrow.folderId ? { id: narrow.folderId } : {}),
+            ...(narrow.role ? { role: narrow.role } : {})
+        },
+        select: { id: true, total: true }
+    });
+    if (folders.length === 0) return false;
+    const held = await prisma.mailMessage.groupBy({
+        by: ["folderId"],
+        where: { folderId: { in: folders.map((folder) => folder.id) } },
+        _count: { _all: true }
+    });
+    const counted = new Map(held.map((row) => [row.folderId, row._count._all]));
+    return folders.some(
+        (folder) =>
+            (counted.get(folder.id) ?? 0) + (unstored.get(folder.id)?.size ?? 0) < folder.total
+    );
+}
+
 async function syncFolder(
     client: ImapFlow,
     account: AccountRow,

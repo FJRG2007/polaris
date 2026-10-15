@@ -42,6 +42,7 @@ import {
     Gamepad2,
     Gauge,
     Handshake,
+    Cloud,
     GitPullRequest,
     Globe,
     HardDrive,
@@ -364,6 +365,22 @@ export const POLARIS_APPS: AppEntry[] = [
         favorites: true
     },
     {
+        /**
+         * Public pages that say whether services are up, from checks Polaris
+         * runs, with the incidents and maintenance the operator posts.
+         *
+         * Installable: a Polaris that publishes no status carries no entry for it.
+         */
+        id: "status-pages",
+        category: "work",
+        label: "Status pages", // i18n-ignore
+        description: "Public pages that show whether your services are up", // i18n-ignore
+        icon: Activity,
+        href: "/status-pages",
+        permission: "status.manage",
+        requiresApp: "status-pages"
+    },
+    {
         id: "notes",
         category: "work",
         label: "Notes", // i18n-ignore
@@ -394,6 +411,22 @@ export const POLARIS_APPS: AppEntry[] = [
         permission: "office.use"
     },
     {
+        /**
+         * Servers at cloud providers, created, sized, switched and destroyed
+         * from here, each enrolled as a Polaris server as it boots.
+         *
+         * Installable: a Polaris that rents nothing carries no menu entry for it.
+         */
+        id: "cloud-servers",
+        category: "infrastructure",
+        label: "Cloud servers", // i18n-ignore
+        description: "Create and run servers at your cloud providers", // i18n-ignore
+        icon: Cloud,
+        href: "/cloud-servers",
+        permission: "system.manage",
+        requiresApp: "cloud-servers"
+    },
+    {
         id: "watch",
         category: "infrastructure",
         label: "Watch", // i18n-ignore
@@ -401,6 +434,20 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: Activity,
         href: "/watch",
         permission: "deploy.read"
+    },
+    {
+        /**
+         * Malware, file changes, host hardening and image vulnerabilities on
+         * the servers Polaris runs. Installable: no entry until it is.
+         */
+        id: "security-scans",
+        category: "infrastructure",
+        label: "Security scans", // i18n-ignore
+        description: "Malware, file changes, host hardening and image vulnerabilities", // i18n-ignore
+        icon: ShieldCheck,
+        href: "/security",
+        permission: "system.manage",
+        requiresApp: "security-scans"
     },
     {
         id: "admin",

@@ -46,6 +46,7 @@ import {
 } from "@polaris/ui";
 import { shelfKey } from "@/lib/shelf";
 import { ORG, VIEWER } from "../fixtures/people";
+import { shellUnread } from "../fixtures/chrome";
 
 /** Every app a full install shows its administrator. */
 export const APP_IDS = [
@@ -94,6 +95,8 @@ export function Chrome({
     // As the app chrome resolves them: the reader's language decides how a date
     // and "3 days ago" are written, not only which catalog the labels come from.
     const locale = useLocale();
+    shellUnread.chat = unread?.chat ?? 0;
+    shellUnread.mail = unread?.mail ?? 0;
     return (
         <CapabilityProvider capabilities={CAPABILITIES as never}>
             <AppUrlProvider baseUrl="https://polaris.example.com">

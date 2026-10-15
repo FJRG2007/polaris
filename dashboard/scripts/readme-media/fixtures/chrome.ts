@@ -41,8 +41,20 @@ export function chromeActions(): Record<string, ActionFixture> {
     };
 }
 
+/** The counts the scene's chrome was drawn with, which the shell asks for again
+ *  whenever the live channel says something moved. */
+export const shellUnread = { chat: 0, mail: 0 };
+
 export function chromeApi(ctx: SceneContext): Record<string, ApiFixture> {
     return {
+        "GET /api/chat/unread": () => ({
+            messages: shellUnread.chat,
+            conversations: shellUnread.chat ? 2 : 0
+        }),
+        "GET /api/mail/unread": () => ({
+            messages: shellUnread.mail,
+            mailboxes: shellUnread.mail ? 1 : 0
+        }),
         "POST /api/presence": ({ body }) => {
             const ids = ((body as { ids?: string[] } | null)?.ids ?? []).filter(
                 (one) => one in PRESENCE

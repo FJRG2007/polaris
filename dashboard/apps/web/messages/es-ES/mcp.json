@@ -59,6 +59,7 @@
         "mailserver_manage": "Gestionar correo",
         "calendar_use": "Ver los próximos eventos",
         "crm_use": "Ver y cambiar registros del CRM",
+        "status_manage": "Gestionar páginas de estado y sus pruebas",
         "calendar_read": "Ver tus calendarios y eventos",
         "calendar_manage": "Crear, cambiar y eliminar eventos",
         "chat_use": "Leer y escribir en tus conversaciones",

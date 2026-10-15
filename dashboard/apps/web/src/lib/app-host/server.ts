@@ -74,6 +74,7 @@ import type {
     SealedSecret
 } from "@/lib/calendar-host";
 import type { CrmShelf, CrmShelfPerson } from "@/lib/crm-host";
+import type { CloudEnrollment } from "@/lib/cloud-servers-host";
 import type { AppStorageView } from "@/lib/storage-moves/app-storage";
 import type { StorageChoice } from "@/lib/storage-moves/placement";
 
@@ -114,6 +115,7 @@ const load = {
     backupsManage: once(() => import("@/lib/backups/manage")),
     calendarHost: once(() => import("@/lib/calendar-host")),
     crmHost: once(() => import("@/lib/crm-host")),
+    cloudServersHost: once(() => import("@/lib/cloud-servers-host")),
     chatGameLinks: once(() => import("@/lib/chat/game-links")),
     chatLive: once(() => import("@/lib/chat/live")),
     chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
@@ -125,6 +127,7 @@ const load = {
     deployRuntime: once(() => import("@/lib/deploy/runtime")),
     deployService: once(() => import("@/lib/deploy-service")),
     domainDns: once(() => import("@/lib/domain-dns")),
+    appEdge: once(() => import("@/lib/app-edge")),
     domainService: once(() => import("@/lib/domain-service")),
     domainZones: once(() => import("@/lib/domain-zones")),
     envVarService: once(() => import("@/lib/env-var-service")),
@@ -301,6 +304,15 @@ export const serverHost = {
         teamMemberIds: later(load.calendarHost, "teamMemberIds"),
         teamsOf: later(load.calendarHost, "teamsOf")
     },
+    // What Cloud servers reaches: its credentials sealed with the master key,
+    // and the same enrollment a server added by hand goes through.
+    cloudServersHost: {
+        cloudEnrollmentStatus: later(load.cloudServersHost, "cloudEnrollmentStatus"),
+        openCloudEnrollment: later(load.cloudServersHost, "openCloudEnrollment"),
+        openCloudSecret: later(load.cloudServersHost, "openCloudSecret"),
+        removeCloudHost: later(load.cloudServersHost, "removeCloudHost"),
+        sealCloudSecret: later(load.cloudServersHost, "sealCloudSecret")
+    },
     // What the CRM reaches beyond the other apps: the shelf the reader works
     // from, what their organization's role lets them do there, and who on it
     // may own a record.
@@ -371,6 +383,13 @@ export const serverHost = {
     },
     domainDns: {
         provisionHostnameDns: later(load.domainDns, "provisionHostnameDns")
+    },
+    // The one edge file an app may write, its own, routing hostnames it owns to
+    // the dashboard. Emptied by core when the app is uninstalled.
+    appEdge: {
+        appEdgeOrigin: later(load.appEdge, "appEdgeOrigin"),
+        edgeHostnameTaken: later(load.appEdge, "edgeHostnameTaken"),
+        writeAppEdge: later(load.appEdge, "writeAppEdge")
     },
     domainService: {
         appBaseUrl: later(load.domainService, "appBaseUrl"),
@@ -539,6 +558,7 @@ declare module "@polaris/app-host" {
         CalendarTask: CalendarTask;
         CalendarTeam: CalendarTeam;
         ChatGameLink: ChatGameLink;
+        CloudEnrollment: CloudEnrollment;
         CrmShelf: CrmShelf;
         CrmShelfPerson: CrmShelfPerson;
         DiscoveredTarget: DiscoveredTarget;

@@ -381,6 +381,7 @@ model User {
     crmPeopleUpdated        CrmPerson[]      @relation("CrmPersonUpdatedBy")
     crmOpportunitiesUpdated CrmOpportunity[] @relation("CrmOpportunityUpdatedBy")
     crmViews                CrmView[]        @relation("CrmViewShelf")
+    cloudAccounts           CloudAccount[]
     crmFields               CrmField[]       @relation("CrmFieldShelf")
     crmEvents               CrmEvent[]       @relation("CrmEventShelf")
     crmLinks                CrmLink[]        @relation("CrmLinkShelf")
@@ -2117,6 +2118,7 @@ model Host {
     groups        HostGroupMember[]
     backupDestinations BackupDestination[]
     agentSessions AgentSession[]
+    cloudServer   CloudServer?
     // Database connections tunnelled through this server, directly or as a jump.
     dataTunnels   DataConnection[] @relation("DataConnectionSshHost")
     dataJumps     DataConnection[] @relation("DataConnectionSshJump")
@@ -4487,6 +4489,11 @@ model DeployTarget {
     databases    ManagedDatabase[]
     deployments  Deployment[]
     volumes      Volume[]
+
+    securityScans      SecurityScan[]
+    securityQuarantine SecurityQuarantine[]
+    securityBaselines  SecurityBaseline[]
+    securitySetting    SecuritySetting?
 
     @@unique([ownerId, name])
     @@index([ownerId])
@@ -13407,4 +13414,335 @@ model RestorePoint {
 
     @@index([kind, objectKey, createdAt])
     @@index([createdAt])
+}
+
+// Status pages (apps/status-pages): public pages that say whether a set of
+// services is working, from checks Polaris runs itself, with the incidents and
+// maintenance the operator posts. Untouched by uninstalling the app.
+model StatusPage {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // The address it is published at: /status/<slug>.
+    slug        String   @unique
+    title       String
+    description String   @default("")
+    // An unpublished page answers 404 publicly.
+    published   Boolean  @default(false)
+    // A hostname of the operator's own that serves this page at its root.
+    customDomain String? @unique
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    components  StatusComponent[]
+    incidents   StatusIncident[]
+    maintenance StatusMaintenance[]
+
+    @@index([createdAt])
+}
+
+// One thing a status page reports on ("API", "Website"), made of checks.
+model StatusComponent {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    pageId      String   @db.Uuid
+    name        String
+    description String   @default("")
+    position    Float    @default(0)
+    createdAt   DateTime @default(now())
+
+    page   StatusPage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    checks StatusCheck[]
+
+    @@index([pageId, position])
+}
+
+// One probe Polaris runs on a schedule. Its target is never shown publicly.
+model StatusCheck {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    componentId   String    @db.Uuid
+    // http | tcp | dns | ping
+    kind          String
+    // A URL for http, a host name or address for the others.
+    target        String
+    port          Int?
+    // http: the status expected; null takes any 2xx or 3xx.
+    expectStatus  Int?
+    // http: text the body must contain; empty checks nothing.
+    keyword       String    @default("")
+    // dns: A | AAAA | CNAME | MX | TXT
+    dnsType       String?
+    // dns: a value one of the answers must equal; empty takes any answer.
+    dnsExpect     String    @default("")
+    intervalSec   Int       @default(60)
+    timeoutMs     Int       @default(10000)
+    enabled       Boolean   @default(true)
+    nextRunAt     DateTime  @default(now())
+    // up | down, null before the first run.
+    lastStatus    String?
+    lastLatencyMs Int?
+    lastError     String?
+    lastCheckedAt DateTime?
+    createdAt     DateTime  @default(now())
+
+    component StatusComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+    samples   StatusSample[]
+    days      StatusDay[]
+
+    @@index([enabled, nextRunAt])
+    @@index([componentId])
+}
+
+// One result of one check. Kept for a day; StatusDay keeps the history.
+model StatusSample {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    checkId   String   @db.Uuid
+    at        DateTime @default(now())
+    ok        Boolean
+    latencyMs Int?
+
+    check StatusCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+    @@index([checkId, at])
+    @@index([at])
+}
+
+// One check's results over one UTC day: the uptime bars are drawn from these.
+model StatusDay {
+    checkId    String   @db.Uuid
+    day        DateTime @db.Date
+    total      Int      @default(0)
+    up         Int      @default(0)
+    // Sum of the latencies of the runs that answered, for the day's average.
+    latencySum Int      @default(0)
+
+    check StatusCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+    @@id([checkId, day])
+    @@index([day])
+}
+
+model StatusIncident {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    pageId       String    @db.Uuid
+    title        String
+    // investigating | identified | monitoring | resolved
+    state        String    @default("investigating")
+    // minor | major | critical
+    impact       String    @default("minor")
+    componentIds String[]  @db.Uuid
+    startedAt    DateTime  @default(now())
+    resolvedAt   DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    page    StatusPage             @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    updates StatusIncidentUpdate[]
+
+    @@index([pageId, startedAt])
+    @@index([pageId, resolvedAt])
+}
+
+model StatusIncidentUpdate {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    incidentId String   @db.Uuid
+    state      String
+    body       String
+    createdAt  DateTime @default(now())
+
+    incident StatusIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+    @@index([incidentId, createdAt])
+}
+
+model StatusMaintenance {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    pageId       String   @db.Uuid
+    title        String
+    body         String   @default("")
+    componentIds String[] @db.Uuid
+    startsAt     DateTime
+    endsAt       DateTime
+    createdAt    DateTime @default(now())
+
+    page StatusPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+    @@index([pageId, endsAt])
+}
+
+// Security scans (apps/security-scans): malware, file changes, the host's
+// hardening audit and image vulnerabilities, per server. Every scan runs in a
+// one-off container; a row is what it found. History is pruned to the newest
+// rows per server and kind, and findings are capped per scan.
+model SecurityScan {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    targetId      String    @db.Uuid
+    // malware | files | audit | image
+    kind          String
+    // What was scanned, as the screen names it.
+    label         String
+    // JSON input of the scan (volume ids and folders, the app, the mode).
+    input         String    @default("{}")
+    // queued | running | done | failed
+    state         String    @default("queued")
+    // JSON figures: severity counts, a score, a diff's totals.
+    summary       String    @default("{}")
+    // gzip: an integrity check's file manifest, or a CycloneDX inventory.
+    payload       Bytes?
+    // A message key, never a container's raw output.
+    error         String?
+    requestedById String?   @db.Uuid
+    createdAt     DateTime  @default(now())
+    startedAt     DateTime?
+    finishedAt    DateTime?
+
+    target   DeployTarget      @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    findings SecurityFinding[]
+
+    @@index([targetId, kind, createdAt(sort: Desc)])
+    @@index([state, createdAt])
+}
+
+model SecurityFinding {
+    id       String  @id @default(uuid(7)) @db.Uuid
+    scanId   String  @db.Uuid
+    // critical | high | medium | low | negligible | unknown | warning | suggestion | found
+    // | added | removed | changed
+    severity String
+    // The signature, the check's text, or the vulnerability id.
+    title    String
+    // Where: a path inside a volume, a package and version, a check id.
+    location String
+    // The volume a malware hit is in, for quarantine.
+    volumeId String? @db.Uuid
+    fixedIn  String?
+    url      String?
+    position Int
+
+    scan SecurityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+    @@index([scanId, position])
+}
+
+model SecurityQuarantine {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    targetId  String    @db.Uuid
+    volumeId  String    @db.Uuid
+    // The volume's engine name and the path inside it the file came from.
+    volume    String
+    path      String
+    signature String
+    // held | restored | deleted
+    state     String    @default("held")
+    createdAt DateTime  @default(now())
+    settledAt DateTime?
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@index([targetId, state, createdAt(sort: Desc)])
+}
+
+model SecurityBaseline {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    targetId  String   @db.Uuid
+    volumeId  String   @db.Uuid
+    subpath   String   @default("")
+    label     String
+    // gzip of a JSON array of [path, sha256], sorted by path.
+    manifest  Bytes
+    files     Int
+    createdAt DateTime @default(now())
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@unique([targetId, volumeId, subpath])
+}
+
+model SecuritySetting {
+    targetId    String    @id @db.Uuid
+    // 0 is never; otherwise every that many hours.
+    everyHours  Int       @default(0)
+    lastPlanned DateTime?
+    // The automatic security updates switch as last read or set on the host:
+    // on | off | unsupported | unknown
+    updates     String    @default("unknown")
+    updatesAt   DateTime?
+    distro      String?
+    updatedAt   DateTime  @updatedAt
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@index([everyHours])
+}
+
+// A cloud provider account connected to the Cloud servers app. The credential
+// (a token, a key pair, a service-account file) is sealed with the master key
+// like every other stored credential and never leaves the server.
+model CloudAccount {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    ownerId         String   @db.Uuid
+    // digitalocean | hetzner | vultr | linode | aws | azure | gcp | ionos
+    provider        String
+    name            String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String
+    // The last refusal the provider answered with, shown on the account.
+    lastError       String?
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    owner   User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    servers CloudServer[]
+
+    @@index([ownerId])
+}
+
+// A server the Cloud servers app created. Kept after it is destroyed
+// (`destroyedAt`) so the month's cost still counts the hours it ran.
+model CloudServer {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    accountId    String    @db.Uuid
+    ownerId      String    @db.Uuid
+    // The provider's own id for it (for IONOS, "<datacenter>/<server>").
+    providerId   String
+    name         String
+    region       String
+    size         String
+    image        String
+    // creating | enrolling | running | off | failed | destroyed, as last read.
+    status       String    @default("creating")
+    ipv4         String?
+    // The Polaris server it became, once the machine enrolled.
+    hostId       String?   @unique @db.Uuid
+    enrollmentId String?   @db.Uuid
+    // Prices as the provider published them; null when it publishes none.
+    priceHourly  Float?
+    priceMonthly Float?
+    currency     String?
+    error        String?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+    destroyedAt  DateTime?
+
+    account CloudAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+    host    Host?        @relation(fields: [hostId], references: [id], onDelete: SetNull)
+
+    @@unique([accountId, providerId])
+    @@index([ownerId, destroyedAt])
+    @@index([accountId, destroyedAt])
+}
+
+// A provider's published price for one size in one region, kept for a day so
+// the hourly refresh does not download a price list every pass. Null prices
+// are kept too: "this provider publishes none" is also worth remembering.
+model CloudPrice {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    provider     String
+    region       String
+    size         String
+    priceHourly  Float?
+    priceMonthly Float?
+    currency     String?
+    fetchedAt    DateTime @default(now())
+
+    @@unique([provider, region, size])
 }
