@@ -32,14 +32,11 @@ CREATE INDEX IF NOT EXISTS "HostTemplateAssignment_hostId_idx" ON "HostTemplateA
 CREATE INDEX IF NOT EXISTS "HostTemplateAssignment_checkedAt_idx" ON "HostTemplateAssignment"("checkedAt");
 CREATE UNIQUE INDEX IF NOT EXISTS "HostTemplateAssignment_templateId_hostId_key" ON "HostTemplateAssignment"("templateId", "hostId");
 
-DO $$ BEGIN
-    ALTER TABLE "HostTemplate" ADD CONSTRAINT "HostTemplate_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "HostTemplate" DROP CONSTRAINT IF EXISTS "HostTemplate_ownerId_fkey";
+ALTER TABLE "HostTemplate" ADD CONSTRAINT "HostTemplate_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "HostTemplateAssignment" ADD CONSTRAINT "HostTemplateAssignment_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "HostTemplate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "HostTemplateAssignment" DROP CONSTRAINT IF EXISTS "HostTemplateAssignment_templateId_fkey";
+ALTER TABLE "HostTemplateAssignment" ADD CONSTRAINT "HostTemplateAssignment_templateId_fkey" FOREIGN KEY ("templateId") REFERENCES "HostTemplate"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "HostTemplateAssignment" ADD CONSTRAINT "HostTemplateAssignment_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "Host"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "HostTemplateAssignment" DROP CONSTRAINT IF EXISTS "HostTemplateAssignment_hostId_fkey";
+ALTER TABLE "HostTemplateAssignment" ADD CONSTRAINT "HostTemplateAssignment_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "Host"("id") ON DELETE CASCADE ON UPDATE CASCADE;

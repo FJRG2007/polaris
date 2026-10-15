@@ -532,7 +532,7 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
 
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto overscroll-contain">
                 <DialogHeader>
                     <DialogTitle>
                         {editing
