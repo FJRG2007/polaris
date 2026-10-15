@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { MAX_OUTBOUND_WEBHOOKS, outboundWebhookInputSchema } from "@polaris/core";
 import * as hooks from "@/lib/notifications/outbound-hooks";
+import * as inbound from "@/lib/deploy/inbound-hooks";
 
 const idSchema = z.string().uuid();
 const eventsSchema = outboundWebhookInputSchema.shape.events;
@@ -111,4 +112,44 @@ export async function listOutboundDeliveriesAction(
     const parsedCursor = idSchema.nullable().safeParse(cursor ?? null);
     if (!parsedId.success || !parsedCursor.success) return { error: await refusal("notFound") };
     return { page: await hooks.listOutboundDeliveries(user.id, parsedId.data, parsedCursor.data) };
+}
+
+const inboundErrors = { rateLimited: "rateLimited", limit: "limit", forbidden: "forbidden" } as const;
+
+export async function createInboundHookAction(
+    input: unknown
+): Promise<{ hook?: inbound.InboundHookView; secret?: string; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("accountNotifications");
+    const parsed = inbound.inboundHookInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("webhooks.inbound.errors.invalid") };
+    const result = await inbound.createInboundHook(user.id, parsed.data);
+    if ("error" in result) {
+        const code = inboundErrors[result.error];
+        return { error: t(`webhooks.inbound.errors.${code}`, { max: inbound.MAX_INBOUND_HOOKS }) };
+    }
+    revalidatePath("/account/webhooks");
+    return result;
+}
+
+export async function setInboundHookEnabledAction(id: unknown, enabled: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsedId = idSchema.safeParse(id);
+    const parsedEnabled = z.boolean().safeParse(enabled);
+    if (!parsedId.success || !parsedEnabled.success) return { error: await refusal("notSaved") };
+    if (!(await inbound.setInboundHookEnabled(user.id, parsedId.data, parsedEnabled.data))) {
+        return { error: await refusal("notFound") };
+    }
+    revalidatePath("/account/webhooks");
+    return {};
+}
+
+export async function deleteInboundHookAction(id: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = idSchema.safeParse(id);
+    if (!parsed.success || !(await inbound.deleteInboundHook(user.id, parsed.data))) {
+        return { error: await refusal("notFound") };
+    }
+    revalidatePath("/account/webhooks");
+    return {};
 }

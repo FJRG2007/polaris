@@ -281,6 +281,7 @@ model User {
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
     outboundWebhooks    OutboundWebhook[]
+    inboundWebhooks     InboundWebhook[]
     notifyDeliveries    NotificationDelivery[]
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
@@ -3824,6 +3825,45 @@ model OutboundWebhookDelivery {
     @@index([createdAt])
 }
 
+// A signed URL that redeploys one service when something outside posts to it.
+// Runs as the account that made it, and only while that account may still
+// deploy the service.
+model InboundWebhook {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    userId          String    @db.Uuid
+    applicationId   String    @db.Uuid
+    name            String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String?
+    enabled         Boolean   @default(true)
+    lastUsedAt      DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    application Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    receipts    InboundWebhookReceipt[]
+
+    @@index([userId])
+    @@index([applicationId])
+}
+
+// A delivery id already accepted, kept until its timestamp could no longer pass,
+// so the same signed request cannot be replayed.
+model InboundWebhookReceipt {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    hookId     String   @db.Uuid
+    deliveryId String
+    expiresAt  DateTime
+    createdAt  DateTime @default(now())
+
+    hook InboundWebhook @relation(fields: [hookId], references: [id], onDelete: Cascade)
+
+    @@unique([hookId, deliveryId])
+    @@index([expiresAt])
+}
+
 // The result of an integration scanning a stored file (e.g. VirusTotal on a
 // drop-point upload). Kept for the owner's audit trail and to avoid re-scanning
 // a known hash. Not FK-bound to the submission so a purged submission does not
@@ -4877,6 +4917,7 @@ model Application {
     volumes     Volume[]
     crons       ServiceCron[]
     runtimeLogs RuntimeLogLine[]
+    inboundHooks InboundWebhook[]
 
     @@unique([environmentId, slug])
     @@index([targetId])

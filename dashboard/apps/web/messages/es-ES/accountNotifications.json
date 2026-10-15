@@ -566,6 +566,34 @@
             "notFound": "Ese destino ya no existe.",
             "invalid": "Revisa el formulario: un nombre, una URL completa y al menos un evento.",
             "notSaved": "No se guardó. Vuelve a probar."
+        },
+        "inbound": {
+            "title": "Hooks de deploy",
+            "description": "Una URL firmada que vuelve a desplegar un servicio cuando tu CI o tu registro le envía algo.",
+            "add": "Añadir hook",
+            "empty": "Aún no hay hooks de despliegue.",
+            "noServices": "No hay servicios que puedas volver a desplegar, así que no hay nada para lo que crear un hook.",
+            "service": "Servicio",
+            "servicePlaceholder": "Elige un servicio",
+            "name": "Nombre",
+            "namePlaceholder": "CI en main",
+            "url": "Dirección",
+            "redeploys": "Despliega {service}",
+            "lastUsed": "Usado {time}",
+            "neverUsed": "Sin usar aún",
+            "switchOn": "Activar",
+            "switchOff": "Desactivar",
+            "remove": "Quitar hook",
+            "removeQuestion": "¿Quitar {name}? Lo que siga enviando a su URL se rechaza desde ahora.",
+            "secretVerify": "Firma cada POST igual: X-Polaris-Timestamp (segundos unix, a menos de 5 minutos), un id único en X-Polaris-Delivery y X-Polaris-Signature: sha256= seguido del HMAC-SHA256 en hex de la marca de tiempo, un punto y el cuerpo.",
+            "dialogTitle": "Añadir hook de deploy",
+            "dialogDescription": "Polaris vuelve a desplegar el servicio con cada petición bien firmada, mientras puedas desplegarlo.",
+            "errors": {
+                "invalid": "Elige un servicio y ponle un nombre al hook.",
+                "rateLimited": "Demasiados intentos. Espera unos minutos y vuelve a probar.",
+                "limit": "Tienes el máximo de {max} hooks de despliegue.",
+                "forbidden": "No puedes volver a desplegar ese servicio."
+            }
         }
     }
 }

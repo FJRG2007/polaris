@@ -56,10 +56,14 @@ vi.mock("@/app/(app)/account/webhooks/actions", () => ({
     setOutboundHookEnabledAction: async () => ({}),
     setOutboundHookEventsAction: async () => ({}),
     rotateOutboundHookSecretAction: async () => ({ secret: "whsec_new" }),
-    testOutboundHookAction: async () => ({ status: "sent" })
+    testOutboundHookAction: async () => ({ status: "sent" }),
+    createInboundHookAction: async () => ({}),
+    setInboundHookEnabledAction: async () => ({}),
+    deleteInboundHookAction: async () => ({})
 }));
 
 const { WebhooksView } = await import("@/app/(app)/account/webhooks/webhooks-view");
+const { InboundHooksCard } = await import("@/app/(app)/account/webhooks/inbound-hooks-card");
 
 const EVENTS = [
     { id: "deploy.failed", label: "Deploy failed", group: "Deploy" },
@@ -123,5 +127,37 @@ describe("the webhooks page", () => {
         fireEvent.click(screen.getByRole("button", { name: "Redeliver" }));
         await waitFor(() => expect(redeliver).toHaveBeenCalledWith("00000000-0000-7000-8000-000000000002"));
         expect(await screen.findByText("Sent again.")).toBeTruthy();
+    });
+});
+
+describe("deploy hooks", () => {
+    it("offers nothing to add when no service can be redeployed", () => {
+        render(<InboundHooksCard hooks={[]} services={[]} baseUrl="https://polaris.example.test" />, {
+            wrapper: MessagesWrapper
+        });
+        expect(screen.getByText(/no services you can redeploy/)).toBeTruthy();
+        expect((screen.getByRole("button", { name: "Add deploy hook" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("names the service a hook redeploys", () => {
+        render(
+            <InboundHooksCard
+                hooks={[
+                    {
+                        id: "00000000-0000-7000-8000-0000000000aa",
+                        name: "CI",
+                        applicationId: "00000000-0000-7000-8000-0000000000bb",
+                        serviceName: "api",
+                        enabled: true,
+                        lastUsedAt: null,
+                        createdAt: "2026-10-01T00:00:00.000Z"
+                    }
+                ]}
+                services={[{ id: "00000000-0000-7000-8000-0000000000bb", name: "api", project: "Shop" }]}
+                baseUrl="https://polaris.example.test"
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.getByText("Redeploys api")).toBeTruthy();
     });
 });
