@@ -252,6 +252,11 @@
         "failedTitle": "Scheduled job failed: {job}",
         "didNotFinish": "It did not finish."
     },
+    "automations": {
+        "failedTitle": "Automation failed: {name}",
+        "failedBody": "An action did not work. Open the project's automations to see which.",
+        "creatorBody": "It did not run: the person it acts as can no longer deploy this project. Save it again to run it as you."
+    },
     "router": {
         "forward": "Forward ports 80 and 443 on your router to this server.",
         "port80": "Port 80 is needed even for an HTTPS-only site: the certificate is issued over it.",

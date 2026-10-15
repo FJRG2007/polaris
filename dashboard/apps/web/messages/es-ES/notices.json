@@ -252,6 +252,11 @@
         "failedTitle": "Falló una tarea programada: {job}",
         "didNotFinish": "No terminó."
     },
+    "automations": {
+        "failedTitle": "Falló la automatización: {name}",
+        "failedBody": "Una acción no funcionó. Abre las automatizaciones del proyecto para ver cuál.",
+        "creatorBody": "No se ejecutó: quien la creó ya no puede desplegar este proyecto. Guárdala de nuevo para que actúe como tú."
+    },
     "router": {
         "forward": "Reenvía los puertos 80 y 443 de tu router a este servidor.",
         "port80": "El puerto 80 hace falta incluso para un sitio solo HTTPS: el certificado se emite a través de él.",

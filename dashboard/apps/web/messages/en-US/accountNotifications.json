@@ -212,6 +212,14 @@
             "label": "A scheduled job failed",
             "description": "A service's scheduled command failed on its last try, or ran out of time."
         },
+        "deployAutomationFailed": {
+            "label": "A project automation failed",
+            "description": "One of a project's automations stopped on an action that did not work."
+        },
+        "deployAutomationNotice": {
+            "label": "A project automation told you something",
+            "description": "A step in one of a project's automations asked to let you know."
+        },
         "domainDown": {
             "label": "A domain stopped serving",
             "description": "A domain pointed at one of your services stopped answering."

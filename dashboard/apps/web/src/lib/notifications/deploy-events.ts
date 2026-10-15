@@ -90,7 +90,8 @@ export async function notifyDeployFinished(input: {
                 deployableId: true,
                 error: true,
                 commitSha: true,
-                triggeredById: true
+                triggeredById: true,
+                trigger: true
             }
         });
         if (!deployment) return;
@@ -148,6 +149,19 @@ export async function notifyDeployFinished(input: {
             url: deployable.href,
             level: input.ok ? "success" : "danger"
         });
+
+        // The project's automations that follow deploys. Not for a deploy one of
+        // them started: "redeploy when a deploy finishes" would otherwise answer
+        // itself every time its cool-off ran out, for ever.
+        if (deployment.trigger !== "automation") {
+            const { raiseAutomationEvent } = await import("@/lib/deploy/automations");
+            await raiseAutomationEvent({
+                projectId: deployable.projectId,
+                event,
+                applicationId:
+                    deployment.deployableType === "application" ? deployment.deployableId : null
+            });
+        }
     } catch (error) {
         console.error("polaris: could not raise the deploy notification:", error);
     }

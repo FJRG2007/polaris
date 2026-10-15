@@ -112,6 +112,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would take two base backups of the same instance, and
             // two replication checks could each find a copy stopped and start one.
             "database-archives",
+            // Two passes would each read the same due rules; the claim on each
+            // rule's next firing is the second guard, not the only one.
+            "deploy-automations",
             // Two passes would each purge the same expired rows and volumes.
             "deploy-recycle-bin",
             // Two passes would each sweep the same low disk at once.

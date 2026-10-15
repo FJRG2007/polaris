@@ -162,6 +162,23 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "deploy.automation.failed",
+        group: "deploy",
+        label: "A project automation failed",
+        description: "One of a project's automations stopped on an action that did not work.",
+        level: "danger",
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "deploy.automation.notice",
+        group: "deploy",
+        label: "A project automation told you something",
+        description: "A step in one of a project's automations asked to let you know.",
+        level: "info",
+        // On: nobody writes "tell me" into an automation hoping not to be told.
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "domain.down",
         group: "deploy",
         label: "A domain stopped serving",
