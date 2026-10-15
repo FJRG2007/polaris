@@ -117,6 +117,8 @@ export async function binItemAction(
         const item = binItemSchema.parse(raw);
         const verb = z.enum(["restore", "forget"]).parse(action);
         const user = await requirePermission("deploy.manage");
+        // Access is checked on this item: it has to be the user's own, or on the
+        // shelf of an organization they run (see recycle-bin requireBinned).
         if (verb === "restore") await recycleBin.restoreFromBin(item.kind, item.id, user.id, user.id);
         else await recycleBin.deleteForever(item.kind, item.id, user.id);
         await recordAudit({

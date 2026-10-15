@@ -20,6 +20,7 @@ import { z } from "zod";
 import { INCLUDING_BINNED, prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import * as restorePoints from "@/lib/restore-points/service";
+import { managedProjectWhere } from "@/lib/deploy-project-access";
 
 export const BIN_RETENTION_KEY = "deploy.recycleBin.days";
 export const DEFAULT_BIN_DAYS = 30;
@@ -99,21 +100,22 @@ export interface BinEntry {
 }
 
 /**
- * What the owner has in the bin. A project's contents are listed as the project,
- * not one by one: they come back and go together.
+ * What this user has in the bin: their own projects' items and those of every
+ * organization they run. A project's contents are listed as the project, not one
+ * by one: they come back and go together.
  */
-export async function listBin(ownerId: string): Promise<BinEntry[]> {
-    const days = await binRetentionDays();
+export async function listBin(userId: string): Promise<BinEntry[]> {
+    const [days, manages] = await Promise.all([binRetentionDays(), managedProjectWhere(userId)]);
     const binned = { binnedAt: { not: null } };
     const [projects, applications, databases] = await Promise.all([
-        prisma.project.findMany({ where: { ownerId, ...binned }, select: { id: true, name: true, binnedAt: true }, take: 200 }),
+        prisma.project.findMany({ where: { ...manages, ...binned }, select: { id: true, name: true, binnedAt: true }, take: 200 }),
         prisma.application.findMany({
-            where: { ...binned, environment: { project: { ownerId, binnedAt: null } } },
+            where: { ...binned, environment: { project: { ...manages, binnedAt: null } } },
             select: { id: true, name: true, binnedAt: true, environment: { select: { project: { select: { name: true } } } } },
             take: 200
         }),
         prisma.managedDatabase.findMany({
-            where: { ...binned, environment: { project: { ownerId, binnedAt: null } } },
+            where: { ...binned, environment: { project: { ...manages, binnedAt: null } } },
             select: { id: true, name: true, binnedAt: true, environment: { select: { project: { select: { name: true } } } } },
             take: 200
         })
@@ -176,20 +178,30 @@ async function ownerOf(kind: BinKind, id: string): Promise<string | null> {
     return row?.environment.project.ownerId ?? null;
 }
 
-async function requireBinned(kind: BinKind, id: string, ownerId: string): Promise<void> {
+/**
+ * Checks this user may act on the binned item - it is theirs, or on the shelf of
+ * an organization they run - and returns the owner whose resources it lives on,
+ * which is the id every owner-scoped path below takes.
+ */
+async function requireBinned(kind: BinKind, id: string, userId: string): Promise<string> {
+    const manages = await managedProjectWhere(userId);
     const binned = { id, binnedAt: { not: null } };
-    const found =
+    const throughProject = { select: { environment: { select: { project: { select: { ownerId: true } } } } } };
+    const ownerId =
         kind === "project"
-            ? await prisma.project.count({ where: { ...binned, ownerId } })
+            ? (await prisma.project.findFirst({ where: { ...binned, ...manages }, select: { ownerId: true } }))?.ownerId
             : kind === "application"
-              ? await prisma.application.count({ where: { ...binned, environment: { project: { ownerId } } } })
-              : await prisma.managedDatabase.count({ where: { ...binned, environment: { project: { ownerId } } } });
-    if (found === 0) throw new Error("That item is no longer in the recycle bin");
+              ? (await prisma.application.findFirst({ where: { ...binned, environment: { project: manages } }, ...throughProject }))
+                    ?.environment.project.ownerId
+              : (await prisma.managedDatabase.findFirst({ where: { ...binned, environment: { project: manages } }, ...throughProject }))
+                    ?.environment.project.ownerId;
+    if (!ownerId) throw new Error("That item is no longer in the recycle bin");
+    return ownerId;
 }
 
 /** Bring an item back and redeploy it. */
-export async function restoreFromBin(kind: BinKind, id: string, ownerId: string, actorId: string): Promise<void> {
-    await requireBinned(kind, id, ownerId);
+export async function restoreFromBin(kind: BinKind, id: string, userId: string, actorId: string): Promise<void> {
+    const ownerId = await requireBinned(kind, id, userId);
     if (kind === "application") return restoreApplicationRow(id, ownerId, actorId);
     if (kind === "database") return restoreDatabaseRow(id, ownerId, actorId);
     const project = await prisma.project.findFirst({ where: { id, ownerId, binnedAt: { not: null } }, select: { binnedAt: true } });
@@ -205,8 +217,8 @@ export async function restoreFromBin(kind: BinKind, id: string, ownerId: string,
 }
 
 /** Delete for good, data included. Releases the names it held. */
-export async function deleteForever(kind: BinKind, id: string, ownerId: string): Promise<void> {
-    await requireBinned(kind, id, ownerId);
+export async function deleteForever(kind: BinKind, id: string, userId: string): Promise<void> {
+    const ownerId = await requireBinned(kind, id, userId);
     // Out of the bin first, so the ordinary delete (which reads it like any other
     // row) finds it. A delete that then fails leaves it listed and stopped, never
     // hidden with its data still on disk.

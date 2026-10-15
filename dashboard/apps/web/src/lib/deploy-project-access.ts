@@ -353,6 +353,17 @@ export async function requireEnvScopeAccess(
         : requireApplicationAccess(scopeId, userId, capability);
 }
 
+/**
+ * The clause matching every project this user runs: their own, and every one on
+ * the shelf of an organization where they hold `deploy.manage` - the same rule
+ * `projectAccess` applies to one project. For the queries that have to reach
+ * rows `projectAccess` cannot load, such as what sits in the recycle bin.
+ */
+export async function managedProjectWhere(userId: string) {
+    const runs = await orgIdsWhere({ id: userId, isAdmin: false }, "deploy.manage");
+    return { OR: [{ ownerId: userId }, ...(runs.length > 0 ? [{ orgId: { in: runs } }] : [])] };
+}
+
 /** Ids of every project the user may at least read. Used to widen the Deploy
  *  landing beyond what they own without loading each project to check. */
 export async function visibleProjectIds(userId: string): Promise<string[]> {
