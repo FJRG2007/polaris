@@ -12,7 +12,9 @@ import type { ListingFailure } from "@/app/(app)/drive/types";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const back = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ back, push: vi.fn(), prefetch: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ back, push: vi.fn(), prefetch: vi.fn() })
+}));
 
 const { ListingError } = await import("@/app/(app)/drive/listing-error");
 
@@ -32,7 +34,12 @@ const refused = (extra: Partial<ListingFailure> = {}): ListingFailure => ({
 function panel(error: ListingFailure, upHref: string | null, serverHref: string | null = null) {
     return (
         <MessagesWrapper>
-            <ListingError error={error} onRetry={() => undefined} upHref={upHref} serverHref={serverHref} />
+            <ListingError
+                error={error}
+                onRetry={() => undefined}
+                upHref={upHref}
+                serverHref={serverHref}
+            />
         </MessagesWrapper>
     );
 }

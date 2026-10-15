@@ -33,7 +33,9 @@ function within(path: string, folder: string): boolean {
  * mount, or only mounts whose source is not a path - a socket's or a tmpfs's).
  */
 export function hostFolderFor(mounts: readonly ContainerMount[], path: string): string | null {
-    const usable = mounts.filter((mount) => mount.source.startsWith("/") && mount.destination.startsWith("/"));
+    const usable = mounts.filter(
+        (mount) => mount.source.startsWith("/") && mount.destination.startsWith("/")
+    );
     if (usable.length === 0) return null;
     // The deepest mount wins: a volume mounted inside another one shadows it.
     const holding = usable

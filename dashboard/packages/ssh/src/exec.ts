@@ -34,7 +34,11 @@ export interface ExecOptions {
 }
 
 /** Run one command, streaming stdout/stderr; resolves with the remote exit code. */
-export function execCommand(client: Client, command: string, options: ExecOptions = {}): Promise<ExecResult> {
+export function execCommand(
+    client: Client,
+    command: string,
+    options: ExecOptions = {}
+): Promise<ExecResult> {
     return new Promise((resolve, reject) => {
         const handler = (error: Error | undefined, channel: ClientChannel): void => {
             if (error) return reject(error);
@@ -138,7 +142,7 @@ export function clampDim(value: number | undefined, fallback: number, max: numbe
  * waiting on a prompt nobody can answer.
  */
 export const ROOT_SFTP_COMMAND =
-    "sudo -n sh -c 'for p in /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server /usr/libexec/sftp-server /usr/lib/sftp-server; do [ -x \"$p\" ] && exec \"$p\"; done; exit 127'";
+    'sudo -n sh -c \'for p in /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server /usr/libexec/sftp-server /usr/lib/sftp-server; do [ -x "$p" ] && exec "$p"; done; exit 127\'';
 
 /** The two channel requests of ssh2's client protocol this needs. */
 interface ChannelRequests {
@@ -167,13 +171,19 @@ const rooted = new WeakSet<Client>();
 export function openRootSftp(client: Client): Promise<SFTPWrapper> {
     if (!rooted.has(client)) {
         const protocol = (client as unknown as { _protocol?: Partial<ChannelRequests> })._protocol;
-        if (!protocol || typeof protocol.subsystem !== "function" || typeof protocol.exec !== "function") {
+        if (
+            !protocol ||
+            typeof protocol.subsystem !== "function" ||
+            typeof protocol.exec !== "function"
+        ) {
             return Promise.reject(new Error("root_sftp_unsupported"));
         }
         const subsystem = protocol.subsystem.bind(protocol);
         const exec = protocol.exec.bind(protocol);
         protocol.subsystem = (channel, name, wantReply) =>
-            name === "sftp" ? exec(channel, ROOT_SFTP_COMMAND, wantReply) : subsystem(channel, name, wantReply);
+            name === "sftp"
+                ? exec(channel, ROOT_SFTP_COMMAND, wantReply)
+                : subsystem(channel, name, wantReply);
         rooted.add(client);
     }
     return openSftp(client);

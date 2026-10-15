@@ -25,7 +25,10 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/session", () => ({ requirePermission: async () => ({ id: "viewer" }) }));
 vi.mock("@/lib/local-server", () => ({ getLocalHostId: async () => localHostId }));
 vi.mock("@/lib/deploy/releases", () => ({ servingReleases }));
-vi.mock("@/lib/effective-access", () => ({ effectiveCan: async () => false, effectiveIsAdmin: async () => false }));
+vi.mock("@/lib/effective-access", () => ({
+    effectiveCan: async () => false,
+    effectiveIsAdmin: async () => false
+}));
 vi.mock("@/lib/drive-root", async () => {
     const actual = await vi.importActual<typeof import("@/lib/drive-root")>("@/lib/drive-root");
     return { reachesLocalHost: actual.reachesLocalHost, managesServers };
@@ -173,9 +176,21 @@ describe("containerDriveLinkAction", () => {
 
     it("refuses input that is not the expected shape", async () => {
         expect(
-            await containerDriveLinkAction({ connectionId: "host:h1", containerName: "db", path: "data", mounts })
+            await containerDriveLinkAction({
+                connectionId: "host:h1",
+                containerName: "db",
+                path: "data",
+                mounts
+            })
         ).toBeNull();
-        expect(await containerDriveLinkAction({ connectionId: "", containerName: "db", path: "/", mounts })).toBeNull();
+        expect(
+            await containerDriveLinkAction({
+                connectionId: "",
+                containerName: "db",
+                path: "/",
+                mounts
+            })
+        ).toBeNull();
         expect(await containerDriveLinkAction(null)).toBeNull();
     });
 });

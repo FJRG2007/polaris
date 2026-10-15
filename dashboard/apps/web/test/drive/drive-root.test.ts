@@ -25,15 +25,23 @@ describe("browsesAsRoot", () => {
 
 describe("reachesLocalHost", () => {
     it("hands the machine Polaris runs on to anybody who manages servers", () => {
-        expect(reachesLocalHost({ localHostId: "h1", hostId: "h1", managesServers: true })).toBe(true);
+        expect(reachesLocalHost({ localHostId: "h1", hostId: "h1", managesServers: true })).toBe(
+            true
+        );
     });
 
     it("keeps it from anybody who does not", () => {
-        expect(reachesLocalHost({ localHostId: "h1", hostId: "h1", managesServers: false })).toBe(false);
+        expect(reachesLocalHost({ localHostId: "h1", hostId: "h1", managesServers: false })).toBe(
+            false
+        );
     });
 
     it("reaches no other server, and nothing before the machine is enrolled", () => {
-        expect(reachesLocalHost({ localHostId: "h1", hostId: "h2", managesServers: true })).toBe(false);
-        expect(reachesLocalHost({ localHostId: null, hostId: "h1", managesServers: true })).toBe(false);
+        expect(reachesLocalHost({ localHostId: "h1", hostId: "h2", managesServers: true })).toBe(
+            false
+        );
+        expect(reachesLocalHost({ localHostId: null, hostId: "h1", managesServers: true })).toBe(
+            false
+        );
     });
 });

@@ -28,25 +28,39 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
+    if (!connectionId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.missingConnection") },
+            { status: 400 }
+        );
 
     let path: string;
     try {
         path = normalizeRelPath(url.searchParams.get("p") ?? "");
     } catch {
-        return Response.json({ error: (await readerWords("api"))("errors.invalidPath") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.invalidPath") },
+            { status: 400 }
+        );
     }
 
     try {
         await authorizeDrive(user.id, connectionId, path, "read");
     } catch (caught) {
         if (caught instanceof DriveLockedError) return Response.json({ locked: true });
-        if (caught instanceof DriveAccessError) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        if (caught instanceof DriveAccessError)
+            return Response.json(
+                { error: (await readerWords("api"))("errors.forbidden") },
+                { status: 403 }
+            );
         throw caught;
     }
 
@@ -56,15 +70,23 @@ export async function GET(request: Request): Promise<Response> {
     } catch (caught) {
         if (caught instanceof SmbShareRequiredError) return Response.json({ needsSmbShare: true });
         console.error("drive: breakdown connect failed", caught);
-        return Response.json({ error: (await readerWords("api"))("errors.locationConnectFailed") }, { status: 502 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.locationConnectFailed") },
+            { status: 502 }
+        );
     }
 
     try {
-        const gated = new Set((await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean));
+        const gated = new Set(
+            (await listLocks(connectionId)).map((lock) => lock.path).filter(Boolean)
+        );
         return Response.json(await driveBreakdown(driver, path, { skip: gated }));
     } catch (caught) {
         console.error("drive: breakdown failed", caught);
-        return Response.json({ error: (await readerWords("api"))("errors.locationMeasureFailed") }, { status: 502 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.locationMeasureFailed") },
+            { status: 502 }
+        );
     } finally {
         await driver.dispose();
     }

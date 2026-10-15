@@ -54,7 +54,11 @@ describe("borrowed SFTP channels", () => {
         });
         vi.doMock("@polaris/ssh", async (importOriginal) => {
             const actual = await importOriginal<typeof import("@polaris/ssh")>();
-            return { ...actual, openSshClient, openRootSftp: vi.fn(async () => new EventEmitter()) };
+            return {
+                ...actual,
+                openSshClient,
+                openRootSftp: vi.fn(async () => new EventEmitter())
+            };
         });
         const { borrowSftp, dropSshConnections } = await import("@/lib/connection-pool");
         const options = {

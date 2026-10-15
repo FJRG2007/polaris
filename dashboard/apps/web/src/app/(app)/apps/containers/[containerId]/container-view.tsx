@@ -273,7 +273,9 @@ export function ContainerView({
                             {detail?.name || containerRef}
                         </h1>
                         {detail ? (
-                            <Badge variant={running ? "success" : "neutral"}>{containerStateLabel(t, state)}</Badge>
+                            <Badge variant={running ? "success" : "neutral"}>
+                                {containerStateLabel(t, state)}
+                            </Badge>
                         ) : (
                             <Skeleton className="h-5 w-16 rounded-full" />
                         )}
@@ -362,7 +364,11 @@ export function ContainerView({
                     icon={<Cpu className="size-4" />}
                     label={t("columns.cpu")}
                     value={latest ? `${latest.cpuPercent}%` : running ? null : "-"}
-                    hint={host ? t("detail.hostCores", { count: host.overview.ncpu }) : t("detail.ofHostCores")}
+                    hint={
+                        host
+                            ? t("detail.hostCores", { count: host.overview.ncpu })
+                            : t("detail.ofHostCores")
+                    }
                     age={latestAge}
                 />
                 <Stat
@@ -371,7 +377,10 @@ export function ContainerView({
                     value={latest ? formatBytes(latest.memUsage) : running ? null : "-"}
                     hint={
                         latest && latest.memLimit > 0
-                            ? t("detail.memShare", { percent: latest.memPercent, limit: formatBytes(latest.memLimit) })
+                            ? t("detail.memShare", {
+                                  percent: latest.memPercent,
+                                  limit: formatBytes(latest.memLimit)
+                              })
                             : t("detail.noLimit")
                     }
                     age={latestAge}
@@ -379,15 +388,35 @@ export function ContainerView({
                 <Stat
                     icon={<Network className="size-4" />}
                     label={t("detail.network")}
-                    value={latest ? t("detail.in", { size: formatBytes(latest.netRx) }) : running ? null : "-"}
-                    hint={latest ? t("detail.out", { size: formatBytes(latest.netTx) }) : t("detail.sinceStart")}
+                    value={
+                        latest
+                            ? t("detail.in", { size: formatBytes(latest.netRx) })
+                            : running
+                              ? null
+                              : "-"
+                    }
+                    hint={
+                        latest
+                            ? t("detail.out", { size: formatBytes(latest.netTx) })
+                            : t("detail.sinceStart")
+                    }
                     age={latestAge}
                 />
                 <Stat
                     icon={<HardDrive className="size-4" />}
                     label={t("detail.disk")}
-                    value={latest ? t("detail.read", { size: formatBytes(latest.blockRead) }) : running ? null : "-"}
-                    hint={latest ? t("detail.written", { size: formatBytes(latest.blockWrite) }) : t("detail.sinceStart")}
+                    value={
+                        latest
+                            ? t("detail.read", { size: formatBytes(latest.blockRead) })
+                            : running
+                              ? null
+                              : "-"
+                    }
+                    hint={
+                        latest
+                            ? t("detail.written", { size: formatBytes(latest.blockWrite) })
+                            : t("detail.sinceStart")
+                    }
                     age={latestAge}
                 />
             </div>
@@ -465,7 +494,10 @@ function Usage({ samples }: { samples: Sample[] }) {
         v: sample.usage.memUsage,
         note:
             sample.usage.memLimit > 0
-                ? t("overview.ofValue", { used: formatBytes(sample.usage.memUsage), total: formatBytes(sample.usage.memLimit) })
+                ? t("overview.ofValue", {
+                      used: formatBytes(sample.usage.memUsage),
+                      total: formatBytes(sample.usage.memLimit)
+                  })
                 : formatBytes(sample.usage.memUsage)
     }));
 
@@ -542,7 +574,10 @@ function RunsOn({
                     </Field>
                     <Field label={t("runsOn.machine")}>
                         {host ? (
-                            t("runsOn.machineValue", { count: host.overview.ncpu, memory: formatBytes(host.overview.memTotal) })
+                            t("runsOn.machineValue", {
+                                count: host.overview.ncpu,
+                                memory: formatBytes(host.overview.memTotal)
+                            })
                         ) : (
                             <Skeleton className="h-4 w-32" />
                         )}
@@ -710,7 +745,9 @@ function LogsTab({ query }: { query: string }) {
     return (
         <div className="flex h-full flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">{t("logs.last", { count: tail })}</span>
+                <span className="text-xs text-muted-foreground">
+                    {t("logs.last", { count: tail })}
+                </span>
                 <div className="flex items-center gap-1">
                     <Button
                         size="sm"
@@ -826,7 +863,9 @@ function FilesTab({
                             <button
                                 type="button"
                                 className="hover:underline"
-                                onClick={() => setPath(`/${segments.slice(0, index + 1).join("/")}`)}
+                                onClick={() =>
+                                    setPath(`/${segments.slice(0, index + 1).join("/")}`)
+                                }
                             >
                                 {segment}
                             </button>
@@ -850,9 +889,7 @@ function FilesTab({
                     ))}
                 </div>
             ) : entries.length === 0 && !error ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                    {t("files.empty")}
-                </p>
+                <p className="py-8 text-center text-sm text-muted-foreground">{t("files.empty")}</p>
             ) : (
                 <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border border-border">
                     {entries.map((entry) => {
@@ -929,11 +966,7 @@ function ConsoleTab({
         );
     }
     if (!canAttach) {
-        return (
-            <Notice tone="muted">
-                {t("console.noSession")}
-            </Notice>
-        );
+        return <Notice tone="muted">{t("console.noSession")}</Notice>;
     }
     return (
         <TerminalPanel
@@ -1023,7 +1056,10 @@ async function fetchJson<T>(
         const response = await fetch(url);
         const payload = (await response.json()) as T & { error?: string };
         if (!response.ok || payload.error) {
-            return { ok: false, error: payload.error ?? t("errors.requestFailed", { status: response.status }) };
+            return {
+                ok: false,
+                error: payload.error ?? t("errors.requestFailed", { status: response.status })
+            };
         }
         return { ok: true, data: payload };
     } catch {

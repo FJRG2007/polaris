@@ -2348,7 +2348,10 @@ export function FilesView({
                                     onRetry={onRetry}
                                     upHref={
                                         depthOf(path) > depthOf(rootPath)
-                                            ? href(connectionId, path.split("/").slice(0, -1).join("/"))
+                                            ? href(
+                                                  connectionId,
+                                                  path.split("/").slice(0, -1).join("/")
+                                              )
                                             : null
                                     }
                                     serverHref={

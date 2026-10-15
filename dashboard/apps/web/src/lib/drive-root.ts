@@ -71,5 +71,8 @@ export function reachesLocalHost(input: {
 export async function managesServers(userId: string): Promise<boolean> {
     const { effectiveCan, effectiveIsAdmin } = await access();
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
-    return (await effectiveIsAdmin(userId, user?.isAdmin === true)) || effectiveCan(userId, "system.manage");
+    return (
+        (await effectiveIsAdmin(userId, user?.isAdmin === true)) ||
+        effectiveCan(userId, "system.manage")
+    );
 }

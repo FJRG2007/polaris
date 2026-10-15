@@ -111,7 +111,9 @@ describe("a server as a Drive source", () => {
 
     it("keeps the machine Polaris runs on from somebody who does not manage servers", async () => {
         localHostId = HOST;
-        userHasPermission.mockImplementation(async (_userId: string, permission: string) => permission !== "system.manage");
+        userHasPermission.mockImplementation(
+            async (_userId: string, permission: string) => permission !== "system.manage"
+        );
         await expect(authorizeDrive(OTHER, SOURCE, "", "read")).rejects.toBeInstanceOf(
             DriveAccessError
         );

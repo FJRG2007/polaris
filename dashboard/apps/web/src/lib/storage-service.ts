@@ -137,7 +137,10 @@ async function sftpDriverFor(conn: HostConnection, asRoot = false): Promise<Stor
                     lease = await borrowSftp("drive-root", conn.id, options);
                     return lease.sftp;
                 } catch (caught) {
-                    console.warn(`drive: root session refused on ${conn.id}, reading as the login`, caught);
+                    console.warn(
+                        `drive: root session refused on ${conn.id}, reading as the login`,
+                        caught
+                    );
                 }
             }
             lease = await borrowSftp("drive", conn.id, options);
@@ -926,7 +929,13 @@ async function listHostsReached(userId: string) {
     const { getLocalHostId } = await import("@/lib/local-server");
     const [owned, localHostId] = await Promise.all([listHosts(userId), getLocalHostId()]);
     if (!localHostId || owned.some((host) => host.id === localHostId)) return owned;
-    if (!reachesLocalHost({ localHostId, hostId: localHostId, managesServers: await managesServers(userId) }))
+    if (
+        !reachesLocalHost({
+            localHostId,
+            hostId: localHostId,
+            managesServers: await managesServers(userId)
+        })
+    )
         return owned;
     const local = await getHostSummary(localHostId);
     return local ? [local, ...owned] : owned;

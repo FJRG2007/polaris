@@ -38,18 +38,28 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
+    if (!connectionId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.missingConnection") },
+            { status: 400 }
+        );
 
     let path: string;
     try {
         path = normalizeRelPath(url.searchParams.get("p") ?? "");
     } catch {
-        return Response.json({ error: (await readerWords("api"))("errors.invalidPath") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.invalidPath") },
+            { status: 400 }
+        );
     }
 
     try {
@@ -57,9 +67,17 @@ export async function GET(request: Request): Promise<Response> {
     } catch (caught) {
         // A locked ancestor: tell the client which lock to unlock rather than 403.
         if (caught instanceof DriveLockedError) {
-            return Response.json({ locked: true, lockId: caught.lockId, lockPath: caught.lockPath });
+            return Response.json({
+                locked: true,
+                lockId: caught.lockId,
+                lockPath: caught.lockPath
+            });
         }
-        if (caught instanceof DriveAccessError) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        if (caught instanceof DriveAccessError)
+            return Response.json(
+                { error: (await readerWords("api"))("errors.forbidden") },
+                { status: 403 }
+            );
         throw caught;
     }
 
@@ -98,7 +116,9 @@ export async function GET(request: Request): Promise<Response> {
         const lockedPaths = new Set(locks.map((lock) => lock.path));
         // Resolve the creator ids present in this listing to display names once.
         const names = await resolveUserNames(
-            [...meta.values()].map((item) => item.creatorId).filter((id): id is string => Boolean(id))
+            [...meta.values()]
+                .map((item) => item.creatorId)
+                .filter((id): id is string => Boolean(id))
         );
         const entries = visibleEntries.map((entry) => {
             const item = meta.get(entry.path);
@@ -177,7 +197,10 @@ async function refusedForWantOfRoot(
     if (!connectionId.startsWith(HOST_CONNECTION_PREFIX)) return false;
     if (!(caught instanceof StorageError) || caught.code !== "permission_denied") return false;
     try {
-        const access = await hostRootAccess(userId, connectionId.slice(HOST_CONNECTION_PREFIX.length));
+        const access = await hostRootAccess(
+            userId,
+            connectionId.slice(HOST_CONNECTION_PREFIX.length)
+        );
         return access.managesServers && !access.sudo;
     } catch {
         // A refinement of the sentence, never a reason to lose the answer.
