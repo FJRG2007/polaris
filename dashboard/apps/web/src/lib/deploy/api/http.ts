@@ -15,6 +15,7 @@ import type { DeployCaller } from "./surface";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { authenticateApiKey } from "@/lib/api-key-auth";
+import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { DeployApiRefusal, publicFailure } from "./refusal";
 
 /** Calls one key may make in a minute, and how many of them may change
@@ -71,7 +72,7 @@ export function tooManyCalls(seconds: number): string {
  * the server log; `changes` picks the stricter of the two rate limits.
  */
 export function deployRoute(operation: string, changes: boolean, handler: Handler) {
-    return async (
+    return withKeyUsage(async (
         request: Request,
         segment: { params: Promise<Record<string, string>> }
     ): Promise<Response> => {
@@ -106,7 +107,7 @@ export function deployRoute(operation: string, changes: boolean, handler: Handle
             const failure = publicFailure(caught, operation);
             return refusal(failure.status, failure.message);
         }
-    };
+    });
 }
 
 /** The request body as JSON, or a refusal saying it was not. An empty body is an

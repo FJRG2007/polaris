@@ -31,6 +31,7 @@ import { readCappedBody } from "@/lib/request-body";
 import type { McpScope } from "@/lib/mcp/scope-table";
 import { DEPLOY_TOOLS } from "@/lib/mcp/tools/deploy";
 import { authenticateApiKey } from "@/lib/api-key-auth";
+import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { throttleDeployKey, tooManyCalls } from "@/lib/deploy/api/http";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import { clientIp } from "@/lib/request-context";
@@ -392,7 +393,7 @@ async function unauthorized(request: Request, hadToken: boolean): Promise<Respon
     );
 }
 
-export async function POST(request: Request): Promise<Response> {
+export const POST = withKeyUsage(async (request: Request): Promise<Response> => {
     const caller = await callerFor(request);
     // A 403 rather than a 401: the credential is good, and a client told to
     // sign in again would only loop. The description says where to change it.
@@ -458,7 +459,7 @@ export async function POST(request: Request): Promise<Response> {
     const reply = await answer(payload, caller, tools, server);
     if (!reply) return new Response(null, { status: 202, headers });
     return Response.json(reply, { headers });
-}
+});
 
 /**
  * A client opening the server-to-client stream.

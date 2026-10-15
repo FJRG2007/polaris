@@ -11,11 +11,12 @@ import { endCliSignIn } from "@/lib/cli/sign-in";
 import { recordAudit } from "@/lib/audit-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { authenticateApiKey } from "@/lib/api-key-auth";
+import { withKeyUsage } from "@/lib/api-usage/recorder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function DELETE(request: Request): Promise<Response> {
+export const DELETE = withKeyUsage(async (request: Request): Promise<Response> => {
     const principal = await authenticateApiKey(request);
     // Already revoked, expired or never valid: there is nothing left to end, which
     // is what the CLI wanted.
@@ -39,4 +40,4 @@ export async function DELETE(request: Request): Promise<Response> {
         targetId: principal.keyId
     });
     return new Response(null, { status: 204 });
-}
+});
