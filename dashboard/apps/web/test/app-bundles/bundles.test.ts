@@ -83,6 +83,7 @@ describe("app bundles", () => {
             "crm",
             "game-servers",
             "home",
+            "security-scans",
             "status-pages"
         ]);
     });
