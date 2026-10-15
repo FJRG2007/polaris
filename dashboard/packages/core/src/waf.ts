@@ -95,6 +95,17 @@ export interface GuardRule {
      * which keeps verifying the HMAC tokens it always did.
      */
     readonly keys?: readonly string[];
+    /**
+     * The oldest a login token may be, counted from when it was minted (`iat`), before
+     * the visitor is sent to sign in again. Absent means the token's own expiry is the
+     * only limit, which is every route that is not a private address.
+     *
+     * Enforced at the edge rather than trusted to the minting side, because a token
+     * minted before the route tightened - a twelve-hour one from when the address only
+     * asked for a login - would otherwise keep admitting somebody the address no longer
+     * admits, for the rest of its life. A token with no `iat` is too old by definition.
+     */
+    readonly loginMaxAge?: number;
     /** Managed rule-pack ids, expanded to rules on decode. Sending ids rather than
      *  their contents is what keeps this header small: a pack of forty user agents
      *  is four bytes here and is stamped onto every single request to the route.
@@ -149,10 +160,30 @@ export function encodeGuardRule(rule: GuardRule): string {
                 ? { f: cleanFrameAncestors(rule.frameAncestors) }
                 : {}),
             ...(rule.requireLogin && (rule.keys?.length ?? 0) > 0 ? { k: rule.keys } : {}),
+            ...(rule.requireLogin && validMaxAge(rule.loginMaxAge) ? { m: rule.loginMaxAge } : {}),
             p: rule.presets ?? [],
             r: rule.rules
         })
     ).toString("base64");
+}
+
+/** A login max age worth carrying: a whole, positive number of seconds. */
+function validMaxAge(value: unknown): value is number {
+    return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+/**
+ * Whether a login token is older than its route accepts (`GuardRule.loginMaxAge`), at
+ * `now` (unix seconds). A route with no limit accepts any age.
+ */
+export function loginTooOld(
+    token: { readonly iat?: number },
+    rule: { readonly loginMaxAge?: number },
+    now: number
+): boolean {
+    if (rule.loginMaxAge === undefined) return false;
+    if (token.iat === undefined) return true;
+    return now - token.iat > rule.loginMaxAge;
 }
 
 /** Grants on the wire: `r` = the principal, `f`/`u` = the window, both left out when
@@ -283,6 +314,7 @@ function decodeUncached(header: string): GuardRule {
                 c?: unknown;
                 f?: unknown;
                 k?: unknown;
+                m?: unknown;
                 p?: unknown;
                 r?: unknown;
             };
@@ -317,6 +349,7 @@ function decodeUncached(header: string): GuardRule {
                           .filter((v): v is string => typeof v === "string" && ED25519_KEY.test(v))
                           .slice(0, 4)
                     : undefined,
+                loginMaxAge: validMaxAge(obj.m) ? obj.m : undefined,
                 presets,
                 rules: parseRules(obj.r),
                 managedRules: expandWafPresets(presets)

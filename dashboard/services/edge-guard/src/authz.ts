@@ -57,6 +57,7 @@ import {
     EDGE_CHALLENGE_BITS,
     EDGE_PASS_COOKIE,
     issueEdgeChallenge,
+    loginTooOld,
     membershipTooOld,
     principalVerdict,
     principalsSuperseded,
@@ -380,7 +381,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
             const token =
                 uri.searchParams.get((rule.keys?.length ?? 0) > 0 ? "etoken" : "token") ?? "";
             const verified = verifyEdgeTokenFor(token, trust, cfg.now, host);
-            if (verified) {
+            if (verified && !loginTooOld(verified, rule, cfg.now)) {
                 const maxAge = Math.max(1, verified.exp - cfg.now);
                 return {
                     status: 302,
@@ -396,6 +397,10 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
         const token = readCookie(req.cookie, cfg.cookieName);
         const verified = verifyEdgeTokenFor(token, trust, cfg.now, host);
         if (!verified) return signIn(cfg, req, proto, rule);
+        // Older than this route takes, however long the token itself has left: a
+        // private address re-decides who gets in every few minutes, and a token minted
+        // before the address turned private never went through that decision at all.
+        if (loginTooOld(verified, rule, cfg.now)) return signIn(cfg, req, proto, rule);
         // Polaris re-decided this account after the token was minted - its membership
         // moved, it was banned, or its sessions were revoked. Asked here rather than
         // inside the principal check below, because "this account may no longer come in
