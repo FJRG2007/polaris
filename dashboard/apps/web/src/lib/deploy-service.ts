@@ -4959,9 +4959,19 @@ export async function executeDeployment(
         // Authenticate to any private registry whose image this deploy pulls, so the
         // pull below (inside the driver) is authorized. A login failure is logged but
         // not fatal - the pull surfaces the real error if the image is truly private.
+        // The service's own pick wins; otherwise the login whose host matches.
+        const pullingApp =
+            queuedRow.deployableType === "application" ? queuedRow.deployableId : undefined;
         for (const image of pullImages) {
-            const auth = await resolveRegistryLogin(ownerId, image);
+            const auth = await resolveRegistryLogin(ownerId, image, pullingApp);
             if (!auth) continue;
+            if (!auth.matchesImage) {
+                log(
+                    Buffer.from(
+                        `[warn] the chosen registry (${auth.registry || "Docker Hub"}) is not where ${image} is pulled from\n`
+                    )
+                );
+            }
             log(Buffer.from(`Authenticating to ${auth.registry || "Docker Hub"}...\n`));
             try {
                 await ports.login(auth.registry, auth.username, auth.password);
