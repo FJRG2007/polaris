@@ -1,0 +1,87 @@
+{
+    "wizard": {
+        "title": "Configurar Polaris",
+        "intro": "Di para qué usarás Polaris y solo se instalarán las apps que encajan. Puedes añadir más luego desde Marketplace.",
+        "useCasesLabel": "¿Para qué usarás Polaris?",
+        "useCases": {
+            "hosting": {
+                "title": "Hosting y despliegues",
+                "body": "Publica webs y servicios, vigílalos y mantenlos seguros."
+            },
+            "team": {
+                "title": "Espacio de equipo",
+                "body": "Chat, tareas, archivos, correo y calendarios para tu gente."
+            },
+            "games": {
+                "title": "Servidores de juego",
+                "body": "Servidores de Minecraft, ARK y FiveM para tus jugadores."
+            },
+            "homelab": {
+                "title": "Laboratorio en casa",
+                "body": "Cámaras, herramientas útiles y las máquinas que tienes en casa."
+            }
+        },
+        "appsLabel": "Apps a instalar",
+        "appsHint": "Recomendadas para lo que elegiste. No ejecutan nada hasta que las uses.",
+        "noApps": "Elige al menos un uso para ver qué encaja.",
+        "noneNeeded": "Todo lo que necesitan estos usos ya viene con Polaris.",
+        "consent": "Al instalarla aceptas el {label}.",
+        "skip": "Ahora no",
+        "next": "Seguir",
+        "back": "Atrás",
+        "install": "Instalar {count, plural, one {# app} other {# apps}}",
+        "finish": "Listo",
+        "status": {
+            "waiting": "En espera",
+            "installing": "Instalando",
+            "installed": "Instalada",
+            "failed": "Falló"
+        },
+        "retry": "Repetir",
+        "retryNamed": "Repetir {app}",
+        "allDone": "Todo listo. Las apps elegidas están en el menú de apps.",
+        "someFailed": "Algunas apps no se instalaron. Repítelas, o termina y añádelas luego desde Marketplace.",
+        "reopenHint": "Puedes volver a abrirlo desde Gestión, en Primeros pasos.",
+        "step": "Paso {current} de {total}",
+        "loading": "Comprobando lo instalado"
+    },
+    "page": {
+        "title": "Primeros pasos",
+        "intro": "Elige para qué es Polaris e instala las apps que encajan. Las ya instaladas aparecen marcadas."
+    },
+    "errors": {
+        "adminOnly": "Solo un administrador puede instalar apps.",
+        "unknownApp": "Esa app no se ofrece aquí.",
+        "download": "{app} no se instaló: no se pudieron descargar sus archivos. Comprueba que este servidor llega a internet y repite.",
+        "install": "{app} no se instaló. Repite, o ábrela en Marketplace para ver qué necesita.",
+        "network": "Polaris no respondió. Comprueba tu conexión y repite."
+    },
+    "presets": {
+        "title": "Apps laterales",
+        "hint": "Elige las apps que el Resumen muestra en su barra lateral. Después puedes fijar y ordenar apps igual.",
+        "custom": "A medida",
+        "customHint": "Ordenaste tu propia lista. Elegir un preajuste la sustituye.",
+        "items": {
+            "default": {
+                "title": "Estándar",
+                "body": "Tus favoritas, o las apps que más abres."
+            },
+            "hosting": {
+                "title": "Hosting y despliegues",
+                "body": "Despliegues, monitorización, estado y seguridad."
+            },
+            "team": {
+                "title": "Espacio de equipo",
+                "body": "Chat, tareas, archivos, correo, calendario y documentos."
+            },
+            "games": {
+                "title": "Servidores de juego",
+                "body": "Servidores de juego, chat, despliegues y monitorización."
+            },
+            "homelab": {
+                "title": "Laboratorio en casa",
+                "body": "Lugares, despliegues, monitorización, archivos, bóveda y herramientas."
+            }
+        }
+    }
+}

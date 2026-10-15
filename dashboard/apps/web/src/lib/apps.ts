@@ -2051,6 +2051,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Settings,
             keywords: ["version", "upgrade"],
             group: ADMIN_PLATFORM_GROUP
+        },
+        {
+            label: "Get started", // i18n-ignore
+            href: "/admin/setup",
+            adminOnly: true,
+            icon: Rocket,
+            keywords: ["setup", "first run", "wizard", "install apps", "onboarding"],
+            group: ADMIN_PLATFORM_GROUP
         }
     ]
 };

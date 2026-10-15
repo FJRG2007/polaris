@@ -21,6 +21,7 @@ import notes from "./notes.json";
 import tasks from "./tasks.json";
 import tools from "./tools.json";
 import tours from "./tours.json";
+import setup from "./setup.json";
 import vault from "./vault.json";
 import watch from "./watch.json";
 import agents from "./agents.json";
@@ -135,6 +136,7 @@ export default {
     telemetry,
     tools,
     tours,
+    setup,
     validation,
     vault,
     watch
