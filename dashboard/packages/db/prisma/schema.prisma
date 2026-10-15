@@ -280,6 +280,7 @@ model User {
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
+    outboundWebhooks    OutboundWebhook[]
     notifyDeliveries    NotificationDelivery[]
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
@@ -3759,6 +3760,68 @@ model NotificationDelivery {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId, createdAt])
+}
+
+// An endpoint of the account's own that is told, as signed JSON, whenever one of
+// the events it picked happens to that account. Unlike a NotificationDestination
+// this is for a program, not a person: the body is the raw event, signed with a
+// secret only Polaris and the endpoint hold, and a failed send is retried.
+//
+// The URL and the signing secret are envelope-encrypted like every other
+// credential; urlHint is what the list renders. A run of failed deliveries
+// switches the endpoint off and says why in disabledReason.
+model OutboundWebhook {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    userId              String    @db.Uuid
+    name                String
+    urlHint             String
+    encryptedUrl        Bytes
+    urlNonce            Bytes
+    urlKeyId            String?
+    encryptedSecret     Bytes
+    secretNonce         Bytes
+    secretKeyId         String?
+    // Catalogue event ids this endpoint is sent.
+    events              String[]
+    enabled             Boolean   @default(true)
+    // Deliveries in a row that ran out of attempts. Reset by any success.
+    consecutiveFailures Int       @default(0)
+    disabledReason      String?
+    lastDeliveryAt      DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    deliveries OutboundWebhookDelivery[]
+
+    @@index([userId])
+}
+
+// One event sent, or being sent, to one OutboundWebhook. The body is kept so a
+// delivery can be sent again exactly as it was; rows go after the retention
+// window whatever their state.
+model OutboundWebhookDelivery {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    webhookId      String    @db.Uuid
+    event          String
+    // The JSON body as signed and sent.
+    payload        String
+    // pending | sent | failed
+    status         String    @default("pending")
+    attempts       Int       @default(0)
+    // When the next attempt is due; null once sent or given up on.
+    nextAttemptAt  DateTime?
+    responseStatus Int?
+    error          String?
+    durationMs     Int?
+    deliveredAt    DateTime?
+    createdAt      DateTime  @default(now())
+
+    webhook OutboundWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+    @@index([webhookId, createdAt])
+    @@index([status, nextAttemptAt])
+    @@index([createdAt])
 }
 
 // The result of an integration scanning a stored file (e.g. VirusTotal on a
