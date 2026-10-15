@@ -29,8 +29,27 @@ const DESTINATION_FIELDS = {
 /** Copies looked at per round, so a destination with thousands never loads at once. */
 const MOVE_BATCH = 50;
 
+/** A move gives up after this many copies in a row did not arrive: the target is not taking them. */
+const MAX_FAILURES_IN_A_ROW = 3;
+
 /** Sources whose move is running in this process. */
 const moving = new Set<string>();
+
+/** Closing the jobs of moves an earlier process lost, once, before this one starts any. */
+let swept: Promise<unknown> | null = null;
+
+function sweepLostMoves(): Promise<unknown> {
+    swept ??= prisma.backupJob
+        .updateMany({
+            where: { type: "replicate", status: "running", resourceId: null },
+            data: { status: "failed", finishedAt: new Date(), error: "Stopped before it finished" }
+        })
+        .catch((error: unknown) => {
+            swept = null;
+            throw error;
+        });
+    return swept;
+}
 
 async function ownedDestination(ownerId: string, id: string): Promise<DestinationRow> {
     const row = await prisma.backupDestination.findFirst({
@@ -99,10 +118,7 @@ export async function startMovingCopies(input: {
 
     // A move this process lost to a restart never closed its job; it says so
     // instead of reading as running for ever.
-    await prisma.backupJob.updateMany({
-        where: { ownerId: input.ownerId, type: "replicate", status: "running", resourceId: null },
-        data: { status: "failed", finishedAt: new Date(), error: "Stopped before it finished" }
-    });
+    await sweepLostMoves();
     const job = await prisma.backupJob.create({
         data: { ownerId: input.ownerId, type: "replicate", actorUserId: input.actorId },
         select: { id: true }
@@ -166,21 +182,26 @@ export async function moveOneCopy(
                 },
                 select: { id: true, status: true, sizeBytes: true }
             }));
+        const abandon = async (reason: string): Promise<void> => {
+            if (existing) {
+                await prisma.recoveryPointCopy
+                    .update({ where: { id: row.id }, data: { status: "failed", error: reason } })
+                    .catch(() => undefined);
+                return;
+            }
+            await prisma.recoveryPointCopy.delete({ where: { id: row.id } }).catch(() => undefined);
+        };
         try {
             const written = await target.put(copy.path, await source.get(copy.path), copy.sizeBytes);
             landed = written.sizeBytes;
         } catch (error) {
-            await prisma.recoveryPointCopy
-                .update({ where: { id: row.id }, data: { status: "failed", error: reasonOf(error) } })
-                .catch(() => undefined);
+            if (!existing) await target.remove(copy.path).catch(() => undefined);
+            await abandon(reasonOf(error));
             throw error;
         }
         if (BigInt(landed) !== copy.sizeBytes) {
-            await prisma.recoveryPointCopy.update({
-                where: { id: row.id },
-                data: { status: "failed", error: "The copy arrived a different size" }
-            });
             await target.remove(copy.path).catch(() => undefined);
+            await abandon("The copy arrived a different size");
             throw new Error("The copy arrived a different size");
         }
         await prisma.recoveryPointCopy.update({
@@ -205,24 +226,32 @@ async function moveCopies(
     let moved = 0;
     let bytes = 0;
     const failures: string[] = [];
-    const skipped = new Set<string>();
+    let inARow = 0;
+    let after: string | undefined;
     try {
         target = await openDestination(to, ownerId);
-        for (;;) {
+        copies: for (;;) {
             const batch = await prisma.recoveryPointCopy.findMany({
-                where: { destinationId: from.id, status: "available", id: { notIn: [...skipped] } },
-                orderBy: { createdAt: "asc" },
+                where: {
+                    destinationId: from.id,
+                    status: "available",
+                    ...(after === undefined ? {} : { id: { gt: after } })
+                },
+                orderBy: { id: "asc" },
                 take: MOVE_BATCH,
                 select: { id: true, pointId: true, path: true, sizeBytes: true, sealedWith: true }
             });
             if (batch.length === 0) break;
             for (const copy of batch) {
+                after = copy.id;
                 try {
                     bytes += await moveOneCopy(copy, source, target, to.id);
                     moved += 1;
+                    inARow = 0;
                 } catch (error) {
-                    skipped.add(copy.id);
                     failures.push(`${copy.path}: ${reasonOf(error)}`);
+                    inARow += 1;
+                    if (inARow >= MAX_FAILURES_IN_A_ROW) break copies;
                 }
             }
         }

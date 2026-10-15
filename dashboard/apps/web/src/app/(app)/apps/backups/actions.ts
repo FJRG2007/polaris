@@ -212,16 +212,16 @@ export async function deletePlanAction(planId: string): Promise<Result> {
 export async function createDestinationAction(
     input: unknown,
     makeDefault: unknown = false
-): Promise<Result<{ id: string }>> {
+): Promise<Result<{ id: string; notDefault?: string }>> {
     const user = await requireAdmin();
     const parsed = destinationSchema.safeParse(input);
     const asDefault = z.boolean().safeParse(makeDefault);
     if (!parsed.success || !asDefault.success) {
         return { error: await schemaSay(parsed.error?.issues[0]?.message, "errors.invalidDestination") };
     }
+    let created: { id: string };
     try {
-        const created = await manage.createDestination(user.id, parsed.data);
-        if (asDefault.data) await relocate.setDefaultDestination(user.id, created.id);
+        created = await manage.createDestination(user.id, parsed.data);
         await recordAudit({
             actorId: user.id,
             action: "backup.destination.create",
@@ -229,10 +229,22 @@ export async function createDestinationAction(
             targetId: created.id,
             metadata: { kind: parsed.data.kind }
         });
-        revalidatePath("/apps/backups");
-        return created;
     } catch (error) {
         return failed(error);
+    }
+    revalidatePath("/apps/backups");
+    if (!asDefault.data) return created;
+    try {
+        await relocate.setDefaultDestination(user.id, created.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.default",
+            targetType: "backup-destination",
+            targetId: created.id
+        });
+        return created;
+    } catch (error) {
+        return { id: created.id, notDefault: (await failed(error)).error };
     }
 }
 

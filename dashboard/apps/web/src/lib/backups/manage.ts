@@ -840,11 +840,13 @@ export async function listDestinations(ownerId: string) {
     const sizes = await prisma.recoveryPointCopy.groupBy({
         by: ["destinationId"],
         where: { destination: { ownerId }, status: "available" },
-        _sum: { sizeBytes: true }
+        _sum: { sizeBytes: true },
+        _count: { _all: true }
     });
     const bytesByDestination = new Map(
         sizes.map((row) => [row.destinationId, Number(row._sum.sizeBytes ?? 0n)])
     );
+    const availableByDestination = new Map(sizes.map((row) => [row.destinationId, row._count._all]));
     return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -857,6 +859,7 @@ export async function listDestinations(ownerId: string) {
         via: row.connection?.name ?? row.host?.name ?? null,
         viaKind: row.connection?.kind ?? (row.host ? "host" : null),
         copyCount: row._count.copies,
+        movableCount: availableByDestination.get(row.id) ?? 0,
         usedByPlans: row._count.plans,
         storedBytes: bytesByDestination.get(row.id) ?? 0
     }));

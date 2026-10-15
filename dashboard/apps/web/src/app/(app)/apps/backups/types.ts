@@ -50,6 +50,8 @@ export interface DestinationSummary {
     via: string | null;
     viaKind: string | null;
     copyCount: number;
+    /** The copies that are there whole, which are the ones a move takes. */
+    movableCount: number;
     usedByPlans: number;
     storedBytes: number;
 }

@@ -20,10 +20,31 @@ interface CopyRow {
     error?: string | null;
 }
 
+interface JobRow {
+    id: string;
+    ownerId: string;
+    type: string;
+    status: string;
+    resourceId: string | null;
+    error?: string | null;
+}
+
 const state = vi.hoisted(() => ({
     copies: [] as CopyRow[],
     destinations: [] as { id: string; ownerId: string; name: string; kind: string; isDefault: boolean }[],
+    jobs: [] as JobRow[],
+    handles: new Map<string, DestinationHandle>(),
+    queries: [] as unknown[],
     next: 0
+}));
+
+vi.mock("@/lib/backups/destination", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/backups/destination")>()),
+    openDestination: async (row: { id: string }) => {
+        const handle = state.handles.get(row.id);
+        if (!handle) throw new Error("no handle");
+        return handle;
+    }
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -48,6 +69,44 @@ vi.mock("@polaris/db", () => ({
             },
             delete: async ({ where }: { where: { id: string } }) => {
                 state.copies = state.copies.filter((copy) => copy.id !== where.id);
+            },
+            count: async ({ where }: { where: { destinationId: string; status: string } }) =>
+                state.copies.filter((copy) => copy.destinationId === where.destinationId && copy.status === where.status)
+                    .length,
+            findMany: async (query: {
+                where: { destinationId: string; status: string; id?: { gt: string } };
+                take: number;
+            }) => {
+                state.queries.push(query.where);
+                const after = query.where.id?.gt;
+                return state.copies
+                    .filter(
+                        (copy) =>
+                            copy.destinationId === query.where.destinationId &&
+                            copy.status === query.where.status &&
+                            (after === undefined || copy.id > after)
+                    )
+                    .sort((a, b) => (a.id < b.id ? -1 : 1))
+                    .slice(0, query.take);
+            }
+        },
+        backupJob: {
+            updateMany: async ({ where, data }: { where: Partial<JobRow>; data: Partial<JobRow> }) => {
+                for (const job of state.jobs) {
+                    if (job.type === where.type && job.status === where.status && job.resourceId === where.resourceId) {
+                        Object.assign(job, data);
+                    }
+                }
+            },
+            create: async ({ data }: { data: { ownerId: string; type: string } }) => {
+                const job = { id: `job-${state.next++}`, status: "running", resourceId: null, ...data };
+                state.jobs.push(job);
+                return job;
+            },
+            update: async ({ where, data }: { where: { id: string }; data: Partial<JobRow> }) => {
+                const job = state.jobs.find((one) => one.id === where.id);
+                if (job) Object.assign(job, data);
+                return job;
             }
         },
         backupDestination: {
@@ -74,7 +133,7 @@ vi.mock("@polaris/db", () => ({
 }));
 
 import type { DestinationHandle } from "@/lib/backups/destination";
-import { moveOneCopy, setDefaultDestination, startMovingCopies } from "@/lib/backups/relocate";
+import { isMoving, moveOneCopy, setDefaultDestination, startMovingCopies } from "@/lib/backups/relocate";
 
 function store(files: Map<string, number>, failPut = false, shortBy = 0): DestinationHandle {
     return {
@@ -104,6 +163,9 @@ const copy = (): CopyRow => ({
 
 beforeEach(() => {
     state.copies = [copy()];
+    state.jobs = [];
+    state.handles = new Map();
+    state.queries = [];
     state.next = 0;
     state.destinations = [
         { id: "local", ownerId: "me", name: "Polaris data dir", kind: "local", isDefault: true },
@@ -130,7 +192,7 @@ describe("moving one copy", () => {
         await expect(moveOneCopy(copy(), store(local), store(new Map(), true), "nas")).rejects.toThrow();
         expect(local.size).toBe(1);
         expect(state.copies.find((row) => row.id === "old-1")?.status).toBe("available");
-        expect(state.copies.find((row) => row.destinationId === "nas")?.status).toBe("failed");
+        expect(state.copies.find((row) => row.destinationId === "nas")).toBeUndefined();
     });
 
     it("leaves the old copy when the new one arrives a different size", async () => {
@@ -140,6 +202,7 @@ describe("moving one copy", () => {
         expect(local.size).toBe(1);
         expect(nas.size).toBe(0);
         expect(state.copies.find((row) => row.id === "old-1")).toBeDefined();
+        expect(state.copies.find((row) => row.destinationId === "nas")).toBeUndefined();
     });
 
     it("only removes the old copy when the new destination already holds that point", async () => {
@@ -177,5 +240,49 @@ describe("starting a move", () => {
         await expect(startMovingCopies({ ownerId: "me", fromId: "local", toId: "beside", actorId: "me" })).rejects.toThrow(
             /cannot be moved/
         );
+    });
+});
+
+async function settled(fromId: string): Promise<void> {
+    await vi.waitFor(() => expect(isMoving(fromId)).toBe(false));
+}
+
+describe("a running move", () => {
+    it("stops once the target refuses copies in a row, and leaves nothing on it", async () => {
+        state.copies = Array.from({ length: 6 }, (_, index) => ({ ...copy(), id: `old-${index}`, pointId: `point-${index}`, path: `p-${index}` }));
+        state.handles.set("local", store(new Map()));
+        state.handles.set("nas", store(new Map(), true));
+        await startMovingCopies({ ownerId: "me", fromId: "local", toId: "nas", actorId: "me" });
+        await settled("local");
+        expect(state.copies.filter((row) => row.destinationId === "local")).toHaveLength(6);
+        expect(state.copies.filter((row) => row.destinationId === "nas")).toHaveLength(0);
+        expect(state.jobs[0]).toEqual(expect.objectContaining({ status: "failed" }));
+        expect(state.queries).toHaveLength(1);
+    });
+
+    it("never marks a move still running here as lost", async () => {
+        state.destinations.push({ id: "other", ownerId: "me", name: "Other", kind: "local", isDefault: false });
+        state.copies.push({ ...copy(), id: "old-2", pointId: "point-2", destinationId: "other" });
+        let release: () => void = () => undefined;
+        const held = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const slow: DestinationHandle = {
+            ...store(new Map()),
+            put: async (_path, _body, size) => {
+                await held;
+                return { sizeBytes: Number(size) };
+            }
+        };
+        state.handles.set("local", store(new Map()));
+        state.handles.set("other", store(new Map()));
+        state.handles.set("nas", slow);
+        await startMovingCopies({ ownerId: "me", fromId: "local", toId: "nas", actorId: "me" });
+        await startMovingCopies({ ownerId: "me", fromId: "other", toId: "nas", actorId: "me" });
+        expect(state.jobs.map((job) => job.status)).toEqual(["running", "running"]);
+        release();
+        await settled("local");
+        await settled("other");
+        expect(state.jobs.map((job) => job.status)).toEqual(["succeeded", "succeeded"]);
     });
 });

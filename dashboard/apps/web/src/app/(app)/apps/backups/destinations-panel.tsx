@@ -159,7 +159,7 @@ export function DestinationsPanel({
                                 <p className="text-xs text-muted-foreground">{t("destinations.sameDiskBody")}</p>
                             </div>
                         </div>
-                        {elsewhere[0] && current.copyCount > 0 ? (
+                        {elsewhere[0] && current.movableCount > 0 ? (
                             <Button size="sm" className="min-w-0 shrink-0" onClick={() => setMoving(current)}>
                                 <ArrowRightLeft className="size-4" />
                                 <span className="truncate">
@@ -227,7 +227,7 @@ export function DestinationsPanel({
                                                 {t("destinations.makeDefault")}
                                             </Button>
                                         ) : null}
-                                        {destination.copyCount > 0 && destination.kind !== "source-local" ? (
+                                        {destination.movableCount > 0 && destination.kind !== "source-local" ? (
                                             <Button size="sm" variant="ghost" onClick={() => setMoving(destination)}>
                                                 {t("destinations.move")}
                                             </Button>
@@ -285,6 +285,7 @@ export function DestinationsPanel({
                     onClose={() => setAdding(false)}
                     onSaved={onChanged}
                     onMoved={(count) => setNotice(t("destinations.moveStarted", { count }))}
+                    onFailed={setError}
                 />
             ) : null}
 
@@ -366,7 +367,7 @@ function MoveDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>{t("destinations.moveTitle", { name: from.name })}</DialogTitle>
-                    <DialogDescription>{t("destinations.moveIntro", { count: from.copyCount })}</DialogDescription>
+                    <DialogDescription>{t("destinations.moveIntro", { count: from.movableCount })}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {ordered.length === 0 ? (
@@ -423,12 +424,14 @@ function DestinationDialog({
     current,
     onClose,
     onSaved,
-    onMoved
+    onMoved,
+    onFailed
 }: {
     current: DestinationSummary | null;
     onClose: () => void;
     onSaved: () => Promise<void>;
     onMoved: (count: number) => void;
+    onFailed: (message: string) => void;
 }) {
     const t = useTranslations("backups");
     const tc = useTranslations("components");
@@ -446,9 +449,9 @@ function DestinationDialog({
     // it the default and to take the copies already there along with it.
     const fromSameDisk = current?.kind === "local";
     const [makeDefault, setMakeDefault] = useState(fromSameDisk);
-    const [moveToo, setMoveToo] = useState(fromSameDisk && (current?.copyCount ?? 0) > 0);
+    const [moveToo, setMoveToo] = useState(fromSameDisk && (current?.movableCount ?? 0) > 0);
     const canDefault = kind !== "source-local";
-    const canMove = canDefault && kind !== "local" && fromSameDisk && (current?.copyCount ?? 0) > 0;
+    const canMove = canDefault && kind !== "local" && fromSameDisk && (current?.movableCount ?? 0) > 0;
 
     // Loaded on open rather than with the console: most visits never add one.
     useEffect(() => {
@@ -502,17 +505,17 @@ function DestinationDialog({
             setError(result.error);
             return;
         }
+        let problem = result.notDefault ?? null;
         if (canMove && moveToo && current) {
-            const moved = await moveCopiesAction({ fromId: current.id, toId: result.id, makeDefault: false });
-            if (moved.error !== undefined) {
-                await onSaved();
-                setError(moved.error);
-                return;
-            }
-            onMoved(moved.count);
+            const moved = await moveCopiesAction({ fromId: current.id, toId: result.id, makeDefault: false }).catch(
+                (caught: unknown) => ({ error: readReasonText(tc, reasonFor(caught)) })
+            );
+            if (moved.error !== undefined) problem ??= moved.error;
+            else onMoved(moved.count);
         }
-        await onSaved();
         onClose();
+        if (problem !== null) onFailed(problem);
+        await onSaved();
     }
 
     return (
@@ -620,12 +623,12 @@ function DestinationDialog({
                     {canMove && current ? (
                         <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                             <p className="min-w-0">
-                                {t("destinations.moveAlso", { count: current.copyCount, name: current.name })}
+                                {t("destinations.moveAlso", { count: current.movableCount, name: current.name })}
                             </p>
                             <Switch
                                 checked={moveToo}
                                 onChange={setMoveToo}
-                                aria-label={t("destinations.moveAlso", { count: current.copyCount, name: current.name })}
+                                aria-label={t("destinations.moveAlso", { count: current.movableCount, name: current.name })}
                             />
                         </div>
                     ) : null}
