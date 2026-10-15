@@ -12,7 +12,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const reachForOlder = vi.fn(async () => true);
 const olderOnServer = vi.fn(async () => true);
-const listThreads = vi.fn(async () => ({ threads: [{ id: "t1" }], cursor: "" }));
+const held = { id: "t1", pinned: false, size: 100, lastMessageAt: "2026-01-02T00:00:00.000Z" };
+const listThreads = vi.fn(async (..._: unknown[]) => ({ threads: [held] as (typeof held)[], cursor: "" }));
 
 vi.mock("@/lib/api-session", () => ({ apiPermission: async () => ({ id: "u1" }) }));
 vi.mock("@/lib/mailbox/shelf", () => ({ mailShelfFor: async () => null }));
@@ -38,7 +39,7 @@ async function ask(query: string) {
 beforeEach(() => {
     reachForOlder.mockClear();
     olderOnServer.mockClear().mockResolvedValue(true);
-    listThreads.mockClear();
+    listThreads.mockReset().mockResolvedValue({ threads: [held], cursor: "" });
 });
 
 describe("a folder's first page", () => {
@@ -46,7 +47,13 @@ describe("a folder's first page", () => {
         const page = await ask("role=trash");
         expect(reachForOlder).not.toHaveBeenCalled();
         expect(page.threads.map((thread) => thread.id)).toEqual(["t1"]);
-        expect(page.cursor).not.toBe("");
+        expect(page.cursor).toBe(`0|${held.lastMessageAt}`);
+    });
+
+    it("hands an empty folder a cursor that still reaches the server", async () => {
+        listThreads.mockResolvedValue({ threads: [], cursor: "" });
+        const page = await ask("role=trash");
+        expect(page.cursor).toBe("older");
     });
 
     it("says there is nothing more when the server holds nothing more", async () => {
@@ -64,6 +71,17 @@ describe("asking past the first page", () => {
         expect(reachForOlder).toHaveBeenCalledTimes(1);
         expect(listThreads).toHaveBeenCalledTimes(3);
         expect(next.cursor).toBe(first.cursor);
+    });
+
+    it("continues past the last held row instead of the top of a folder holding several pages", async () => {
+        const last = { ...held, id: "t9", lastMessageAt: "2025-06-01T00:00:00.000Z" };
+        listThreads.mockResolvedValueOnce({ threads: [], cursor: "" });
+        listThreads.mockResolvedValueOnce({ threads: [last], cursor: "" });
+        const page = await ask(`role=trash&cursor=0|${held.lastMessageAt}`);
+        expect(reachForOlder).toHaveBeenCalledTimes(1);
+        expect(listThreads.mock.calls[1][1]).toMatchObject({ cursor: `0|${held.lastMessageAt}` });
+        expect(page.threads.map((thread) => thread.id)).toEqual(["t9"]);
+        expect(page.cursor).toBe(`0|${last.lastMessageAt}`);
     });
 
     it("stops once the server has nothing older to give", async () => {

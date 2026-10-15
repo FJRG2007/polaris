@@ -22,6 +22,7 @@ import * as core from "@polaris/core";
 import { NextResponse } from "next/server";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { apiPermission } from "@/lib/api-session";
+import { mailCursorOf } from "@/lib/mailbox/list-order";
 import { readMailPageParams } from "@/lib/mailbox/page-params";
 import { olderOnServer, reachForOlder } from "@/lib/mailbox/sync";
 import { reachesForOlder } from "@/lib/mailbox/folder-window";
@@ -30,12 +31,22 @@ import { everyAccountId, unifiedAccountIds } from "@/lib/mailbox/access";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 /**
- * The cursor of a page that ended on what is held here while the server holds
- * more. It reads as no cursor to the list (`mailCursorWhere`), so asking with it
- * lists from the top again - the rows already drawn are dropped by the list -
- * after the server has been asked for the next older batch.
+ * The cursor of an empty page that ended on what is held here while the server
+ * holds more. It reads as no cursor to the list (`mailCursorWhere`), so asking
+ * with it lists from the top again after the server has been asked for the next
+ * older batch.
  */
 const OLDER_ON_SERVER = "older";
+
+/**
+ * Where a page that ended on what is held here, while the server holds more,
+ * hands over: past its own last row, so asking with it lists nothing held and
+ * goes to the server - never back to the top of a folder that holds several
+ * pages here.
+ */
+function olderCursor(sort: core.MailSort, threads: Parameters<typeof mailCursorOf>[1]): string {
+    return mailCursorOf(sort, threads, threads.length) || OLDER_ON_SERVER;
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,11 +88,12 @@ export async function GET(request: Request): Promise<Response> {
             ? (await everyAccountId(user.id)).filter((id) => id === narrow.accountId)
             : await unifiedAccountIds(user.id, shelf);
         if (cursor === "") {
-            if (await olderOnServer(accountIds, narrow)) page = { ...page, cursor: OLDER_ON_SERVER };
+            if (await olderOnServer(accountIds, narrow))
+                page = { ...page, cursor: olderCursor(list.sort, page.threads) };
         } else if (await reachForOlder(accountIds, narrow)) {
             page = await listThreads(user.id, list, shelf);
             if (page.cursor === "" && (await olderOnServer(accountIds, narrow)))
-                page = { ...page, cursor: OLDER_ON_SERVER };
+                page = { ...page, cursor: olderCursor(list.sort, page.threads) };
         }
     }
     return NextResponse.json(page, {
