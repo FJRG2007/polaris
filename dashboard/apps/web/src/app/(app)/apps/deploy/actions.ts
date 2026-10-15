@@ -80,12 +80,7 @@ import {
     stopNgrokTunnel,
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
-import {
-    deleteRegistryCredential,
-    listRegistryCredentials,
-    upsertRegistryCredential,
-    type RegistryCredentialView
-} from "@/lib/registry-credential-service";
+import { listRegistries, type RegistryCredentialView } from "@/lib/registry-credential-service";
 import {
     createDatabase,
     databaseConnection,
@@ -1946,46 +1941,11 @@ export async function deployDatabaseAction(
     }
 }
 
-/** List the owner's private-registry logins (password-free). Gated on deploy.manage. */
+/** The open shelf's registry logins (password-free), for Integrations. */
 export async function listRegistryCredentialsAction(): Promise<RegistryCredentialView[]> {
-    const user = await requirePermission("deploy.manage");
-    return listRegistryCredentials(user.id);
-}
-
-/** Add or replace a private-registry login. Gated on deploy.manage. */
-export async function saveRegistryCredentialAction(input: {
-    registry: string;
-    username: string;
-    password: string;
-}): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    try {
-        await upsertRegistryCredential(user.id, input);
-        await recordDeployAudit({
-            actorId: user.id,
-            action: "deploy.registry.save",
-            targetType: "registry",
-            targetId: input.registry
-        });
-        return {};
-    } catch (caught) {
-        return {
-            error: caught instanceof Error ? caught.message : await reply("registry.saveFailed")
-        };
-    }
-}
-
-/** Remove a private-registry login. Gated on deploy.manage. */
-export async function deleteRegistryCredentialAction(id: string): Promise<{ error?: string }> {
-    const user = await requirePermission("deploy.manage");
-    await deleteRegistryCredential(id, user.id);
-    await recordDeployAudit({
-        actorId: user.id,
-        action: "deploy.registry.delete",
-        targetType: "registry",
-        targetId: id
-    });
-    return {};
+    const user = await requirePermission("deploy.read");
+    const shelf = await listRegistries(user, await scopeOrgIdFor(user.id)).catch(() => null);
+    return shelf?.registries ?? [];
 }
 
 /** Inspect a repo to auto-configure a deploy (find a Dockerfile, detect the

@@ -1,0 +1,108 @@
+{
+    "title": "Container registries",
+    "description": "Logins your deploys use to pull private images.",
+    "open": "Registries",
+    "add": "Add registry",
+    "edit": "Edit",
+    "loading": "Loading registries",
+    "cannotManage": "Only an organization admin can add or change these logins.",
+    "shelf": {
+        "personal": "Your own logins. Only your projects use them.",
+        "org": "Shared with your organization. Its projects deploy with them."
+    },
+    "empty": {
+        "title": "No registries yet",
+        "description": "Add one to deploy images from a private registry.",
+        "readOnly": "An organization admin can add one."
+    },
+    "remove": {
+        "button": "Remove",
+        "title": "Remove {name}?",
+        "description": "Services that picked it go back to the login that matches their image.",
+        "confirm": "Remove"
+    },
+    "status": {
+        "untested": "Not tested",
+        "ok": "Signed in",
+        "failed": "Failed"
+    },
+    "test": {
+        "button": "Test connection",
+        "ok": "Signed in. This login works.",
+        "denied": "The registry refused this user and token.",
+        "unreachable": "The registry did not answer. Check the host.",
+        "notRegistry": "That host does not answer like a container registry."
+    },
+    "kinds": {
+        "dockerhub": "Docker Hub",
+        "ghcr": "GitHub Packages",
+        "gitlab": "GitLab",
+        "generic": "Other registry"
+    },
+    "hints": {
+        "dockerhub": {
+            "user": "Docker ID",
+            "secret": "Access token",
+            "secretHint": "An access token from your Docker account settings."
+        },
+        "ghcr": {
+            "user": "GitHub username",
+            "secret": "Personal access token",
+            "secretHint": "A token with the read:packages scope."
+        },
+        "gitlab": {
+            "user": "Username",
+            "secret": "Access token",
+            "secretHint": "A token with the read_registry scope."
+        },
+        "generic": {
+            "user": "Username",
+            "secret": "Password or token",
+            "secretHint": "The password or token for this user."
+        }
+    },
+    "form": {
+        "addTitle": "Add registry",
+        "editTitle": "Edit registry",
+        "kind": "Registry",
+        "name": "Name",
+        "nameHint": "Leave empty to use the host.",
+        "namePlaceholder": "Production images",
+        "host": "Host",
+        "hostHint": "Leave empty for the default host.",
+        "hostHintGeneric": "For example registry.example.com:5000.",
+        "hostPlaceholder": "registry.example.com",
+        "secretKeep": "Leave empty to keep the saved one.",
+        "save": "Save",
+        "fixFirst": "Fill in the form first.",
+        "kindRequired": "Pick a registry.",
+        "nameTooLong": "Use 80 characters or fewer.",
+        "hostRequired": "Enter the registry host.",
+        "hostInvalid": "Enter a host name, like registry.example.com.",
+        "usernameRequired": "Enter the username.",
+        "usernameTooLong": "Use 200 characters or fewer.",
+        "usernameInvalid": "A username has no spaces or colons.",
+        "secretRequired": "Enter the password or token.",
+        "secretTooLong": "That token is too long.",
+        "secretRequiredOnMove": "Enter the password again when you change the host or user."
+    },
+    "errors": {
+        "cannotManage": "Only an organization admin can change these logins.",
+        "deleteFailed": "Could not remove the registry. Try again.",
+        "invalid": "Check the form and try again.",
+        "loadFailed": "Could not load registries. Try again.",
+        "notFound": "That registry no longer exists.",
+        "notUsable": "This project cannot use that registry.",
+        "saveFailed": "Could not save the registry. Try again.",
+        "testFailed": "Could not test the connection. Try again.",
+        "unreadable": "The saved password can no longer be read. Enter it again."
+    },
+    "pick": {
+        "title": "Registry login",
+        "description": "The login this service pulls its image with.",
+        "automatic": "Automatic (by image host)",
+        "none": "No registries are available to this project yet.",
+        "manage": "Manage registries",
+        "saving": "Saving"
+    }
+}

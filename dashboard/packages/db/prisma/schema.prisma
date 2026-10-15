@@ -4760,23 +4760,41 @@ model StagedChange {
     @@index([environmentId])
 }
 
-// A private container-registry login, owner-scoped, one per registry host. The
-// password is envelope-encrypted at rest; deploys `docker login` before pulling a
-// private image whose registry matches.
+// A private container-registry login. Personal (orgId null, the owner's alone)
+// or held by an organization, where anybody on its roster deploys with it and
+// whoever holds the organization's deploy.manage edits it. The password is
+// envelope-encrypted at rest and never leaves the server; deploys `docker login`
+// before pulling a private image with the registry the service picked, or the
+// one whose host matches the image.
 model RegistryCredential {
     id                String   @id @default(uuid(7)) @db.Uuid
+    // The person who added it. For a personal login also its only user.
     ownerId           String   @db.Uuid
+    // The organization that holds it, or null for a personal login.
+    orgId             String?  @db.Uuid
+    // What the reader calls it; empty on rows from before it existed, where the
+    // host stands in.
+    name              String   @default("")
+    // dockerhub | ghcr | gitlab | generic. Decides only the default host and the
+    // hints on screen.
+    kind              String   @default("generic")
     // Registry host, e.g. "ghcr.io" or "docker.io" (Docker Hub).
     registry          String
     username          String
     encryptedPassword Bytes
     passwordNonce     Bytes
     passwordKeyId     String
+    // The last connection test and whether it signed in.
+    lastTestedAt      DateTime?
+    lastTestOk        Boolean?
     createdAt         DateTime @default(now())
     updatedAt         DateTime @updatedAt
 
-    @@unique([ownerId, registry])
+    org Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+    @@index([ownerId, registry])
     @@index([ownerId])
+    @@index([orgId])
 }
 
 model Environment {
@@ -6077,6 +6095,7 @@ model Organization {
     chatSpaces ChatSpace[]
     chatChannels ChatChannel[]
     projects Project[]
+    registryCredentials RegistryCredential[]
     projectGrants ProjectMember[]
     domains  OwnerDomain[]
     avatar   OrganizationAvatar?

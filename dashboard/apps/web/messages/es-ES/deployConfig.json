@@ -238,17 +238,5 @@
         "exit": "- salida {code}",
         "noOutput": "No imprimió nada.",
         "deleteTitle": "Borrar tarea programada"
-    },
-    "registry": {
-        "button": "Registros",
-        "title": "Credenciales de registros privados",
-        "loading": "Cargando...",
-        "empty": "Aún no hay inicios de sesión.",
-        "remove": "Quitar",
-        "add": "Añadir acceso",
-        "hostPlaceholder": "ghcr.io (o docker.io)",
-        "userPlaceholder": "usuario",
-        "passwordPlaceholder": "contraseña o token",
-        "save": "Guardar"
     }
 }

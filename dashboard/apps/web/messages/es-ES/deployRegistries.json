@@ -1,0 +1,108 @@
+{
+    "title": "Registros de contenedores",
+    "description": "Accesos que usan tus despliegues para descargar imágenes privadas.",
+    "open": "Registros",
+    "add": "Añadir registro",
+    "edit": "Editar",
+    "loading": "Cargando registros",
+    "cannotManage": "Solo un admin de la organización puede añadir o cambiar estos accesos.",
+    "shelf": {
+        "personal": "Tus propios accesos. Solo los usan tus proyectos.",
+        "org": "Compartidos con tu organización. Sus proyectos despliegan con ellos."
+    },
+    "empty": {
+        "title": "Aún no hay registros",
+        "description": "Añade uno para desplegar imágenes de un registro privado.",
+        "readOnly": "Un admin de la organización puede añadir uno."
+    },
+    "remove": {
+        "button": "Quitar",
+        "title": "¿Quitar {name}?",
+        "description": "Los servicios que lo eligieron vuelven al acceso que coincide con su imagen.",
+        "confirm": "Quitar"
+    },
+    "status": {
+        "untested": "Sin probar",
+        "ok": "Conectado",
+        "failed": "Falló"
+    },
+    "test": {
+        "button": "Probar conexión",
+        "ok": "Sesión iniciada. Este acceso funciona.",
+        "denied": "El registro rechazó este usuario y token.",
+        "unreachable": "El registro no respondió. Revisa el host.",
+        "notRegistry": "Ese host no responde como un registro de contenedores."
+    },
+    "kinds": {
+        "dockerhub": "Docker Hub",
+        "ghcr": "GitHub Packages",
+        "gitlab": "GitLab",
+        "generic": "Otro registro"
+    },
+    "hints": {
+        "dockerhub": {
+            "user": "Docker ID",
+            "secret": "Token de acceso",
+            "secretHint": "Un token de acceso de los ajustes de tu cuenta de Docker."
+        },
+        "ghcr": {
+            "user": "Usuario de GitHub",
+            "secret": "Token personal",
+            "secretHint": "Un token con el permiso read:packages."
+        },
+        "gitlab": {
+            "user": "Usuario",
+            "secret": "Token de acceso",
+            "secretHint": "Un token con el permiso read_registry."
+        },
+        "generic": {
+            "user": "Usuario",
+            "secret": "Contraseña o token",
+            "secretHint": "La contraseña o el token de este usuario."
+        }
+    },
+    "form": {
+        "addTitle": "Añadir registro",
+        "editTitle": "Editar registro",
+        "kind": "Registro",
+        "name": "Nombre",
+        "nameHint": "Déjalo vacío para usar el host.",
+        "namePlaceholder": "Imágenes de producción",
+        "host": "Host",
+        "hostHint": "Déjalo vacío para el host por defecto.",
+        "hostHintGeneric": "Por ejemplo registry.example.com:5000.",
+        "hostPlaceholder": "registry.example.com",
+        "secretKeep": "Déjalo vacío para conservar el guardado.",
+        "save": "Guardar",
+        "fixFirst": "Rellena el formulario primero.",
+        "kindRequired": "Elige un registro.",
+        "nameTooLong": "Usa 80 caracteres o menos.",
+        "hostRequired": "Escribe el host del registro.",
+        "hostInvalid": "Escribe un nombre de host, como registry.example.com.",
+        "usernameRequired": "Escribe el usuario.",
+        "usernameTooLong": "Usa 200 caracteres o menos.",
+        "usernameInvalid": "Un usuario no lleva espacios ni dos puntos.",
+        "secretRequired": "Escribe la contraseña o el token.",
+        "secretTooLong": "Ese token es demasiado largo.",
+        "secretRequiredOnMove": "Vuelve a escribir la contraseña al cambiar el host o el usuario."
+    },
+    "errors": {
+        "cannotManage": "Solo un admin de la organización puede cambiar estos accesos.",
+        "deleteFailed": "No se pudo quitar el registro. Inténtalo de nuevo.",
+        "invalid": "Revisa el formulario e inténtalo de nuevo.",
+        "loadFailed": "No se pudieron cargar los registros. Inténtalo de nuevo.",
+        "notFound": "Ese registro ya no existe.",
+        "notUsable": "Este proyecto no puede usar ese registro.",
+        "saveFailed": "No se pudo guardar el registro. Inténtalo de nuevo.",
+        "testFailed": "No se pudo probar la conexión. Inténtalo de nuevo.",
+        "unreadable": "La contraseña guardada ya no se puede leer. Escríbela de nuevo."
+    },
+    "pick": {
+        "title": "Acceso al registro",
+        "description": "El acceso con el que este servicio descarga su imagen.",
+        "automatic": "Automático (por host)",
+        "none": "Este proyecto aún no tiene registros disponibles.",
+        "manage": "Gestionar registros",
+        "saving": "Guardando"
+    }
+}

@@ -26,7 +26,7 @@ import {
 interface IntegrationState {
     github: { connected: boolean; login: string | null; repos: number };
     cloudflare: { connected: boolean; account: string | null; dnsReady: boolean };
-    registries: { registry: string; username: string }[];
+    registries: { name: string; username: string }[];
 }
 
 export function IntegrationsSection({ projectId }: { projectId: string }) {
@@ -53,7 +53,7 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                     dnsReady: cloudflare?.dnsReady ?? false
                 },
                 registries: registries.map((entry) => ({
-                    registry: entry.registry,
+                    name: entry.name,
                     username: entry.username
                 }))
             };
@@ -69,7 +69,10 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
 
     if (!state) {
         return (
-            <SettingsCard title={t("integrations.title")} description={t("integrations.loadingHint")}>
+            <SettingsCard
+                title={t("integrations.title")}
+                description={t("integrations.loadingHint")}
+            >
                 <div className="flex justify-center py-6 text-muted-foreground">
                     <Loader2 className="size-5 animate-spin" />
                 </div>
@@ -109,7 +112,9 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                         detail={
                             state.cloudflare.connected
                                 ? (state.cloudflare.account ?? t("integrations.connected")) +
-                                  (state.cloudflare.dnsReady ? t("integrations.dnsReady") : t("integrations.dnsNotReady"))
+                                  (state.cloudflare.dnsReady
+                                      ? t("integrations.dnsReady")
+                                      : t("integrations.dnsNotReady"))
                                 : t("integrations.cloudflareHint")
                         }
                         href="/admin/integrations"
@@ -121,11 +126,11 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                         detail={
                             state.registries.length > 0
                                 ? state.registries
-                                      .map((entry) => `${entry.registry} (${entry.username})`)
+                                      .map((entry) => `${entry.name} (${entry.username})`)
                                       .join(", ")
                                 : t("integrations.registriesHint")
                         }
-                        href="/apps/deploy"
+                        href="/apps/deploy/registries"
                     />
                 </div>
             </SettingsCard>
@@ -169,7 +174,8 @@ function IntegrationRow({
                 href={href}
                 className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-primary transition-colors hover:bg-muted"
             >
-                {connected ? t("integrations.manage") : t("integrations.connect")} <ExternalLink className="size-3" />
+                {connected ? t("integrations.manage") : t("integrations.connect")}{" "}
+                <ExternalLink className="size-3" />
             </Link>
         </div>
     );
