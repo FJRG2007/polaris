@@ -206,7 +206,7 @@ async function meterProjects(scope: BillingScope, from: Date, to: Date): Promise
                 owner: { select: { name: true, username: true } },
                 environments: {
                     select: {
-                        applications: {
+                        applications: { where: { binnedAt: null },
                             select: {
                                 id: true,
                                 target: { select: { kind: true, hostId: true } },

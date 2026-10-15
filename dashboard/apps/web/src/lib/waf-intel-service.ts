@@ -510,7 +510,7 @@ async function pushIntelToServers(json: string, snapshot: object): Promise<void>
                 deployTargets: {
                     some: {
                         kind: { not: "local" },
-                        applications: {
+                        applications: { where: { binnedAt: null },
                             some: {
                                 domains: { some: { enabled: true, servedBy: { not: "polaris" } } }
                             }

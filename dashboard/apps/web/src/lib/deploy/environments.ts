@@ -116,8 +116,8 @@ export async function cloneEnvironment(
         },
         include: {
             project: { select: { id: true, slug: true } },
-            applications: { include: { volumes: true } },
-            databases: { orderBy: { createdAt: "asc" } }
+            applications: { where: { binnedAt: null }, include: { volumes: true } },
+            databases: { where: { binnedAt: null }, orderBy: { createdAt: "asc" } }
         }
     });
     if (!source) throw new Error("Environment not found");
@@ -395,7 +395,7 @@ async function projectsPreviewing(repo: string) {
             flags: true,
             environments: {
                 where: { isDefault: true },
-                select: { id: true, applications: { select: { sourceConfig: true } } }
+                select: { id: true, applications: { where: { binnedAt: null }, select: { sourceConfig: true } } }
             }
         }
     });
@@ -579,7 +579,7 @@ export async function reconcilePullRequestPreviews(): Promise<void> {
                         pullRequest: true,
                         previewRepo: true,
                         previewOfId: true,
-                        applications: { select: { sourceConfig: true } }
+                        applications: { where: { binnedAt: null }, select: { sourceConfig: true } }
                     }
                 }
             }

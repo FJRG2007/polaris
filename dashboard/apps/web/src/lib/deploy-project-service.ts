@@ -102,7 +102,7 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
                     previewRepo: true,
                     networkMode: true,
                     layout: true,
-                    _count: { select: { applications: true, databases: true } }
+                    _count: { select: { applications: { where: { binnedAt: null } }, databases: { where: { binnedAt: null } } } }
                 }
             }
         }
@@ -832,7 +832,7 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
             environments: {
                 orderBy: { createdAt: "asc" },
                 include: {
-                    applications: {
+                    applications: { where: { binnedAt: null },
                         select: {
                             id: true,
                             name: true,
@@ -840,7 +840,7 @@ export async function getProjectUsage(projectId: string): Promise<ProjectUsage> 
                             volumes: { select: { id: true } }
                         }
                     },
-                    databases: { select: { id: true, name: true, status: true } }
+                    databases: { where: { binnedAt: null }, select: { id: true, name: true, status: true } }
                 }
             }
         }
@@ -992,14 +992,14 @@ export async function exportProjectTemplate(projectId: string): Promise<Record<s
             environments: {
                 orderBy: { createdAt: "asc" },
                 include: {
-                    applications: {
+                    applications: { where: { binnedAt: null },
                         orderBy: { createdAt: "asc" },
                         include: {
                             volumes: true,
                             domains: { select: { kind: true, targetPort: true } }
                         }
                     },
-                    databases: { orderBy: { createdAt: "asc" } }
+                    databases: { where: { binnedAt: null }, orderBy: { createdAt: "asc" } }
                 }
             }
         }
