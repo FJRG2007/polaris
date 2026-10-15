@@ -103,8 +103,9 @@ describe("authorized_keys parsing", () => {
 
     it("keeps the scripts free of single quotes and runs others through sudo", () => {
         for (const script of [keys.LIST_LOGINS, keys.READ_KEYS, keys.WRITE_KEYS]) expect(script).not.toContain("'");
+        expect(keys.WRITE_KEYS).not.toContain("chown");
         expect(keys.scriptCommand("echo", "polaris", "polaris")).toBe("sh -c 'echo' sh polaris");
-        expect(keys.scriptCommand("echo", "ana", "polaris", ["abc"])).toBe("sudo -n sh -c 'echo' sh ana abc");
+        expect(keys.scriptCommand("echo", "ana", "polaris", ["abc"])).toBe("sudo -n -u ana sh -c 'echo' sh ana abc");
         expect(() => keys.scriptCommand("echo 'x'", "ana", "polaris")).toThrow();
     });
 });
@@ -125,7 +126,7 @@ describe("server key operations", () => {
         expect(view.login).toBe("ana");
         // Another login's file does not keep Polaris in, so nothing is protected there.
         expect(view.keys.some((key) => key.polaris)).toBe(false);
-        expect(commands.at(-1)).toMatch(/^sudo -n sh -c '[^']*' sh ana$/);
+        expect(commands.at(-1)).toMatch(/^sudo -n -u ana sh -c '[^']*' sh ana$/);
     });
 
     it("refuses another login's keys without root", async () => {

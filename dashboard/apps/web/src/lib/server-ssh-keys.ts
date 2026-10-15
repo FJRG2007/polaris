@@ -7,9 +7,11 @@
  * away on demand and nothing about it is kept on Polaris's side.
  *
  * The login Polaris signs in as can manage its own file. Every other login's file
- * is only reachable as root, which means the server was enrolled with root
+ * is only reachable through sudo, which means the server was enrolled with root
  * (password-less sudo); without it the panel offers Polaris's own login and says
- * why the others are not there.
+ * why the others are not there. Even then the scripts run as that login, never as
+ * root, so a link the login planted in its own home reaches nothing it could not
+ * already read or write.
  *
  * Writes are compare-and-swap. The file is read, changed here, and written back
  * only if it still has the checksum it had when it was read - somebody editing it
@@ -173,15 +175,14 @@ export const WRITE_KEYS = [
     't="$d/.authorized_keys.polaris.$$"',
     'cat > "$t" || { rm -f "$t"; exit 5; }',
     'chmod 600 "$t"',
-    'chown "$u" "$d" "$t" 2>/dev/null || true',
     'mv -f "$t" "$f"'
 ].join("\n");
 
-/** How a script is started for a login: as that login itself when it is
- *  Polaris's own, through sudo for anyone else. */
+/** How a script is started for a login: directly when it is Polaris's own,
+ *  through sudo as that login for anyone else. */
 export function scriptCommand(script: string, login: string, self: string, extra: string[] = []): string {
     if (script.includes("'")) throw new Error("A key script must not contain a single quote");
-    const sudo = login === self ? "" : "sudo -n ";
+    const sudo = login === self ? "" : `sudo -n -u ${login} `;
     return `${sudo}sh -c '${script}' sh ${[login, ...extra].join(" ")}`;
 }
 

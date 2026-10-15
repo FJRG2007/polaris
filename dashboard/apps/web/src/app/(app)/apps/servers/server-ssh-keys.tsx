@@ -74,8 +74,11 @@ export function ServerSshKeys({ hostId }: { hostId: string }) {
     }, [load]);
 
     const current = login ?? view?.login ?? "";
+    // The keys on screen, only while they are the chosen login's: a login whose
+    // list failed to load shows the error, never the previous login's keys.
+    const keys = view && view.login === current ? view.keys : null;
     // Memoized: the import dialog reloads GitHub whenever this set changes.
-    const present = useMemo(() => new Set(view?.keys.map((key) => key.fingerprint) ?? []), [view]);
+    const present = useMemo(() => new Set(keys?.map((key) => key.fingerprint) ?? []), [keys]);
 
     async function changed(message: string) {
         setNotice(message);
@@ -143,13 +146,13 @@ export function ServerSshKeys({ hostId }: { hostId: string }) {
                     <Skeleton className="h-12 w-full" />
                     <Skeleton className="h-12 w-full" />
                 </div>
-            ) : view && view.keys.length === 0 ? (
+            ) : keys && keys.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-sm text-muted-foreground">
                     {t("sshKeys.empty", { login: current })}
                 </p>
-            ) : view ? (
+            ) : keys ? (
                 <ul className="flex flex-col divide-y divide-border/60 rounded-md border border-border">
-                    {view.keys.map((key) => (
+                    {keys.map((key) => (
                         <li key={key.fingerprint} className="flex items-center gap-3 px-3 py-2">
                             <KeyRound className="size-4 shrink-0 text-muted-foreground" />
                             <div className="flex min-w-0 flex-1 flex-col">
@@ -326,7 +329,7 @@ function AddDialog(props: {
                         value={text}
                         rows={5}
                         className="font-mono text-xs"
-                        placeholder="ssh-ed25519 AAAA... you@laptop"
+                        placeholder={t("sshKeys.publicKeyPlaceholder")}
                         aria-invalid={issue ? true : undefined}
                         onChange={(event) => {
                             setText(event.target.value);
@@ -418,7 +421,7 @@ function GenerateDialog(props: {
                         <Input
                             value={label}
                             maxLength={64}
-                            placeholder={`${props.login}@polaris`}
+                            placeholder={`${props.login}@polaris`} // i18n-ignore the comment a key gets by default
                             onChange={(event) => setLabel(event.target.value)}
                         />
                     </label>

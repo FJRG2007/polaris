@@ -50,6 +50,7 @@ import {
     ENROLLMENT_REFUSAL_MESSAGES,
     ENROLLMENT_TTL_MS,
     readEnrollmentProgress,
+    settleStalledSetup,
     type EnrollmentEvent,
     type EnrollmentLogCode,
     ENROLLMENT_USERNAME,
@@ -93,7 +94,7 @@ export type EnrollmentNote = Omit<EnrollmentEvent, "at">;
 export async function noteEnrollment(id: string, note: EnrollmentNote): Promise<void> {
     const line = JSON.stringify([{ ...note, at: new Date().toISOString() }]);
     try {
-        await prisma.$executeRaw`UPDATE "Enrollment" SET "progress" = COALESCE("progress", '[]'::jsonb) || ${line}::jsonb WHERE "id" = ${id}::uuid AND jsonb_array_length(COALESCE("progress", '[]'::jsonb)) < ${ENROLLMENT_PROGRESS_LIMIT}`;
+        await prisma.$executeRaw`UPDATE "Enrollment" SET "progress" = (SELECT jsonb_agg(e ORDER BY i) FROM jsonb_array_elements(COALESCE("progress", '[]'::jsonb) || ${line}::jsonb) WITH ORDINALITY AS t(e, i) WHERE i > jsonb_array_length(COALESCE("progress", '[]'::jsonb)) + 1 - ${ENROLLMENT_PROGRESS_LIMIT}) WHERE "id" = ${id}::uuid`;
     } catch {
         // Nothing to do: see above.
     }
@@ -104,7 +105,7 @@ export async function noteEnrollment(id: string, note: EnrollmentNote): Promise<
 async function noteLiveToken(tokenHash: string, note: EnrollmentNote): Promise<void> {
     const line = JSON.stringify([{ ...note, at: new Date().toISOString() }]);
     try {
-        await prisma.$executeRaw`UPDATE "Enrollment" SET "progress" = COALESCE("progress", '[]'::jsonb) || ${line}::jsonb WHERE "tokenHash" = ${tokenHash} AND "claimedAt" IS NULL AND "hostId" IS NULL AND "expiresAt" > NOW() AND jsonb_array_length(COALESCE("progress", '[]'::jsonb)) < ${ENROLLMENT_PROGRESS_LIMIT}`;
+        await prisma.$executeRaw`UPDATE "Enrollment" SET "progress" = (SELECT jsonb_agg(e ORDER BY i) FROM jsonb_array_elements(COALESCE("progress", '[]'::jsonb) || ${line}::jsonb) WITH ORDINALITY AS t(e, i) WHERE i > jsonb_array_length(COALESCE("progress", '[]'::jsonb)) + 1 - ${ENROLLMENT_PROGRESS_LIMIT}) WHERE "tokenHash" = ${tokenHash} AND "claimedAt" IS NULL AND "hostId" IS NULL AND "expiresAt" > NOW()`;
     } catch {
         // Best effort, as above.
     }
@@ -347,7 +348,7 @@ export async function getEnrollmentStatus(
         name: row.name,
         error: row.error,
         retryable: !row.hostId && !row.claimedAt && row.expiresAt > new Date(),
-        progress: readEnrollmentProgress(row.progress)
+        progress: settleStalledSetup(readEnrollmentProgress(row.progress), new Date())
     };
 }
 

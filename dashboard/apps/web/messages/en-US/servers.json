@@ -454,7 +454,8 @@
             "registered": "Added as {name}",
             "setupQueued": "Installing Docker and the edge router",
             "setupDone": "Ready to deploy to",
-            "setupFailed": "Setup stopped: {reason}"
+            "setupFailed": "Setup stopped: {reason}",
+            "setupStalled": "Setup stopped reporting back"
         },
         "whatToDo": "What to do:",
         "fix": {
@@ -499,6 +500,7 @@
         "addTitle": "Add a key for {login}",
         "addHint": "Paste one or more public keys, one per line. They usually end in .pub.",
         "publicKey": "Public key",
+        "publicKeyPlaceholder": "ssh-ed25519 AAAA... you@laptop",
         "adding": "Adding...",
         "generateTitle": "New key pair for {login}",
         "generateHint": "Polaris creates an Ed25519 key pair and lets its public half sign in as this login. You get the private half once.",

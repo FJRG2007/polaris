@@ -454,7 +454,8 @@
             "registered": "Agregado como {name}",
             "setupQueued": "Instalando Docker y el router de borde",
             "setupDone": "Listo para desplegar",
-            "setupFailed": "La preparación se detuvo: {reason}"
+            "setupFailed": "La preparación se detuvo: {reason}",
+            "setupStalled": "La preparación dejó de informar"
         },
         "whatToDo": "Qué hacer:",
         "fix": {
@@ -499,6 +500,7 @@
         "addTitle": "Añadir clave para {login}",
         "addHint": "Pega una o más claves públicas, una por línea. Suelen terminar en .pub.",
         "publicKey": "Clave pública",
+        "publicKeyPlaceholder": "ssh-ed25519 AAAA... tu@portatil",
         "adding": "Añadiendo...",
         "generateTitle": "Par de claves para {login}",
         "generateHint": "Polaris crea un par Ed25519 y deja que su parte pública entre como este usuario. Recibes la privada una sola vez.",

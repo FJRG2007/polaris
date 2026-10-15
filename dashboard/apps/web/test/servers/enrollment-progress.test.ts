@@ -62,9 +62,14 @@ vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true 
 const { claimEnrollment, getEnrollmentStatus, refuseEnrollment } = await import(
     "../../src/lib/enrollment-service"
 );
-const { enrollmentTimeline, enrollmentStillRunning, readEnrollmentProgress } = await import(
-    "@polaris/core"
-);
+const {
+    ENROLLMENT_PROGRESS_LIMIT,
+    ENROLLMENT_SETUP_DEADLINE_MS,
+    enrollmentTimeline,
+    enrollmentStillRunning,
+    readEnrollmentProgress,
+    settleStalledSetup
+} = await import("@polaris/core");
 
 const claim = {
     hostname: "web-1",
@@ -226,6 +231,37 @@ describe("enrollmentTimeline", () => {
                 event({ step: "setup", state: "failed", code: "setupFailed", detail: "No root" })
             ])
         ).toBe(false);
+    });
+
+    // Past the limit the oldest lines are the ones dropped, so a step whose lines
+    // went is still ticked when a later one has moved.
+    it("ticks a step whose lines were dropped once a later step has moved", () => {
+        const steps = enrollmentTimeline([event({ step: "registered", state: "done", code: "registered" })]);
+        expect(steps.map((step) => step.status)).toEqual(["done", "done", "done", "done", "done"]);
+    });
+
+    it("keeps the newest events of a log over the limit", () => {
+        const stored = [
+            ...Array.from({ length: ENROLLMENT_PROGRESS_LIMIT }, () =>
+                event({ step: "connect", state: "active", code: "trying", address: "10.0.0.5" })
+            ),
+            event({ step: "registered", state: "done", code: "registered" })
+        ];
+        const read = readEnrollmentProgress(stored);
+        expect(read).toHaveLength(ENROLLMENT_PROGRESS_LIMIT);
+        expect(read.at(-1)?.code).toBe("registered");
+    });
+
+    it("closes a setup that has been quiet past its deadline", () => {
+        const queuedAt = new Date("2026-10-15T10:00:00.000Z");
+        const queued = [event({ step: "setup", state: "active", code: "setupQueued" }, queuedAt.toISOString())];
+        const soon = new Date(queuedAt.getTime() + ENROLLMENT_SETUP_DEADLINE_MS - 1000);
+        expect(settleStalledSetup(queued, soon)).toBe(queued);
+        const late = settleStalledSetup(queued, new Date(queuedAt.getTime() + ENROLLMENT_SETUP_DEADLINE_MS));
+        expect(enrollmentStillRunning(late)).toBe(false);
+        expect(enrollmentTimeline(late).at(-1)?.failure?.code).toBe("setupStalled");
+        const done = [...queued, event({ step: "setup", state: "done", code: "setupDone" })];
+        expect(settleStalledSetup(done, new Date(queuedAt.getTime() + 2 * ENROLLMENT_SETUP_DEADLINE_MS))).toBe(done);
     });
 
     it("reads a column that is not a list as no log at all", () => {

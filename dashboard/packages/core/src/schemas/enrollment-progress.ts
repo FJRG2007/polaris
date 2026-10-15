@@ -55,7 +55,8 @@ export const ENROLLMENT_LOG_CODES = [
     "registered",
     "setupQueued",
     "setupDone",
-    "setupFailed"
+    "setupFailed",
+    "setupStalled"
 ] as const;
 export type EnrollmentLogCode = (typeof ENROLLMENT_LOG_CODES)[number];
 
@@ -82,14 +83,20 @@ export const enrollmentEventSchema = z.object({
 export type EnrollmentEvent = z.infer<typeof enrollmentEventSchema>;
 
 /** The most events one enrollment keeps. A command is fetched and claimed a
- *  handful of times at most; this only bounds a machine that keeps retrying. */
+ *  handful of times at most; this only bounds a machine that keeps retrying, and
+ *  past it the oldest lines go so the latest one is always written. */
 export const ENROLLMENT_PROGRESS_LIMIT = 100;
+
+/** How long the setup after a claim may stay quiet before the dialog stops
+ *  waiting on it. The outcome is written from the same process that ran it, so a
+ *  restart in the middle leaves nothing to write it. */
+export const ENROLLMENT_SETUP_DEADLINE_MS = 30 * 60 * 1000;
 
 /** The stored progress, keeping each entry that still parses. */
 export function readEnrollmentProgress(value: unknown): EnrollmentEvent[] {
     if (!Array.isArray(value)) return [];
     const events: EnrollmentEvent[] = [];
-    for (const entry of value.slice(0, ENROLLMENT_PROGRESS_LIMIT)) {
+    for (const entry of value.slice(-ENROLLMENT_PROGRESS_LIMIT)) {
         const parsed = enrollmentEventSchema.safeParse(entry);
         if (parsed.success) events.push(parsed.data);
     }
@@ -112,15 +119,17 @@ export interface EnrollmentStepView {
  *
  * A step's status is its LAST event's, because a machine that refused and was
  * then re-run has a failed event followed by a good one, and the good one is the
- * truth. A step nothing has happened to yet waits. `setup` is only listed once
- * something says it applies to this machine.
+ * truth. A step nothing has happened to yet waits, unless a later one has
+ * already moved, which means its lines were the oldest and have been dropped.
+ * `setup` is only listed once something says it applies to this machine.
  */
 export function enrollmentTimeline(events: readonly EnrollmentEvent[]): EnrollmentStepView[] {
     const hasSetup = events.some((event) => event.step === "setup");
-    return ENROLLMENT_STEPS.filter((step) => step !== "setup" || hasSetup).map((step) => {
+    const reached = Math.max(-1, ...events.map((event) => ENROLLMENT_STEPS.indexOf(event.step)));
+    return ENROLLMENT_STEPS.filter((step) => step !== "setup" || hasSetup).map((step, index) => {
         const own = events.filter((event) => event.step === step);
         const last = own.at(-1);
-        const status: EnrollmentStepStatus = last ? last.state : "waiting";
+        const status: EnrollmentStepStatus = last ? last.state : index < reached ? "done" : "waiting";
         return { step, status, events: own, failure: status === "failed" ? (last ?? null) : null };
     });
 }
@@ -130,4 +139,14 @@ export function enrollmentTimeline(events: readonly EnrollmentEvent[]): Enrollme
 export function enrollmentStillRunning(events: readonly EnrollmentEvent[]): boolean {
     const setup = events.filter((event) => event.step === "setup").at(-1);
     return setup?.state === "active";
+}
+
+/** The log with a setup that has been quiet past its deadline closed as
+ *  stalled, so nothing waits on an outcome no one is left to write. */
+export function settleStalledSetup(events: EnrollmentEvent[], now: Date): EnrollmentEvent[] {
+    const setup = events.filter((event) => event.step === "setup").at(-1);
+    if (setup?.state !== "active") return events;
+    const since = new Date(setup.at).getTime();
+    if (Number.isFinite(since) && now.getTime() - since < ENROLLMENT_SETUP_DEADLINE_MS) return events;
+    return [...events, { step: "setup", state: "failed", code: "setupStalled", at: now.toISOString() }];
 }

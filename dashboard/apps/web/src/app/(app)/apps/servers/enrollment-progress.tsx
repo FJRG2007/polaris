@@ -143,7 +143,8 @@ const FIXES = {
     connectFailed: "connectFailed",
     noAddress: "noAddress",
     noHostKey: "noHostKey",
-    setupFailed: "setupFailed"
+    setupFailed: "setupFailed",
+    setupStalled: "setupFailed"
 } as const;
 
 /** The time of day an event happened, to the second: the log is read live. */

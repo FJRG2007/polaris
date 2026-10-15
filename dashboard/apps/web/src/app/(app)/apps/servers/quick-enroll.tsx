@@ -20,7 +20,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
 import { EnrollmentProgress } from "./enrollment-progress";
-import { enrollmentStillRunning, type EnrollmentEvent, type ServerEnvironment } from "@polaris/core";
+import {
+    enrollmentStillRunning,
+    enrollmentTimeline,
+    type EnrollmentEvent,
+    type ServerEnvironment
+} from "@polaris/core";
 import { Check, CheckCircle2, Copy, Terminal, TriangleAlert } from "lucide-react";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -55,6 +60,9 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [waitError, setWaitError] = useState<string | null>(null);
+    // Whether the failed step in the log is what `waitError` says; an expiry is
+    // news the log does not carry.
+    const [waitExplained, setWaitExplained] = useState(false);
     // Whether the command the panel is still showing works. A machine that stops
     // before claiming - no SSH server running, Remote Login off - reports why and
     // spends nothing, so this is a state to recover from rather than the end of it.
@@ -95,6 +103,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             }
             if (status.state === "failed") {
                 setWaitError(status.error ?? t("enroll.notRegistered"));
+                setWaitExplained(true);
                 setStillUsable(status.retryable);
                 // Only a spent command is the end of the road. While the token is
                 // still good the poll stays alive, so the operator who fixes the
@@ -106,6 +115,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             if (status.state === "expired") {
                 clearInterval(timer);
                 setStillUsable(false);
+                setWaitExplained(false);
                 // A machine that refused left its reason on the enrollment, and it
                 // is still the true account of what happened - the command only
                 // ran out afterwards. Saying it never ran would be the misreport
@@ -169,8 +179,8 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     }
 
     if (opened && finished) {
-        const setupFailed = progress.some(
-            (event) => event.step === "setup" && event.state === "failed"
+        const setupFailed = enrollmentTimeline(progress).some(
+            (view) => view.step === "setup" && view.status === "failed"
         );
         return (
             <div className="flex flex-col gap-3">
@@ -265,7 +275,8 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                     <div className="flex flex-col gap-1">
                         {/* The failed step already says this, with what to do;
                             the sentence stands alone only when there is no log. */}
-                        {progress.some((event) => event.state === "failed") ? null : (
+                        {waitExplained &&
+                        enrollmentTimeline(progress).some((view) => view.status === "failed") ? null : (
                             <p className="text-sm text-danger">{waitError}</p>
                         )}
                         {stillUsable ? (
