@@ -99,6 +99,7 @@ import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { refuseWhileCopying } from "./apps/install-copy-hold";
 import { notifyVolumeHealth } from "./notifications/volume-events";
 import { nasBinding } from "./deploy/nas-binding";
+import { takeDownFileAccess } from "./deploy/file-access";
 import {
     appEdgeConfigSchema,
     applicationDefaultWafPresets,
@@ -2458,6 +2459,8 @@ export async function deleteApplication(
     });
     await prisma.domain.updateMany({ where: { applicationId }, data: { enabled: false } });
     await syncAppRoutes().catch(() => undefined);
+    // Its SFTP server is a container of its own, which the row delete would orphan.
+    await takeDownFileAccess(applicationId, ownerId);
     const teardown = removeApplicationDeployment(applicationId, ownerId);
     // A service that was never placed on a server has nothing running to fail on.
     if (options?.strict && app.target) {

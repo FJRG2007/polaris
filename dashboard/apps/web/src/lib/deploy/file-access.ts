@@ -284,6 +284,31 @@ export async function syncFileAccess(applicationId: string, ownerId: string): Pr
     }
 }
 
+/**
+ * Take the server down for a service that is being deleted. Its rows cascade
+ * with the service, but its container does not, and with the rows gone nothing
+ * would ever take it down. Best-effort: a server that does not answer is
+ * logged and never holds up the delete.
+ */
+export async function takeDownFileAccess(applicationId: string, ownerId: string): Promise<void> {
+    const running = await prisma.fileAccessServer.findUnique({ where: { applicationId }, select: { applicationId: true } });
+    if (!running) return;
+    try {
+        await oneAtATime(applicationId, async () => {
+            const service = await serviceOf(applicationId, ownerId);
+            const ports = await getPorts(service.target, ownerId);
+            try {
+                await ports.composeDown(core.fileAccessProject(shortHash(service.id, 8)));
+            } finally {
+                await ports.dispose().catch(() => undefined);
+            }
+            await prisma.fileAccessServer.deleteMany({ where: { applicationId } });
+        });
+    } catch (error) {
+        console.error(`polaris: the SFTP server of service ${applicationId} was not taken down:`, error);
+    }
+}
+
 export async function createFileAccessAccount(
     applicationId: string,
     ownerId: string,
