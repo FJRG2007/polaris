@@ -64,7 +64,7 @@
         "status": "Estado: {status}",
         "history": "Historial",
         "builtOn": " - compilado en {machine}",
-        "viaPromotion": " - promocionado desde otro entorno"
+        "viaPromotion": " - promovido desde otro entorno"
     },
     "kept": {
         "rollbackTitle": "Restaurado de una imagen",

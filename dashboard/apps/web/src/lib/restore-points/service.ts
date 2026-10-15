@@ -10,7 +10,6 @@
  */
 
 import { prisma } from "@polaris/db";
-import { recordAudit } from "@/lib/audit-service";
 import * as core from "@/lib/restore-points/core";
 
 type Body = core.SnapshotBody;
@@ -310,6 +309,9 @@ export async function restorePoint(
     }
     await capture(expected.kind, expected.objectKey, { actorId: actor.id, reason: "restore" });
     await ADAPTERS[expected.kind].apply(expected.objectKey, core.parseBody(point.body), actor);
+    // Loaded here: this module sits under every service that captures a point,
+    // and the audit service brings the auth stack with it.
+    const { recordAudit } = await import("@/lib/audit-service");
     await recordAudit({
         actorId: actor.id,
         orgId: actor.orgId ?? undefined,

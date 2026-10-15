@@ -144,9 +144,9 @@
         },
         "stageNone": "Sin etapa",
         "stageNamed": "Para qué es {name}",
-        "promote": "Promocionar",
-        "promoteNamed": "Promocionar {name}",
-        "promoteNeedsTwo": "Añade otro entorno al que promocionar"
+        "promote": "Promover",
+        "promoteNamed": "Promover {name}",
+        "promoteNeedsTwo": "Añade otro entorno al que promover"
     },
     "sections": {
         "title": "Ajustes del proyecto",
@@ -283,9 +283,9 @@
         "connect": "Conectar"
     },
     "promotion": {
-        "title": "Promocionar {name}",
+        "title": "Promover {name}",
         "into": "A",
-        "includeData": "Reemplazar también los datos",
+        "includeData": "Reemplazar datos también",
         "includeDataHint": "Cada base de datos recibe el contenido del origen. Antes se guarda en Copias de seguridad un punto de restauración de lo que hay ahora.",
         "cannotDeploy": "No puedes desplegar en ese entorno.",
         "cannotCopyData": "No puedes gestionar las bases de datos de ese entorno.",
@@ -298,10 +298,10 @@
         "skippedLine": "{name} se queda fuera: {reason}",
         "noDowntime": "Cada servicio sigue atendiendo hasta que su nueva versión está arriba y sana.",
         "typeName": "Escribe {name} para confirmar",
-        "confirm": "Promocionar a {name}",
+        "confirm": "Promover a {name}",
         "historyTitle": "Promociones",
         "historyDescription": "Código, y datos si se pidió, llevados de un entorno a otro.",
-        "historyEmpty": "Todavía no se ha promocionado nada.",
+        "historyEmpty": "Todavía no se ha promovido nada.",
         "historyLine": "{from} -> {to}",
         "withData": ", con datos",
         "status": {
@@ -319,7 +319,7 @@
         "reasons": {
             "missing": "no está en el destino",
             "engine": "usa otro motor",
-            "dataFailed": "falló la copia de una base de datos",
+            "dataFailed": "falló una copia de datos",
             "builtDifferently": "se construye de otra forma",
             "noImage": "no tiene imagen",
             "otherRepository": "se construye desde otro repositorio",

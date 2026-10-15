@@ -18,8 +18,8 @@
         "networkCannotDeploy": "Puedes cambiar este ajuste, pero no desplegar los servicios de este entorno.",
         "elsewhere": "Ese entorno no pertenece a este proyecto",
         "stageFailed": "No se pudo indicar para qué es el entorno",
-        "promoteFailed": "No se pudo promocionar el entorno",
-        "promoteCannotDeploy": "No puedes desplegar en ese entorno, así que no puedes promocionar a él.",
+        "promoteFailed": "No se pudo promover el entorno",
+        "promoteCannotDeploy": "No puedes desplegar en ese entorno, así que no puedes promover a él.",
         "promoteCannotCopyData": "No puedes gestionar las bases de datos de ese entorno, así que sus datos no se pueden reemplazar. Deja fuera los datos e inténtalo de nuevo."
     },
     "service": {
