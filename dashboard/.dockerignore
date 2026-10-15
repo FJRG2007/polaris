@@ -18,6 +18,11 @@ packages/db/generated
 !**/.env.example
 secrets
 **/secrets
+# ...but a screen *about* secrets is source, not a secret. Without this the route
+# is left out of the image: it builds from a checkout and answers 404 wherever it
+# is deployed. A source tree under a `secrets` name anywhere else needs the same
+# line - test/build/docker-context.test.ts fails until it has one.
+!apps/web/src/app/(app)/apps/runners/secrets
 .git
 .gitignore
 *.log
