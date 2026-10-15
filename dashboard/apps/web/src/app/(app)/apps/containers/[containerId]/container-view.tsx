@@ -28,6 +28,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
+import { containerDriveLinkAction } from "./drive-link-actions";
 import { containerStateLabel } from "../container-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -56,6 +57,7 @@ import {
     ChevronRight,
     Cpu,
     Download,
+    ExternalLink,
     FileText,
     Folder,
     HardDrive,
@@ -419,7 +421,9 @@ export function ContainerView({
                 <CardBody className="min-h-[24rem]">
                     {tab === "details" ? <DetailsTab detail={detail} /> : null}
                     {tab === "logs" ? <LogsTab query={query} /> : null}
-                    {tab === "files" ? <FilesTab query={query} /> : null}
+                    {tab === "files" ? (
+                        <FilesTab query={query} connectionId={connection.id} detail={detail} />
+                    ) : null}
                     {tab === "console" ? (
                         <ConsoleTab
                             connectionId={connection.id}
@@ -739,9 +743,46 @@ function LogsTab({ query }: { query: string }) {
     );
 }
 
-function FilesTab({ query }: { query: string }) {
+function FilesTab({
+    query,
+    connectionId,
+    detail
+}: {
+    query: string;
+    connectionId: string;
+    /** For the name and mounts "Open in Drive" is worked out from; null until read. */
+    detail: ContainerDetailData | null;
+}) {
     const t = useTranslations("containers");
     const [path, setPath] = useState("/");
+    const [driveHref, setDriveHref] = useState<string | null>(null);
+
+    // Where this folder opens in Drive, for this viewer - or no button at all.
+    // Keyed on the mounts' text, not the array: the live detail is re-read every
+    // few seconds and a fresh array of the same mounts must not ask again.
+    const containerName = detail?.name ?? null;
+    const mountsKey = JSON.stringify(
+        (detail?.mounts ?? []).map(({ source, destination }) => ({ source, destination }))
+    );
+    useEffect(() => {
+        if (!containerName) return;
+        let cancelled = false;
+        void containerDriveLinkAction({
+            connectionId,
+            containerName,
+            path,
+            mounts: JSON.parse(mountsKey) as unknown
+        })
+            .then((href) => {
+                if (!cancelled) setDriveHref(href);
+            })
+            .catch(() => {
+                if (!cancelled) setDriveHref(null);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [connectionId, containerName, mountsKey, path]);
     const [entries, setEntries] = useState<Array<{ name: string; isDir: boolean }> | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -771,23 +812,36 @@ function FilesTab({ query }: { query: string }) {
 
     return (
         <div className="flex h-full flex-col gap-2">
-            <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label={t("files.breadcrumb")}>
-                <button type="button" className="hover:underline" onClick={() => setPath("/")}>
-                    /
-                </button>
-                {segments.map((segment, index) => (
-                    <span key={`${segment}-${index}`} className="flex items-center gap-1">
-                        <ChevronRight className="size-3 text-muted-foreground" />
-                        <button
-                            type="button"
-                            className="hover:underline"
-                            onClick={() => setPath(`/${segments.slice(0, index + 1).join("/")}`)}
-                        >
-                            {segment}
-                        </button>
-                    </span>
-                ))}
-            </nav>
+            <div className="flex items-start gap-2">
+                <nav
+                    className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-sm"
+                    aria-label={t("files.breadcrumb")}
+                >
+                    <button type="button" className="hover:underline" onClick={() => setPath("/")}>
+                        /
+                    </button>
+                    {segments.map((segment, index) => (
+                        <span key={`${segment}-${index}`} className="flex items-center gap-1">
+                            <ChevronRight className="size-3 text-muted-foreground" />
+                            <button
+                                type="button"
+                                className="hover:underline"
+                                onClick={() => setPath(`/${segments.slice(0, index + 1).join("/")}`)}
+                            >
+                                {segment}
+                            </button>
+                        </span>
+                    ))}
+                </nav>
+                {driveHref ? (
+                    <Button size="sm" variant="secondary" asChild className="shrink-0">
+                        <Link href={driveHref}>
+                            <ExternalLink className="size-4" />
+                            {t("files.openInDrive")}
+                        </Link>
+                    </Button>
+                ) : null}
+            </div>
             {error ? <Notice tone="danger">{error}</Notice> : null}
             {entries === null ? (
                 <div className="space-y-1">

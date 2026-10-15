@@ -169,7 +169,8 @@
     "files": {
         "breadcrumb": "Breadcrumb",
         "empty": "This directory is empty.",
-        "download": "Download {name}"
+        "download": "Download {name}",
+        "openInDrive": "Open in Drive"
     },
     "console": {
         "start": "Start this container to open a console in it.",

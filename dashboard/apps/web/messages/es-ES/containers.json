@@ -169,7 +169,8 @@
     "files": {
         "breadcrumb": "Ruta",
         "empty": "Esta carpeta está vacía.",
-        "download": "Descargar {name}"
+        "download": "Descargar {name}",
+        "openInDrive": "Abrir en Drive"
     },
     "console": {
         "start": "Inicia este contenedor para abrir una consola en él.",
