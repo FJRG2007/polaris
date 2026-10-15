@@ -8,7 +8,16 @@
  * guessed - and a source with no machine behind it is not probed at all.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Whether a server is read as root asks the request's access, which loads the
+// session layer and its environment; nothing here is about root.
+vi.mock("@/lib/drive-root", () => ({
+    hostRootAccess: async () => ({ asRoot: false, sudo: false, managesServers: false }),
+    managesServers: async () => false,
+    reachesLocalHost: () => false
+}));
+vi.mock("@/lib/local-server", () => ({ getLocalHostId: async () => null }));
 import { sourceEndpoint } from "../../src/lib/drive-source-status";
 
 describe("the endpoint a Drive source is probed on", () => {

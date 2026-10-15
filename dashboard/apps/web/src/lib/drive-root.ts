@@ -43,3 +43,27 @@ export async function hostRootAccess(userId: string, hostId: string): Promise<Ho
     const sudo = host?.sudo === true;
     return { asRoot: browsesAsRoot({ sudo, admin, managesServers }), sudo, managesServers };
 }
+
+/**
+ * The machine Polaris runs on is enrolled once, by whoever got there first, and
+ * a Host belongs to the account that enrolled it. That is right for a server
+ * somebody brought along, and wrong for this one: it is the deployment's own box,
+ * and every administrator who manages servers manages it. So its Host - the one
+ * the local enrollment points at - reaches anybody who manages servers, not only
+ * its owner.
+ */
+export function reachesLocalHost(input: {
+    /** The Host the local enrollment points at, or null while there is none. */
+    readonly localHostId: string | null;
+    readonly hostId: string;
+    readonly managesServers: boolean;
+}): boolean {
+    return input.managesServers && input.localHostId !== null && input.localHostId === input.hostId;
+}
+
+/** Whether this viewer manages servers - an administrator, or the permission the
+ *  Servers app manages them with. */
+export async function managesServers(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    return (await effectiveIsAdmin(userId, user?.isAdmin === true)) || effectiveCan(userId, "system.manage");
+}

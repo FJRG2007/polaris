@@ -32,10 +32,12 @@ import {
 import {
     getHostConnection,
     getHostConnectionUnscoped,
+    getHostSummary,
     listHosts,
     type HostConnection
 } from "@/lib/host-service";
-import { hostRootAccess } from "@/lib/drive-root";
+import { hostRootAccess, managesServers, reachesLocalHost } from "@/lib/drive-root";
+import { getLocalHostId } from "@/lib/local-server";
 import {
     borrowSftp,
     borrowSmb,
@@ -852,7 +854,7 @@ export async function listAccessibleConnections(userId: string, shelfOrgId: stri
         // company's. On a company shelf its place is taken by theirs.
         shelfOrgId ? Promise.resolve([]) : listConnections(userId, { personal: true }),
         grantedConnectionIds(userId),
-        listHosts(userId),
+        listHostsReached(userId),
         organizationDrivesFor(userId, shelfOrgId)
     ]);
     const ownedIds = new Set(owned.map((row) => row.id));
@@ -912,6 +914,20 @@ export async function listAccessibleConnections(userId: string, shelfOrgId: stri
             })),
         ...hostSummaries
     ];
+}
+
+/**
+ * The servers a viewer browses in Drive: the ones they enrolled, and the machine
+ * Polaris runs on for anybody who manages servers, whoever enrolled it
+ * (`reachesLocalHost`).
+ */
+async function listHostsReached(userId: string) {
+    const [owned, localHostId] = await Promise.all([listHosts(userId), getLocalHostId()]);
+    if (!localHostId || owned.some((host) => host.id === localHostId)) return owned;
+    if (!reachesLocalHost({ localHostId, hostId: localHostId, managesServers: await managesServers(userId) }))
+        return owned;
+    const local = await getHostSummary(localHostId);
+    return local ? [local, ...owned] : owned;
 }
 
 /**

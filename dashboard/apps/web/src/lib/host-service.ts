@@ -22,26 +22,33 @@ import {
 } from "@polaris/core";
 
 /** Non-secret fields safe to show in listings. */
+const HOST_SUMMARY_SELECT = {
+    id: true,
+    name: true,
+    address: true,
+    port: true,
+    username: true,
+    authMethod: true,
+    sudo: true,
+    os: true,
+    dockerId: true,
+    environment: true,
+    wildcardDomain: true,
+    status: true,
+    createdAt: true
+} as const;
+
 export async function listHosts(ownerId: string) {
     return prisma.host.findMany({
         where: { ownerId },
-        select: {
-            id: true,
-            name: true,
-            address: true,
-            port: true,
-            username: true,
-            authMethod: true,
-            sudo: true,
-            os: true,
-            dockerId: true,
-            environment: true,
-            wildcardDomain: true,
-            status: true,
-            createdAt: true
-        },
+        select: HOST_SUMMARY_SELECT,
         orderBy: { createdAt: "asc" }
     });
+}
+
+/** One server as `listHosts` describes it, whoever owns it. */
+export async function getHostSummary(hostId: string) {
+    return prisma.host.findUnique({ where: { id: hostId }, select: HOST_SUMMARY_SELECT });
 }
 
 export interface HostConnection {
