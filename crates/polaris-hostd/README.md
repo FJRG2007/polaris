@@ -85,6 +85,14 @@ safe, generic message (internal error detail is never leaked).
   deleted the credentials file the second's `mount.cifs` had not opened yet.
   A different id is never held up by it, so a share that is unreachable and
   retrying its connect does not block an unrelated mount.
+- **A live mount catches up on a flag it was mounted without** - mounting an
+  id that is already up answers `201` without re-mounting, but if the live
+  mount is missing an option this call now asks for (e.g. `mfsymlinks`, so a
+  share mounted before Polaris turned links on refuses them until something
+  remounts it), it is `remount`ed in place once per id and option set, which
+  changes the options every container's bind of the share sees without
+  detaching it. A remount the kernel refuses leaves the mount as it was and is
+  only logged.
 - **Docker proxy least privilege** - the web container is never given the Docker
   socket (it is root-equivalent). `/v1/docker` forwards only a fixed allowlist of
   read and lifecycle calls; `create`, `exec`, image pulls, and arbitrary runs are
