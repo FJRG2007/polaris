@@ -238,17 +238,5 @@
         "exit": "- exit {code}",
         "noOutput": "It printed nothing.",
         "deleteTitle": "Delete scheduled job"
-    },
-    "registry": {
-        "button": "Registries",
-        "title": "Private registry credentials",
-        "loading": "Loading...",
-        "empty": "No registry logins yet.",
-        "remove": "Remove",
-        "add": "Add a login",
-        "hostPlaceholder": "ghcr.io (or docker.io)",
-        "userPlaceholder": "username",
-        "passwordPlaceholder": "password or token",
-        "save": "Save login"
     }
 }

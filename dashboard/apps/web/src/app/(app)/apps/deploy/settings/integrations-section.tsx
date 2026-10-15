@@ -26,7 +26,7 @@ import {
 interface IntegrationState {
     github: { connected: boolean; login: string | null; repos: number };
     cloudflare: { connected: boolean; account: string | null; dnsReady: boolean };
-    registries: { registry: string; username: string }[];
+    registries: { name: string; username: string }[];
 }
 
 export function IntegrationsSection({ projectId }: { projectId: string }) {
@@ -53,7 +53,7 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                     dnsReady: cloudflare?.dnsReady ?? false
                 },
                 registries: registries.map((entry) => ({
-                    registry: entry.registry,
+                    name: entry.name,
                     username: entry.username
                 }))
             };
@@ -121,11 +121,11 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                         detail={
                             state.registries.length > 0
                                 ? state.registries
-                                      .map((entry) => `${entry.registry} (${entry.username})`)
+                                      .map((entry) => `${entry.name} (${entry.username})`)
                                       .join(", ")
                                 : t("integrations.registriesHint")
                         }
-                        href="/apps/deploy"
+                        href="/apps/deploy/registries"
                     />
                 </div>
             </SettingsCard>

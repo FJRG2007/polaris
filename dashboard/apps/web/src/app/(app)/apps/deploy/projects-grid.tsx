@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RecycleBinButton } from "./recycle-bin";
 import { ImportSiteButton } from "./import-site";
-import { RegistryCredentialsButton } from "./registry-credentials";
 import { useShowManaged } from "./show-managed";
 import { createProjectAction, deleteProjectAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -36,6 +35,7 @@ import {
     Rocket,
     Search,
     Settings,
+    KeyRound,
     SquareArrowOutUpRight,
     Trash2
 } from "lucide-react";
@@ -97,6 +97,7 @@ export function ProjectsGrid({
     const router = useRouter();
     const t = useTranslations("deploy");
     const tSafety = useTranslations("deploySafety");
+    const tRegistries = useTranslations("deployRegistries");
     const [layout, setLayout] = useState<"grid" | "list">("grid");
     const [showManaged, setShowManaged] = useShowManaged(viewerId, !hideManagedByDefault);
     const [search, setSearch] = useState("");
@@ -161,10 +162,15 @@ export function ProjectsGrid({
                             {tSafety("binSettings.open")}
                         </Link>
                     </Button>
+                    <Button asChild variant="outline">
+                        <Link href="/apps/deploy/registries">
+                            <KeyRound className="size-4" />
+                            {tRegistries("open")}
+                        </Link>
+                    </Button>
                     {canManage && (
                         <>
                             <ImportSiteButton allowed={canCreateHere} />
-                            <RegistryCredentialsButton />
                             <CreateProjectButton />
                         </>
                     )}

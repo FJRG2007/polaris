@@ -58,6 +58,7 @@ import marketplace from "./marketplace.json";
 import publicPages from "./publicPages.json";
 import tasksDetail from "./tasksDetail.json";
 import deployConfig from "./deployConfig.json";
+import deployRegistries from "./deployRegistries.json";
 import deploySafety from "./deploySafety.json";
 import deployPrivateNet from "./deployPrivateNet.json";
 import deployServer from "./deployServer.json";
@@ -93,6 +94,7 @@ export default {
     diagram,
     deploy,
     deployConfig,
+    deployRegistries,
     deploySafety,
     deployData,
     deployProject,

@@ -22,6 +22,7 @@ import { useParams, useRouter } from "next/navigation";
 import { UploadedSourceSection } from "./upload-source";
 import { stageServiceDeleteAction } from "./project-actions";
 import { BuildMachineSection } from "./build-machine-section";
+import { RegistryPickCard } from "./registries/registry-pick-card";
 import { DeployBehaviourSection } from "./deploy-behaviour-section";
 import { isTunnelHostname, runtimeVersionSchema } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -755,6 +756,9 @@ export function SettingsTab({
                     <UploadedSourceSection applicationId={app.id} onChanged={onChanged} />
                 )}
                 <DeployBehaviourSection applicationId={app.id} canConfigure={configure} />
+                {app.sourceType === "image" && (
+                    <RegistryPickCard applicationId={app.id} canConfigure={configure} />
+                )}
             </SettingsSection>
 
             {section(2).shown && (
