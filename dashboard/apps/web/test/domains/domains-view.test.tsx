@@ -25,6 +25,10 @@ vi.mock("../../src/app/(app)/admin/domains/actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/domains/setup-actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/integrations/actions", () => ({}));
 vi.mock("../../src/app/(app)/account/domains/dns-actions", () => ({}));
+vi.mock("../../src/app/(app)/apps/deploy/restore-actions", () => ({
+    listHistoryAction: async () => ({ points: [] }),
+    restoreHistoryAction: async () => ({})
+}));
 
 const { DomainsView } = await import("../../src/app/(app)/admin/domains/domains-view");
 

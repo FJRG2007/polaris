@@ -34,7 +34,9 @@ async function backupWithHomeTar(homeEntry: string): Promise<string> {
     );
     await mkdir(join(home, "public_html"), { recursive: true });
     await writeFile(join(home, "public_html", "index.html"), "hello");
-    execFileSync("tar", ["-cf", join(root, "homedir.tar"), "-C", home, homeEntry]);
+    // -P keeps a leading "../" in the member name: GNU tar strips it otherwise,
+    // and the archive meant to leave the folder would not.
+    execFileSync("tar", ["-P", "-cf", join(root, "homedir.tar"), "-C", home, homeEntry]);
     const archive = join(work, "backup.tar.gz");
     execFileSync("tar", ["-czf", archive, "-C", work, "backup-1.1.2026_example"]);
     return archive;

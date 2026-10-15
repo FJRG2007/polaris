@@ -260,7 +260,9 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // same data. Each pass purges a bounded handful, so a large bin drains
         // over several passes instead of holding one for long.
         everyMs: HOUR,
-        leaseMs: 30 * MINUTE,
+        // Longer than the interval, so a slow pass is never joined by the next
+        // one purging the same rows.
+        leaseMs: 2 * HOUR,
         run: async () => ({ ...(await purgeRecycleBin()), ...(await pruneOldRestorePoints()) })
     },
     {

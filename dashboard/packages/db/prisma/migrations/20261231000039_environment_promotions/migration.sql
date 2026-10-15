@@ -25,7 +25,5 @@ CREATE TABLE IF NOT EXISTS "EnvironmentPromotion" (
 CREATE INDEX IF NOT EXISTS "EnvironmentPromotion_projectId_createdAt_idx" ON "EnvironmentPromotion"("projectId", "createdAt");
 CREATE INDEX IF NOT EXISTS "EnvironmentPromotion_targetEnvironmentId_status_idx" ON "EnvironmentPromotion"("targetEnvironmentId", "status");
 
-DO $$ BEGIN
-    ALTER TABLE "EnvironmentPromotion" ADD CONSTRAINT "EnvironmentPromotion_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "EnvironmentPromotion" DROP CONSTRAINT IF EXISTS "EnvironmentPromotion_projectId_fkey";
+ALTER TABLE "EnvironmentPromotion" ADD CONSTRAINT "EnvironmentPromotion_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
