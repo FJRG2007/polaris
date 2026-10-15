@@ -27,7 +27,7 @@ import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { avatarUrl } from "@/lib/avatar-url";
 import { Avatar, OrgAvatar } from "@/components/avatar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AccessDialog, type AccessTarget } from "./access-dialog";
 import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -364,7 +364,9 @@ function TreeRow({
                 // names a key nothing listens for is worse than a menu with no
                 // key on it at all.
                 if (shortcutPressed(event, DELETE_SHORTCUT)) {
-                    const removal = rowActions.find((action) => action.shortcut === DELETE_SHORTCUT);
+                    const removal = rowActions.find(
+                        (action) => action.shortcut === DELETE_SHORTCUT
+                    );
                     if (!removal) return;
                     event.preventDefault();
                     removal.onSelect();
@@ -600,8 +602,38 @@ export function SpaceTree({
         );
     };
 
+    /** Open the new-space form, with the owners it can be filed under. */
+    const openNewSpace = useCallback(() => {
+        setNewSpace(true);
+        void (async () => {
+            const result = await runAction(() => actions.spaceOwnerOptionsAction(), setError);
+            setSpaceOrgs(result?.orgs ?? []);
+            setMe(result?.me ?? null);
+            // Start on the shelf that is open. Somebody
+            // working from a client's shelf who presses
+            // "new space" means one for that client, and
+            // defaulting to their own is how a company's
+            // work ends up somewhere nobody else can find.
+            setSpaceOwner(result?.scopeOrgId ?? "");
+        })();
+    }, []);
+
+    // "Do it myself" on the first-visit screen points here: the form it means is
+    // this one, so the address opens it rather than a page of its own.
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const asked = searchParams.get("new") === "space";
+    useEffect(() => {
+        if (!asked || !canManage || !canCreate) return;
+        openNewSpace();
+        router.replace(pathname, { scroll: false });
+    }, [asked, canManage, canCreate, openNewSpace, router, pathname]);
+
     return (
-        <nav aria-label={t("tree.spaces")} className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
+        <nav
+            aria-label={t("tree.spaces")}
+            className="flex w-full flex-col gap-3 md:w-60 md:shrink-0"
+        >
             <div className="flex items-center justify-between">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {t("tree.spaces")}
@@ -612,23 +644,8 @@ export function SpaceTree({
                         aria-label={t("tree.createSpace")}
                         title={t("tree.createSpace")}
                         onClick={() => {
-                            const opening = !newSpace;
-                            setNewSpace(opening);
-                            if (!opening) return;
-                            void (async () => {
-                                const result = await runAction(
-                                    () => actions.spaceOwnerOptionsAction(),
-                                    setError
-                                );
-                                setSpaceOrgs(result?.orgs ?? []);
-                                setMe(result?.me ?? null);
-                                // Start on the shelf that is open. Somebody
-                                // working from a client's shelf who presses
-                                // "new space" means one for that client, and
-                                // defaulting to their own is how a company's
-                                // work ends up somewhere nobody else can find.
-                                setSpaceOwner(result?.scopeOrgId ?? "");
-                            })();
+                            if (newSpace) setNewSpace(false);
+                            else openNewSpace();
                         }}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -672,7 +689,9 @@ export function SpaceTree({
                                                     image: me ? avatarUrl(me.id) : null
                                                 }}
                                             />
-                                            <span className="truncate">{me?.name ?? t("tree.you")}</span>
+                                            <span className="truncate">
+                                                {me?.name ?? t("tree.you")}
+                                            </span>
                                         </span>
                                     )
                                 },
@@ -714,15 +733,16 @@ export function SpaceTree({
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink"
+                >
                     {error}
                 </p>
             )}
 
             {spaces.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                    {t("tree.empty")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("tree.empty")}</p>
             )}
 
             {spaces.map((space) => (
@@ -765,7 +785,11 @@ export function SpaceTree({
                 title={confirm?.kind === "list" ? t("tree.deleteList") : t("tree.deleteFolder")}
                 question={t.rich("deleteTask.question", {
                     name: confirm?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={
                     confirm?.empty
@@ -774,7 +798,9 @@ export function SpaceTree({
                           ? t("tree.deleteFolderDescription")
                           : t("tree.deleteListDescription")
                 }
-                confirmLabel={confirm?.kind === "folder" ? t("tree.deleteFolder") : t("tree.deleteList")}
+                confirmLabel={
+                    confirm?.kind === "folder" ? t("tree.deleteFolder") : t("tree.deleteList")
+                }
                 onConfirm={async () => {
                     if (!confirm) return;
                     await run(() =>
@@ -1159,7 +1185,9 @@ function SpaceSection({
                             type="button"
                             onClick={() => onToggle(space.id)}
                             aria-label={
-                                open ? t("tree.collapse", { name: space.name }) : t("tree.expand", { name: space.name })
+                                open
+                                    ? t("tree.collapse", { name: space.name })
+                                    : t("tree.expand", { name: space.name })
                             }
                             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
@@ -1353,7 +1381,9 @@ function DraftRow({
                 ref={field}
                 value={value}
                 aria-label={draft.kind === "folder" ? t("tree.folderName") : t("tree.listName")}
-                placeholder={draft.kind === "folder" ? t("tree.folderNameHint") : t("tree.listNameHint")}
+                placeholder={
+                    draft.kind === "folder" ? t("tree.folderNameHint") : t("tree.listNameHint")
+                }
                 onChange={(event) => setValue(event.target.value)}
                 onBlur={() => void commit()}
                 onKeyDown={(event) => {
