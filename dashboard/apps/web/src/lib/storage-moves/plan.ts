@@ -189,6 +189,35 @@ export function placementsOverlap(left: Placement, right: Placement): boolean {
     return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
+/**
+ * The volume rows that can reach the files at `placement`, as a query filter.
+ *
+ * A named volume is the app's own: compose prefixes it with the app's project, so
+ * "data" in one app and "data" in another are two volumes with two sets of files.
+ * Only a volume of the same app by that name, or one that names the docker volume
+ * itself, reaches them. Matching the bare name across every app kept the original
+ * of every move whose volume was called "data" - most of them - and left a 22 GB
+ * game world on a nearly full disk after it had been moved.
+ */
+export function volumesReaching(
+    placement: Placement,
+    owner: { readonly applicationId: string; readonly dockerName: string | undefined }
+) {
+    const names = sourceAncestors(placement);
+    const named = [{ source: { in: names } }, { source: null, name: { in: names } }];
+    return {
+        kind: placement.kind,
+        connectionId: placement.connectionId,
+        OR:
+            placement.kind === "volume"
+                ? [
+                      { applicationId: owner.applicationId, OR: named },
+                      ...(owner.dockerName ? [{ source: owner.dockerName }] : [])
+                  ]
+                : [...named, { source: { startsWith: `${names[names.length - 1]}/` } }]
+    };
+}
+
 /** How long a failed move's copy is tried again before it is given up on. */
 export const LEFT_COPY_RETRY_MS = 7 * 24 * 60 * 60_000;
 /** How long a move that is over is kept in the Storage history. */

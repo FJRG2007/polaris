@@ -435,9 +435,7 @@ export async function listMoves(): Promise<MoveView[]> {
                 rows
                     .filter((row) => row.state === "moved")
                     .map(async (row) =>
-                        (await originShared(row.volumeId, plan.parsePlacement(row.origin)))
-                            ? row.id
-                            : null
+                        (await originShared(row, plan.parsePlacement(row.origin))) ? row.id : null
                     )
             )
         ).filter((id): id is string => id !== null)
@@ -684,32 +682,38 @@ export async function startMove(input: {
     return { id: created.id };
 }
 
+/** The move a sharing question is asked for: whose volume, and where it was. */
+interface MoveScope {
+    readonly volumeId: string;
+    readonly applicationId: string;
+    /** The move's stored origin, which carries the docker name the copy found. */
+    readonly origin: string;
+}
+
 /**
- * Whether another volume still reaches the files at `origin`: the same named
+ * Whether another volume still reaches the files at `placement`: the same named
  * volume, or a folder that is, holds or sits inside it. Emptying the original
  * would take those files from it.
+ * Named volumes are scoped to their app (`plan.volumesReaching`).
  */
-async function originShared(volumeId: string, origin: plan.Placement): Promise<boolean> {
-    const names = plan.sourceAncestors(origin);
+async function originShared(move: MoveScope, placement: plan.Placement): Promise<boolean> {
     const candidates = await prisma.volume.findMany({
         where: {
-            id: { not: volumeId },
-            kind: origin.kind,
-            connectionId: origin.connectionId,
-            OR: [
-                { source: { in: names } },
-                { source: null, name: { in: names } },
-                ...(origin.kind === "volume"
-                    ? []
-                    : [{ source: { startsWith: `${names[names.length - 1]}/` } }])
-            ]
+            id: { not: move.volumeId },
+            ...plan.volumesReaching(placement, {
+                applicationId: move.applicationId,
+                dockerName: recordedDockerName(move.origin)
+            })
         },
         select: { kind: true, source: true, name: true, connectionId: true },
         take: 50
     });
+    // A named volume's filter is already exact - the same app's name, or the
+    // docker name itself, which the stored source never spells the same way.
+    if (placement.kind === "volume") return candidates.length > 0;
     return candidates.some((row) => {
-        const placement = plan.placementOf(row);
-        return placement !== null && plan.placementsOverlap(origin, placement);
+        const found = plan.placementOf(row);
+        return found !== null && plan.placementsOverlap(placement, found);
     });
 }
 
@@ -721,10 +725,10 @@ export async function answerMove(
     if (answer === "remove") {
         const row = await prisma.storageMove.findFirst({
             where: { id, state: "moved" },
-            select: { volumeId: true, origin: true }
+            select: { volumeId: true, applicationId: true, origin: true }
         });
         if (!row) return "gone";
-        if (await originShared(row.volumeId, plan.parsePlacement(row.origin))) return "shared";
+        if (await originShared(row, plan.parsePlacement(row.origin))) return "shared";
     }
     const next = plan.nextState("moved", answer);
     const updated = await prisma.storageMove.updateMany({
@@ -851,7 +855,7 @@ export async function runMove(id: string): Promise<void> {
                 // another volume still reaches the same files.
                 let kept = false;
                 if (next === "moved" && row.auto) {
-                    kept = await originShared(row.volumeId, plan.parsePlacement(row.origin));
+                    kept = await originShared(row, plan.parsePlacement(row.origin));
                     next = plan.nextState("moved", kept ? "keep" : "remove");
                 }
                 const advanced = await prisma.storageMove.updateMany({
@@ -1096,7 +1100,7 @@ async function clearEarlierCopies(
             if (left.kind === "volume") continue;
             if (plan.placementsOverlap(left, context.origin)) continue;
             if (plan.placementsOverlap(left, context.destination)) continue;
-            if (await originShared(context.row.volumeId, left)) continue;
+            if (await originShared(context.row, left)) continue;
             await emptyCopy(context, ports, move.id, left, context.row.ownerId);
         } catch (caught) {
             console.error(`polaris: storage move ${move.id} still holds its copy:`, caught);
@@ -1226,7 +1230,7 @@ async function clearLeftCopy(
         firstTriedAt: row.copyTriedAt,
         now
     });
-    if (action === "keep" || (await originShared(row.volumeId, copy))) {
+    if (action === "keep" || (await originShared(row, copy))) {
         await settle();
         return false;
     }
@@ -1505,7 +1509,7 @@ async function cleanOrigin(context: MoveContext): Promise<void> {
         const dockerName = recordedDockerName(context.row.origin);
         if (context.origin.kind === "volume" && !dockerName)
             throw new MoveFailure({ code: "cleanFailed" });
-        if (await originShared(context.row.volumeId, context.origin))
+        if (await originShared(context.row, context.origin))
             throw new MoveFailure({ code: "originShared" });
         const spec = plan.cleanupSpec(context.row.id, context.origin, dockerName);
         const { exitCode, log } = await runOneShot(context, ports, spec);
