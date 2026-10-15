@@ -167,7 +167,9 @@
         "suggestTitle": "Link your {name} account",
         "suggestBody": "You signed up with a {name} address. Linking it confirms the address, and lets you sign in without a password.",
         "refusedTitle": "{name} could not complete an authorization",
-        "refusedBody": "Somebody tried to connect their {name} account and it was refused. {name} said: {reason}"
+        "refusedBody": "Somebody tried to connect their {name} account and it was refused. {name} said: {reason}",
+        "driveOffTitle": "Google Drive is turned off for Polaris",
+        "driveOffBody": "Somebody tried to open a file from Google Drive, but the Google Drive API is disabled in the Google Cloud project Polaris signs in with. Enable it in that project's Google Cloud console, then they can try again."
     },
     "modelKeys": {
         "expiringTitle": "{whose, select, mine {Your} other {The deployment''s}} {provider} key \"{name}\" expires soon",

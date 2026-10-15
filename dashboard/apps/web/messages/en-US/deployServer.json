@@ -122,7 +122,33 @@
         "limitsFailed": "Could not change the limits",
         "pitrFailed": "Could not change point-in-time recovery",
         "recoveryFailed": "Could not start the recovery",
-        "copyFailed": "Could not start the copy"
+        "copyFailed": "Could not start the copy",
+        "accountsFailed": "Could not read the accounts",
+        "accountFailed": "Could not change the account",
+        "processesFailed": "Could not read the connections",
+        "killFailed": "Could not end the connection",
+        "tuningFailed": "Could not apply the settings",
+        "accountsEngine": "Users and connections are managed for PostgreSQL, MySQL and MariaDB.",
+        "accountsHosted": "This database lives inside another instance. Manage its users from that instance.",
+        "accountsCluster": "Users and connections are managed on a single instance, not on a cluster.",
+        "accountProtected": "Polaris and your services sign in with this account, so it cannot be changed here.",
+        "statementFailed": "The database refused it: {said}",
+        "statementFailedQuiet": "The database refused it.",
+        "memoryUnknown": "The container did not say how much memory it has.",
+        "tuningRefused": {
+            "mariadb": "MariaDB cannot save a setting from a connection, so these can only be read here.",
+            "mysqlOld": "Saving a setting from a connection needs MySQL 8 or later.",
+            "noLimit": "Set a memory limit for this database first, so the settings fit what it may use."
+        },
+        "issues": {
+            "accountName": "Use lowercase letters, digits and underscores, starting with a letter, up to 32 characters.",
+            "accountReserved": "That name belongs to the engine. Pick another.",
+            "notManagedAccount": "That is not an account name Polaris manages.",
+            "notManagedDatabase": "That is not a database name Polaris manages.",
+            "engineAccount": "That account belongs to the engine.",
+            "generatedPassword": "A password has to be one Polaris generated.",
+            "connectionId": "That is not a connection id."
+        }
     },
     "registry": {
         "saveFailed": "Could not save the registry login"
@@ -253,5 +279,18 @@
         "rangeFull": "Every public port in the TCP proxy range is taken on this server.",
         "portFixed": "This domain is reached on the service's own port. Change the service's port instead.",
         "failed": "That did not go through. Try again in a moment."
+    },
+    "fileAccess": {
+        "loadFailed": "Could not read the SFTP accounts",
+        "saveFailed": "Could not add the SFTP account",
+        "removeFailed": "Could not remove the SFTP account",
+        "serviceGone": "That service is not there any more.",
+        "noVolumes": "This service has no volumes, so there are no files to reach. Add a volume first.",
+        "reservedFolder": "A volume of this service points at a server folder that belongs to Polaris. Choose a different path for it.",
+        "portsFull": "Every SFTP port on this server is in use.",
+        "startFailed": "The SFTP server did not start. Check that nothing else on this server uses port {port}.",
+        "nameTaken": "This service already has an account with that name.",
+        "breached": "That password appears in known data breaches. Pick another.",
+        "accountGone": "That account is not there any more."
     }
 }

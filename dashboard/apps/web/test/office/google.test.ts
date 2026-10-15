@@ -26,6 +26,8 @@ const readDocument = vi.fn();
 const deleteDocument = vi.fn();
 const documentAccess = vi.fn();
 const exportDocument = vi.fn();
+const recordConnectionFailure = vi.fn(async () => true);
+const clearConnectionFailure = vi.fn(async () => true);
 const officeGoogleFile = {
     create: vi.fn(),
     findUnique: vi.fn(),
@@ -37,6 +39,7 @@ class GoogleAuthExpiredError extends Error {}
 
 vi.mock("@polaris/db", () => ({ prisma: { officeGoogleFile } }));
 vi.mock("@/lib/connections/store", () => ({ getConnection, listConnections, readCredential }));
+vi.mock("@/lib/connections/attention", () => ({ recordConnectionFailure, clearConnectionFailure }));
 vi.mock("@/lib/google-calendar/service", () => ({
     GOOGLE_DRIVE_READ_SCOPE: READ,
     GOOGLE_DRIVE_FILE_SCOPE: WRITE,
@@ -249,6 +252,22 @@ describe("what Google's refusals mean", () => {
         ).rejects.toMatchObject({
             reason: "api-off"
         });
+        // The reader cannot switch it on, so whoever can configure Google hears.
+        expect(recordConnectionFailure).toHaveBeenCalledWith(
+            "google",
+            expect.stringContaining("Google Drive API"),
+            "api-off",
+            expect.objectContaining({ say: expect.any(Function) })
+        );
+
+        // Drive answering again ends it on the Google card - once, not on every call.
+        clearConnectionFailure.mockClear();
+        fetchMock.mockResolvedValueOnce(json({ files: [] }));
+        await google.listGoogleOfficeFiles("u1", CONNECTION, "", null);
+        fetchMock.mockResolvedValueOnce(json({ files: [] }));
+        await google.listGoogleOfficeFiles("u1", CONNECTION, "", null);
+        expect(clearConnectionFailure).toHaveBeenCalledTimes(1);
+        expect(clearConnectionFailure).toHaveBeenCalledWith("google", "api-off");
     });
 
     it("asks for the account again when the grant is too narrow", async () => {

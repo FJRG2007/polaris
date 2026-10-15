@@ -10,7 +10,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rows, alerts, throttle, broken } = vi.hoisted(() => ({
+const { rows, alerts, throttle, broken, answered, throttled } = vi.hoisted(() => ({
     rows: new Map<
         string,
         {
@@ -24,11 +24,27 @@ const { rows, alerts, throttle, broken } = vi.hoisted(() => ({
     alerts: [] as { event: string; title: string; body: string }[],
     throttle: { ok: true },
     /** Set when the test wants the write itself to fail. */
-    broken: { write: false }
+    broken: { write: false },
+    /** The bell alerts each clear answered, by the links it matched. */
+    answered: [] as string[][],
+    /** The throttle keys each alert was counted against. */
+    throttled: [] as string[]
+}));
+
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        notification: {
+            updateMany: async (input: { where: { href: { in: string[] } } }) => {
+                answered.push(input.where.href.in);
+                return { count: 1 };
+            }
+        }
+    }
 }));
 
 vi.mock("@/lib/integration-service", () => ({
     getIntegrationState: async (provider: string) => rows.get(provider) ?? null,
+    listIntegrationStates: async () => new Map(rows),
     upsertIntegration: async (provider: string, input: { config?: Record<string, unknown> }) => {
         if (broken.write) throw new Error("database is gone");
         const existing = rows.get(provider);
@@ -38,7 +54,10 @@ vi.mock("@/lib/integration-service", () => ({
 }));
 
 vi.mock("@/lib/rate-limit-service", () => ({
-    rateLimit: async () => throttle
+    rateLimit: async (key: string) => {
+        throttled.push(key);
+        return throttle;
+    }
 }));
 
 vi.mock("@/lib/notifications/operators", () => ({
@@ -51,8 +70,16 @@ import {
     clearConnectionFailure,
     connectionFailure,
     describeFailure,
+    attentionHref,
+    markConnectionFailureSeen,
     recordConnectionFailure
 } from "@/lib/connections/attention";
+
+beforeEach(() => {
+    rows.clear();
+    answered.length = 0;
+    throttled.length = 0;
+});
 
 function install(provider: string, config: Record<string, unknown> = {}): void {
     rows.set(provider, { provider, enabled: true, config, hasSecret: true, updatedAt: null });
@@ -100,6 +127,25 @@ describe("recordConnectionFailure", () => {
         expect(alerts[0]?.body).toContain("invalid_client");
     });
 
+    it("holds what kind of trouble it is, and throttles each kind on its own", async () => {
+        install("google");
+        await recordConnectionFailure("google", "invalid_client");
+        expect((await connectionFailure("google"))?.kind).toBe("refusal");
+
+        await recordConnectionFailure("google", "The Google Drive API is disabled", "api-off");
+        expect((await connectionFailure("google"))?.kind).toBe("api-off");
+        // A refusal alert sent this hour must not swallow the first API-off one.
+        expect(throttled).toEqual([
+            "integration-attention:google:refusal",
+            "integration-attention:google:api-off"
+        ]);
+    });
+
+    it("reads a failure recorded before it had a kind as a refusal", async () => {
+        install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
+        expect((await connectionFailure("epic"))?.kind).toBe("refusal");
+    });
+
     it("keeps recording while the alert is throttled", async () => {
         install("epic");
         throttle.ok = false;
@@ -144,9 +190,106 @@ describe("clearConnectionFailure", () => {
         expect(rows.get("epic")?.config.clientId).toBe("abc");
     });
 
+    it("leaves an API that is off standing when somebody signs in", async () => {
+        const off = { at: "2026-08-11T00:00:00.000Z", reason: "Drive API off", kind: "api-off" };
+        install("google", { lastFailure: off });
+
+        // Completing an authorization does not switch the API on.
+        expect(await clearConnectionFailure("google", "refusal")).toBe(true);
+        expect((await connectionFailure("google"))?.kind).toBe("api-off");
+        expect(answered).toEqual([]);
+
+        // Drive answering again clears it.
+        expect(await clearConnectionFailure("google", "api-off")).toBe(true);
+        expect(await connectionFailure("google")).toBeNull();
+    });
+
+    it("says so when it could not clear it", async () => {
+        install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        broken.write = true;
+
+        expect(await clearConnectionFailure("epic")).toBe(false);
+        vi.restoreAllMocks();
+    });
+
     it("does nothing when there was none", async () => {
         install("epic", { clientId: "abc" });
-        await clearConnectionFailure("epic");
+        expect(await clearConnectionFailure("epic")).toBe(true);
         expect(rows.get("epic")?.config).toEqual({ clientId: "abc" });
+        expect(answered).toEqual([]);
+    });
+
+    it("answers that service's alert in every bell", async () => {
+        install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
+        install("spotify", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "y" } });
+        await clearConnectionFailure("epic");
+
+        // Spotify still needs attention, so an older alert that does not say
+        // which service it was about stays where it is.
+        expect(answered).toEqual([[attentionHref("epic")]]);
+    });
+
+    it("answers the older unnamed alerts once nothing needs attention", async () => {
+        install("spotify", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "y" } });
+        await clearConnectionFailure("spotify");
+
+        expect(answered).toEqual([[attentionHref("spotify"), "/admin/integrations"]]);
+    });
+});
+
+describe("markConnectionFailureSeen", () => {
+    it("keeps the failure - the service still needs attention - and answers its alerts", async () => {
+        install("spotify", {
+            lastFailure: { at: "2026-10-13T20:23:06.000Z", reason: "invalid_client" }
+        });
+        expect(await markConnectionFailureSeen("spotify")).toBe(true);
+
+        const failure = await connectionFailure("spotify");
+        expect(failure?.reason).toBe("invalid_client");
+        expect(failure?.seenAt).toEqual(expect.any(String));
+        // Nothing else needs reading, so the older unnamed alerts go too.
+        expect(answered).toEqual([[attentionHref("spotify"), "/admin/integrations"]]);
+    });
+
+    it("leaves the older unnamed alerts while another service is unread", async () => {
+        install("spotify", { lastFailure: { at: "2026-10-13T20:23:06.000Z", reason: "x" } });
+        install("epic", { lastFailure: { at: "2026-10-13T20:23:06.000Z", reason: "y" } });
+        await markConnectionFailureSeen("spotify");
+        expect(answered).toEqual([[attentionHref("spotify")]]);
+    });
+
+    it("keeps the mark when the same failure happens again, and drops it on a new one", async () => {
+        install("spotify");
+        await recordConnectionFailure("spotify", "invalid_client");
+        await markConnectionFailureSeen("spotify");
+        const seenAt = (await connectionFailure("spotify"))?.seenAt;
+
+        await recordConnectionFailure("spotify", "invalid_client");
+        expect((await connectionFailure("spotify"))?.seenAt).toBe(seenAt);
+
+        await recordConnectionFailure("spotify", "redirect_uri_mismatch");
+        expect((await connectionFailure("spotify"))?.seenAt).toBeUndefined();
+    });
+
+    it("does not raise the alert again for a failure already marked seen", async () => {
+        install("spotify");
+        await recordConnectionFailure("spotify", "invalid_client");
+        await markConnectionFailureSeen("spotify");
+        alerts.length = 0;
+
+        await recordConnectionFailure("spotify", "invalid_client");
+        expect(alerts).toEqual([]);
+
+        await recordConnectionFailure("spotify", "redirect_uri_mismatch");
+        expect(alerts).toHaveLength(1);
+    });
+
+    it("says so when it could not save the mark", async () => {
+        install("epic", { lastFailure: { at: "2026-08-11T00:00:00.000Z", reason: "x" } });
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        broken.write = true;
+        expect(await markConnectionFailureSeen("epic")).toBe(false);
+        vi.restoreAllMocks();
     });
 });

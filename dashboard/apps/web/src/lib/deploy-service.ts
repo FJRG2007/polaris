@@ -66,7 +66,7 @@ import { IN_FLIGHT_DEPLOY_STATUSES, TERMINAL_DEPLOY_STATUSES } from "./deploy/st
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "./deploy-target-service";
 import { externalNetworkPlan, storedExternalNetworks } from "./deploy/external-networks";
 import { gitBuildContext, type BuildCommands, type GitSource } from "./git-build-service";
-import { bindSourceClaimed, isReservedBindSource, wipeVolume } from "./deploy-volume-service";
+import { bindSourceClaimed, volumeMountSource, wipeVolume } from "./deploy-volume-service";
 import {
     quickTunnelAppIds,
     tunnelHostForApp,
@@ -100,6 +100,7 @@ import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { refuseWhileCopying } from "./apps/install-copy-hold";
 import { notifyVolumeHealth } from "./notifications/volume-events";
 import { nasBinding } from "./deploy/nas-binding";
+import { refreshFileAccess, takeDownFileAccess } from "./deploy/file-access";
 import {
     appEdgeConfigSchema,
     applicationDefaultWafPresets,
@@ -2493,6 +2494,8 @@ export async function deleteApplication(
     });
     await prisma.domain.updateMany({ where: { applicationId }, data: { enabled: false } });
     await syncAppRoutes().catch(() => undefined);
+    // Its SFTP server is a container of its own, which the row delete would orphan.
+    await takeDownFileAccess(applicationId, ownerId);
     const teardown = removeApplicationDeployment(applicationId, ownerId);
     // A service that was never placed on a server has nothing running to fail on.
     if (options?.strict && app.target) {
@@ -3008,22 +3011,10 @@ async function buildAppPlan(
                 pathPrefix: domain.pathPrefix ?? undefined,
                 certResolver: domain.certResolver as "le" | "internal" | "none"
             })),
-        // A nas volume's source is confined under the mount root as
-        // `<connectionId>/<subpath>`, so it resolves onto that connection's host
-        // mount (`/mnt/polaris/<connectionId>/...`). bind/volume pass through.
-        volumes: app.volumes.map((volume) => {
-            const kind = volume.kind === "bind" ? "bind" : volume.kind === "nas" ? "nas" : "volume";
-            const stored = volume.source ?? volume.name;
-            // A server folder Polaris keeps for itself (an agent home, a database
-            // archive) is refused where it is written; this stops one stored before.
-            if (kind === "bind" && isReservedBindSource(stored))
-                throw new Error(
-                    `The server folder of volume ${volume.name} belongs to Polaris. Choose a different path.`
-                );
-            const source =
-                kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
-            return { mountPath: volume.mountPath, source, kind };
-        }),
+        volumes: app.volumes.map((volume) => ({
+            mountPath: volume.mountPath,
+            ...volumeMountSource(volume)
+        })),
         healthcheck,
         // The image's command replaced, for a one-click service whose image does
         // nothing without its arguments (MinIO's `server /data`).
@@ -4360,6 +4351,8 @@ export async function setApplicationServer(
         where: { id: applicationId },
         data: { targetId: newTarget.id, currentDeploymentId: null }
     });
+    // Its SFTP server follows it: taken down on the old server, started on the new.
+    await refreshFileAccess(applicationId, ownerId);
 }
 
 /** Update an application's auto-deploy settings (owner-checked). */

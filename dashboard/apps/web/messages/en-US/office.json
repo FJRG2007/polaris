@@ -553,7 +553,7 @@
             "failed": "Google Drive couldn't be linked. Try again."
         },
         "errors": {
-            "no-client": "Google isn't connected to this Polaris yet. An administrator can add it under Integrations.",
+            "no-client": "Google Drive isn't set up here yet. Ask an administrator.",
             "no-account": "That Google account isn't linked anymore. Link it again.",
             "relink": "Google needs you to link this account again before it shares Drive files.",
             "not-supported": "Only Google Docs and Sheets can be opened and saved here.",
@@ -561,7 +561,7 @@
             "not-found": "That file isn't there anymore, or this account can't see it.",
             "denied": "Google refused. Check the file is shared with this account.",
             "failed": "Google didn't answer. Try again in a moment.",
-            "api-off": "The Google Drive API is off in this Polaris's Google project. An administrator can switch it on under Integrations.",
+            "api-off": "Google Drive isn't available here right now. An administrator has been told.",
             "busy": "Google is busy right now. Try again in a minute."
         }
     },
