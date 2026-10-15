@@ -16,10 +16,23 @@
  * Runs on demand only, in the request's process, and leaves nothing running.
  */
 
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { rm, writeFile } from "node:fs/promises";
 import { prisma } from "@polaris/db";
 import type { TargetRow } from "./runtime";
+import type { RuntimePorts } from "@polaris/deploy";
 import {
+    listTablesCommand,
+    parseHexRows,
     parseWordpressPrefixes,
+    replaceInStoredValue,
+    rowsContainingCommand,
+    runScriptCommand,
+    updateRowsScript,
+    wordpressValueTables,
+    type StoredValueTable,
     pinnedImageRef,
     planPromotion,
     wordpressAddressCommand,
@@ -391,7 +404,66 @@ async function pointWordpressAtTarget(
                 const command = wordpressAddressCommand(client, { prefixes, ...move });
                 if (command) await runStep(ports, context.container, command, [client.password]);
             }
+            const tables = wordpressValueTables(
+                await runStep(ports, context.container, listTablesCommand(client), [client.password])
+            );
+            for (const move of moves) {
+                for (const table of tables) {
+                    await rewriteStoredValues(ports, context.container, client, table, `//${move.from}`, `//${move.to}`);
+                }
+            }
         });
+    }
+}
+
+/** Rows read and written back per round. */
+const PAGE = 200;
+/** A table is walked this far and no further, so a runaway one cannot hold the
+ *  promotion forever. */
+const MAX_ROWS = 200_000;
+
+/**
+ * Rewrite one table's values that contain `from`, serialized ones included,
+ * a page at a time: read the matching rows as hex, replace with their lengths
+ * recounted, and write back only the rows that changed, through one prepared
+ * statement whose values are bound, staged as a file so no value has to fit on
+ * a command line.
+ */
+async function rewriteStoredValues(
+    ports: RuntimePorts,
+    container: string,
+    client: { engine: "mysql" | "mariadb"; username: string; password: string; database: string },
+    table: StoredValueTable,
+    from: string,
+    to: string
+): Promise<void> {
+    const { runStep, stageInto, unstage } = await import("@/lib/database-ops/ops");
+    let afterId = "0";
+    for (let seen = 0; seen < MAX_ROWS; ) {
+        const rows = parseHexRows(
+            await runStep(ports, container, rowsContainingCommand(client, table, from, afterId, PAGE), [client.password])
+        );
+        if (rows.length === 0) return;
+        seen += rows.length;
+        afterId = rows[rows.length - 1]!.id;
+        const changed = rows.flatMap((row) => {
+            const value = replaceInStoredValue(row.value, from, to);
+            return value.equals(row.value) ? [] : [{ id: row.id, value }];
+        });
+        if (changed.length > 0) {
+            const name = `polaris-${randomUUID()}.sql`;
+            const local = join(tmpdir(), name);
+            const inside = `/tmp/${name}`;
+            await writeFile(local, updateRowsScript(table, changed), { mode: 0o600 });
+            try {
+                await stageInto(ports, container, local, inside);
+                await runStep(ports, container, runScriptCommand(client, inside), [client.password]);
+            } finally {
+                await unstage(ports, container, inside);
+                await rm(local, { force: true });
+            }
+        }
+        if (rows.length < PAGE) return;
     }
 }
 

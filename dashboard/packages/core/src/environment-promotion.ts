@@ -244,3 +244,119 @@ export function pinnedImageRef(imageRef: string, repoDigests: readonly string[])
     }
     return null;
 }
+/** A table that holds WordPress values which may be serialized. */
+export interface StoredValueTable {
+    readonly table: string;
+    readonly id: string;
+    readonly value: string;
+}
+
+const TABLE_NAME = /^[A-Za-z0-9_]{1,64}$/;
+
+/** Every table in the client's database, one name per line. */
+export function listTablesCommand(client: SqlClient): MaintenanceCommand {
+    return sqlCommand(
+        client,
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
+        "Listing the tables"
+    );
+}
+
+/**
+ * The option and metadata tables of every WordPress install in a database,
+ * found by their names rather than assumed: an install is a prefix with both
+ * an options and a posts table, and its metadata tables are taken when present.
+ */
+export function wordpressValueTables(listing: string): StoredValueTable[] {
+    const tables = new Set(
+        listing
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => TABLE_NAME.test(line))
+    );
+    const found: StoredValueTable[] = [];
+    for (const table of [...tables].sort()) {
+        if (!table.endsWith("_options")) continue;
+        const prefix = table.slice(0, -"options".length);
+        if (!tables.has(`${prefix}posts`)) continue;
+        found.push({ table, id: "option_id", value: "option_value" });
+        if (tables.has(`${prefix}postmeta`)) found.push({ table: `${prefix}postmeta`, id: "meta_id", value: "meta_value" });
+        if (tables.has(`${prefix}usermeta`)) found.push({ table: `${prefix}usermeta`, id: "umeta_id", value: "meta_value" });
+    }
+    return found;
+}
+
+function checkedTable(target: StoredValueTable): StoredValueTable {
+    if (![target.table, target.id, target.value].every((name) => TABLE_NAME.test(name)))
+        throw new Error("That is not a table name");
+    return target;
+}
+
+/**
+ * The next page of rows whose value contains `needle`, after row `afterId`:
+ * the id and the value as hex, so a tab or newline in a value cannot break a
+ * line of the output apart. The needle travels as a hex literal.
+ */
+export function rowsContainingCommand(
+    client: SqlClient,
+    target: StoredValueTable,
+    needle: string,
+    afterId: string,
+    limit: number
+): MaintenanceCommand {
+    const { table, id, value } = checkedTable(target);
+    if (!/^\d{1,20}$/.test(afterId)) throw new Error("That is not a row id");
+    const hex = Buffer.from(needle, "utf8").toString("hex");
+    if (!hex) throw new Error("Nothing to look for");
+    const size = Math.max(1, Math.min(500, Math.trunc(limit)));
+    return sqlCommand(
+        client,
+        `SELECT \`${id}\`, HEX(\`${value}\`) FROM \`${table}\` WHERE \`${id}\` > ${afterId} AND INSTR(\`${value}\`, X'${hex}') > 0 ORDER BY \`${id}\` LIMIT ${size}`,
+        `Reading ${table}`
+    );
+}
+
+/** The rows a `rowsContainingCommand` printed. A line that is not an id and
+ *  hex is skipped rather than guessed at. */
+export function parseHexRows(output: string): { id: string; value: Buffer }[] {
+    return output.split(/\r?\n/).flatMap((line) => {
+        const match = /^(\d{1,20})\t([0-9A-Fa-f]*)$/.exec(line.replace(/\r$/, ""));
+        if (!match || match[2]!.length % 2 !== 0) return [];
+        return [{ id: match[1]!, value: Buffer.from(match[2]!, "hex") }];
+    });
+}
+
+/**
+ * A script that writes the given values back, one prepared statement for all
+ * of them with each value and id bound as a parameter. Values are bound from
+ * hex literals, so no byte of a value is ever read as SQL.
+ */
+export function updateRowsScript(target: StoredValueTable, rows: readonly { id: string; value: Buffer }[]): string {
+    const { table, id, value } = checkedTable(target);
+    const lines = [`PREPARE polaris_write FROM 'UPDATE \`${table}\` SET \`${value}\` = ? WHERE \`${id}\` = ?';`];
+    for (const row of rows) {
+        if (!/^\d{1,20}$/.test(row.id)) throw new Error("That is not a row id");
+        lines.push(`SET @polaris_value = X'${row.value.toString("hex")}', @polaris_id = ${row.id};`);
+        lines.push("EXECUTE polaris_write USING @polaris_value, @polaris_id;");
+    }
+    lines.push("DEALLOCATE PREPARE polaris_write;");
+    return `${lines.join("\n")}\n`;
+}
+
+/** Run a staged script file with the engine's client, the file on its stdin.
+ *  Every value is its own argument; the shell only wires the redirect. */
+export function runScriptCommand(client: SqlClient, path: string): MaintenanceCommand {
+    return {
+        argv: [
+            "sh",
+            "-c",
+            '"$0" -u"$1" -p"$2" "$3" < "$4"',
+            client.engine === "mariadb" ? "mariadb" : "mysql",
+            client.username,
+            client.password,
+            client.database,
+            path
+        ],
+        describe: "Writing the values back"
+    };
+}

@@ -54,6 +54,7 @@ export * from "./seasons.js";
 export * from "./sleep.js";
 export * from "./service-templates.js";
 export * from "./environment-promotion.js";
+export * from "./php-serialize.js";
 export * from "./mailbox-folder-look.js";
 export * from "./mailbox-list.js";
 export * from "./mail-prefs.js";
