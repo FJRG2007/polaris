@@ -46,7 +46,7 @@ restarting from a dead mount point:
   and diffs the bare flags - not valued options, which the kernel often
   prints in another form or not at all - from what was requested
   (`missing_flags`). A real gap re-runs `mount_command` with `-o
-  remount,<options>`, which changes the options every container's bind of
+remount,<options>`, which changes the options every container's bind of
   the share sees without detaching it. `first_remount` keys a process-lifetime
   set by `id` and the exact option string, so a flag the kernel accepts but
   never lists back (and would therefore look "still missing" forever) is
