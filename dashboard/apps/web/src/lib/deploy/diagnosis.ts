@@ -87,7 +87,10 @@ async function failedApplicationDeployment(deploymentId: string, ownerId: string
 }
 
 /** Why this failed deploy failed, when its log says; null when it does not. */
-export async function diagnoseDeployment(deploymentId: string, ownerId: string): Promise<Diagnosis | null> {
+export async function diagnoseDeployment(
+    deploymentId: string,
+    ownerId: string
+): Promise<Diagnosis | null> {
     const deployment = await failedDeployment(deploymentId);
     if (!deployment) return null;
     const app = await applicationOf(deployment, ownerId);
@@ -104,7 +107,9 @@ export async function diagnoseDeployment(deploymentId: string, ownerId: string):
 
 /** A secret a framework accepts. Laravel's key has a shape of its own. */
 function generatedSecret(name: string): string {
-    return name === "APP_KEY" ? `base64:${randomBytes(32).toString("base64")}` : randomBytes(32).toString("base64url");
+    return name === "APP_KEY"
+        ? `base64:${randomBytes(32).toString("base64")}`
+        : randomBytes(32).toString("base64url");
 }
 
 /**

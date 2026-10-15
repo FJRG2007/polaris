@@ -37,29 +37,46 @@ vi.mock("@polaris/db", () => ({
                 updates.push(args);
                 // Mirror the real conditional write: a settled row is never rewritten.
                 const status = String(args.data.status ?? "");
-                if (row && ["cancelled", "failed", "running"].includes(row.status)) return { count: 0 };
+                if (row && ["cancelled", "failed", "running"].includes(row.status))
+                    return { count: 0 };
                 if (row) row.status = status;
                 return { count: 1 };
             })
         },
         // Promotion is what a cancel must never reach; if it does, this records it.
-        application: { findUnique: vi.fn(async () => promoted()), update: vi.fn(async () => promoted()) },
+        application: {
+            findUnique: vi.fn(async () => promoted()),
+            update: vi.fn(async () => promoted())
+        },
         domain: { deleteMany: vi.fn(async () => ({ count: 0 })) }
     }
 }));
-vi.mock("@/lib/notifications/deploy-events", () => ({ notifyDeployFinished: vi.fn(async () => undefined) }));
+vi.mock("@/lib/notifications/deploy-events", () => ({
+    notifyDeployFinished: vi.fn(async () => undefined)
+}));
 vi.mock("@/lib/deploy/runtime", () => ({
     getPorts: vi.fn(async (_target: unknown, _ownerId: string, signal?: AbortSignal) => {
         handedSignal = signal;
         return { dispose: vi.fn(async () => undefined) };
     }),
     getDriver: vi.fn(() => ({})),
-    toTargetInfo: vi.fn(() => ({ id: "target-1", kind: "local", engine: "compose", proxyNetwork: "polaris" }))
+    toTargetInfo: vi.fn(() => ({
+        id: "target-1",
+        kind: "local",
+        engine: "compose",
+        proxyNetwork: "polaris"
+    }))
 }));
 
 const { cancelDeployment, executeDeployment } = await import("@/lib/deploy-service");
 
-const TARGET = { id: "target-1", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "polaris" };
+const TARGET = {
+    id: "target-1",
+    kind: "local",
+    hostId: null,
+    runtime: "compose",
+    proxyNetwork: "polaris"
+};
 
 beforeEach(() => {
     row = { status: "queued" };
@@ -75,7 +92,9 @@ describe("cancelling a deploy that is running", () => {
         const aborted = new Promise<void>((resolve) => {
             void executeDeployment("dep-1", TARGET as never, "owner-1", async (ctx) => {
                 void ctx;
-                await new Promise<void>((stop) => handedSignal?.addEventListener("abort", () => stop(), { once: true }));
+                await new Promise<void>((stop) =>
+                    handedSignal?.addEventListener("abort", () => stop(), { once: true })
+                );
                 resolve();
                 return { ok: true, imageTag: "img:1" };
             });
