@@ -12,7 +12,11 @@
 import { normalizeRelPath, storageFailure, storageFailureDetail } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
-import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
+import {
+    getDriverForConnection,
+    HOST_CONNECTION_PREFIX,
+    SmbShareRequiredError
+} from "@/lib/storage-service";
 import {
     authorizeDrive,
     canManageDriveConnection,
@@ -24,6 +28,8 @@ import { listLocks } from "@/lib/access-lock-service";
 import { isReservedRootPath } from "@/lib/system-paths";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { hostRootAccess } from "@/lib/drive-root";
+import { StorageError } from "@polaris/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,18 +38,28 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     if (!(await sessionCan(user, "drive.read"))) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden") },
+            { status: 403 }
+        );
     }
 
     const url = new URL(request.url);
     const connectionId = url.searchParams.get("c");
-    if (!connectionId) return Response.json({ error: (await readerWords("api"))("errors.missingConnection") }, { status: 400 });
+    if (!connectionId)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.missingConnection") },
+            { status: 400 }
+        );
 
     let path: string;
     try {
         path = normalizeRelPath(url.searchParams.get("p") ?? "");
     } catch {
-        return Response.json({ error: (await readerWords("api"))("errors.invalidPath") }, { status: 400 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.invalidPath") },
+            { status: 400 }
+        );
     }
 
     try {
@@ -51,9 +67,17 @@ export async function GET(request: Request): Promise<Response> {
     } catch (caught) {
         // A locked ancestor: tell the client which lock to unlock rather than 403.
         if (caught instanceof DriveLockedError) {
-            return Response.json({ locked: true, lockId: caught.lockId, lockPath: caught.lockPath });
+            return Response.json({
+                locked: true,
+                lockId: caught.lockId,
+                lockPath: caught.lockPath
+            });
         }
-        if (caught instanceof DriveAccessError) return Response.json({ error: (await readerWords("api"))("errors.forbidden") }, { status: 403 });
+        if (caught instanceof DriveAccessError)
+            return Response.json(
+                { error: (await readerWords("api"))("errors.forbidden") },
+                { status: 403 }
+            );
         throw caught;
     }
 
@@ -67,7 +91,7 @@ export async function GET(request: Request): Promise<Response> {
 
     let driver;
     try {
-        driver = await getDriverForConnection(connectionId);
+        driver = await getDriverForConnection(connectionId, { userId: user.id });
     } catch (caught) {
         // A UNAS with no SMB share yet: tell the client to ask for the share name
         // rather than surfacing a generic failure (credentials are reused).
@@ -92,7 +116,9 @@ export async function GET(request: Request): Promise<Response> {
         const lockedPaths = new Set(locks.map((lock) => lock.path));
         // Resolve the creator ids present in this listing to display names once.
         const names = await resolveUserNames(
-            [...meta.values()].map((item) => item.creatorId).filter((id): id is string => Boolean(id))
+            [...meta.values()]
+                .map((item) => item.creatorId)
+                .filter((id): id is string => Boolean(id))
         );
         const entries = visibleEntries.map((entry) => {
             const item = meta.get(entry.path);
@@ -146,7 +172,38 @@ async function failed(
         ? storageFailureDetail(caught)
         : null;
     return Response.json(
-        { error: failure.reason, hint: failure.hint, retryable: failure.retryable, detail },
+        {
+            error: failure.reason,
+            hint: failure.hint,
+            retryable: failure.retryable,
+            detail,
+            noRoot: await refusedForWantOfRoot(user.id, connectionId, caught)
+        },
         { status: 502 }
     );
+}
+
+/**
+ * Whether a server refused this folder to its login only because it was
+ * enrolled without root access, for a reader who manages servers - who is read
+ * as root on any server that grants it, so the refusal is the enrollment's, and
+ * the screen says so instead of blaming the folder's permissions.
+ */
+async function refusedForWantOfRoot(
+    userId: string,
+    connectionId: string,
+    caught: unknown
+): Promise<boolean> {
+    if (!connectionId.startsWith(HOST_CONNECTION_PREFIX)) return false;
+    if (!(caught instanceof StorageError) || caught.code !== "permission_denied") return false;
+    try {
+        const access = await hostRootAccess(
+            userId,
+            connectionId.slice(HOST_CONNECTION_PREFIX.length)
+        );
+        return access.managesServers && !access.sudo;
+    } catch {
+        // A refinement of the sentence, never a reason to lose the answer.
+        return false;
+    }
 }

@@ -34,7 +34,11 @@ export interface ExecOptions {
 }
 
 /** Run one command, streaming stdout/stderr; resolves with the remote exit code. */
-export function execCommand(client: Client, command: string, options: ExecOptions = {}): Promise<ExecResult> {
+export function execCommand(
+    client: Client,
+    command: string,
+    options: ExecOptions = {}
+): Promise<ExecResult> {
     return new Promise((resolve, reject) => {
         const handler = (error: Error | undefined, channel: ClientChannel): void => {
             if (error) return reject(error);
@@ -125,4 +129,62 @@ export function forwardOut(
 export function clampDim(value: number | undefined, fallback: number, max: number): number {
     if (value === undefined || !Number.isFinite(value)) return fallback;
     return Math.max(MIN_DIM, Math.min(max, Math.floor(value)));
+}
+
+/**
+ * The command a root SFTP session runs instead of the `sftp` subsystem: the
+ * machine's own sftp-server, started through the login's password-less sudo.
+ *
+ * Fixed text with nothing interpolated into it. The candidates are where the
+ * common distributions put the binary (Debian/Ubuntu, RHEL/Fedora, Arch,
+ * Alpine/BSD); the first executable one replaces the shell. `-n` never prompts,
+ * so a machine whose sudo wants a password ends the session at once instead of
+ * waiting on a prompt nobody can answer.
+ */
+export const ROOT_SFTP_COMMAND =
+    'sudo -n sh -c \'for p in /usr/lib/openssh/sftp-server /usr/libexec/openssh/sftp-server /usr/lib/ssh/sftp-server /usr/libexec/sftp-server /usr/lib/sftp-server; do [ -x "$p" ] && exec "$p"; done; exit 127\'';
+
+/** The two channel requests of ssh2's client protocol this needs. */
+interface ChannelRequests {
+    subsystem(channel: number, name: string, wantReply: boolean): void;
+    exec(channel: number, command: string, wantReply: boolean): void;
+}
+
+/** Clients whose SFTP channels already start as root. */
+const rooted = new WeakSet<Client>();
+
+/**
+ * Open an SFTP session that runs as root, through the login's password-less sudo.
+ *
+ * ssh2 builds its SFTP object from the channel type when the channel opens, and
+ * only then asks the server for the `sftp` subsystem; a plain exec channel can
+ * never become one. So the request is what changes: on this client, the
+ * subsystem request for `sftp` goes out as an exec of `ROOT_SFTP_COMMAND`, and
+ * the SFTP protocol then runs over the stdin/stdout of a root sftp-server
+ * exactly as it does over the subsystem's.
+ *
+ * Every SFTP channel on the client becomes root, so the client must be one kept
+ * for root sessions alone, never shared with a login's. It reaches ssh2's
+ * protocol object, which is not public API: if a future ssh2 moves it, this
+ * throws rather than quietly opening a session as the login.
+ */
+export function openRootSftp(client: Client): Promise<SFTPWrapper> {
+    if (!rooted.has(client)) {
+        const protocol = (client as unknown as { _protocol?: Partial<ChannelRequests> })._protocol;
+        if (
+            !protocol ||
+            typeof protocol.subsystem !== "function" ||
+            typeof protocol.exec !== "function"
+        ) {
+            return Promise.reject(new Error("root_sftp_unsupported"));
+        }
+        const subsystem = protocol.subsystem.bind(protocol);
+        const exec = protocol.exec.bind(protocol);
+        protocol.subsystem = (channel, name, wantReply) =>
+            name === "sftp"
+                ? exec(channel, ROOT_SFTP_COMMAND, wantReply)
+                : subsystem(channel, name, wantReply);
+        rooted.add(client);
+    }
+    return openSftp(client);
 }

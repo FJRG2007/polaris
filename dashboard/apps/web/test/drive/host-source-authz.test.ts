@@ -55,6 +55,10 @@ vi.mock("@/lib/access-lock-service", () => ({
     verifyLockUnlock: () => false
 }));
 
+// The Host the local enrollment points at - the machine Polaris runs on.
+let localHostId: string | null = null;
+vi.mock("@/lib/local-server", () => ({ getLocalHostId: async () => localHostId }));
+
 const { authorizeDrive, DriveAccessError } = await import("../../src/lib/drive-authz");
 
 const OWNER = "018f2b7a-0000-7000-8000-0000000000a1";
@@ -69,6 +73,7 @@ describe("a server as a Drive source", () => {
         userHasPermission.mockClear();
         findUniqueHost.mockResolvedValue({ ownerId: OWNER });
         findUniqueUser.mockResolvedValue({ isAdmin: false });
+        localHostId = null;
     });
 
     it("lets the owner browse it, without touching the connection table", async () => {
@@ -96,6 +101,23 @@ describe("a server as a Drive source", () => {
     it("lets an admin in without owning it", async () => {
         findUniqueUser.mockResolvedValue({ isAdmin: true });
         await expect(authorizeDrive(OTHER, SOURCE, "", "delete")).resolves.toBeUndefined();
+    });
+
+    it("lets somebody who manages servers into the machine Polaris runs on, whoever enrolled it", async () => {
+        localHostId = HOST;
+        await expect(authorizeDrive(OTHER, SOURCE, "root", "read")).resolves.toBeUndefined();
+        expect(userHasPermission).toHaveBeenCalledWith(OTHER, "system.manage");
+    });
+
+    it("keeps the machine Polaris runs on from somebody who does not manage servers", async () => {
+        localHostId = HOST;
+        userHasPermission.mockImplementation(
+            async (_userId: string, permission: string) => permission !== "system.manage"
+        );
+        await expect(authorizeDrive(OTHER, SOURCE, "", "read")).rejects.toBeInstanceOf(
+            DriveAccessError
+        );
+        userHasPermission.mockImplementation(async () => true);
     });
 
     it("refuses a server that is no longer registered", async () => {

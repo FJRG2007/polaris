@@ -28,6 +28,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
+import { containerDriveLinkAction } from "./drive-link-actions";
 import { containerStateLabel } from "../container-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -56,6 +57,7 @@ import {
     ChevronRight,
     Cpu,
     Download,
+    ExternalLink,
     FileText,
     Folder,
     HardDrive,
@@ -271,7 +273,9 @@ export function ContainerView({
                             {detail?.name || containerRef}
                         </h1>
                         {detail ? (
-                            <Badge variant={running ? "success" : "neutral"}>{containerStateLabel(t, state)}</Badge>
+                            <Badge variant={running ? "success" : "neutral"}>
+                                {containerStateLabel(t, state)}
+                            </Badge>
                         ) : (
                             <Skeleton className="h-5 w-16 rounded-full" />
                         )}
@@ -360,7 +364,11 @@ export function ContainerView({
                     icon={<Cpu className="size-4" />}
                     label={t("columns.cpu")}
                     value={latest ? `${latest.cpuPercent}%` : running ? null : "-"}
-                    hint={host ? t("detail.hostCores", { count: host.overview.ncpu }) : t("detail.ofHostCores")}
+                    hint={
+                        host
+                            ? t("detail.hostCores", { count: host.overview.ncpu })
+                            : t("detail.ofHostCores")
+                    }
                     age={latestAge}
                 />
                 <Stat
@@ -369,7 +377,10 @@ export function ContainerView({
                     value={latest ? formatBytes(latest.memUsage) : running ? null : "-"}
                     hint={
                         latest && latest.memLimit > 0
-                            ? t("detail.memShare", { percent: latest.memPercent, limit: formatBytes(latest.memLimit) })
+                            ? t("detail.memShare", {
+                                  percent: latest.memPercent,
+                                  limit: formatBytes(latest.memLimit)
+                              })
                             : t("detail.noLimit")
                     }
                     age={latestAge}
@@ -377,15 +388,35 @@ export function ContainerView({
                 <Stat
                     icon={<Network className="size-4" />}
                     label={t("detail.network")}
-                    value={latest ? t("detail.in", { size: formatBytes(latest.netRx) }) : running ? null : "-"}
-                    hint={latest ? t("detail.out", { size: formatBytes(latest.netTx) }) : t("detail.sinceStart")}
+                    value={
+                        latest
+                            ? t("detail.in", { size: formatBytes(latest.netRx) })
+                            : running
+                              ? null
+                              : "-"
+                    }
+                    hint={
+                        latest
+                            ? t("detail.out", { size: formatBytes(latest.netTx) })
+                            : t("detail.sinceStart")
+                    }
                     age={latestAge}
                 />
                 <Stat
                     icon={<HardDrive className="size-4" />}
                     label={t("detail.disk")}
-                    value={latest ? t("detail.read", { size: formatBytes(latest.blockRead) }) : running ? null : "-"}
-                    hint={latest ? t("detail.written", { size: formatBytes(latest.blockWrite) }) : t("detail.sinceStart")}
+                    value={
+                        latest
+                            ? t("detail.read", { size: formatBytes(latest.blockRead) })
+                            : running
+                              ? null
+                              : "-"
+                    }
+                    hint={
+                        latest
+                            ? t("detail.written", { size: formatBytes(latest.blockWrite) })
+                            : t("detail.sinceStart")
+                    }
                     age={latestAge}
                 />
             </div>
@@ -419,7 +450,9 @@ export function ContainerView({
                 <CardBody className="min-h-[24rem]">
                     {tab === "details" ? <DetailsTab detail={detail} /> : null}
                     {tab === "logs" ? <LogsTab query={query} /> : null}
-                    {tab === "files" ? <FilesTab query={query} /> : null}
+                    {tab === "files" ? (
+                        <FilesTab query={query} connectionId={connection.id} detail={detail} />
+                    ) : null}
                     {tab === "console" ? (
                         <ConsoleTab
                             connectionId={connection.id}
@@ -461,7 +494,10 @@ function Usage({ samples }: { samples: Sample[] }) {
         v: sample.usage.memUsage,
         note:
             sample.usage.memLimit > 0
-                ? t("overview.ofValue", { used: formatBytes(sample.usage.memUsage), total: formatBytes(sample.usage.memLimit) })
+                ? t("overview.ofValue", {
+                      used: formatBytes(sample.usage.memUsage),
+                      total: formatBytes(sample.usage.memLimit)
+                  })
                 : formatBytes(sample.usage.memUsage)
     }));
 
@@ -538,7 +574,10 @@ function RunsOn({
                     </Field>
                     <Field label={t("runsOn.machine")}>
                         {host ? (
-                            t("runsOn.machineValue", { count: host.overview.ncpu, memory: formatBytes(host.overview.memTotal) })
+                            t("runsOn.machineValue", {
+                                count: host.overview.ncpu,
+                                memory: formatBytes(host.overview.memTotal)
+                            })
                         ) : (
                             <Skeleton className="h-4 w-32" />
                         )}
@@ -706,7 +745,9 @@ function LogsTab({ query }: { query: string }) {
     return (
         <div className="flex h-full flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-muted-foreground">{t("logs.last", { count: tail })}</span>
+                <span className="text-xs text-muted-foreground">
+                    {t("logs.last", { count: tail })}
+                </span>
                 <div className="flex items-center gap-1">
                     <Button
                         size="sm"
@@ -739,9 +780,46 @@ function LogsTab({ query }: { query: string }) {
     );
 }
 
-function FilesTab({ query }: { query: string }) {
+function FilesTab({
+    query,
+    connectionId,
+    detail
+}: {
+    query: string;
+    connectionId: string;
+    /** For the name and mounts "Open in Drive" is worked out from; null until read. */
+    detail: ContainerDetailData | null;
+}) {
     const t = useTranslations("containers");
     const [path, setPath] = useState("/");
+    const [driveHref, setDriveHref] = useState<string | null>(null);
+
+    // Where this folder opens in Drive, for this viewer - or no button at all.
+    // Keyed on the mounts' text, not the array: the live detail is re-read every
+    // few seconds and a fresh array of the same mounts must not ask again.
+    const containerName = detail?.name ?? null;
+    const mountsKey = JSON.stringify(
+        (detail?.mounts ?? []).map(({ source, destination }) => ({ source, destination }))
+    );
+    useEffect(() => {
+        if (!containerName) return;
+        let cancelled = false;
+        void containerDriveLinkAction({
+            connectionId,
+            containerName,
+            path,
+            mounts: JSON.parse(mountsKey) as unknown
+        })
+            .then((href) => {
+                if (!cancelled) setDriveHref(href);
+            })
+            .catch(() => {
+                if (!cancelled) setDriveHref(null);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [connectionId, containerName, mountsKey, path]);
     const [entries, setEntries] = useState<Array<{ name: string; isDir: boolean }> | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -771,23 +849,38 @@ function FilesTab({ query }: { query: string }) {
 
     return (
         <div className="flex h-full flex-col gap-2">
-            <nav className="flex flex-wrap items-center gap-1 text-sm" aria-label={t("files.breadcrumb")}>
-                <button type="button" className="hover:underline" onClick={() => setPath("/")}>
-                    /
-                </button>
-                {segments.map((segment, index) => (
-                    <span key={`${segment}-${index}`} className="flex items-center gap-1">
-                        <ChevronRight className="size-3 text-muted-foreground" />
-                        <button
-                            type="button"
-                            className="hover:underline"
-                            onClick={() => setPath(`/${segments.slice(0, index + 1).join("/")}`)}
-                        >
-                            {segment}
-                        </button>
-                    </span>
-                ))}
-            </nav>
+            <div className="flex items-start gap-2">
+                <nav
+                    className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-sm"
+                    aria-label={t("files.breadcrumb")}
+                >
+                    <button type="button" className="hover:underline" onClick={() => setPath("/")}>
+                        /
+                    </button>
+                    {segments.map((segment, index) => (
+                        <span key={`${segment}-${index}`} className="flex items-center gap-1">
+                            <ChevronRight className="size-3 text-muted-foreground" />
+                            <button
+                                type="button"
+                                className="hover:underline"
+                                onClick={() =>
+                                    setPath(`/${segments.slice(0, index + 1).join("/")}`)
+                                }
+                            >
+                                {segment}
+                            </button>
+                        </span>
+                    ))}
+                </nav>
+                {driveHref ? (
+                    <Button size="sm" variant="secondary" asChild className="shrink-0">
+                        <Link href={driveHref}>
+                            <ExternalLink className="size-4" />
+                            {t("files.openInDrive")}
+                        </Link>
+                    </Button>
+                ) : null}
+            </div>
             {error ? <Notice tone="danger">{error}</Notice> : null}
             {entries === null ? (
                 <div className="space-y-1">
@@ -796,9 +889,7 @@ function FilesTab({ query }: { query: string }) {
                     ))}
                 </div>
             ) : entries.length === 0 && !error ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                    {t("files.empty")}
-                </p>
+                <p className="py-8 text-center text-sm text-muted-foreground">{t("files.empty")}</p>
             ) : (
                 <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-md border border-border">
                     {entries.map((entry) => {
@@ -875,11 +966,7 @@ function ConsoleTab({
         );
     }
     if (!canAttach) {
-        return (
-            <Notice tone="muted">
-                {t("console.noSession")}
-            </Notice>
-        );
+        return <Notice tone="muted">{t("console.noSession")}</Notice>;
     }
     return (
         <TerminalPanel
@@ -969,7 +1056,10 @@ async function fetchJson<T>(
         const response = await fetch(url);
         const payload = (await response.json()) as T & { error?: string };
         if (!response.ok || payload.error) {
-            return { ok: false, error: payload.error ?? t("errors.requestFailed", { status: response.status }) };
+            return {
+                ok: false,
+                error: payload.error ?? t("errors.requestFailed", { status: response.status })
+            };
         }
         return { ok: true, data: payload };
     } catch {

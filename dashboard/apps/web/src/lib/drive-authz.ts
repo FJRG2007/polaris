@@ -21,6 +21,8 @@ import { loadEnv } from "@polaris/config";
 import type { StorageDriver } from "@polaris/storage";
 import type { DriveAction, Permission } from "@polaris/core";
 import { effectiveCan, effectiveIsAdmin } from "@/lib/effective-access";
+import { getLocalHostId } from "@/lib/local-server";
+import { managesServers, reachesLocalHost } from "@/lib/drive-root";
 import { canAccessDrive, resolveDriveDecision } from "@/lib/drive-acl-service";
 import {
     CONTAINER_CONNECTION_PREFIX,
@@ -228,7 +230,16 @@ async function resolveReader(
         ]);
         if (!host) throw new DriveAccessError();
         if (!(await effectiveIsAdmin(userId, user?.isAdmin === true))) {
-            if (host.ownerId !== userId) throw new DriveAccessError();
+            if (host.ownerId !== userId) {
+                // The machine Polaris runs on is everybody's who manages servers,
+                // whoever happened to enroll it (`reachesLocalHost`).
+                const [localHostId, manages] = await Promise.all([
+                    getLocalHostId(),
+                    managesServers(userId)
+                ]);
+                if (!reachesLocalHost({ localHostId, hostId, managesServers: manages }))
+                    throw new DriveAccessError();
+            }
             if (!(await effectiveCan(userId, OWNER_CAPABILITY[action])))
                 throw new DriveAccessError();
         }
@@ -499,5 +510,5 @@ export async function requireDriveDriver(
     opts?: { skipLock?: boolean }
 ): Promise<StorageDriver> {
     await authorizeDrive(userId, connectionId, path, action, opts);
-    return getDriverForConnection(connectionId);
+    return getDriverForConnection(connectionId, { userId });
 }

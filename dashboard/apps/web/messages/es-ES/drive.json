@@ -266,7 +266,14 @@
             "placeholder": "p. ej. Documentos/Archivo",
             "submit": "Mover"
         },
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "listingError": {
+            "up": "Subir una carpeta",
+            "back": "Volver",
+            "details": "Detalles técnicos",
+            "openServer": "Abrir servidor",
+            "noRoot": "Este servidor se añadió sin acceso root, así que Drive lo lee con su cuenta. Añádelo de nuevo con acceso root desde su página para abrir todo."
+        }
     },
     "page": {
         "title": "Drive",

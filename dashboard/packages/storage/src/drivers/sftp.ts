@@ -41,6 +41,11 @@ const SFTP_CAPABILITIES: StorageDriverCapabilities = {
 interface SftpDriverBase {
     readonly id: string;
     readonly root: string;
+    /** Hand every file and folder this driver creates to the owner of the folder
+     *  it lands in. Set for a session that runs as root, so what an administrator
+     *  uploads or extracts into a service's folder stays that service's to change
+     *  instead of becoming root's. */
+    readonly inheritOwner?: boolean;
 }
 
 /** Options for a driver that owns its connection: it opens one on `connect` and
@@ -88,7 +93,8 @@ export type SftpDriverOptions = SftpConnectOptions | SftpSessionOptions;
  * sentence of its own leaves nothing upstream to classify.
  */
 function sftpError(error: Error & { code?: number }, what: string): StorageError {
-    if (error.code === 3) return new StorageError("permission_denied", `Not permitted: ${what}`, error);
+    if (error.code === 3)
+        return new StorageError("permission_denied", `Not permitted: ${what}`, error);
     if (error.code !== undefined && error.code !== 2) {
         return new StorageError("io_error", `Cannot ${what} (code ${error.code})`, error);
     }
@@ -127,12 +133,12 @@ export class SftpDriver implements StorageDriver {
         // Auth method follows the material provided: a private key when present,
         // otherwise a password. Host-key pinning + auth live in @polaris/ssh.
         const auth = this.options.privateKey
-            ? ({
+            ? {
                   method: "key" as const,
                   privateKey: this.options.privateKey,
                   passphrase: this.options.passphrase
-              })
-            : ({ method: "password" as const, password: this.options.password ?? "" });
+              }
+            : { method: "password" as const, password: this.options.password ?? "" };
         let client: Client;
         try {
             client = await openSshClient({
@@ -169,14 +175,24 @@ export class SftpDriver implements StorageDriver {
         const rel = normalizeRelPath(path);
         const abs = this.resolve(rel);
         const sftp = this.channel();
-        const items = await new Promise<Array<{ filename: string; attrs: Stats }>>((resolve, reject) => {
-            sftp.readdir(abs, (error, list) =>
-                error ? reject(sftpError(error, `list ${path || "this location"}`)) : resolve(list as never)
-            );
-        });
+        const items = await new Promise<Array<{ filename: string; attrs: Stats }>>(
+            (resolve, reject) => {
+                sftp.readdir(abs, (error, list) =>
+                    error
+                        ? reject(sftpError(error, `list ${path || "this location"}`))
+                        : resolve(list as never)
+                );
+            }
+        );
         const entries: StatEntry[] = items
             .filter((item) => item.filename !== "." && item.filename !== "..")
-            .map((item) => toEntry(item.filename, rel === "" ? item.filename : `${rel}/${item.filename}`, item.attrs));
+            .map((item) =>
+                toEntry(
+                    item.filename,
+                    rel === "" ? item.filename : `${rel}/${item.filename}`,
+                    item.attrs
+                )
+            );
         entries.sort((a, b) => {
             if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;
             return a.name.localeCompare(b.name);
@@ -189,7 +205,9 @@ export class SftpDriver implements StorageDriver {
         const sftp = this.channel();
         const attrs = await new Promise<Stats>((resolve, reject) => {
             sftp.stat(this.resolve(rel), (error, stats) =>
-                error ? reject(sftpError(error, `read ${path || "this location"}`)) : resolve(stats as never)
+                error
+                    ? reject(sftpError(error, `read ${path || "this location"}`))
+                    : resolve(stats as never)
             );
         });
         return toEntry(baseName(rel) || rel, rel, attrs);
@@ -214,11 +232,13 @@ export class SftpDriver implements StorageDriver {
             options?.offset && options.offset > 0
                 ? { flags: "r+" as const, start: options.offset }
                 : { flags: "w" as const };
+        const created =
+            this.options.inheritOwner === true &&
+            writeOptions.flags === "w" &&
+            !(await this.exists(abs));
         const out = this.channel().createWriteStream(abs, writeOptions);
-        await pipeAndClose(
-            Readable.fromWeb(body as import("node:stream/web").ReadableStream),
-            out
-        );
+        await pipeAndClose(Readable.fromWeb(body as import("node:stream/web").ReadableStream), out);
+        if (created) await this.adoptParentOwner(abs, this.resolve(parentOf(rel)));
         return this.stat(rel);
     }
 
@@ -232,7 +252,9 @@ export class SftpDriver implements StorageDriver {
         await this.mkdirp(parentOf(normalizeRelPath(to)));
         const sftp = this.channel();
         await new Promise<void>((resolve, reject) => {
-            sftp.rename(src, dst, (error) => (error ? reject(sftpError(error, `move ${from}`)) : resolve()));
+            sftp.rename(src, dst, (error) =>
+                error ? reject(sftpError(error, `move ${from}`)) : resolve()
+            );
         });
     }
 
@@ -265,21 +287,47 @@ export class SftpDriver implements StorageDriver {
         for (const segment of segments) {
             current = current === "" ? segment : `${current}/${segment}`;
             const abs = this.resolve(current);
-            await new Promise<void>((resolve) => {
-                this.channel().mkdir(abs, () => resolve());
+            const made = await new Promise<boolean>((resolve) => {
+                this.channel().mkdir(abs, (error) => resolve(!error));
             });
+            if (made && this.options.inheritOwner)
+                await this.adoptParentOwner(abs, this.resolve(parentOf(current)));
         }
+    }
+
+    private async exists(abs: string): Promise<boolean> {
+        return new Promise<boolean>((resolve) => {
+            this.channel().stat(abs, (error) => resolve(!error));
+        });
+    }
+
+    /** Give a path the owner and group of its folder. Best effort: a session that
+     *  may not chown leaves the entry as it was written, which is what it was
+     *  before this existed. */
+    private async adoptParentOwner(abs: string, parentAbs: string): Promise<void> {
+        const sftp = this.channel();
+        const parent = await new Promise<Stats | undefined>((resolve) => {
+            sftp.stat(parentAbs, (error, stats) => resolve(error ? undefined : (stats as never)));
+        });
+        if (!parent || typeof parent.uid !== "number" || typeof parent.gid !== "number") return;
+        await new Promise<void>((resolve) => {
+            sftp.chown(abs, parent.uid, parent.gid, () => resolve());
+        });
     }
 
     private async rmdir(abs: string): Promise<void> {
         await new Promise<void>((resolve, reject) => {
-            this.channel().rmdir(abs, (error) => (error ? reject(sftpError(error, "remove this folder")) : resolve()));
+            this.channel().rmdir(abs, (error) =>
+                error ? reject(sftpError(error, "remove this folder")) : resolve()
+            );
         });
     }
 
     private async unlink(abs: string): Promise<void> {
         await new Promise<void>((resolve, reject) => {
-            this.channel().unlink(abs, (error) => (error ? reject(sftpError(error, "delete this file")) : resolve()));
+            this.channel().unlink(abs, (error) =>
+                error ? reject(sftpError(error, "delete this file")) : resolve()
+            );
         });
     }
 }
@@ -288,6 +336,8 @@ export class SftpDriver implements StorageDriver {
 interface Stats {
     size: number;
     mtime: number;
+    uid: number;
+    gid: number;
     isDirectory(): boolean;
     isSymbolicLink(): boolean;
 }

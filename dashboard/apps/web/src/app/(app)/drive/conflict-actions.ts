@@ -90,7 +90,7 @@ export async function nameClashesAction(
     const kinds = new Map(visible.map((entry) => [entry.path, entry.kind]));
     let driver;
     try {
-        driver = await getDriverForConnection(connectionId);
+        driver = await getDriverForConnection(connectionId, { userId: user.id });
     } catch (caught) {
         console.error("drive: clash check could not open the location:", caught);
         return { error: t("conflicts.checkFailed") };
@@ -156,7 +156,7 @@ export async function reserveFolderAction(
     }
     let driver;
     try {
-        driver = await getDriverForConnection(parsed.data.connectionId);
+        driver = await getDriverForConnection(parsed.data.connectionId, { userId: user.id });
     } catch {
         return { error: t("errors.createFolderFailed") };
     }
