@@ -5558,9 +5558,56 @@ model Domain {
     healthAlertedAt DateTime?
 
     application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    cutovers    DnsCutover[]
 
     @@index([applicationId])
     @@index([deploymentId])
+}
+
+// Moving one hostname from the service that answers it to another, step by step:
+// checked, its TTL lowered, switched, watched until the public resolvers and the new
+// service agree, and finished or rolled back. The background pass reads `phase` and
+// moves it on; the screen only reads this row.
+model DnsCutover {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    domainId            String    @db.Uuid
+    hostname            String
+    // Soft pointers, like Deployment.deployableId: the services it moves between.
+    sourceApplicationId String    @db.Uuid
+    targetApplicationId String    @db.Uuid
+    actorId             String?   @db.Uuid
+    // Set to the domain id while the cutover is open and cleared when it ends, so
+    // two cutovers of one hostname cannot be open at once.
+    openKey             String?   @unique
+    // preflight-failed | lowering | ready | propagating | finishing | done |
+    // failed | rolled-back (see lib/deploy/dns-cutover.ts)
+    phase               String
+    // edge: both services answer behind the same edge, so only the route moves.
+    // cloudflare: Polaris writes the record. manual: the owner changes it.
+    mode                String
+    // The A record before and after: JSON string arrays.
+    oldValues           String    @default("[]")
+    newValue            String?
+    // The record's TTL before it was lowered, restored at the end.
+    oldTtl              Int?
+    zoneId              String?
+    // The Cloudflare record ids it wrote, JSON, for the rollback.
+    recordIds           String    @default("[]")
+    // What the last check found: JSON, read by the screen as it is.
+    checks              String    @default("{}")
+    // A machine reason the screen turns into a sentence, when it failed.
+    failure             String?
+    passes              Int       @default(0)
+    lowerUntil          DateTime?
+    switchedAt          DateTime?
+    finishedAt          DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+    @@index([domainId, createdAt])
+    @@index([phase])
 }
 
 // Environment variable or secret, scoped to an application or an environment.
