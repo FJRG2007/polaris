@@ -301,8 +301,12 @@ export async function prepareServerEdge(
  * operator's call, and so is a setup somebody already started. What happened is
  * written into the server's history, since nobody is watching when this runs.
  */
-export async function setUpNewServer(hostId: string, ownerId: string, name: string): Promise<void> {
-    if (isSettingUp(hostId)) return;
+export async function setUpNewServer(
+    hostId: string,
+    ownerId: string,
+    name: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (isSettingUp(hostId)) return { ok: true };
     try {
         const ready = await withSetupLock(hostId, async () => {
             const state = await readServerEdge(hostId, ownerId);
@@ -313,9 +317,10 @@ export async function setUpNewServer(hostId: string, ownerId: string, name: stri
             return true;
         });
         if (ready) await recordServerEvent(hostId, null, "edge-ready");
+        return { ok: true };
     } catch (error) {
-        await recordServerEvent(hostId, null, "edge-failed", {
-            to: error instanceof Error ? error.message : "It could not be set up"
-        }).catch(() => undefined);
+        const reason = error instanceof Error ? error.message : "It could not be set up";
+        await recordServerEvent(hostId, null, "edge-failed", { to: reason }).catch(() => undefined);
+        return { ok: false, error: reason };
     }
 }

@@ -46,8 +46,13 @@ import { generateToken, hashToken } from "@polaris/core/tokens";
 import { decryptSecret, encryptCredentials, encryptSecret } from "@polaris/storage";
 import { generateSshKeyPair, publicKeyBlob, testAndCaptureHostKey } from "@polaris/ssh";
 import {
+    ENROLLMENT_PROGRESS_LIMIT,
     ENROLLMENT_REFUSAL_MESSAGES,
     ENROLLMENT_TTL_MS,
+    readEnrollmentProgress,
+    settleStalledSetup,
+    type EnrollmentEvent,
+    type EnrollmentLogCode,
     ENROLLMENT_USERNAME,
     enrollmentAddressCandidates,
     environmentFromAddress,
@@ -75,6 +80,54 @@ const FETCH_WINDOW_MS = 10 * 60 * 1000;
  *  is the claim's, since neither should be worth grinding at. */
 const REFUSE_LIMIT = 10;
 const REFUSE_WINDOW_MS = 10 * 60 * 1000;
+
+/** An event as a caller writes it; the time is stamped here. */
+export type EnrollmentNote = Omit<EnrollmentEvent, "at">;
+
+/**
+ * Append one event to an enrollment's log, in one statement so two writers - the
+ * script fetch and a claim - never overwrite each other's line.
+ *
+ * Best effort by design. The log is what the operator watches; the exchange
+ * itself must never fail because a line about it could not be written.
+ */
+export async function noteEnrollment(id: string, note: EnrollmentNote): Promise<void> {
+    const line = JSON.stringify([{ ...note, at: new Date().toISOString() }]);
+    try {
+        await prisma.$executeRaw`UPDATE "Enrollment" SET "progress" = (SELECT jsonb_agg(e ORDER BY i) FROM jsonb_array_elements(COALESCE("progress", '[]'::jsonb) || ${line}::jsonb) WITH ORDINALITY AS t(e, i) WHERE i > jsonb_array_length(COALESCE("progress", '[]'::jsonb)) + 1 - ${ENROLLMENT_PROGRESS_LIMIT}) WHERE "id" = ${id}::uuid`;
+    } catch {
+        // Nothing to do: see above.
+    }
+}
+
+/** The same, for the endpoints that only hold a token, and only while the
+ *  command it names is still live - a dead token writes nothing. */
+async function noteLiveToken(tokenHash: string, note: EnrollmentNote): Promise<void> {
+    const line = JSON.stringify([{ ...note, at: new Date().toISOString() }]);
+    try {
+        await prisma.$executeRaw`UPDATE "Enrollment" SET "progress" = (SELECT jsonb_agg(e ORDER BY i) FROM jsonb_array_elements(COALESCE("progress", '[]'::jsonb) || ${line}::jsonb) WITH ORDINALITY AS t(e, i) WHERE i > jsonb_array_length(COALESCE("progress", '[]'::jsonb)) + 1 - ${ENROLLMENT_PROGRESS_LIMIT}) WHERE "tokenHash" = ${tokenHash} AND "claimedAt" IS NULL AND "hostId" IS NULL AND "expiresAt" > NOW()`;
+    } catch {
+        // Best effort, as above.
+    }
+}
+
+/** How the setup that follows a claim went, for the dialog still watching. */
+export async function noteEnrollmentSetup(
+    enrollmentId: string,
+    outcome: { ok: true } | { ok: false; error: string }
+): Promise<void> {
+    await noteEnrollment(
+        enrollmentId,
+        outcome.ok
+            ? { step: "setup", state: "done", code: "setupDone" }
+            : {
+                  step: "setup",
+                  state: "failed",
+                  code: "setupFailed",
+                  detail: outcome.error.slice(0, 500)
+              }
+    );
+}
 
 /** The same command, addressed at Polaris on the local network. */
 export interface LocalEnrollment {
@@ -143,6 +196,7 @@ export async function openEnrollment(
         },
         select: { id: true }
     });
+    await noteEnrollment(row.id, { step: "command", state: "done", code: "created" });
 
     await recordAudit({
         actorId: userId,
@@ -215,6 +269,7 @@ export async function resolveEnrollment(
         }
     });
     if (!row || row.claimedAt || row.expiresAt < new Date()) return null;
+    await noteEnrollment(row.id, { step: "fetched", state: "done", code: "scriptFetched" });
     return { id: row.id, kind: row.kind, username: row.username, publicKey: row.publicKey };
 }
 
@@ -257,6 +312,12 @@ export async function refuseEnrollment(
         },
         data: { error: ENROLLMENT_REFUSAL_MESSAGES[reason] }
     });
+    await noteLiveToken(hashToken(token), {
+        step: "checked",
+        state: "failed",
+        code: "refused",
+        reason
+    });
 }
 
 /** How a claim went, in the shape the waiting dialog polls for. */
@@ -271,6 +332,8 @@ export interface EnrollmentStatus {
      *  server is on" apart from "generate a new one", and needs to keep watching
      *  for the re-run rather than treating the error as the end. */
     retryable: boolean;
+    /** Every step so far, for the dialog to draw. */
+    progress: EnrollmentEvent[];
 }
 
 export async function getEnrollmentStatus(
@@ -279,7 +342,14 @@ export async function getEnrollmentStatus(
 ): Promise<EnrollmentStatus | null> {
     const row = await prisma.enrollment.findFirst({
         where: { id, createdById: userId },
-        select: { name: true, claimedAt: true, expiresAt: true, hostId: true, error: true }
+        select: {
+            name: true,
+            claimedAt: true,
+            expiresAt: true,
+            hostId: true,
+            error: true,
+            progress: true
+        }
     });
     if (!row) return null;
     return {
@@ -287,7 +357,8 @@ export async function getEnrollmentStatus(
         hostId: row.hostId,
         name: row.name,
         error: row.error,
-        retryable: !row.hostId && !row.claimedAt && row.expiresAt > new Date()
+        retryable: !row.hostId && !row.claimedAt && row.expiresAt > new Date(),
+        progress: settleStalledSetup(readEnrollmentProgress(row.progress), new Date())
     };
 }
 
@@ -333,7 +404,7 @@ export interface ClaimResult {
      * pressing the button: a Linux server enrolled with root. For the caller to
      * start once the machine has had its answer - never sent back to it.
      */
-    setup?: { hostId: string; ownerId: string; name: string };
+    setup?: { hostId: string; ownerId: string; name: string; enrollmentId: string };
 }
 
 /**
@@ -380,6 +451,18 @@ export async function claimEnrollment(
             username: payload.username
         }
     });
+    await noteEnrollment(row.id, {
+        step: "checked",
+        state: "done",
+        code: "machineReported",
+        facts: {
+            platform: payload.platform,
+            arch: payload.arch,
+            os: payload.os ? payload.os.slice(0, 200) : undefined,
+            docker: payload.docker,
+            root: payload.root
+        }
+    });
 
     // Polaris' own address on the local network, so a machine that is on it is
     // reached across the room rather than out through the router and back. Null
@@ -391,13 +474,17 @@ export async function claimEnrollment(
         await getHostLanIp().catch(() => null)
     );
     if (candidates.length === 0)
-        return await failClaim(row.id, "Could not work out an address to reach this machine at");
+        return await failClaim(
+            row.id,
+            "Could not work out an address to reach this machine at",
+            "noAddress"
+        );
 
     const pins = payload.hostKeys
         .map(publicKeyBlob)
         .filter((blob): blob is string => blob !== null);
     if (pins.length === 0)
-        return await failClaim(row.id, "The machine reported no usable SSH host key");
+        return await failClaim(row.id, "The machine reported no usable SSH host key", "noHostKey");
 
     const privateKey = decryptSecret(
         {
@@ -408,8 +495,14 @@ export async function claimEnrollment(
         loadEnv().POLARIS_MASTER_KEY
     );
 
-    const reached = await reachMachine(candidates, payload, privateKey, pins);
-    if ("error" in reached) return await failClaim(row.id, reached.error);
+    const reached = await reachMachine(row.id, candidates, payload, privateKey, pins);
+    if ("error" in reached) return await failClaim(row.id, reached.error, reached.code);
+    await noteEnrollment(row.id, {
+        step: "connect",
+        state: "done",
+        code: "connected",
+        address: reached.address
+    });
     const { address, hostKey } = reached;
 
     // Stored in the shape every reader expects - `getHostConnection` decrypts a
@@ -454,6 +547,16 @@ export async function claimEnrollment(
     // happens to have the same name.
     if (row.kind === "local") await setLocalHostId(host.id);
 
+    const setsUp = setsUpOnEnrollment(row.kind, payload);
+    await noteEnrollment(row.id, {
+        step: "registered",
+        state: "done",
+        code: "registered",
+        detail: payload.hostname
+    });
+    if (setsUp)
+        await noteEnrollment(row.id, { step: "setup", state: "active", code: "setupQueued" });
+
     await recordAudit({
         actorId: row.createdById,
         action: "enrollment.claim",
@@ -472,8 +575,13 @@ export async function claimEnrollment(
 
     return {
         ok: true,
-        setup: setsUpOnEnrollment(row.kind, payload)
-            ? { hostId: host.id, ownerId: row.createdById, name: payload.hostname }
+        setup: setsUp
+            ? {
+                  hostId: host.id,
+                  ownerId: row.createdById,
+                  name: payload.hostname,
+                  enrollmentId: row.id
+              }
             : undefined
     };
 }
@@ -494,14 +602,25 @@ export async function claimEnrollment(
  * best-first and the tail of the list is the closest thing to an answer.
  */
 async function reachMachine(
+    enrollmentId: string,
     candidates: string[],
     payload: ClaimEnrollmentInput,
     privateKey: string,
     pins: string[]
-): Promise<{ address: string; hostKey: string } | { error: string }> {
-    let failure = "Polaris could not reach this machine at any address it offered";
+): Promise<{ address: string; hostKey: string } | ConnectFailure> {
+    let failure: ConnectFailure = {
+        // i18n-ignore stored on the enrollment; the dialog says it from the step log
+        error: "Polaris could not reach this machine at any address it offered",
+        code: "unreachable"
+    };
 
     for (const address of candidates) {
+        await noteEnrollment(enrollmentId, {
+            step: "connect",
+            state: "active",
+            code: "trying",
+            address
+        });
         let hostKey: string;
         try {
             hostKey = await testAndCaptureHostKey({
@@ -513,18 +632,40 @@ async function reachMachine(
             });
         } catch (caught) {
             failure = connectError(caught);
+            await noteEnrollment(enrollmentId, {
+                step: "connect",
+                state: "active",
+                code: failure.code,
+                address
+            });
             continue;
         }
         // The machine named its keys while the script still had root on it. A key
         // it did not name means something other than that machine answered here.
         if (!pins.includes(hostKey)) {
-            failure = "The machine that answered presented an unexpected host key";
+            failure = {
+                // i18n-ignore stored on the enrollment; the dialog says it from the step log
+                error: "The machine that answered presented an unexpected host key",
+                code: "wrongMachine"
+            };
+            await noteEnrollment(enrollmentId, {
+                step: "connect",
+                state: "active",
+                code: "wrongMachine",
+                address
+            });
             continue;
         }
         return { address, hostKey };
     }
 
-    return { error: failure };
+    return failure;
+}
+
+/** Why one address did not answer as the machine, as a sentence and a code. */
+interface ConnectFailure {
+    error: string;
+    code: EnrollmentLogCode;
 }
 
 /** Per-address budget. Shorter than a normal connect because several of these can
@@ -534,8 +675,9 @@ const PROBE_TIMEOUT_MS = 6_000;
 
 /** Record why a claim did not finish and report it back. The message is written
  *  for the operator watching the dialog, so it says what to go and look at. */
-async function failClaim(id: string, error: string): Promise<ClaimResult> {
+async function failClaim(id: string, error: string, code: EnrollmentLogCode): Promise<ClaimResult> {
     await prisma.enrollment.update({ where: { id }, data: { error } });
+    await noteEnrollment(id, { step: "connect", state: "failed", code });
     return { ok: false, error };
 }
 
@@ -546,15 +688,24 @@ function resolveEnvironment(chosen: string, address: string): string {
 }
 
 /** ssh2's errors are readable but say nothing about what to do; these do. */
-function connectError(caught: unknown): string {
+function connectError(caught: unknown): ConnectFailure {
     const message = caught instanceof Error ? caught.message : String(caught);
     if (/All configured authentication methods failed/i.test(message)) {
-        return "The machine refused the key Polaris installed. Check that its SSH server allows key authentication";
+        return {
+            // i18n-ignore stored on the enrollment; the dialog says it from the step log
+            error: "The machine refused the key Polaris installed. Check that its SSH server allows key authentication",
+            code: "keyRefused"
+        };
     }
     if (/ECONNREFUSED|ETIMEDOUT|EHOSTUNREACH|ENETUNREACH|timed out/i.test(message)) {
-        return "Polaris could not reach the machine's SSH port from here. Check the firewall between them";
+        return {
+            // i18n-ignore stored on the enrollment; the dialog says it from the step log
+            error: "Polaris could not reach the machine's SSH port from here. Check the firewall between them",
+            code: "unreachable"
+        };
     }
-    return `Polaris could not connect to the machine: ${message}`;
+    // i18n-ignore stored on the enrollment; the dialog says it from the step log
+    return { error: `Polaris could not connect to the machine: ${message}`, code: "connectFailed" };
 }
 
 /** The claim endpoint's own payload wrapper, so a malformed body is rejected

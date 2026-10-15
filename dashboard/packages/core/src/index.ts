@@ -161,6 +161,8 @@ export * from "./schemas/profile.js";
 export * from "./schemas/profile-style.js";
 export * from "./schemas/host.js";
 export * from "./schemas/enrollment.js";
+export * from "./schemas/enrollment-progress.js";
+export * from "./schemas/server-ssh-keys.js";
 export * from "./schemas/runners.js";
 export * from "./schemas/agents.js";
 export * from "./schemas/agent-sessions.js";

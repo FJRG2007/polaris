@@ -24,6 +24,7 @@ import { ServerWorkload } from "./server-workload";
 import { environmentWords } from "../environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ServerMetrics } from "@/lib/server-probe";
+import { ServerSshKeys } from "../server-ssh-keys";
 import { ServerNotesPanel } from "../server-notes-panel";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RemoveServerDialog } from "../remove-server-dialog";
@@ -56,6 +57,9 @@ const TABS = [
     // to say what is on the disk, let alone take anything off it.
     { id: "storage", needsLocal: true },
     { id: "connection" },
+    // Who can sign in to it with a key. Read over Polaris's own connection, so
+    // only a registered server has one to read it over.
+    { id: "keys", needsHost: true },
     // Only a registered server has an id to hang a history on: the box Polaris
     // runs on has no Host row until it is enrolled.
     { id: "notes", needsHost: true }
@@ -205,6 +209,8 @@ export function ServerDetail({
 
             {tab === "notes" && server.hostId ? (
                 <ServerNotesPanel hostId={server.hostId} />
+            ) : tab === "keys" && server.hostId ? (
+                <ServerSshKeys hostId={server.hostId} />
             ) : tab === "storage" && server.kind === "local" ? (
                 <ServerStorage />
             ) : tab === "overview" ? (

@@ -15,11 +15,18 @@
  * into the row it already shows for this machine.
  */
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Checkbox, Input, Select } from "@polaris/ui";
-import type { ServerEnvironment } from "@polaris/core";
-import { Check, Copy, Terminal, TriangleAlert } from "lucide-react";
+import { EnrollmentProgress } from "./enrollment-progress";
+import {
+    enrollmentStillRunning,
+    enrollmentTimeline,
+    type EnrollmentEvent,
+    type ServerEnvironment
+} from "@polaris/core";
+import { Check, CheckCircle2, Copy, Terminal, TriangleAlert } from "lucide-react";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { cancelEnrollmentAction, enrollmentStatusAction, openEnrollmentAction } from "./actions";
@@ -37,11 +44,20 @@ interface Opened {
     local?: { command: string; base: string; insecureTransport: boolean };
 }
 
-export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; kind?: "server" | "local" }) {
+export function QuickEnroll({
+    onDone,
+    kind = "server"
+}: {
+    onDone: () => void;
+    kind?: "server" | "local";
+}) {
     const t = useTranslations("servers");
     const tc = useTranslations("components");
     const environmentOptions = [
-        ...ENVIRONMENT_CHOICES.map((value) => ({ value, label: environmentWords(tc, value).label })),
+        ...ENVIRONMENT_CHOICES.map((value) => ({
+            value,
+            label: environmentWords(tc, value).label
+        })),
         { value: "unknown", label: t("host.notSure") }
     ];
     const router = useRouter();
@@ -53,6 +69,9 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [waitError, setWaitError] = useState<string | null>(null);
+    // Whether the failed step in the log is what `waitError` says; an expiry is
+    // news the log does not carry.
+    const [waitExplained, setWaitExplained] = useState(false);
     // Whether the command the panel is still showing works. A machine that stops
     // before claiming - no SSH server running, Remote Login off - reports why and
     // spends nothing, so this is a state to recover from rather than the end of it.
@@ -67,6 +86,10 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
      * saying which address it had used.
      */
     const [overLan, setOverLan] = useState(false);
+    // The step-by-step log, as the enrollment recorded it.
+    const [progress, setProgress] = useState<EnrollmentEvent[]>([]);
+    // Set once the machine is a server and nothing after that is still running.
+    const [finished, setFinished] = useState<{ hostId: string | null; name: string } | null>(null);
 
     // Watch the enrollment until the machine claims it. The dialog closing
     // unmounts this, which is what stops the poll.
@@ -76,14 +99,20 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
         const timer = setInterval(async () => {
             const status = await enrollmentStatusAction(opened.id);
             if (!live || !status) return;
+            setProgress(status.progress);
             if (status.state === "claimed") {
-                clearInterval(timer);
                 router.refresh();
-                onDone();
+                // A server Polaris prepares for deployments right after it joins
+                // has one more step to watch; the dialog stays on it until that
+                // has finished either way, so a failure there is seen here.
+                if (enrollmentStillRunning(status.progress)) return;
+                clearInterval(timer);
+                setFinished({ hostId: status.hostId, name: status.name });
                 return;
             }
             if (status.state === "failed") {
                 setWaitError(status.error ?? t("enroll.notRegistered"));
+                setWaitExplained(true);
                 setStillUsable(status.retryable);
                 // Only a spent command is the end of the road. While the token is
                 // still good the poll stays alive, so the operator who fixes the
@@ -95,6 +124,7 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             if (status.state === "expired") {
                 clearInterval(timer);
                 setStillUsable(false);
+                setWaitExplained(false);
                 // A machine that refused left its reason on the enrollment, and it
                 // is still the true account of what happened - the command only
                 // ran out afterwards. Saying it never ran would be the misreport
@@ -133,13 +163,59 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
             return;
         }
         setOpened(result.enrollment);
+        setProgress([]);
+        setFinished(null);
+        setCopied(false);
     }
 
     async function discard() {
-        if (opened) await cancelEnrollmentAction(opened.id);
+        if (opened && !finished) await cancelEnrollmentAction(opened.id);
         setOpened(null);
         setWaitError(null);
         setStillUsable(false);
+        setProgress([]);
+        setFinished(null);
+    }
+
+    /** A spent command cannot be run again; this replaces it with a fresh one for
+     *  the same server in one click, rather than sending the reader back to the
+     *  form they already filled in. */
+    async function retry() {
+        if (opened && !finished) await cancelEnrollmentAction(opened.id);
+        setWaitError(null);
+        setStillUsable(false);
+        await generate();
+    }
+
+    if (opened && finished) {
+        const setupFailed = enrollmentTimeline(progress).some(
+            (view) => view.step === "setup" && view.status === "failed"
+        );
+        return (
+            <div className="flex flex-col gap-3">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                    <CheckCircle2 className="size-4 shrink-0 text-success" />
+                    <span className="min-w-0 truncate" title={finished.name}>
+                        {setupFailed
+                            ? t("onboard.addedNotReady", { name: finished.name })
+                            : t("onboard.ready", { name: finished.name })}
+                    </span>
+                </p>
+                <EnrollmentProgress events={progress} />
+                <div className="mt-1 flex justify-end gap-2">
+                    <Button variant="ghost" onClick={onDone}>
+                        {t("onboard.close")}
+                    </Button>
+                    {finished.hostId ? (
+                        <Button asChild>
+                            <Link href={`/apps/servers/${finished.hostId}`} onClick={onDone}>
+                                {t("onboard.openServer")}
+                            </Link>
+                        </Button>
+                    ) : null}
+                </div>
+            </div>
+        );
     }
 
     if (opened) {
@@ -166,7 +242,11 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                             setCopied(true);
                         }}
                     >
-                        {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                        {copied ? (
+                            <Check className="size-4 text-success" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
                     </Button>
                 </div>
 
@@ -196,15 +276,22 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
 
                 {showing.insecureTransport ? (
                     <Notice>
-                        {overLan && local
-                            ? t("enroll.insecureLan")
-                            : t("enroll.insecure")}
+                        {overLan && local ? t("enroll.insecureLan") : t("enroll.insecure")}
                     </Notice>
                 ) : null}
 
+                <EnrollmentProgress events={progress} />
+
                 {waitError ? (
                     <div className="flex flex-col gap-1">
-                        <p className="text-sm text-danger">{waitError}</p>
+                        {/* The failed step already says this, with what to do;
+                            the sentence stands alone only when there is no log. */}
+                        {waitExplained &&
+                        enrollmentTimeline(progress).some(
+                            (view) => view.status === "failed"
+                        ) ? null : (
+                            <p className="text-sm text-danger">{waitError}</p>
+                        )}
                         {stillUsable ? (
                             <p className="text-sm text-muted-foreground">
                                 {t("enroll.stillUsable")}
@@ -219,6 +306,11 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                     <Button variant="ghost" onClick={() => void discard()}>
                         {waitError && !stillUsable ? t("enroll.startOver") : t("enroll.cancel")}
                     </Button>
+                    {waitError && !stillUsable ? (
+                        <Button onClick={() => void retry()} disabled={pending}>
+                            {pending ? t("enroll.generating") : t("onboard.retry")}
+                        </Button>
+                    ) : null}
                 </div>
             </div>
         );
@@ -227,11 +319,9 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-                {isLocal ? (
-                    t.rich("enroll.introLocal", { code: loginCode })
-                ) : (
-                    t.rich("enroll.intro", { code: loginCode })
-                )}
+                {isLocal
+                    ? t.rich("enroll.introLocal", { code: loginCode })
+                    : t.rich("enroll.intro", { code: loginCode })}
             </p>
 
             {isLocal ? null : (
@@ -253,13 +343,13 @@ export function QuickEnroll({ onDone, kind = "server" }: { onDone: () => void; k
                         onValueChange={(value) => setEnvironment(value as ServerEnvironment)}
                         options={environmentOptions}
                     />
-                    <span className="text-xs text-muted-foreground">{environmentWords(tc, environment).routing}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {environmentWords(tc, environment).routing}
+                    </span>
                 </label>
             )}
 
-            <p className="text-xs text-muted-foreground">
-                {t("enroll.grants")}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("enroll.grants")}</p>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
 
