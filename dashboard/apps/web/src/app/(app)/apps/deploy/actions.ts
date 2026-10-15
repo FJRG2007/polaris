@@ -8,6 +8,7 @@
 
 import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { z } from "zod";
+import { domainPrivateInputSchema } from "@/lib/deploy/private-domain";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import * as follow from "@/lib/follow/follow";
@@ -1463,6 +1464,36 @@ export async function removeDomainAction(domainId: string): Promise<void> {
     const access = await requireDomainAccess(domainId, user.id, "domains.manage");
     await deployService.removeApplicationDomain(domainId, access.ownerId);
     revalidatePath(DEPLOY_PATH);
+}
+
+/** Make an address private - only people signed in to Polaris and allowed in reach
+ *  it - or public again with `access: null`. */
+export async function setDomainPrivateAction(
+    input: z.input<typeof domainPrivateInputSchema>
+): Promise<{ error?: string }> {
+    const parsed = domainPrivateInputSchema.safeParse(input);
+    if (!parsed.success) return { error: await firstIssue(parsed.error, "domains.updateFailed") };
+    const user = await requirePermission("deploy.manage");
+    try {
+        const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
+        await deployService.setApplicationDomainPrivate(
+            parsed.data.domainId,
+            access.ownerId,
+            parsed.data.access
+        );
+        await recordDeployAudit({
+            actorId: user.id,
+            action: parsed.data.access ? "deploy.domain.private.on" : "deploy.domain.private.off",
+            targetType: "domain",
+            targetId: parsed.data.domainId
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : await reply("domains.updateFailed")
+        };
+    }
 }
 
 /** Turn a domain on or off without deleting it (drops or restores its route). */

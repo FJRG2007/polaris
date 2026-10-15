@@ -11,6 +11,7 @@ import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import * as deployActions from "./actions";
 import { DomainCdnButton } from "./domain-cdn";
+import { DomainPrivateButton } from "./domain-private";
 import { EdgeSettings } from "./edge-settings";
 import * as publicNet from "./public-networking";
 import { useProjectCan } from "./access-context";
@@ -1690,6 +1691,16 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                             supplied={domain.hasCertificate === true}
                                             onChanged={onChanged}
                                         />
+                                        {domain.targetPort !== undefined && (
+                                            <DomainPrivateButton
+                                                domainId={domain.id}
+                                                applicationId={app.id}
+                                                hostname={domain.hostname}
+                                                access={domain.privateAccess ?? null}
+                                                canManage={can("domains.manage")}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
                                         {domain.cdn !== undefined && !local && (
                                             <DomainCdnButton
                                                 domainId={domain.id}

@@ -111,12 +111,16 @@ export function LoginPrincipals({
     admitted,
     refused,
     disabled,
+    copy,
     onChange
 }: {
     scope: WafPrincipalScope;
     admitted: WafPrincipalGrant[];
     refused: WafPrincipalGrant[];
     disabled?: boolean;
+    /** What the admitted list says when empty and when filled, where it does not mean
+     *  what it means on a firewall rule (a private address, where empty is "members"). */
+    copy?: { admittedEmpty: string; admittedFilled: string };
     onChange: (patch: LoginPrincipalsPatch) => void;
 }) {
     const t = useTranslations("firewall");
@@ -146,8 +150,8 @@ export function LoginPrincipals({
         <div className="flex flex-col gap-4">
             <GrantList
                 title={t("principals.admitted")}
-                empty={t("principals.admittedEmpty")}
-                filled={t("principals.admittedFilled")}
+                empty={copy?.admittedEmpty ?? t("principals.admittedEmpty")}
+                filled={copy?.admittedFilled ?? t("principals.admittedFilled")}
                 addLabel={t("principals.admittedAdd")}
                 grants={admitted}
                 // Naming somebody in both lists is an operator contradicting themselves,

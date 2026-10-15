@@ -8,6 +8,7 @@
  * says plainly when it needs the full edition rather than failing silently.
  */
 
+import type { PrivateAccess } from "@/lib/deploy/private-domain";
 import { FilesPanel } from "./files-panel";
 import { dbTone, StatusPill } from "./status-pill";
 import { DeployFailureNote } from "./deploy-failure";
@@ -170,6 +171,9 @@ export interface ProjectSummary {
                 /** Whether the operator supplied a certificate for this name. Never the
                  *  certificate itself - the panel only says which one is in use. */
                 hasCertificate?: boolean;
+                /** Who may open it when only signed-in, allowed people may; null or
+                 *  absent when it is public. */
+                privateAccess?: PrivateAccess | null;
                 /** Who answers it: "server" - the machine the service runs on - or
                  *  "polaris" - this instance, dialling that machine. */
                 servedBy?: string;

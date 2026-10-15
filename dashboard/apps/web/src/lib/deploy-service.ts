@@ -6,6 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import { parsePrivateAccess, storePrivateAccess, withPrivateAccess, type PrivateAccess } from "@/lib/deploy/private-domain";
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
@@ -1287,6 +1288,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
             id: true,
             hostname: true,
             pathPrefix: true,
+            privateAccess: true,
             certResolver: true,
             targetPort: true,
             portPinned: true,
@@ -1526,7 +1528,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                   ? (serverAddress.get(remoteHostId) ?? "")
                   : localIp;
             if (!dialHost) continue;
-            localRoutes.push({
+            localRoutes.push(withPrivateAccess({
                 id: domain.id,
                 hostname: domain.hostname,
                 pathPrefix: domain.pathPrefix ?? undefined,
@@ -1558,7 +1560,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                 emailObfuscation: rule.emailObfuscation,
                 frameAncestors: frameRuleOf(rule),
                 loginKeys
-            });
+            }, parsePrivateAccess(domain.privateAccess)));
         }
         for (const app of localTunnelApps) {
             const rule = waf.get(app.id) ?? emptyWaf;
@@ -1637,6 +1639,7 @@ type RoutableDomain = {
     id: string;
     hostname: string;
     pathPrefix: string | null;
+    privateAccess: string | null;
     certResolver: string;
     targetPort: number;
     servedBy: string;
@@ -1727,7 +1730,7 @@ async function pushRemoteRoutes(
                         ),
                         serving.get(domain.application.currentDeploymentId ?? "")
                     );
-                    return {
+                    return withPrivateAccess({
                         id: domain.id,
                         hostname: domain.hostname,
                         pathPrefix: domain.pathPrefix ?? undefined,
@@ -1769,7 +1772,7 @@ async function pushRemoteRoutes(
                         // The fallback header only, for the same reason.
                         frameAncestors: rule ? frameRuleOf(rule) : [],
                         loginKeys
-                    } satisfies AppRoute;
+                    } satisfies AppRoute, parsePrivateAccess(domain.privateAccess));
                 });
                 await new RemoteRouter({
                     address: connection.address,
@@ -1907,6 +1910,46 @@ export async function setApplicationDomainEnabled(
     });
     if (result.count === 0) throw new Error("Domain not found");
     await syncAppRoutes().catch(() => undefined);
+}
+
+/** Make one address private (only people signed in and allowed in reach it) or
+ *  public again (`null`), and republish the edge so it takes effect now. */
+export async function setApplicationDomainPrivate(
+    domainId: string,
+    ownerId: string,
+    access: PrivateAccess | null
+): Promise<void> {
+    const result = await prisma.domain.updateMany({
+        where: { id: domainId, application: { environment: { project: { ownerId } } } },
+        data: { privateAccess: storePrivateAccess(access) }
+    });
+    if (result.count === 0) throw new Error("Domain not found");
+    await syncAppRoutes();
+}
+
+/**
+ * The private rule on the address a visitor is headed for, with the project it
+ * belongs to - what `/edge/authorize` decides a private address against. Exact name
+ * first, then the wildcard that covers it, the same order the edge matches in.
+ */
+export async function privateDomainForHost(
+    host: string
+): Promise<{ access: PrivateAccess; projectId: string } | null> {
+    const name = host.trim().toLowerCase();
+    if (!name) return null;
+    const dot = name.indexOf(".");
+    const names = dot > 0 ? [name, `*.${name.slice(dot + 1)}`] : [name];
+    const rows = await prisma.domain.findMany({
+        where: { enabled: true, hostname: { in: names } },
+        select: {
+            hostname: true,
+            privateAccess: true,
+            application: { select: { environment: { select: { projectId: true } } } }
+        }
+    });
+    const row = rows.find((entry) => entry.hostname === name) ?? rows[0];
+    const access = parsePrivateAccess(row?.privateAccess);
+    return row && access ? { access, projectId: row.application.environment.projectId } : null;
 }
 
 /**
