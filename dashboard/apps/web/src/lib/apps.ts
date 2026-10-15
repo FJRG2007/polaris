@@ -105,6 +105,7 @@ import {
     Keyboard,
     Music,
     TrendingUp,
+    Stethoscope,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -2015,6 +2016,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "api key",
                 "agents"
             ],
+            group: ADMIN_PLATFORM_GROUP
+        },
+        {
+            label: "Diagnostics", // i18n-ignore
+            href: "/admin/diagnostics",
+            adminOnly: true,
+            icon: Stethoscope,
+            keywords: ["health", "doctor", "speed test", "support bundle", "troubleshoot"],
             group: ADMIN_PLATFORM_GROUP
         },
         {

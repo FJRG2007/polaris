@@ -54,6 +54,7 @@ import mailCompose from "./mailCompose.json";
 import marketplace from "./marketplace.json";
 import publicPages from "./publicPages.json";
 import tasksDetail from "./tasksDetail.json";
+import diagnostics from "./diagnostics.json";
 import deployConfig from "./deployConfig.json";
 import deploySafety from "./deploySafety.json";
 import deployPrivateNet from "./deployPrivateNet.json";
@@ -88,6 +89,7 @@ export default {
     containers,
     databases,
     diagram,
+    diagnostics,
     deploy,
     deployConfig,
     deploySafety,
