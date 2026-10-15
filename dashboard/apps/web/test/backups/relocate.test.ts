@@ -31,7 +31,13 @@ interface JobRow {
 
 const state = vi.hoisted(() => ({
     copies: [] as CopyRow[],
-    destinations: [] as { id: string; ownerId: string; name: string; kind: string; isDefault: boolean }[],
+    destinations: [] as {
+        id: string;
+        ownerId: string;
+        name: string;
+        kind: string;
+        isDefault: boolean;
+    }[],
     jobs: [] as JobRow[],
     handles: new Map<string, DestinationHandle>(),
     queries: [] as unknown[],
@@ -50,7 +56,11 @@ vi.mock("@/lib/backups/destination", async (importOriginal) => ({
 vi.mock("@polaris/db", () => ({
     prisma: {
         recoveryPointCopy: {
-            findUnique: async ({ where }: { where: { pointId_destinationId: { pointId: string; destinationId: string } } }) =>
+            findUnique: async ({
+                where
+            }: {
+                where: { pointId_destinationId: { pointId: string; destinationId: string } };
+            }) =>
                 state.copies.find(
                     (copy) =>
                         copy.pointId === where.pointId_destinationId.pointId &&
@@ -71,8 +81,10 @@ vi.mock("@polaris/db", () => ({
                 state.copies = state.copies.filter((copy) => copy.id !== where.id);
             },
             count: async ({ where }: { where: { destinationId: string; status: string } }) =>
-                state.copies.filter((copy) => copy.destinationId === where.destinationId && copy.status === where.status)
-                    .length,
+                state.copies.filter(
+                    (copy) =>
+                        copy.destinationId === where.destinationId && copy.status === where.status
+                ).length,
             findMany: async (query: {
                 where: { destinationId: string; status: string; id?: { gt: string } };
                 take: number;
@@ -91,15 +103,30 @@ vi.mock("@polaris/db", () => ({
             }
         },
         backupJob: {
-            updateMany: async ({ where, data }: { where: Partial<JobRow>; data: Partial<JobRow> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Partial<JobRow>;
+                data: Partial<JobRow>;
+            }) => {
                 for (const job of state.jobs) {
-                    if (job.type === where.type && job.status === where.status && job.resourceId === where.resourceId) {
+                    if (
+                        job.type === where.type &&
+                        job.status === where.status &&
+                        job.resourceId === where.resourceId
+                    ) {
                         Object.assign(job, data);
                     }
                 }
             },
             create: async ({ data }: { data: { ownerId: string; type: string } }) => {
-                const job = { id: `job-${state.next++}`, status: "running", resourceId: null, ...data };
+                const job = {
+                    id: `job-${state.next++}`,
+                    status: "running",
+                    resourceId: null,
+                    ...data
+                };
                 state.jobs.push(job);
                 return job;
             },
@@ -111,11 +138,20 @@ vi.mock("@polaris/db", () => ({
         },
         backupDestination: {
             findFirst: async ({ where }: { where: { id: string; ownerId: string } }) =>
-                state.destinations.find((row) => row.id === where.id && row.ownerId === where.ownerId) ?? null,
-            updateMany: ({ where, data }: { where: { ownerId: string; id: { not: string } }; data: { isDefault: boolean } }) => ({
+                state.destinations.find(
+                    (row) => row.id === where.id && row.ownerId === where.ownerId
+                ) ?? null,
+            updateMany: ({
+                where,
+                data
+            }: {
+                where: { ownerId: string; id: { not: string } };
+                data: { isDefault: boolean };
+            }) => ({
                 run: () => {
                     for (const row of state.destinations) {
-                        if (row.ownerId === where.ownerId && row.id !== where.id.not) row.isDefault = data.isDefault;
+                        if (row.ownerId === where.ownerId && row.id !== where.id.not)
+                            row.isDefault = data.isDefault;
                     }
                 }
             }),
@@ -133,7 +169,12 @@ vi.mock("@polaris/db", () => ({
 }));
 
 import type { DestinationHandle } from "@/lib/backups/destination";
-import { isMoving, moveOneCopy, setDefaultDestination, startMovingCopies } from "@/lib/backups/relocate";
+import {
+    isMoving,
+    moveOneCopy,
+    setDefaultDestination,
+    startMovingCopies
+} from "@/lib/backups/relocate";
 
 function store(files: Map<string, number>, failPut = false, shortBy = 0): DestinationHandle {
     return {
@@ -170,7 +211,13 @@ beforeEach(() => {
     state.destinations = [
         { id: "local", ownerId: "me", name: "Polaris data dir", kind: "local", isDefault: true },
         { id: "nas", ownerId: "me", name: "UNAS", kind: "connection", isDefault: false },
-        { id: "beside", ownerId: "me", name: "Beside the source", kind: "source-local", isDefault: false }
+        {
+            id: "beside",
+            ownerId: "me",
+            name: "Beside the source",
+            kind: "source-local",
+            isDefault: false
+        }
     ];
 });
 
@@ -183,13 +230,20 @@ describe("moving one copy", () => {
         expect(nas.get("res-1/world.tar.zst.sealed")).toBe(500);
         expect(local.size).toBe(0);
         expect(state.copies).toEqual([
-            expect.objectContaining({ destinationId: "nas", status: "available", sealedWith: "key-1", sizeBytes: 500n })
+            expect.objectContaining({
+                destinationId: "nas",
+                status: "available",
+                sealedWith: "key-1",
+                sizeBytes: 500n
+            })
         ]);
     });
 
     it("leaves the old copy where it was when the new one cannot be written", async () => {
         const local = new Map([["res-1/world.tar.zst.sealed", 500]]);
-        await expect(moveOneCopy(copy(), store(local), store(new Map(), true), "nas")).rejects.toThrow();
+        await expect(
+            moveOneCopy(copy(), store(local), store(new Map(), true), "nas")
+        ).rejects.toThrow();
         expect(local.size).toBe(1);
         expect(state.copies.find((row) => row.id === "old-1")?.status).toBe("available");
         expect(state.copies.find((row) => row.destinationId === "nas")).toBeUndefined();
@@ -198,7 +252,9 @@ describe("moving one copy", () => {
     it("leaves the old copy when the new one arrives a different size", async () => {
         const local = new Map([["res-1/world.tar.zst.sealed", 500]]);
         const nas = new Map<string, number>();
-        await expect(moveOneCopy(copy(), store(local), store(nas, false, 10), "nas")).rejects.toThrow();
+        await expect(
+            moveOneCopy(copy(), store(local), store(nas, false, 10), "nas")
+        ).rejects.toThrow();
         expect(local.size).toBe(1);
         expect(nas.size).toBe(0);
         expect(state.copies.find((row) => row.id === "old-1")).toBeDefined();
@@ -219,27 +275,33 @@ describe("moving one copy", () => {
 describe("the default destination", () => {
     it("is one per owner", async () => {
         await setDefaultDestination("me", "nas");
-        expect(state.destinations.filter((row) => row.isDefault).map((row) => row.id)).toEqual(["nas"]);
+        expect(state.destinations.filter((row) => row.isDefault).map((row) => row.id)).toEqual([
+            "nas"
+        ]);
     });
 
     it("is never copies beside the source, which most kinds cannot keep", async () => {
-        await expect(setDefaultDestination("me", "beside")).rejects.toThrow(/cannot be the default/);
+        await expect(setDefaultDestination("me", "beside")).rejects.toThrow(
+            /cannot be the default/
+        );
         expect(state.destinations.find((row) => row.isDefault)?.id).toBe("local");
     });
 
     it("is never somebody else's destination", async () => {
-        await expect(setDefaultDestination("someone-else", "nas")).rejects.toThrow(/does not exist/);
+        await expect(setDefaultDestination("someone-else", "nas")).rejects.toThrow(
+            /does not exist/
+        );
     });
 });
 
 describe("starting a move", () => {
     it("refuses the same destination, and copies beside the source", async () => {
-        await expect(startMovingCopies({ ownerId: "me", fromId: "local", toId: "local", actorId: "me" })).rejects.toThrow(
-            /different destination/
-        );
-        await expect(startMovingCopies({ ownerId: "me", fromId: "local", toId: "beside", actorId: "me" })).rejects.toThrow(
-            /cannot be moved/
-        );
+        await expect(
+            startMovingCopies({ ownerId: "me", fromId: "local", toId: "local", actorId: "me" })
+        ).rejects.toThrow(/different destination/);
+        await expect(
+            startMovingCopies({ ownerId: "me", fromId: "local", toId: "beside", actorId: "me" })
+        ).rejects.toThrow(/cannot be moved/);
     });
 });
 
@@ -249,7 +311,12 @@ async function settled(fromId: string): Promise<void> {
 
 describe("a running move", () => {
     it("stops once the target refuses copies in a row, and leaves nothing on it", async () => {
-        state.copies = Array.from({ length: 6 }, (_, index) => ({ ...copy(), id: `old-${index}`, pointId: `point-${index}`, path: `p-${index}` }));
+        state.copies = Array.from({ length: 6 }, (_, index) => ({
+            ...copy(),
+            id: `old-${index}`,
+            pointId: `point-${index}`,
+            path: `p-${index}`
+        }));
         state.handles.set("local", store(new Map()));
         state.handles.set("nas", store(new Map(), true));
         await startMovingCopies({ ownerId: "me", fromId: "local", toId: "nas", actorId: "me" });
@@ -261,7 +328,13 @@ describe("a running move", () => {
     });
 
     it("never marks a move still running here as lost", async () => {
-        state.destinations.push({ id: "other", ownerId: "me", name: "Other", kind: "local", isDefault: false });
+        state.destinations.push({
+            id: "other",
+            ownerId: "me",
+            name: "Other",
+            kind: "local",
+            isDefault: false
+        });
         state.copies.push({ ...copy(), id: "old-2", pointId: "point-2", destinationId: "other" });
         let release: () => void = () => undefined;
         const held = new Promise<void>((resolve) => {

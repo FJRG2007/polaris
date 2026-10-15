@@ -15,7 +15,12 @@
 
 import { prisma } from "@polaris/db";
 import { SourceUnavailableError } from "./sources/types";
-import { isSourceLocal, openDestination, type DestinationHandle, type DestinationRow } from "./destination";
+import {
+    isSourceLocal,
+    openDestination,
+    type DestinationHandle,
+    type DestinationRow
+} from "./destination";
 
 const DESTINATION_FIELDS = {
     id: true,
@@ -154,7 +159,13 @@ function reasonOf(error: unknown): string {
 
 /** One copy, from where it is to where it goes. Exported for the tests. */
 export async function moveOneCopy(
-    copy: { id: string; pointId: string; path: string; sizeBytes: bigint; sealedWith: string | null },
+    copy: {
+        id: string;
+        pointId: string;
+        path: string;
+        sizeBytes: bigint;
+        sealedWith: string | null;
+    },
     source: DestinationHandle,
     target: DestinationHandle,
     toId: string
@@ -192,7 +203,11 @@ export async function moveOneCopy(
             await prisma.recoveryPointCopy.delete({ where: { id: row.id } }).catch(() => undefined);
         };
         try {
-            const written = await target.put(copy.path, await source.get(copy.path), copy.sizeBytes);
+            const written = await target.put(
+                copy.path,
+                await source.get(copy.path),
+                copy.sizeBytes
+            );
             landed = written.sizeBytes;
         } catch (error) {
             if (!existing) await target.remove(copy.path).catch(() => undefined);
@@ -206,7 +221,13 @@ export async function moveOneCopy(
         }
         await prisma.recoveryPointCopy.update({
             where: { id: row.id },
-            data: { status: "available", sizeBytes: BigInt(landed), path: copy.path, error: null, sealedWith: copy.sealedWith }
+            data: {
+                status: "available",
+                sizeBytes: BigInt(landed),
+                path: copy.path,
+                error: null,
+                sealedWith: copy.sealedWith
+            }
         });
     }
     // The new copy is in place; the old one can go. If its bytes cannot be

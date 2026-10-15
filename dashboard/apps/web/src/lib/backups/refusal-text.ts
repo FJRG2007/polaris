@@ -18,10 +18,12 @@ type Key = NamespaceKey<"backups">;
 
 const EXACT: Readonly<Record<string, Key>> = {
     "That did not work": "errors.failed",
-    "Copies beside the source are written by the source itself, not through a destination": "refusals.besideSource",
+    "Copies beside the source are written by the source itself, not through a destination":
+        "refusals.besideSource",
     "This backup key was stored under a different master key. Add its recovery key to open the copies it sealed.":
         "refusals.otherMasterKey",
-    "This copy was sealed under a key this Polaris does not have. Add its recovery key first.": "refusals.missingKey",
+    "This copy was sealed under a key this Polaris does not have. Add its recovery key first.":
+        "refusals.missingKey",
     "That key belongs to somebody else here": "refusals.keyNotYours",
     "That recovery key does not match the key already stored here under the same id. Check it for a typo.":
         "refusals.keyMismatch",
@@ -38,7 +40,8 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That server does not exist": "refusals.serverMissing",
     "That destination still holds copies. Delete them first, or keep it so they stay reachable.":
         "refusals.destinationHoldsCopies",
-    "That is the default destination. Make another one the default first.": "refusals.defaultDestination",
+    "That is the default destination. Make another one the default first.":
+        "refusals.defaultDestination",
     "Copies beside the source cannot be the default": "refusals.besideSourceDefault",
     "Copies beside the source cannot be moved": "refusals.besideSourceMove",
     "Choose a different destination to move the copies to": "refusals.moveSameDestination",
@@ -75,7 +78,8 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That mail server's engine is not running": "refusals.mailServerStopped",
     "The engine's volumes could not be found on its machine": "refusals.mailServerVolumes",
     "That copy is not an export of this mail server": "refusals.notThisMailServer",
-    "A copy of the server as it is now could not be taken, so nothing was restored": "refusals.mailSafetyFailed"
+    "A copy of the server as it is now could not be taken, so nothing was restored":
+        "refusals.mailSafetyFailed"
 };
 
 /** Sentences that carry a value, by their shape. */
@@ -87,8 +91,16 @@ const SHAPED: readonly (readonly [RegExp, Key, readonly string[]])[] = [
     [/^Unknown kind: (.+)$/, "refusals.unknownKind", ["kind"]],
     [/^Polaris no longer knows how to back up a (.+)$/, "refusals.noLongerKnows", ["kind"]],
     [/^Polaris cannot dump a (.+) database yet$/, "refusals.cannotDump", ["engine"]],
-    [/^Nothing was restored: a copy of what is there now could not be taken first \((.+)\)\.$/s, "refusals.safetyFailedWhy", ["why"]],
-    [/^(\d+) of the cluster's (\d+) masters answered, so no backup was taken: a copy of part of a cluster is not a backup of it\.$/, "refusals.clusterPartial", ["answered", "masters"]],
+    [
+        /^Nothing was restored: a copy of what is there now could not be taken first \((.+)\)\.$/s,
+        "refusals.safetyFailedWhy",
+        ["why"]
+    ],
+    [
+        /^(\d+) of the cluster's (\d+) masters answered, so no backup was taken: a copy of part of a cluster is not a backup of it\.$/,
+        "refusals.clusterPartial",
+        ["answered", "masters"]
+    ],
     [/^The dump failed inside (.+?): (.+)$/s, "refusals.dumpFailed", ["container", "reason"]],
     [/^The snapshot failed on (.+?): (.+)$/s, "refusals.snapshotFailed", ["node", "reason"]],
     [/^Preparing the export failed: (.*)$/s, "refusals.exportPrepare", ["reason"]],
@@ -112,8 +124,12 @@ export function backupRefusalText(t: Words, message: string): string {
     // The one sentence that names a kind by its English label.
     const restore = /^A (.+) cannot be put back from here - download it instead$/.exec(message);
     if (restore) {
-        const info = Object.values(RESOURCE_KINDS_INFO).find((kind) => kind.label.toLowerCase() === restore[1]);
-        return t("refusals.cannotRestore", { kind: info ? kindInSentence(t, info.kind) : (restore[1] ?? "") });
+        const info = Object.values(RESOURCE_KINDS_INFO).find(
+            (kind) => kind.label.toLowerCase() === restore[1]
+        );
+        return t("refusals.cannotRestore", {
+            kind: info ? kindInSentence(t, info.kind) : (restore[1] ?? "")
+        });
     }
     for (const [pattern, key, names] of SHAPED) {
         const match = pattern.exec(message);

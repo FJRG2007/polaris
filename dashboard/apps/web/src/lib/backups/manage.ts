@@ -619,7 +619,8 @@ export async function openCopy(
     // once opened is not the stored one, so none is claimed.
     const sealed = isSealedCopy(copy);
     const fileName = plainName(stored);
-    const reveal = (stream: ReadableStream<Uint8Array>) => (sealed ? openSealed(ownerId, stream) : stream);
+    const reveal = (stream: ReadableStream<Uint8Array>) =>
+        sealed ? openSealed(ownerId, stream) : stream;
     const sizeBytes = sealed ? 0 : Number(copy.sizeBytes);
     if (isSourceLocal(copy.destination)) {
         const resource = toSourceResource(copy.point.resource);
@@ -846,7 +847,9 @@ export async function listDestinations(ownerId: string) {
     const bytesByDestination = new Map(
         sizes.map((row) => [row.destinationId, Number(row._sum.sizeBytes ?? 0n)])
     );
-    const availableByDestination = new Map(sizes.map((row) => [row.destinationId, row._count._all]));
+    const availableByDestination = new Map(
+        sizes.map((row) => [row.destinationId, row._count._all])
+    );
     return rows.map((row) => ({
         id: row.id,
         name: row.name,

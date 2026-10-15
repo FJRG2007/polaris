@@ -24,7 +24,17 @@ import {
     setDefaultDestinationAction,
     testDestinationAction
 } from "./actions";
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, HardDrive, Loader2, Plus, Server, Star, Trash2 } from "lucide-react";
+import {
+    AlertTriangle,
+    ArrowRightLeft,
+    CheckCircle2,
+    HardDrive,
+    Loader2,
+    Plus,
+    Server,
+    Star,
+    Trash2
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -53,7 +63,9 @@ function offMachine(destination: DestinationSummary): boolean {
 
 function kindNote(t: NamespaceTranslator<"backups">, kind: string): string {
     if (!DESTINATION_KINDS.has(kind)) return kind;
-    return t(`destinations.notes.${kind === "source-local" ? "sourceLocal" : kind}` as NamespaceKey<"backups">);
+    return t(
+        `destinations.notes.${kind === "source-local" ? "sourceLocal" : kind}` as NamespaceKey<"backups">
+    );
 }
 
 export function DestinationsPanel({
@@ -114,7 +126,12 @@ export function DestinationsPanel({
                 );
             }
         } catch (caught) {
-            setError(t("destinations.testFailed", { name: destination.name, reason: readReasonText(tc, reasonFor(caught)) }));
+            setError(
+                t("destinations.testFailed", {
+                    name: destination.name,
+                    reason: readReasonText(tc, reasonFor(caught))
+                })
+            );
         } finally {
             setTesting(null);
         }
@@ -137,9 +154,7 @@ export function DestinationsPanel({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                    {t("destinations.intro")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("destinations.intro")}</p>
                 <Button size="sm" onClick={() => setAdding(true)}>
                     <Plus className="size-4" />
                     {t("destinations.add")}
@@ -156,11 +171,17 @@ export function DestinationsPanel({
                             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                             <div className="min-w-0">
                                 <p className="font-medium">{t("destinations.sameDiskTitle")}</p>
-                                <p className="text-xs text-muted-foreground">{t("destinations.sameDiskBody")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("destinations.sameDiskBody")}
+                                </p>
                             </div>
                         </div>
                         {elsewhere[0] && current.movableCount > 0 ? (
-                            <Button size="sm" className="min-w-0 shrink-0" onClick={() => setMoving(current)}>
+                            <Button
+                                size="sm"
+                                className="min-w-0 shrink-0"
+                                onClick={() => setMoving(current)}
+                            >
                                 <ArrowRightLeft className="size-4" />
                                 <span className="truncate">
                                     {t("destinations.sameDiskMove", { name: elsewhere[0].name })}
@@ -206,7 +227,11 @@ export function DestinationsPanel({
                                                 <HardDrive className="size-4 text-muted-foreground" />
                                             )}
                                             {destination.name}
-                                            {destination.isDefault ? <Badge variant="neutral">{t("table.default")}</Badge> : null}
+                                            {destination.isDefault ? (
+                                                <Badge variant="neutral">
+                                                    {t("table.default")}
+                                                </Badge>
+                                            ) : null}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
                                             {kindNote(t, destination.kind)}
@@ -214,7 +239,8 @@ export function DestinationsPanel({
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                                        {!destination.isDefault && destination.kind !== "source-local" ? (
+                                        {!destination.isDefault &&
+                                        destination.kind !== "source-local" ? (
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
@@ -227,8 +253,13 @@ export function DestinationsPanel({
                                                 {t("destinations.makeDefault")}
                                             </Button>
                                         ) : null}
-                                        {destination.movableCount > 0 && destination.kind !== "source-local" ? (
-                                            <Button size="sm" variant="ghost" onClick={() => setMoving(destination)}>
+                                        {destination.movableCount > 0 &&
+                                        destination.kind !== "source-local" ? (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setMoving(destination)}
+                                            >
                                                 {t("destinations.move")}
                                             </Button>
                                         ) : null}
@@ -246,7 +277,9 @@ export function DestinationsPanel({
                                         <Button
                                             size="icon"
                                             variant="ghost"
-                                            aria-label={t("plans.deleteNamed", { name: destination.name })}
+                                            aria-label={t("plans.deleteNamed", {
+                                                name: destination.name
+                                            })}
                                             title={t("destinations.delete")}
                                             onClick={() => setRemoving(destination)}
                                         >
@@ -269,7 +302,9 @@ export function DestinationsPanel({
                                     ) : destination.lastCheckedAt ? (
                                         <span className="flex items-center gap-1 text-success">
                                             <CheckCircle2 className="size-3.5" />
-                                            {t("destinations.answered", { when: format.dateTime(destination.lastCheckedAt) })}
+                                            {t("destinations.answered", {
+                                                when: format.dateTime(destination.lastCheckedAt)
+                                            })}
                                         </span>
                                     ) : null}
                                 </div>
@@ -293,7 +328,8 @@ export function DestinationsPanel({
                 <MoveDialog
                     from={moving}
                     targets={destinations.filter(
-                        (destination) => destination.id !== moving.id && destination.kind !== "source-local"
+                        (destination) =>
+                            destination.id !== moving.id && destination.kind !== "source-local"
                     )}
                     onClose={() => setMoving(null)}
                     onMoved={async (count) => {
@@ -338,7 +374,10 @@ function MoveDialog({
     const tc = useTranslations("components");
     const tcommon = useTranslations("common");
     // Off the machine first: that is where a copy is worth moving to.
-    const ordered = [...targets.filter(offMachine), ...targets.filter((target) => !offMachine(target))];
+    const ordered = [
+        ...targets.filter(offMachine),
+        ...targets.filter((target) => !offMachine(target))
+    ];
     const [toId, setToId] = useState(ordered[0]?.id ?? "");
     const [makeDefault, setMakeDefault] = useState(from.isDefault);
     const [pending, setPending] = useState(false);
@@ -367,7 +406,9 @@ function MoveDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>{t("destinations.moveTitle", { name: from.name })}</DialogTitle>
-                    <DialogDescription>{t("destinations.moveIntro", { count: from.movableCount })}</DialogDescription>
+                    <DialogDescription>
+                        {t("destinations.moveIntro", { count: from.movableCount })}
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     {ordered.length === 0 ? (
@@ -383,7 +424,9 @@ function MoveDialog({
                                 aria-label={t("destinations.moveTo")}
                                 options={ordered.map((target) => ({
                                     value: target.id,
-                                    label: target.via ? `${target.name} - ${target.via}` : target.name
+                                    label: target.via
+                                        ? `${target.name} - ${target.via}`
+                                        : target.name
                                 }))}
                             />
                         </label>
@@ -391,7 +434,9 @@ function MoveDialog({
                     <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                         <div className="min-w-0">
                             <p>{t("destinations.makeAsDefault")}</p>
-                            <p className="text-xs text-muted-foreground">{t("destinations.makeAsDefaultHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("destinations.makeAsDefaultHint")}
+                            </p>
                         </div>
                         <Switch
                             checked={makeDefault}
@@ -451,7 +496,8 @@ function DestinationDialog({
     const [makeDefault, setMakeDefault] = useState(fromSameDisk);
     const [moveToo, setMoveToo] = useState(fromSameDisk && (current?.movableCount ?? 0) > 0);
     const canDefault = kind !== "source-local";
-    const canMove = canDefault && kind !== "local" && fromSameDisk && (current?.movableCount ?? 0) > 0;
+    const canMove =
+        canDefault && kind !== "local" && fromSameDisk && (current?.movableCount ?? 0) > 0;
 
     // Loaded on open rather than with the console: most visits never add one.
     useEffect(() => {
@@ -507,9 +553,11 @@ function DestinationDialog({
         }
         let problem = result.notDefault ?? null;
         if (canMove && moveToo && current) {
-            const moved = await moveCopiesAction({ fromId: current.id, toId: result.id, makeDefault: false }).catch(
-                (caught: unknown) => ({ error: readReasonText(tc, reasonFor(caught)) })
-            );
+            const moved = await moveCopiesAction({
+                fromId: current.id,
+                toId: result.id,
+                makeDefault: false
+            }).catch((caught: unknown) => ({ error: readReasonText(tc, reasonFor(caught)) }));
             if (moved.error !== undefined) problem ??= moved.error;
             else onMoved(moved.count);
         }
@@ -537,7 +585,10 @@ function DestinationDialog({
                                 { value: "connection", label: t("destinations.kinds.connection") },
                                 { value: "host", label: t("destinations.kinds.host") },
                                 { value: "local", label: t("destinations.kinds.local") },
-                                { value: "source-local", label: t("destinations.kinds.sourceLocal") }
+                                {
+                                    value: "source-local",
+                                    label: t("destinations.kinds.sourceLocal")
+                                }
                             ]}
                         />
                         <span className="text-xs text-muted-foreground">{kindNote(t, kind)}</span>
@@ -566,7 +617,10 @@ function DestinationDialog({
                                     value={connectionId}
                                     onValueChange={setConnectionId}
                                     aria-label={t("destinations.connection")}
-                                    options={connections.map((entry) => ({ value: entry.id, label: entry.name }))}
+                                    options={connections.map((entry) => ({
+                                        value: entry.id,
+                                        label: entry.name
+                                    }))}
                                 />
                             )}
                         </label>
@@ -586,7 +640,10 @@ function DestinationDialog({
                                     value={hostId}
                                     onValueChange={setHostId}
                                     aria-label={t("destinations.server")}
-                                    options={hosts.map((entry) => ({ value: entry.id, label: entry.name }))}
+                                    options={hosts.map((entry) => ({
+                                        value: entry.id,
+                                        label: entry.name
+                                    }))}
                                 />
                             )}
                         </label>
@@ -598,7 +655,9 @@ function DestinationDialog({
                             <Input
                                 value={basePath}
                                 onChange={(event) => setBasePath(event.target.value)}
-                                placeholder={kind === "host" ? "/var/backups/polaris" : "polaris-backups"}
+                                placeholder={
+                                    kind === "host" ? "/var/backups/polaris" : "polaris-backups"
+                                }
                             />
                             <span className="text-xs text-muted-foreground">
                                 {t("destinations.folderHint")}
@@ -610,7 +669,9 @@ function DestinationDialog({
                         <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                             <div className="min-w-0">
                                 <p>{t("destinations.makeAsDefault")}</p>
-                                <p className="text-xs text-muted-foreground">{t("destinations.makeAsDefaultHint")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("destinations.makeAsDefaultHint")}
+                                </p>
                             </div>
                             <Switch
                                 checked={makeDefault}
@@ -623,12 +684,18 @@ function DestinationDialog({
                     {canMove && current ? (
                         <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
                             <p className="min-w-0">
-                                {t("destinations.moveAlso", { count: current.movableCount, name: current.name })}
+                                {t("destinations.moveAlso", {
+                                    count: current.movableCount,
+                                    name: current.name
+                                })}
                             </p>
                             <Switch
                                 checked={moveToo}
                                 onChange={setMoveToo}
-                                aria-label={t("destinations.moveAlso", { count: current.movableCount, name: current.name })}
+                                aria-label={t("destinations.moveAlso", {
+                                    count: current.movableCount,
+                                    name: current.name
+                                })}
                             />
                         </div>
                     ) : null}

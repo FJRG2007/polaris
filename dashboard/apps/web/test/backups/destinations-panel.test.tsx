@@ -39,14 +39,29 @@ const destination = (extra: Partial<DestinationSummary>): DestinationSummary => 
 
 const draw = (destinations: DestinationSummary[], locale: "en-US" | "es-ES" = "en-US") =>
     renderToStaticMarkup(
-        withMessages(<DestinationsPanel destinations={destinations} loading={false} onChanged={async () => undefined} />, locale)
+        withMessages(
+            <DestinationsPanel
+                destinations={destinations}
+                loading={false}
+                onChanged={async () => undefined}
+            />,
+            locale
+        )
     );
 
 describe("copies on the data dir", () => {
     it("offers to move them to the NAS that is already a destination", () => {
         const html = draw([
             destination({}),
-            destination({ id: "nas", name: "UNAS", kind: "connection", isDefault: false, copyCount: 0, movableCount: 0, via: "UNAS Pro" })
+            destination({
+                id: "nas",
+                name: "UNAS",
+                kind: "connection",
+                isDefault: false,
+                copyCount: 0,
+                movableCount: 0,
+                via: "UNAS Pro"
+            })
         ]);
         expect(html).toContain("on this server&#x27;s own disk");
         expect(html).toContain("Move them to UNAS");
@@ -62,7 +77,13 @@ describe("copies on the data dir", () => {
     it("says nothing once the default is off the machine", () => {
         const html = draw([
             destination({ isDefault: false }),
-            destination({ id: "nas", name: "UNAS", kind: "connection", isDefault: true, copyCount: 4 })
+            destination({
+                id: "nas",
+                name: "UNAS",
+                kind: "connection",
+                isDefault: true,
+                copyCount: 4
+            })
         ]);
         expect(html).not.toContain("own disk");
     });
@@ -72,7 +93,14 @@ describe("moving copies", () => {
     it("is offered only for copies that are there whole", () => {
         const html = draw([
             destination({ isDefault: false }),
-            destination({ id: "nas", name: "UNAS", kind: "connection", isDefault: true, copyCount: 2, movableCount: 0 })
+            destination({
+                id: "nas",
+                name: "UNAS",
+                kind: "connection",
+                isDefault: true,
+                copyCount: 2,
+                movableCount: 0
+            })
         ]);
         expect(html.match(/Move copies/g)).toHaveLength(1);
     });
