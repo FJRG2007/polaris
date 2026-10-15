@@ -230,6 +230,27 @@ export class HostdClient {
         };
     }
 
+    /**
+     * Run one of the daemon's fixed host security actions to the end: the
+     * hardening audit or the automatic security updates switch. Null from a
+     * daemon that predates the call, "busy" while another is running.
+     */
+    public async hostSecurity(
+        action: "audit" | "updates-status" | "updates-on" | "updates-off"
+    ): Promise<{ exitCode: number; output: string } | "busy" | null> {
+        const response = await this.call("POST", "/v1/host/security", JSON.stringify({ action }));
+        if (response.status === 404) return null;
+        if (response.status === 409) return "busy";
+        if (response.status !== 200) {
+            throw new Error(`hostd host security failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as { exitCode?: unknown; output?: unknown };
+        return {
+            exitCode: typeof parsed.exitCode === "number" ? parsed.exitCode : -1,
+            output: typeof parsed.output === "string" ? parsed.output : ""
+        };
+    }
+
     /** Take every container off a link network between two projects, now. Throws
      *  unless the daemon says nothing is left on it. */
     public async cutPrivateNetwork(name: string): Promise<void> {

@@ -1,0 +1,27 @@
+{
+    "name": "@polaris-app/security-scans",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Security scans: malware, file changes, host hardening and image vulnerabilities on the servers Polaris runs. An installable Polaris app.",
+    "polaris": {
+        "id": "security-scans",
+        "extension": "src/lib/security-extension.ts#securityExtension"
+    },
+    "dependencies": {
+        "@polaris/app-host": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "@polaris/deploy": "0.1.0",
+        "@polaris/hostd-client": "0.1.0",
+        "@polaris/ssh": "0.1.0",
+        "@polaris/ui": "0.1.0",
+        "lucide-react": "0.469.0",
+        "zod": "3.24.1"
+    },
+    "peerDependencies": {
+        "next": "*",
+        "react": "^19",
+        "react-dom": "^19"
+    }
+}

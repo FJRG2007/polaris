@@ -4488,6 +4488,11 @@ model DeployTarget {
     deployments  Deployment[]
     volumes      Volume[]
 
+    securityScans      SecurityScan[]
+    securityQuarantine SecurityQuarantine[]
+    securityBaselines  SecurityBaseline[]
+    securitySetting    SecuritySetting?
+
     @@unique([ownerId, name])
     @@index([ownerId])
     @@index([hostId])
@@ -13306,4 +13311,109 @@ model CrmRoleRule {
     org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
     @@unique([orgId, role, object])
+}
+
+// Security scans (apps/security-scans): malware, file changes, the host's
+// hardening audit and image vulnerabilities, per server. Every scan runs in a
+// one-off container; a row is what it found. History is pruned to the newest
+// rows per server and kind, and findings are capped per scan.
+model SecurityScan {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    targetId      String    @db.Uuid
+    // malware | files | audit | image
+    kind          String
+    // What was scanned, as the screen names it.
+    label         String
+    // JSON input of the scan (volume ids and folders, the app, the mode).
+    input         String    @default("{}")
+    // queued | running | done | failed
+    state         String    @default("queued")
+    // JSON figures: severity counts, a score, a diff's totals.
+    summary       String    @default("{}")
+    // gzip: an integrity check's file manifest, or a CycloneDX inventory.
+    payload       Bytes?
+    // A message key, never a container's raw output.
+    error         String?
+    requestedById String?   @db.Uuid
+    createdAt     DateTime  @default(now())
+    startedAt     DateTime?
+    finishedAt    DateTime?
+
+    target   DeployTarget      @relation(fields: [targetId], references: [id], onDelete: Cascade)
+    findings SecurityFinding[]
+
+    @@index([targetId, kind, createdAt(sort: Desc)])
+    @@index([state, createdAt])
+}
+
+model SecurityFinding {
+    id       String  @id @default(uuid(7)) @db.Uuid
+    scanId   String  @db.Uuid
+    // critical | high | medium | low | negligible | unknown | warning | suggestion | found
+    // | added | removed | changed
+    severity String
+    // The signature, the check's text, or the vulnerability id.
+    title    String
+    // Where: a path inside a volume, a package and version, a check id.
+    location String
+    // The volume a malware hit is in, for quarantine.
+    volumeId String? @db.Uuid
+    fixedIn  String?
+    url      String?
+    position Int
+
+    scan SecurityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+    @@index([scanId, position])
+}
+
+model SecurityQuarantine {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    targetId  String    @db.Uuid
+    volumeId  String    @db.Uuid
+    // The volume's engine name and the path inside it the file came from.
+    volume    String
+    path      String
+    signature String
+    // held | restored | deleted
+    state     String    @default("held")
+    createdAt DateTime  @default(now())
+    settledAt DateTime?
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@index([targetId, state, createdAt(sort: Desc)])
+}
+
+model SecurityBaseline {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    targetId  String   @db.Uuid
+    volumeId  String   @db.Uuid
+    subpath   String   @default("")
+    label     String
+    // gzip of a JSON array of [path, sha256], sorted by path.
+    manifest  Bytes
+    files     Int
+    createdAt DateTime @default(now())
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@unique([targetId, volumeId, subpath])
+}
+
+model SecuritySetting {
+    targetId    String    @id @db.Uuid
+    // 0 is never; otherwise every that many hours.
+    everyHours  Int       @default(0)
+    lastPlanned DateTime?
+    // The automatic security updates switch as last read or set on the host:
+    // on | off | unsupported | unknown
+    updates     String    @default("unknown")
+    updatesAt   DateTime?
+    distro      String?
+    updatedAt   DateTime  @updatedAt
+
+    target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@index([everyHours])
 }
