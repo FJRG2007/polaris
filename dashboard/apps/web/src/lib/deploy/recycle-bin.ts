@@ -32,6 +32,8 @@ import { INCLUDING_BINNED, prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import * as restorePoints from "@/lib/restore-points/service";
 import { managedProjectWhere } from "@/lib/deploy-project-access";
+import * as quotas from "@/lib/orgs/quotas";
+import * as quota from "@/lib/orgs/quota-service";
 
 /** The instance-wide retention an earlier version kept; now only the default. */
 export const BIN_RETENTION_KEY = "deploy.recycleBin.days";
@@ -420,6 +422,67 @@ async function requireBinned(kind: BinKind, id: string, userId: string): Promise
     return ownerId;
 }
 
+/**
+ * Refuse a restore that would take the organization past one of its caps. A
+ * binned item counts toward none of them, so bringing it back is one more of
+ * everything it is: a project returns with the services and databases binned
+ * along with it, and each returns with what its limits reserve.
+ */
+async function assertRoomToRestore(kind: BinKind, id: string): Promise<void> {
+    const binned = { id, binnedAt: { not: null } };
+    const inProject = { select: { environment: { select: { project: { select: { orgId: true } } } } } };
+    const limits = { cpuLimit: true, memoryLimitMb: true } as const;
+    let orgId: string | null = null;
+    let projects = 0;
+    let applications: { replicas: number; cpuLimit: number | null; memoryLimitMb: number | null }[] = [];
+    let databases: { members: number; parentId: string | null; cpuLimit: number | null; memoryLimitMb: number | null }[] = [];
+    if (kind === "application") {
+        const row = await prisma.application.findFirst({
+            where: binned,
+            select: { ...limits, replicas: true, ...inProject.select }
+        });
+        if (!row) return;
+        orgId = row.environment.project.orgId;
+        applications = [row];
+    } else if (kind === "database") {
+        const row = await prisma.managedDatabase.findFirst({
+            where: binned,
+            select: { ...limits, members: true, parentId: true, ...inProject.select }
+        });
+        if (!row) return;
+        orgId = row.environment.project.orgId;
+        databases = [row];
+    } else {
+        const project = await prisma.project.findFirst({ where: binned, select: { orgId: true, binnedAt: true } });
+        if (!project?.binnedAt) return;
+        orgId = project.orgId;
+        projects = 1;
+        const together = { binnedAt: project.binnedAt, environment: { projectId: id } };
+        [applications, databases] = await Promise.all([
+            prisma.application.findMany({ where: together, select: { ...limits, replicas: true } }),
+            prisma.managedDatabase.findMany({ where: together, select: { ...limits, members: true, parentId: true } })
+        ]);
+    }
+    if (!orgId) return;
+    await quota.assertOrgRoom(orgId, "projects", projects);
+    await quota.assertOrgRoom(orgId, "services", applications.length);
+    await quota.assertOrgRoom(orgId, "databases", databases.length);
+    // A database hosted inside another instance has no container of its own.
+    const dedicated = databases.filter((database) => !database.parentId);
+    await quota.assertOrgReservation(
+        orgId,
+        { cpus: 0, memoryMb: 0 },
+        {
+            cpus:
+                applications.reduce((sum, app) => sum + quotas.reservationOf(app.cpuLimit, app.replicas), 0) +
+                dedicated.reduce((sum, db) => sum + quotas.reservationOf(db.cpuLimit, db.members), 0),
+            memoryMb:
+                applications.reduce((sum, app) => sum + quotas.reservationOf(app.memoryLimitMb, app.replicas), 0) +
+                dedicated.reduce((sum, db) => sum + quotas.reservationOf(db.memoryLimitMb, db.members), 0)
+        }
+    );
+}
+
 /** Bring an item back and redeploy it. */
 export async function restoreFromBin(
     kind: BinKind,
@@ -428,6 +491,7 @@ export async function restoreFromBin(
     actorId: string
 ): Promise<void> {
     const ownerId = await requireBinned(kind, id, userId);
+    await assertRoomToRestore(kind, id);
     if (kind === "application") return restoreApplicationRow(id, ownerId, actorId);
     if (kind === "database") return restoreDatabaseRow(id, ownerId, actorId);
     const project = await prisma.project.findFirst({

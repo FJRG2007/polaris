@@ -84,7 +84,7 @@ function BinContents({ canManage }: { canManage: boolean }) {
             const result = await binItemAction(action, { kind: entry.kind, id: entry.id });
             if (result.error) {
                 setEntries(previous);
-                setError(t(action === "restore" ? "bin.binRestoreFailed" : "bin.binDeleteFailed"));
+                setError(result.message ?? t(action === "restore" ? "bin.binRestoreFailed" : "bin.binDeleteFailed"));
                 return;
             }
             router.refresh();

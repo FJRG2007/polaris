@@ -149,18 +149,26 @@ export async function orgQuotaUsage(orgId: string): Promise<quotas.OrgQuotaUsage
 }
 
 /**
- * Refuse one more of `dimension` when the organization is at its cap. Personal
- * things (no organization) are never capped here. Members and teams are checked
- * by their own services, which also hold the instance's cap.
+ * Refuse `adding` more of `dimension` (one, unless a restore brings several back
+ * at once) when they would not fit under the organization's cap. Personal things
+ * (no organization) are never capped here. Members and teams are checked by their
+ * own services, which also hold the instance's cap.
+ *
+ * The count and the insert after it are not one transaction, so two creates
+ * racing at the last place can both pass and leave the organization one over.
+ * That is accepted: a cap here is an allowance, not a safety limit, nothing is
+ * lost by the overshoot, and the next create is refused as usual.
  */
 export async function assertOrgRoom(
     orgId: string | null | undefined,
-    dimension: "projects" | "services" | "databases"
+    dimension: "projects" | "services" | "databases",
+    adding = 1
 ): Promise<void> {
-    if (!orgId) return;
+    if (!orgId || adding <= 0) return;
     const limit = (await getOrgQuota(orgId))?.[dimension] ?? null;
     if (limit === null) return;
-    if (!quotas.roomForOne(limit, await countOrgUsage(orgId, dimension))) throw await quotaRefusal(dimension, limit);
+    const current = await countOrgUsage(orgId, dimension);
+    if (!quotas.roomForOne(limit, current + adding - 1)) throw await quotaRefusal(dimension, limit);
 }
 
 /** The organization an environment's project sits on, or null for a personal one. */

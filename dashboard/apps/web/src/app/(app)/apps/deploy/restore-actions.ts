@@ -14,6 +14,7 @@ import { requirePermission } from "@/lib/session";
 import { requireVariableScopeAccess } from "@/lib/deploy/variable-groups";
 import { recordAudit } from "@/lib/audit-service";
 import * as recycleBin from "@/lib/deploy/recycle-bin";
+import { OrgQuotaError } from "@/lib/orgs/quota-service";
 import { openShelfBinPolicy } from "@/lib/deploy/recycle-bin-access";
 import * as restorePoints from "@/lib/restore-points/service";
 import { requireApplicationAccess, requireEnvironmentAccess } from "@/lib/deploy-project-access";
@@ -170,7 +171,7 @@ export async function listBinAction(): Promise<{
 export async function binItemAction(
     action: "restore" | "forget",
     raw: { kind: string; id: string }
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; message?: string }> {
     try {
         const item = binItemSchema.parse(raw);
         const verb = z.enum(["restore", "forget"]).parse(action);
@@ -189,6 +190,8 @@ export async function binItemAction(
         revalidatePath("/apps/deploy");
         return {};
     } catch (error) {
+        // A restore past the organization's caps says which one, in the reader's words.
+        if (error instanceof OrgQuotaError) return { error: "binRestoreFailed", message: error.message };
         console.error("polaris: recycle bin action failed:", error);
         return { error: action === "restore" ? "binRestoreFailed" : "binDeleteFailed" };
     }
