@@ -22,7 +22,7 @@
 
 import { rateLimit } from "@/lib/rate-limit-service";
 import { findConnectionProvider } from "@polaris/core";
-import { notifyOperators } from "@/lib/notifications/operators";
+import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
 import { getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
 /** Held on the integration's own config, so forgetting the application forgets
@@ -73,8 +73,15 @@ export function describeFailure(caught: unknown): string {
  * Record a refusal and tell whoever can act on it. Never throws: it runs on the
  * path that is already handling a failure, and the person waiting on that
  * redirect must still land somewhere. Answers whether the reason was recorded.
+ *
+ * `notice` replaces the alert's words, for a failure that is not somebody
+ * connecting an account - a linked account the provider stopped serving.
  */
-export async function recordConnectionFailure(provider: string, reason: string): Promise<boolean> {
+export async function recordConnectionFailure(
+    provider: string,
+    reason: string,
+    notice?: Pick<OperatorAlert, "title" | "body" | "say">
+): Promise<boolean> {
     let recorded = false;
     try {
         const state = await getIntegrationState(provider);
@@ -103,6 +110,7 @@ export async function recordConnectionFailure(provider: string, reason: string):
                 title: t("connections.refusedTitle", { name }),
                 body: t("connections.refusedBody", { name, reason })
             }),
+            ...notice,
             href: "/admin/integrations",
             level: "warning",
             actionRequired: true
