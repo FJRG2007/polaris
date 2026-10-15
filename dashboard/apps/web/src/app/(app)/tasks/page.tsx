@@ -79,6 +79,7 @@ export default async function TasksHomePage() {
                 // A first visit has nowhere to put a task, so the empty state
                 // below has to offer to make somewhere rather than advise.
                 hasSpaces={tree.length > 0}
+                canManage={mayManage}
             />
         </div>
     );

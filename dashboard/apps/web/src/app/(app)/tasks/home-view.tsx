@@ -55,7 +55,8 @@ export function HomeView({
     timer,
     contexts,
     lists,
-    hasSpaces
+    hasSpaces,
+    canManage
 }: {
     tasks: readonly TaskRow[];
     counts: HomeCounts;
@@ -70,6 +71,9 @@ export function HomeView({
      *  and it needs a different sentence and a button rather than advice about
      *  a list that does not exist. */
     hasSpaces: boolean;
+    /** Whether this account may make a space by hand - the space tree's form
+     *  answers only to `tasks.manage`, so "Do it myself" is not offered without it. */
+    canManage: boolean;
 }) {
     const router = useRouter();
     const format = useDisplayFormat();
@@ -275,9 +279,14 @@ export function HomeView({
                                     )}
                                     {t("home.setUp")}
                                 </Button>
-                                <Button size="sm" variant="ghost" asChild>
-                                    <Link href="/tasks/spaces">{t("home.doItMyself")}</Link>
-                                </Button>
+                                {canManage && (
+                                    <Button size="sm" variant="ghost" asChild>
+                                        {/* The new-space form lives in the space tree beside this. */}
+                                        <Link href="/tasks?new=space" scroll={false}>
+                                            {t("home.doItMyself")}
+                                        </Link>
+                                    </Button>
+                                )}
                             </>
                         }
                     />

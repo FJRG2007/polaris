@@ -15,7 +15,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { settleReport } from "@/lib/chat/reports";
 
-const PATH = "/admin/reports";
+// The queue is drawn on the safety screen; there is no page at /admin/reports.
+const PATH = "/admin/safety";
 
 export async function settleReportAction(
     reportId: string,

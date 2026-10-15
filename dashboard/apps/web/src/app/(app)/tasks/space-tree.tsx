@@ -27,7 +27,7 @@ import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { avatarUrl } from "@/lib/avatar-url";
 import { Avatar, OrgAvatar } from "@/components/avatar";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AccessDialog, type AccessTarget } from "./access-dialog";
 import { dropEdge, neighbours, type DropEdge } from "./drop-edge";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -600,6 +600,36 @@ export function SpaceTree({
         );
     };
 
+    /** Open the new-space form, with the owners it can be filed under. */
+    const openNewSpace = useCallback(() => {
+        setNewSpace(true);
+        void (async () => {
+            const result = await runAction(
+                () => actions.spaceOwnerOptionsAction(),
+                setError
+            );
+            setSpaceOrgs(result?.orgs ?? []);
+            setMe(result?.me ?? null);
+            // Start on the shelf that is open. Somebody
+            // working from a client's shelf who presses
+            // "new space" means one for that client, and
+            // defaulting to their own is how a company's
+            // work ends up somewhere nobody else can find.
+            setSpaceOwner(result?.scopeOrgId ?? "");
+        })();
+    }, []);
+
+    // "Do it myself" on the first-visit screen points here: the form it means is
+    // this one, so the address opens it rather than a page of its own.
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const asked = searchParams.get("new") === "space";
+    useEffect(() => {
+        if (!asked || !canManage || !canCreate) return;
+        openNewSpace();
+        router.replace(pathname, { scroll: false });
+    }, [asked, canManage, canCreate, openNewSpace, router, pathname]);
+
     return (
         <nav aria-label={t("tree.spaces")} className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
             <div className="flex items-center justify-between">
@@ -612,23 +642,8 @@ export function SpaceTree({
                         aria-label={t("tree.createSpace")}
                         title={t("tree.createSpace")}
                         onClick={() => {
-                            const opening = !newSpace;
-                            setNewSpace(opening);
-                            if (!opening) return;
-                            void (async () => {
-                                const result = await runAction(
-                                    () => actions.spaceOwnerOptionsAction(),
-                                    setError
-                                );
-                                setSpaceOrgs(result?.orgs ?? []);
-                                setMe(result?.me ?? null);
-                                // Start on the shelf that is open. Somebody
-                                // working from a client's shelf who presses
-                                // "new space" means one for that client, and
-                                // defaulting to their own is how a company's
-                                // work ends up somewhere nobody else can find.
-                                setSpaceOwner(result?.scopeOrgId ?? "");
-                            })();
+                            if (newSpace) setNewSpace(false);
+                            else openNewSpace();
                         }}
                         className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
