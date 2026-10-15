@@ -20,13 +20,13 @@
             "title": "Base de datos",
             "ok": "Responde en {ms} ms.",
             "slow": "Responde, pero lenta: {ms} ms.",
-            "unreachable": "No responde. Las páginas con datos fallarán hasta que vuelva."
+            "unreachable": "No responde. Las páginas con datos fallarán hasta que vuelva. Si dura unos minutos, reinicia la máquina donde corre Polaris; si sigue, envía el paquete de soporte al pedir ayuda."
         },
         "hostAgent": {
             "title": "Agente",
             "ok": "Edición completa, agente {version}.",
             "limited": "Edición limitada: no hay actualizaciones, despliegues ni limpieza de disco desde aquí.",
-            "silent": "El agente del servidor no responde; actualizaciones y despliegues en pausa. Suele volver en un minuto."
+            "silent": "El agente del servidor no responde; actualizaciones y despliegues en pausa. Suele volver en un minuto. Si no, reinicia la máquina donde corre Polaris; si sigue, envía el paquete de soporte al pedir ayuda."
         },
         "updates": {
             "title": "Versiones",
@@ -72,7 +72,7 @@
         "clock": {
             "title": "Hora",
             "ok": "En hora (margen de {seconds} s).",
-            "skewed": "Desfase de {seconds} s. Códigos y certificados pueden fallar.",
+            "skewed": "Desfase de {seconds} s. Códigos y certificados pueden fallar. Activa la hora automática (NTP) en la máquina donde corre Polaris.",
             "unreachable": "Sin internet para comparar la hora."
         }
     },
@@ -106,6 +106,9 @@
         "description": "Un zip para compartir al pedir ayuda. Nunca incluye contraseñas, claves ni tokens.",
         "contents": "Qué contiene",
         "download": "Descargar paquete",
+        "preparing": "Preparando...",
+        "limited": "Límite alcanzado. Prueba en {minutes, plural, one {# minuto} other {# minutos}}.",
+        "failed": "No se pudo generar el paquete. Inténtalo de nuevo.",
         "files": {
             "manifest": "Versiones, edición y datos del sistema",
             "diagnosis": "El resultado de las comprobaciones",

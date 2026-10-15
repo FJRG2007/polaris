@@ -29,7 +29,8 @@ export async function runFixAction(input: unknown): Promise<{ ok: boolean; check
         if (parsed.data === "republishRoutes") await syncAppRoutes();
         else {
             if (getCapabilities().edition !== "full") return { ok: false };
-            await reclaimHostSpace({ whenIdle: true });
+            if ((await reclaimHostSpace({ whenIdle: true })) === null)
+                return { ok: false, check: await runCheck(CHECK_FOR[parsed.data]) };
         }
     } catch (error) {
         console.error(`polaris: diagnostics fix ${parsed.data} failed:`, error);

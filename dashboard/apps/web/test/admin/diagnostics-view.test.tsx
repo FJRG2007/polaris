@@ -6,7 +6,8 @@
  * Every check row paints at once with its name and its own placeholder; each
  * fills as its own answer lands, so one slow probe holds only its row. The
  * bundle card lists the files and the settings that ride along - values for
- * the safe ones, names only for the rest - and downloads through a plain link.
+ * the safe ones, names only for the rest - and downloads it, saying why when
+ * the download is refused.
  */
 
 import type { ReactElement } from "react";
@@ -114,12 +115,35 @@ describe("the Diagnostics screen", () => {
         expect(screen.getByText("POLARIS_SESSION_SECRET")).toBeTruthy();
     });
 
-    it("downloads the bundle through a plain link, not a prefetching router link", () => {
+    it("downloads the bundle as a file, and says why when it is refused", async () => {
+        const createObjectURL = vi.fn(() => "blob:bundle");
+        vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+        const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+        const fetched = vi.mocked(fetch);
         render(<DiagnosticsView checks={IDS} initialSpeed={null} />);
-        const link = screen.getByRole("link", { name: /Download bundle/ });
-        expect(link.tagName).toBe("A");
-        expect(link.getAttribute("href")).toBe("/api/admin/diagnostics/bundle");
-        expect(link.hasAttribute("download")).toBe(true);
+        const button = screen.getByRole("button", { name: /Download bundle/ });
+
+        fetched.mockResolvedValueOnce(
+            new Response("zip", {
+                headers: { "Content-Disposition": 'attachment; filename="polaris-support-2026-10-15.zip"' }
+            })
+        );
+        await act(async () => button.click());
+        await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+        expect((click.mock.instances[0] as unknown as HTMLAnchorElement).download).toBe("polaris-support-2026-10-15.zip");
+        expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+        fetched.mockResolvedValueOnce(
+            Response.json({ error: "rate limited" }, { status: 429, headers: { "Retry-After": "61" } })
+        );
+        await act(async () => button.click());
+        await waitFor(() => expect(screen.getByText("Limit reached. Try again in 2 minutes.")).toBeTruthy());
+
+        fetched.mockResolvedValueOnce(new Response("", { status: 500 }));
+        await act(async () => button.click());
+        await waitFor(() => expect(screen.getByText("The bundle could not be built. Try again.")).toBeTruthy());
+        expect(click).toHaveBeenCalledTimes(1);
+        click.mockRestore();
     });
 
     it("shows the last speed result at once, and says when the limit is reached", async () => {

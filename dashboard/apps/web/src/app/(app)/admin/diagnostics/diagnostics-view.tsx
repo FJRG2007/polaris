@@ -6,7 +6,8 @@
  * Every check row paints at once with its name and a placeholder, and each
  * asks for its own answer, so a slow certificate probe never holds the disk
  * reading. The bundle's contents are read on paint too, so the reader sees
- * what the archive holds before they download it.
+ * what the archive holds before they download it, and the download itself is
+ * fetched here so a refusal reads as a sentence rather than a broken file.
  */
 
 import { Download, Gauge, RefreshCw } from "lucide-react";
@@ -249,6 +250,8 @@ function BundleCard() {
     const t = useTranslations("diagnostics");
     const [preview, setPreview] = useState<BundlePreview | null>(null);
     const [failed, setFailed] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [downloadError, setDownloadError] = useState<string | null>(null);
 
     useEffect(() => {
         let live = true;
@@ -261,6 +264,31 @@ function BundleCard() {
         };
     }, []);
 
+    const download = async () => {
+        setDownloading(true);
+        setDownloadError(null);
+        try {
+            const response = await fetch("/api/admin/diagnostics/bundle", { cache: "no-store" });
+            if (response.status === 429) {
+                const seconds = Number(response.headers.get("Retry-After")) || 60;
+                setDownloadError(t("bundle.limited", { minutes: Math.max(1, Math.ceil(seconds / 60)) }));
+                return;
+            }
+            if (!response.ok) throw new Error(`bundle answered ${response.status}`);
+            const name = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "")?.[1];
+            const url = URL.createObjectURL(await response.blob());
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = name ?? "polaris-support.zip";
+            anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 40_000);
+        } catch {
+            setDownloadError(t("bundle.failed"));
+        } finally {
+            setDownloading(false);
+        }
+    };
+
     return (
         <Card>
             <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
@@ -268,15 +296,13 @@ function BundleCard() {
                     <CardTitle>{t("bundle.heading")}</CardTitle>
                     <span className="text-xs text-muted-foreground">{t("bundle.description")}</span>
                 </div>
-                {/* A plain anchor: a router link to an API route prefetches it. */}
-                <Button size="sm" asChild>
-                    <a href="/api/admin/diagnostics/bundle" download>
-                        <Download />
-                        {t("bundle.download")}
-                    </a>
+                <Button size="sm" onClick={download} disabled={downloading}>
+                    <Download />
+                    {downloading ? t("bundle.preparing") : t("bundle.download")}
                 </Button>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
+                {downloadError ? <p className="text-sm text-danger" role="status">{downloadError}</p> : null}
                 <h3 className="text-xs font-medium uppercase text-muted-foreground">{t("bundle.contents")}</h3>
                 <ul className="flex flex-col gap-1">
                     {BUNDLE_FILES.map((file) => (

@@ -5,6 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { LIMITED_CAPABILITIES, setCapabilities } from "@polaris/config";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ADMIN = { id: "admin-1", isAdmin: true };
@@ -16,7 +17,7 @@ const bundleZip = vi.fn(async () => Buffer.from("zip"));
 const rateLimit = vi.fn(async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({ ok: true, retryAfterMs: 0 }));
 const runSpeedTest = vi.fn(async () => ({ ok: true }));
 const syncAppRoutes = vi.fn(async () => undefined);
-const reclaimHostSpace = vi.fn(async () => undefined);
+const reclaimHostSpace = vi.fn(async (): Promise<number | null> => 0);
 
 vi.mock("@/lib/api-session", () => ({ apiAdmin }));
 vi.mock("@/lib/session", () => ({ requireAdmin }));
@@ -103,6 +104,21 @@ describe("what an administrator sends", () => {
         expect(syncAppRoutes).toHaveBeenCalledTimes(1);
         expect(runCheck).toHaveBeenCalledWith("edge");
         expect(outcome.ok).toBe(true);
+    });
+
+    it("reports freeing space as failed when the host agent answered no prune", async () => {
+        setCapabilities({ ...LIMITED_CAPABILITIES, edition: "full" });
+        try {
+            reclaimHostSpace.mockResolvedValueOnce(null);
+            const refused = await actions.runFixAction("freeSpace");
+            expect(refused.ok).toBe(false);
+            expect(runCheck).toHaveBeenCalledWith("disk");
+
+            reclaimHostSpace.mockResolvedValueOnce(2048);
+            expect((await actions.runFixAction("freeSpace")).ok).toBe(true);
+        } finally {
+            setCapabilities(LIMITED_CAPABILITIES);
+        }
     });
 
     it("rate limits the download per admin, and the preview builds nothing", async () => {

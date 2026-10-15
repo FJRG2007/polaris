@@ -20,13 +20,13 @@
             "title": "Database server",
             "ok": "Answering in {ms} ms.",
             "slow": "Answering, but slowly: {ms} ms.",
-            "unreachable": "Not answering. Pages that read data will fail until it does."
+            "unreachable": "Not answering. Pages that read data will fail until it does. If this lasts a few minutes, restart the machine Polaris runs on; if it persists, send the support bundle when asking for help."
         },
         "hostAgent": {
             "title": "Host agent",
             "ok": "Full edition, agent version {version}.",
             "limited": "Limited edition: updates, deploys and disk cleanup are not available from here.",
-            "silent": "The host agent stopped answering, so updates and deploys are paused. It usually recovers within a minute."
+            "silent": "The host agent stopped answering, so updates and deploys are paused. It usually recovers within a minute. If not, restart the machine Polaris runs on; if it persists, send the support bundle when asking for help."
         },
         "updates": {
             "title": "Updates",
@@ -72,7 +72,7 @@
         "clock": {
             "title": "Clock",
             "ok": "In sync (within {seconds} s).",
-            "skewed": "Off by {seconds} s. Sign-in codes and certificates can fail.",
+            "skewed": "Off by {seconds} s. Sign-in codes and certificates can fail. Turn on automatic time sync (NTP) on the machine Polaris runs on.",
             "unreachable": "Could not reach the internet to compare the time."
         }
     },
@@ -106,6 +106,9 @@
         "description": "A zip file to share when asking for help. Passwords, keys and tokens are never included.",
         "contents": "What it contains",
         "download": "Download bundle",
+        "preparing": "Preparing...",
+        "limited": "Limit reached. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+        "failed": "The bundle could not be built. Try again.",
         "files": {
             "manifest": "Versions, edition and system details",
             "diagnosis": "The results of the checks above",
