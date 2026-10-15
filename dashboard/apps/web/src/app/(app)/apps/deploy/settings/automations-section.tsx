@@ -674,7 +674,7 @@ function RunHistory({
                                         </span>
                                     )}
                                     {step.output && (
-                                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-background p-2 font-mono text-[0.6875rem]">
+                                        <pre className="max-h-40 overflow-auto overscroll-contain whitespace-pre-wrap break-all rounded bg-background p-2 font-mono text-[0.6875rem]">
                                             {step.output}
                                         </pre>
                                     )}
@@ -833,7 +833,7 @@ export function AutomationEditor({
 
     return (
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogContent className="max-h-[90vh] overflow-y-auto overscroll-contain sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
                         {draft.id ? t("automations.editTitle") : t("automations.newTitle")}
