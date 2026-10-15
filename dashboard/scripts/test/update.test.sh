@@ -35,8 +35,10 @@ eval "$(extract edge_labels)"
 eval "$(extract retire)"
 eval "$(extract roll_dashboard)"
 eval "$(extract roll_service)"
+eval "$(extract room_to_update)"
+MIN_FREE_KB=$((5 * 1024 * 1024))
 
-for fn in compose_hash container_hash container_image container_ref image_id container_ready wait_ready edge_labels retire roll_dashboard roll_service; do
+for fn in compose_hash container_hash container_image container_ref image_id container_ready wait_ready edge_labels retire roll_dashboard roll_service room_to_update; do
     if ! command -v "$fn" >/dev/null 2>&1; then
         printf 'setup failed: %s was not extracted from %s\n' "$fn" "$update_sh" >&2
         exit 2

@@ -406,6 +406,30 @@ keep_checkout() {
     return 0
 }
 
+# Free kilobytes on the filesystem holding a path, or nothing when df cannot say.
+# The checkout is bind-mounted from the host, so this is the host's disk - the
+# one Docker and the database live on in a standard install.
+free_kb() {
+    df -Pk "$1" 2>/dev/null | awk 'NR==2 {print $4}'
+}
+
+# Whether there is room to fetch an update without starving the database.
+#
+# An update pulled a 1.7 GB dashboard image onto a disk at 97%, the database's
+# next checkpoint could not be written ("No space left on device"), and it went
+# down with every screen behind it. So below MIN_FREE_KB nothing is fetched and
+# the update stops with nothing changed. Nothing is pruned from here: that goes
+# through the dashboard's image-store lock (see the test), and its Free up space
+# is what the message sends the reader to.
+MIN_FREE_KB=$(( ${POLARIS_UPDATE_MIN_FREE_GB:-5} * 1024 * 1024 ))
+room_to_update() {
+    free=$(free_kb "$1")
+    case "$free" in ''|*[!0-9]*) return 0 ;; esac
+    [ "$free" -ge "$MIN_FREE_KB" ] && return 0
+    err "not enough free disk space to update safely: $((free / 1024 / 1024)) GB free, $((MIN_FREE_KB / 1024 / 1024)) GB needed so the database keeps room to write. Use Free up space on this server in Servers, then update again; nothing has been changed"
+    return 1
+}
+
 main() {
     need docker "install Docker Engine: https://docs.docker.com/engine/install/"
     compose="$(compose_cmd)"
@@ -508,6 +532,8 @@ main() {
 
     tag=$(sed -n 's/^POLARIS_IMAGE_TAG=//p' .env | head -n1)
     web_image="${WEB_IMAGE_REPO}:${tag:-latest}"
+
+    room_to_update "$dash_dir" || exit 1
 
     # The dashboard image is the update, however it is obtained. Either way it is
     # done on its own first and stops the run when it fails - otherwise the rollover
