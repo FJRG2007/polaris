@@ -4647,6 +4647,7 @@ model Project {
     tokens       ApiKey[]
     telemetry    TelemetryProject[]
     promotions   EnvironmentPromotion[]
+    automations  DeployAutomation[]
 
     @@unique([ownerId, slug])
     @@index([ownerId])
@@ -13861,6 +13862,61 @@ model CloudPrice {
     fetchedAt    DateTime @default(now())
 
     @@unique([provider, region, size])
+}
+
+// A project's automation: when something happens - a schedule, a call to its
+// webhook, a deploy or domain event - run its actions in order. Read by the
+// minute's scheduler through (enabled, nextRunAt), by the webhook route through
+// the token's hash, and by the deploy and domain alerts through (projectId).
+model DeployAutomation {
+    id                 String    @id @default(uuid(7)) @db.Uuid
+    projectId          String    @db.Uuid
+    name               String
+    enabled            Boolean   @default(true)
+    // schedule | webhook | event
+    trigger            String
+    // schedule: a cron expression, read in `timezone`.
+    schedule           String?
+    timezone           String    @default("UTC")
+    // event: deploy.succeeded | deploy.failed | domain.down | domain.up
+    event              String?
+    // event: only this service's events, or every service's when null.
+    eventApplicationId String?   @db.Uuid
+    // webhook: SHA-256 of the token in the URL. The token itself is shown once.
+    webhookTokenHash   String?   @unique
+    // JSON array of actions, run in order; see deployAutomationActionSchema.
+    actions            String    @default("[]")
+    nextRunAt          DateTime?
+    lastRunAt          DateTime?
+    // succeeded | failed, of the last finished run.
+    lastStatus         String?
+    createdById        String?   @db.Uuid
+    createdAt          DateTime  @default(now())
+    updatedAt          DateTime  @updatedAt
+
+    project Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+    runs    DeployAutomationRun[]
+
+    @@index([projectId])
+    @@index([enabled, nextRunAt])
+}
+
+// One run of an automation and what each of its actions did.
+model DeployAutomationRun {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    automationId String    @db.Uuid
+    // schedule | webhook | event | manual
+    trigger      String
+    // running | succeeded | failed
+    status       String    @default("running")
+    // One line per action, appended as each finishes; bounded in code.
+    log          String    @default("")
+    startedAt    DateTime  @default(now())
+    finishedAt   DateTime?
+
+    automation DeployAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+    @@index([automationId, startedAt])
 }
 
 // SFTP accounts that reach one service's volumes, each chrooted to them. The

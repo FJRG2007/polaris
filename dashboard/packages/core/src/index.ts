@@ -139,6 +139,7 @@ export * from "./frame-protection.js";
 export * from "./schemas/database.js";
 export * from "./schemas/database-statements.js";
 export * from "./schemas/database-maintenance.js";
+export * from "./schemas/deploy-automations.js";
 export * from "./schemas/database-accounts.js";
 export * from "./schemas/database-tuning.js";
 export * from "./schemas/file-access.js";
