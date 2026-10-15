@@ -3,6 +3,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { capabilitiesFor } from "@/lib/host-capabilities";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { mayCreateProjectIn } from "@/lib/deploy-project-access";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { ProjectsGrid, type ProjectCardData } from "./projects-grid";
 import { getApplicationDeployStatuses, listProjects } from "@/lib/deploy-service";
@@ -94,6 +95,8 @@ export default async function DeployPage() {
         };
     });
 
+    const canCreateHere = canManage && (await mayCreateProjectIn({ id: user.id, isAdmin: user.isAdmin }, orgId));
+
     return (
         <ProjectsGrid
             projects={cards}
@@ -104,6 +107,7 @@ export default async function DeployPage() {
             // for them the list opens on their own projects.
             hideManagedByDefault={user.isAdmin}
             canSetBinDays={canSetBinDays}
+            canCreateHere={canCreateHere}
         />
     );
 }

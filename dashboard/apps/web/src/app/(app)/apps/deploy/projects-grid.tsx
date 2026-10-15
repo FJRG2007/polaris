@@ -82,7 +82,8 @@ export function ProjectsGrid({
     localReady,
     viewerId,
     hideManagedByDefault = false,
-    canSetBinDays = false
+    canSetBinDays = false,
+    canCreateHere = canManage
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
@@ -93,6 +94,8 @@ export function ProjectsGrid({
     hideManagedByDefault?: boolean;
     /** Whether the reader may change how long the recycle bin keeps things. */
     canSetBinDays?: boolean;
+    /** Whether the reader may make a project on the open shelf - the import's own check. */
+    canCreateHere?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("deploy");
@@ -156,7 +159,7 @@ export function ProjectsGrid({
                     <RecycleBinButton canManage={canManage} isAdmin={canSetBinDays} />
                     {canManage && (
                         <>
-                            <ImportSiteButton />
+                            <ImportSiteButton allowed={canCreateHere} />
                             <RegistryCredentialsButton />
                             <CreateProjectButton />
                         </>

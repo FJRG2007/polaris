@@ -116,7 +116,9 @@ function sendBackup(file: File, onProgress: (percent: number) => void): Promise<
     });
 }
 
-export function ImportSiteButton() {
+/** `allowed`: whether the reader may make a project on the open shelf. When not,
+ *  the button stays, disabled, with the reason beside it. */
+export function ImportSiteButton({ allowed = true }: { allowed?: boolean }) {
     const t = useTranslations("deploySafety");
     const router = useRouter();
     const input = useRef<HTMLInputElement>(null);
@@ -232,16 +234,28 @@ export function ImportSiteButton() {
 
     return (
         <>
-            <Button variant="outline" onClick={() => setOpen(true)}>
-                {running ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                {running
-                    ? t("importSite.running")
-                    : job?.status === "succeeded"
-                      ? t("importSite.finished")
-                      : job?.status === "failed"
-                        ? t("importSite.stopped")
-                        : t("importSite.open")}
-            </Button>
+            {!allowed && !job ? (
+                <span className="inline-flex" title={t("importSite.notAllowed")}>
+                    <Button variant="outline" disabled aria-describedby="import-site-blocked">
+                        <Upload className="size-4" />
+                        {t("importSite.open")}
+                    </Button>
+                    <span id="import-site-blocked" className="sr-only">
+                        {t("importSite.notAllowed")}
+                    </span>
+                </span>
+            ) : (
+                <Button variant="outline" onClick={() => setOpen(true)}>
+                    {running ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                    {running
+                        ? t("importSite.running")
+                        : job?.status === "succeeded"
+                          ? t("importSite.finished")
+                          : job?.status === "failed"
+                            ? t("importSite.stopped")
+                            : t("importSite.open")}
+                </Button>
+            )}
             <Dialog
                 open={open}
                 onOpenChange={(next) => {

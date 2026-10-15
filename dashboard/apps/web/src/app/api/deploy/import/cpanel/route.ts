@@ -17,7 +17,7 @@ import { NextResponse } from "next/server";
 import { apiPermission } from "@/lib/api-session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { requireOrgPermission } from "@/lib/orgs/org-service";
+import { mayCreateProjectIn } from "@/lib/deploy-project-access";
 import { stageBody, stagedPath, TooLarge } from "@/lib/deploy/staging";
 import { getImport, ImportBusy, recentImports, startCpanelImport } from "@/lib/deploy/panel-import/jobs";
 
@@ -33,11 +33,8 @@ export async function POST(request: Request): Promise<Response> {
     const words = await readerWords("deploySafety");
     const tooLarge = () => NextResponse.json({ error: words("importSite.tooLarge") }, { status: 413 });
 
-    let orgId: string | null;
-    try {
-        orgId = await scopeOrgIdFor(user.id);
-        if (orgId) await requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "deploy.manage");
-    } catch {
+    const orgId = await scopeOrgIdFor(user.id);
+    if (!(await mayCreateProjectIn({ id: user.id, isAdmin: user.isAdmin }, orgId))) {
         return NextResponse.json({ error: words("importSite.notAllowed") }, { status: 403 });
     }
     const declared = Number(request.headers.get("content-length"));

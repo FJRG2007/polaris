@@ -19,6 +19,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { requireOrgPermission, type OrgActor } from "@/lib/orgs/org-service";
 import { canOn, grantedResourceIds } from "@polaris/auth";
 import {
     memberOrgIds,
@@ -393,4 +394,18 @@ export async function visibleProjectIds(userId: string): Promise<string[]> {
         orderBy: { createdAt: "asc" }
     });
     return rows.map((row) => row.id);
+}
+
+/**
+ * Whether this actor may make a project on the shelf `orgId` (null: their own).
+ * Their own shelf takes only the `deploy.manage` the caller has already checked;
+ * an organization's takes being allowed to run its services. The import route
+ * refuses on this, and the projects screen disables Import site on it.
+ */
+export async function mayCreateProjectIn(actor: OrgActor, orgId: string | null): Promise<boolean> {
+    if (!orgId) return true;
+    return requireOrgPermission(actor, orgId, "deploy.manage").then(
+        () => true,
+        () => false
+    );
 }
