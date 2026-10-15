@@ -23,7 +23,7 @@
     "bin": {
         "open": "Papelera",
         "title": "Papelera",
-        "description": "Los servicios, bases de datos y proyectos eliminados se quedan aquí {days, plural, one {# día} other {# días}} y después se borran definitivamente.",
+        "description": "Los servicios, bases de datos y proyectos eliminados esperan aquí hasta la fecha indicada y luego se borran.",
         "empty": "No se ha eliminado nada recientemente.",
         "unavailable": "No se pudo cargar la papelera. Recarga la página e inténtalo de nuevo.",
         "kindApplication": "Servicio",
@@ -41,7 +41,9 @@
         "daysUnit": "días",
         "daysSave": "Guardar",
         "daysSaved": "Guardado.",
-        "daysInvalid": "Usa un número de días entre 1 y 365."
+        "daysInvalid": "Usa un número de días entre 1 y 365.",
+        "off": "La papelera está desactivada aquí: al eliminar se borra definitivamente al momento.",
+        "settingsLink": "Ajustes de la papelera"
     },
     "importSite": {
         "open": "Importar sitio",
@@ -97,5 +99,22 @@
             "leavesFolder": "La copia contiene una ruta que sale de su carpeta.",
             "controlCharacters": "La copia contiene un nombre de archivo con caracteres de control."
         }
+    },
+    "binSettings": {
+        "open": "Ajustes",
+        "pageTitle": "Ajustes de Deploy",
+        "personalScope": "Se aplica a tus proyectos personales.",
+        "orgScope": "Se aplica a todos los proyectos de {org}.",
+        "back": "Proyectos",
+        "title": "Papelera",
+        "intro": "Los servicios, bases de datos y proyectos eliminados esperan en la papelera antes de borrarse.",
+        "enabled": "Guardar lo eliminado en la papelera",
+        "offHint": "Desactivada: al eliminar se borra al momento. Lo que ya está en la papelera mantiene su fecha.",
+        "days": "Guardar lo eliminado durante",
+        "save": "Guardar",
+        "saved": "Guardado.",
+        "failed": "No se pudo guardar. Inténtalo de nuevo en un momento.",
+        "lockNoDeploy": "Cambiar esto requiere permiso para gestionar Deploy.",
+        "lockNotOrgAdmin": "Solo los propietarios y administradores de {org} pueden cambiarlo."
     }
 }

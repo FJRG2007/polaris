@@ -22,7 +22,12 @@
  * instance-wide number of days an earlier version stored, else 30.
  */
 
-import { z } from "zod";
+import {
+    DEFAULT_BIN_DAYS,
+    binDaysSchema,
+    binPolicySchema,
+    type BinPolicy
+} from "@/lib/deploy/recycle-bin-policy";
 import { INCLUDING_BINNED, prisma } from "@polaris/db";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import * as restorePoints from "@/lib/restore-points/service";
@@ -30,9 +35,7 @@ import { managedProjectWhere } from "@/lib/deploy-project-access";
 
 /** The instance-wide retention an earlier version kept; now only the default. */
 export const BIN_RETENTION_KEY = "deploy.recycleBin.days";
-export const DEFAULT_BIN_DAYS = 30;
-export const binDaysSchema = z.coerce.number().int().min(1).max(365);
-export const binPolicySchema = z.object({ enabled: z.boolean(), days: binDaysSchema });
+export { DEFAULT_BIN_DAYS, binDaysSchema, binPolicySchema, type BinPolicy };
 /** Items purged per scheduled pass, so one pass never runs for long. */
 const PURGE_BATCH = 10;
 /** Scopes with a policy of their own read per purge pass. */
@@ -41,7 +44,6 @@ const ORG_POLICY_PREFIX = "deploy.recycleBin.org.";
 const USER_POLICY_PREFIX = "deploy.recycleBin.user.";
 
 export type BinKind = "application" | "database" | "project";
-export type BinPolicy = z.infer<typeof binPolicySchema>;
 
 /** Whose bin it is: an organization's, or the person's own for a personal project. */
 export interface BinScope {

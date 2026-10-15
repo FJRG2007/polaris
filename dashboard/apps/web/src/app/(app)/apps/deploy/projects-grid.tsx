@@ -82,7 +82,6 @@ export function ProjectsGrid({
     localReady,
     viewerId,
     hideManagedByDefault = false,
-    canSetBinDays = false,
     canCreateHere = canManage
 }: {
     projects: ProjectCardData[];
@@ -92,13 +91,12 @@ export function ProjectsGrid({
     viewerId: string;
     /** Whether the projects Polaris runs for itself start hidden. */
     hideManagedByDefault?: boolean;
-    /** Whether the reader may change how long the recycle bin keeps things. */
-    canSetBinDays?: boolean;
     /** Whether the reader may make a project on the open shelf - the import's own check. */
     canCreateHere?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("deploy");
+    const tSafety = useTranslations("deploySafety");
     const [layout, setLayout] = useState<"grid" | "list">("grid");
     const [showManaged, setShowManaged] = useShowManaged(viewerId, !hideManagedByDefault);
     const [search, setSearch] = useState("");
@@ -156,7 +154,13 @@ export function ProjectsGrid({
                     {t("projects.title")}
                 </h1>
                 <div data-tour="deploy.create" className="flex flex-wrap items-center gap-2">
-                    <RecycleBinButton canManage={canManage} isAdmin={canSetBinDays} />
+                    <RecycleBinButton canManage={canManage} />
+                    <Button asChild variant="outline">
+                        <Link href="/apps/deploy/settings">
+                            <Settings className="size-4" />
+                            {tSafety("binSettings.open")}
+                        </Link>
+                    </Button>
                     {canManage && (
                         <>
                             <ImportSiteButton allowed={canCreateHere} />
