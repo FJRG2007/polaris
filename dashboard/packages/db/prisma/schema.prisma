@@ -1475,6 +1475,7 @@ model ApiKey {
     project Project?            @relation(fields: [projectId], references: [id], onDelete: Cascade)
     groups  ApiKeyAccessGroup[]
     usage   ApiKeyUsage[]
+    calls   ApiKeyCallHour[]
 
     @@index([userId])
     @@index([userId, kind])
@@ -1501,6 +1502,44 @@ model ApiKeyUsage {
     apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
 
     @@id([apiKeyId, day])
+}
+
+// What one key's calls to one route did in one hour: how many, which status
+// they ended on, and how long they took.
+//
+// The day counter above says whether a key is in use; this says what for and
+// how well, which is the screen behind one key. Still counters, never a log:
+// one row per key, hour, route and status, written by the batch the dashboard
+// flushes every few seconds rather than once per call, and rows older than the
+// retention window are removed by the flush that first crosses into a new hour.
+//
+// Latency is a histogram rather than a list of timings: each column counts the
+// calls that finished within that many milliseconds and above the previous
+// column, so percentiles can be read off a sum across any number of rows.
+model ApiKeyCallHour {
+    apiKeyId String   @db.Uuid
+    /// The start of the hour, UTC.
+    hour     DateTime
+    method   String
+    /// The documented path template, e.g. /api/v1/deploy/services/{id}.
+    route    String
+    status   Int
+    calls    Int      @default(0)
+    totalMs  BigInt   @default(0)
+    ms25     Int      @default(0)
+    ms50     Int      @default(0)
+    ms100    Int      @default(0)
+    ms250    Int      @default(0)
+    ms500    Int      @default(0)
+    ms1000   Int      @default(0)
+    ms2500   Int      @default(0)
+    ms5000   Int      @default(0)
+    msOver   Int      @default(0)
+
+    apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+    @@id([apiKeyId, hour, method, route, status])
+    @@index([hour])
 }
 
 // An application that asked to act for people over MCP - an AI assistant, an

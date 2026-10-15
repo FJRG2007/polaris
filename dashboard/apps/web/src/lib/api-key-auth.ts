@@ -16,6 +16,7 @@ import { evaluateAccountAccess } from "@/lib/network-rules";
 import { userAgentAllowed, type Permission } from "@polaris/core";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { noteKeyCall } from "@/lib/api-usage/recorder";
 
 export interface ApiKeyPrincipal {
     keyId: string;
@@ -69,6 +70,9 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     // about this request, and every API call was paying for them before its
     // answer. touchApiKey never throws.
     void touchApiKey(verified.id, ip, userAgent);
+    // And which route it was, what it answered and how long it took, counted
+    // when the response is handed back - see withKeyUsage.
+    noteKeyCall(verified.id);
     return {
         keyId: verified.id,
         userId: verified.userId,
