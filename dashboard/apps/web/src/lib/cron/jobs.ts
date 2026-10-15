@@ -650,6 +650,16 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: async () => (await import("@/lib/domain-security/service")).runDomainSecuritySweep()
     },
     {
+        key: "server-templates",
+        // Hourly, a few servers a pass: each assignment is re-read about every
+        // six hours, and no pass holds many SSH sessions at once.
+        everyMs: Number(process.env.POLARIS_SERVER_TEMPLATES_MS) || HOUR,
+        // Leased: the pass can put drift back, and two runners would run the
+        // same fix on the same server at once.
+        leaseMs: 2 * HOUR,
+        run: async () => (await import("@/lib/server-templates/service")).runTemplateSweep()
+    },
+    {
         key: "alarms",
         everyMs: Number(process.env.POLARIS_ALARM_POLL_MS) || MINUTE,
         // The one that was actually broken. An alarm crossing its threshold is

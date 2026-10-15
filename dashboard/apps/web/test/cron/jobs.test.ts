@@ -186,6 +186,8 @@ describe("the work Polaris runs on a schedule", () => {
             // A capture stores the lines after the newest one it has; two at once
             // would both read the same newest line and store what follows twice.
             "runtime-logs",
+            // Two passes would run the same fix on the same server at once.
+            "server-templates",
             // Two passes would both see the same streak and both add a copy.
             "service-autoscale",
             // Two passes would both stop the same container, and the one that
