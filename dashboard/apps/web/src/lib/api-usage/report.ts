@@ -8,10 +8,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import type { UsageRange } from "./ranges";
 import { LATENCY_BOUNDS, LATENCY_COLUMNS, hourOf, type LatencyColumn } from "./recorder";
 
-export const USAGE_RANGES = ["24h", "7d", "30d", "90d"] as const;
-export type UsageRange = (typeof USAGE_RANGES)[number];
+export { USAGE_RANGES, type UsageRange } from "./ranges";
 
 const RANGE_HOURS: Record<UsageRange, number> = { "24h": 24, "7d": 24 * 7, "30d": 24 * 30, "90d": 24 * 90 };
 const HOUR_MS = 60 * 60 * 1000;

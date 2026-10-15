@@ -17,7 +17,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { keyUsageAction, type KeyUsage } from "@/app/(app)/account/api-keys/usage-actions";
 import { ArrowLeft, BookOpen, Pencil, RotateCw } from "lucide-react";
 import { Badge, Button, SegmentedControl, Skeleton, cn } from "@polaris/ui";
-import { USAGE_RANGES, type Percentile, type UsageRange } from "@/lib/api-usage/report";
+import type { Percentile } from "@/lib/api-usage/report";
+import { USAGE_RANGES, type UsageRange } from "@/lib/api-usage/ranges";
 
 type Translate = NamespaceTranslator<"account">;
 
