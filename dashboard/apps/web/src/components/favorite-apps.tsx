@@ -94,6 +94,7 @@ export function FavoriteAppsProvider({
             order: prefs.order,
             arrangeApps: (visible) => save(arrangedPrefs(latest.current, visible)),
             resetOrder: () => save({ ...latest.current, order: [] }),
+            replacePrefs: (next) => save({ favorites: [...next.favorites], order: [...next.order] }),
             launcherOpen,
             setLauncherOpen,
             openLauncher: () => {

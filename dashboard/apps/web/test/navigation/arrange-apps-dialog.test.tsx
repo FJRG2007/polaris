@@ -38,6 +38,7 @@ function store(overrides: Partial<FavoriteApps> = {}): FavoriteApps {
         order: [],
         arrangeApps: vi.fn(),
         resetOrder: vi.fn(),
+        replacePrefs: vi.fn(),
         launcherOpen: false,
         setLauncherOpen: () => undefined,
         openLauncher: () => undefined,
