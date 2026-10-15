@@ -36,7 +36,11 @@ export function normalizeRegistryHost(input: string): string {
         .toLowerCase()
         .replace(/^[a-z]+:\/\//, "")
         .replace(/\/.*$/, "");
-    if (bare === "index.docker.io" || bare === "registry-1.docker.io" || bare === "hub.docker.com") {
+    if (
+        bare === "index.docker.io" ||
+        bare === "registry-1.docker.io" ||
+        bare === "hub.docker.com"
+    ) {
         return "docker.io";
     }
     return bare;

@@ -17,8 +17,22 @@ import { useLiveRead } from "@/components/use-live-resource";
 import { Badge, Button, EmptyState, Skeleton } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { RegistryShelf, RegistryView } from "@/lib/registry-credential-service";
-import { deleteRegistryAction, listRegistriesAction, testRegistryAction } from "../registry-actions";
-import { CheckCircle2, CircleAlert, CircleDashed, Loader2, Package, Pencil, PlugZap, Plus, Trash2 } from "lucide-react";
+import {
+    deleteRegistryAction,
+    listRegistriesAction,
+    testRegistryAction
+} from "../registry-actions";
+import {
+    CheckCircle2,
+    CircleAlert,
+    CircleDashed,
+    Loader2,
+    Package,
+    Pencil,
+    PlugZap,
+    Plus,
+    Trash2
+} from "lucide-react";
 
 type Shelf = RegistryShelf & { orgId: string | null };
 
@@ -42,7 +56,10 @@ export function RegistriesView() {
     function saved(registry: RegistryView) {
         if (!data) return;
         const others = data.registries.filter((entry) => entry.id !== registry.id);
-        replace({ ...data, registries: [...others, registry].sort((a, b) => a.name.localeCompare(b.name)) });
+        replace({
+            ...data,
+            registries: [...others, registry].sort((a, b) => a.name.localeCompare(b.name))
+        });
     }
 
     async function remove(registry: RegistryView) {
@@ -57,7 +74,10 @@ export function RegistriesView() {
         setRowError(null);
         const before = data;
         // Gone at once; back where it was if the server says no.
-        replace({ ...data, registries: data.registries.filter((entry) => entry.id !== registry.id) });
+        replace({
+            ...data,
+            registries: data.registries.filter((entry) => entry.id !== registry.id)
+        });
         startTransition(async () => {
             const result = await deleteRegistryAction(registry.id);
             if (result.error) {
@@ -80,7 +100,11 @@ export function RegistriesView() {
             }
             const current = data.registries.find((entry) => entry.id === registry.id);
             if (current) {
-                saved({ ...current, lastTestedAt: new Date().toISOString(), lastTestOk: answer.result === "ok" });
+                saved({
+                    ...current,
+                    lastTestedAt: new Date().toISOString(),
+                    lastTestOk: answer.result === "ok"
+                });
             }
             if (answer.result !== "ok") setRowError(t(`test.${answer.result}`));
         });
@@ -100,7 +124,9 @@ export function RegistriesView() {
                     <Plus className="size-4" /> {t("add")}
                 </Button>
             </div>
-            {data && !canManage && <p className="text-sm text-muted-foreground">{t("cannotManage")}</p>}
+            {data && !canManage && (
+                <p className="text-sm text-muted-foreground">{t("cannotManage")}</p>
+            )}
             {rowError && (
                 <p role="alert" className="text-sm text-danger">
                     {rowError}
@@ -114,7 +140,10 @@ export function RegistriesView() {
             ) : !data ? (
                 <ul className="flex flex-col gap-2" aria-busy="true" aria-label={t("loading")}>
                     {[0, 1, 2].map((index) => (
-                        <li key={index} className="flex items-center gap-3 rounded-lg border border-border/60 px-4 py-3">
+                        <li
+                            key={index}
+                            className="flex items-center gap-3 rounded-lg border border-border/60 px-4 py-3"
+                        >
                             <Skeleton className="size-4" />
                             <Skeleton className="h-4 w-40" />
                             <Skeleton className="ml-auto h-4 w-24" />

@@ -11,7 +11,16 @@
 import { useState, useTransition } from "react";
 import { Loader2, PlugZap } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, Input, Select } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Input,
+    Select
+} from "@polaris/ui";
 import {
     REGISTRY_DEFAULT_HOST,
     REGISTRY_KINDS,
@@ -24,7 +33,11 @@ import {
 } from "@/lib/registries/registry-form";
 import { RegistryKindIcon } from "./registry-kind-icon";
 import type { RegistryView } from "@/lib/registry-credential-service";
-import { createRegistryAction, testRegistryAction, updateRegistryAction } from "../registry-actions";
+import {
+    createRegistryAction,
+    testRegistryAction,
+    updateRegistryAction
+} from "../registry-actions";
 
 type Field = keyof RegistryFormValues;
 
@@ -55,7 +68,9 @@ export function RegistryDialog({
 
     const issues = registryFormIssues(values, editing);
     const valid = Object.keys(issues).length === 0;
-    const dirty = (Object.keys(initial) as Field[]).some((field) => initial[field] !== values[field]);
+    const dirty = (Object.keys(initial) as Field[]).some(
+        (field) => initial[field] !== values[field]
+    );
 
     function set(field: Field, value: string) {
         setValues((current) => ({ ...current, [field]: value }));
@@ -88,7 +103,10 @@ export function RegistryDialog({
         if (!valid) return;
         setTestNote(null);
         startTest(async () => {
-            const answer = await testRegistryAction({ ...(registry ? { id: registry.id } : {}), values });
+            const answer = await testRegistryAction({
+                ...(registry ? { id: registry.id } : {}),
+                values
+            });
             if (answer.error || !answer.result) {
                 setTestNote({ ok: false, text: answer.error ?? t("errors.testFailed") });
                 return;
@@ -125,7 +143,11 @@ export function RegistryDialog({
                             aria-label={t("form.kind")}
                         />
                     </Labelled>
-                    <Labelled label={t("form.name")} hint={t("form.nameHint")} issue={issueOf("name")}>
+                    <Labelled
+                        label={t("form.name")}
+                        hint={t("form.nameHint")}
+                        issue={issueOf("name")}
+                    >
                         <Input
                             value={values.name}
                             maxLength={REGISTRY_NAME_MAX}
@@ -137,7 +159,11 @@ export function RegistryDialog({
                     <Labelled
                         label={t("form.host")}
                         required={values.kind === "generic"}
-                        hint={values.kind === "generic" ? t("form.hostHintGeneric") : t("form.hostHint")}
+                        hint={
+                            values.kind === "generic"
+                                ? t("form.hostHintGeneric")
+                                : t("form.hostHint")
+                        }
                         issue={issueOf("host")}
                     >
                         <Input
@@ -149,7 +175,11 @@ export function RegistryDialog({
                             aria-invalid={issueOf("host") !== null}
                         />
                     </Labelled>
-                    <Labelled label={t(`hints.${values.kind}.user`)} required issue={issueOf("username")}>
+                    <Labelled
+                        label={t(`hints.${values.kind}.user`)}
+                        required
+                        issue={issueOf("username")}
+                    >
                         <Input
                             value={values.username}
                             maxLength={REGISTRY_USERNAME_MAX}
@@ -176,7 +206,12 @@ export function RegistryDialog({
                         />
                     </Labelled>
                     {testNote && (
-                        <p role="status" className={testNote.ok ? "text-sm text-success-ink" : "text-sm text-danger"}>
+                        <p
+                            role="status"
+                            className={
+                                testNote.ok ? "text-sm text-success-ink" : "text-sm text-danger"
+                            }
+                        >
                             {testNote.text}
                         </p>
                     )}
@@ -193,11 +228,16 @@ export function RegistryDialog({
                             disabled={!valid || testing}
                             title={valid ? undefined : t("form.fixFirst")}
                         >
-                            {testing ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}{" "}
+                            {testing ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                <PlugZap className="size-4" />
+                            )}{" "}
                             {t("test.button")}
                         </Button>
                         <Button type="submit" disabled={!valid || !dirty || pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />} {t("form.save")}
+                            {pending && <Loader2 className="size-4 animate-spin" />}{" "}
+                            {t("form.save")}
                         </Button>
                     </DialogFooter>
                 </form>

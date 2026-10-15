@@ -69,7 +69,10 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
 
     if (!state) {
         return (
-            <SettingsCard title={t("integrations.title")} description={t("integrations.loadingHint")}>
+            <SettingsCard
+                title={t("integrations.title")}
+                description={t("integrations.loadingHint")}
+            >
                 <div className="flex justify-center py-6 text-muted-foreground">
                     <Loader2 className="size-5 animate-spin" />
                 </div>
@@ -109,7 +112,9 @@ export function IntegrationsSection({ projectId }: { projectId: string }) {
                         detail={
                             state.cloudflare.connected
                                 ? (state.cloudflare.account ?? t("integrations.connected")) +
-                                  (state.cloudflare.dnsReady ? t("integrations.dnsReady") : t("integrations.dnsNotReady"))
+                                  (state.cloudflare.dnsReady
+                                      ? t("integrations.dnsReady")
+                                      : t("integrations.dnsNotReady"))
                                 : t("integrations.cloudflareHint")
                         }
                         href="/admin/integrations"
@@ -169,7 +174,8 @@ function IntegrationRow({
                 href={href}
                 className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-primary transition-colors hover:bg-muted"
             >
-                {connected ? t("integrations.manage") : t("integrations.connect")} <ExternalLink className="size-3" />
+                {connected ? t("integrations.manage") : t("integrations.connect")}{" "}
+                <ExternalLink className="size-3" />
             </Link>
         </div>
     );

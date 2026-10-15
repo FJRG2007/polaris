@@ -79,7 +79,9 @@ function toView(row: ViewRow): RegistryView {
     return {
         id: row.id,
         name: row.name || row.registry,
-        kind: (REGISTRY_KINDS as readonly string[]).includes(row.kind) ? (row.kind as RegistryKind) : "generic",
+        kind: (REGISTRY_KINDS as readonly string[]).includes(row.kind)
+            ? (row.kind as RegistryKind)
+            : "generic",
         registry: row.registry,
         username: row.username,
         orgId: row.orgId,
@@ -104,7 +106,10 @@ export interface RegistryShelf {
  * The logins on one shelf. Anybody on an organization's roster sees its logins
  * (names and users, never a secret); only `deploy.manage` changes them.
  */
-export async function listRegistries(actor: OrgActor, orgId: string | null): Promise<RegistryShelf> {
+export async function listRegistries(
+    actor: OrgActor,
+    orgId: string | null
+): Promise<RegistryShelf> {
     let canManage = true;
     if (orgId) {
         const access = await resolveOrgAccess(actor, orgId);
@@ -143,10 +148,18 @@ async function manageableRow(actor: OrgActor, id: string) {
 
 function sealed(password: string) {
     const blob = encryptSecret(password, loadEnv().POLARIS_MASTER_KEY);
-    return { encryptedPassword: blob.ciphertext, passwordNonce: blob.nonce, passwordKeyId: blob.keyId };
+    return {
+        encryptedPassword: blob.ciphertext,
+        passwordNonce: blob.nonce,
+        passwordKeyId: blob.keyId
+    };
 }
 
-function opened(row: { encryptedPassword: Uint8Array; passwordNonce: Uint8Array; passwordKeyId: string }): string | null {
+function opened(row: {
+    encryptedPassword: Uint8Array;
+    passwordNonce: Uint8Array;
+    passwordKeyId: string;
+}): string | null {
     try {
         return decryptSecret(
             {
@@ -165,7 +178,8 @@ function opened(row: { encryptedPassword: Uint8Array; passwordNonce: Uint8Array;
 function parsedOrRefused(values: RegistryFormValues, editing: boolean) {
     const schema = editing ? registryUpdateSchema : registryCreateSchema;
     const parsed = schema.safeParse(normalizeRegistryForm(values));
-    if (!parsed.success) throw new RegistryRefusal(parsed.error.issues[0]?.message ?? "errors.invalid");
+    if (!parsed.success)
+        throw new RegistryRefusal(parsed.error.issues[0]?.message ?? "errors.invalid");
     return parsed.data;
 }
 
@@ -219,7 +233,10 @@ export async function updateRegistry(
 }
 
 /** Removes a login. Services that picked it fall back to matching by host. */
-export async function deleteRegistry(actor: OrgActor, id: string): Promise<{ orgId: string | null; registry: string }> {
+export async function deleteRegistry(
+    actor: OrgActor,
+    id: string
+): Promise<{ orgId: string | null; registry: string }> {
     const row = await manageableRow(actor, id);
     await prisma.registryCredential.delete({ where: { id } });
     return { orgId: row.orgId, registry: row.registry };
@@ -242,11 +259,14 @@ function apiHost(host: string): string {
 }
 
 /** `Bearer realm="...",service="..."`, as a registry challenges. */
-export function parseChallenge(header: string): { scheme: string; params: Record<string, string> } | null {
+export function parseChallenge(
+    header: string
+): { scheme: string; params: Record<string, string> } | null {
     const match = /^\s*(\w+)\s*(.*)$/.exec(header);
     if (!match) return null;
     const params: Record<string, string> = {};
-    for (const part of match[2]!.matchAll(/(\w+)="([^"]*)"/g)) params[part[1]!.toLowerCase()] = part[2]!;
+    for (const part of match[2]!.matchAll(/(\w+)="([^"]*)"/g))
+        params[part[1]!.toLowerCase()] = part[2]!;
     return { scheme: match[1]!.toLowerCase(), params };
 }
 
@@ -264,7 +284,11 @@ export async function probeRegistryLogin(
     const basic = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
     let root: Response;
     try {
-        root = await configuredRequest(`https://${apiHost(host)}/v2/`, { method: "GET", timeoutMs: 10_000 }, options);
+        root = await configuredRequest(
+            `https://${apiHost(host)}/v2/`,
+            { method: "GET", timeoutMs: 10_000 },
+            options
+        );
     } catch {
         return "unreachable";
     }
@@ -288,7 +312,8 @@ export async function probeRegistryLogin(
         } else if (challenge.scheme === "bearer" && challenge.params.realm) {
             const realm = new URL(challenge.params.realm);
             if (realm.protocol !== "https:") return "notRegistry";
-            if (challenge.params.service) realm.searchParams.set("service", challenge.params.service);
+            if (challenge.params.service)
+                realm.searchParams.set("service", challenge.params.service);
             realm.searchParams.set("account", username);
             answer = await configuredRequest(
                 realm.toString(),
@@ -324,7 +349,9 @@ export async function testRegistry(
     if (input.values) {
         if (!stored) await requireManage(actor, input.orgId);
         const values = parsedOrRefused(input.values, stored !== null);
-        const moved = stored !== null && (stored.registry !== values.host || stored.username !== values.username);
+        const moved =
+            stored !== null &&
+            (stored.registry !== values.host || stored.username !== values.username);
         if (moved && !values.password) throw new RegistryRefusal("form.secretRequiredOnMove");
         host = values.host;
         username = values.username;
@@ -337,8 +364,13 @@ export async function testRegistry(
         throw new RegistryRefusal("errors.invalid");
     }
     if (password === null) throw new RegistryRefusal("errors.unreadable");
-    const result = await probeRegistryLogin(host, username, password, { allowPrivate: actor.isAdmin });
-    const unchanged = stored && (!input.values || (host === stored.registry && username === stored.username && !input.values.password));
+    const result = await probeRegistryLogin(host, username, password, {
+        allowPrivate: actor.isAdmin
+    });
+    const unchanged =
+        stored &&
+        (!input.values ||
+            (host === stored.registry && username === stored.username && !input.values.password));
     if (stored && unchanged) {
         await prisma.registryCredential.update({
             where: { id: stored.id },
@@ -362,7 +394,9 @@ function projectWhere(project: { ownerId: string; orgId: string | null }) {
 export function pickedRegistryId(sourceConfig: string): string | null {
     try {
         const source = JSON.parse(sourceConfig) as { registryId?: unknown };
-        return typeof source.registryId === "string" && source.registryId ? source.registryId : null;
+        return typeof source.registryId === "string" && source.registryId
+            ? source.registryId
+            : null;
     } catch {
         return null;
     }
@@ -385,7 +419,9 @@ export interface ServiceRegistryChoice {
 
 /** What a service may pick from, and what it has picked. The caller has
  *  already checked the reader may see the service. */
-export async function registriesForApplication(applicationId: string): Promise<ServiceRegistryChoice> {
+export async function registriesForApplication(
+    applicationId: string
+): Promise<ServiceRegistryChoice> {
     const app = await applicationProject(applicationId);
     if (!app) throw new RegistryRefusal("errors.notFound");
     const rows = await prisma.registryCredential.findMany({
@@ -403,7 +439,10 @@ export async function registriesForApplication(applicationId: string): Promise<S
 
 /** Picks (or clears, with null) the registry a service pulls its image with.
  *  Only a login the project may use is accepted. */
-export async function setApplicationRegistry(applicationId: string, registryId: string | null): Promise<void> {
+export async function setApplicationRegistry(
+    applicationId: string,
+    registryId: string | null
+): Promise<void> {
     const app = await applicationProject(applicationId);
     if (!app) throw new RegistryRefusal("errors.notFound");
     if (registryId) {
@@ -467,7 +506,9 @@ export async function resolveRegistryLogin(
     const candidates = [];
     const picked = app ? pickedRegistryId(app.sourceConfig) : null;
     if (picked) {
-        const row = await prisma.registryCredential.findFirst({ where: { id: picked, ...projectWhere(project) } });
+        const row = await prisma.registryCredential.findFirst({
+            where: { id: picked, ...projectWhere(project) }
+        });
         if (row) candidates.push(row);
     }
     if (project.orgId) {

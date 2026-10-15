@@ -22,7 +22,13 @@ import { serviceRegistriesAction, setServiceRegistryAction } from "../registry-a
 
 const AUTOMATIC = "auto";
 
-export function RegistryPickCard({ applicationId, canConfigure }: { applicationId: string; canConfigure: boolean }) {
+export function RegistryPickCard({
+    applicationId,
+    canConfigure
+}: {
+    applicationId: string;
+    canConfigure: boolean;
+}) {
     const t = useTranslations("deployRegistries");
     const load = useCallback(async (): Promise<ServiceRegistryChoice> => {
         const answer = await serviceRegistriesAction(applicationId);
@@ -66,7 +72,11 @@ export function RegistryPickCard({ applicationId, canConfigure }: { applicationI
         <SettingsCard
             title={t("pick.title")}
             description={t("pick.description")}
-            badge={pending ? <Loader2 className="size-3.5 animate-spin" aria-label={t("pick.saving")} /> : null}
+            badge={
+                pending ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-label={t("pick.saving")} />
+                ) : null
+            }
         >
             {!data && error ? (
                 <p role="alert" className="text-sm text-danger">
@@ -92,7 +102,10 @@ export function RegistryPickCard({ applicationId, canConfigure }: { applicationI
                             {saveError}
                         </p>
                     )}
-                    <Link href="/apps/deploy/registries" className="w-fit text-xs text-primary hover:underline">
+                    <Link
+                        href="/apps/deploy/registries"
+                        className="w-fit text-xs text-primary hover:underline"
+                    >
                         {t("pick.manage")}
                     </Link>
                 </div>

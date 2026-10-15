@@ -80,10 +80,7 @@ import {
     stopNgrokTunnel,
     type NgrokTunnelStatus
 } from "@/lib/deploy/ngrok-tunnel-service";
-import {
-    listRegistries,
-    type RegistryCredentialView
-} from "@/lib/registry-credential-service";
+import { listRegistries, type RegistryCredentialView } from "@/lib/registry-credential-service";
 import {
     createDatabase,
     databaseConnection,
