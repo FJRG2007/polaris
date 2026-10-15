@@ -17,7 +17,7 @@ import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
 import { useProjectCan } from "./access-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
+import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { LogViewer } from "@/components/log-viewer";
 import type { ImportedConfig } from "@polaris/deploy";
 import { DatabaseManageDialog } from "./database-panel";
@@ -1118,9 +1118,9 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
     }
 
     const describe = (template: ServiceTemplate) =>
-        t(`view.template.catalog.${template.id}.description`);
+        t(`view.template.catalog.${template.id}.description` as NamespaceKey<"deploy">);
     const firstRun = (template: ServiceTemplate) =>
-        t(`view.template.catalog.${template.id}.firstRun`);
+        t(`view.template.catalog.${template.id}.firstRun` as NamespaceKey<"deploy">);
 
     if (!picked) {
         const needle = query.trim().toLowerCase();
