@@ -83,6 +83,18 @@ export interface ToastAction {
     readonly label: string;
     readonly icon?: ReactNode;
     /** Does it; answers why it could not, or null. The note goes once it is done. */
+    readonly run?: () => Promise<string | null>;
+    /**
+     * Several ways of doing it - "Mute" for an hour, a day, for good - offered on
+     * the note itself once the action is pressed, in place of `run`. Shown in
+     * the note rather than in a menu over it, so nothing it draws can be clipped
+     * by the stack or outlive the note.
+     */
+    readonly choices?: readonly ToastChoice[];
+}
+
+export interface ToastChoice {
+    readonly label: string;
     readonly run: () => Promise<string | null>;
 }
 
@@ -228,11 +240,13 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
     const [problem, setProblem] = useState<string | null>(null);
     /** The action under way, by label. */
     const [acting, setActing] = useState<string | null>(null);
+    /** The action whose choices are open on the note, by label. */
+    const [choosing, setChoosing] = useState<ToastAction | null>(null);
     const seen = useSeen();
     const life = toast.life ?? LIFE_MS;
     // Writing an answer holds the note like a pointer over it does: it must not
     // go in the middle of a sentence.
-    const writing = answer !== null || sending || acting !== null;
+    const writing = answer !== null || sending || acting !== null || choosing !== null;
     // A note replaced while it said "Sent" is about something new, which has not
     // been answered; an answer half written or on its way is kept.
     const showing = useRef(toast.shownAs);
@@ -261,8 +275,8 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
         if (showing.current === sentFrom) setSent(true);
     };
 
-    const act = async (action: ToastAction) => {
-        if (acting) return;
+    const act = async (action: { label: string; run?: () => Promise<string | null> }) => {
+        if (acting || !action.run) return;
         const actedFrom = showing.current;
         setActing(action.label);
         setProblem(null);
@@ -322,6 +336,38 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                     <span className="mt-2 block" onClick={(event) => event.stopPropagation()}>
                         {sent ? (
                             <span className="block text-xs text-muted-foreground">{words.sent}</span>
+                        ) : choosing ? (
+                            <span className="flex flex-wrap items-center gap-1">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-foreground">
+                                    {choosing.icon}
+                                    {choosing.label}
+                                </span>
+                                {choosing.choices?.map((choice) => (
+                                    <button
+                                        key={choice.label}
+                                        type="button"
+                                        onClick={() => void act(choice)}
+                                        disabled={acting !== null}
+                                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+                                    >
+                                        {acting === choice.label ? (
+                                            <Loader2 className="size-3.5 animate-spin" />
+                                        ) : null}
+                                        {choice.label}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setChoosing(null);
+                                        setProblem(null);
+                                    }}
+                                    disabled={acting !== null}
+                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+                                >
+                                    {words.cancel}
+                                </button>
+                            </span>
                         ) : answer === null || !toast.reply ? (
                             <span className="flex flex-wrap items-center gap-1">
                                 {toast.reply ? (
@@ -339,7 +385,11 @@ function ToastNote({ toast, onDismiss }: { toast: Shown; onDismiss: () => void }
                                     <button
                                         key={action.label}
                                         type="button"
-                                        onClick={() => void act(action)}
+                                        onClick={() =>
+                                            action.choices?.length
+                                                ? setChoosing(action)
+                                                : void act(action)
+                                        }
                                         disabled={acting !== null}
                                         className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-50"
                                     >

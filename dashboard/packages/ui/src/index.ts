@@ -64,6 +64,7 @@ export {
     useToast,
     type Toast,
     type ToastAction,
+    type ToastChoice,
     type ToastReply
 } from "./components/toast";
 export {

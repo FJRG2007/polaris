@@ -50,6 +50,7 @@ const shown: Array<{ key?: string }> = [];
 const dismissed: string[] = [];
 const closed: string[] = [];
 const played: string[] = [];
+const mutes: Array<[string, number | null]> = [];
 const notices: Array<{ tag: string }> = [];
 const replies: Array<{ channelId: string; messageId?: string; body: string }> = [];
 /** Held open by a test that needs an answer to still be on its way. */
@@ -75,6 +76,10 @@ vi.mock("@/app/(app)/chat/use-chat-stream", () => ({
     }
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    setMutedAction: async (channelId: string, minutes: number | null) => {
+        mutes.push([channelId, minutes]);
+        return {};
+    },
     replyFromNoticeAction: async (input: {
         channelId: string;
         messageId?: string;
@@ -138,6 +143,7 @@ beforeEach(() => {
     soundOn = true;
     shown.length = 0;
     played.length = 0;
+    mutes.length = 0;
     notices.length = 0;
     dismissed.length = 0;
     closed.length = 0;
@@ -206,6 +212,32 @@ describe("a conversation read in another tab", () => {
 });
 
 describe("a message arriving", () => {
+    it("can be muted from its card, for a while or for good", async () => {
+        await arrive();
+        const card = shown[0] as unknown as {
+            actions: Array<{
+                label: string;
+                choices?: Array<{ label: string; run: () => Promise<string | null> }>;
+            }>;
+        };
+        const mute = card.actions.find((action) => action.choices);
+        // A direct message is the person: the label names them.
+        expect(mute?.label).toBe("components.messageToasts.mutePerson");
+        expect(mute?.choices?.map((choice) => choice.label)).toEqual([
+            "components.messageToasts.muteFor.hour",
+            "components.messageToasts.muteFor.eightHours",
+            "components.messageToasts.muteFor.day",
+            "components.messageToasts.muteFor.forever"
+        ]);
+
+        await expect(mute!.choices![3]!.run()).resolves.toBeNull();
+        await mute!.choices![0]!.run();
+        expect(mutes).toEqual([
+            [CHANNEL, 0],
+            [CHANNEL, 60]
+        ]);
+    });
+
     it("plays the sound when the reader is somewhere else in Polaris", async () => {
         await arrive();
         expect(played).toEqual(["message"]);

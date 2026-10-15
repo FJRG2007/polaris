@@ -34,7 +34,8 @@
  * `lib/chat/message-alert` for the whole decision.
  */
 
-import { CheckCheck } from "lucide-react";
+import * as core from "@polaris/core";
+import { BellOff, CheckCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { usePathname } from "next/navigation";
@@ -46,7 +47,11 @@ import { ToastPicture } from "@/components/toast-picture";
 import { useSessionScope } from "@/components/session-scope";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { messageToastsAction, replyFromNoticeAction } from "@/app/(app)/chat/actions";
+import {
+    messageToastsAction,
+    replyFromNoticeAction,
+    setMutedAction
+} from "@/app/(app)/chat/actions";
 import { useChatStream } from "@/app/(app)/chat/use-chat-stream";
 import {
     actOnUnclaimedNotices,
@@ -127,6 +132,27 @@ function replyNotSent(t: Translate, channelId: string | null, why: string): void
         tag: `reply-failed:${channelId ?? "notice"}`,
         href: channelId ? `/chat/c/${channelId}` : "/chat"
     });
+}
+
+/**
+ * The lengths a conversation can be muted for from its note: the ones somebody
+ * reaches for when a room will not stop, and no end. The full set is in the
+ * conversation's own menu.
+ */
+const NOTE_MUTES = [
+    { minutes: 60, key: "messageToasts.muteFor.hour" },
+    { minutes: 480, key: "messageToasts.muteFor.eightHours" },
+    { minutes: 1440, key: "messageToasts.muteFor.day" },
+    { minutes: core.MUTE_FOREVER, key: "messageToasts.muteFor.forever" }
+] as const;
+
+/** Mute one conversation from its note, the way a phone's notification does.
+ *  Answers why it could not, or null. */
+async function muteFromNotice(t: Translate, channelId: string, minutes: number): Promise<string | null> {
+    const result = await setMutedAction(channelId, minutes).catch(() => ({
+        error: t("messageToasts.muteFailed")
+    }));
+    return result.error ?? null;
 }
 
 export function MessageToasts() {
@@ -250,6 +276,18 @@ export function MessageToasts() {
                         }
                     },
                     actions: [
+                        {
+                            // A direct message is the person, so muting it is
+                            // muting them; a channel is the room.
+                            label: message.inChannel
+                                ? t("messageToasts.muteChannel")
+                                : t("messageToasts.mutePerson", { author: message.authorName }),
+                            icon: <BellOff className="size-3.5" />,
+                            choices: NOTE_MUTES.map((mute) => ({
+                                label: t(mute.key),
+                                run: () => muteFromNotice(t, message.channelId, mute.minutes)
+                            }))
+                        },
                         {
                             label: t("messageToasts.markRead"),
                             icon: <CheckCheck className="size-3.5" />,

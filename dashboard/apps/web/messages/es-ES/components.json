@@ -70,6 +70,15 @@
         "messageChannel": "Mensaje en #{channel}",
         "replyTo": "Responder a {author}",
         "markReadFailed": "No se ha podido marcar como leído",
+        "muteChannel": "Silenciar",
+        "mutePerson": "Silenciar a {author}",
+        "muteFailed": "No se pudo silenciar",
+        "muteFor": {
+            "hour": "1 hora",
+            "eightHours": "8 horas",
+            "day": "24 horas",
+            "forever": "Hasta reactivar"
+        },
         "noticeGone": "Ya no se puede responder a ese aviso"
     },
     "mailUnread": {
