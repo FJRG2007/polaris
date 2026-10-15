@@ -88,7 +88,14 @@ jobs:
           DEFAULT: ${{ github.event.repository.default_branch }}
           RUN: ${{ github.run_number }}
         run: |
-          git add -A docs/assets/media
+          # The marketplace shows copies of some of these pictures, and a copy
+          # that drifts from its original fails the dashboard's tests: refresh
+          # every copy that has an original here.
+          for copy in dashboard/apps/web/public/marketplace/*; do
+            original="docs/assets/media/$(basename "$copy")"
+            [ -f "$original" ] && cp "$original" "$copy"
+          done
+          git add -A docs/assets/media dashboard/apps/web/public/marketplace
           if git diff --cached --quiet; then
             echo "The pictures are unchanged." >> "$GITHUB_STEP_SUMMARY"
             exit 0
