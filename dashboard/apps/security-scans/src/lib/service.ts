@@ -15,6 +15,7 @@ import { gunzip, gzip } from "node:zlib";
 import { shortHash } from "@polaris/deploy";
 import {
     exportImage,
+    listExports,
     portsFor,
     removeExport,
     runHostAction,
@@ -665,6 +666,43 @@ async function prune(now: Date): Promise<void> {
     });
 }
 
+/** When each server's export volumes were last swept, in this process. */
+const lastSwept = new Map<string, number>();
+const SWEEP_EVERY_MS = 60 * 60_000;
+
+/**
+ * Remove image exports a scan left behind (a dashboard that stopped mid-scan
+ * never reached its cleanup), at most once an hour per server. The volumes
+ * are listed before the running scans are read; see `staleExports`.
+ */
+async function sweepExports(now: Date): Promise<void> {
+    const targets = await prisma.deployTarget.findMany({
+        select: TARGET_SELECT,
+        orderBy: { createdAt: "asc" },
+        take: 100
+    });
+    for (const target of targets) {
+        if (now.getTime() - (lastSwept.get(target.id) ?? 0) < SWEEP_EVERY_MS) continue;
+        lastSwept.set(target.id, now.getTime());
+        try {
+            const listed = await listExports(target);
+            if (!listed || listed.length === 0) continue;
+            const running = await prisma.securityScan.findMany({
+                where: { targetId: target.id, state: "running" },
+                select: { id: true }
+            });
+            for (const volume of specs.staleExports(
+                listed,
+                running.map((scan) => scan.id)
+            )) {
+                await removeExport(target, volume);
+            }
+        } catch (caught) {
+            console.error(`polaris: security scans could not sweep exports on ${target.id}:`, caught);
+        }
+    }
+}
+
 export async function tick(): Promise<void> {
     const now = new Date();
     // A scan a restarted dashboard left "running" can never finish.
@@ -675,4 +713,5 @@ export async function tick(): Promise<void> {
     await planSchedules(now);
     await drain();
     await prune(now);
+    await sweepExports(now);
 }

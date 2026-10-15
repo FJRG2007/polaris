@@ -228,6 +228,30 @@ export function isExportVolume(name: string): boolean {
     return /^polaris-secscan-image-[0-9a-f]{8,32}$/.test(name);
 }
 
+/** Lists the export volumes on a server (a substring filter; see below). */
+export const LIST_EXPORTS_ARGV = ["docker", "volume", "ls", "-q", "--filter", `name=${EXPORT_VOLUME_PREFIX}`];
+
+/**
+ * The export volumes a sweep may remove: every one on the server that is an
+ * export by its exact shape and does not belong to a scan still running. The
+ * running scans must be read after the volumes were listed, so a scan claimed
+ * in between (whose volume the list cannot hold yet) is never swept.
+ */
+export function staleExports(listed: readonly string[], runningScanIds: readonly string[]): string[] {
+    const live = new Set(
+        runningScanIds.flatMap((id) => {
+            try {
+                return [exportVolumeName(id)];
+            } catch {
+                return [];
+            }
+        })
+    );
+    return [...new Set(listed.map((name) => name.trim()))].filter(
+        (name) => isExportVolume(name) && !live.has(name)
+    );
+}
+
 /** The free bytes `df -Pk` reports on its one filesystem line. */
 export function parseDfFree(output: string): number | null {
     const kib = Number(output.split("\n")[1]?.trim().split(/\s+/)[3]);

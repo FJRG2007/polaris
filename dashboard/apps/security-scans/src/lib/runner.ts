@@ -8,7 +8,14 @@
 import { host } from "@polaris/app-host";
 import { HostdClient } from "@polaris/hostd-client";
 import { openSshClient, execCommand } from "@polaris/ssh";
-import { exportArgv, hasRoom, hostArgv, parseDfFree, type HostAction } from "../model/specs";
+import {
+    exportArgv,
+    hasRoom,
+    hostArgv,
+    LIST_EXPORTS_ARGV,
+    parseDfFree,
+    type HostAction
+} from "../model/specs";
 import { parseContainerState, quoteArgv, type ComposeSpec, type RuntimePorts } from "@polaris/deploy";
 
 /** The server a scan runs on, as the runtime needs it. */
@@ -169,6 +176,15 @@ export async function exportImage(target: ScanTarget, image: string, volume: str
         const save = await sshRun(client, `${quoteArgv(argv.save)} | ${quoteArgv(argv.write)}`);
         const check = await sshRun(client, quoteArgv(argv.check));
         if (save.code !== 0 || check.code !== 0) throw new ScanFailure("scanError");
+    });
+}
+
+/** The export volumes on a server; null when it cannot be asked. */
+export async function listExports(target: ScanTarget): Promise<string[] | null> {
+    if (target.kind === "local" || !target.hostId) return new HostdClient().hostImageExports();
+    return withSsh(target, async (client) => {
+        const result = await sshRun(client, quoteArgv(LIST_EXPORTS_ARGV));
+        return result.code === 0 ? result.output.split("\n") : null;
     });
 }
 

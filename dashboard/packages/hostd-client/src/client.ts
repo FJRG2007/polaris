@@ -276,6 +276,19 @@ export class HostdClient {
         return { size: typeof parsed.size === "number" ? parsed.size : 0 };
     }
 
+    /** The export volumes on this host. Null from a daemon that predates it. */
+    public async hostImageExports(): Promise<string[] | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/host/security/image",
+            JSON.stringify({ action: "list" })
+        );
+        if (response.status !== 200) return null;
+        const parsed = JSON.parse(response.body) as { volumes?: unknown };
+        if (!Array.isArray(parsed.volumes)) return null;
+        return parsed.volumes.filter((name): name is string => typeof name === "string");
+    }
+
     /** Remove an export volume made by `hostImageExport`. Throws unless gone. */
     public async hostImageRemove(volume: string): Promise<void> {
         const response = await this.call(

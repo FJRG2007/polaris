@@ -146,12 +146,15 @@ pub const EXPORT_HEADROOM: u64 = 1024 * 1024 * 1024;
 pub enum ExportAction {
     Export,
     Remove,
+    List,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ImageExportRequest {
     pub action: ExportAction,
+    /// Required for export and remove; ignored by list.
+    #[serde(default)]
     pub volume: String,
     #[serde(default)]
     pub image: Option<String>,
@@ -270,6 +273,32 @@ pub fn export_image(image: &str, volume: &str) -> Result<u64, ExportError> {
 }
 
 /// Remove an export volume and the archive in it.
+pub fn list_exports_argv() -> Vec<String> {
+    let filter = format!("name={EXPORT_VOLUME_PREFIX}");
+    ["volume", "ls", "-q", "--filter", &filter]
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Keep only names an export could have: the filter is a substring match.
+pub fn export_names(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .map(str::trim)
+        .filter(|name| valid_export_volume(name))
+        .map(String::from)
+        .collect()
+}
+
+/// The export volumes on this host, for the dashboard to sweep leftovers.
+pub fn list_exports() -> Option<Vec<String>> {
+    match docker_output(&list_exports_argv()) {
+        Ok((true, out)) => Some(export_names(&out)),
+        _ => None,
+    }
+}
+
 pub fn remove_export(volume: &str) -> bool {
     let args: Vec<String> = ["volume", "rm", "-f", volume]
         .iter()
@@ -281,6 +310,19 @@ pub fn remove_export(volume: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lists_only_export_volumes() {
+        let out =
+            "polaris-secscan-image-0123abcd\nx-polaris-secscan-image-0123abcd\npolaris-abc_data\n";
+        assert_eq!(export_names(out), vec!["polaris-secscan-image-0123abcd"]);
+        assert_eq!(
+            list_exports_argv().last().map(String::as_str),
+            Some("name=polaris-secscan-image-")
+        );
+        let list: ImageExportRequest = serde_json::from_str(r#"{"action":"list"}"#).unwrap();
+        assert_eq!(list.action, ExportAction::List);
+    }
 
     #[test]
     fn export_volume_names_are_confined() {

@@ -268,6 +268,18 @@ describe("one-off specs", () => {
         expect(specs.hasRoom(1024 ** 3 + 1, 2 * 1024 ** 3)).toBe(false);
     });
 
+    it("sweeps only exports no running scan owns", () => {
+        const other = "0190a5f2-8c3e-7d4a-9b1c-aaaaaaaaaaaa";
+        const leftover = specs.exportVolumeName(other);
+        const listed = [VOLUME, leftover, ` ${leftover}`, "polaris-abcd_data", "x-polaris-secscan-image-0123abcd", ""];
+        expect(specs.staleExports(listed, [SCAN_ID])).toEqual([leftover]);
+        expect(specs.staleExports(listed, [SCAN_ID, other])).toEqual([]);
+        expect(specs.staleExports(listed, [])).toEqual([VOLUME, leftover]);
+        expect(specs.staleExports([VOLUME], ["not-a-uuid"])).toEqual([VOLUME]);
+        expect(specs.staleExports([], [SCAN_ID])).toEqual([]);
+        expect(specs.LIST_EXPORTS_ARGV.at(-1)).toBe("name=polaris-secscan-image-");
+    });
+
     it("exports with the same commands the daemon runs", () => {
         const rust = readFileSync(
             new URL("../../../../../../crates/polaris-hostd/src/host_security.rs", import.meta.url),

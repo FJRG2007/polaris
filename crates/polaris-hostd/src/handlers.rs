@@ -1354,10 +1354,17 @@ fn host_security_image<R: Read>(req: &Request, body: &mut R) -> Response {
         Ok(r) => r,
         Err(_) => return Response::bad_request("invalid image export request"),
     };
+    if request.action == host_security::ExportAction::List {
+        return match host_security::list_exports() {
+            Some(volumes) => Response::json(200, "OK", &serde_json::json!({ "volumes": volumes })),
+            None => Response::text(502, "Bad Gateway", "could not list export volumes"),
+        };
+    }
     if !host_security::valid_export_volume(&request.volume) {
         return Response::bad_request("invalid export volume");
     }
     match request.action {
+        host_security::ExportAction::List => unreachable!("answered above"),
         host_security::ExportAction::Remove => {
             if host_security::remove_export(&request.volume) {
                 Response::json(200, "OK", &serde_json::json!({ "removed": true }))
