@@ -14,6 +14,7 @@ import { z } from "zod";
 import { NextResponse } from "next/server";
 import { apiAdmin } from "@/lib/api-session";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { bundleFiles, bundleZip, redactConfig } from "@/lib/diagnostics/support-bundle";
 
 export const runtime = "nodejs";
@@ -65,6 +66,9 @@ export async function GET(request: Request): Promise<Response> {
     return new Response(new Uint8Array(zip), {
         headers: {
             "Content-Type": "application/zip",
+            // Says "this download has started" to a page that sent a ticket - see
+            // `download-ticket`. Nothing at all when none was sent.
+            ...downloadTicketHeaders(request),
             "Content-Disposition": `attachment; filename="polaris-support-${day}.zip"`,
             "Cache-Control": "no-store"
         }
