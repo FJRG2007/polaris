@@ -60,15 +60,37 @@ export const templateFirewallSchema = z.object({
 });
 
 /** The expected state itself. Each list is short on purpose: a check runs all
- *  of it over one SSH command. */
-export const templateSpecSchema = z.object({
-    packages: z.array(templatePackageSchema).max(100).default([]),
-    services: z.array(templateServiceSchema).max(50).default([]),
-    files: z.array(templateFileSchema).max(30).default([]),
-    sysctl: z.array(templateSysctlSchema).max(50).default([]),
-    users: z.array(templateUserSchema).max(30).default([]),
-    firewall: z.array(templateFirewallSchema).max(50).default([])
-});
+ *  of it over one SSH command.
+ *
+ *  An item may appear once. Two entries for one file, setting or unit with
+ *  different values would each be drift whenever the other was put back - a
+ *  difference no fix can ever clear - so the second is refused as typed. */
+export const templateSpecSchema = z
+    .object({
+        packages: z.array(templatePackageSchema).max(100).default([]),
+        services: z.array(templateServiceSchema).max(50).default([]),
+        files: z.array(templateFileSchema).max(30).default([]),
+        sysctl: z.array(templateSysctlSchema).max(50).default([]),
+        users: z.array(templateUserSchema).max(30).default([]),
+        firewall: z.array(templateFirewallSchema).max(50).default([])
+    })
+    .superRefine((spec, ctx) => {
+        const once = <T>(list: readonly T[], identity: (item: T) => string, path: (index: number) => (string | number)[]) => {
+            const seen = new Set<string>();
+            list.forEach((item, index) => {
+                const id = identity(item);
+                if (seen.has(id)) ctx.addIssue({ code: "custom", message: "duplicate", path: path(index) });
+                seen.add(id);
+            });
+        };
+        once(spec.packages, (name) => name, (i) => ["packages", i]);
+        // `nginx` and `nginx.service` are the same unit.
+        once(spec.services, (svc) => svc.name.replace(/\.service$/, ""), (i) => ["services", i, "name"]);
+        once(spec.files, (file) => file.path, (i) => ["files", i, "path"]);
+        once(spec.sysctl, (entry) => entry.key, (i) => ["sysctl", i, "key"]);
+        once(spec.users, (user) => user.name, (i) => ["users", i, "name"]);
+        once(spec.firewall, (rule) => `${rule.port}/${rule.protocol}`, (i) => ["firewall", i, "port"]);
+    });
 
 export type TemplateSpec = z.infer<typeof templateSpecSchema>;
 export type TemplateSpecInput = z.input<typeof templateSpecSchema>;

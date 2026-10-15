@@ -670,6 +670,7 @@
             "sysctlKey": "Como net.ipv4.ip_forward",
             "sysctlValue": "Una línea de texto",
             "userName": "Minúsculas, dígitos, - y _",
+            "duplicate": "Ya está en la lista",
             "required": "Obligatorio",
             "other": "No es válido"
         }

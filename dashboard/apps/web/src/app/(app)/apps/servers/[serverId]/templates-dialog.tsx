@@ -79,7 +79,8 @@ const INVALID_CODES = new Set([
     "fileMode",
     "sysctlKey",
     "sysctlValue",
-    "userName"
+    "userName",
+    "duplicate"
 ]);
 
 /** Field path -> what is wrong with it, in words. */
