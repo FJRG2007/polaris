@@ -120,17 +120,6 @@ export async function listRegistries(actor: OrgActor, orgId: string | null): Pro
     return { registries: rows.map(toView), canManage };
 }
 
-/** Password-free list of an owner's personal logins. */
-export async function listRegistryCredentials(ownerId: string): Promise<RegistryView[]> {
-    const rows = await prisma.registryCredential.findMany({
-        where: { ownerId, orgId: null },
-        orderBy: [{ name: "asc" }, { registry: "asc" }],
-        select: VIEW_SELECT,
-        take: 500
-    });
-    return rows.map(toView);
-}
-
 /** Refuses unless the actor may change logins on this shelf. */
 async function requireManage(actor: OrgActor, orgId: string | null): Promise<void> {
     if (!orgId) return;
@@ -236,11 +225,6 @@ export async function deleteRegistry(actor: OrgActor, id: string): Promise<{ org
     return { orgId: row.orgId, registry: row.registry };
 }
 
-/** Kept for callers of the personal-only API. */
-export async function deleteRegistryCredential(id: string, ownerId: string): Promise<void> {
-    await prisma.registryCredential.deleteMany({ where: { id, ownerId, orgId: null } });
-}
-
 /** Normalize a registry host. Empty maps to Docker Hub ("docker.io"). */
 export function normalizeRegistry(input: string): string {
     return normalizeRegistryHost(input) || "docker.io";
@@ -340,6 +324,8 @@ export async function testRegistry(
     if (input.values) {
         if (!stored) await requireManage(actor, input.orgId);
         const values = parsedOrRefused(input.values, stored !== null);
+        const moved = stored !== null && (stored.registry !== values.host || stored.username !== values.username);
+        if (moved && !values.password) throw new RegistryRefusal("form.secretRequiredOnMove");
         host = values.host;
         username = values.username;
         password = values.password || (stored ? opened(stored) : null);

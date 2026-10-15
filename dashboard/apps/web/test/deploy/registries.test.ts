@@ -299,4 +299,16 @@ describe("testing a login", () => {
         expect(await refusal(service.testRegistry(other, { id: view.id, orgId: null }))).toBe("errors.notFound");
         expect(configuredRequest).not.toHaveBeenCalled();
     });
+
+    it("never sends a stored secret to a host or user the form moved it to", async () => {
+        const view = await service.createRegistry(me, null, values());
+        const moved = values({ kind: "generic", host: "evil.example.test", password: "" });
+        expect(await refusal(service.testRegistry(me, { id: view.id, orgId: null, values: moved }))).toBe(
+            "form.secretRequiredOnMove"
+        );
+        expect(
+            await refusal(service.testRegistry(me, { id: view.id, orgId: null, values: values({ username: "x", password: "" }) }))
+        ).toBe("form.secretRequiredOnMove");
+        expect(configuredRequest).not.toHaveBeenCalled();
+    });
 });

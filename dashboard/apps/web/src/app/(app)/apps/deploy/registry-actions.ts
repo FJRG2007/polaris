@@ -9,7 +9,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { recordDeployAudit } from "@/lib/deploy-audit";
@@ -35,8 +35,11 @@ export async function listRegistriesAction(): Promise<
     const user = await requirePermission("deploy.read");
     const orgId = await scopeOrgIdFor(user.id);
     try {
-        const shelf = await registries.listRegistries(user, orgId);
-        return { ...shelf, orgId };
+        const [shelf, mayManage] = await Promise.all([
+            registries.listRegistries(user, orgId),
+            userHasManage(user, "deploy.manage")
+        ]);
+        return { ...shelf, canManage: shelf.canManage && mayManage, orgId };
     } catch (caught) {
         return { error: await failure(caught, "errors.loadFailed") };
     }
