@@ -116,14 +116,14 @@ export function redactConfig(env: Readonly<Record<string, string | undefined>>):
  * Blank the value of every variable not on an allowlist wherever it appears in
  * `text`. A value equal to one the bundle publishes on purpose is left alone:
  * it is already in the open, and blanking it would only blank the safe copy.
- * Pure.
+ * A safe key whose value had to be cut to publish it (a URL with a userinfo)
+ * is blanked in its raw form like any other. Pure.
  */
 export function scrubWithheld(text: string, env: Readonly<Record<string, string | undefined>>): string {
     const published = new Set(Object.values(redactConfig(env).values));
     const secrets = Object.entries(env)
         .filter(
             ([key, value]) =>
-                !SAFE_CONFIG_KEYS.has(key) &&
                 !RUNTIME_SAFE_KEYS.has(key) &&
                 value !== undefined &&
                 value.trim().length >= MIN_SCRUB_LENGTH &&
