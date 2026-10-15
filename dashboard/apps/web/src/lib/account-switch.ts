@@ -25,7 +25,7 @@
 
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
 import { dropMailCache } from "@/lib/mailbox/mail-cache";
-import { STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
+import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
 import { PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
 import { STORE_KEY as RECENT_SEARCH_KEY } from "@/lib/search/recent";
 import { STORE_KEY as RECENT_PLACES_KEY } from "@/lib/overview/recent-places";
@@ -61,6 +61,7 @@ export async function forgetAccountTraces(): Promise<void> {
 
 const ACCOUNT_KEYS: ReadonlySet<string> = new Set([
     APP_USAGE_KEY,
+    APP_MENU_KEY,
     RECENT_PLACES_KEY,
     RECENT_SEARCH_KEY,
     MAIL_CURSOR_KEY,
