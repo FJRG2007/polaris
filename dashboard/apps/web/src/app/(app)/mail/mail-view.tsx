@@ -57,7 +57,13 @@ import {
     subscribePendingChanges,
     type PendingHandle
 } from "./pending-changes";
-import { useMailList, useMailThread, warmThread, type MailListAnswer } from "./use-mail-list";
+import {
+    LIST_NOT_LOADED,
+    useMailList,
+    useMailThread,
+    warmThread,
+    type MailListAnswer
+} from "./use-mail-list";
 import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
 import {
     useCallback,
@@ -70,6 +76,7 @@ import {
     type RefObject
 } from "react";
 import { useBusy } from "./use-busy";
+import { listWait, nextCursor } from "./list-wait";
 import { closeDesktopNotice } from "@/lib/desktop-notify";
 import { readMessage, warmMessage } from "./message-store";
 import {
@@ -375,6 +382,14 @@ export function MailView({
     const [cursor, setCursor] = useState(firstCursor);
     const [loadingMore, setLoadingMore] = useState(false);
     /**
+     * The last reach for the next page failed. Below a list of rows that is a
+     * marker the next scroll asks through again; under nothing at all it is the
+     * only thing on screen, and a skeleton that stays up because a request
+     * failed is a list that never loads - so an empty list says so instead,
+     * with the retry.
+     */
+    const [olderFailed, setOlderFailed] = useState(false);
+    /**
      * The element the list scrolls in, which `MoreRows` watches inside.
      *
      * Nothing on this screen scrolls the window - the layout is exactly the
@@ -390,6 +405,7 @@ export function MailView({
     useEffect(() => {
         setOlder([]);
         setCursor(firstCursor);
+        setOlderFailed(false);
     }, [firstPage, firstCursor]);
 
     const threads = useMemo(() => [...firstPage, ...older], [firstPage, older]);
@@ -446,31 +462,36 @@ export function MailView({
     const loadMore = useCallback(() => {
         if (!cursor || loadingMore) return;
         setLoadingMore(true);
+        setOlderFailed(false);
         void (async () => {
             try {
                 const response = await fetch(
                     `/api/mail/threads?${mailPageParams(page, cursor).toString()}`,
                     { cache: "no-store" }
                 );
-                if (!response.ok) return;
+                if (!response.ok) throw new Error(LIST_NOT_LOADED);
                 const outcome = (await response.json()) as MailListAnswer;
+                const known = new Set([...firstPage, ...older].map((thread) => thread.id));
+                const fresh = outcome.threads.filter((thread) => !known.has(thread.id));
                 // Anything already on screen is dropped rather than repeated: a
                 // message arriving between two pages shifts everything down by
                 // one, and the row on the seam would otherwise appear twice.
                 setOlder((held) => {
-                    const known = new Set([...firstPage, ...held].map((thread) => thread.id));
-                    return [...held, ...outcome.threads.filter((thread) => !known.has(thread.id))];
+                    const shown = new Set(held.map((thread) => thread.id));
+                    return [...held, ...fresh.filter((thread) => !shown.has(thread.id))];
                 });
-                setCursor(outcome.cursor);
+                setCursor(nextCursor(cursor, outcome.cursor, fresh.length));
             } catch {
                 // The bottom of the list stays where it is and the observer will
-                // ask again the next time it comes into view. Nothing is said:
-                // this was not something anybody pressed.
+                // ask again the next time it comes into view. Nothing is said
+                // over rows: this was not something anybody pressed. Over no
+                // rows it is said - see `olderFailed`.
+                setOlderFailed(true);
             } finally {
                 setLoadingMore(false);
             }
         })();
-    }, [cursor, firstPage, loadingMore, page]);
+    }, [cursor, firstPage, older, loadingMore, page]);
 
     /** Draw a change now, until the server's answer and every list asked for
      *  before it are behind us. Settle it on a yes, abandon it on a no. */
@@ -1388,8 +1409,22 @@ export function MailView({
         [folders, page.accountId, page.folderId, page.role]
     );
     const narrowed = Boolean(page.query) || filter !== "" || category !== "";
-    const stillFetching =
-        !narrowed && threads.length === 0 && feeding.some((folder) => folder.total > 0);
+    // And only while something is still on its way: a mailbox feeding the list
+    // has not finished its first pass yet (the rail says so when it has), or the
+    // server still says there is more to bring down - the cursor is its word
+    // that the folder holds mail this list does not have, and `MoreRows` under
+    // the skeleton is what goes and gets it. Once both have answered, an empty
+    // list is an empty list: the count alone kept this skeleton up for ever
+    // over a mailbox whose mail Polaris could not bring down.
+    const { failed: listFailed, fetching: stillFetching } = listWait({
+        narrowed,
+        shown: threads.length,
+        feeding,
+        accounts,
+        cursor,
+        olderFailed,
+        listFailed: list.failed
+    });
 
     const allPicked = threads.length > 0 && selected.length === threads.length;
     /**
@@ -1650,14 +1685,17 @@ export function MailView({
                         // real: a spinner over the whole screen would take away
                         // the tabs and the search box, which work.
                         <ThreadRowsSkeleton />
-                    ) : list.failed ? (
+                    ) : listFailed ? (
                         <div className="p-6">
                             <EmptyState
                                 icon={<Inbox className="size-5 shrink-0" aria-hidden />}
                                 title={t("list.failedTitle")}
-                                description={mailRefusalText(t, list.failed)}
+                                description={mailRefusalText(t, listFailed)}
                                 action={
-                                    <Button variant="secondary" onClick={refresh}>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={list.failed ? refresh : loadMore}
+                                    >
                                         {t("list.retry")}
                                     </Button>
                                 }

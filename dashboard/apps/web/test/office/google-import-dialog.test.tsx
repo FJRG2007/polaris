@@ -12,7 +12,7 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
@@ -27,7 +27,7 @@ vi.mock("../../src/app/(app)/office/google-actions", () => ({
     importGoogleFileAction
 }));
 
-const { GoogleImportDialog, OFFICE_GOOGLE_LINK } = await import(
+const { GoogleImportDialog, OFFICE_GOOGLE_LINK, GOOGLE_ANSWER_DEADLINE_MS } = await import(
     "../../src/app/(app)/office/google-import-dialog"
 );
 
@@ -53,7 +53,10 @@ beforeEach(() => {
         mock.mockReset();
     }
 });
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+});
 
 describe("opening from Google Drive", () => {
     it("says who can add Google when this Polaris has none", async () => {
@@ -128,5 +131,77 @@ describe("opening from Google Drive", () => {
         expect(screen.getByRole("link", { name: "Link Google Drive" }).getAttribute("href")).toBe(
             OFFICE_GOOGLE_LINK
         );
+    });
+
+    it("offers to try again as well as to link again", async () => {
+        officeGoogleStateAction.mockResolvedValue({ available: true, accounts: [ACCOUNT] });
+        listGoogleFilesAction.mockResolvedValueOnce({ error: "Link it again.", relink: true });
+        listGoogleFilesAction.mockResolvedValueOnce({ files: [], next: null });
+        mount();
+        await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+        expect(await screen.findByText("No Docs, Sheets or Slides in this account")).toBeTruthy();
+    });
+});
+
+/**
+ * The report this guards: an account linked, the dialog opened, and the list
+ * skeleton never went away. A server action that rejects (a lost request, a
+ * server that answered with an error page) or never answers left `files` at
+ * null with nothing to replace it.
+ */
+describe("the list never sits on a skeleton", () => {
+    it("says the list failed, with a retry, when the action rejects", async () => {
+        officeGoogleStateAction.mockResolvedValue({ available: true, accounts: [ACCOUNT] });
+        listGoogleFilesAction.mockRejectedValueOnce(new Error("An unexpected response"));
+        listGoogleFilesAction.mockResolvedValueOnce({
+            files: [
+                {
+                    id: "d1",
+                    name: "Quarterly plan",
+                    mime: "application/vnd.google-apps.document",
+                    modifiedAt: null,
+                    importable: true,
+                    link: null
+                }
+            ],
+            next: null
+        });
+        mount();
+        expect((await screen.findByRole("alert")).textContent).toContain("Google didn't answer");
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByText("Quarterly plan")).toBeTruthy();
+        expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("says the list failed when the action never answers", async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        officeGoogleStateAction.mockResolvedValue({ available: true, accounts: [ACCOUNT] });
+        listGoogleFilesAction.mockReturnValue(new Promise(() => undefined));
+        mount();
+        await vi.waitFor(() => expect(listGoogleFilesAction).toHaveBeenCalled());
+        expect(screen.queryByRole("alert")).toBeNull();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(GOOGLE_ANSWER_DEADLINE_MS);
+        });
+        expect(screen.getByRole("alert").textContent).toContain("Google didn't answer");
+        expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    });
+
+    it("says what failed, with a retry, when the accounts cannot be read", async () => {
+        officeGoogleStateAction.mockRejectedValueOnce(new Error("An unexpected response"));
+        officeGoogleStateAction.mockResolvedValueOnce({ available: true, accounts: [ACCOUNT] });
+        listGoogleFilesAction.mockResolvedValue({ files: [], next: null });
+        mount();
+        expect((await screen.findByRole("alert")).textContent).toContain("Google didn't answer");
+        expect(screen.queryByText(/An administrator can add it/)).toBeNull();
+        await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+        expect(await screen.findByText("No Docs, Sheets or Slides in this account")).toBeTruthy();
+    });
+
+    it("shows an empty Drive as empty", async () => {
+        officeGoogleStateAction.mockResolvedValue({ available: true, accounts: [ACCOUNT] });
+        listGoogleFilesAction.mockResolvedValue({ files: [], next: null });
+        mount();
+        expect(await screen.findByText("No Docs, Sheets or Slides in this account")).toBeTruthy();
     });
 });

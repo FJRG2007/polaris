@@ -137,6 +137,19 @@ export function useLiveRead<T>({
     const seededFor = useRef(cacheKey);
     const started = useRef(0);
     const shown = useRef(0);
+    /**
+     * The reads still in the air, so they can be called off when the subject
+     * changes - and only then.
+     *
+     * A new `load` for the same subject is a newer question about the same thing,
+     * not a different thing: the mail list gets one every time the live channel
+     * says a mailbox moved. Calling the read already out off on each of those
+     * meant a list whose request took longer than the gap between two frames -
+     * a first sync storing mail every few hundred milliseconds - never landed an
+     * answer at all, and sat on its skeleton until the reload. The ordering in
+     * `refresh` already keeps an older answer from replacing a newer one.
+     */
+    const inFlight = useRef(new Set<AbortController>());
 
     // The kept snapshot wins over `initial` when there is one, being the newer.
     useLayoutEffect(() => {
@@ -162,6 +175,7 @@ export function useLiveRead<T>({
 
     const refresh = useCallback(() => {
         const controller = new AbortController();
+        inFlight.current.add(controller);
         const turn = (started.current += 1);
         const current = (): boolean => {
             if (controller.signal.aborted || turn < shown.current) return false;
@@ -191,6 +205,7 @@ export function useLiveRead<T>({
                 setError(caught instanceof Error ? caught.message : "Unable to reach the device");
             })
             .finally(() => {
+                inFlight.current.delete(controller);
                 if (!controller.signal.aborted && turn === started.current) setRefreshing(false);
             });
         return () => controller.abort();
@@ -213,9 +228,18 @@ export function useLiveRead<T>({
     // the subject changes. Kept apart from the poll so pausing stops the refresh
     // without leaving a newly selected subject with nothing to show.
     useEffect(() => {
-        if (!enabled) return;
-        return refresh();
+        if (enabled) refresh();
     }, [refresh, enabled]);
+
+    // What calls the reads off: another subject, the read switched off, or the
+    // screen going away. Not a new `load` for the same subject - see `inFlight`.
+    useEffect(() => {
+        const reads = inFlight.current;
+        return () => {
+            for (const controller of reads) controller.abort();
+            reads.clear();
+        };
+    }, [cacheKey, enabled]);
 
     useEffect(() => {
         if (!enabled || paused || !intervalMs) return;

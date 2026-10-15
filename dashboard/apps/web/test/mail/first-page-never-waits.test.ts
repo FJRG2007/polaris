@@ -41,7 +41,7 @@ async function ask(query: string) {
 }
 
 beforeEach(() => {
-    reachForOlder.mockClear();
+    reachForOlder.mockReset().mockResolvedValue(true);
     olderOnServer.mockClear().mockResolvedValue(true);
     listThreads.mockReset().mockResolvedValue({ threads: [held], cursor: "" });
 });
@@ -65,6 +65,26 @@ describe("a folder's first page", () => {
         const page = await ask("role=trash");
         expect(page.cursor).toBe("");
         expect(reachForOlder).not.toHaveBeenCalled();
+    });
+});
+
+describe("every list a folder can be opened as", () => {
+    // Spam was as slow as Trash, and for the same reason: every folder list -
+    // the merged Spam and Trash, one mailbox's own, a folder by id - is this
+    // route, and none of them may wait on the mail server for its first page.
+    it.each([
+        ["merged Spam", "role=junk"],
+        ["merged Trash", "role=trash"],
+        ["merged Inbox", "role=inbox"],
+        ["one mailbox's Spam", "accountId=a1&role=junk"],
+        ["one mailbox's Trash", "accountId=a1&role=trash"],
+        ["a folder by id", "accountId=a1&folderId=f1"]
+    ])("answers %s at once, even while the server never would", async (_, query) => {
+        reachForOlder.mockImplementation(() => new Promise<boolean>(() => undefined));
+        listThreads.mockResolvedValue({ threads: [], cursor: "" });
+        const page = await ask(query);
+        expect(reachForOlder).not.toHaveBeenCalled();
+        expect(page.cursor).toBe("older");
     });
 });
 
