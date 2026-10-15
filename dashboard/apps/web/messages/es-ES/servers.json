@@ -695,7 +695,8 @@
         "server": "Servidor",
         "noReading": "Sin lectura",
         "failed": "No se pudo leer el historial: {reason}",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "withOthers": "Comparar con otros servidores"
     },
     "insights": {
         "heading": "Análisis de servidores",
@@ -730,7 +731,8 @@
             "warning": "Notable",
             "danger": "Grave",
             "allServers": "Todos",
-            "filter": "Ver anomalías de"
+            "filter": "Ver anomalías de",
+            "server": "Servidor"
         }
     }
 }

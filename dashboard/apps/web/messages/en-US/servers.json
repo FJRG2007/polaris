@@ -695,7 +695,8 @@
         "server": "Server",
         "noReading": "No reading",
         "failed": "The history could not be read: {reason}",
-        "retry": "Try again"
+        "retry": "Try again",
+        "withOthers": "Compare with other servers"
     },
     "insights": {
         "heading": "Server insights",
@@ -730,7 +731,8 @@
             "warning": "Notable",
             "danger": "Severe",
             "allServers": "All servers",
-            "filter": "Show anomalies for"
+            "filter": "Show anomalies for",
+            "server": "Server"
         }
     }
 }
