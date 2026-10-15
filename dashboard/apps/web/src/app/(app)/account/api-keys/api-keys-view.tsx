@@ -44,7 +44,7 @@ import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ApiKeyView } from "@polaris/auth";
 import { deleteApiKeyAction, revokeApiKeyAction } from "./actions";
-import { Ban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ban, BarChart3, BookOpen, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { API_KEY_ENVIRONMENTS, describeDevice, type ApiKeyEnvironment } from "@polaris/core";
 import * as list from "./api-keys-filter";
 import {
@@ -234,12 +234,20 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         />
                     </label>
                 </div>
-                <Button size="sm" asChild>
-                    <Link href="/account/api-keys/new" className="no-underline">
-                        <Plus className="size-4" />
-                        {t("apiKeys.list.newKey")}
-                    </Link>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" asChild>
+                        <Link href="/account/api-keys/reference" className="no-underline">
+                            <BookOpen className="size-4" />
+                            {t("apiKeys.list.reference")}
+                        </Link>
+                    </Button>
+                    <Button size="sm" asChild>
+                        <Link href="/account/api-keys/new" className="no-underline">
+                            <Plus className="size-4" />
+                            {t("apiKeys.list.newKey")}
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <p className="text-xs text-muted-foreground">
@@ -462,37 +470,49 @@ function KeyRow({
                 {t("apiKeys.list.comingSoon")}
             </td>
             <td className="px-3 py-2 align-top">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label={t("apiKeys.list.menuFor", { name: entry.name })}
-                            title={t("apiKeys.list.more")}
+                <span className="flex items-center justify-end gap-0.5">
+                    <Button size="icon" variant="ghost" asChild>
+                        <Link
+                            href={`${href}/usage`}
+                            className="no-underline"
+                            aria-label={t("apiKeys.usage.title", { name: entry.name })}
+                            title={t("apiKeys.list.usage")}
                         >
-                            <MoreHorizontal className="size-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem asChild>
-                            <Link href={href} className="no-underline">
-                                <Pencil className="size-3.5" />
-                                {t("apiKeys.list.edit")}
-                            </Link>
-                        </DropdownMenuItem>
-                        {state === "revoked" ? null : (
-                            <DropdownMenuItem onSelect={onRevoke}>
-                                <Ban className="size-3.5" />
-                                {t("apiKeys.list.revoke")}
+                            <BarChart3 className="size-4" />
+                        </Link>
+                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                aria-label={t("apiKeys.list.menuFor", { name: entry.name })}
+                                title={t("apiKeys.list.more")}
+                            >
+                                <MoreHorizontal className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem asChild>
+                                <Link href={href} className="no-underline">
+                                    <Pencil className="size-3.5" />
+                                    {t("apiKeys.list.edit")}
+                                </Link>
                             </DropdownMenuItem>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={onDelete} variant="danger">
-                            <Trash2 className="size-3.5" />
-                            {t("apiKeys.list.delete")}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            {state === "revoked" ? null : (
+                                <DropdownMenuItem onSelect={onRevoke}>
+                                    <Ban className="size-3.5" />
+                                    {t("apiKeys.list.revoke")}
+                                </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={onDelete} variant="danger">
+                                <Trash2 className="size-3.5" />
+                                {t("apiKeys.list.delete")}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </span>
             </td>
         </tr>
     );

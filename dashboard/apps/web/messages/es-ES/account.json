@@ -340,7 +340,7 @@
             }
         },
         "reference": {
-            "title": "Referencia de la API",
+            "title": "Referencia API",
             "intro": "Todas las llamadas que puede hacer una clave. Hace lo que permiten sus permisos, nunca más que su dueño.",
             "back": "Claves API",
             "download": "Archivo OpenAPI",
@@ -364,7 +364,7 @@
         "usage": {
             "title": "Uso de {name}",
             "back": "Claves API",
-            "edit": "Editar clave",
+            "edit": "Editar",
             "range": "Periodo",
             "ranges": {
                 "24h": "24 horas",
