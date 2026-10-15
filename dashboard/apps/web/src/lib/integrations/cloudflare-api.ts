@@ -205,6 +205,9 @@ export interface CfDnsRecord {
     id: string;
     /** What the record points at today (an IP for an A record). */
     content: string;
+    /** Seconds, or 1 for Cloudflare's automatic TTL. */
+    ttl?: number;
+    proxied?: boolean;
 }
 
 /**
@@ -221,7 +224,9 @@ export async function findDnsRecords(
     type: string,
     name: string
 ): Promise<CfDnsRecord[]> {
-    const existing = await cf<Array<{ id?: unknown; content?: unknown }>>(
+    const existing = await cf<
+        Array<{ id?: unknown; content?: unknown; ttl?: unknown; proxied?: unknown }>
+    >(
         token,
         "GET",
         `/zones/${zoneId}/dns_records?type=${type}&name=${encodeURIComponent(name)}`
@@ -229,11 +234,14 @@ export async function findDnsRecords(
     if (!Array.isArray(existing)) return [];
     return existing
         .filter(
-            (entry): entry is { id: string; content?: unknown } => typeof entry?.id === "string"
+            (entry): entry is { id: string; content?: unknown; ttl?: unknown; proxied?: unknown } =>
+                typeof entry?.id === "string"
         )
         .map((entry) => ({
             id: entry.id,
-            content: typeof entry.content === "string" ? entry.content : ""
+            content: typeof entry.content === "string" ? entry.content : "",
+            ttl: typeof entry.ttl === "number" ? entry.ttl : 1,
+            proxied: entry.proxied === true
         }));
 }
 

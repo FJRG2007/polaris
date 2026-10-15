@@ -462,15 +462,28 @@ async function dnsTargetFor(hostname: string): Promise<{ ip: string | null; serv
             }
         })
         .catch(() => null);
-    const host =
-        domain?.application.target.kind !== "local" ? domain?.application.target.host : null;
-    if (!domain || !host || domain.servedBy === "polaris") return { ip: await detectPublicIp() };
+    if (!domain) return { ip: await detectPublicIp() };
+    return serviceDnsTarget(domain.application.target, domain.servedBy);
+}
+
+/**
+ * The address a hostname's record should name when it is served by a service on this
+ * target - this server's own for one that runs here or is fronted by Polaris, the
+ * other server's public one otherwise - and that server's name when it is not this
+ * one. Also what a DNS cutover points a moving hostname at.
+ */
+export async function serviceDnsTarget(
+    target: { kind: string; host: { name: string; address: string } | null },
+    servedBy: string
+): Promise<{ ip: string | null; server?: string }> {
+    const host = target.kind !== "local" ? target.host : null;
+    if (!host || servedBy === "polaris") return { ip: await detectPublicIp() };
     const address = host.address.trim();
     // An address is used as it is; a name is looked up, the way a visitor would.
     const addresses = isIP(address) !== 0 ? [address] : await resolveOrEmpty(address);
     return {
         ip: dnsAddressFor(
-            { remote: true, servedBy: domain.servedBy, serverAddresses: addresses },
+            { remote: true, servedBy, serverAddresses: addresses },
             null
         ),
         server: host.name
