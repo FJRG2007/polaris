@@ -339,7 +339,7 @@ export function machineOfTarget(
 }
 
 /** What the database protects, read once per sweep. */
-async function protectedFromDatabase(): Promise<{
+async function protectedFromDatabase(window: number): Promise<{
     refs: Set<string>;
     inFlightHashes: Set<string>;
     keptByMachine: Map<string, { id: string; imageTag: string; createdAt: Date }[]>;
@@ -400,7 +400,11 @@ async function protectedFromDatabase(): Promise<{
                   }
               })
             : [];
-    const { refs, inFlightHashes } = protectedReleaseRefs([...rows, ...sources], currentByApp);
+    const { refs, inFlightHashes } = protectedReleaseRefs(
+        [...rows, ...sources],
+        currentByApp,
+        window
+    );
     const keptByMachine = new Map<string, { id: string; imageTag: string; createdAt: Date }[]>();
     for (const row of rows) {
         if (!row.imageKept || !row.imageTag) continue;
@@ -476,9 +480,17 @@ async function sweepMachine(
 /**
  * Remove the release images nothing can still want, on one machine (`local` or
  * a host id) or on every machine Polaris deploys to.
+ *
+ * `window` is how many earlier releases per service stay for a rollback. A disk
+ * that is running out passes 0: a rollback target is worth less than the
+ * database on that disk being able to write, and the serving and pinned images
+ * stay whatever it is.
  */
-export async function sweepReleaseImages(only?: string): Promise<ReleaseSweep[]> {
-    const database = await protectedFromDatabase();
+export async function sweepReleaseImages(
+    only?: string,
+    window: number = ROLLBACK_WINDOW
+): Promise<ReleaseSweep[]> {
+    const database = await protectedFromDatabase(window);
     const machines: Machine[] = [];
     if (!only || only === LOCAL_MACHINE) machines.push(localMachine());
     const hosts =

@@ -1384,7 +1384,7 @@
         "thisServer": "This server",
         "free": "Free up space",
         "freeing": "Freeing",
-        "freeHint": "Removes old release images, build cache and images no container uses. Volumes are never touched.",
+        "freeHint": "Removes every release image a service is not running, including the one kept to roll back to, plus build cache and images no container uses. Volumes are never touched.",
         "freed": "{size} freed.",
         "nothingFreed": "Nothing else could be removed safely. What is left is volumes and files, and only you can decide what goes.",
         "busy": "A deploy is running there. Try again once it finishes.",
