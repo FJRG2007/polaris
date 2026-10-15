@@ -328,6 +328,7 @@ export async function listProjects(caller: DeployCaller): Promise<ProjectLine[]>
                     slug: true,
                     isDefault: true,
                     applications: {
+                        where: { binnedAt: null },
                         orderBy: { createdAt: "asc" },
                         select: { id: true, name: true, slug: true, currentDeploymentId: true }
                     }

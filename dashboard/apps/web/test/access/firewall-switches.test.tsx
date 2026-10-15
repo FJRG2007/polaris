@@ -42,6 +42,10 @@ const setWafRuleAction = vi.fn(
 );
 const getWafRuleAction = vi.fn(async () => ({ rule: held, inherited: null, tor: null }));
 
+vi.mock("../../src/app/(app)/apps/deploy/restore-actions", () => ({
+    listHistoryAction: async () => ({ points: [] }),
+    restoreHistoryAction: async () => ({})
+}));
 vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
     getWafRuleAction,
     setWafRuleAction,

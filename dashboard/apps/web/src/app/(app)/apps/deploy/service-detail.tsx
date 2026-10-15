@@ -478,11 +478,13 @@ function deploySubtitle(
               ? t("deployments.viaScale")
               : deployment.trigger === "upload"
                 ? t("deployments.viaUpload")
-                : deployment.trigger === "preview"
-                  ? t("deployments.viaPreview", { source })
-                  : deployment.trigger === "push"
-                    ? t("deployments.viaPush", { source })
-                    : t("deployments.via", { source });
+                : deployment.trigger === "promotion"
+                  ? t("deployments.viaPromotion")
+                  : deployment.trigger === "preview"
+                    ? t("deployments.viaPreview", { source })
+                    : deployment.trigger === "push"
+                      ? t("deployments.viaPush", { source })
+                      : t("deployments.via", { source });
     const took =
         deployment.durationMs !== null
             ? t("deployments.took", { duration: duration(deployment.durationMs) })

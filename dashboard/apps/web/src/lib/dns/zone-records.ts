@@ -11,6 +11,7 @@
  * turns a scope into the token and zone to use and refuses anything outside it.
  */
 
+import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import type { MessageParams } from "@polaris/core";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -55,7 +56,11 @@ export class DnsEditError extends Error {
 }
 
 /** A refusal in the language of whoever asked. */
-async function refusal(key: NamespaceKey<"dns">, params?: MessageParams, problems?: DraftProblems): Promise<DnsEditError> {
+async function refusal(
+    key: NamespaceKey<"dns">,
+    params?: MessageParams,
+    problems?: DraftProblems
+): Promise<DnsEditError> {
     const t = await readerWords("dns");
     return new DnsEditError(t(key, params), problems);
 }
@@ -84,7 +89,9 @@ async function zoneFor(scope: DnsScope): Promise<Zone> {
     const row = await prisma.ownerDomain.findFirst({
         where: {
             id: scope.domainId,
-            ...(scope.owner.kind === "user" ? { userId: scope.owner.id } : { orgId: scope.owner.id }),
+            ...(scope.owner.kind === "user"
+                ? { userId: scope.owner.id }
+                : { orgId: scope.owner.id }),
             verifiedAt: { not: null }
         },
         select: { domain: true, dnsToken: true }
@@ -106,7 +113,10 @@ export interface TokenCaller {
  * The closest domain at or above `hostname` that one of these owners has proven,
  * or null when there is none.
  */
-export async function provenDomainOf(hostname: string, owners: readonly DomainOwner[]): Promise<string | null> {
+export async function provenDomainOf(
+    hostname: string,
+    owners: readonly DomainOwner[]
+): Promise<string | null> {
     const labels = normalizeHostname(hostname).replace(/^\*\./, "").split(".");
     const candidates = labels.slice(0, -1).map((_, index) => labels.slice(index).join("."));
     if (candidates.length === 0 || owners.length === 0) return null;
@@ -114,7 +124,9 @@ export async function provenDomainOf(hostname: string, owners: readonly DomainOw
         where: {
             domain: { in: candidates },
             verifiedAt: { not: null },
-            OR: owners.map((owner) => (owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id }))
+            OR: owners.map((owner) =>
+                owner.kind === "user" ? { userId: owner.id } : { orgId: owner.id }
+            )
         },
         select: { domain: true }
     });
@@ -127,7 +139,10 @@ export async function provenDomainOf(hostname: string, owners: readonly DomainOw
  * edits any zone the token reaches, and anybody else only names at or under a
  * domain they - or the organization they act for - have proven.
  */
-export async function instanceTokenAllowed(hostname: string, caller: TokenCaller): Promise<boolean> {
+export async function instanceTokenAllowed(
+    hostname: string,
+    caller: TokenCaller
+): Promise<boolean> {
     if (caller.isAdmin) return true;
     return (await provenDomainOf(hostname, caller.owners)) !== null;
 }
@@ -183,7 +198,11 @@ function draftOf(record: CfEditableRecord, zone: string): DnsRecordDraft | null 
                 value: typeof record.data?.value === "string" ? record.data.value : ""
             };
         case "MX":
-            return { ...draft, content: record.content, priority: record.priority === null ? "" : String(record.priority) };
+            return {
+                ...draft,
+                content: record.content,
+                priority: record.priority === null ? "" : String(record.priority)
+            };
         default:
             return { ...draft, content: record.content };
     }
@@ -227,7 +246,11 @@ async function scopedRecords(zone: Zone): Promise<DnsRecordView[]> {
 /** A zone's records, narrowed to what this scope may see. */
 export async function zoneRecords(scope: DnsScope): Promise<ZoneRecords> {
     const zone = await zoneFor(scope);
-    return { zone: { id: zone.id, name: zone.name }, within: zone.within, records: await scopedRecords(zone) };
+    return {
+        zone: { id: zone.id, name: zone.name },
+        within: zone.within,
+        records: await scopedRecords(zone)
+    };
 }
 
 /**
@@ -239,41 +262,63 @@ export async function zoneRecords(scope: DnsScope): Promise<ZoneRecords> {
 export async function saveZoneRecord(
     scope: DnsScope,
     recordId: string | null,
-    draft: DnsRecordDraft
+    draft: DnsRecordDraft,
+    /** False when the caller already kept a restore point for the whole batch. */
+    snapshot = true
 ): Promise<DnsRecordView> {
     const zone = await zoneFor(scope);
     const existing = await scopedRecords(zone);
-    if (recordId !== null && !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))) {
+    if (
+        recordId !== null &&
+        !(CF_ID.test(recordId) && existing.some((record) => record.id === recordId))
+    ) {
         throw await refusal("errors.recordNotInZone");
     }
     const t = await readerWords("dns");
-    const checked = recordFields(draft, zone.name, { within: zone.within, existing, editingId: recordId }, t);
+    const checked = recordFields(
+        draft,
+        zone.name,
+        { within: zone.within, existing, editingId: recordId },
+        t
+    );
     if (!checked.ok) {
         const problems = { ...checked.problems };
         for (const field of checked.missing) problems[field] ??= t("problems.required");
         throw new DnsEditError(t("errors.checkFields"), problems);
     }
+    if (snapshot) await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
     return viewOf(await saveDnsRecord(zone.token, zone.id, recordId, checked.record), zone.name);
 }
 
 /** Refuse a record id that is not in this zone, or not within this scope. */
-async function requireOwnRecord(zone: Zone, recordId: string): Promise<{ type: string; name: string }> {
+async function requireOwnRecord(
+    zone: Zone,
+    recordId: string
+): Promise<{ type: string; name: string }> {
     if (!CF_ID.test(recordId)) throw await refusal("errors.recordNotInZone");
     const current = await getDnsRecord(zone.token, zone.id, recordId);
     if (!current || !inside(zone, current.name)) throw await refusal("errors.recordNotInZone");
     return current;
 }
 
-export async function deleteZoneRecord(scope: DnsScope, recordId: string): Promise<void> {
+export async function deleteZoneRecord(
+    scope: DnsScope,
+    recordId: string,
+    /** False when the caller already kept a restore point for the whole batch. */
+    snapshot = true
+): Promise<void> {
     const zone = await zoneFor(scope);
     await requireOwnRecord(zone, recordId);
+    if (snapshot) await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
     await deleteDnsRecord(zone.token, zone.id, recordId);
 }
 
 /** The values a resolver should give for a record once the change has reached it,
  *  in the form it gives them - or null when there is nothing to expect: a proxied
  *  record answers with Cloudflare's own addresses rather than its content. */
-export function expectedValues(record: Pick<CfEditableRecord, "type" | "content" | "proxied" | "priority" | "data">): string[] | null {
+export function expectedValues(
+    record: Pick<CfEditableRecord, "type" | "content" | "proxied" | "priority" | "data">
+): string[] | null {
     if (record.proxied) return null;
     switch (record.type) {
         case "MX":
@@ -283,7 +328,9 @@ export function expectedValues(record: Pick<CfEditableRecord, "type" | "content"
                 `${numberOf(record.data?.priority)} ${numberOf(record.data?.weight)} ${numberOf(record.data?.port)} ${normalizeHostname(String(record.data?.target ?? ""))}`
             ];
         case "CAA":
-            return [`${numberOf(record.data?.flags) || "0"} ${String(record.data?.tag ?? "")} "${String(record.data?.value ?? "")}"`];
+            return [
+                `${numberOf(record.data?.flags) || "0"} ${String(record.data?.tag ?? "")} "${String(record.data?.value ?? "")}"`
+            ];
         default:
             return [record.content];
     }
@@ -294,14 +341,19 @@ export function expectedValues(record: Pick<CfEditableRecord, "type" | "content"
  * holds them, against what each public resolver answers. All of them rather than
  * the one, because a resolver answers with the whole set at a name.
  */
-export async function recordPropagation(scope: DnsScope, recordId: string): Promise<PropagationReport> {
+export async function recordPropagation(
+    scope: DnsScope,
+    recordId: string
+): Promise<PropagationReport> {
     const zone = await zoneFor(scope);
     const current = await requireOwnRecord(zone, recordId);
     if (!(DNS_RECORD_TYPES as readonly string[]).includes(current.type)) {
         throw await refusal("errors.propagationTypes", { types: DNS_RECORD_TYPES.join(", ") });
     }
     const siblings = (await listDnsRecords(zone.token, zone.id)).filter(
-        (record) => record.type === current.type && normalizeHostname(record.name) === normalizeHostname(current.name)
+        (record) =>
+            record.type === current.type &&
+            normalizeHostname(record.name) === normalizeHostname(current.name)
     );
     const expected = siblings.some((record) => record.proxied)
         ? null

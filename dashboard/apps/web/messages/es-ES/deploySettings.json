@@ -136,7 +136,17 @@
         "new": "Nuevo entorno",
         "deleteWithServices": "También se van todos sus servicios - {count}, con sus contenedores, dominios y variables.",
         "deleteEmpty": "Se eliminan el entorno y sus variables.",
-        "deleteTitle": "Borrar entorno"
+        "deleteTitle": "Borrar entorno",
+        "stages": {
+            "development": "Desarrollo",
+            "staging": "Pruebas",
+            "production": "Producción"
+        },
+        "stageNone": "Sin etapa",
+        "stageNamed": "Para qué es {name}",
+        "promote": "Promover",
+        "promoteNamed": "Promover {name}",
+        "promoteNeedsTwo": "Añade otro entorno al que promover"
     },
     "sections": {
         "title": "Ajustes del proyecto",
@@ -271,5 +281,52 @@
         "registriesHint": "Inicia sesión en un registro para que este proyecto pueda descargar imágenes privadas.",
         "manage": "Gestionar",
         "connect": "Conectar"
+    },
+    "promotion": {
+        "title": "Promover {name}",
+        "into": "A",
+        "includeData": "Reemplazar datos también",
+        "includeDataHint": "Cada base de datos recibe el contenido del origen. Antes se guarda en Copias de seguridad un punto de restauración de lo que hay ahora.",
+        "cannotDeploy": "No puedes desplegar en ese entorno.",
+        "cannotCopyData": "No puedes gestionar las bases de datos de ese entorno.",
+        "running": "Todavía hay una promoción en curso hacia {name}.",
+        "nothing": "Nada de aquí tiene equivalente en ese entorno.",
+        "loadFailed": "No se pudo leer qué cambiaría.",
+        "overwrites": "En {name}, esto reemplaza:",
+        "serviceLine": "{name} - su código, desplegado de nuevo",
+        "databaseLine": "{name} - todos sus datos",
+        "skippedLine": "{name} se queda fuera: {reason}",
+        "noDowntime": "Cada servicio sigue atendiendo hasta que su nueva versión está arriba y sana.",
+        "typeName": "Escribe {name} para confirmar",
+        "confirm": "Promover a {name}",
+        "historyTitle": "Promociones",
+        "historyDescription": "Código, y datos si se pidió, llevados de un entorno a otro.",
+        "historyEmpty": "Todavía no se ha promovido nada.",
+        "historyLine": "{from} -> {to}",
+        "withData": ", con datos",
+        "status": {
+            "running": "En curso",
+            "succeeded": "Hecha",
+            "partial": "Hecha en parte",
+            "failed": "Fallida"
+        },
+        "outcome": {
+            "deployed": "{name} desplegado",
+            "copied": "{name} con datos reemplazados",
+            "skipped": "{name} omitido",
+            "failed": "{name} falló"
+        },
+        "reasons": {
+            "missing": "no está en el destino",
+            "engine": "usa otro motor",
+            "dataFailed": "falló una copia de datos",
+            "builtDifferently": "se construye de otra forma",
+            "noImage": "no tiene imagen",
+            "otherRepository": "se construye desde otro repositorio",
+            "notDeployed": "no está desplegado en el origen"
+        },
+        "notes": {
+            "tagOnly": "se volvió a descargar la etiqueta de su imagen: no se pudo leer la versión exacta que ejecuta el origen, así que puede ser distinta"
+        }
     }
 }

@@ -65,7 +65,11 @@ export interface TemplatePrepareStep {
     readonly command: string;
     /** Run every `intervalMs` until it exits 0, at most `retries` times, before
      *  the command runs. */
-    readonly readiness: { readonly test: string; readonly intervalMs: number; readonly retries: number };
+    readonly readiness: {
+        readonly test: string;
+        readonly intervalMs: number;
+        readonly retries: number;
+    };
 }
 
 export interface ServiceTemplate extends TemplateService {
@@ -86,6 +90,10 @@ export interface ServiceTemplate extends TemplateService {
 
 /** The value a template writes for the service's own public address. */
 export const PUBLIC_URL_PLACEHOLDER = "{{publicUrl}}";
+
+/** One line of PHP for wp-config.php: trust the edge's forwarded scheme. */
+export const WORDPRESS_FORWARDED_HTTPS =
+    "if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') { $_SERVER['HTTPS'] = 'on'; }";
 
 export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
     {
@@ -160,7 +168,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         },
         secrets: [],
         volumes: [{ name: "content", mountPath: "/var/lib/ghost/content" }],
-        firstRun: "Open /ghost/ right away and create the owner account - until then anyone who opens it can."
+        firstRun:
+            "Open /ghost/ right away and create the owner account - until then anyone who opens it can."
     },
     {
         id: "gitea",
@@ -185,10 +194,15 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
                 title: "Create the Gitea admin",
                 command:
                     'su-exec git gitea admin user create --admin --username "$GITEA_ADMIN_USERNAME" --password "$GITEA_ADMIN_PASSWORD" --email "$GITEA_ADMIN_EMAIL" --must-change-password=false 2>&1 || true; echo done',
-                readiness: { test: "su-exec git gitea admin user list >/dev/null 2>&1", intervalMs: 3000, retries: 40 }
+                readiness: {
+                    test: "su-exec git gitea admin user list >/dev/null 2>&1",
+                    intervalMs: 3000,
+                    retries: 40
+                }
             }
         ],
-        firstRun: "Once setup has run, sign in as admin with the GITEA_ADMIN_PASSWORD variable. Registration is off."
+        firstRun:
+            "Once setup has run, sign in as admin with the GITEA_ADMIN_PASSWORD variable. Registration is off."
     },
     {
         id: "grafana",
@@ -216,7 +230,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
     {
         id: "kafka",
         name: "Apache Kafka",
-        description: "Event-streaming broker, with a web console for topics, messages and consumer groups.",
+        description:
+            "Event-streaming broker, with a web console for topics, messages and consumer groups.",
         image: "ghcr.io/kafbat/kafka-ui:latest",
         port: 8080,
         env: {
@@ -374,7 +389,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         env: { DATABASE_TYPE: "postgresql", DATABASE_URL: "{{database.DATABASE_URL}}" },
         secrets: ["APP_SECRET"],
         volumes: [],
-        firstRun: "Sign in as admin with the password umami, then change it under Settings, Profile."
+        firstRun:
+            "Sign in as admin with the password umami, then change it under Settings, Profile."
     },
     {
         id: "uptime-kuma",
@@ -386,7 +402,8 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         secrets: [],
         volumes: [{ name: "data", mountPath: "/app/data" }],
         embedded: true,
-        firstRun: "Create the admin account on the first visit - until then anyone who opens it can."
+        firstRun:
+            "Create the admin account on the first visit - until then anyone who opens it can."
     },
     {
         id: "vaultwarden",
@@ -398,6 +415,637 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         secrets: ["ADMIN_TOKEN"],
         volumes: [{ name: "data", mountPath: "/data" }],
         firstRun: "Open /admin with the ADMIN_TOKEN variable to invite the first account."
+    },
+    // Every image below is pinned to a tag checked against its registry when it
+    // was added; the variables are the ones each image documents.
+    {
+        id: "actual",
+        name: "Actual Budget",
+        description: "Envelope budgeting that syncs across your devices.",
+        image: "actualbudget/actual-server:26.10.0",
+        port: 5006,
+        env: { ACTUAL_LOGIN_METHOD: "password" },
+        secrets: [],
+        volumes: [{ name: "data", mountPath: "/data" }],
+        firstRun: "Set the server password on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "anythingllm",
+        name: "AnythingLLM",
+        description: "Chat with your documents through the model of your choice.",
+        image: "mintplexlabs/anythingllm:1.18.0",
+        port: 3001,
+        env: { STORAGE_DIR: "/app/server/storage", DISABLE_TELEMETRY: "true" },
+        secrets: ["JWT_SECRET", "SIG_KEY", "SIG_SALT"],
+        volumes: [{ name: "storage", mountPath: "/app/server/storage" }],
+        firstRun:
+            "Pick a model provider on the first visit, then turn on a password under Settings, Security."
+    },
+    {
+        id: "audiobookshelf",
+        name: "Audiobookshelf",
+        description: "Audiobook and podcast server with progress sync.",
+        image: "ghcr.io/advplyr/audiobookshelf:2.37.1",
+        port: 80,
+        env: {},
+        secrets: [],
+        volumes: [
+            { name: "config", mountPath: "/config" },
+            { name: "metadata", mountPath: "/metadata" },
+            { name: "audiobooks", mountPath: "/audiobooks" },
+            { name: "podcasts", mountPath: "/podcasts" }
+        ],
+        firstRun: "Create the root account on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "beszel",
+        name: "Beszel",
+        description: "Lightweight server monitoring with history and alerts.",
+        image: "henrygd/beszel:0.21.0",
+        port: 8090,
+        env: {},
+        secrets: [],
+        volumes: [{ name: "data", mountPath: "/beszel_data" }],
+        firstRun:
+            "Create the admin account on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "calibre-web",
+        name: "Calibre-Web",
+        description: "Browse, read and download books from a Calibre library.",
+        image: "linuxserver/calibre-web:0.6.27",
+        port: 8083,
+        env: { PUID: "1000", PGID: "1000", TZ: "Etc/UTC" },
+        secrets: [],
+        volumes: [
+            { name: "config", mountPath: "/config" },
+            { name: "books", mountPath: "/books" }
+        ],
+        firstRun:
+            "Sign in as admin with the password admin123 and change it right away. Point it at /books once a library is there."
+    },
+    {
+        id: "chroma",
+        name: "Chroma",
+        description: "Embedding database for AI apps.",
+        image: "chromadb/chroma:1.5.9",
+        port: 8000,
+        env: { IS_PERSISTENT: "TRUE", PERSIST_DIRECTORY: "/data", ANONYMIZED_TELEMETRY: "FALSE" },
+        secrets: [],
+        volumes: [{ name: "data", mountPath: "/data" }],
+        firstRun:
+            "It has no sign-in: leave it without a public address and reach it on its private domain, port 8000."
+    },
+    {
+        id: "clickhouse",
+        name: "ClickHouse",
+        description: "Column-oriented database for fast analytics.",
+        image: "clickhouse/clickhouse-server:25.8-alpine",
+        port: 8123,
+        env: { CLICKHOUSE_USER: "default", CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1" },
+        secrets: ["CLICKHOUSE_PASSWORD"],
+        volumes: [{ name: "data", mountPath: "/var/lib/clickhouse" }],
+        firstRun:
+            "Connect as default with the CLICKHOUSE_PASSWORD variable: HTTP on port 8123, native on 9000."
+    },
+    {
+        id: "couchdb",
+        name: "CouchDB",
+        description: "Document database that syncs over HTTP.",
+        image: "couchdb:3.5.3",
+        port: 5984,
+        env: { COUCHDB_USER: "admin" },
+        secrets: ["COUCHDB_PASSWORD"],
+        volumes: [{ name: "data", mountPath: "/opt/couchdb/data" }],
+        firstRun: "Open /_utils and sign in as admin with the COUCHDB_PASSWORD variable."
+    },
+    {
+        id: "flowise",
+        name: "Flowise",
+        description: "Build LLM agents and flows with a visual editor.",
+        image: "flowiseai/flowise:3.1.4",
+        port: 3000,
+        env: {
+            PORT: "3000",
+            DATABASE_PATH: "/root/.flowise",
+            APIKEY_PATH: "/root/.flowise",
+            SECRETKEY_PATH: "/root/.flowise",
+            LOG_PATH: "/root/.flowise/logs"
+        },
+        secrets: ["FLOWISE_SECRETKEY_OVERWRITE"],
+        volumes: [{ name: "data", mountPath: "/root/.flowise" }],
+        firstRun:
+            "Create the admin account on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "gotify",
+        name: "Gotify",
+        description: "Push notifications for your own apps and scripts.",
+        image: "gotify/server:2.9.0",
+        port: 80,
+        env: {
+            GOTIFY_DEFAULTUSER_NAME: "admin",
+            GOTIFY_REGISTRATION: "false",
+            GOTIFY_DATABASE_DIALECT: "sqlite3",
+            GOTIFY_DATABASE_CONNECTION: "data/gotify.db"
+        },
+        secrets: ["GOTIFY_DEFAULTUSER_PASS"],
+        volumes: [{ name: "data", mountPath: "/app/data" }],
+        firstRun: "Sign in as admin with the GOTIFY_DEFAULTUSER_PASS variable."
+    },
+    {
+        id: "grav",
+        name: "Grav",
+        description: "Flat-file CMS, no database needed.",
+        image: "linuxserver/grav:2.2.9",
+        port: 80,
+        env: { PUID: "1000", PGID: "1000", TZ: "Etc/UTC" },
+        secrets: [],
+        volumes: [{ name: "config", mountPath: "/config" }],
+        firstRun:
+            "Open /admin right away and create the admin account - until then anyone who opens it can."
+    },
+    {
+        id: "influxdb",
+        name: "InfluxDB",
+        description: "Time-series database for metrics and sensor data.",
+        image: "influxdb:2.7",
+        port: 8086,
+        env: {
+            DOCKER_INFLUXDB_INIT_MODE: "setup",
+            DOCKER_INFLUXDB_INIT_USERNAME: "admin",
+            DOCKER_INFLUXDB_INIT_ORG: "main",
+            DOCKER_INFLUXDB_INIT_BUCKET: "default"
+        },
+        secrets: ["DOCKER_INFLUXDB_INIT_PASSWORD", "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN"],
+        volumes: [
+            { name: "data", mountPath: "/var/lib/influxdb2" },
+            { name: "config", mountPath: "/etc/influxdb2" }
+        ],
+        firstRun:
+            "Sign in as admin with the DOCKER_INFLUXDB_INIT_PASSWORD variable. Clients use the DOCKER_INFLUXDB_INIT_ADMIN_TOKEN variable."
+    },
+    {
+        id: "jaeger",
+        name: "Jaeger",
+        description: "Distributed tracing: follow a request across services.",
+        image: "jaegertracing/jaeger:2.22.0",
+        port: 16686,
+        env: {},
+        secrets: [],
+        volumes: [],
+        firstRun:
+            "Send OTLP traces to its private domain, port 4317 (gRPC) or 4318 (HTTP). Traces are kept in memory and cleared on restart."
+    },
+    {
+        id: "jellyfin",
+        name: "Jellyfin",
+        description: "Stream your movies, shows and music to any device.",
+        image: "jellyfin/jellyfin:10.11",
+        port: 8096,
+        env: {},
+        secrets: [],
+        volumes: [
+            { name: "config", mountPath: "/config" },
+            { name: "cache", mountPath: "/cache" },
+            { name: "media", mountPath: "/media" }
+        ],
+        firstRun:
+            "Finish the setup wizard on the first visit - until then anyone who opens it can. Libraries go under /media."
+    },
+    {
+        id: "keycloak",
+        name: "Keycloak",
+        description: "Single sign-on and identity management.",
+        image: "quay.io/keycloak/keycloak:26.8.1",
+        port: 8080,
+        command: ["start"],
+        database: { engine: "postgres", version: "17" },
+        env: {
+            KC_DB: "postgres",
+            KC_DB_URL_HOST: "{{database.HOST}}",
+            KC_DB_URL_PORT: "{{database.PORT}}",
+            KC_DB_URL_DATABASE: "{{database.DATABASE}}",
+            KC_DB_USERNAME: "{{database.USER}}",
+            KC_DB_PASSWORD: "{{database.PASSWORD}}",
+            KC_HOSTNAME: PUBLIC_URL_PLACEHOLDER,
+            KC_HTTP_ENABLED: "true",
+            KC_PROXY_HEADERS: "xforwarded",
+            KC_BOOTSTRAP_ADMIN_USERNAME: "admin"
+        },
+        secrets: ["KC_BOOTSTRAP_ADMIN_PASSWORD"],
+        volumes: [],
+        firstRun:
+            "Sign in as admin with the KC_BOOTSTRAP_ADMIN_PASSWORD variable, then create a permanent admin; the bootstrap one is temporary."
+    },
+    {
+        id: "langflow",
+        name: "Langflow",
+        description: "Visual builder for AI agents and RAG pipelines.",
+        image: "langflowai/langflow:1.12.6",
+        port: 7860,
+        database: { engine: "postgres", version: "17" },
+        env: {
+            LANGFLOW_DATABASE_URL:
+                "postgresql://{{database.USER}}:{{database.PASSWORD}}@{{database.HOST}}:{{database.PORT}}/{{database.DATABASE}}",
+            LANGFLOW_CONFIG_DIR: "/app/langflow",
+            LANGFLOW_HOST: "0.0.0.0",
+            LANGFLOW_AUTO_LOGIN: "false",
+            LANGFLOW_SUPERUSER: "admin"
+        },
+        secrets: ["LANGFLOW_SECRET_KEY", "LANGFLOW_SUPERUSER_PASSWORD"],
+        volumes: [{ name: "data", mountPath: "/app/langflow" }],
+        firstRun: "Sign in as admin with the LANGFLOW_SUPERUSER_PASSWORD variable."
+    },
+    {
+        id: "linkding",
+        name: "linkding",
+        description: "Bookmark manager with tags and a browser extension.",
+        image: "sissbruecker/linkding:1.47.0",
+        port: 9090,
+        env: { LD_SUPERUSER_NAME: "admin" },
+        secrets: ["LD_SUPERUSER_PASSWORD"],
+        volumes: [{ name: "data", mountPath: "/etc/linkding/data" }],
+        firstRun: "Sign in as admin with the LD_SUPERUSER_PASSWORD variable."
+    },
+    {
+        id: "loki",
+        name: "Loki",
+        description: "Log storage you query from Grafana.",
+        image: "grafana/loki:3.6.0",
+        port: 3100,
+        env: {},
+        secrets: [],
+        volumes: [{ name: "data", mountPath: "/loki" }],
+        firstRun:
+            "It has no sign-in: leave it without a public address and add its private domain, port 3100, as a Grafana data source."
+    },
+    {
+        id: "mattermost",
+        name: "Mattermost",
+        description: "Team chat with channels, threads and integrations.",
+        image: "mattermost/mattermost-team-edition:11.7.12",
+        port: 8065,
+        database: { engine: "postgres", version: "17" },
+        env: {
+            MM_SQLSETTINGS_DRIVERNAME: "postgres",
+            MM_SQLSETTINGS_DATASOURCE:
+                "postgres://{{database.USER}}:{{database.PASSWORD}}@{{database.HOST}}:{{database.PORT}}/{{database.DATABASE}}?sslmode=disable&connect_timeout=10",
+            MM_SERVICESETTINGS_SITEURL: PUBLIC_URL_PLACEHOLDER
+        },
+        secrets: [],
+        volumes: [
+            { name: "config", mountPath: "/mattermost/config" },
+            { name: "data", mountPath: "/mattermost/data" },
+            { name: "logs", mountPath: "/mattermost/logs" },
+            { name: "plugins", mountPath: "/mattermost/plugins" }
+        ],
+        firstRun: "Create the first account right away - it becomes the system admin."
+    },
+    {
+        id: "memos",
+        name: "Memos",
+        description: "Quick notes and a private timeline, in Markdown.",
+        image: "neosmemo/memos:0.31.0",
+        port: 5230,
+        env: {},
+        secrets: [],
+        volumes: [{ name: "data", mountPath: "/var/opt/memos" }],
+        firstRun: "Create the first account right away - it becomes the admin."
+    },
+    {
+        id: "miniflux",
+        name: "Miniflux",
+        description: "Minimal, fast feed reader.",
+        image: "miniflux/miniflux:2.3.3",
+        port: 8080,
+        database: { engine: "postgres", version: "17" },
+        env: {
+            DATABASE_URL:
+                "postgres://{{database.USER}}:{{database.PASSWORD}}@{{database.HOST}}:{{database.PORT}}/{{database.DATABASE}}?sslmode=disable",
+            RUN_MIGRATIONS: "1",
+            CREATE_ADMIN: "1",
+            ADMIN_USERNAME: "admin",
+            BASE_URL: PUBLIC_URL_PLACEHOLDER
+        },
+        secrets: ["ADMIN_PASSWORD"],
+        volumes: [],
+        firstRun: "Sign in as admin with the ADMIN_PASSWORD variable."
+    },
+    {
+        id: "navidrome",
+        name: "Navidrome",
+        description: "Music streaming server that works with Subsonic apps.",
+        image: "deluan/navidrome:0.64.2",
+        port: 4533,
+        env: {},
+        secrets: [],
+        volumes: [
+            { name: "data", mountPath: "/data" },
+            { name: "music", mountPath: "/music" }
+        ],
+        firstRun:
+            "Create the admin account on the first visit - until then anyone who opens it can. Music goes under /music."
+    },
+    {
+        id: "nextcloud",
+        name: "Nextcloud",
+        description: "Files, calendars and contacts with a large app store.",
+        image: "nextcloud:32-apache",
+        port: 80,
+        database: { engine: "postgres", version: "17" },
+        env: {
+            POSTGRES_HOST: "{{database.HOST}}:{{database.PORT}}",
+            POSTGRES_DB: "{{database.DATABASE}}",
+            POSTGRES_USER: "{{database.USER}}",
+            POSTGRES_PASSWORD: "{{database.PASSWORD}}",
+            NEXTCLOUD_ADMIN_USER: "admin",
+            NEXTCLOUD_TRUSTED_DOMAINS: "{{self.POLARIS_PUBLIC_DOMAIN}}",
+            OVERWRITEPROTOCOL: "https",
+            OVERWRITECLIURL: PUBLIC_URL_PLACEHOLDER
+        },
+        secrets: ["NEXTCLOUD_ADMIN_PASSWORD"],
+        volumes: [{ name: "html", mountPath: "/var/www/html" }],
+        firstRun:
+            "Sign in as admin with the NEXTCLOUD_ADMIN_PASSWORD variable. The first start takes a few minutes."
+    },
+    {
+        id: "ntfy",
+        name: "ntfy",
+        description: "Send push notifications to your phone with a plain HTTP request.",
+        image: "binwiederhier/ntfy:v2.30.0",
+        port: 80,
+        command: ["serve"],
+        env: {
+            NTFY_BASE_URL: PUBLIC_URL_PLACEHOLDER,
+            NTFY_BEHIND_PROXY: "true",
+            NTFY_CACHE_FILE: "/var/cache/ntfy/cache.db",
+            NTFY_AUTH_FILE: "/var/lib/ntfy/user.db",
+            NTFY_AUTH_DEFAULT_ACCESS: "deny-all"
+        },
+        // `ntfy user add` reads the password from NTFY_PASSWORD.
+        secrets: ["NTFY_PASSWORD"],
+        volumes: [
+            { name: "cache", mountPath: "/var/cache/ntfy" },
+            { name: "lib", mountPath: "/var/lib/ntfy" }
+        ],
+        prepare: [
+            {
+                title: "Create the ntfy admin",
+                command:
+                    "ntfy user list 2>&1 | grep -q 'user admin' || ntfy user add --role=admin admin; echo done",
+                readiness: { test: "test -f /var/lib/ntfy/user.db", intervalMs: 3000, retries: 30 }
+            }
+        ],
+        firstRun:
+            "Once setup has run, sign in as admin with the NTFY_PASSWORD variable. Topics are private until you grant access."
+    },
+    {
+        id: "open-webui",
+        name: "Open WebUI",
+        description: "Chat with local models, with an Ollama server beside it.",
+        image: "ghcr.io/open-webui/open-webui:v0.6.30",
+        port: 8080,
+        env: { OLLAMA_BASE_URL: "http://{{companion.POLARIS_PRIVATE_DOMAIN}}:11434" },
+        secrets: ["WEBUI_SECRET_KEY"],
+        volumes: [{ name: "data", mountPath: "/app/backend/data" }],
+        companion: {
+            suffix: "ollama",
+            label: "Ollama model server",
+            image: "ollama/ollama:0.40.4",
+            port: 11434,
+            env: {},
+            secrets: [],
+            volumes: [{ name: "models", mountPath: "/root/.ollama" }]
+        },
+        firstRun:
+            "Create the first account right away - it becomes the admin. Pull a model from Settings, Models."
+    },
+    {
+        id: "paperless-ngx",
+        name: "Paperless-ngx",
+        description: "Scan, OCR and search your paper documents.",
+        image: "ghcr.io/paperless-ngx/paperless-ngx:2.20.0",
+        port: 8000,
+        database: { engine: "redis", version: "7" },
+        env: {
+            PAPERLESS_REDIS: "{{database.URL}}",
+            PAPERLESS_URL: PUBLIC_URL_PLACEHOLDER,
+            PAPERLESS_ADMIN_USER: "admin",
+            PAPERLESS_OCR_LANGUAGE: "eng",
+            PAPERLESS_TIME_ZONE: "Etc/UTC"
+        },
+        secrets: ["PAPERLESS_SECRET_KEY", "PAPERLESS_ADMIN_PASSWORD"],
+        volumes: [
+            { name: "data", mountPath: "/usr/src/paperless/data" },
+            { name: "media", mountPath: "/usr/src/paperless/media" },
+            { name: "consume", mountPath: "/usr/src/paperless/consume" },
+            { name: "export", mountPath: "/usr/src/paperless/export" }
+        ],
+        firstRun: "Sign in as admin with the PAPERLESS_ADMIN_PASSWORD variable."
+    },
+    {
+        id: "pgadmin",
+        name: "pgAdmin",
+        description: "Web console for PostgreSQL servers.",
+        image: "dpage/pgadmin4:9.18",
+        port: 80,
+        env: { PGADMIN_DEFAULT_EMAIL: "admin@example.com" },
+        secrets: ["PGADMIN_DEFAULT_PASSWORD"],
+        volumes: [{ name: "data", mountPath: "/var/lib/pgadmin" }],
+        firstRun:
+            "Sign in as admin@example.com with the PGADMIN_DEFAULT_PASSWORD variable, then add a server with a database's connection details."
+    },
+    {
+        id: "phpmyadmin",
+        name: "phpMyAdmin",
+        description: "Web console for MySQL and MariaDB servers.",
+        image: "phpmyadmin:5.2.3-apache",
+        port: 80,
+        env: { PMA_ARBITRARY: "1", UPLOAD_LIMIT: "100M", PMA_ABSOLUTE_URI: PUBLIC_URL_PLACEHOLDER },
+        secrets: [],
+        volumes: [],
+        firstRun:
+            "Sign in with a server's host, user and password. A Polaris database's are on its connection details."
+    },
+    {
+        id: "photoprism",
+        name: "PhotoPrism",
+        description: "Photo library with face recognition, maps and search.",
+        image: "photoprism/photoprism:261007",
+        port: 2342,
+        database: { engine: "mariadb", version: "11" },
+        env: {
+            PHOTOPRISM_ADMIN_USER: "admin",
+            PHOTOPRISM_SITE_URL: PUBLIC_URL_PLACEHOLDER,
+            PHOTOPRISM_DATABASE_DRIVER: "mysql",
+            PHOTOPRISM_DATABASE_SERVER: "{{database.HOST}}:{{database.PORT}}",
+            PHOTOPRISM_DATABASE_NAME: "{{database.DATABASE}}",
+            PHOTOPRISM_DATABASE_USER: "{{database.USER}}",
+            PHOTOPRISM_DATABASE_PASSWORD: "{{database.PASSWORD}}"
+        },
+        secrets: ["PHOTOPRISM_ADMIN_PASSWORD"],
+        volumes: [
+            { name: "storage", mountPath: "/photoprism/storage" },
+            { name: "originals", mountPath: "/photoprism/originals" }
+        ],
+        firstRun: "Sign in as admin with the PHOTOPRISM_ADMIN_PASSWORD variable."
+    },
+    {
+        id: "prometheus",
+        name: "Prometheus",
+        description: "Metrics collection and alerting.",
+        image: "prom/prometheus:v3.15.0",
+        port: 9090,
+        env: {},
+        secrets: [],
+        volumes: [{ name: "data", mountPath: "/prometheus" }],
+        firstRun:
+            "It has no sign-in: leave it without a public address and add its private domain, port 9090, as a Grafana data source."
+    },
+    {
+        id: "prowlarr",
+        name: "Prowlarr",
+        description: "Indexer manager for Sonarr and Radarr.",
+        image: "linuxserver/prowlarr:2.6.5",
+        port: 9696,
+        env: { PUID: "1000", PGID: "1000", TZ: "Etc/UTC" },
+        secrets: [],
+        volumes: [{ name: "config", mountPath: "/config" }],
+        firstRun: "Choose a sign-in method on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "rabbitmq",
+        name: "RabbitMQ",
+        description: "Message broker, with its management console.",
+        image: "rabbitmq:4.3-management-alpine",
+        port: 15672,
+        env: { RABBITMQ_DEFAULT_USER: "admin" },
+        secrets: ["RABBITMQ_DEFAULT_PASS"],
+        volumes: [{ name: "data", mountPath: "/var/lib/rabbitmq" }],
+        firstRun:
+            "Sign in as admin with the RABBITMQ_DEFAULT_PASS variable. Services reach AMQP on its private domain, port 5672."
+    },
+    {
+        id: "radarr",
+        name: "Radarr",
+        description: "Movie collection manager.",
+        image: "linuxserver/radarr:6.4.4",
+        port: 7878,
+        env: { PUID: "1000", PGID: "1000", TZ: "Etc/UTC" },
+        secrets: [],
+        volumes: [
+            { name: "config", mountPath: "/config" },
+            { name: "movies", mountPath: "/movies" },
+            { name: "downloads", mountPath: "/downloads" }
+        ],
+        firstRun: "Choose a sign-in method on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "searxng",
+        name: "SearXNG",
+        description: "Private metasearch engine that does not track you.",
+        image: "searxng/searxng:2026.10.13-22c64b8d3",
+        port: 8080,
+        env: { SEARXNG_BASE_URL: PUBLIC_URL_PLACEHOLDER },
+        secrets: ["SEARXNG_SECRET"],
+        volumes: [{ name: "config", mountPath: "/etc/searxng" }],
+        firstRun: "Open it and search. It has no accounts, so anyone with the address can use it."
+    },
+    {
+        id: "sonarr",
+        name: "Sonarr",
+        description: "TV series collection manager.",
+        image: "linuxserver/sonarr:4.0.20",
+        port: 8989,
+        env: { PUID: "1000", PGID: "1000", TZ: "Etc/UTC" },
+        secrets: [],
+        volumes: [
+            { name: "config", mountPath: "/config" },
+            { name: "tv", mountPath: "/tv" },
+            { name: "downloads", mountPath: "/downloads" }
+        ],
+        firstRun: "Choose a sign-in method on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "typesense",
+        name: "Typesense",
+        description: "Instant search engine with an API.",
+        image: "typesense/typesense:30.1",
+        port: 8108,
+        command: ["--data-dir", "/data", "--enable-cors"],
+        env: {},
+        secrets: ["TYPESENSE_API_KEY"],
+        volumes: [{ name: "data", mountPath: "/data" }],
+        firstRun: "Clients authenticate with the TYPESENSE_API_KEY variable."
+    },
+    {
+        id: "vikunja",
+        name: "Vikunja",
+        description: "To-do lists and projects with kanban and Gantt views.",
+        image: "vikunja/vikunja:0.24.6",
+        port: 3456,
+        env: {
+            VIKUNJA_SERVICE_PUBLICURL: PUBLIC_URL_PLACEHOLDER,
+            VIKUNJA_DATABASE_TYPE: "sqlite",
+            VIKUNJA_DATABASE_PATH: "/db/vikunja.db"
+        },
+        secrets: ["VIKUNJA_SERVICE_JWTSECRET"],
+        volumes: [
+            { name: "db", mountPath: "/db" },
+            { name: "files", mountPath: "/app/vikunja/files" }
+        ],
+        firstRun: "Register the first account. Registration stays open until you turn it off."
+    },
+    {
+        id: "wikijs",
+        name: "Wiki.js",
+        description: "Wiki with a Markdown editor, search and access rules.",
+        image: "ghcr.io/requarks/wiki:2.5",
+        port: 3000,
+        database: { engine: "postgres", version: "17" },
+        env: {
+            DB_TYPE: "postgres",
+            DB_HOST: "{{database.HOST}}",
+            DB_PORT: "{{database.PORT}}",
+            DB_USER: "{{database.USER}}",
+            DB_PASS: "{{database.PASSWORD}}",
+            DB_NAME: "{{database.DATABASE}}"
+        },
+        secrets: [],
+        volumes: [],
+        firstRun:
+            "Finish setup and create the admin on the first visit - until then anyone who opens it can."
+    },
+    {
+        id: "wordpress",
+        name: "WordPress",
+        description: "Websites and blogs, with themes and plugins.",
+        image: "wordpress:7.1-apache",
+        port: 80,
+        database: { engine: "mariadb", version: "11" },
+        env: {
+            WORDPRESS_DB_HOST: "{{database.HOST}}:{{database.PORT}}",
+            WORDPRESS_DB_USER: "{{database.USER}}",
+            WORDPRESS_DB_PASSWORD: "{{database.PASSWORD}}",
+            WORDPRESS_DB_NAME: "{{database.DATABASE}}",
+            // TLS ends at the edge, so WordPress sees plain HTTP unless it trusts
+            // the forwarded scheme; without this it redirects to http:// forever.
+            WORDPRESS_CONFIG_EXTRA: WORDPRESS_FORWARDED_HTTPS
+        },
+        secrets: [
+            "WORDPRESS_AUTH_KEY",
+            "WORDPRESS_SECURE_AUTH_KEY",
+            "WORDPRESS_LOGGED_IN_KEY",
+            "WORDPRESS_NONCE_KEY",
+            "WORDPRESS_AUTH_SALT",
+            "WORDPRESS_SECURE_AUTH_SALT",
+            "WORDPRESS_LOGGED_IN_SALT",
+            "WORDPRESS_NONCE_SALT"
+        ],
+        volumes: [{ name: "html", mountPath: "/var/www/html" }],
+        firstRun:
+            "Open it right away and finish the installer - until then anyone who opens it can."
     }
 ];
 
@@ -447,7 +1095,11 @@ export function templateVariables(
                 return `\${{${slug}.${key}}}`;
             });
     return [
-        ...Object.entries(service.env).map(([key, value]) => ({ key, value: wire(value), isSecret: false })),
+        ...Object.entries(service.env).map(([key, value]) => ({
+            key,
+            value: wire(value),
+            isSecret: false
+        })),
         ...service.secrets.map((key) => ({ key, value: generate(), isSecret: true }))
     ];
 }
@@ -473,7 +1125,12 @@ export interface PrepareExecResult {
 
 export type PrepareOutcome =
     | { readonly ok: true; readonly title: string; readonly output: string }
-    | { readonly ok: false; readonly title: string; readonly reason: string; readonly output: string };
+    | {
+          readonly ok: false;
+          readonly title: string;
+          readonly reason: string;
+          readonly output: string;
+      };
 
 /**
  * Run a template's setup steps, in order, through `exec`.
@@ -511,13 +1168,19 @@ export async function runPrepareSteps(
         try {
             result = await exec(step.command);
         } catch (error) {
-            const reason = error instanceof Error && error.message ? error.message : "It could not be run.";
+            const reason =
+                error instanceof Error && error.message ? error.message : "It could not be run.";
             outcomes.push({ ok: false, title: step.title, reason, output: "" });
             return outcomes;
         }
         const output = result.output.trim();
         if (result.code !== 0) {
-            outcomes.push({ ok: false, title: step.title, reason: `It exited with code ${result.code}.`, output });
+            outcomes.push({
+                ok: false,
+                title: step.title,
+                reason: `It exited with code ${result.code}.`,
+                output
+            });
             return outcomes;
         }
         outcomes.push({ ok: true, title: step.title, output });

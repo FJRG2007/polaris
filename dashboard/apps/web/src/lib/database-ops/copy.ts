@@ -61,7 +61,14 @@ export async function copyInto(
     databaseId: string,
     ownerId: string,
     actorId: string,
-    source: { fromDatabaseId: string } | { fromUrl: string } | { fromConnectionId: string }
+    source: { fromDatabaseId: string } | { fromUrl: string } | { fromConnectionId: string },
+    options: {
+        /** Take a restore point of the destination even when it is not
+         *  protected yet - protecting it, with no schedule, to keep one. */
+        alwaysBackUp?: boolean;
+        /** Answer once the copy has finished, and throw if it failed. */
+        wait?: boolean;
+    } = {}
 ): Promise<{ operationId: string }> {
     const into = await instanceContext(databaseId, ownerId);
     if (!isDumpableEngine(into.engine))
@@ -112,31 +119,53 @@ export async function copyInto(
     }
 
     const operation = await startOperation(databaseId, "copy", actorId);
-    void (async () => {
+    const run = (async () => {
         try {
-            await safetyCopy(databaseId, actorId, operation);
+            await safetyCopy(
+                databaseId,
+                ownerId,
+                actorId,
+                operation,
+                options.alwaysBackUp === true
+            );
             if (from) await copyFromManaged(from, into, ownerId, operation);
             else if (external) await copyFromExternal(external, into, operation);
             else if (saved) await copyFromSaved(saved, into, operation);
             await operation.succeed();
         } catch (error) {
             await operation.fail(error);
+            throw error;
         }
     })();
+    if (options.wait) await run;
+    else run.catch(() => undefined);
     return { operationId: operation.id };
 }
 
-/** A backup of the destination first, when it is protected - its contents are
- *  about to be replaced. */
+/** A backup of the destination first, when it is protected or `always` asks
+ *  for one - its contents are about to be replaced. */
 async function safetyCopy(
     databaseId: string,
+    ownerId: string,
     actorId: string,
-    operation: OperationHandle
+    operation: OperationHandle,
+    always: boolean
 ): Promise<void> {
-    const resource = await prisma.protectedResource.findFirst({
+    let resource = await prisma.protectedResource.findFirst({
         where: { selector: buildSelector("managed-database", [databaseId]) },
         select: { id: true }
     });
+    if (!resource && always) {
+        // Protected without a plan: nothing is scheduled, so it costs nothing
+        // until somebody backs it up again, and the copy taken now is listed
+        // in Backups where it can be restored from.
+        const { ensureDefaultDestinations } = await import("@/lib/backups/service");
+        const { protectResource } = await import("@/lib/backups/manage");
+        await ensureDefaultDestinations(ownerId);
+        resource = await protectResource(ownerId, {
+            target: { kind: "managed-database", databaseId }
+        });
+    }
     if (!resource) return;
     await operation.step("Taking a backup of what is there now");
     const { runBackup } = await import("@/lib/backups/service");

@@ -136,7 +136,17 @@
         "new": "New environment",
         "deleteWithServices": "Every service in it goes too - {count} of them, with their containers, domains and variables.",
         "deleteEmpty": "The environment and its variables are removed.",
-        "deleteTitle": "Delete environment"
+        "deleteTitle": "Delete environment",
+        "stages": {
+            "development": "Development",
+            "staging": "Staging",
+            "production": "Production"
+        },
+        "stageNone": "No stage",
+        "stageNamed": "What {name} is for",
+        "promote": "Promote",
+        "promoteNamed": "Promote {name}",
+        "promoteNeedsTwo": "Add another environment to promote into"
     },
     "sections": {
         "title": "Project settings",
@@ -271,5 +281,52 @@
         "registriesHint": "Sign in to a registry so this project can pull private images.",
         "manage": "Manage",
         "connect": "Connect"
+    },
+    "promotion": {
+        "title": "Promote {name}",
+        "into": "Into",
+        "includeData": "Replace the data too",
+        "includeDataHint": "Each database gets the source's contents. A restore point of what is there now is kept in Backups first.",
+        "cannotDeploy": "You cannot deploy to that environment.",
+        "cannotCopyData": "You cannot manage the databases in that environment.",
+        "running": "A promotion into {name} is still running.",
+        "nothing": "Nothing here has a match in that environment.",
+        "loadFailed": "Could not read what would change.",
+        "overwrites": "In {name}, this replaces:",
+        "serviceLine": "{name} - its code, deployed again",
+        "databaseLine": "{name} - all of its data",
+        "skippedLine": "{name} is left out: {reason}",
+        "noDowntime": "Each service keeps serving until its new release is up and healthy.",
+        "typeName": "Type {name} to confirm",
+        "confirm": "Promote into {name}",
+        "historyTitle": "Promotions",
+        "historyDescription": "Code, and data when asked, moved from one environment into another.",
+        "historyEmpty": "Nothing has been promoted yet.",
+        "historyLine": "{from} -> {to}",
+        "withData": ", with data",
+        "status": {
+            "running": "Running",
+            "succeeded": "Done",
+            "partial": "Partly done",
+            "failed": "Failed"
+        },
+        "outcome": {
+            "deployed": "{name} deployed",
+            "copied": "{name} data replaced",
+            "skipped": "{name} skipped",
+            "failed": "{name} failed"
+        },
+        "reasons": {
+            "missing": "not in the target",
+            "engine": "runs a different engine",
+            "dataFailed": "a database copy failed",
+            "builtDifferently": "built a different way",
+            "noImage": "has no image",
+            "otherRepository": "built from another repository",
+            "notDeployed": "not deployed in the source"
+        },
+        "notes": {
+            "tagOnly": "its image tag was pulled again: the exact build the source runs could not be read, so it may differ"
+        }
     }
 }

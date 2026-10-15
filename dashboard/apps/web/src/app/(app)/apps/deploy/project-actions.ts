@@ -12,13 +12,17 @@
  * role gates the project.
  */
 
+import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { firstIssue, reply } from "./reply";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import * as deployService from "@/lib/deploy-service";
 import * as staged from "@/lib/deploy-staged-changes";
+import { prisma } from "@polaris/db";
 import { recordDeployAudit } from "@/lib/deploy-audit";
+import * as promotion from "@/lib/deploy/promotion";
+import type { PromotionPreview } from "@/lib/deploy/promotion";
 import * as projectService from "@/lib/deploy-project-service";
 import { readMonthToDate, type StatementView } from "@/lib/billing/statement";
 import {
@@ -38,6 +42,8 @@ import {
 import {
     environmentNameSchema,
     environmentNetworkModeSchema,
+    environmentPromotionSchema,
+    environmentStageSchema,
     projectAccessInputSchema,
     projectFlagsSchema,
     projectGeneralSchema,
@@ -45,6 +51,8 @@ import {
     projectVisibilitySchema,
     projectWebhookInputSchema,
     type EnvironmentNetworkMode,
+    type EnvironmentPromotionInput,
+    type EnvironmentStage,
     type ProjectAccessInput,
     type ProjectCapability,
     type ProjectFlags,
@@ -56,7 +64,11 @@ import {
 const DEPLOY_PATH = "/apps/deploy";
 
 /** What a token that may change things can do through the Deploy API. */
-const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = ["deploy.run", "variables.write", "domains.manage"];
+const TOKEN_CHANGE_CAPABILITIES: readonly ProjectCapability[] = [
+    "deploy.run",
+    "variables.write",
+    "domains.manage"
+];
 
 /** The one shape every action here answers with, so a caller never has to guess
  *  whether a missing `error` means success or a field it forgot to read. */
@@ -71,6 +83,8 @@ async function attempt<T>(
     try {
         return await body();
     } catch (caught) {
+        if (caught instanceof promotion.PromotionRefusal)
+            return { error: await reply(caught.key, caught.params) };
         return { error: caught instanceof Error ? caught.message : await reply(fallback) };
     }
 }
@@ -183,7 +197,8 @@ export async function renameEnvironmentAction(input: {
     return attempt("environment.renameFailed", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentNameSchema.safeParse(input);
-        if (!parsed.success) return { error: await firstIssue(parsed.error, "environment.checkName") };
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkName") };
         const access = await requireEnvironmentAccess(
             parsed.data.environmentId,
             user.id,
@@ -373,7 +388,10 @@ export async function createProjectTokenAction(
         );
         // A token acts with its minter's access and never more, so one that may
         // change things is only minted by somebody who can change something here.
-        if (parsed.data.canManage && !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))) {
+        if (
+            parsed.data.canManage &&
+            !TOKEN_CHANGE_CAPABILITIES.some((can) => accessCan(access, can))
+        ) {
             return {
                 error: await reply("tokens.beyondYourAccess")
             };
@@ -569,7 +587,7 @@ export async function stageServiceDeleteAction(input: {
         if (!app) return { error: await reply("common.serviceNotFound") };
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
-            await deployService.deleteApplication(input.applicationId, access.ownerId);
+            await recycleBin.binApplication(input.applicationId, access.ownerId, user.id);
             await recordDeployAudit({
                 actorId: user.id,
                 orgId: access.orgId ?? undefined,
@@ -608,8 +626,7 @@ export async function stageDatabaseDeleteAction(input: {
         );
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
-            const { deleteDatabase } = await import("@/lib/database-service");
-            await deleteDatabase(input.databaseId, access.ownerId);
+            await recycleBin.binDatabase(input.databaseId, access.ownerId, user.id);
             await recordDeployAudit({
                 actorId: user.id,
                 orgId: access.orgId ?? undefined,
@@ -805,5 +822,126 @@ export async function wipeVolumeAction(volumeId: string): Promise<Result> {
         });
         refresh(access.projectId);
         return {};
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Stages and promotion
+// ---------------------------------------------------------------------------
+
+/** Mark what an environment is for - production, staging or development. */
+export async function setEnvironmentStageAction(input: {
+    environmentId: string;
+    stage: EnvironmentStage | null;
+}): Promise<Result> {
+    return attempt("environment.stageFailed", async () => {
+        const user = await requirePermission("deploy.manage");
+        const parsed = environmentStageSchema.safeParse(input);
+        if (!parsed.success) return { error: await reply("common.pickOption") };
+        const access = await requireEnvironmentAccess(
+            parsed.data.environmentId,
+            user.id,
+            "project.settings"
+        );
+        await prisma.environment.update({
+            where: { id: parsed.data.environmentId },
+            data: { stage: parsed.data.stage }
+        });
+        refresh(access.projectId);
+        return {};
+    });
+}
+
+/** What the dialog sends; the data stays out unless it says otherwise. */
+type PromotionRequest = {
+    sourceEnvironmentId: string;
+    targetEnvironmentId: string;
+    includeData?: boolean;
+};
+
+/**
+ * Who may promote: deploying into the target, being allowed into the source
+ * (its releases and, with the data, its contents leave it), and managing the
+ * target's databases when their contents are replaced. The preview answers
+ * with the same checks, so the dialog offers only what the action allows.
+ */
+async function promotionAccess(input: EnvironmentPromotionInput, userId: string) {
+    const access = await requireEnvironmentAccess(
+        input.targetEnvironmentId,
+        userId,
+        "project.read"
+    );
+    if (!accessInEnvironment(access, input.sourceEnvironmentId))
+        throw new Error(await reply("environment.notFound"));
+    return {
+        access,
+        canDeploy: accessCan(access, "deploy.run"),
+        canCopyData: accessCan(access, "deploy.run") && accessCan(access, "databases.manage")
+    };
+}
+
+export async function previewPromotionAction(
+    input: PromotionRequest
+): Promise<Result<{ preview: PromotionPreview; canDeploy: boolean; canCopyData: boolean }>> {
+    return attempt("environment.promoteFailed", async () => {
+        const user = await requirePermission("deploy.read");
+        const parsed = environmentPromotionSchema.safeParse(input);
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkDetails") };
+        const { access, canDeploy, canCopyData } = await promotionAccess(parsed.data, user.id);
+        const preview = await promotion.previewPromotion(
+            access.projectId,
+            access.ownerId,
+            parsed.data.sourceEnvironmentId,
+            parsed.data.targetEnvironmentId
+        );
+        return { preview, canDeploy, canCopyData };
+    });
+}
+
+/** Promote one environment into another; runs on, followed in the history. */
+export async function promoteEnvironmentAction(
+    input: PromotionRequest
+): Promise<Result<{ id: string }>> {
+    return attempt("environment.promoteFailed", async () => {
+        const user = await requirePermission("deploy.manage");
+        const parsed = environmentPromotionSchema.safeParse(input);
+        if (!parsed.success)
+            return { error: await firstIssue(parsed.error, "environment.checkDetails") };
+        const { access, canDeploy, canCopyData } = await promotionAccess(parsed.data, user.id);
+        if (!canDeploy) return { error: await reply("environment.promoteCannotDeploy") };
+        if (parsed.data.includeData && !canCopyData)
+            return { error: await reply("environment.promoteCannotCopyData") };
+        const started = await promotion.startPromotion({
+            projectId: access.projectId,
+            ownerId: access.ownerId,
+            actorId: user.id,
+            sourceId: parsed.data.sourceEnvironmentId,
+            targetId: parsed.data.targetEnvironmentId,
+            includeData: parsed.data.includeData
+        });
+        await recordDeployAudit({
+            actorId: user.id,
+            orgId: access.orgId ?? undefined,
+            action: "deploy.env.promote",
+            targetType: "environment",
+            targetId: parsed.data.targetEnvironmentId,
+            metadata: {
+                from: parsed.data.sourceEnvironmentId,
+                includeData: parsed.data.includeData
+            }
+        });
+        refresh(access.projectId);
+        return { id: started.id };
+    });
+}
+
+export async function listPromotionsAction(
+    projectId: string
+): Promise<Result<{ promotions: promotion.PromotionView[] }>> {
+    return attempt("environment.promoteFailed", async () => {
+        const user = await requirePermission("deploy.read");
+        const access = await requireProjectAccess(projectId, user.id, "project.read");
+        return { promotions: await promotion.listPromotions(access.projectId) };
     });
 }

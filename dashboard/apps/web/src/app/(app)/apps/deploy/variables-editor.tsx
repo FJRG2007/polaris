@@ -21,6 +21,7 @@
  * (`variables-raw-dialog.tsx`) shows the whole set as a .env or as JSON.
  */
 
+import { RestoreHistoryButton } from "@/components/restore-history";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EnvVarView } from "@/lib/env-var-service";
 import type { VariableLink } from "@/lib/deploy/variable-links";
@@ -201,7 +202,12 @@ export function VariablesEditor({
     useEffect(() => {
         if (!canWrite) return;
         function onKey(event: KeyboardEvent): void {
-            if (event.defaultPrevented || !hovered.current || !shortcutPressed(event, "general.rename")) return;
+            if (
+                event.defaultPrevented ||
+                !hovered.current ||
+                !shortcutPressed(event, "general.rename")
+            )
+                return;
             const target = event.target;
             if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
             if (
@@ -422,6 +428,11 @@ export function VariablesEditor({
                     {t("variables.count", { count: rows ? rows.length : 0 })}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
+                    <RestoreHistoryButton
+                        target={{ kind: "env", scope, scopeId }}
+                        canRestore={canWrite}
+                        onRestored={load}
+                    />
                     <Button
                         variant="ghost"
                         size="sm"
@@ -596,7 +607,12 @@ export function VariablesEditor({
                                     if (hovered.current?.id === row.id) hovered.current = null;
                                 }}
                                 onKeyDown={(event) => {
-                                    if (!canWrite || removed || !shortcutPressed(event, "general.rename")) return;
+                                    if (
+                                        !canWrite ||
+                                        removed ||
+                                        !shortcutPressed(event, "general.rename")
+                                    )
+                                        return;
                                     event.preventDefault();
                                     void startEditing(row);
                                 }}

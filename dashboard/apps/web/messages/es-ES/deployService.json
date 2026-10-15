@@ -63,7 +63,8 @@
         "disabled": "Despliegue desactivado",
         "status": "Estado: {status}",
         "history": "Historial",
-        "builtOn": " - compilado en {machine}"
+        "builtOn": " - compilado en {machine}",
+        "viaPromotion": " - promovido desde otro entorno"
     },
     "kept": {
         "rollbackTitle": "Restaurado de una imagen",
