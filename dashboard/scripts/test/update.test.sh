@@ -339,5 +339,16 @@ for script in "$update_sh" "$self_dir/../install.sh"; do
     fi
 done
 
+# An update fetched onto a nearly full disk took the database down with it: it
+# stops before fetching anything, and a df it cannot read does not block it.
+FREE_KB=""
+free_kb() { printf '%s\n' "$FREE_KB"; }
+FREE_KB=$((3 * 1024 * 1024))
+if room_to_update /x; then bad "room_to_update: 3 GB free let an update through"; else ok "room_to_update: 3 GB free stops the update"; fi
+FREE_KB=$((20 * 1024 * 1024))
+if room_to_update /x; then ok "room_to_update: 20 GB free lets it through"; else bad "room_to_update: 20 GB free stopped it"; fi
+FREE_KB=""
+if room_to_update /x; then ok "room_to_update: an unreadable df does not block an update"; else bad "room_to_update: an unreadable df blocked it"; fi
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
