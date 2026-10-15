@@ -31,6 +31,8 @@ import type { ComposeSpec, ComposeSpecVolume } from "@polaris/deploy";
 import { currentReleaseRef, serviceRef } from "@/lib/deploy/releases";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
 import { createApplication, deleteApplication } from "@/lib/deploy-service";
+import * as quotas from "@/lib/orgs/quotas";
+import * as quota from "@/lib/orgs/quota-service";
 import { slugify, parseContainerState, shortHash, type RuntimePorts } from "@polaris/deploy";
 
 /** Why a copy could not be made, as a code the caller turns into its own words. */
@@ -181,6 +183,18 @@ export async function createInstallCopy(
         select: { id: true }
     });
     if (!slug || taken) throw new InstallCopyRefusal("name-taken");
+
+    // The copy reserves what its original does, so it is held to the
+    // organization's caps before anything is made; the service count is checked
+    // by `createApplication` itself.
+    await quota.assertOrgReservation(
+        await quota.orgIdOfEnvironment(source.environmentId),
+        { cpus: 0, memoryMb: 0 },
+        {
+            cpus: quotas.reservationOf(source.cpuLimit, source.replicas),
+            memoryMb: quotas.reservationOf(source.memoryLimitMb, source.replicas)
+        }
+    );
 
     const sourceConfig = parseObject(source.sourceConfig);
     const application = await createApplication(ownerId, {
