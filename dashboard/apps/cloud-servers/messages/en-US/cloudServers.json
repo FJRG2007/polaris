@@ -50,7 +50,7 @@
         "powerOn": "Power on",
         "powerOff": "Power off",
         "reboot": "Restart",
-        "resize": "Resize",
+        "resize": "Change size",
         "destroy": "Destroy",
         "refresh": "Refresh"
     },
@@ -58,7 +58,7 @@
         "creating": "Creating",
         "enrolling": "Joining Polaris",
         "running": "Running",
-        "off": "Off",
+        "off": "Powered off",
         "transitioning": "Changing",
         "failed": "Failed",
         "destroyed": "Destroyed",
@@ -87,7 +87,7 @@
     "resize": {
         "title": "Resize {name}",
         "stoppedFirst": "Power the server off first: this provider only resizes a stopped server.",
-        "submit": "Resize"
+        "submit": "Change size"
     },
     "destroy": {
         "title": "Destroy {name}?",

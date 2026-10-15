@@ -328,7 +328,8 @@
         "New opportunity": "New opportunity",
         "Dashboards": "Dashboards",
         "Forecast": "Forecast",
-        "Audit log": "Audit log"
+        "Audit log": "Audit log",
+        "Cloud servers": "Cloud servers"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

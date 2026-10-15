@@ -328,7 +328,8 @@
         "New opportunity": "Nueva oportunidad",
         "Dashboards": "Paneles",
         "Forecast": "Previsión",
-        "Audit log": "Auditoría"
+        "Audit log": "Auditoría",
+        "Cloud servers": "Servidores cloud"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

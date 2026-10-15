@@ -4,7 +4,7 @@
     "accounts": {
         "title": "Cuentas",
         "connect": "Conectar cuenta",
-        "empty": "Aún no hay ninguna cuenta cloud conectada",
+        "empty": "Ninguna cuenta cloud conectada",
         "emptyHint": "Conecta una para crear servidores en ella.",
         "remove": "Quitar cuenta",
         "removeTitle": "¿Quitar {name}?",
@@ -18,19 +18,19 @@
         "refreshError": "La última actualización falló: {error}",
         "fields": {
             "token": "Token de API",
-            "accessKeyId": "ID de clave de acceso",
-            "secretAccessKey": "Clave de acceso secreta",
-            "tenantId": "ID de inquilino (directorio)",
+            "accessKeyId": "ID de la clave",
+            "secretAccessKey": "Clave secreta",
+            "tenantId": "ID de inquilino",
             "subscriptionId": "ID de suscripción",
             "clientId": "ID de aplicación (cliente)",
-            "clientSecret": "Secreto de cliente",
-            "serviceAccountJson": "Clave de cuenta de servicio (JSON)"
+            "clientSecret": "Secreto cliente",
+            "serviceAccountJson": "Clave de servicio (JSON)"
         }
     },
     "servers": {
         "title": "Servidores",
         "create": "Crear servidor",
-        "empty": "Aún no hay servidores",
+        "empty": "Sin servidores aún",
         "emptyHint": "Crea uno y aparecerá en Servidores cuando haya arrancado.",
         "needAccount": "Conecta una cuenta primero.",
         "name": "Nombre",
@@ -62,7 +62,7 @@
         "transitioning": "Cambiando",
         "failed": "Falló",
         "destroyed": "Destruido",
-        "unknown": "Desconocido"
+        "unknown": "Sin datos"
     },
     "create": {
         "title": "Crear un servidor",
