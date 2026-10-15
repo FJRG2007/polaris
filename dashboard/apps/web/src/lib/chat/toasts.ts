@@ -83,6 +83,9 @@ export interface MessageToast {
     /** Whether it is a channel rather than a direct message, which decides
      *  whether the line reads "Ana" or "Ana in #general". */
     readonly inChannel: boolean;
+    /** Whether it is a one-to-one direct message, so the conversation is the
+     *  person rather than a channel or a group. */
+    readonly direct: boolean;
     readonly authorId: string | null;
     readonly authorName: string;
     /** The words, or what was sent when there are none - never empty. */
@@ -295,6 +298,7 @@ export async function messageToasts(
             messageId: row.id,
             conversation: conversationName(row.channel, actor.id),
             inChannel: row.channel.spaceId !== null,
+            direct: row.channel.kind === "dm",
             authorId: row.authorId,
             authorName: (row.authorId && names.get(row.authorId)) || "Somebody",
             excerpt: plainExcerpt(row.body, EXCERPT) || describeFiles(row.attachments),
@@ -339,6 +343,7 @@ function recentIn(userId: string, channelIds: readonly string[], since: Date, ta
             channel: {
                 select: {
                     name: true,
+                    kind: true,
                     spaceId: true,
                     members: { select: { userId: true, user: { select: { name: true } } } }
                 }

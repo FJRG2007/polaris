@@ -278,10 +278,10 @@ export function MessageToasts() {
                     actions: [
                         {
                             // A direct message is the person, so muting it is
-                            // muting them; a channel is the room.
-                            label: message.inChannel
-                                ? t("messageToasts.muteChannel")
-                                : t("messageToasts.mutePerson", { author: message.authorName }),
+                            // muting them; a channel or a group is the room.
+                            label: message.direct
+                                ? t("messageToasts.mutePerson", { author: message.authorName })
+                                : t("messageToasts.muteChannel"),
                             icon: <BellOff className="size-3.5" />,
                             choices: NOTE_MUTES.map((mute) => ({
                                 label: t(mute.key),

@@ -39,6 +39,7 @@ let onFrame: ((frame: unknown, context: { owner: boolean }) => void) | null = nu
 let pathname = "/deploy";
 let watched = true;
 let soundOn = true;
+let direct = true;
 /** Held open by a test that needs the round trip to still be in flight; it
  *  always answers false, so the words come back either way. */
 let inFlight: Promise<void> | null = null;
@@ -97,6 +98,7 @@ vi.mock("@/app/(app)/chat/actions", () => ({
                   messageId: "m-1",
                   conversation: "general",
                   inChannel: false,
+                  direct,
                   authorId: "ada",
                   authorName: "Ada",
                   excerpt: "Hello",
@@ -141,6 +143,7 @@ beforeEach(() => {
     pathname = "/deploy";
     watched = true;
     soundOn = true;
+    direct = true;
     shown.length = 0;
     played.length = 0;
     mutes.length = 0;
@@ -236,6 +239,16 @@ describe("a message arriving", () => {
             [CHANNEL, 0],
             [CHANNEL, 60]
         ]);
+    });
+
+    it("names the conversation, not the author, when muting a group", async () => {
+        direct = false;
+        await arrive();
+        const card = shown[0] as unknown as {
+            actions: Array<{ label: string; choices?: unknown[] }>;
+        };
+        const mute = card.actions.find((action) => action.choices);
+        expect(mute?.label).toBe("components.messageToasts.muteChannel");
     });
 
     it("plays the sound when the reader is somewhere else in Polaris", async () => {
