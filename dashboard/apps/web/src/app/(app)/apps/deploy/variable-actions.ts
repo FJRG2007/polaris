@@ -32,13 +32,29 @@ import {
     type EnvScope
 } from "@/lib/env-var-service";
 import { getTranslations } from "@/lib/i18n/request";
+import * as groups from "@/lib/deploy/variable-groups";
+import { variableScopeSchema } from "@/lib/deploy/variable-groups";
 
 const DEPLOY_PATH = "/apps/deploy";
 
-const scopeSchema = z.object({
-    scope: z.enum(["application", "environment"]),
-    scopeId: z.string().trim().min(1).max(100)
-});
+const scopeSchema = variableScopeSchema;
+
+/** Redeploy what a scope's variables reach: a service, an environment's
+ *  services, or every deployed service linking a group that the actor may deploy. */
+async function redeployScope(
+    actor: { id: string; isAdmin: boolean },
+    scope: EnvScope,
+    scopeId: string,
+    ownerId: string
+): Promise<void> {
+    if (scope === "group") {
+        await groups.redeployLinked(actor, scopeId, (applicationId, appOwnerId) =>
+            redeployForEnvScope("application", applicationId, appOwnerId, actor.id)
+        );
+        return;
+    }
+    await redeployForEnvScope(scope, scopeId, ownerId, actor.id);
+}
 
 async function audit(
     actorId: string,
@@ -53,7 +69,7 @@ async function audit(
         actorId,
         orgId: orgId ?? undefined,
         action,
-        targetType: scope === "application" ? "application" : "environment",
+        targetType: groups.variableTargetType(scope),
         targetId: scopeId,
         metadata
     });
@@ -83,9 +99,15 @@ export async function saveEnvVarChangesAction(
     if (set.length + secrecy.length + remove.length === 0 && !redeploy) return { saved: 0 };
 
     try {
-        const access = await requireEnvScopeAccess(scope, scopeId, user.id, "variables.write");
+        const access = await groups.requireVariableScopeAccess(
+            scope,
+            scopeId,
+            user,
+            "variables.write"
+        );
         // Asked before anything is written, so a refusal leaves nothing half-done.
-        if (redeploy) await requireEnvScopeAccess(scope, scopeId, user.id, "deploy.run");
+        if (redeploy)
+            await groups.requireVariableScopeAccess(scope, scopeId, user, "deploy.run");
 
         const keys = new Map<string, string>();
         for (const id of [...remove, ...secrecy.map((item) => item.id)]) {
@@ -143,10 +165,9 @@ export async function saveEnvVarChangesAction(
             }
         }
 
+        if (scope === "group") await groups.touchGroup(scopeId);
         if (redeploy)
-            void redeployForEnvScope(scope, scopeId, access.ownerId, user.id).catch(
-                () => undefined
-            );
+            void redeployScope(user, scope, scopeId, access.ownerId).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return { saved: set.length + secrecy.length + remove.length, redeployed: redeploy };
     } catch (caught) {
@@ -162,18 +183,15 @@ export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: 
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return { error: await reply("variables.nothingToRedeploy") };
     try {
-        const access = await requireEnvScopeAccess(
+        const access = await groups.requireVariableScopeAccess(
             parsed.data.scope,
             parsed.data.scopeId,
-            user.id,
+            user,
             "deploy.run"
         );
-        void redeployForEnvScope(
-            parsed.data.scope,
-            parsed.data.scopeId,
-            access.ownerId,
-            user.id
-        ).catch(() => undefined);
+        void redeployScope(user, parsed.data.scope, parsed.data.scopeId, access.ownerId).catch(
+            () => undefined
+        );
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
@@ -189,6 +207,9 @@ export async function variableLinksAction(input: unknown): Promise<Record<string
     const user = await requirePermission("deploy.read");
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return {};
+    // A group's references resolve against each service that links it, so
+    // there is nothing to point at from the group itself.
+    if (parsed.data.scope === "group") return {};
     try {
         await requireEnvScopeAccess(
             parsed.data.scope,
@@ -215,7 +236,13 @@ export async function revealEnvScopeAction(
     if (!parsed.success) return { error: await reply("variables.revealAllFailed") };
     const { scope, scopeId } = parsed.data;
     try {
-        const access = await requireEnvScopeAccess(scope, scopeId, user.id, "variables.read");
+        const access = await groups.requireVariableScopeAccess(
+            scope,
+            scopeId,
+            user,
+            "variables.read",
+            { reveal: true }
+        );
         const rows = await listEnvVars(scope, scopeId, access.ownerId);
         const values: Record<string, string> = {};
         const secrets: string[] = [];

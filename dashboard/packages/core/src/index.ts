@@ -46,6 +46,7 @@ export * from "./mail-dns.js";
 export * from "./mail-ptr.js";
 export * from "./dmarc.js";
 export * from "./deploy-references.js";
+export * from "./variable-groups.js";
 export * from "./env-values.js";
 export * from "./cron.js";
 export * from "./clock-commands.js";

@@ -14,6 +14,7 @@ import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
 import { firstIssue, reply } from "./reply";
 import { normalizeRoot } from "@polaris/deploy";
+import { requireVariableScopeAccess, variableScopeSchema, variableTargetType } from "@/lib/deploy/variable-groups";
 import { requirePermission } from "@/lib/session";
 import * as activity from "@/lib/activity/activity";
 import * as comments from "@/lib/comments/comments";
@@ -105,7 +106,6 @@ import {
     requireDeploymentAccess,
     requireDomainAccess,
     requireEnvironmentAccess,
-    requireEnvScopeAccess,
     requireProjectAccess
 } from "@/lib/deploy-project-access";
 import {
@@ -645,7 +645,7 @@ async function recordVariableEvent(
         actorId,
         orgId: orgId ?? undefined,
         action,
-        targetType: scope === "application" ? "application" : "environment",
+        targetType: variableTargetType(scope),
         targetId: scopeId,
         metadata
     });
@@ -654,7 +654,14 @@ async function recordVariableEvent(
 /** Env vars for a scope (application service or shared environment); secrets masked. */
 export async function listEnvVarsAction(scope: EnvScope, scopeId: string): Promise<EnvVarView[]> {
     const user = await requirePermission("deploy.read");
-    const access = await requireEnvScopeAccess(scope, scopeId, user.id, "variables.read");
+    const parsed = variableScopeSchema.safeParse({ scope, scopeId });
+    if (!parsed.success) throw new Error("Variables not found");
+    const access = await requireVariableScopeAccess(
+        parsed.data.scope,
+        parsed.data.scopeId,
+        user,
+        "variables.read"
+    );
     return listEnvVars(scope, scopeId, access.ownerId);
 }
 
@@ -665,11 +672,13 @@ export async function revealEnvVarAction(
     try {
         const scope = await envVarScope(id);
         if (!scope) return { error: await reply("variables.gone") };
-        const access = await requireEnvScopeAccess(
+        // A group's secret is shown only to who may edit the group.
+        const access = await requireVariableScopeAccess(
             scope.scope,
             scope.scopeId,
-            user.id,
-            "variables.read"
+            user,
+            "variables.read",
+            { reveal: true }
         );
         const value = await revealEnvVar(id, access.ownerId);
         // Written only once the value has actually been handed over: a reveal is

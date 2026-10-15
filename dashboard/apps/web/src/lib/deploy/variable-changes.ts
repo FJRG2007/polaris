@@ -54,7 +54,7 @@ const trimmedId = z.string().trim().min(1).max(100);
 /** The change set as the server receives it. */
 export const variableChangesSchema = z
     .object({
-        scope: z.enum(["application", "environment"]),
+        scope: z.enum(["application", "environment", "group"]),
         scopeId: trimmedId,
         set: z
             .array(

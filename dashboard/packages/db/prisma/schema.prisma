@@ -4634,6 +4634,9 @@ model Project {
     // @polaris/core). One column rather than a table: they are read together on
     // every project load and never addressed one at a time.
     flags       String   @default("{}")
+    // Free-form labels as a JSON string array, normalized (see normalizeTags in
+    // @polaris/core). The projects screen filters on them.
+    tags        String   @default("[]")
     // Set while it sits in the recycle bin: containers removed, data kept, hidden
     // from every list. Cleared by a restore; the row goes when it is purged.
     binnedAt            DateTime?
@@ -4969,6 +4972,8 @@ model Application {
     // redirects and rewrites. Read whole through `parseAppEdgeConfig`, which
     // rebuilds the shape, because a row is always older than the code reading it.
     edgeConfig          String    @default("{}")
+    // Free-form labels as a JSON string array, normalized like a project's.
+    tags                String    @default("[]")
     // Set while it sits in the recycle bin: containers removed, data kept, hidden
     // from every list. Cleared by a restore; the row goes when it is purged.
     binnedAt            DateTime?
@@ -4985,6 +4990,7 @@ model Application {
     inboundHooks       InboundWebhook[]
     fileAccessAccounts FileAccessAccount[]
     fileAccessServer   FileAccessServer?
+    variableGroupLinks VariableGroupLink[]
 
     @@unique([environmentId, slug])
     @@index([targetId])
@@ -5518,7 +5524,7 @@ model Domain {
 // Polymorphic (no FK) like PolicyAttachment; secrets use the envelope columns.
 model EnvVar {
     id             String   @id @default(uuid(7)) @db.Uuid
-    // application | environment
+    // application | environment | group (a VariableGroup)
     scopeType      String
     scopeId        String   @db.Uuid
     key            String
@@ -5533,6 +5539,44 @@ model EnvVar {
 
     @@unique([scopeType, scopeId, key])
     @@index([scopeType, scopeId])
+}
+
+// A named set of variables on a shelf - somebody's own (orgId null) or one
+// organization's - that services in any project on that same shelf can link.
+// Its variables are EnvVar rows with scopeType "group" and scopeId = this id,
+// so a secret is sealed exactly as a service's is. A linked service gets them
+// underneath its environment's shared variables and its own.
+model VariableGroup {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    ownerId     String   @db.Uuid
+    orgId       String?  @db.Uuid
+    name        String
+    description String   @default("")
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    links VariableGroupLink[]
+
+    @@index([ownerId])
+    @@index([orgId])
+}
+
+// One service reading one group. `position` is the order the groups are
+// layered in: a higher position wins a key two linked groups share.
+model VariableGroupLink {
+    id            String   @id @default(uuid(7)) @db.Uuid
+    groupId       String   @db.Uuid
+    applicationId String   @db.Uuid
+    position      Int      @default(0)
+    createdById   String?  @db.Uuid
+    createdAt     DateTime @default(now())
+
+    group       VariableGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+    application Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@unique([groupId, applicationId])
+    @@index([applicationId])
 }
 
 // Web Application Firewall rules for Deploy. Polymorphic (no FK) scoping like
