@@ -208,12 +208,10 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor } = await import(
-    "@polaris-app/places/src/screens/automations/automation-editor"
-);
-const { AutomationsView } = await import(
-    "@polaris-app/places/src/screens/automations/automations-view"
-);
+const { AutomationEditor } =
+    await import("@polaris-app/places/src/screens/automations/automation-editor");
+const { AutomationsView } =
+    await import("@polaris-app/places/src/screens/automations/automations-view");
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -293,7 +291,11 @@ describe("a new automation from the switch-off template", () => {
         );
         await painted();
         fireEvent.change(screen.getByLabelText(/^For/), { target: { value: "0" } });
-        expect(screen.getByText("That is too small.")).toBeDefined();
+        expect(
+            screen.getByText(
+                'At least 1 minute. To act the moment it happens, use "A device changes".'
+            )
+        ).toBeDefined();
         expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
             "true"
         );
