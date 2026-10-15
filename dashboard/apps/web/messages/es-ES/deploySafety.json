@@ -53,7 +53,7 @@
         "emptyFile": "Ese archivo está vacío.",
         "tooLarge": "La copia ocupa más de 5 GB.",
         "uploading": "Subiendo... {percent}%",
-        "importing": "Importando. Los sitios y bases de datos grandes pueden tardar varios minutos; deja esta ventana abierta.",
+        "importing": "Importando. Puedes cerrar esta ventana; la importación sigue y aparecerá aquí al terminar.",
         "start": "Importar",
         "retry": "Reintentar",
         "cancel": "Cancelar",
@@ -63,6 +63,16 @@
         "warnings": "No todo se ha podido traer:",
         "unreachable": "No se pudo conectar con Polaris. Revisa tu conexión y vuelve a intentarlo.",
         "notAllowed": "No puedes crear proyectos en esta organización.",
-        "failed": "La importación no terminó. Vuelve a intentarlo en un momento."
+        "failed": "La importación no terminó y se ha quitado lo que había creado. Inténtalo de nuevo en un momento.",
+        "busy": "Ya hay otra importación en curso. Espera a que termine e inténtalo de nuevo.",
+        "running": "Importando sitio",
+        "finished": "Importado",
+        "stopped": "Error al importar",
+        "step": {
+            "unpacking": "Desempaquetando la copia...",
+            "databases": "Cargando bases de datos ({done} de {total})...",
+            "sites": "Copiando sitios ({done} de {total})...",
+            "finishing": "Terminando..."
+        }
     }
 }

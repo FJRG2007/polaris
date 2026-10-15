@@ -5095,6 +5095,36 @@ model DatabaseBaseBackup {
     @@index([databaseId, finishedAt])
 }
 
+// A site brought over from a hosting panel's backup, run after the upload has
+// been answered. Written first and closed last, like a DatabaseOperation, so one
+// cut short by a restart shows as never having finished. `projectId` is not a
+// foreign key: an import that fails removes the project it made, and its row
+// stays to say so.
+model DeployImport {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    ownerId    String    @db.Uuid
+    orgId      String?   @db.Uuid
+    actorId    String    @db.Uuid
+    // cpanel
+    source     String
+    // running | succeeded | failed
+    status     String    @default("running")
+    // unpacking | databases | sites | finishing - worded by the screen.
+    step       String    @default("unpacking")
+    done       Int       @default(0)
+    total      Int       @default(0)
+    projectId  String?   @db.Uuid
+    // What came over: counts, domains and warnings as codes with their values.
+    result     Json?
+    // A refusal worded for the reader; null when it failed on something else.
+    error      String?
+    startedAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    finishedAt DateTime?
+
+    @@index([ownerId, startedAt])
+}
+
 // Something done to a database that takes a while and that somebody watches:
 // a restore, an upgrade, a copy from elsewhere, a point-in-time recovery. The
 // row is written first and closed last, so one that died mid-way shows as never

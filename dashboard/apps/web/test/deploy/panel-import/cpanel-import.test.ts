@@ -49,8 +49,28 @@ const storeSourceFolder = vi.fn(async (id: string, _owner: string, dir: string, 
     return {};
 });
 
-vi.mock("@/lib/deploy-service", () => ({ createProject, createApplication, addApplicationDomain, deployApplication }));
-vi.mock("@/lib/database-service", () => ({ createDatabase, deployDatabaseAndWait }));
+const deleteProject = vi.fn(async (id: string) => void events.push(`delete project ${id}`));
+const deleteApplication = vi.fn(async (id: string) => void events.push(`delete service ${id}`));
+const deleteDatabase = vi.fn(async (id: string) => void events.push(`delete database ${id}`));
+/** What the project holds when a rollback looks. */
+let present: { environments: number; applications: string[]; databases: string[] } | null = null;
+
+vi.mock("@/lib/deploy-service", () => ({
+    createProject,
+    createApplication,
+    addApplicationDomain,
+    deployApplication,
+    deleteProject,
+    deleteApplication
+}));
+vi.mock("@/lib/database-service", () => ({ createDatabase, deployDatabaseAndWait, deleteDatabase }));
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        environment: { count: async () => present?.environments ?? 1 },
+        application: { findMany: async () => (present?.applications ?? []).map((id) => ({ id })) },
+        managedDatabase: { findMany: async () => (present?.databases ?? []).map((id) => ({ id })) }
+    }
+}));
 vi.mock("@/lib/deploy/source-upload", () => ({ storeSourceFolder }));
 vi.mock("@/lib/deploy-target-service", () => ({ getOrCreateLocalTarget: async () => ({ id: "target-1" }) }));
 vi.mock("@/lib/deploy/service-networks", () => ({ NEW_ENVIRONMENT_NETWORK_MODE: "environment" }));
@@ -63,12 +83,13 @@ vi.mock("@/lib/deploy/panel-import/cpanel", () => ({
     inspectCpanelBackup: async () => ({ dir: scratch, root: join(scratch, "backup"), plan })
 }));
 
-const { importCpanelBackup } = await import("@/lib/deploy/panel-import/import");
+const { importCpanelBackup, rollbackScope } = await import("@/lib/deploy/panel-import/import");
 
 const input = (orgId: string | null = null) => ({ archive: "backup.tar.gz", ownerId: OWNER, orgId, actorId: OWNER });
 
 beforeEach(async () => {
     events.length = 0;
+    present = null;
     vi.clearAllMocks();
     scratch = await mkdtemp(join(tmpdir(), "polaris-test-import-"));
     const root = join(scratch, "backup");
@@ -149,5 +170,39 @@ describe("importCpanelBackup", () => {
         await expect(importCpanelBackup(input())).rejects.toThrow("database down");
         await expect(stat(scratch)).rejects.toThrow();
         expect(createApplication).not.toHaveBeenCalled();
+    });
+
+    it("takes the whole project back when a site cannot be made", async () => {
+        storeSourceFolder.mockRejectedValueOnce(new Error("disk full"));
+        present = { environments: 1, applications: ["app-main.test"], databases: ["db-acct_shop", "db-acct_wp"] };
+        await expect(importCpanelBackup(input())).rejects.toThrow("disk full");
+        expect(events.at(-1)).toBe("delete project project-1");
+        expect(deleteApplication).not.toHaveBeenCalled();
+        await expect(stat(scratch)).rejects.toThrow();
+    });
+
+    it("keeps a project somebody added to, removing only what the import made", async () => {
+        storeSourceFolder.mockRejectedValueOnce(new Error("disk full"));
+        present = { environments: 1, applications: ["app-main.test", "app-theirs"], databases: ["db-acct_shop", "db-acct_wp"] };
+        await expect(importCpanelBackup(input())).rejects.toThrow("disk full");
+        expect(deleteProject).not.toHaveBeenCalled();
+        expect(events.slice(-3)).toEqual(["delete service app-main.test", "delete database db-acct_wp", "delete database db-acct_shop"]);
+    });
+
+    it("has nothing to take back when the project was never made", async () => {
+        createProject.mockRejectedValueOnce(new Error("database down"));
+        await expect(importCpanelBackup(input())).rejects.toThrow("database down");
+        expect(deleteProject).not.toHaveBeenCalled();
+    });
+});
+
+describe("rollbackScope", () => {
+    const made = { projectId: "p", applications: ["a"], databases: ["d"] };
+    it("takes the project when it holds only what the import made", () => {
+        expect(rollbackScope(made, { environments: 1, applications: ["a"], databases: [] })).toBe("project");
+    });
+    it("keeps it when anything else is in it", () => {
+        expect(rollbackScope(made, { environments: 1, applications: ["a"], databases: ["d", "x"] })).toBe("own");
+        expect(rollbackScope(made, { environments: 2, applications: ["a"], databases: ["d"] })).toBe("own");
     });
 });

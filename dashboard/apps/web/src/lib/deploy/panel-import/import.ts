@@ -16,10 +16,12 @@
  * Nothing here runs until somebody imports a backup. The scratch folder is
  * removed when the import ends, whether it worked or not. Something that cannot
  * be carried over (a domain another service already holds, a dump that will not
- * load) is reported as a warning instead of stopping the whole import.
+ * load) is reported as a warning instead of stopping the whole import; anything
+ * that does stop it takes back what this import made (see `rollBackImport`).
  */
 
 import { join } from "node:path";
+import { prisma } from "@polaris/db";
 import { createGzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
 import * as deployService from "@/lib/deploy-service";
@@ -54,6 +56,65 @@ export interface CpanelImportResult {
     readonly databases: number;
     readonly domains: string[];
     readonly warnings: string[];
+}
+
+/** Where an import is, for whoever watches it. */
+export type ImportStep = "unpacking" | "databases" | "sites" | "finishing";
+export type ImportReporter = (step: ImportStep, done: number, total: number) => Promise<void>;
+
+/** What one import has made so far, for taking it back when it fails. */
+export interface MadeByImport {
+    projectId: string | null;
+    readonly applications: string[];
+    /** In the order made: an instance before the databases inside it. */
+    readonly databases: string[];
+}
+
+/** What is in the project now, whoever put it there. */
+export interface ProjectContents {
+    readonly environments: number;
+    readonly applications: readonly string[];
+    readonly databases: readonly string[];
+}
+
+/** Whether the whole project can go, or only what the import made: anything in it
+ *  the import did not make (somebody added a service while it ran) keeps it. */
+export function rollbackScope(made: MadeByImport, present: ProjectContents): "project" | "own" {
+    const ours = (ids: readonly string[], own: readonly string[]) => ids.every((id) => own.includes(id));
+    return present.environments <= 1 && ours(present.applications, made.applications) && ours(present.databases, made.databases)
+        ? "project"
+        : "own";
+}
+
+/** Take back what a failed import made. Each removal is tried on its own and
+ *  logged when it fails: an import that failed is reported as failed either way. */
+export async function rollBackImport(made: MadeByImport, ownerId: string): Promise<void> {
+    const { projectId } = made;
+    if (!projectId) return;
+    const inProject = { environment: { projectId } };
+    const [environments, applications, databases] = await Promise.all([
+        prisma.environment.count({ where: { projectId } }),
+        prisma.application.findMany({ where: inProject, select: { id: true } }),
+        prisma.managedDatabase.findMany({ where: inProject, select: { id: true } })
+    ]);
+    const present = {
+        environments,
+        applications: applications.map((row) => row.id),
+        databases: databases.map((row) => row.id)
+    };
+    const attempt = (what: string, run: () => Promise<unknown>) =>
+        run().catch((error: unknown) => console.error(`panel-import: could not take back ${what}:`, error));
+    if (rollbackScope(made, present) === "project") {
+        await attempt(`project ${projectId}`, () => deployService.deleteProject(projectId, ownerId));
+        return;
+    }
+    for (const id of made.applications) {
+        await attempt(`service ${id}`, () => deployService.deleteApplication(id, ownerId, { deleteData: true }));
+    }
+    // The databases inside the instance first, the instance last.
+    for (const id of [...made.databases].reverse()) {
+        await attempt(`database ${id}`, () => databaseService.deleteDatabase(id, ownerId));
+    }
 }
 
 /** One service to make: a folder in the home and the domains it serves. */
@@ -129,20 +190,27 @@ async function loadDump(databaseId: string, ownerId: string, actorId: string, du
 }
 
 /** Import a checked backup as a new project. See the module comment. */
-export async function importCpanelBackup(input: CpanelImportInput): Promise<CpanelImportResult> {
+export async function importCpanelBackup(
+    input: CpanelImportInput,
+    report: ImportReporter = async () => undefined
+): Promise<CpanelImportResult> {
+    await report("unpacking", 0, 0);
     const { dir, root, plan } = await inspectCpanelBackup(input.archive);
+    const made: MadeByImport = { projectId: null, applications: [], databases: [] };
     try {
         const { ownerId, actorId } = input;
         const warnings = [...plan.warnings];
         const primary = plan.domains.find((domain) => domain.primary)?.name;
         const project = await createFreshProject(ownerId, primary ?? plan.account ?? "Imported site", input.orgId);
+        made.projectId = project.id;
         const environmentId = project.environments[0]?.id;
         if (!environmentId) throw new Error("The new project has no environment");
         const target = await getOrCreateLocalTarget(ownerId);
 
         let databases = 0;
         let instanceId: string | undefined;
-        for (const database of plan.databases) {
+        for (const [index, database] of plan.databases.entries()) {
+            await report("databases", index, plan.databases.length);
             try {
                 const created = await databaseService.createDatabase(ownerId, {
                     environmentId,
@@ -153,6 +221,7 @@ export async function importCpanelBackup(input: CpanelImportInput): Promise<Cpan
                     ...(SQL_IDENTIFIER.test(database.name) ? { databaseName: database.name } : {}),
                     ...(instanceId ? { instanceId } : {})
                 });
+                made.databases.push(created.id);
                 const failed = await databaseService.deployDatabaseAndWait(created.id, ownerId, actorId);
                 if (failed) throw new Error(failed);
                 instanceId ??= created.id;
@@ -166,7 +235,9 @@ export async function importCpanelBackup(input: CpanelImportInput): Promise<Cpan
 
         let services = 0;
         const domains: string[] = [];
-        for (const site of siteFolders(plan)) {
+        const sites = siteFolders(plan);
+        for (const [index, site] of sites.entries()) {
+            await report("sites", index, sites.length);
             const folder = join(root, "homedir", ...site.documentRoot.split("/").filter(Boolean));
             const name = site.domains[0]?.name ?? (site.documentRoot || "site");
             if (!(await isFolder(folder))) {
@@ -182,6 +253,7 @@ export async function importCpanelBackup(input: CpanelImportInput): Promise<Cpan
                 publishPort: false,
                 safeHeaders: true
             });
+            made.applications.push(application.id);
             await storeSourceFolder(application.id, ownerId, folder, name, await countFolder(folder));
             services += 1;
             for (const domain of site.domains) {
@@ -199,7 +271,11 @@ export async function importCpanelBackup(input: CpanelImportInput): Promise<Cpan
                 warnings.push(`${name} was imported but did not start deploying; deploy it from its page.`);
             });
         }
+        await report("finishing", sites.length, sites.length);
         return { projectId: project.id, services, databases, domains, warnings };
+    } catch (error) {
+        await rollBackImport(made, input.ownerId);
+        throw error;
     } finally {
         await rm(dir, { recursive: true, force: true });
     }

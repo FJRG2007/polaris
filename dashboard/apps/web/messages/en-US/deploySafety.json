@@ -53,7 +53,7 @@
         "emptyFile": "That file is empty.",
         "tooLarge": "The backup is larger than 5 GB.",
         "uploading": "Uploading... {percent}%",
-        "importing": "Importing. Large sites and databases can take several minutes; keep this window open.",
+        "importing": "Importing. You can close this window; the import keeps going and shows here when it ends.",
         "start": "Import",
         "retry": "Try again",
         "cancel": "Cancel",
@@ -63,6 +63,16 @@
         "warnings": "Not everything came over:",
         "unreachable": "Could not reach Polaris. Check your connection and try again.",
         "notAllowed": "You cannot create projects in this organization.",
-        "failed": "The import did not finish. Try again in a moment."
+        "failed": "The import did not finish, and what it had made was removed. Try again in a moment.",
+        "busy": "Another import is still running. Wait for it to finish, then try again.",
+        "running": "Importing site",
+        "finished": "Import finished",
+        "stopped": "Import failed",
+        "step": {
+            "unpacking": "Unpacking the backup...",
+            "databases": "Loading databases ({done} of {total})...",
+            "sites": "Copying sites ({done} of {total})...",
+            "finishing": "Finishing..."
+        }
     }
 }
