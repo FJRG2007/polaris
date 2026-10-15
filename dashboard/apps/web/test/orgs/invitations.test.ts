@@ -63,7 +63,9 @@ const state = vi.hoisted(() => ({
     created: null as { email: string; org?: { id: string; role: string } } | null,
     /** Whether the role the membership is written under holds nothing. */
     restrictedRole: false,
-    memberWrite: null as { role: string; restricted: boolean } | null
+    memberWrite: null as { role: string; restricted: boolean } | null,
+    /** The organization's own caps, or null for none set. */
+    quota: null as { members: number | null } | null
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -111,6 +113,7 @@ vi.mock("@polaris/db", () => ({
             }
         },
         orgRole: { findUnique: async () => state.role },
+        organizationQuota: { findUnique: async () => state.quota },
         $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations)
     }
 }));
@@ -171,6 +174,7 @@ beforeEach(() => {
     state.created = null;
     state.restrictedRole = false;
     state.memberWrite = null;
+    state.quota = null;
 });
 
 describe("inviting somebody", () => {
@@ -410,5 +414,35 @@ describe("joining from an emailed invitation", () => {
         });
         expect(joined).toBe(false);
         expect(state.written).toEqual([]);
+    });
+});
+
+describe("the organization's own member cap", () => {
+    beforeEach(() => {
+        state.policy = { maxMembers: 50, invitesPerHour: 20, newPeople: "admins" };
+    });
+
+    it("counts the owner, the roster and open invitations, and refuses past it", async () => {
+        const { OrgQuotaError } = await import("@/lib/orgs/quota-service");
+        state.quota = { members: 3 };
+        state.memberCount = 1;
+        state.invitationCount = 1;
+        await expect(inviteToOrg("org-1", "ada", "member", owner)).rejects.toBeInstanceOf(OrgQuotaError);
+        expect(state.written).toEqual([]);
+    });
+
+    it("lets one more in under it", async () => {
+        state.quota = { members: 3 };
+        state.memberCount = 1;
+        await inviteToOrg("org-1", "ada", "member", owner);
+        expect(state.written).toEqual(["invitation"]);
+    });
+
+    it("leaves an organization with no cap to the instance's limit only", async () => {
+        state.memberCount = 30;
+        await inviteToOrg("org-1", "ada", "member", owner);
+        state.quota = { members: null };
+        await inviteToOrg("org-1", "grace", "member", owner);
+        expect(state.written).toEqual(["invitation", "invitation"]);
     });
 });
