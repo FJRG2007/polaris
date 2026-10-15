@@ -6,14 +6,24 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const rateLimit = vi.fn(async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({ ok: true, retryAfterMs: 0 }));
+const rateLimit = vi.fn(
+    async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({ ok: true, retryAfterMs: 0 })
+);
 const setSetting = vi.fn(async () => undefined);
 
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: vi.fn(async () => null), setSetting }));
 
 const speed = await import("@/lib/diagnostics/speed-test");
-const { runSpeedTest, mbps, DOWNLOAD_BYTES, UPLOAD_BYTES, LEG_TIMEOUT_MS, SPEED_TEST_LIMIT, SPEED_TEST_WINDOW_MS } = speed;
+const {
+    runSpeedTest,
+    mbps,
+    DOWNLOAD_BYTES,
+    UPLOAD_BYTES,
+    LEG_TIMEOUT_MS,
+    SPEED_TEST_LIMIT,
+    SPEED_TEST_WINDOW_MS
+} = speed;
 
 const CHUNK = 1_000_000;
 
@@ -31,7 +41,8 @@ function endpoint(seen: Seen, options: { stall?: boolean } = {}) {
             seen.uploadBytes = (init.body as Uint8Array).byteLength;
             return new Response("ok");
         }
-        if (url.includes("bytes=0")) return new Response(null, { headers: { date: new Date().toUTCString() } });
+        if (url.includes("bytes=0"))
+            return new Response(null, { headers: { date: new Date().toUTCString() } });
         let body: ReadableStreamDefaultController<Uint8Array> | null = null;
         init.signal?.addEventListener("abort", () => body?.error(new Error("aborted")));
         return new Response(
@@ -102,8 +113,16 @@ describe("the speed test", () => {
         const fetcher = vi.fn();
         vi.stubGlobal("fetch", fetcher);
         rateLimit.mockResolvedValueOnce({ ok: false, retryAfterMs: 120_000 });
-        expect(await runSpeedTest()).toEqual({ ok: false, reason: "limited", retryAfterMs: 120_000 });
-        expect(rateLimit).toHaveBeenCalledWith("diagnostics:speed-test", SPEED_TEST_LIMIT, SPEED_TEST_WINDOW_MS);
+        expect(await runSpeedTest()).toEqual({
+            ok: false,
+            reason: "limited",
+            retryAfterMs: 120_000
+        });
+        expect(rateLimit).toHaveBeenCalledWith(
+            "diagnostics:speed-test",
+            SPEED_TEST_LIMIT,
+            SPEED_TEST_WINDOW_MS
+        );
         expect(fetcher).not.toHaveBeenCalled();
         // The refusal released the lock: the next one is asked again.
         const seen: Seen = { pulled: 0, uploadBytes: null, signals: [] };

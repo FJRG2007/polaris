@@ -10,7 +10,12 @@ import { syncAppRoutes } from "@/lib/deploy-service";
 import { getCapabilities } from "@polaris/config";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
 import { runSpeedTest, type SpeedTestOutcome } from "@/lib/diagnostics/speed-test";
-import { fixActionSchema, runCheck, type CheckId, type CheckResult } from "@/lib/diagnostics/checks";
+import {
+    fixActionSchema,
+    runCheck,
+    type CheckId,
+    type CheckResult
+} from "@/lib/diagnostics/checks";
 
 const CHECK_FOR: Record<"republishRoutes" | "freeSpace", CheckId> = {
     republishRoutes: "edge",

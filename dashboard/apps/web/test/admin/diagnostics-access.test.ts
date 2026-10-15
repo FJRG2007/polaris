@@ -11,10 +11,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ADMIN = { id: "admin-1", isAdmin: true };
 const apiAdmin = vi.fn(async (): Promise<unknown> => ADMIN);
 const requireAdmin = vi.fn(async (): Promise<unknown> => ADMIN);
-const runCheck = vi.fn(async (id: string) => ({ id, status: "pass", code: "ok", facts: {}, fix: null, ms: 1 }));
+const runCheck = vi.fn(async (id: string) => ({
+    id,
+    status: "pass",
+    code: "ok",
+    facts: {},
+    fix: null,
+    ms: 1
+}));
 const bundleFiles = vi.fn(async () => ({ "manifest.json": "{}\n" }));
 const bundleZip = vi.fn(async () => Buffer.from("zip"));
-const rateLimit = vi.fn(async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({ ok: true, retryAfterMs: 0 }));
+const rateLimit = vi.fn(
+    async (): Promise<{ ok: boolean; retryAfterMs: number }> => ({ ok: true, retryAfterMs: 0 })
+);
 const runSpeedTest = vi.fn(async () => ({ ok: true }));
 const syncAppRoutes = vi.fn(async () => undefined);
 const reclaimHostSpace = vi.fn(async (): Promise<number | null> => 0);
@@ -24,7 +33,10 @@ vi.mock("@/lib/session", () => ({ requireAdmin }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit }));
 vi.mock("@/lib/deploy-service", () => ({ syncAppRoutes }));
 vi.mock("@/lib/deploy/host-space", () => ({ reclaimHostSpace }));
-vi.mock("@/lib/diagnostics/speed-test", () => ({ runSpeedTest, lastSpeedResult: vi.fn(async () => null) }));
+vi.mock("@/lib/diagnostics/speed-test", () => ({
+    runSpeedTest,
+    lastSpeedResult: vi.fn(async () => null)
+}));
 vi.mock("@/lib/diagnostics/checks", async (original) => ({
     ...(await original<typeof import("@/lib/diagnostics/checks")>()),
     runCheck
@@ -47,7 +59,10 @@ const refusals = [
 ] as const;
 
 /** What `requireAdmin` does to a non-admin: Next's redirect, which throws. */
-const redirected = () => Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/home?denied=1;307;" });
+const redirected = () =>
+    Object.assign(new Error("NEXT_REDIRECT"), {
+        digest: "NEXT_REDIRECT;replace;/home?denied=1;307;"
+    });
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -60,9 +75,15 @@ describe("who may use diagnostics", () => {
     for (const [who, status] of refusals) {
         it(`refuses somebody ${who} at both endpoints, running nothing`, async () => {
             apiAdmin.mockResolvedValue(NextResponse.json({ error: who }, { status }));
-            expect((await checkRoute.GET(get("/api/admin/diagnostics/check?id=disk"))).status).toBe(status);
-            expect((await bundleRoute.GET(get("/api/admin/diagnostics/bundle"))).status).toBe(status);
-            expect((await bundleRoute.GET(get("/api/admin/diagnostics/bundle?preview=1"))).status).toBe(status);
+            expect((await checkRoute.GET(get("/api/admin/diagnostics/check?id=disk"))).status).toBe(
+                status
+            );
+            expect((await bundleRoute.GET(get("/api/admin/diagnostics/bundle"))).status).toBe(
+                status
+            );
+            expect(
+                (await bundleRoute.GET(get("/api/admin/diagnostics/bundle?preview=1"))).status
+            ).toBe(status);
             expect(runCheck).not.toHaveBeenCalled();
             expect(bundleFiles).not.toHaveBeenCalled();
             expect(rateLimit).not.toHaveBeenCalled();
@@ -91,7 +112,9 @@ describe("what an administrator sends", () => {
         expect(ok.status).toBe(200);
         expect(runCheck).toHaveBeenCalledWith("disk");
         for (const query of ["", "?id=", "?id=__proto__", "?id=DISK", "?id=disk%00"]) {
-            expect((await checkRoute.GET(get(`/api/admin/diagnostics/check${query}`))).status).toBe(400);
+            expect((await checkRoute.GET(get(`/api/admin/diagnostics/check${query}`))).status).toBe(
+                400
+            );
         }
         expect(runCheck).toHaveBeenCalledTimes(1);
     });
@@ -130,8 +153,14 @@ describe("what an administrator sends", () => {
         const download = await bundleRoute.GET(get("/api/admin/diagnostics/bundle"));
         expect(download.status).toBe(200);
         expect(download.headers.get("content-type")).toBe("application/zip");
-        expect(download.headers.get("content-disposition")).toMatch(/^attachment; filename="polaris-support-/);
-        expect(rateLimit).toHaveBeenCalledWith("diagnostics:bundle:admin-1", expect.any(Number), expect.any(Number));
+        expect(download.headers.get("content-disposition")).toMatch(
+            /^attachment; filename="polaris-support-/
+        );
+        expect(rateLimit).toHaveBeenCalledWith(
+            "diagnostics:bundle:admin-1",
+            expect.any(Number),
+            expect.any(Number)
+        );
 
         rateLimit.mockResolvedValueOnce({ ok: false, retryAfterMs: 61_000 });
         const limited = await bundleRoute.GET(get("/api/admin/diagnostics/bundle"));
@@ -139,13 +168,17 @@ describe("what an administrator sends", () => {
         expect(limited.headers.get("retry-after")).toBe("61");
         expect(bundleFiles).toHaveBeenCalledTimes(1);
 
-        expect((await bundleRoute.GET(get("/api/admin/diagnostics/bundle?preview=yes"))).status).toBe(400);
+        expect(
+            (await bundleRoute.GET(get("/api/admin/diagnostics/bundle?preview=yes"))).status
+        ).toBe(400);
     });
 
     it("shows withheld settings in the preview by name, never by value", async () => {
         process.env.POLARIS_DIAG_TEST_SECRET = "fixture-preview-secret-value";
         try {
-            const body = await (await bundleRoute.GET(get("/api/admin/diagnostics/bundle?preview=1"))).text();
+            const body = await (
+                await bundleRoute.GET(get("/api/admin/diagnostics/bundle?preview=1"))
+            ).text();
             expect(body).toContain("POLARIS_DIAG_TEST_SECRET");
             expect(body).not.toContain("fixture-preview-secret-value");
         } finally {

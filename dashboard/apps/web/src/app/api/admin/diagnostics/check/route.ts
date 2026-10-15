@@ -23,5 +23,7 @@ export async function GET(request: Request): Promise<Response> {
     if (refused instanceof Response) return refused;
     const parsed = querySchema.safeParse({ id: new URL(request.url).searchParams.get("id") });
     if (!parsed.success) return NextResponse.json({ error: "unknown check" }, { status: 400 });
-    return NextResponse.json(await runCheck(parsed.data.id), { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(await runCheck(parsed.data.id), {
+        headers: { "Cache-Control": "no-store" }
+    });
 }

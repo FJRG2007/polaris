@@ -106,7 +106,10 @@ export async function within<T>(work: Promise<T>, ms = CHECK_TIMEOUT_MS): Promis
 export function diskVerdict(disk: { used: number; total: number } | null, full: boolean): Verdict {
     if (!disk) return verdict("unknown", "unreadable");
     const free = Math.max(0, disk.total - disk.used);
-    const facts = { freeGb: Math.round((free / GB) * 10) / 10, percent: Math.round((disk.used / disk.total) * 100) };
+    const facts = {
+        freeGb: Math.round((free / GB) * 10) / 10,
+        percent: Math.round((disk.used / disk.total) * 100)
+    };
     const level = diskLevel(free, disk.total);
     const fix: CheckFix | null = full ? { kind: "action", action: "freeSpace" } : null;
     if (level === "critical") return verdict("fail", "critical", facts, fix);
@@ -165,12 +168,18 @@ function peerCertificate(host: string): Promise<{ validTo: Date | null; trusted:
     return new Promise((resolve, reject) => {
         // Not verified here on purpose: an untrusted certificate is a finding to
         // report, not a reason to learn nothing about it.
-        const socket = connect({ host, port: 443, servername: host, rejectUnauthorized: false }, () => {
-            const peer = socket.getPeerCertificate();
-            const validTo = peer?.valid_to ? new Date(peer.valid_to) : null;
-            resolve({ validTo: validTo && !Number.isNaN(validTo.getTime()) ? validTo : null, trusted: socket.authorized });
-            socket.end();
-        });
+        const socket = connect(
+            { host, port: 443, servername: host, rejectUnauthorized: false },
+            () => {
+                const peer = socket.getPeerCertificate();
+                const validTo = peer?.valid_to ? new Date(peer.valid_to) : null;
+                resolve({
+                    validTo: validTo && !Number.isNaN(validTo.getTime()) ? validTo : null,
+                    trusted: socket.authorized
+                });
+                socket.end();
+            }
+        );
         socket.setTimeout(CHECK_TIMEOUT_MS, () => socket.destroy(new Error("timeout")));
         socket.on("error", reject);
     });
@@ -195,7 +204,9 @@ async function edgeFiles(): Promise<Array<{ name: string; size: number }>> {
     const dir = dynamicDir();
     const names = (await readdir(dir)).filter((name) => /\.(ya?ml|toml)$/i.test(name));
     return Promise.all(
-        names.slice(0, 200).map(async (name) => ({ name, size: (await stat(join(dir, name))).size }))
+        names
+            .slice(0, 200)
+            .map(async (name) => ({ name, size: (await stat(join(dir, name))).size }))
     );
 }
 
@@ -218,7 +229,12 @@ const RUNNERS: Record<CheckId, () => Promise<Verdict>> = {
         const link: CheckFix = { kind: "link", href: "/admin/settings" };
         if (!status || status.error) return verdict("unknown", "unreachable", {}, link);
         if (status.upToDate) return verdict("pass", "ok", { version: status.current ?? "-" });
-        return verdict("warn", "behind", { behind: status.behindBy ?? 0, version: status.current ?? "-" }, link);
+        return verdict(
+            "warn",
+            "behind",
+            { behind: status.behindBy ?? 0, version: status.current ?? "-" },
+            link
+        );
     },
     async disk() {
         return diskVerdict(await within(localDisk()), getCapabilities().edition === "full");
@@ -230,9 +246,12 @@ const RUNNERS: Record<CheckId, () => Promise<Verdict>> = {
         const checked = await within(checkedAddresses(), CHECK_TIMEOUT_MS * 2);
         const link: CheckFix = { kind: "link", href: "/admin/settings" };
         if (!checked) return verdict("unknown", "unreachable");
-        const down = checked.filter((address) => address.health.state === "down").map((address) => address.host);
+        const down = checked
+            .filter((address) => address.health.state === "down")
+            .map((address) => address.host);
         if (down.length === 0) return verdict("pass", "ok", { count: checked.length });
-        if (down.length === checked.length) return verdict("fail", "allDown", { hosts: down.join(", ") }, link);
+        if (down.length === checked.length)
+            return verdict("fail", "allDown", { hosts: down.join(", ") }, link);
         return verdict("warn", "someDown", { hosts: down.join(", ") }, link);
     },
     async certificate() {
@@ -244,7 +263,13 @@ const RUNNERS: Record<CheckId, () => Promise<Verdict>> = {
         const host = await dashboardHost();
         if (!host) return verdict("skip", "noDomain");
         const found = await within(lookup(host).then((answer) => answer.address));
-        if (!found) return verdict("fail", "unresolved", { host }, { kind: "link", href: "/admin/domains" });
+        if (!found)
+            return verdict(
+                "fail",
+                "unresolved",
+                { host },
+                { kind: "link", href: "/admin/domains" }
+            );
         return verdict("pass", "ok", { host, address: found });
     },
     async clock() {
@@ -257,7 +282,8 @@ export async function runCheck(id: CheckId): Promise<CheckResult> {
     const started = Date.now();
     let result: Verdict;
     try {
-        result = (await within(RUNNERS[id](), CHECK_TIMEOUT_MS * 2)) ?? verdict("unknown", "timeout");
+        result =
+            (await within(RUNNERS[id](), CHECK_TIMEOUT_MS * 2)) ?? verdict("unknown", "timeout");
     } catch {
         result = verdict("unknown", "timeout");
     }

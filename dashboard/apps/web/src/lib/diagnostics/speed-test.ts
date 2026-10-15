@@ -56,7 +56,10 @@ async function latency(): Promise<number | null> {
     for (let sample = 0; sample < LATENCY_SAMPLES; sample++) {
         try {
             const started = performance.now();
-            const response = await fetch(TIME_REFERENCE_URL, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+            const response = await fetch(TIME_REFERENCE_URL, {
+                cache: "no-store",
+                signal: AbortSignal.timeout(5000)
+            });
             const took = performance.now() - started;
             await response.body?.cancel().catch(() => undefined);
             if (response.ok) best = best === null ? took : Math.min(best, took);
@@ -73,7 +76,10 @@ async function download(): Promise<number | null> {
     const started = performance.now();
     let bytes = 0;
     try {
-        const response = await fetch(DOWNLOAD_URL, { cache: "no-store", signal: controller.signal });
+        const response = await fetch(DOWNLOAD_URL, {
+            cache: "no-store",
+            signal: controller.signal
+        });
         if (!response.ok || !response.body) return null;
         const reader = response.body.getReader();
         for (;;) {
@@ -132,14 +138,24 @@ export async function runSpeedTest(): Promise<SpeedTestOutcome> {
     // pass the check while the rate limit is being read.
     running = true;
     try {
-        const allowed = await rateLimit("diagnostics:speed-test", SPEED_TEST_LIMIT, SPEED_TEST_WINDOW_MS);
-        if (!allowed.ok) return { ok: false, reason: "limited", retryAfterMs: allowed.retryAfterMs };
+        const allowed = await rateLimit(
+            "diagnostics:speed-test",
+            SPEED_TEST_LIMIT,
+            SPEED_TEST_WINDOW_MS
+        );
+        if (!allowed.ok)
+            return { ok: false, reason: "limited", retryAfterMs: allowed.retryAfterMs };
         // One leg at a time: run together they would share the link and each
         // measure half of it.
         const latencyMs = await latency();
         const downloadMbps = await download();
         const uploadMbps = await upload();
-        const result: SpeedResult = { downloadMbps, uploadMbps, latencyMs, at: new Date().toISOString() };
+        const result: SpeedResult = {
+            downloadMbps,
+            uploadMbps,
+            latencyMs,
+            at: new Date().toISOString()
+        };
         await setSetting(RESULT_KEY, JSON.stringify(result)).catch(() => undefined);
         return { ok: true, result };
     } finally {

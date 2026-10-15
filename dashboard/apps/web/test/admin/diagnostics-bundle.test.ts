@@ -78,10 +78,14 @@ vi.mock("@/lib/diagnostics/checks", async (original) => ({
     runDiagnosis
 }));
 vi.mock("@/lib/diagnostics/speed-test", () => ({ lastSpeedResult: vi.fn(async () => null) }));
-vi.mock("@/lib/telemetry/project-service", () => ({ systemProject: vi.fn(async () => ({ id: "system" })) }));
+vi.mock("@/lib/telemetry/project-service", () => ({
+    systemProject: vi.fn(async () => ({ id: "system" }))
+}));
 vi.mock("@polaris/db", () => ({ prisma: { telemetryIssue: { findMany } } }));
 
-const { bundleFiles, bundleZip, redactConfig, scrubWithheld } = await import("@/lib/diagnostics/support-bundle");
+const { bundleFiles, bundleZip, redactConfig, scrubWithheld } = await import(
+    "@/lib/diagnostics/support-bundle"
+);
 
 async function archiveText(): Promise<string> {
     const zip = await JSZip.loadAsync(await bundleZip(await bundleFiles(ENV)));
@@ -99,14 +103,21 @@ describe("the support bundle", () => {
         expect(findMany).toHaveBeenCalled();
         for (const secret of FORBIDDEN) expect(text).not.toContain(secret);
         // Not even as JSON escapes them.
-        for (const secret of FORBIDDEN) expect(text).not.toContain(JSON.stringify(secret).slice(1, -1));
+        for (const secret of FORBIDDEN)
+            expect(text).not.toContain(JSON.stringify(secret).slice(1, -1));
         expect(text).toContain("[redacted]");
     });
 
     it("holds every file the preview names", async () => {
         const zip = await JSZip.loadAsync(await bundleZip(await bundleFiles(ENV)));
         expect(Object.keys(zip.files).sort()).toEqual(
-            ["config.json", "diagnosis.json", "errors.json", "manifest.json", "speed-test.json"].sort()
+            [
+                "config.json",
+                "diagnosis.json",
+                "errors.json",
+                "manifest.json",
+                "speed-test.json"
+            ].sort()
         );
         const manifest = JSON.parse(await zip.file("manifest.json")!.async("string"));
         expect(manifest.imageTag).toBe("2026.10.1");
@@ -116,7 +127,13 @@ describe("the support bundle", () => {
     it("reports values only for allowlisted keys, and everything else by name", () => {
         const config = redactConfig(ENV);
         expect(Object.keys(config.values).sort()).toEqual(
-            ["NODE_ENV", "POLARIS_APP_URL", "POLARIS_DB_PROVIDER", "POLARIS_IMAGE_TAG", "POLARIS_REPO"].sort()
+            [
+                "NODE_ENV",
+                "POLARIS_APP_URL",
+                "POLARIS_DB_PROVIDER",
+                "POLARIS_IMAGE_TAG",
+                "POLARIS_REPO"
+            ].sort()
         );
         expect(config.values.POLARIS_APP_URL).toBe("https://polaris.example.com");
         expect(config.values.POLARIS_REPO).not.toContain(SECRETS.repoToken);
@@ -131,7 +148,10 @@ describe("the support bundle", () => {
     });
 
     it("leaves the values it publishes on purpose, and the runtime's paths, alone", () => {
-        const out = scrubWithheld("NODE_ENV=production on /usr/local/bin:/usr/bin with postgresql", ENV);
+        const out = scrubWithheld(
+            "NODE_ENV=production on /usr/local/bin:/usr/bin with postgresql",
+            ENV
+        );
         expect(out).toBe("NODE_ENV=production on /usr/local/bin:/usr/bin with postgresql");
     });
 });

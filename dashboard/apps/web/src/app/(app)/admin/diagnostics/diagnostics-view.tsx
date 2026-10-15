@@ -74,13 +74,20 @@ function CheckRow({
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-sm font-medium">{t(`checks.${id}.title` as Key)}</span>
                 {check ? (
-                    <span className="break-words text-xs text-muted-foreground">{sentence(t, check)}</span>
+                    <span className="break-words text-xs text-muted-foreground">
+                        {sentence(t, check)}
+                    </span>
                 ) : (
                     <Skeleton className="h-3.5 w-48 max-w-full" />
                 )}
             </div>
             {fix?.kind === "action" ? (
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => check && onFix(check)}>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => check && onFix(check)}
+                >
                     {t(`fix.${fix.action}` as Key)}
                 </Button>
             ) : null}
@@ -111,10 +118,13 @@ function ChecksCard({ ids }: { ids: CheckId[] }) {
         setNote(null);
         for (const id of ids) {
             fetch(`/api/admin/diagnostics/check?id=${id}`, { cache: "no-store" })
-                .then((response) => (response.ok ? (response.json() as Promise<CheckResult>) : failedCheck(id)))
+                .then((response) =>
+                    response.ok ? (response.json() as Promise<CheckResult>) : failedCheck(id)
+                )
                 .catch(() => failedCheck(id))
                 .then((result) => {
-                    if (round.current === mine) setResults((current) => ({ ...current, [id]: result }));
+                    if (round.current === mine)
+                        setResults((current) => ({ ...current, [id]: result }));
                 });
         }
     }, [ids]);
@@ -137,7 +147,8 @@ function ChecksCard({ ids }: { ids: CheckId[] }) {
     };
 
     const done = ids.every((id) => results[id]);
-    const count = (status: CheckStatus) => ids.filter((id) => results[id]?.status === status).length;
+    const count = (status: CheckStatus) =>
+        ids.filter((id) => results[id]?.status === status).length;
 
     return (
         <Card>
@@ -159,13 +170,22 @@ function ChecksCard({ ids }: { ids: CheckId[] }) {
             </CardHeader>
             <CardBody className="p-0">
                 {note ? (
-                    <p className={`px-4 pt-3 text-sm ${note.ok ? "text-success" : "text-danger"}`} role="status">
+                    <p
+                        className={`px-4 pt-3 text-sm ${note.ok ? "text-success" : "text-danger"}`}
+                        role="status"
+                    >
                         {t(note.ok ? "fix.done" : "fix.failed")}
                     </p>
                 ) : null}
                 <ul className="divide-y divide-border">
                     {ids.map((id) => (
-                        <CheckRow key={id} id={id} check={results[id] ?? null} busy={fixing} onFix={fix} />
+                        <CheckRow
+                            key={id}
+                            id={id}
+                            check={results[id] ?? null}
+                            busy={fixing}
+                            onFix={fix}
+                        />
                     ))}
                 </ul>
             </CardBody>
@@ -186,7 +206,12 @@ function SpeedCard({ initial }: { initial: SpeedResult | null }) {
             const outcome = await runSpeedTestAction();
             if (outcome.ok) setResult(outcome.result);
             else if (outcome.reason === "busy") setError(t("speed.busy"));
-            else setError(t("speed.limited", { minutes: Math.max(1, Math.ceil(outcome.retryAfterMs / 60_000)) }));
+            else
+                setError(
+                    t("speed.limited", {
+                        minutes: Math.max(1, Math.ceil(outcome.retryAfterMs / 60_000))
+                    })
+                );
         } catch {
             setError(t("speed.failed"));
         } finally {
@@ -219,14 +244,23 @@ function SpeedCard({ initial }: { initial: SpeedResult | null }) {
                 <dl className="grid grid-cols-3 gap-3">
                     {stats.map((stat) => (
                         <div key={stat.label} className="flex min-w-0 flex-col gap-0.5">
-                            <dt className="truncate text-xs text-muted-foreground" title={stat.label}>{stat.label}</dt>
+                            <dt
+                                className="truncate text-xs text-muted-foreground"
+                                title={stat.label}
+                            >
+                                {stat.label}
+                            </dt>
                             <dd className="truncate text-sm font-medium tabular-nums">
                                 {running ? <Skeleton className="h-4 w-16" /> : stat.value}
                             </dd>
                         </div>
                     ))}
                 </dl>
-                {error ? <p className="text-sm text-danger" role="status">{error}</p> : null}
+                {error ? (
+                    <p className="text-sm text-danger" role="status">
+                        {error}
+                    </p>
+                ) : null}
                 <p className="text-xs text-muted-foreground">
                     {result ? (
                         <>
@@ -256,7 +290,9 @@ function BundleCard() {
     useEffect(() => {
         let live = true;
         fetch("/api/admin/diagnostics/bundle?preview=1", { cache: "no-store" })
-            .then((response) => (response.ok ? (response.json() as Promise<BundlePreview>) : Promise.reject()))
+            .then((response) =>
+                response.ok ? (response.json() as Promise<BundlePreview>) : Promise.reject()
+            )
             .then((data) => live && setPreview(data))
             .catch(() => live && setFailed(true));
         return () => {
@@ -271,11 +307,15 @@ function BundleCard() {
             const response = await fetch("/api/admin/diagnostics/bundle", { cache: "no-store" });
             if (response.status === 429) {
                 const seconds = Number(response.headers.get("Retry-After")) || 60;
-                setDownloadError(t("bundle.limited", { minutes: Math.max(1, Math.ceil(seconds / 60)) }));
+                setDownloadError(
+                    t("bundle.limited", { minutes: Math.max(1, Math.ceil(seconds / 60)) })
+                );
                 return;
             }
             if (!response.ok) throw new Error(`bundle answered ${response.status}`);
-            const name = /filename="([^"]+)"/.exec(response.headers.get("Content-Disposition") ?? "")?.[1];
+            const name = /filename="([^"]+)"/.exec(
+                response.headers.get("Content-Disposition") ?? ""
+            )?.[1];
             const url = URL.createObjectURL(await response.blob());
             const anchor = document.createElement("a");
             anchor.href = url;
@@ -302,8 +342,14 @@ function BundleCard() {
                 </Button>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                {downloadError ? <p className="text-sm text-danger" role="status">{downloadError}</p> : null}
-                <h3 className="text-xs font-medium uppercase text-muted-foreground">{t("bundle.contents")}</h3>
+                {downloadError ? (
+                    <p className="text-sm text-danger" role="status">
+                        {downloadError}
+                    </p>
+                ) : null}
+                <h3 className="text-xs font-medium uppercase text-muted-foreground">
+                    {t("bundle.contents")}
+                </h3>
                 <ul className="flex flex-col gap-1">
                     {BUNDLE_FILES.map((file) => (
                         <li key={file.name} className="flex min-w-0 flex-wrap gap-x-2 text-sm">
@@ -313,15 +359,22 @@ function BundleCard() {
                     ))}
                 </ul>
                 {failed ? <p className="text-sm text-danger">{t("bundle.loadFailed")}</p> : null}
-                {!preview && !failed ? <Skeleton className="h-16 w-full" aria-label={t("bundle.loading")} /> : null}
+                {!preview && !failed ? (
+                    <Skeleton className="h-16 w-full" aria-label={t("bundle.loading")} />
+                ) : null}
                 {preview ? (
                     <div className="flex flex-col gap-2">
-                        <h3 className="text-xs font-medium text-muted-foreground">{t("bundle.included")}</h3>
+                        <h3 className="text-xs font-medium text-muted-foreground">
+                            {t("bundle.included")}
+                        </h3>
                         <ul className="flex flex-col gap-0.5">
                             {Object.entries(preview.config.values).map(([key, value]) => (
                                 <li key={key} className="flex min-w-0 gap-2 text-xs">
                                     <code className="shrink-0">{key}</code>
-                                    <span className="min-w-0 truncate text-muted-foreground" title={value}>
+                                    <span
+                                        className="min-w-0 truncate text-muted-foreground"
+                                        title={value}
+                                    >
                                         {value}
                                     </span>
                                 </li>
@@ -329,7 +382,9 @@ function BundleCard() {
                         </ul>
                         {preview.config.withheld.length > 0 ? (
                             <>
-                                <h3 className="text-xs font-medium text-muted-foreground">{t("bundle.withheld")}</h3>
+                                <h3 className="text-xs font-medium text-muted-foreground">
+                                    {t("bundle.withheld")}
+                                </h3>
                                 <p className="break-words text-xs">
                                     <code>{preview.config.withheld.join(", ")}</code>
                                 </p>
@@ -342,7 +397,13 @@ function BundleCard() {
     );
 }
 
-export function DiagnosticsView({ checks, initialSpeed }: { checks: CheckId[]; initialSpeed: SpeedResult | null }) {
+export function DiagnosticsView({
+    checks,
+    initialSpeed
+}: {
+    checks: CheckId[];
+    initialSpeed: SpeedResult | null;
+}) {
     return (
         <div className="flex flex-col gap-4">
             <ChecksCard ids={checks} />

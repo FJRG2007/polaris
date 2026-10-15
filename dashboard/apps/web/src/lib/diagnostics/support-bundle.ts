@@ -106,7 +106,8 @@ export function redactConfig(env: Readonly<Record<string, string | undefined>>):
         if (!REPORTED.test(key) || value === undefined || value === "") continue;
         // A safe key still loses a userinfo or a `NAME=secret` somebody pasted
         // into it: the key is vouched for, a value typed into it is not.
-        if (SAFE_CONFIG_KEYS.has(key)) values[key] = URL_KEYS.has(key) ? originOnly(value) : redactSecrets(value);
+        if (SAFE_CONFIG_KEYS.has(key))
+            values[key] = URL_KEYS.has(key) ? originOnly(value) : redactSecrets(value);
         else withheld.push(key);
     }
     return { values, withheld };
@@ -119,7 +120,10 @@ export function redactConfig(env: Readonly<Record<string, string | undefined>>):
  * A safe key whose value had to be cut to publish it (a URL with a userinfo)
  * is blanked in its raw form like any other. Pure.
  */
-export function scrubWithheld(text: string, env: Readonly<Record<string, string | undefined>>): string {
+export function scrubWithheld(
+    text: string,
+    env: Readonly<Record<string, string | undefined>>
+): string {
     const published = new Set(Object.values(redactConfig(env).values));
     const secrets = Object.entries(env)
         .filter(
@@ -149,7 +153,14 @@ async function recentErrors(): Promise<unknown[]> {
         where: { projectId: project.id },
         orderBy: { lastSeen: "desc" },
         take: ERROR_LIMIT,
-        select: { title: true, culprit: true, level: true, timesSeen: true, firstSeen: true, lastSeen: true }
+        select: {
+            title: true,
+            culprit: true,
+            level: true,
+            timesSeen: true,
+            firstSeen: true,
+            lastSeen: true
+        }
     });
     return issues.map((issue) => ({
         ...issue,

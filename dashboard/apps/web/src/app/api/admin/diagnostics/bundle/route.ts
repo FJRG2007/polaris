@@ -26,7 +26,9 @@ const WINDOW_MS = 10 * 60 * 1000;
 export async function GET(request: Request): Promise<Response> {
     const caller = await apiAdmin();
     if (caller instanceof Response) return caller;
-    const parsed = querySchema.safeParse({ preview: new URL(request.url).searchParams.get("preview") ?? undefined });
+    const parsed = querySchema.safeParse({
+        preview: new URL(request.url).searchParams.get("preview") ?? undefined
+    });
     if (!parsed.success) return NextResponse.json({ error: "bad request" }, { status: 400 });
 
     if (parsed.data.preview) {
@@ -34,7 +36,16 @@ export async function GET(request: Request): Promise<Response> {
         // settings ride along. Building the files for it would probe the network
         // twice for one download.
         return NextResponse.json(
-            { files: ["manifest.json", "diagnosis.json", "errors.json", "config.json", "speed-test.json"], config: redactConfig(process.env) },
+            {
+                files: [
+                    "manifest.json",
+                    "diagnosis.json",
+                    "errors.json",
+                    "config.json",
+                    "speed-test.json"
+                ],
+                config: redactConfig(process.env)
+            },
             { headers: { "Cache-Control": "no-store" } }
         );
     }
@@ -43,7 +54,10 @@ export async function GET(request: Request): Promise<Response> {
     if (!allowed.ok)
         return NextResponse.json(
             { error: "rate limited" },
-            { status: 429, headers: { "Retry-After": String(Math.ceil(allowed.retryAfterMs / 1000)) } }
+            {
+                status: 429,
+                headers: { "Retry-After": String(Math.ceil(allowed.retryAfterMs / 1000)) }
+            }
         );
 
     const zip = await bundleZip(await bundleFiles());

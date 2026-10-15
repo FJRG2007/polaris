@@ -100,9 +100,15 @@ describe("the Diagnostics screen", () => {
             release.edge();
         });
         await waitFor(() => expect(within(rowOf("Routing")).getByText("Problem")).toBeTruthy());
-        expect(within(rowOf("Disk space")).getByText("Running low: 8 GB free, 92% used.")).toBeTruthy();
-        expect(within(rowOf("Disk space")).getByRole("button", { name: "Free up space" })).toBeTruthy();
-        expect(within(rowOf("Routing")).getByRole("button", { name: "Republish routes" })).toBeTruthy();
+        expect(
+            within(rowOf("Disk space")).getByText("Running low: 8 GB free, 92% used.")
+        ).toBeTruthy();
+        expect(
+            within(rowOf("Disk space")).getByRole("button", { name: "Free up space" })
+        ).toBeTruthy();
+        expect(
+            within(rowOf("Routing")).getByRole("button", { name: "Republish routes" })
+        ).toBeTruthy();
         expect(screen.getByText("1 problem, 1 warning")).toBeTruthy();
     });
 
@@ -118,45 +124,69 @@ describe("the Diagnostics screen", () => {
     it("downloads the bundle as a file, and says why when it is refused", async () => {
         const createObjectURL = vi.fn(() => "blob:bundle");
         vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
-        const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+        const click = vi
+            .spyOn(HTMLAnchorElement.prototype, "click")
+            .mockImplementation(() => undefined);
         const fetched = vi.mocked(fetch);
         render(<DiagnosticsView checks={IDS} initialSpeed={null} />);
         const button = screen.getByRole("button", { name: /Download bundle/ });
 
         fetched.mockResolvedValueOnce(
             new Response("zip", {
-                headers: { "Content-Disposition": 'attachment; filename="polaris-support-2026-10-15.zip"' }
+                headers: {
+                    "Content-Disposition": 'attachment; filename="polaris-support-2026-10-15.zip"'
+                }
             })
         );
         await act(async () => button.click());
         await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
-        expect((click.mock.instances[0] as unknown as HTMLAnchorElement).download).toBe("polaris-support-2026-10-15.zip");
+        expect((click.mock.instances[0] as unknown as HTMLAnchorElement).download).toBe(
+            "polaris-support-2026-10-15.zip"
+        );
         expect(createObjectURL).toHaveBeenCalledTimes(1);
 
         fetched.mockResolvedValueOnce(
-            Response.json({ error: "rate limited" }, { status: 429, headers: { "Retry-After": "61" } })
+            Response.json(
+                { error: "rate limited" },
+                { status: 429, headers: { "Retry-After": "61" } }
+            )
         );
         await act(async () => button.click());
-        await waitFor(() => expect(screen.getByText("Limit reached. Try again in 2 minutes.")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("Limit reached. Try again in 2 minutes.")).toBeTruthy()
+        );
 
         fetched.mockResolvedValueOnce(new Response("", { status: 500 }));
         await act(async () => button.click());
-        await waitFor(() => expect(screen.getByText("The bundle could not be built. Try again.")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("The bundle could not be built. Try again.")).toBeTruthy()
+        );
         expect(click).toHaveBeenCalledTimes(1);
         click.mockRestore();
     });
 
     it("shows the last speed result at once, and says when the limit is reached", async () => {
-        runSpeedTestAction.mockResolvedValueOnce({ ok: false, reason: "limited", retryAfterMs: 5 * 60_000 });
+        runSpeedTestAction.mockResolvedValueOnce({
+            ok: false,
+            reason: "limited",
+            retryAfterMs: 5 * 60_000
+        });
         render(
             <DiagnosticsView
                 checks={IDS}
-                initialSpeed={{ downloadMbps: 412.5, uploadMbps: 88, latencyMs: 12, at: new Date().toISOString() }}
+                initialSpeed={{
+                    downloadMbps: 412.5,
+                    uploadMbps: 88,
+                    latencyMs: 12,
+                    at: new Date().toISOString()
+                }}
             />
         );
         expect(screen.getByText("412.5 Mbps")).toBeTruthy();
         expect(screen.getByText("12 ms")).toBeTruthy();
         await act(async () => screen.getByRole("button", { name: "Run speed test" }).click());
-        await waitFor(() => expect(screen.getByText("Limit reached. Try again in 5 minutes.")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("Limit reached. Try again in 5 minutes.")).toBeTruthy()
+        );
     });
 });
