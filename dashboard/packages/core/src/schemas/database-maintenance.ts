@@ -953,6 +953,100 @@ export const databaseUpgradeSchema = z.object({
     at: z.string().datetime({ offset: true }).optional()
 });
 
+/** A table or collection name as a copy names it: bare, or `schema.name`. */
+export const COPY_TABLE_PATTERN = /^[A-Za-z_][A-Za-z0-9_$-]{0,62}(\.[A-Za-z_][A-Za-z0-9_$-]{0,62})?$/;
+
+/** At most this many names in each of a copy's two table lists. */
+export const COPY_TABLE_LIMIT = 100;
+
+const copyTableName = z
+    .string()
+    .trim()
+    .regex(COPY_TABLE_PATTERN, "Use a table name: letters, digits and underscores, optionally schema.name");
+
+/**
+ * What a copy leaves behind. `skip` is not copied at all - the destination ends
+ * without it - and `structureOnly` arrives with its columns and indexes but no
+ * rows, the usual treatment for sessions, logs and queues when production is
+ * copied into staging.
+ */
+export const copyTablesSchema = z
+    .object({
+        skip: z.array(copyTableName).max(COPY_TABLE_LIMIT).default([]),
+        structureOnly: z.array(copyTableName).max(COPY_TABLE_LIMIT).default([])
+    })
+    .refine((value) => !value.skip.some((name) => value.structureOnly.includes(name)), {
+        message: "A table is either left out or copied empty, not both",
+        path: ["structureOnly"]
+    });
+
+export type CopyTables = z.infer<typeof copyTablesSchema>;
+
+/** Split a typed list - commas, spaces or lines - into distinct names. */
+export function parseTableList(text: string): string[] {
+    return [...new Set(text.split(/[\s,]+/).map((name) => name.trim()).filter(Boolean))];
+}
+
+/** A Postgres pattern matching one table exactly, case kept. */
+function pgTablePattern(name: string): string {
+    return name
+        .split(".")
+        .map((part) => `"${part}"`)
+        .join(".");
+}
+
+/**
+ * A dump command with a copy's table choices applied.
+ *
+ * Postgres and MongoDB take exclusions as flags. MySQL and MariaDB ignore both
+ * lists in the main pass and dump the empty ones' structure in a second pass,
+ * appended to the same file - without routines, which the first pass already
+ * wrote and a second copy of would fail to load. Postgres keeps each empty
+ * table's structure itself; MongoDB has no structure apart from its documents,
+ * so an empty collection there is one left out. The database name is always
+ * the last element of a MySQL or MariaDB `base`.
+ */
+export function filteredDumpArgv(
+    engine: "postgres" | "mysql" | "mariadb" | "mongo",
+    database: string,
+    base: readonly string[],
+    tables: CopyTables | undefined
+): { main: string[]; schemaPass: string[] | null } {
+    const skip = tables?.skip ?? [];
+    const empty = tables?.structureOnly ?? [];
+    if (skip.length === 0 && empty.length === 0) return { main: [...base], schemaPass: null };
+    if (engine === "postgres") {
+        return {
+            main: [
+                ...base,
+                ...skip.map((name) => `--exclude-table=${pgTablePattern(name)}`),
+                ...empty.map((name) => `--exclude-table-data=${pgTablePattern(name)}`)
+            ],
+            schemaPass: null
+        };
+    }
+    if (engine === "mongo") {
+        return {
+            main: [...base, ...[...skip, ...empty].map((name) => `--excludeCollection=${name}`)],
+            schemaPass: null
+        };
+    }
+    const options = base.slice(0, -1);
+    const ignored = [...skip, ...empty].map((name) => `--ignore-table=${database}.${name}`);
+    return {
+        main: [...options, ...ignored, database],
+        schemaPass:
+            empty.length > 0
+                ? [
+                      ...options.filter((arg) => arg !== "--routines"),
+                      "--no-data",
+                      database,
+                      ...empty
+                  ]
+                : null
+    };
+}
+
 export const databaseCopySchema = z
     .object({
         /** The database the data goes into. Its current contents are replaced. */
@@ -963,8 +1057,17 @@ export const databaseCopySchema = z
         fromUrl: z.string().trim().max(2048).optional(),
         /** ...or a connection saved in Databases, which may reach its database
          *  through an SSH tunnel nothing else here can open. */
-        fromConnectionId: z.string().uuid().optional()
+        fromConnectionId: z.string().uuid().optional(),
+        /** Managed source only: tables left out of the copy, or copied empty. */
+        tables: copyTablesSchema.optional()
     })
+    .refine(
+        (value) =>
+            !value.tables ||
+            (value.tables.skip.length === 0 && value.tables.structureOnly.length === 0) ||
+            Boolean(value.fromDatabaseId),
+        { message: "Tables can only be chosen when copying from a managed database", path: ["tables"] }
+    )
     .refine(
         (value) =>
             [value.fromDatabaseId, value.fromUrl, value.fromConnectionId].filter(Boolean).length ===

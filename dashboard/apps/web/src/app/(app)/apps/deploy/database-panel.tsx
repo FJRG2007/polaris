@@ -1064,6 +1064,8 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
     const [sourceId, setSourceId] = useState("");
     const [connectionId, setConnectionId] = useState("");
     const [url, setUrl] = useState("");
+    const [skipText, setSkipText] = useState("");
+    const [emptyText, setEmptyText] = useState("");
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -1086,9 +1088,23 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
             <p className="text-sm text-muted-foreground">{t("database.copy.needsPermission")}</p>
         );
 
+    // Which tables travel is a choice only a managed source offers: the other
+    // two are dumped by the destination's own container from an address.
+    const tablesOffered = from === "managed" && overview.engine !== "redis";
+    const emptyOffered = tablesOffered && overview.engine !== "mongo";
+    const tables = {
+        skip: tablesOffered ? core.parseTableList(skipText) : [],
+        structureOnly: emptyOffered ? core.parseTableList(emptyText) : []
+    };
+    const tablesChosen = tables.skip.length + tables.structureOnly.length > 0;
+    const tablesCheck = core.copyTablesSchema.safeParse(tables);
     const request =
         from === "managed"
-            ? { databaseId: overview.id, fromDatabaseId: sourceId || undefined }
+            ? {
+                  databaseId: overview.id,
+                  fromDatabaseId: sourceId || undefined,
+                  ...(tablesChosen ? { tables } : {})
+              }
             : from === "saved"
               ? { databaseId: overview.id, fromConnectionId: connectionId || undefined }
               : { databaseId: overview.id, fromUrl: url.trim() || undefined };
@@ -1213,6 +1229,44 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                     )}
                 </>
             )}
+            {tablesOffered ? (
+                <div className="flex flex-col gap-2">
+                    <label className="flex flex-col gap-1 text-xs">
+                        <span className="font-medium">{t("database.copy.skipTables")}</span>
+                        <Input
+                            value={skipText}
+                            onChange={(event) => setSkipText(event.target.value)}
+                            placeholder={t("database.copy.tablesPlaceholder")}
+                            autoComplete="off"
+                            spellCheck={false}
+                        />
+                        <span className="text-muted-foreground">{t("database.copy.skipHint")}</span>
+                    </label>
+                    {emptyOffered ? (
+                        <label className="flex flex-col gap-1 text-xs">
+                            <span className="font-medium">{t("database.copy.emptyTables")}</span>
+                            <Input
+                                value={emptyText}
+                                onChange={(event) => setEmptyText(event.target.value)}
+                                placeholder={t("database.copy.tablesPlaceholder")}
+                                autoComplete="off"
+                                spellCheck={false}
+                            />
+                            <span className="text-muted-foreground">
+                                {t("database.copy.emptyHint")}
+                            </span>
+                        </label>
+                    ) : null}
+                    {!tablesCheck.success ? (
+                        <p className="text-xs text-danger">
+                            {tablesCheck.error.issues[0]?.path.includes("structureOnly") &&
+                            tablesCheck.error.issues[0]?.message.includes("not both")
+                                ? t("database.copy.tablesTwice")
+                                : t("database.copy.tablesInvalid")}
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
             <div>
                 <Button
@@ -1229,7 +1283,13 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                                         : from === "saved"
                                           ? (connection?.name ?? t("database.copy.thatDatabase"))
                                           : t("database.copy.thatAddress")
-                            }),
+                            }) +
+                                (tablesChosen
+                                    ? ` ${t("database.copy.confirmTables", {
+                                          skipped: tables.skip.length,
+                                          emptied: tables.structureOnly.length
+                                      })}`
+                                    : ""),
                             label: t("database.copy.copy"),
                             danger: true,
                             run: () => actions.copyIntoDatabaseAction(request)

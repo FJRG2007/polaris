@@ -21,7 +21,7 @@ import { createWriteStream } from "node:fs";
 import { prisma, Prisma } from "@polaris/db";
 import { pipeline } from "node:stream/promises";
 import { getPorts } from "@/lib/deploy/runtime";
-import { SHARDED_DUMP_REFUSAL } from "@polaris/core";
+import { filteredDumpArgv, SHARDED_DUMP_REFUSAL, type CopyTables } from "@polaris/core";
 import { restoreDumpInto } from "@/lib/database-ops/restore";
 import { createZipStream, type ZipSource } from "@/lib/zip-stream";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
@@ -328,6 +328,9 @@ export interface DumpRequest {
     /** MongoDB only: a replica set of several members as a seed list, so the
      *  dump is read from a secondary. */
     readonly mongoSeeds?: string;
+    /** A copy's choice of tables to leave out or copy empty. A backup never
+     *  sets this: it takes everything. */
+    readonly tables?: CopyTables;
 }
 
 /** A replica set connection as the seed list the database tools' `--host` reads. */
@@ -349,6 +352,14 @@ export function isDumpableEngine(value: unknown): value is Engine {
  * file is removed whether the read succeeded or not - a failed backup that fills
  * the database's own disk is worse than no backup.
  */
+/** The shell line that writes a dump into `file`, with any table choices. */
+function filteredDumpShell(request: DumpRequest, argv: readonly string[], file: string): string {
+    if (request.engine === "redis") return `${argv.map(shellQuote).join(" ")} > ${file}`;
+    const { main, schemaPass } = filteredDumpArgv(request.engine, request.database, argv, request.tables);
+    const first = `${main.map(shellQuote).join(" ")} > ${file}`;
+    return schemaPass ? `${first} && ${schemaPass.map(shellQuote).join(" ")} >> ${file}` : first;
+}
+
 export async function dumpInContainer(request: DumpRequest): Promise<StagedArtifact> {
     const dumper = DUMPERS[request.engine];
     const at = new Date();
@@ -382,7 +393,7 @@ export async function dumpInContainer(request: DumpRequest): Promise<StagedArtif
         const command =
             request.engine === "redis"
                 ? ["sh", "-c", `[ "$(redis-cli --no-auth-warning SAVE)" = "OK" ] && cp /data/dump.rdb ${inContainer}`]
-                : ["sh", "-c", `${argv.map(shellQuote).join(" ")} > ${inContainer}`];
+                : ["sh", "-c", filteredDumpShell(request, argv, inContainer)];
         // Redis is started with `--requirepass`, so an unauthenticated SAVE was
         // refused and the copy that followed was whatever snapshot Redis had last
         // written on its own schedule - or nothing at all.
