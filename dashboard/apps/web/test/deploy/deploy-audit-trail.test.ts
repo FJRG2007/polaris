@@ -67,6 +67,7 @@ const { app, create, findFirstDeployment, findUniqueDeployment, recordDeployAudi
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: dataDir }) }));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        variableGroupLink: { findMany: vi.fn(async () => []) },
         application: { findFirst: vi.fn(async () => app), findUnique: vi.fn(async () => null) },
         envVar: { findMany: vi.fn(async () => []) },
         environment: { findUnique: vi.fn(async () => null) },

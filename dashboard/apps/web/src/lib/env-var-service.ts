@@ -20,7 +20,11 @@ export interface EnvVarView {
     value: string | null;
 }
 
-export type EnvScope = "application" | "environment";
+/** A service, an environment's shared variables, or a variable group
+ *  (lib/deploy/variable-groups) - which may span projects. */
+export type EnvScope = "application" | "environment" | "group";
+
+const SCOPES: readonly string[] = ["application", "environment", "group"] satisfies EnvScope[];
 
 /**
  * A variable as a listing that must never carry its value shows it: the name,
@@ -34,8 +38,16 @@ export interface EnvVarName {
     updatedAt: Date;
 }
 
-/** Confirm the signed-in owner owns the app or environment the scope points at. */
+/** Confirm the owner owns the app, environment or group the scope points at. */
 async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string): Promise<void> {
+    if (scope === "group") {
+        const group = await prisma.variableGroup.findFirst({
+            where: { id: scopeId, ownerId },
+            select: { id: true }
+        });
+        if (!group) throw new Error("Variable group not found");
+        return;
+    }
     if (scope === "environment") {
         const env = await prisma.environment.findFirst({
             where: { id: scopeId, project: { ownerId } },
@@ -67,7 +79,7 @@ export async function envVarScope(
         where: { id },
         select: { scopeId: true, scopeType: true, key: true }
     });
-    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
+    if (!row || !SCOPES.includes(row.scopeType)) return null;
     return { scope: row.scopeType as EnvScope, scopeId: row.scopeId, key: row.key };
 }
 
@@ -125,7 +137,7 @@ export async function envVarIdByKey(
  *  Used by the eye toggle so a secret is only sent to the client when asked for. */
 export async function revealEnvVar(id: string, ownerId: string): Promise<string | null> {
     const row = await prisma.envVar.findUnique({ where: { id } });
-    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
+    if (!row || !SCOPES.includes(row.scopeType)) return null;
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
     if (!row.isSecret) return row.value;
     if (!row.encryptedValue || !row.valueNonce || !row.valueKeyId) return null;
@@ -267,7 +279,7 @@ export async function setEnvVarSecrecy(
     isSecret: boolean
 ): Promise<void> {
     const row = await prisma.envVar.findUnique({ where: { id } });
-    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) {
+    if (!row || !SCOPES.includes(row.scopeType)) {
         throw new Error("That variable no longer exists");
     }
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
@@ -310,9 +322,12 @@ export async function deleteEnvVar(
         where: { id },
         select: { scopeId: true, scopeType: true }
     });
-    if (!row || (row.scopeType !== "application" && row.scopeType !== "environment")) return null;
+    if (!row || !SCOPES.includes(row.scopeType)) return null;
     await assertOwnsScope(row.scopeType as EnvScope, row.scopeId, ownerId);
-    await restorePoints.capture("env", restorePoints.restoreKeys.env(row.scopeType, row.scopeId));
+    await restorePoints.capture(
+        "env",
+        restorePoints.restoreKeys.env(row.scopeType as EnvScope, row.scopeId)
+    );
     await prisma.envVar.delete({ where: { id } });
     return { scope: row.scopeType as EnvScope, scopeId: row.scopeId };
 }

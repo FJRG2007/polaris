@@ -21,6 +21,7 @@ import { DeployCallouts } from "./deploy-callouts";
 import { LogViewer } from "@/components/log-viewer";
 import type { HttpLogEntry } from "@polaris/deploy";
 import { VariablesEditor } from "./variables-editor";
+import { LinkedGroupsPanel } from "./variable-groups";
 import { Discussion } from "@/components/discussion";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { RuntimeLogs } from "@/components/runtime-logs";
@@ -2094,6 +2095,9 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                 }
                 onConfigureShared={() => setScope("environment")}
             />
+            {scope === "application" && (
+                <LinkedGroupsPanel applicationId={app.id} canDeploy={can("deploy.run")} />
+            )}
         </div>
     );
 }

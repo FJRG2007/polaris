@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RecycleBinButton } from "./recycle-bin";
 import { ImportSiteButton } from "./import-site";
+import { VariableGroupsButton } from "./variable-groups";
 import { useShowManaged } from "./show-managed";
 import { createProjectAction, deleteProjectAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -37,6 +38,7 @@ import {
     Settings,
     KeyRound,
     SquareArrowOutUpRight,
+    Tag,
     Trash2
 } from "lucide-react";
 import {
@@ -52,6 +54,10 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     Input,
     Switch,
     cn
@@ -70,10 +76,27 @@ export interface ProjectCardData {
      *  a count that has not moved yet, and what keeps the page looking again. */
     deploying: number;
     total: number;
+    /** Normalized labels the list filters on. */
+    tags: string[];
+    /** Its services' labels, which find the project too. */
+    serviceTags: string[];
+}
+
+/** The projects carrying a tag, themselves or on a service, or all of them
+ *  when none is picked. */
+export function filterByTag<T extends { tags: string[]; serviceTags?: string[] }>(
+    items: readonly T[],
+    tag: string | null
+): T[] {
+    return tag === null
+        ? [...items]
+        : items.filter((item) => item.tags.includes(tag) || (item.serviceTags ?? []).includes(tag));
 }
 
 const PROJECT_FIELDS: readonly SearchField<ProjectCardData>[] = [
-    { text: (project) => project.name }
+    { text: (project) => project.name },
+    { text: (project) => project.tags.join(" ") },
+    { text: (project) => project.serviceTags.join(" ") }
 ];
 
 export function ProjectsGrid({
@@ -98,9 +121,11 @@ export function ProjectsGrid({
     const t = useTranslations("deploy");
     const tSafety = useTranslations("deploySafety");
     const tRegistries = useTranslations("deployRegistries");
+    const t2 = useTranslations("deployConfig");
     const [layout, setLayout] = useState<"grid" | "list">("grid");
     const [showManaged, setShowManaged] = useShowManaged(viewerId, !hideManagedByDefault);
     const [search, setSearch] = useState("");
+    const [tag, setTag] = useState<string | null>(null);
     // Projects whose delete is in flight. Deleting one now takes its services off
     // their servers as well as its rows out of the database, which is seconds of
     // work - the card goes when the reader asks for it to go, and comes back with
@@ -145,7 +170,19 @@ export function ProjectsGrid({
         () => (showManaged ? kept : kept.filter((project) => !project.managed)),
         [kept, showManaged]
     );
-    const filtered = useMemo(() => searchItems(visible, search, PROJECT_FIELDS), [visible, search]);
+    const allTags = useMemo(
+        () =>
+            [
+                ...new Set(kept.flatMap((project) => [...project.tags, ...project.serviceTags]))
+            ].sort(),
+        [kept]
+    );
+    // A tag that no project carries any more stops filtering instead of emptying the list.
+    const activeTag = tag !== null && allTags.includes(tag) ? tag : null;
+    const filtered = useMemo(
+        () => searchItems(filterByTag(visible, activeTag), search, PROJECT_FIELDS),
+        [visible, search, activeTag]
+    );
     const count = visible.length;
 
     return (
@@ -168,6 +205,7 @@ export function ProjectsGrid({
                             {tRegistries("open")}
                         </Link>
                     </Button>
+                    <VariableGroupsButton />
                     {canManage && (
                         <>
                             <ImportSiteButton allowed={canCreateHere} />
@@ -215,6 +253,33 @@ export function ProjectsGrid({
                     />
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
+                    {allTags.length > 0 && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" aria-label={t2("tags.filter")}>
+                                    <Tag className="size-4" />
+                                    <span className="max-w-[8rem] truncate">
+                                        {activeTag ?? t2("tags.all")}
+                                    </span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                                align="end"
+                                className="max-h-72 overflow-y-auto overscroll-contain"
+                            >
+                                <DropdownMenuItem onSelect={() => setTag(null)}>
+                                    {t2("tags.all")}
+                                </DropdownMenuItem>
+                                {allTags.map((one) => (
+                                    <DropdownMenuItem key={one} onSelect={() => setTag(one)}>
+                                        <span className="truncate" title={one}>
+                                            {one}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                     {/* Only when there is something it would hide. */}
                     {managedCount > 0 && (
                         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
@@ -516,6 +581,19 @@ const ProjectCard = forwardRef<
                     <ServiceTiles services={project.services} />
                 )}
             </div>
+            {project.tags.length > 0 && (
+                <div className="flex min-w-0 flex-wrap gap-1 px-4 pt-3">
+                    {project.tags.map((tag) => (
+                        <span
+                            key={tag}
+                            className="max-w-[8rem] truncate rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
+                            title={tag}
+                        >
+                            {tag}
+                        </span>
+                    ))}
+                </div>
+            )}
             <div className="flex items-center justify-between gap-2 px-4 py-3">
                 <span
                     className="truncate text-xs text-muted-foreground"

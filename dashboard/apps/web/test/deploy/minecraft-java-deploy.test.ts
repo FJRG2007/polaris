@@ -61,6 +61,7 @@ const { app, refs, updateApp, findUniqueDeployment, deployed } = vi.hoisted(() =
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: dataDir }) }));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        variableGroupLink: { findMany: vi.fn(async () => []) },
         application: {
             findFirst: vi.fn(async () => app),
             findUnique: vi.fn(async ({ select }: { select?: Record<string, boolean> }) =>

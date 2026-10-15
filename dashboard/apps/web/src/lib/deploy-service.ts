@@ -14,6 +14,7 @@ import {
 } from "@/lib/deploy/private-domain";
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
+import { copyGroupLinks, groupLayers } from "@/lib/deploy/variable-groups";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
 import { localDialHost } from "./deploy/dial";
@@ -2742,6 +2743,7 @@ export async function duplicateApplication(
         { scopeType: "application", scopeId: app.id },
         { scopeType: "application", scopeId: created.id }
     );
+    await copyGroupLinks(app.id, created.id);
     return created.id;
 }
 
@@ -3473,6 +3475,9 @@ async function mergedEnv(
         ...(await systemEnv(environmentId, applicationId)),
         ...(await telemetryEnv(environmentId))
     };
+    // Linked variable groups sit under the environment's shared variables and
+    // the service's own, so either of those wins a key a group also sets.
+    for (const layer of await groupLayers(applicationId)) Object.assign(env, layer.values);
     for (const row of rows) {
         const value = decryptedValue(row);
         if (value !== null) env[row.key] = value;

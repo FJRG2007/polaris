@@ -11,6 +11,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { getWafRule } from "@/lib/waf-service";
 import { requirePermission } from "@/lib/session";
+import { requireVariableScopeAccess } from "@/lib/deploy/variable-groups";
 import { recordAudit } from "@/lib/audit-service";
 import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { openShelfBinPolicy } from "@/lib/deploy/recycle-bin-access";
@@ -20,7 +21,7 @@ import { requireApplicationAccess, requireEnvironmentAccess } from "@/lib/deploy
 const targetSchema = z.discriminatedUnion("kind", [
     z.object({
         kind: z.literal("env"),
-        scope: z.enum(["application", "environment"]),
+        scope: z.enum(["application", "environment", "group"]),
         scopeId: z.string().uuid()
     }),
     z.object({ kind: z.literal("cron"), applicationId: z.string().uuid() }),
@@ -47,6 +48,17 @@ async function resolve(raw: unknown, write: boolean): Promise<Resolved> {
     const user = await requirePermission(write ? "deploy.manage" : "deploy.read");
     switch (target.kind) {
         case "env": {
+            if (target.scope === "group") {
+                const group = await requireVariableScopeAccess(
+                    "group",
+                    target.scopeId,
+                    user,
+                    write ? "variables.write" : "variables.read",
+                    { reveal: true }
+                );
+                const objectKey = restorePoints.restoreKeys.env("group", target.scopeId);
+                return { kind: "env", objectKey, ownerId: group.ownerId, orgId: group.orgId };
+            }
             const access =
                 target.scope === "application"
                     ? await requireApplicationAccess(

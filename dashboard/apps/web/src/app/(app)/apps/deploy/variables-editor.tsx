@@ -77,7 +77,7 @@ import {
     type VariableDraft
 } from "@/lib/deploy/variable-changes";
 
-type Scope = "application" | "environment";
+type Scope = "application" | "environment" | "group";
 
 const NO_ROWS: EnvVarView[] = [];
 
@@ -160,6 +160,7 @@ export function VariablesEditor({
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<"pending" | "redeploying" | null>(null);
+    const [skipped, setSkipped] = useState(0);
     const [pending, startTransition] = useTransition();
     const counter = useRef(0);
     // The row the pointer is over, for F2: an editor's rename key works on what
@@ -395,7 +396,8 @@ export function VariablesEditor({
                 redeploy
             }).catch(() => ({
                 error: t("variables.saveFailed"),
-                redeployed: false
+                redeployed: false,
+                skipped: 0
             }));
             if (result.error) {
                 setError(result.error);
@@ -406,6 +408,7 @@ export function VariablesEditor({
             setKnown({});
             setEditing(new Set());
             setNotice(result.redeployed ? "redeploying" : "pending");
+            setSkipped(result.skipped ?? 0);
             load();
         });
     }
@@ -414,10 +417,14 @@ export function VariablesEditor({
         setError(null);
         startTransition(async () => {
             const result = await redeployEnvScopeAction({ scope, scopeId }).catch(() => ({
-                error: t("variables.redeployFailed")
+                error: t("variables.redeployFailed"),
+                skipped: 0
             }));
             if (result.error) setError(result.error);
-            else setNotice("redeploying");
+            else {
+                setNotice("redeploying");
+                setSkipped(result.skipped ?? 0);
+            }
         });
     }
 
@@ -496,6 +503,11 @@ export function VariablesEditor({
             {notice === "redeploying" && (
                 <p role="status" className="text-xs text-success-ink">
                     {t("variables.savedRedeploying", { target: redeployTarget })}
+                    {skipped > 0 && (
+                        <span className="block text-muted-foreground">
+                            {t("variables.redeploySkipped", { count: skipped })}
+                        </span>
+                    )}
                 </p>
             )}
 

@@ -26,6 +26,7 @@ import { BuildMachineSection } from "./build-machine-section";
 import { RegistryPickCard } from "./registries/registry-pick-card";
 import { DeployBehaviourSection } from "./deploy-behaviour-section";
 import { isTunnelHostname, runtimeVersionSchema } from "@polaris/core";
+import { ServiceTags } from "./variable-groups";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MoveOutDialog } from "@/app/(app)/apps/deploy/move-dialogs";
 import { CloudflareMark, NgrokMark } from "@/components/brand-icons";
@@ -682,6 +683,7 @@ export function SettingsTab({
     onChanged: () => void;
 }) {
     const t = useTranslations("deployService");
+    const tc = useTranslations("deployConfig");
     const can = useProjectCan();
     const configure = can("service.configure");
     const domains = can("domains.manage");
@@ -760,6 +762,9 @@ export function SettingsTab({
                 {app.sourceType === "image" && (
                     <RegistryPickCard applicationId={app.id} canConfigure={configure} />
                 )}
+                <SettingsCard title={tc("tags.title")}>
+                    <ServiceTags applicationId={app.id} />
+                </SettingsCard>
             </SettingsSection>
 
             {section(2).shown && (

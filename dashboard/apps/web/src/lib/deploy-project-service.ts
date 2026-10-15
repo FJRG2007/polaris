@@ -28,6 +28,7 @@ import {
     type EnvironmentStage,
     projectRoleFor,
     parseEnvironmentScope,
+    parseTags,
     parseProjectCapabilities,
     resolveProjectCapabilities,
     ALL_PROJECT_CAPABILITIES,
@@ -83,6 +84,8 @@ export interface ProjectSettingsView {
     createdAt: string;
     environments: ProjectEnvironmentView[];
     serviceCount: number;
+    /** Normalized labels; the projects list filters on them. */
+    tags: string[];
     /** Whether this machine's daemon makes private networks. An older one keeps
      *  every service here on the shared network until Polaris is updated. */
     privateNetworksHere: boolean;
@@ -137,6 +140,7 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
         name: project.name,
         slug: project.slug,
         description: project.description ?? "",
+        tags: parseTags(project.tags),
         visibility: project.visibility as ProjectVisibility,
         flags: parseProjectFlags(project.flags),
         ownerId: project.ownerId,

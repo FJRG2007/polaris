@@ -30,8 +30,12 @@ export async function deployTargetOrgId(
     switch (targetType) {
         case "project":
             return (
-                (await prisma.project.findUnique({ where: { id: targetId }, select: { orgId: true } }))
-                    ?.orgId ?? null
+                (
+                    await prisma.project.findUnique({
+                        where: { id: targetId },
+                        select: { orgId: true }
+                    })
+                )?.orgId ?? null
             );
         case "environment":
             return (
@@ -44,12 +48,23 @@ export async function deployTargetOrgId(
             );
         case "application":
             return applicationOrgId(targetId);
+        case "variable-group":
+            return (
+                (
+                    await prisma.variableGroup.findUnique({
+                        where: { id: targetId },
+                        select: { orgId: true }
+                    })
+                )?.orgId ?? null
+            );
         case "database":
             return (
                 (
                     await prisma.managedDatabase.findUnique({
                         where: { id: targetId },
-                        select: { environment: { select: { project: { select: { orgId: true } } } } }
+                        select: {
+                            environment: { select: { project: { select: { orgId: true } } } }
+                        }
                     })
                 )?.environment.project.orgId ?? null
             );

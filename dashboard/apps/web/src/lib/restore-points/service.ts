@@ -414,7 +414,7 @@ export async function restorePoint(
 
 /** Keys used by the code that captures, so every caller writes the same one. */
 export const restoreKeys = {
-    env: (scope: "application" | "environment", scopeId: string) => `${scope}:${scopeId}`,
+    env: (scope: "application" | "environment" | "group", scopeId: string) => `${scope}:${scopeId}`,
     firewall: (scopeType: string, scopeId: string) => `${scopeType}:${scopeId}`,
     cron: (applicationId: string) => applicationId,
     routes: (applicationId: string) => applicationId,

@@ -32,6 +32,7 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { decryptSecret } from "@polaris/storage";
 import { setEnvVars } from "@/lib/env-var-service";
+import { groupLayers } from "@/lib/deploy/variable-groups";
 import { readCredential } from "@/lib/connections/store";
 import { carriable, isPublicKey, repoFromSourceConfig } from "@/lib/deploy/migrate-rules";
 import {
@@ -129,6 +130,8 @@ async function localVariables(
 
     const masterKey = loadEnv().POLARIS_MASTER_KEY;
     const values: Record<string, string> = {};
+    // Linked variable groups underneath, as the pipeline layers them.
+    for (const layer of await groupLayers(applicationId)) Object.assign(values, layer.values);
     for (const row of rows) {
         if (row.isSecret && row.encryptedValue && row.valueNonce) {
             values[row.key] = decryptSecret(

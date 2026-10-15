@@ -306,5 +306,17 @@
         "nameTaken": "Este servicio ya tiene una cuenta con ese nombre.",
         "breached": "Esa contraseña aparece en filtraciones de datos conocidas. Elige otra.",
         "accountGone": "Esa cuenta ya no existe."
+    },
+    "variableGroups": {
+        "notFound": "Ese grupo de variables ya no existe.",
+        "readOnly": "Puedes usar este grupo, pero no cambiarlo.",
+        "secretLink": "Este grupo guarda secretos: solo lo enlaza quien puede cambiarlo.",
+        "otherShelf": "Solo se enlazan grupos del espacio del proyecto.",
+        "tooMany": "Un servicio enlaza como mucho 10 grupos.",
+        "taken": "Ya hay un grupo con ese nombre aquí.",
+        "failed": "No ha funcionado. Inténtalo otra vez.",
+        "nameRequired": "Pon al grupo un nombre de hasta 60 caracteres.",
+        "tagsInvalid": "Usa hasta 12 etiquetas de hasta 32 caracteres.",
+        "tagsFailed": "No se guardaron las etiquetas. Reinténtalo."
     }
 }

@@ -795,7 +795,7 @@ async function variableScopeAccess(
     caller: DeployCaller,
     scope: VariableScope,
     capability: ProjectCapability
-): Promise<{ access: ProjectAccess; envScope: EnvScope; scopeId: string }> {
+): Promise<{ access: ProjectAccess; envScope: Exclude<EnvScope, "group">; scopeId: string }> {
     if (scope.kind === "service") {
         const { access, applicationId } = await resolveService(caller, scope.ref, capability);
         return { access, envScope: "application", scopeId: applicationId };
@@ -910,7 +910,7 @@ function requireRedeploy(access: ProjectAccess, redeploy: boolean): void {
  *  the dashboard: those already deployed redeploy in the background. */
 function applyVariables(
     caller: DeployCaller,
-    envScope: EnvScope,
+    envScope: Exclude<EnvScope, "group">,
     scopeId: string,
     ownerId: string,
     redeploy: boolean
@@ -998,9 +998,10 @@ async function variableAccess(
     caller: DeployCaller,
     variableId: string,
     capability: ProjectCapability
-): Promise<{ access: ProjectAccess; envScope: EnvScope; scopeId: string }> {
+): Promise<{ access: ProjectAccess; envScope: Exclude<EnvScope, "group">; scopeId: string }> {
     const located = await envVarScope(variableId);
-    if (!located) throw new DeployApiRefusal(404, "Not found");
+    // A variable group is not reachable through this surface.
+    if (!located || located.scope === "group") throw new DeployApiRefusal(404, "Not found");
     return variableScopeAccess(
         caller,
         located.scope === "application"
@@ -1058,7 +1059,8 @@ async function removeVariable(
             ? { activity: { applicationId: removed.scopeId, action: "variable-removed" } }
             : {})
     });
-    applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, redeploy);
+    if (removed.scope !== "group")
+        applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, redeploy);
     return { redeployed: redeploy };
 }
 
