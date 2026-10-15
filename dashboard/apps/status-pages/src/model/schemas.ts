@@ -64,7 +64,11 @@ const httpUrl = z
     .url()
     .refine((value) => {
         const url = new URL(value);
-        return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+        return (
+            (url.protocol === "http:" || url.protocol === "https:") &&
+            !url.username &&
+            !url.password
+        );
     });
 
 const checkBase = {
@@ -147,7 +151,9 @@ export function normalizeHostname(value: string): string {
  *  wildcard, no IP, no private suffix. */
 export function isCustomHostname(value: string): boolean {
     if (value.length > 253) return false;
-    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(value)) {
+    if (
+        !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(value)
+    ) {
         return false;
     }
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value)) return false;

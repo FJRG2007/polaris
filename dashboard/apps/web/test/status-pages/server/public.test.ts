@@ -39,7 +39,13 @@ const row = {
             componentIds: ["c1", "gone"],
             startedAt: new Date("2026-03-10T10:00:00Z"),
             resolvedAt: null,
-            updates: [{ state: "identified", body: "Cache node failed", createdAt: new Date("2026-03-10T10:05:00Z") }]
+            updates: [
+                {
+                    state: "identified",
+                    body: "Cache node failed",
+                    createdAt: new Date("2026-03-10T10:05:00Z")
+                }
+            ]
         }
     ],
     maintenance: [
@@ -76,10 +82,20 @@ describe("publicStatusPage", () => {
         prisma.statusPage.findFirst.mockResolvedValue(null);
         await publicStatusPage("acme", now);
         const select = prisma.statusPage.findFirst.mock.calls[0]![0].select;
-        expect(Object.keys(select.components.select.checks.select).sort()).toEqual(["days", "lastStatus"]);
+        expect(Object.keys(select.components.select.checks.select).sort()).toEqual([
+            "days",
+            "lastStatus"
+        ]);
         expect(select.createdById).toBeUndefined();
         const serialized = JSON.stringify(select);
-        for (const field of ["target", "port", "lastError", "keyword", "dnsExpect", "createdById"]) {
+        for (const field of [
+            "target",
+            "port",
+            "lastError",
+            "keyword",
+            "dnsExpect",
+            "createdById"
+        ]) {
             expect(serialized).not.toContain(`"${field}"`);
         }
     });

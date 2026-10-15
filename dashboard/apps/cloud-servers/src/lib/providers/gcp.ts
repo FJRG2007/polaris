@@ -47,7 +47,11 @@ const instanceSchema = z.object({
     zone: z.string(),
     machineType: z.string(),
     networkInterfaces: z
-        .array(z.object({ accessConfigs: z.array(z.object({ natIP: z.string().optional() })).optional() }))
+        .array(
+            z.object({
+                accessConfigs: z.array(z.object({ natIP: z.string().optional() })).optional()
+            })
+        )
         .default([])
 });
 
@@ -83,12 +87,14 @@ export function createAdapter(credentials: Credentials<"gcp">): ProviderAdapter 
     let token: { token: string; expiresAt: number } | null = null;
 
     async function headers(): Promise<Record<string, string>> {
-        if (!token || token.expiresAt < Date.now() + 60_000) token = await googleAccessToken(account);
+        if (!token || token.expiresAt < Date.now() + 60_000)
+            token = await googleAccessToken(account);
         return { authorization: `Bearer ${token.token}`, "content-type": "application/json" };
     }
 
     const zone = (z: string) => {
-        if (!/^[a-z]+-[a-z]+\d+-[a-z]$/.test(z)) throw new ProviderError("Unknown Compute Engine zone.", null);
+        if (!/^[a-z]+-[a-z]+\d+-[a-z]$/.test(z))
+            throw new ProviderError("Unknown Compute Engine zone.", null);
         return `${project}/zones/${z}`;
     };
     const instance = (ref: { providerId: string; region: string }) =>
@@ -99,17 +105,28 @@ export function createAdapter(credentials: Credentials<"gcp">): ProviderAdapter 
     return {
         async listRegions() {
             const answer = await callJson(
-                z.object({ items: z.array(z.object({ name: z.string(), status: z.string() })).max(500) }),
+                z.object({
+                    items: z.array(z.object({ name: z.string(), status: z.string() })).max(500)
+                }),
                 `${project}/zones?maxResults=500`,
                 { headers: await headers() }
             );
-            return answer.items.filter((z) => z.status === "UP").map((z) => ({ id: z.name, label: z.name }));
+            return answer.items
+                .filter((z) => z.status === "UP")
+                .map((z) => ({ id: z.name, label: z.name }));
         },
         async listSizes(region) {
             const answer = await callJson(
                 z.object({
                     items: z
-                        .array(z.object({ name: z.string(), guestCpus: z.number(), memoryMb: z.number(), description: z.string() }))
+                        .array(
+                            z.object({
+                                name: z.string(),
+                                guestCpus: z.number(),
+                                memoryMb: z.number(),
+                                description: z.string()
+                            })
+                        )
                         .max(2000)
                         .default([])
                 }),
@@ -118,7 +135,13 @@ export function createAdapter(credentials: Credentials<"gcp">): ProviderAdapter 
             );
             return answer.items
                 .sort((a, b) => a.memoryMb - b.memoryMb)
-                .map((m) => ({ id: m.name, label: `${m.name} (${m.description})`, priceHourly: null, priceMonthly: null, currency: null }));
+                .map((m) => ({
+                    id: m.name,
+                    label: `${m.name} (${m.description})`,
+                    priceHourly: null,
+                    priceMonthly: null,
+                    currency: null
+                }));
         },
         async listImages() {
             const found = await Promise.all(
@@ -128,47 +151,78 @@ export function createAdapter(credentials: Credentials<"gcp">): ProviderAdapter 
                         `${API}/projects/${f.project}/global/images/family/${f.family}`,
                         { headers: await headers() }
                     ).catch(() => null);
-                    return image ? { id: `projects/${f.project}/global/images/family/${f.family}`, label: f.label } : null;
+                    return image
+                        ? {
+                              id: `projects/${f.project}/global/images/family/${f.family}`,
+                              label: f.label
+                          }
+                        : null;
                 })
             );
             return found.filter((i): i is { id: string; label: string } => i !== null);
         },
         async create(spec) {
-            if (!/^projects\/(ubuntu-os-cloud|debian-cloud)\/global\/images\/family\/[a-z0-9-]+$/.test(spec.image)) {
+            if (
+                !/^projects\/(ubuntu-os-cloud|debian-cloud)\/global\/images\/family\/[a-z0-9-]+$/.test(
+                    spec.image
+                )
+            ) {
                 throw new ProviderError("Unknown Compute Engine image.", null);
             }
             await post(`${zone(spec.region)}/instances`, {
                 name: spec.name,
                 machineType: `zones/${spec.region}/machineTypes/${spec.size}`,
                 labels: { polaris: "cloud-servers" },
-                disks: [{ boot: true, autoDelete: true, initializeParams: { sourceImage: spec.image } }],
+                disks: [
+                    { boot: true, autoDelete: true, initializeParams: { sourceImage: spec.image } }
+                ],
                 networkInterfaces: [
-                    { network: "global/networks/default", accessConfigs: [{ type: "ONE_TO_ONE_NAT", name: "External NAT" }] }
+                    {
+                        network: "global/networks/default",
+                        accessConfigs: [{ type: "ONE_TO_ONE_NAT", name: "External NAT" }]
+                    }
                 ],
                 metadata: { items: [{ key: "startup-script", value: spec.userData }] }
             });
-            return { providerId: spec.name, name: spec.name, region: spec.region, size: spec.size, status: "creating", ipv4: null };
+            return {
+                providerId: spec.name,
+                name: spec.name,
+                region: spec.region,
+                size: spec.size,
+                status: "creating",
+                ipv4: null
+            };
         },
         async get(ref) {
             try {
-                return machineOf(await callJson(instanceSchema, instance(ref), { headers: await headers() }));
+                return machineOf(
+                    await callJson(instanceSchema, instance(ref), { headers: await headers() })
+                );
             } catch (caught) {
                 if (caught instanceof ProviderError && caught.status === 404) return null;
                 throw caught;
             }
         },
         async action(ref, action) {
-            await post(`${instance(ref)}/${action === "power_on" ? "start" : action === "power_off" ? "stop" : "reset"}`);
+            await post(
+                `${instance(ref)}/${action === "power_on" ? "start" : action === "power_off" ? "stop" : "reset"}`
+            );
         },
         async resize(ref, size) {
-            await post(`${instance(ref)}/setMachineType`, { machineType: `zones/${ref.region}/machineTypes/${size}` });
+            await post(`${instance(ref)}/setMachineType`, {
+                machineType: `zones/${ref.region}/machineTypes/${size}`
+            });
         },
         async destroy(ref) {
             await callVoid(instance(ref), { method: "DELETE", headers: await headers() });
         },
         async monthlyCost(region, size) {
             const type = await callJson(
-                z.object({ guestCpus: z.number(), memoryMb: z.number(), isSharedCpu: z.boolean().optional() }),
+                z.object({
+                    guestCpus: z.number(),
+                    memoryMb: z.number(),
+                    isSharedCpu: z.boolean().optional()
+                }),
                 `${zone(region)}/machineTypes/${encodeURIComponent(size)}`,
                 { headers: await headers() }
             );

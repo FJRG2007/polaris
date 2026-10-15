@@ -48,13 +48,19 @@ describe("evaluate", () => {
     });
 
     it("is down on an unexpected status", () => {
-        expect(evaluate(spec(), { kind: "http", status: 500, body: "", latencyMs: 40 }).error).toBe("status");
+        expect(evaluate(spec(), { kind: "http", status: 500, body: "", latencyMs: 40 }).error).toBe(
+            "status"
+        );
     });
 
     it("checks the keyword after the status", () => {
         const keyword = spec({ keyword: "healthy" });
-        expect(evaluate(keyword, { kind: "http", status: 200, body: "all healthy", latencyMs: 1 }).ok).toBe(true);
-        expect(evaluate(keyword, { kind: "http", status: 200, body: "degraded", latencyMs: 1 }).error).toBe("keyword");
+        expect(
+            evaluate(keyword, { kind: "http", status: 200, body: "all healthy", latencyMs: 1 }).ok
+        ).toBe(true);
+        expect(
+            evaluate(keyword, { kind: "http", status: 200, body: "degraded", latencyMs: 1 }).error
+        ).toBe("keyword");
     });
 
     it("passes a network failure through as down", () => {
@@ -66,13 +72,19 @@ describe("evaluate", () => {
     });
 
     it("is up when a TCP connection opens", () => {
-        expect(evaluate(spec({ kind: "tcp", port: 22 }), { kind: "tcp", latencyMs: 3 }).ok).toBe(true);
+        expect(evaluate(spec({ kind: "tcp", port: 22 }), { kind: "tcp", latencyMs: 3 }).ok).toBe(
+            true
+        );
     });
 
     it("compares DNS answers without case or a trailing dot", () => {
         const dns = spec({ kind: "dns", dnsType: "CNAME", dnsExpect: "Edge.Example.com." });
-        expect(evaluate(dns, { kind: "dns", answers: ["edge.example.com"], latencyMs: 2 }).ok).toBe(true);
-        expect(evaluate(dns, { kind: "dns", answers: ["other.example.com"], latencyMs: 2 }).error).toBe("dnsMismatch");
+        expect(evaluate(dns, { kind: "dns", answers: ["edge.example.com"], latencyMs: 2 }).ok).toBe(
+            true
+        );
+        expect(
+            evaluate(dns, { kind: "dns", answers: ["other.example.com"], latencyMs: 2 }).error
+        ).toBe("dnsMismatch");
         expect(evaluate(dns, { kind: "dns", answers: [], latencyMs: 2 }).error).toBe("dnsEmpty");
     });
 
@@ -84,7 +96,13 @@ describe("evaluate", () => {
 
 describe("addressAllowed", () => {
     it("allows public and private network addresses", () => {
-        for (const address of ["93.184.216.34", "192.168.1.10", "10.0.0.5", "172.16.3.4", "2001:db8::1"]) {
+        for (const address of [
+            "93.184.216.34",
+            "192.168.1.10",
+            "10.0.0.5",
+            "172.16.3.4",
+            "2001:db8::1"
+        ]) {
             expect(addressAllowed(address)).toBe(true);
         }
     });

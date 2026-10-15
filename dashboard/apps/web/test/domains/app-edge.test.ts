@@ -13,7 +13,13 @@ vi.mock("@/lib/traefik-dynamic", () => ({ writeDynamicFile }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts, dashboardOrigin: () => "http://web:3000" }));
 vi.mock("@polaris/db", () => ({ prisma: { domain: { findUnique } } }));
 
-import { appEdgeFile, clearAppEdge, edgeHostnameTaken, writeAppEdge, EMPTY_EDGE } from "@/lib/app-edge";
+import {
+    appEdgeFile,
+    clearAppEdge,
+    edgeHostnameTaken,
+    writeAppEdge,
+    EMPTY_EDGE
+} from "@/lib/app-edge";
 
 beforeEach(() => {
     vi.clearAllMocks();

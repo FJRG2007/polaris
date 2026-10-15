@@ -27,8 +27,16 @@ const DEFAULT_REGION = "us-east-1";
 const SECURITY_GROUP = "polaris-cloud-servers";
 
 const IMAGES: readonly { owner: string; pattern: string; label: string }[] = [
-    { owner: "099720109477", pattern: "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*", label: "Ubuntu 24.04 LTS" },
-    { owner: "099720109477", pattern: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*", label: "Ubuntu 22.04 LTS" },
+    {
+        owner: "099720109477",
+        pattern: "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*",
+        label: "Ubuntu 24.04 LTS"
+    },
+    {
+        owner: "099720109477",
+        pattern: "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*",
+        label: "Ubuntu 22.04 LTS"
+    },
     { owner: "136693071363", pattern: "debian-12-amd64-*", label: "Debian 12" }
 ];
 
@@ -59,7 +67,11 @@ export function readInstance(node: XmlNode): z.infer<typeof instanceSchema> {
         instanceType: textOf(node, "instanceType"),
         ipAddress: textOf(node, "ipAddress"),
         availabilityZone: textOf(child(node, "placement"), "availabilityZone"),
-        name: textOf(tags.find((t) => textOf(t, "key") === "Name"), "value") ?? ""
+        name:
+            textOf(
+                tags.find((t) => textOf(t, "key") === "Name"),
+                "value"
+            ) ?? ""
     });
 }
 
@@ -80,8 +92,13 @@ export function queryBody(action: string, params: Readonly<Record<string, string
 }
 
 export function createAdapter(credentials: Credentials<"aws">): ProviderAdapter {
-    async function call(region: string, action: string, params: Record<string, string> = {}): Promise<XmlNode> {
-        if (!/^[a-z]{2}(-[a-z]+)+-\d$/.test(region)) throw new ProviderError("Unknown AWS region.", null);
+    async function call(
+        region: string,
+        action: string,
+        params: Record<string, string> = {}
+    ): Promise<XmlNode> {
+        if (!/^[a-z]{2}(-[a-z]+)+-\d$/.test(region))
+            throw new ProviderError("Unknown AWS region.", null);
         const url = `https://ec2.${region}.amazonaws.com/`;
         const body = queryBody(action, params);
         const headers = signV4({
@@ -115,7 +132,8 @@ export function createAdapter(credentials: Credentials<"aws">): ProviderAdapter 
             GroupDescription: "SSH for servers Polaris created and enrolled"
         });
         const groupId = textOf(created, "groupId");
-        if (!groupId) throw new ProviderError("AWS did not return the security group it created.", null);
+        if (!groupId)
+            throw new ProviderError("AWS did not return the security group it created.", null);
         // Polaris connects over SSH with a key only; password logins are off on
         // these images.
         await call(region, "AuthorizeSecurityGroupIngress", {
@@ -174,7 +192,10 @@ export function createAdapter(credentials: Credentials<"aws">): ProviderAdapter 
                         "Filter.2.Value.1": "available"
                     });
                     const newest = items(root, "imagesSet")
-                        .map((i) => ({ id: textOf(i, "imageId"), created: textOf(i, "creationDate") ?? "" }))
+                        .map((i) => ({
+                            id: textOf(i, "imageId"),
+                            created: textOf(i, "creationDate") ?? ""
+                        }))
                         .filter((i): i is { id: string; created: string } => !!i.id)
                         .sort((a, b) => b.created.localeCompare(a.created))[0];
                     return newest ? { id: newest.id, label: image.label } : null;
@@ -207,23 +228,40 @@ export function createAdapter(credentials: Credentials<"aws">): ProviderAdapter 
                 const node = items(items(root, "reservationSet")[0], "instancesSet")[0];
                 return node ? machine(readInstance(node)) : null;
             } catch (caught) {
-                if (caught instanceof ProviderError && /InvalidInstanceID/.test(caught.message)) return null;
+                if (caught instanceof ProviderError && /InvalidInstanceID/.test(caught.message))
+                    return null;
                 throw caught;
             }
         },
         async action(ref, action) {
-            const verb = action === "power_on" ? "StartInstances" : action === "power_off" ? "StopInstances" : "RebootInstances";
+            const verb =
+                action === "power_on"
+                    ? "StartInstances"
+                    : action === "power_off"
+                      ? "StopInstances"
+                      : "RebootInstances";
             await call(ref.region, verb, ids(ref));
         },
         async resize(ref, size) {
-            await call(ref.region, "ModifyInstanceAttribute", { InstanceId: ref.providerId, "InstanceType.Value": size });
+            await call(ref.region, "ModifyInstanceAttribute", {
+                InstanceId: ref.providerId,
+                "InstanceType.Value": size
+            });
         },
         async destroy(ref) {
             await call(ref.region, "TerminateInstances", ids(ref));
         },
         async monthlyCost(region, size) {
             const hourly = await awsHourlyPrice(credentials, size, region);
-            return hourly === null ? null : { id: size, label: size, priceHourly: hourly, priceMonthly: null, currency: "USD" };
+            return hourly === null
+                ? null
+                : {
+                      id: size,
+                      label: size,
+                      priceHourly: hourly,
+                      priceMonthly: null,
+                      currency: "USD"
+                  };
         }
     };
 }

@@ -60,18 +60,29 @@ export function priceFresh(fetchedAt: Date, now: Date): boolean {
     return now.getTime() - fetchedAt.getTime() < PRICE_TTL_MS;
 }
 
-type PriceFigures = { priceHourly: number | null; priceMonthly: number | null; currency: string | null };
+type PriceFigures = {
+    priceHourly: number | null;
+    priceMonthly: number | null;
+    currency: string | null;
+};
 
 /**
  * A size's price, from the day-old cache or the provider. A failed read keeps
  * the last known figure and is not cached, so it is tried again next time; a
  * provider that publishes no price is cached as that, so it is not asked hourly.
  */
-async function cachedPrice(provider: string, adapter: ProviderAdapter, region: string, size: string): Promise<PriceFigures | null> {
+async function cachedPrice(
+    provider: string,
+    adapter: ProviderAdapter,
+    region: string,
+    size: string
+): Promise<PriceFigures | null> {
     const where = { provider_region_size: { provider, region, size } };
     const row = await prisma.cloudPrice.findUnique({ where });
     const fromRow = (r: PriceFigures) =>
-        r.priceHourly === null && r.priceMonthly === null ? null : { priceHourly: r.priceHourly, priceMonthly: r.priceMonthly, currency: r.currency };
+        r.priceHourly === null && r.priceMonthly === null
+            ? null
+            : { priceHourly: r.priceHourly, priceMonthly: r.priceMonthly, currency: r.currency };
     if (row && priceFresh(row.fetchedAt, new Date())) return fromRow(row);
     let read: Awaited<ReturnType<ProviderAdapter["monthlyCost"]>>;
     try {
@@ -103,7 +114,12 @@ const accountSelect = {
     secretKeyId: true
 } as const;
 
-type AccountRow = { provider: string; encryptedSecret: Uint8Array; secretNonce: Uint8Array; secretKeyId: string };
+type AccountRow = {
+    provider: string;
+    encryptedSecret: Uint8Array;
+    secretNonce: Uint8Array;
+    secretKeyId: string;
+};
 
 async function adapterOf(account: AccountRow): Promise<ProviderAdapter> {
     const secret = await host.cloudServersHost.openCloudSecret(account);
@@ -112,7 +128,10 @@ async function adapterOf(account: AccountRow): Promise<ProviderAdapter> {
 }
 
 async function ownAccount(userId: string, accountId: string) {
-    const account = await prisma.cloudAccount.findFirst({ where: { id: accountId, ownerId: userId }, select: accountSelect });
+    const account = await prisma.cloudAccount.findFirst({
+        where: { id: accountId, ownerId: userId },
+        select: accountSelect
+    });
     return account ?? refuse("errors.accountNotFound");
 }
 
@@ -186,7 +205,12 @@ export async function removeAccount(userId: string, accountId: string): Promise<
 /** Regions, or a region's sizes and images. */
 export async function accountOptions(userId: string, accountId: string, region: string | null) {
     const adapter = await adapterOf(await ownAccount(userId, accountId));
-    if (!region) return { regions: await adapter.listRegions().catch(providerRefusal), sizes: [], images: [] };
+    if (!region)
+        return {
+            regions: await adapter.listRegions().catch(providerRefusal),
+            sizes: [],
+            images: []
+        };
     const [sizes, images] = await Promise.all([
         adapter.listSizes(region).catch(providerRefusal),
         adapter.listImages(region).catch(providerRefusal)
@@ -257,7 +281,10 @@ function monthStart(now: Date): Date {
 export async function listServers(userId: string) {
     const now = new Date();
     const rows = await prisma.cloudServer.findMany({
-        where: { ownerId: userId, OR: [{ destroyedAt: null }, { destroyedAt: { gte: monthStart(now) } }] },
+        where: {
+            ownerId: userId,
+            OR: [{ destroyedAt: null }, { destroyedAt: { gte: monthStart(now) } }]
+        },
         include: { account: { select: { provider: true } } },
         orderBy: { createdAt: "desc" },
         take: 500
@@ -284,8 +311,11 @@ function reachableFromCloud(command: string): boolean {
     const url = /https?:\/\/[^\s/]+/.exec(command)?.[0];
     if (!url) return false;
     const hostname = new URL(url).hostname;
-    if (hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".lan")) return false;
-    return !/^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[?fd|\[?fe80)/i.test(hostname);
+    if (hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".lan"))
+        return false;
+    return !/^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[?fd|\[?fe80)/i.test(
+        hostname
+    );
 }
 
 export async function createServer(
@@ -338,10 +368,15 @@ export async function serverProgress(userId: string, serverId: string): Promise<
     const server = await ownServer(userId, serverId);
     if (server.destroyedAt) return view(server, new Date());
     const adapter = await adapterOf(server.account);
-    const machine = await adapter.get({ providerId: server.providerId, region: server.region }).catch(providerRefusal);
+    const machine = await adapter
+        .get({ providerId: server.providerId, region: server.region })
+        .catch(providerRefusal);
     let { hostId, error } = server;
     if (!hostId && server.enrollmentId) {
-        const enrollment = await host.cloudServersHost.cloudEnrollmentStatus(server.enrollmentId, userId);
+        const enrollment = await host.cloudServersHost.cloudEnrollmentStatus(
+            server.enrollmentId,
+            userId
+        );
         if (enrollment?.hostId) hostId = enrollment.hostId;
         else if (enrollment?.error) error = enrollment.error;
         else if (enrollment?.expired) error = (await cloudT())("errors.enrollmentExpired");
@@ -360,12 +395,21 @@ export async function serverProgress(userId: string, serverId: string): Promise<
     return view(updated, new Date());
 }
 
-export async function powerServer(userId: string, serverId: string, action: PowerAction): Promise<void> {
+export async function powerServer(
+    userId: string,
+    serverId: string,
+    action: PowerAction
+): Promise<void> {
     const server = await ownServer(userId, serverId);
     if (server.destroyedAt) await refuse("errors.serverNotFound");
     const adapter = await adapterOf(server.account);
-    await adapter.action({ providerId: server.providerId, region: server.region }, action).catch(providerRefusal);
-    await prisma.cloudServer.update({ where: { id: server.id }, data: { status: "transitioning" } });
+    await adapter
+        .action({ providerId: server.providerId, region: server.region }, action)
+        .catch(providerRefusal);
+    await prisma.cloudServer.update({
+        where: { id: server.id },
+        data: { status: "transitioning" }
+    });
     await host.auditService.recordAudit({
         actorId: userId,
         action: `cloud.server.${action}`,
@@ -378,11 +422,14 @@ export async function resizeServer(userId: string, serverId: string, size: strin
     const server = await ownServer(userId, serverId);
     if (server.destroyedAt) await refuse("errors.serverNotFound");
     const adapter = await adapterOf(server.account);
-    if (!adapter.resize || RESIZE[server.account.provider as ProviderId] === "none") await refuse("errors.noResize");
+    if (!adapter.resize || RESIZE[server.account.provider as ProviderId] === "none")
+        await refuse("errors.noResize");
     const sizes = await adapter.listSizes(server.region).catch(providerRefusal);
     const chosen = sizes.find((s) => s.id === size);
     if (!chosen) await refuse("errors.unknownSize");
-    await adapter.resize!({ providerId: server.providerId, region: server.region }, size).catch(providerRefusal);
+    await adapter.resize!({ providerId: server.providerId, region: server.region }, size).catch(
+        providerRefusal
+    );
     const price = await cachedPrice(server.account.provider, adapter, server.region, size);
     await prisma.cloudServer.update({
         where: { id: server.id },
@@ -405,18 +452,32 @@ export async function resizeServer(userId: string, serverId: string, size: strin
 
 /** Destroy at the provider, then take it out of Polaris. The typed name must
  *  match: the dialog asks for it and the server checks it again. */
-export async function destroyServer(userId: string, serverId: string, typedName: string): Promise<void> {
+export async function destroyServer(
+    userId: string,
+    serverId: string,
+    typedName: string
+): Promise<void> {
     const server = await ownServer(userId, serverId);
     if (server.destroyedAt) return;
     if (typedName.trim() !== server.name) await refuse("errors.confirmName");
     const adapter = await adapterOf(server.account);
-    const machine = await adapter.get({ providerId: server.providerId, region: server.region }).catch(providerRefusal);
-    if (machine) await adapter.destroy({ providerId: server.providerId, region: server.region }).catch(providerRefusal);
+    const machine = await adapter
+        .get({ providerId: server.providerId, region: server.region })
+        .catch(providerRefusal);
+    if (machine)
+        await adapter
+            .destroy({ providerId: server.providerId, region: server.region })
+            .catch(providerRefusal);
     let warning: string | null = null;
     if (server.hostId) warning = await host.cloudServersHost.removeCloudHost(userId, server.hostId);
     await prisma.cloudServer.update({
         where: { id: server.id },
-        data: { destroyedAt: new Date(), status: "destroyed", hostId: warning ? server.hostId : null, error: warning }
+        data: {
+            destroyedAt: new Date(),
+            status: "destroyed",
+            hostId: warning ? server.hostId : null,
+            error: warning
+        }
     });
     await host.auditService.recordAudit({
         actorId: userId,
@@ -434,7 +495,10 @@ async function removeGoneHost(ownerId: string, hostId: string): Promise<string |
     try {
         return await host.cloudServersHost.removeCloudHost(ownerId, hostId);
     } catch (caught) {
-        console.error("polaris: cloud-servers could not remove a server gone at its provider:", caught);
+        console.error(
+            "polaris: cloud-servers could not remove a server gone at its provider:",
+            caught
+        );
         return (await cloudT())("errors.generic");
     }
 }
@@ -452,7 +516,8 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
         take: REFRESH_LIMIT
     });
     const byAccount = new Map<string, typeof rows>();
-    for (const row of rows) byAccount.set(row.accountId, [...(byAccount.get(row.accountId) ?? []), row]);
+    for (const row of rows)
+        byAccount.set(row.accountId, [...(byAccount.get(row.accountId) ?? []), row]);
     let read = 0;
     let failed = 0;
     for (const [accountId, servers] of byAccount) {
@@ -461,15 +526,29 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
             const adapter = await adapterOf(first.account);
             const prices = new Map<string, PriceFigures | null>();
             for (const server of servers) {
-                const machine = await adapter.get({ providerId: server.providerId, region: server.region });
+                const machine = await adapter.get({
+                    providerId: server.providerId,
+                    region: server.region
+                });
                 const key = `${server.region}\u0000${machine?.size ?? server.size}`;
                 if (machine && !prices.has(key)) {
-                    prices.set(key, await cachedPrice(first.account.provider, adapter, server.region, machine.size));
+                    prices.set(
+                        key,
+                        await cachedPrice(
+                            first.account.provider,
+                            adapter,
+                            server.region,
+                            machine.size
+                        )
+                    );
                 }
                 const price = prices.get(key);
                 // Gone at the provider: the Polaris server it became goes too,
                 // or it stays enrolled with nothing left on this screen to remove it.
-                const leftover = !machine && server.hostId ? await removeGoneHost(server.ownerId, server.hostId) : null;
+                const leftover =
+                    !machine && server.hostId
+                        ? await removeGoneHost(server.ownerId, server.hostId)
+                        : null;
                 await prisma.cloudServer.update({
                     where: { id: server.id },
                     data: machine
@@ -478,7 +557,11 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
                               ipv4: machine.ipv4 ?? server.ipv4,
                               size: machine.size || server.size,
                               ...(price
-                                  ? { priceHourly: price.priceHourly, priceMonthly: price.priceMonthly, currency: price.currency }
+                                  ? {
+                                        priceHourly: price.priceHourly,
+                                        priceMonthly: price.priceMonthly,
+                                        currency: price.currency
+                                    }
                                   : {})
                           }
                         : // Gone at the provider without going through here: it no
@@ -492,11 +575,20 @@ export async function refreshAll(): Promise<{ read: number; failed: number }> {
                 });
                 read++;
             }
-            await prisma.cloudAccount.update({ where: { id: accountId }, data: { lastError: null } });
+            await prisma.cloudAccount.update({
+                where: { id: accountId },
+                data: { lastError: null }
+            });
         } catch (caught) {
             failed++;
-            const message = caught instanceof ProviderError || caught instanceof CloudRefusal ? caught.message : "refresh failed";
-            await prisma.cloudAccount.update({ where: { id: accountId }, data: { lastError: message.slice(0, 300) } });
+            const message =
+                caught instanceof ProviderError || caught instanceof CloudRefusal
+                    ? caught.message
+                    : "refresh failed";
+            await prisma.cloudAccount.update({
+                where: { id: accountId },
+                data: { lastError: message.slice(0, 300) }
+            });
             if (!(caught instanceof ProviderError || caught instanceof CloudRefusal)) {
                 console.error("polaris: cloud-servers refresh failed for an account:", caught);
             }

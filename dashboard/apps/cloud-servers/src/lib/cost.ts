@@ -66,7 +66,11 @@ export function serverCosts(
         sinceCreation: costBetween(price, createdAt, end),
         // A server gone before this month began cost nothing in it (or has no
         // figure, without a price): an empty interval answers exactly that.
-        thisMonth: costBetween(price, createdAt > start ? createdAt : start, end > start ? end : start)
+        thisMonth: costBetween(
+            price,
+            createdAt > start ? createdAt : start,
+            end > start ? end : start
+        )
     };
 }
 

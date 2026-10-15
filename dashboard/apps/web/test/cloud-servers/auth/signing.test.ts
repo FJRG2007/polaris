@@ -7,11 +7,23 @@
 import { describe, expect, it } from "vitest";
 import { createVerify, generateKeyPairSync } from "node:crypto";
 import { opensshRsaLine, throwawaySshKey } from "@polaris-app/cloud-servers/src/lib/auth/throwaway";
-import { amzDates, canonicalRequest, signingKey, signV4 } from "@polaris-app/cloud-servers/src/lib/auth/sigv4";
-import { buildAssertion, COMPUTE_SCOPE, GOOGLE_TOKEN_URL } from "@polaris-app/cloud-servers/src/lib/auth/google-jwt";
+import {
+    amzDates,
+    canonicalRequest,
+    signingKey,
+    signV4
+} from "@polaris-app/cloud-servers/src/lib/auth/sigv4";
+import {
+    buildAssertion,
+    COMPUTE_SCOPE,
+    GOOGLE_TOKEN_URL
+} from "@polaris-app/cloud-servers/src/lib/auth/google-jwt";
 
 // AWS's documented example credentials (not a real key).
-const EXAMPLE = { accessKeyId: "AKIDEXAMPLE", secretAccessKey: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY" };
+const EXAMPLE = {
+    accessKeyId: "AKIDEXAMPLE",
+    secretAccessKey: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"
+};
 const NOW = new Date("2015-08-30T12:36:00Z");
 
 describe("AWS Signature Version 4", () => {
@@ -21,9 +33,9 @@ describe("AWS Signature Version 4", () => {
 
     it("derives the documented signing key", () => {
         // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
-        expect(signingKey(EXAMPLE.secretAccessKey, "20150830", "us-east-1", "iam").toString("hex")).toBe(
-            "c4afb1cc5771d871763a393e44b703571b55cc28424d1a5e86da6ed3c154a4b9"
-        );
+        expect(
+            signingKey(EXAMPLE.secretAccessKey, "20150830", "us-east-1", "iam").toString("hex")
+        ).toBe("c4afb1cc5771d871763a393e44b703571b55cc28424d1a5e86da6ed3c154a4b9");
     });
 
     it("signs the IAM ListUsers example to AWS's published signature", () => {
@@ -87,7 +99,9 @@ describe("AWS Signature Version 4", () => {
             now: NOW
         });
         expect(headers["x-amz-security-token"]).toBe("fixture-session-token");
-        expect(headers.authorization).toContain("SignedHeaders=host;x-amz-date;x-amz-security-token");
+        expect(headers.authorization).toContain(
+            "SignedHeaders=host;x-amz-date;x-amz-security-token"
+        );
     });
 });
 
@@ -103,7 +117,10 @@ describe("Google service-account assertion", () => {
     it("is an RS256 JWT for the Compute scope that verifies with the public key", () => {
         const jwt = buildAssertion(account, COMPUTE_SCOPE, new Date("2026-01-01T00:00:00Z"));
         const [header, claims, signature] = jwt.split(".");
-        expect(JSON.parse(Buffer.from(header!, "base64url").toString())).toEqual({ alg: "RS256", typ: "JWT" });
+        expect(JSON.parse(Buffer.from(header!, "base64url").toString())).toEqual({
+            alg: "RS256",
+            typ: "JWT"
+        });
         expect(JSON.parse(Buffer.from(claims!, "base64url").toString())).toEqual({
             iss: account.client_email,
             scope: COMPUTE_SCOPE,

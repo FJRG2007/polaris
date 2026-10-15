@@ -42,7 +42,11 @@ export function renderStatusEdge(routes: readonly StatusEdgeRoute[], origin: str
     if (unique.length === 0) return "http: {}\n";
 
     const routers: string[] = [];
-    const middlewares: string[] = [`    ${REDIRECT}:`, "      redirectScheme:", "        scheme: https"];
+    const middlewares: string[] = [
+        `    ${REDIRECT}:`,
+        "      redirectScheme:",
+        "        scheme: https"
+    ];
     for (const route of unique) {
         const name = `${SERVICE}-${route.slug}`;
         const root = `${name}-root`;

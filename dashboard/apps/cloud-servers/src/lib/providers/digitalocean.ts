@@ -10,13 +10,22 @@
 
 import { z } from "zod";
 import { bearer, callJson, callVoid } from "../http";
-import { isLtsImage, type CloudMachine, type Credentials, type MachineStatus, type ProviderAdapter, type SizeChoice } from "./types";
+import {
+    isLtsImage,
+    type CloudMachine,
+    type Credentials,
+    type MachineStatus,
+    type ProviderAdapter,
+    type SizeChoice
+} from "./types";
 
 const API = "https://api.digitalocean.com/v2";
 const PAGE = "per_page=200";
 
 const regionsSchema = z.object({
-    regions: z.array(z.object({ slug: z.string(), name: z.string(), available: z.boolean() })).max(500)
+    regions: z
+        .array(z.object({ slug: z.string(), name: z.string(), available: z.boolean() }))
+        .max(500)
 });
 const sizeSchema = z.object({
     slug: z.string(),
@@ -30,7 +39,11 @@ const sizeSchema = z.object({
 });
 const sizesSchema = z.object({ sizes: z.array(sizeSchema).max(1000) });
 const imagesSchema = z.object({
-    images: z.array(z.object({ slug: z.string().nullable(), name: z.string(), distribution: z.string() })).max(1000)
+    images: z
+        .array(
+            z.object({ slug: z.string().nullable(), name: z.string(), distribution: z.string() })
+        )
+        .max(1000)
 });
 const dropletSchema = z.object({
     id: z.number(),
@@ -41,7 +54,12 @@ const dropletSchema = z.object({
     networks: z.object({ v4: z.array(z.object({ ip_address: z.string(), type: z.string() })) })
 });
 
-const STATUS: Readonly<Record<string, MachineStatus>> = { new: "creating", active: "running", off: "off", archive: "off" };
+const STATUS: Readonly<Record<string, MachineStatus>> = {
+    new: "creating",
+    active: "running",
+    off: "off",
+    archive: "off"
+};
 
 function machine(d: z.infer<typeof dropletSchema>): CloudMachine {
     return {
@@ -72,18 +90,28 @@ export function createAdapter(credentials: Credentials<"digitalocean">): Provide
         );
     const dropletPath = (id: string) => `${API}/droplets/${encodeURIComponent(id)}`;
     const act = (id: string, body: object) =>
-        callVoid(`${dropletPath(id)}/actions`, { method: "POST", headers, body: JSON.stringify(body) });
+        callVoid(`${dropletPath(id)}/actions`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body)
+        });
 
     return {
         async listRegions() {
-            const { regions } = await callJson(regionsSchema, `${API}/regions?${PAGE}`, { headers });
+            const { regions } = await callJson(regionsSchema, `${API}/regions?${PAGE}`, {
+                headers
+            });
             return regions.filter((r) => r.available).map((r) => ({ id: r.slug, label: r.name }));
         },
         async listSizes(region) {
             return (await sizes(region)).map(sizeChoice);
         },
         async listImages() {
-            const { images } = await callJson(imagesSchema, `${API}/images?type=distribution&${PAGE}`, { headers });
+            const { images } = await callJson(
+                imagesSchema,
+                `${API}/images?type=distribution&${PAGE}`,
+                { headers }
+            );
             return images
                 .filter((i) => i.slug && isLtsImage(`${i.distribution} ${i.name}`))
                 .map((i) => ({ id: i.slug!, label: `${i.distribution} ${i.name}` }));
@@ -105,7 +133,15 @@ export function createAdapter(credentials: Credentials<"digitalocean">): Provide
         },
         async get(ref) {
             try {
-                return machine((await callJson(z.object({ droplet: dropletSchema }), dropletPath(ref.providerId), { headers })).droplet);
+                return machine(
+                    (
+                        await callJson(
+                            z.object({ droplet: dropletSchema }),
+                            dropletPath(ref.providerId),
+                            { headers }
+                        )
+                    ).droplet
+                );
             } catch (caught) {
                 if ((caught as { status?: number }).status === 404) return null;
                 throw caught;

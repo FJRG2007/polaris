@@ -26,13 +26,17 @@ export async function listPagesAction(): Promise<Outcome<{ pages: manage.PageSum
     return outcome(async () => ({ pages: await manage.listPages() }));
 }
 
-export async function pageDetailAction(input: unknown): Promise<Outcome<{ page: manage.PageDetail }>> {
+export async function pageDetailAction(
+    input: unknown
+): Promise<Outcome<{ page: manage.PageDetail }>> {
     const parsed = idInput.safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({ page: await manage.pageDetail(parsed.data.id) }));
 }
 
-export async function previewAction(input: unknown): Promise<Outcome<{ view: PublicStatusPage | null }>> {
+export async function previewAction(
+    input: unknown
+): Promise<Outcome<{ view: PublicStatusPage | null }>> {
     const parsed = z.object({ slug: z.string().max(60) }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
@@ -133,18 +137,26 @@ export async function deleteMaintenanceAction(input: unknown): Promise<Outcome<o
     });
 }
 
-export async function setCustomDomainAction(input: unknown): Promise<Outcome<{ status: manage.DomainStatus | null }>> {
+export async function setCustomDomainAction(
+    input: unknown
+): Promise<Outcome<{ status: manage.DomainStatus | null }>> {
     const parsed = customDomainInput.safeParse(input);
     if (!parsed.success) return invalid();
-    return outcome(async () => ({ status: await manage.setCustomDomain(parsed.data.id, parsed.data.domain) }));
+    return outcome(async () => ({
+        status: await manage.setCustomDomain(parsed.data.id, parsed.data.domain)
+    }));
 }
 
-export async function checkCustomDomainAction(input: unknown): Promise<Outcome<{ status: manage.DomainStatus | null }>> {
+export async function checkCustomDomainAction(
+    input: unknown
+): Promise<Outcome<{ status: manage.DomainStatus | null }>> {
     const parsed = idInput.safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({ status: await manage.checkCustomDomain(parsed.data.id) }));
 }
 
-export async function deployedTargetsAction(): Promise<Outcome<{ targets: { label: string; url: string }[] }>> {
+export async function deployedTargetsAction(): Promise<
+    Outcome<{ targets: { label: string; url: string }[] }>
+> {
     return outcome(async () => ({ targets: await manage.deployedTargets() }));
 }

@@ -10,7 +10,12 @@
  */
 
 import { prisma } from "@polaris/db";
-import { isOpen, maintenanceActive, type IncidentImpact, type IncidentState } from "../model/incidents";
+import {
+    isOpen,
+    maintenanceActive,
+    type IncidentImpact,
+    type IncidentState
+} from "../model/incidents";
 import {
     HISTORY_DAYS,
     componentState,
@@ -43,7 +48,11 @@ export interface PublicIncident {
     readonly startedAt: string;
     readonly resolvedAt: string | null;
     readonly components: readonly string[];
-    readonly updates: readonly { readonly state: IncidentState; readonly body: string; readonly at: string }[];
+    readonly updates: readonly {
+        readonly state: IncidentState;
+        readonly body: string;
+        readonly at: string;
+    }[];
 }
 
 export interface PublicMaintenance {
@@ -142,7 +151,9 @@ export async function publicStatusPage(
         const rollups = component.checks.flatMap((check) =>
             check.days.map((day) => ({ day: dayKey(day.day), total: day.total, up: day.up }))
         );
-        const inMaintenance = activeWindows.some((window) => window.componentIds.includes(component.id));
+        const inMaintenance = activeWindows.some((window) =>
+            window.componentIds.includes(component.id)
+        );
         return {
             id: component.id,
             name: component.name,

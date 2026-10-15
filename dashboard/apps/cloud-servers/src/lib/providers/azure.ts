@@ -20,7 +20,13 @@
 import { z } from "zod";
 import { throwawaySshKey } from "../auth/throwaway";
 import { callJson, callVoid, ProviderError } from "../http";
-import type { CloudMachine, Credentials, MachineStatus, ProviderAdapter, SizeChoice } from "./types";
+import type {
+    CloudMachine,
+    Credentials,
+    MachineStatus,
+    ProviderAdapter,
+    SizeChoice
+} from "./types";
 
 const ARM = "https://management.azure.com";
 const COMPUTE_API = "2024-07-01";
@@ -49,7 +55,9 @@ const vmSchema = z.object({
 export function vmStatus(vm: z.infer<typeof vmSchema>): MachineStatus {
     if (vm.properties.provisioningState === "Failed") return "failed";
     if (vm.properties.provisioningState === "Creating") return "creating";
-    const power = vm.properties.instanceView?.statuses.find((s) => s.code.startsWith("PowerState/"))?.code;
+    const power = vm.properties.instanceView?.statuses.find((s) =>
+        s.code.startsWith("PowerState/")
+    )?.code;
     if (power === "PowerState/running") return "running";
     if (power === "PowerState/stopped" || power === "PowerState/deallocated") return "off";
     if (power) return "transitioning";
@@ -76,13 +84,17 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
                     }).toString()
                 }
             );
-            token = { value: answer.access_token, expiresAt: Date.now() + answer.expires_in * 1000 };
+            token = {
+                value: answer.access_token,
+                expiresAt: Date.now() + answer.expires_in * 1000
+            };
         }
         return { authorization: `Bearer ${token.value}`, "content-type": "application/json" };
     }
 
     const group = (location: string) => {
-        if (!/^[a-z0-9]{2,40}$/.test(location)) throw new ProviderError("Unknown Azure location.", null);
+        if (!/^[a-z0-9]{2,40}$/.test(location))
+            throw new ProviderError("Unknown Azure location.", null);
         return `${sub}/resourceGroups/polaris-cloud-servers-${location}`;
     };
     const vmUrl = (location: string, name: string) =>
@@ -91,7 +103,10 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
         callVoid(url, { method: "PUT", headers: await headers(), body: JSON.stringify(body) });
 
     async function ensureNetwork(location: string): Promise<{ subnet: string; nsg: string }> {
-        await put(`${group(location)}?api-version=${RESOURCES_API}`, { location, tags: { polaris: "cloud-servers" } });
+        await put(`${group(location)}?api-version=${RESOURCES_API}`, {
+            location,
+            tags: { polaris: "cloud-servers" }
+        });
         const net = `${group(location)}/providers/Microsoft.Network`;
         const nsg = `${net}/networkSecurityGroups/polaris-ssh`;
         await put(`${nsg}?api-version=${NETWORK_API}`, {
@@ -126,9 +141,13 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
     }
 
     async function readVm(location: string, name: string) {
-        return callJson(vmSchema, `${vmUrl(location, name)}?$expand=instanceView&api-version=${COMPUTE_API}`, {
-            headers: await headers()
-        });
+        return callJson(
+            vmSchema,
+            `${vmUrl(location, name)}?$expand=instanceView&api-version=${COMPUTE_API}`,
+            {
+                headers: await headers()
+            }
+        );
     }
 
     async function publicIp(location: string, name: string): Promise<string | null> {
@@ -170,7 +189,13 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
                 !/spot|low priority/i.test(i.skuName)
         );
         return linux
-            ? { id: size, label: size, priceHourly: linux.retailPrice, priceMonthly: null, currency: linux.currencyCode }
+            ? {
+                  id: size,
+                  label: size,
+                  priceHourly: linux.retailPrice,
+                  priceMonthly: null,
+                  currency: linux.currencyCode
+              }
             : null;
     }
 
@@ -185,7 +210,13 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
             const answer = await callJson(
                 z.object({
                     value: z
-                        .array(z.object({ name: z.string(), displayName: z.string(), metadata: z.object({ regionType: z.string().optional() }).optional() }))
+                        .array(
+                            z.object({
+                                name: z.string(),
+                                displayName: z.string(),
+                                metadata: z.object({ regionType: z.string().optional() }).optional()
+                            })
+                        )
                         .max(200)
                 }),
                 `${sub}/locations?api-version=${LOCATIONS_API}`,
@@ -197,7 +228,17 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
         },
         async listSizes(region) {
             const answer = await callJson(
-                z.object({ value: z.array(z.object({ name: z.string(), numberOfCores: z.number(), memoryInMB: z.number() })).max(2000) }),
+                z.object({
+                    value: z
+                        .array(
+                            z.object({
+                                name: z.string(),
+                                numberOfCores: z.number(),
+                                memoryInMB: z.number()
+                            })
+                        )
+                        .max(2000)
+                }),
                 `${sub}/providers/Microsoft.Compute/locations/${encodeURIComponent(region)}/vmSizes?api-version=${COMPUTE_API}`,
                 { headers: await headers() }
             );
@@ -235,7 +276,12 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
                         linuxConfiguration: {
                             disablePasswordAuthentication: true,
                             ssh: {
-                                publicKeys: [{ path: "/home/polarisadmin/.ssh/authorized_keys", keyData: throwawaySshKey() }]
+                                publicKeys: [
+                                    {
+                                        path: "/home/polarisadmin/.ssh/authorized_keys",
+                                        keyData: throwawaySshKey()
+                                    }
+                                ]
                             }
                         }
                     },
@@ -256,7 +302,10 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
                                                 publicIPAddressConfiguration: {
                                                     name: `${spec.name}-ip`,
                                                     sku: { name: "Standard" },
-                                                    properties: { deleteOption: "Delete", publicIPAllocationMethod: "Static" }
+                                                    properties: {
+                                                        deleteOption: "Delete",
+                                                        publicIPAllocationMethod: "Static"
+                                                    }
                                                 }
                                             }
                                         }
@@ -297,7 +346,8 @@ export function createAdapter(credentials: Credentials<"azure">): ProviderAdapte
         async action(machineRef, action) {
             const { location, name } = ref(machineRef.providerId);
             // Deallocate rather than power off: a powered-off machine is still billed.
-            const verb = action === "power_on" ? "start" : action === "power_off" ? "deallocate" : "restart";
+            const verb =
+                action === "power_on" ? "start" : action === "power_off" ? "deallocate" : "restart";
             await callVoid(`${vmUrl(location, name)}/${verb}?api-version=${COMPUTE_API}`, {
                 method: "POST",
                 headers: await headers()

@@ -83,7 +83,12 @@ export interface PageDetail {
         readonly componentIds: readonly string[];
         readonly startedAt: string;
         readonly resolvedAt: string | null;
-        readonly updates: readonly { readonly id: string; readonly state: string; readonly body: string; readonly at: string }[];
+        readonly updates: readonly {
+            readonly id: string;
+            readonly state: string;
+            readonly body: string;
+            readonly at: string;
+        }[];
     }[];
     readonly maintenance: readonly {
         readonly id: string;
@@ -135,7 +140,14 @@ export async function pageDetail(id: string): Promise<PageDetail> {
             maintenance: {
                 orderBy: { startsAt: "desc" },
                 take: 50,
-                select: { id: true, title: true, body: true, componentIds: true, startsAt: true, endsAt: true }
+                select: {
+                    id: true,
+                    title: true,
+                    body: true,
+                    componentIds: true,
+                    startsAt: true,
+                    endsAt: true
+                }
             }
         }
     });
@@ -185,7 +197,11 @@ function isUniqueViolation(caught: unknown): boolean {
     return (caught as { code?: string } | null)?.code === "P2002";
 }
 
-export async function savePage(id: string | null, input: PageInput, userId: string): Promise<{ id: string }> {
+export async function savePage(
+    id: string | null,
+    input: PageInput,
+    userId: string
+): Promise<{ id: string }> {
     try {
         if (id) {
             await prisma.statusPage.update({ where: { id }, data: input });
@@ -193,7 +209,10 @@ export async function savePage(id: string | null, input: PageInput, userId: stri
             await trySyncStatusEdge();
             return { id };
         }
-        const page = await prisma.statusPage.create({ data: { ...input, createdById: userId }, select: { id: true } });
+        const page = await prisma.statusPage.create({
+            data: { ...input, createdById: userId },
+            select: { id: true }
+        });
         return page;
     } catch (caught) {
         if (isUniqueViolation(caught)) throw new StatusRefusal("errors.slugTaken");
@@ -235,7 +254,10 @@ export async function domainStatus(domain: string, routed: boolean): Promise<Dom
 }
 
 /** Sets or removes a page's custom domain and rewrites the edge. */
-export async function setCustomDomain(id: string, domain: string | null): Promise<DomainStatus | null> {
+export async function setCustomDomain(
+    id: string,
+    domain: string | null
+): Promise<DomainStatus | null> {
     if (domain) {
         const [taken, other] = await Promise.all([
             host.appEdge.edgeHostnameTaken(domain),
@@ -263,7 +285,10 @@ export async function setCustomDomain(id: string, domain: string | null): Promis
 /** Checks a page's domain again, rewriting the edge on the way so a missed
  *  write repairs itself from here. */
 export async function checkCustomDomain(id: string): Promise<DomainStatus | null> {
-    const page = await prisma.statusPage.findUnique({ where: { id }, select: { customDomain: true } });
+    const page = await prisma.statusPage.findUnique({
+        where: { id },
+        select: { customDomain: true }
+    });
     if (!page) throw new StatusRefusal("errors.pageGone");
     if (!page.customDomain) return null;
     const routed = await trySyncStatusEdge();
@@ -353,7 +378,11 @@ export async function openIncident(input: {
     });
 }
 
-export async function postIncidentUpdate(input: { incidentId: string; state: IncidentState; body: string }) {
+export async function postIncidentUpdate(input: {
+    incidentId: string;
+    state: IncidentState;
+    body: string;
+}) {
     const incident = await prisma.statusIncident.findUnique({
         where: { id: input.incidentId },
         select: { state: true, resolvedAt: true }

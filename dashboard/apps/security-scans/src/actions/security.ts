@@ -10,7 +10,9 @@ import * as schemas from "../model/schemas";
 import { ScanFailure } from "../lib/runner";
 import { requireSecurityUser } from "../lib/access";
 
-export type Result<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: string };
+export type Result<T> =
+    | { readonly ok: true; readonly data: T }
+    | { readonly ok: false; readonly error: string };
 
 async function run<T>(work: () => Promise<T>): Promise<Result<T>> {
     try {
@@ -57,14 +59,18 @@ export async function scanFilesAction(input: unknown) {
     const parsed = schemas.filesInput.safeParse(input);
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
     const { targetId, volumeId, subpath, mode } = parsed.data;
-    return run(async () => (await service()).queueFiles(targetId, volumeId, subpath, mode, user.id));
+    return run(async () =>
+        (await service()).queueFiles(targetId, volumeId, subpath, mode, user.id)
+    );
 }
 
 export async function auditAction(input: unknown) {
     const user = await requireSecurityUser();
     const parsed = schemas.targetInput.safeParse(input);
     if (!parsed.success) return { ok: false, error: "invalid" } as const;
-    return run(async () => (await service()).enqueue(parsed.data.targetId, "audit", "host", {}, user.id));
+    return run(async () =>
+        (await service()).enqueue(parsed.data.targetId, "audit", "host", {}, user.id)
+    );
 }
 
 export async function scanImageAction(input: unknown) {

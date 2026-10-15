@@ -31,7 +31,11 @@ const moneySchema = z.object({
 
 export const skuSchema = z.object({
     description: z.string(),
-    category: z.object({ resourceFamily: z.string(), resourceGroup: z.string(), usageType: z.string() }),
+    category: z.object({
+        resourceFamily: z.string(),
+        resourceGroup: z.string(),
+        usageType: z.string()
+    }),
     serviceRegions: z.array(z.string()).default([]),
     pricingInfo: z
         .array(
@@ -56,7 +60,10 @@ function unitPrice(sku: Sku): { amount: number; currency: string } | null {
     const rates = sku.pricingInfo[0]?.pricingExpression.tieredRates ?? [];
     const last = rates[rates.length - 1]?.unitPrice;
     if (!last) return null;
-    return { amount: Number(last.units ?? 0) + (last.nanos ?? 0) / 1e9, currency: last.currencyCode };
+    return {
+        amount: Number(last.units ?? 0) + (last.nanos ?? 0) / 1e9,
+        currency: last.currencyCode
+    };
 }
 
 /** The E2 on-demand core and RAM rates of one region, or null. */
@@ -91,7 +98,10 @@ export async function computeSkus(token: string): Promise<Sku[]> {
     for (let page = 0; page < MAX_PAGES; page++) {
         const url = `https://cloudbilling.googleapis.com/v1/${COMPUTE_SERVICE}/skus?pageSize=5000${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
         const answer = await callJson(
-            z.object({ skus: z.array(skuSchema).default([]), nextPageToken: z.string().optional() }),
+            z.object({
+                skus: z.array(skuSchema).default([]),
+                nextPageToken: z.string().optional()
+            }),
             url,
             { headers: { authorization: `Bearer ${token}` }, timeoutMs: 60_000 }
         );

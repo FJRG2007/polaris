@@ -3,7 +3,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { canTransition, maintenanceActive, transition } from "@polaris-app/status-pages/src/model/incidents";
+import {
+    canTransition,
+    maintenanceActive,
+    transition
+} from "@polaris-app/status-pages/src/model/incidents";
 
 const at = new Date("2026-03-10T12:00:00Z");
 const earlier = new Date("2026-03-10T10:00:00Z");
@@ -15,7 +19,9 @@ describe("transition", () => {
             state: "identified",
             resolvedAt: null
         });
-        expect(transition({ state: "monitoring", resolvedAt: null }, "investigating", at).ok).toBe(true);
+        expect(transition({ state: "monitoring", resolvedAt: null }, "investigating", at).ok).toBe(
+            true
+        );
     });
 
     it("stamps the moment an incident is resolved", () => {
@@ -35,11 +41,13 @@ describe("transition", () => {
     });
 
     it("reopens a resolved incident only as investigating", () => {
-        expect(transition({ state: "resolved", resolvedAt: earlier }, "investigating", at)).toEqual({
-            ok: true,
-            state: "investigating",
-            resolvedAt: null
-        });
+        expect(transition({ state: "resolved", resolvedAt: earlier }, "investigating", at)).toEqual(
+            {
+                ok: true,
+                state: "investigating",
+                resolvedAt: null
+            }
+        );
         expect(transition({ state: "resolved", resolvedAt: earlier }, "monitoring", at)).toEqual({
             ok: false,
             reason: "resolvedReopen"

@@ -16,7 +16,12 @@ import {
     parseDfFree,
     type HostAction
 } from "../model/specs";
-import { parseContainerState, quoteArgv, type ComposeSpec, type RuntimePorts } from "@polaris/deploy";
+import {
+    parseContainerState,
+    quoteArgv,
+    type ComposeSpec,
+    type RuntimePorts
+} from "@polaris/deploy";
 
 /** The server a scan runs on, as the runtime needs it. */
 export interface ScanTarget {
@@ -127,7 +132,10 @@ export async function runHostAction(
 type SshClient = Awaited<ReturnType<typeof openSshClient>>;
 
 /** Run one command over an open SSH client, keeping what it printed. */
-async function sshRun(client: SshClient, command: string): Promise<{ code: number; output: string }> {
+async function sshRun(
+    client: SshClient,
+    command: string
+): Promise<{ code: number; output: string }> {
     const parts: Buffer[] = [];
     const result = await execCommand(client, command, {
         onStdout: (chunk) => void parts.push(chunk)
@@ -156,7 +164,11 @@ async function withSsh<T>(target: ScanTarget, work: (client: SshClient) => Promi
  * the disk has room for it. Locally the daemon does it; over SSH the same
  * commands run, each an argument list quoted word by word.
  */
-export async function exportImage(target: ScanTarget, image: string, volume: string): Promise<void> {
+export async function exportImage(
+    target: ScanTarget,
+    image: string,
+    volume: string
+): Promise<void> {
     if (target.kind === "local" || !target.hostId) {
         const result = await new HostdClient().hostImageExport(image, volume);
         if (result === null) throw new ScanFailure("daemonOutdated");

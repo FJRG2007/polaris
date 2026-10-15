@@ -92,7 +92,10 @@ function spec(
     };
 }
 
-function shellOf(script: string, args: readonly string[]): Pick<ComposeSpecService, "entrypoint" | "command"> {
+function shellOf(
+    script: string,
+    args: readonly string[]
+): Pick<ComposeSpecService, "entrypoint" | "command"> {
     // `$0` is a fixed word; the person's values start at `$1`.
     return { entrypoint: ["/bin/sh", "-c"], command: [script, "polaris", ...args] };
 }
@@ -130,7 +133,10 @@ export function malwareSpec(volumes: readonly ScanVolume[]): ComposeSpec {
         PROJECTS.malware,
         service("polaris-secscan-malware", MALWARE_IMAGE, {
             ...shellOf(MALWARE_SCRIPT, paths),
-            volumes: [{ source: "signatures", target: "/var/lib/clamav", kind: "volume" }, ...mounts],
+            volumes: [
+                { source: "signatures", target: "/var/lib/clamav", kind: "volume" },
+                ...mounts
+            ],
             memoryMb: 3072
         }),
         ["signatures"],
@@ -229,7 +235,14 @@ export function isExportVolume(name: string): boolean {
 }
 
 /** Lists the export volumes on a server (a substring filter; see below). */
-export const LIST_EXPORTS_ARGV = ["docker", "volume", "ls", "-q", "--filter", `name=${EXPORT_VOLUME_PREFIX}`];
+export const LIST_EXPORTS_ARGV = [
+    "docker",
+    "volume",
+    "ls",
+    "-q",
+    "--filter",
+    `name=${EXPORT_VOLUME_PREFIX}`
+];
 
 /**
  * The export volumes a sweep may remove: every one on the server that is an
@@ -237,7 +250,10 @@ export const LIST_EXPORTS_ARGV = ["docker", "volume", "ls", "-q", "--filter", `n
  * running scans must be read after the volumes were listed, so a scan claimed
  * in between (whose volume the list cannot hold yet) is never swept.
  */
-export function staleExports(listed: readonly string[], runningScanIds: readonly string[]): string[] {
+export function staleExports(
+    listed: readonly string[],
+    runningScanIds: readonly string[]
+): string[] {
     const live = new Set(
         runningScanIds.flatMap((id) => {
             try {
@@ -357,7 +373,17 @@ export const HOST_CONTAINER = "polaris-secscan-host";
 export function hostArgv(action: HostAction): string[] {
     const base = ["docker", "run", "--rm", "--name", HOST_CONTAINER, "--cpu-shares", "64"];
     if (action === "audit") {
-        return [...base, "--memory", "512m", "-v", "/:/host:ro", TOOLS_IMAGE, "/bin/sh", "-c", AUDIT_SCRIPT];
+        return [
+            ...base,
+            "--memory",
+            "512m",
+            "-v",
+            "/:/host:ro",
+            TOOLS_IMAGE,
+            "/bin/sh",
+            "-c",
+            AUDIT_SCRIPT
+        ];
     }
     return [
         ...base,

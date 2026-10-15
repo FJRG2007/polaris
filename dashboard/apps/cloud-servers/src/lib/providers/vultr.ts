@@ -12,7 +12,14 @@
 
 import { z } from "zod";
 import { bearer, callJson, callVoid, ProviderError } from "../http";
-import { isLtsImage, type CloudMachine, type Credentials, type MachineStatus, type ProviderAdapter, type SizeChoice } from "./types";
+import {
+    isLtsImage,
+    type CloudMachine,
+    type Credentials,
+    type MachineStatus,
+    type ProviderAdapter,
+    type SizeChoice
+} from "./types";
 
 const API = "https://api.vultr.com/v2";
 
@@ -30,7 +37,9 @@ const planSchema = z.object({
 });
 const plansSchema = z.object({ plans: z.array(planSchema).max(1000) });
 const osSchema = z.object({
-    os: z.array(z.object({ id: z.number(), name: z.string(), arch: z.string(), family: z.string() })).max(1000)
+    os: z
+        .array(z.object({ id: z.number(), name: z.string(), arch: z.string(), family: z.string() }))
+        .max(1000)
 });
 const instanceSchema = z.object({
     id: z.string(),
@@ -45,7 +54,11 @@ const instanceSchema = z.object({
 function status(i: z.infer<typeof instanceSchema>): MachineStatus {
     if (i.status === "pending") return "creating";
     if (i.status === "suspended" || i.status === "resizing") return "transitioning";
-    return i.power_status === "running" ? "running" : i.power_status === "stopped" ? "off" : "unknown";
+    return i.power_status === "running"
+        ? "running"
+        : i.power_status === "stopped"
+          ? "off"
+          : "unknown";
 }
 
 function machine(i: z.infer<typeof instanceSchema>): CloudMachine {
@@ -79,7 +92,9 @@ export function createAdapter(credentials: Credentials<"vultr">): ProviderAdapte
 
     return {
         async listRegions() {
-            const { regions } = await callJson(regionsSchema, `${API}/regions?per_page=500`, { headers });
+            const { regions } = await callJson(regionsSchema, `${API}/regions?per_page=500`, {
+                headers
+            });
             return regions.map((r) => ({ id: r.id, label: `${r.city}, ${r.country}` }));
         },
         listSizes: sizes,
@@ -90,35 +105,56 @@ export function createAdapter(credentials: Credentials<"vultr">): ProviderAdapte
                 .map((o) => ({ id: String(o.id), label: o.name }));
         },
         async create(spec) {
-            const answer = await callJson(z.object({ instance: instanceSchema }), `${API}/instances`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                    region: spec.region,
-                    plan: spec.size,
-                    os_id: Number(spec.image),
-                    label: spec.name,
-                    hostname: spec.name,
-                    user_data: Buffer.from(spec.userData).toString("base64"),
-                    tags: ["polaris"]
-                })
-            });
+            const answer = await callJson(
+                z.object({ instance: instanceSchema }),
+                `${API}/instances`,
+                {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                        region: spec.region,
+                        plan: spec.size,
+                        os_id: Number(spec.image),
+                        label: spec.name,
+                        hostname: spec.name,
+                        user_data: Buffer.from(spec.userData).toString("base64"),
+                        tags: ["polaris"]
+                    })
+                }
+            );
             return machine(answer.instance);
         },
         async get(ref) {
             try {
-                return machine((await callJson(z.object({ instance: instanceSchema }), path(ref.providerId), { headers })).instance);
+                return machine(
+                    (
+                        await callJson(
+                            z.object({ instance: instanceSchema }),
+                            path(ref.providerId),
+                            { headers }
+                        )
+                    ).instance
+                );
             } catch (caught) {
                 if (caught instanceof ProviderError && caught.status === 404) return null;
                 throw caught;
             }
         },
         async action(ref, action) {
-            const verb = action === "power_on" ? "start" : action === "power_off" ? "halt" : "reboot";
-            await callVoid(`${path(ref.providerId)}/${verb}`, { method: "POST", headers, body: "{}" });
+            const verb =
+                action === "power_on" ? "start" : action === "power_off" ? "halt" : "reboot";
+            await callVoid(`${path(ref.providerId)}/${verb}`, {
+                method: "POST",
+                headers,
+                body: "{}"
+            });
         },
         async resize(ref, size) {
-            await callVoid(path(ref.providerId), { method: "PATCH", headers, body: JSON.stringify({ plan: size }) });
+            await callVoid(path(ref.providerId), {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({ plan: size })
+            });
         },
         async destroy(ref) {
             await callVoid(path(ref.providerId), { method: "DELETE", headers });

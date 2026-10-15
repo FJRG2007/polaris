@@ -50,7 +50,9 @@ export function StatusView({
                 ) : null}
                 <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
                     <span className={cn("size-2.5 shrink-0 rounded-full", STATE_DOT[view.state])} />
-                    <span className="min-w-0 text-sm font-medium">{t(`page.headline.${view.state}`)}</span>
+                    <span className="min-w-0 text-sm font-medium">
+                        {t(`page.headline.${view.state}`)}
+                    </span>
                 </div>
             </header>
 
@@ -71,9 +73,14 @@ export function StatusView({
                         {t("public.maintenance")}
                     </h2>
                     {view.maintenance.map((window) => (
-                        <div key={window.id} className="rounded-lg border border-border bg-card p-4">
+                        <div
+                            key={window.id}
+                            className="rounded-lg border border-border bg-card p-4"
+                        >
                             <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                <p className="min-w-0 break-words text-sm font-medium">{window.title}</p>
+                                <p className="min-w-0 break-words text-sm font-medium">
+                                    {window.title}
+                                </p>
                                 <span className="text-xs text-muted-foreground">
                                     {window.active ? t("public.inProgress") : t("public.scheduled")}
                                 </span>
@@ -87,7 +94,9 @@ export function StatusView({
                                 </p>
                             ) : null}
                             {window.body ? (
-                                <p className="mt-2 whitespace-pre-wrap break-words text-sm">{window.body}</p>
+                                <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+                                    {window.body}
+                                </p>
                             ) : null}
                         </div>
                     ))}
@@ -106,7 +115,10 @@ export function StatusView({
                             <li key={component.id} className="space-y-2 p-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium" title={component.name}>
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={component.name}
+                                        >
                                             {component.name}
                                         </p>
                                         {component.description ? (
@@ -116,21 +128,35 @@ export function StatusView({
                                         ) : null}
                                     </div>
                                     <span className="flex shrink-0 items-center gap-1.5 text-xs">
-                                        <span className={cn("size-2 rounded-full", STATE_DOT[component.state])} />
+                                        <span
+                                            className={cn(
+                                                "size-2 rounded-full",
+                                                STATE_DOT[component.state]
+                                            )}
+                                        />
                                         {t(`state.${component.state}`)}
                                     </span>
                                 </div>
-                                <div className="flex h-7 items-stretch gap-px" role="img" aria-label={t("public.barsLabel")}>
+                                <div
+                                    className="flex h-7 items-stretch gap-px"
+                                    role="img"
+                                    aria-label={t("public.barsLabel")}
+                                >
                                     {component.bars.map((bar) => (
                                         <span
                                             key={bar.day}
-                                            className={cn("min-w-0 flex-1 rounded-[1px]", BAR[bar.tone])}
+                                            className={cn(
+                                                "min-w-0 flex-1 rounded-[1px]",
+                                                BAR[bar.tone]
+                                            )}
                                             title={
                                                 bar.ratio === null
                                                     ? t("public.barNoData", { day: bar.day })
                                                     : t("public.barUptime", {
                                                           day: bar.day,
-                                                          percent: (Math.floor(bar.ratio * 10_000) / 100).toString()
+                                                          percent: (
+                                                              Math.floor(bar.ratio * 10_000) / 100
+                                                          ).toString()
                                                       })
                                             }
                                         />
@@ -141,7 +167,9 @@ export function StatusView({
                                     <span>
                                         {component.uptime === null
                                             ? t("public.noData")
-                                            : t("public.uptime", { percent: component.uptime.toString() })}
+                                            : t("public.uptime", {
+                                                  percent: component.uptime.toString()
+                                              })}
                                     </span>
                                     <span>{t("public.today")}</span>
                                 </div>
@@ -193,8 +221,13 @@ function Incident({
                 {incident.updates.map((update) => (
                     <li key={update.at + update.state}>
                         <p className="text-xs">
-                            <span className="font-medium">{t(`incidentState.${update.state}`)}</span>
-                            <span className="text-muted-foreground"> - {when(update.at, locale)}</span>
+                            <span className="font-medium">
+                                {t(`incidentState.${update.state}`)}
+                            </span>
+                            <span className="text-muted-foreground">
+                                {" "}
+                                - {when(update.at, locale)}
+                            </span>
                         </p>
                         <p className="whitespace-pre-wrap break-words text-sm">{update.body}</p>
                     </li>

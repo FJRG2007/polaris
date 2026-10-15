@@ -185,9 +185,15 @@ export function parseAuditReport(text: string): AuditReport {
     }
     const score = Number(values.get("hardening_index"));
     const tests = Number(values.get("lynis_tests_done"));
-    const os = [values.get("os_name"), values.get("os_version")].map(field).filter(Boolean).join(" ");
+    const os = [values.get("os_name"), values.get("os_version")]
+        .map(field)
+        .filter(Boolean)
+        .join(" ");
     return {
-        score: Number.isFinite(score) && values.has("hardening_index") ? Math.max(0, Math.min(100, score)) : null,
+        score:
+            Number.isFinite(score) && values.has("hardening_index")
+                ? Math.max(0, Math.min(100, score))
+                : null,
         os: os || null,
         testsRun: Number.isFinite(tests) && values.has("lynis_tests_done") ? tests : null,
         items
@@ -238,7 +244,9 @@ export interface UpdatesReport {
 }
 
 export function parseUpdatesLog(text: string): UpdatesReport {
-    const state = /POLARIS_UPDATES=(on|off|unsupported)/.exec(text)?.[1] as UpdatesState | undefined;
+    const state = /POLARIS_UPDATES=(on|off|unsupported)/.exec(text)?.[1] as
+        | UpdatesState
+        | undefined;
     const distro = /POLARIS_DISTRO id=([A-Za-z0-9._-]*)/.exec(text)?.[1];
     return { state: state ?? null, distro: distro ? distro : null };
 }
@@ -288,7 +296,11 @@ function str(value: unknown): string | null {
 }
 
 export function parseVulnJson(value: unknown, cap = 500): VulnReport | null {
-    if (!value || typeof value !== "object" || !Array.isArray((value as { matches?: unknown }).matches)) {
+    if (
+        !value ||
+        typeof value !== "object" ||
+        !Array.isArray((value as { matches?: unknown }).matches)
+    ) {
         return null;
     }
     const counts = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;

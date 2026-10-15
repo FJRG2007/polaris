@@ -22,7 +22,9 @@ const spec = (patch: Partial<CheckSpec>): CheckSpec => ({
 describe("literalAllowed", () => {
     it("refuses a typed loopback or metadata address and leaves names to the lookup", () => {
         expect(literalAllowed({ kind: "http", target: "http://127.0.0.1:8080/" })).toBe(false);
-        expect(literalAllowed({ kind: "http", target: "http://169.254.169.254/latest" })).toBe(false);
+        expect(literalAllowed({ kind: "http", target: "http://169.254.169.254/latest" })).toBe(
+            false
+        );
         expect(literalAllowed({ kind: "tcp", target: "[::1]" })).toBe(false);
         expect(literalAllowed({ kind: "tcp", target: "192.168.1.20" })).toBe(true);
         expect(literalAllowed({ kind: "http", target: "https://example.com/" })).toBe(true);
@@ -36,7 +38,9 @@ describe("probe", () => {
             error: "blocked",
             latencyMs: null
         });
-        expect(await probe(spec({ kind: "tcp", target: "127.0.0.1", port: 9 }))).toMatchObject({ error: "blocked" });
+        expect(await probe(spec({ kind: "tcp", target: "127.0.0.1", port: 9 }))).toMatchObject({
+            error: "blocked"
+        });
     });
 
     it("refuses a name that resolves to loopback at connect time", async () => {

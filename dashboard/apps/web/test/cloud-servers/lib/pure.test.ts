@@ -8,15 +8,22 @@ import { backoffMs } from "@polaris-app/cloud-servers/src/lib/http";
 import { child, items, parseXml, textOf } from "@polaris-app/cloud-servers/src/lib/xml";
 import { ENROLLED_MARK, renderFirstBoot } from "@polaris-app/cloud-servers/src/lib/cloud-init";
 import { isLtsImage, machineNameSchema } from "@polaris-app/cloud-servers/src/lib/providers/types";
-import { costBetween, serverCosts, totalsByCurrency } from "@polaris-app/cloud-servers/src/lib/cost";
+import {
+    costBetween,
+    serverCosts,
+    totalsByCurrency
+} from "@polaris-app/cloud-servers/src/lib/cost";
 
-const COMMAND = "curl -sSL https://polaris.example.test/api/servers/enroll/fixtureToken_123 | sudo sh -s -- --docker --root";
+const COMMAND =
+    "curl -sSL https://polaris.example.test/api/servers/enroll/fixtureToken_123 | sudo sh -s -- --docker --root";
 
 describe("first-boot script", () => {
     it("installs what enrollment needs, enrolls once, and marks it done", () => {
         const script = renderFirstBoot(COMMAND);
         expect(script.startsWith("#!/bin/sh\n")).toBe(true);
-        expect(script).toContain("apt-get install -y -q curl ca-certificates sudo openssh-server docker.io");
+        expect(script).toContain(
+            "apt-get install -y -q curl ca-certificates sudo openssh-server docker.io"
+        );
         expect(script).toContain(`\n${COMMAND}\n`);
         expect(script).toContain(`if [ -e ${ENROLLED_MARK} ]; then`);
         expect(script.trimEnd().endsWith(`touch ${ENROLLED_MARK}`)).toBe(true);
@@ -46,17 +53,27 @@ describe("cost", () => {
     });
 
     it("caps each calendar month on its own", () => {
-        expect(costBetween(hourlyCapped, new Date("2026-03-01T00:00:00Z"), new Date("2026-04-30T00:00:00Z"))).toBe(10);
+        expect(
+            costBetween(
+                hourlyCapped,
+                new Date("2026-03-01T00:00:00Z"),
+                new Date("2026-04-30T00:00:00Z")
+            )
+        ).toBe(10);
     });
 
     it("uses the share of the month when only a monthly price is published", () => {
         const monthly = { hourly: null, monthly: 31, currency: "EUR" };
         // March has 31 days: one day is one thirty-first of the price.
-        expect(costBetween(monthly, new Date("2026-03-10T00:00:00Z"), new Date("2026-03-11T00:00:00Z"))).toBe(1);
+        expect(
+            costBetween(monthly, new Date("2026-03-10T00:00:00Z"), new Date("2026-03-11T00:00:00Z"))
+        ).toBe(1);
     });
 
     it("has no figure at all without a price", () => {
-        expect(costBetween({ hourly: null, monthly: null, currency: null }, new Date(0), new Date())).toBeNull();
+        expect(
+            costBetween({ hourly: null, monthly: null, currency: null }, new Date(0), new Date())
+        ).toBeNull();
     });
 
     it("splits since-creation from this month, and stops at destruction", () => {
@@ -65,7 +82,12 @@ describe("cost", () => {
         expect(costs.thisMonth).toBe(2.16);
         // 17 days of March (408 hours, under the cap) and 9 days of April.
         expect(costs.sinceCreation).toBe(6.24);
-        const gone = serverCosts(hourlyCapped, new Date("2026-03-15T00:00:00Z"), new Date("2026-03-16T00:00:00Z"), now);
+        const gone = serverCosts(
+            hourlyCapped,
+            new Date("2026-03-15T00:00:00Z"),
+            new Date("2026-03-16T00:00:00Z"),
+            now
+        );
         expect(gone).toEqual({ sinceCreation: 0.24, thisMonth: 0 });
     });
 

@@ -9,7 +9,12 @@ import { invalid, outcome, type Outcome } from "../lib/outcome";
 import { machineNameSchema, PROVIDERS } from "../lib/providers/types";
 
 const id = z.string().uuid();
-const providerToken = z.string().trim().min(1).max(200).regex(/^[A-Za-z0-9_./:-]+$/);
+const providerToken = z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .regex(/^[A-Za-z0-9_./:-]+$/);
 
 export type Overview = Awaited<ReturnType<typeof service.listServers>> & {
     accounts: service.AccountView[];
@@ -18,7 +23,10 @@ export type Overview = Awaited<ReturnType<typeof service.listServers>> & {
 export async function overviewAction(): Promise<Outcome<Overview>> {
     return outcome(async () => {
         const user = await service.requireCloudUser();
-        const [accounts, servers] = await Promise.all([service.listAccounts(user.id), service.listServers(user.id)]);
+        const [accounts, servers] = await Promise.all([
+            service.listAccounts(user.id),
+            service.listServers(user.id)
+        ]);
         return { accounts, ...servers };
     });
 }
@@ -29,7 +37,9 @@ const accountSchema = z.object({
     credentials: z.record(z.string().max(12_000)).refine((r) => Object.keys(r).length <= 8)
 });
 
-export async function connectAccountAction(input: unknown): Promise<Outcome<{ account: service.AccountView }>> {
+export async function connectAccountAction(
+    input: unknown
+): Promise<Outcome<{ account: service.AccountView }>> {
     const parsed = accountSchema.safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => {
@@ -50,7 +60,9 @@ export async function removeAccountAction(accountId: unknown): Promise<Outcome<o
 
 const optionsSchema = z.object({ accountId: id, region: providerToken.nullable() });
 
-export async function optionsAction(input: unknown): Promise<Outcome<Awaited<ReturnType<typeof service.accountOptions>>>> {
+export async function optionsAction(
+    input: unknown
+): Promise<Outcome<Awaited<ReturnType<typeof service.accountOptions>>>> {
     const parsed = optionsSchema.safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => {
@@ -67,7 +79,9 @@ export const createSchema = z.object({
     image: providerToken
 });
 
-export async function createServerAction(input: unknown): Promise<Outcome<{ server: service.ServerView }>> {
+export async function createServerAction(
+    input: unknown
+): Promise<Outcome<{ server: service.ServerView }>> {
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => {
@@ -76,7 +90,9 @@ export async function createServerAction(input: unknown): Promise<Outcome<{ serv
     });
 }
 
-export async function progressAction(serverId: unknown): Promise<Outcome<{ server: service.ServerView }>> {
+export async function progressAction(
+    serverId: unknown
+): Promise<Outcome<{ server: service.ServerView }>> {
     const parsed = id.safeParse(serverId);
     if (!parsed.success) return invalid();
     return outcome(async () => {

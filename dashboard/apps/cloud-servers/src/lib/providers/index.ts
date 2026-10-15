@@ -21,7 +21,10 @@ const LOADERS: Readonly<Record<ProviderId, () => Promise<{ createAdapter: Factor
 };
 
 /** Build the adapter from a stored credential (JSON), validated again on read. */
-export async function adapterFor(provider: ProviderId, credentialJson: string): Promise<ProviderAdapter> {
+export async function adapterFor(
+    provider: ProviderId,
+    credentialJson: string
+): Promise<ProviderAdapter> {
     const credentials = credentialSchemas[provider].parse(JSON.parse(credentialJson));
     const { createAdapter } = await LOADERS[provider]();
     return createAdapter(credentials as never);

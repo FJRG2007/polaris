@@ -61,7 +61,10 @@ export const SCHEDULE_HOURS = [0, 6, 12, 24, 168] as const;
 
 export const scheduleInput = z.object({
     targetId: id,
-    everyHours: z.number().int().refine((n) => (SCHEDULE_HOURS as readonly number[]).includes(n))
+    everyHours: z
+        .number()
+        .int()
+        .refine((n) => (SCHEDULE_HOURS as readonly number[]).includes(n))
 });
 
 export const scanListInput = z.object({

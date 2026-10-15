@@ -29,7 +29,9 @@ const RETRY_MS = 5 * 60_000;
 
 type State = { failures: Map<string, string>; retrying: Set<string> };
 
-const state: State = ((globalThis as Record<symbol, unknown>)[Symbol.for("polaris.app-bundles.lifecycle")] ??= {
+const state: State = ((globalThis as Record<symbol, unknown>)[
+    Symbol.for("polaris.app-bundles.lifecycle")
+] ??= {
     failures: new Map(),
     retrying: new Set()
 }) as State;
@@ -111,7 +113,8 @@ export async function appInstalled(id: string): Promise<void> {
 
 /** Try again to bring an installed app whose code is not here. */
 export async function retryApp(id: string): Promise<{ error?: string }> {
-    if (!knownApps().includes(id)) return { error: (await readerWords("api"))("refusals.apps.appMissing") };
+    if (!knownApps().includes(id))
+        return { error: (await readerWords("api"))("refusals.apps.appMissing") };
     try {
         await bring(id);
         return {};

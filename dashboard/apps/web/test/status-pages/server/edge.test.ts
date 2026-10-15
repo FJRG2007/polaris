@@ -63,7 +63,7 @@ describe("renderStatusEdge", () => {
                 { hostname: "a.example.com", slug: "dup" },
                 { hostname: "evil.com`) || Host(`x", slug: "bad" },
                 { hostname: "*.example.com", slug: "wild" },
-                { hostname: "ok.example.com", slug: "a\"b" }
+                { hostname: "ok.example.com", slug: 'a"b' }
             ],
             ORIGIN
         );
@@ -86,7 +86,15 @@ describe("custom hostnames", () => {
     });
 
     it("refuses wildcards, IPs, single labels and private names", () => {
-        for (const value of ["*.example.com", "10.0.0.1", "localhost", "nas.local", "box.home.arpa", "a..b.com", "-a.example.com"]) {
+        for (const value of [
+            "*.example.com",
+            "10.0.0.1",
+            "localhost",
+            "nas.local",
+            "box.home.arpa",
+            "a..b.com",
+            "-a.example.com"
+        ]) {
             expect(isCustomHostname(value)).toBe(false);
         }
         expect(isCustomHostname("status.example.co.uk")).toBe(true);
@@ -94,7 +102,8 @@ describe("custom hostnames", () => {
 
     it("takes null to remove the domain", () => {
         expect(
-            customDomainInput.parse({ id: "0190f1a0-0000-7000-8000-000000000002", domain: null }).domain
+            customDomainInput.parse({ id: "0190f1a0-0000-7000-8000-000000000002", domain: null })
+                .domain
         ).toBeNull();
     });
 });

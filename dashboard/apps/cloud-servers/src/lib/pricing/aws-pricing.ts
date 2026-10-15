@@ -95,6 +95,9 @@ export async function awsHourlyPrice(
     });
     const { host: _host, ...sent } = headers;
     const response = await send(ENDPOINT, { method: "POST", headers: sent, body });
-    const answer = parseWith(z.object({ PriceList: z.array(z.string()).max(100) }), await response.json());
+    const answer = parseWith(
+        z.object({ PriceList: z.array(z.string()).max(100) }),
+        await response.json()
+    );
     return readHourlyUsd(answer.PriceList);
 }

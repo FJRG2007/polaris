@@ -16,7 +16,13 @@ import * as net from "node:net";
 import * as dns from "node:dns";
 import * as http from "node:http";
 import * as https from "node:https";
-import { addressAllowed, clampTimeout, type CheckError, type CheckSpec, type ProbeResult } from "../model/checks";
+import {
+    addressAllowed,
+    clampTimeout,
+    type CheckError,
+    type CheckSpec,
+    type ProbeResult
+} from "../model/checks";
 
 /** How much of a body is read to look for a keyword. */
 const BODY_CEILING = 64 * 1024;
@@ -51,7 +57,11 @@ async function vetted(hostname: string): Promise<{ address: string; family: numb
 const guardedLookup: net.LookupFunction = (hostname, options, callback) => {
     vetted(hostname).then(
         (addresses) => {
-            if (options.all) return (callback as unknown as (e: null, a: typeof addresses) => void)(null, addresses);
+            if (options.all)
+                return (callback as unknown as (e: null, a: typeof addresses) => void)(
+                    null,
+                    addresses
+                );
             callback(null, addresses[0]!.address, addresses[0]!.family);
         },
         (error: Error) => callback(error as NodeJS.ErrnoException, "", 0)
@@ -64,7 +74,8 @@ function errorCode(caught: unknown): CheckError {
     if (code === "ETIMEDOUT" || code === "ESOCKETTIMEDOUT") return "timeout";
     if (code === "ECONNREFUSED" || code === "ECONNRESET") return "refused";
     if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "unresolved";
-    if (code.startsWith("ERR_TLS") || code.startsWith("CERT_") || code.includes("SELF_SIGNED")) return "tls";
+    if (code.startsWith("ERR_TLS") || code.startsWith("CERT_") || code.includes("SELF_SIGNED"))
+        return "tls";
     return "network";
 }
 
@@ -129,10 +140,19 @@ function probeHttp(spec: CheckSpec, timeoutMs: number, started: number): Promise
     });
 }
 
-function probeTcp(host: string, port: number, timeoutMs: number, started: number): Promise<ProbeResult> {
+function probeTcp(
+    host: string,
+    port: number,
+    timeoutMs: number,
+    started: number
+): Promise<ProbeResult> {
     return new Promise((resolve) => {
         let settled = false;
-        const socket = net.connect({ host: host.replace(/^\[|\]$/g, ""), port, lookup: guardedLookup });
+        const socket = net.connect({
+            host: host.replace(/^\[|\]$/g, ""),
+            port,
+            lookup: guardedLookup
+        });
         const finish = (result: ProbeResult) => {
             if (settled) return;
             settled = true;
@@ -178,7 +198,11 @@ async function probeDns(spec: CheckSpec, timeoutMs: number, started: number): Pr
         if (code === "ENODATA" || code === "ENOTFOUND") {
             return { kind: "dns", answers: [], latencyMs: Date.now() - started };
         }
-        return { kind: "error", error: code === "ETIMEOUT" ? "timeout" : "unresolved", latencyMs: null };
+        return {
+            kind: "error",
+            error: code === "ETIMEOUT" ? "timeout" : "unresolved",
+            latencyMs: null
+        };
     }
 }
 

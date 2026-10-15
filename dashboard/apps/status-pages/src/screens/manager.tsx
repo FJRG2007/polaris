@@ -25,7 +25,14 @@ import {
 import { StatusView } from "./status-view";
 import { DomainSection } from "./domain-section";
 import { readCache, unwrap, useStatusLocale, useStatusT, writeCache } from "./i18n";
-import { CheckDialog, ComponentDialog, IncidentDialog, MaintenanceDialog, PageDialog, UpdateDialog } from "./forms";
+import {
+    CheckDialog,
+    ComponentDialog,
+    IncidentDialog,
+    MaintenanceDialog,
+    PageDialog,
+    UpdateDialog
+} from "./forms";
 import {
     deleteCheckAction,
     deleteComponentAction,
@@ -84,7 +91,11 @@ function PagesList() {
                 <EmptyState
                     title={t("errors.loadFailed")}
                     description={failed}
-                    action={<Button variant="outline" onClick={load}>{t("actions.retry")}</Button>}
+                    action={
+                        <Button variant="outline" onClick={load}>
+                            {t("actions.retry")}
+                        </Button>
+                    }
                 />
             ) : pages === null ? (
                 <div className="space-y-2" aria-busy>
@@ -107,18 +118,23 @@ function PagesList() {
                                     {page.title}
                                 </p>
                                 <p className="truncate text-xs text-muted-foreground">
-                                    {PUBLIC_BASE}/{page.slug} - {t("list.components", { count: page.components.toString() })}
+                                    {PUBLIC_BASE}/{page.slug} -{" "}
+                                    {t("list.components", { count: page.components.toString() })}
                                 </p>
                             </Link>
                             {page.openIncidents > 0 ? (
                                 <span className="shrink-0 rounded-full bg-danger/15 px-2 py-0.5 text-xs text-danger">
-                                    {t("list.openIncidents", { count: page.openIncidents.toString() })}
+                                    {t("list.openIncidents", {
+                                        count: page.openIncidents.toString()
+                                    })}
                                 </span>
                             ) : null}
                             <span
                                 className={cn(
                                     "shrink-0 rounded-full px-2 py-0.5 text-xs",
-                                    page.published ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+                                    page.published
+                                        ? "bg-success/15 text-success"
+                                        : "bg-muted text-muted-foreground"
                                 )}
                             >
                                 {page.published ? t("page.isPublished") : t("page.isDraft")}
@@ -153,10 +169,18 @@ function PageEditor({ pageId }: { pageId: string }) {
     const [page, setPage] = useState<PageDetail | null>(() => readCache(`page:${pageId}`));
     const [failed, setFailed] = useState<string | null>(null);
     const [editing, setEditing] = useState(false);
-    const [component, setComponent] = useState<{ id: string | null; name: string; description: string } | null>(null);
-    const [check, setCheck] = useState<{ componentId: string; check: CheckView | null } | null>(null);
+    const [component, setComponent] = useState<{
+        id: string | null;
+        name: string;
+        description: string;
+    } | null>(null);
+    const [check, setCheck] = useState<{ componentId: string; check: CheckView | null } | null>(
+        null
+    );
     const [incidentOpen, setIncidentOpen] = useState(false);
-    const [updating, setUpdating] = useState<{ id: string; title: string; state: string } | null>(null);
+    const [updating, setUpdating] = useState<{ id: string; title: string; state: string } | null>(
+        null
+    );
     const [maintenanceOpen, setMaintenanceOpen] = useState(false);
     const [deleting, setDeleting] = useState<Pending | null>(null);
     const [deletePending, setDeletePending] = useState(false);
@@ -192,7 +216,13 @@ function PageEditor({ pageId }: { pageId: string }) {
     const pageInitial = useMemo(
         () =>
             page
-                ? { id: page.id, title: page.title, slug: page.slug, description: page.description, published: page.published }
+                ? {
+                      id: page.id,
+                      title: page.title,
+                      slug: page.slug,
+                      description: page.description,
+                      published: page.published
+                  }
                 : NEW_PAGE,
         [page]
     );
@@ -213,7 +243,10 @@ function PageEditor({ pageId }: { pageId: string }) {
                 ...page,
                 components: page.components
                     .filter((entry) => !(deleting.kind === "component" && entry.id === id))
-                    .map((entry) => ({ ...entry, checks: entry.checks.filter((row) => row.id !== id) })),
+                    .map((entry) => ({
+                        ...entry,
+                        checks: entry.checks.filter((row) => row.id !== id)
+                    })),
                 incidents: page.incidents.filter((row) => row.id !== id),
                 maintenance: page.maintenance.filter((row) => row.id !== id)
             };
@@ -237,7 +270,10 @@ function PageEditor({ pageId }: { pageId: string }) {
 
     const header = (
         <div className="mb-4 space-y-3">
-            <Link href="/status-pages" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+            <Link
+                href="/status-pages"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
                 <ArrowLeft className="size-3.5" aria-hidden /> {t("list.title")}
             </Link>
             <PageHeader
@@ -249,15 +285,30 @@ function PageEditor({ pageId }: { pageId: string }) {
                             <CopyButton value={publicUrl(page.slug)} />
                             {page.published ? (
                                 <Button variant="outline" asChild>
-                                    <a href={`${PUBLIC_BASE}/${page.slug}`} target="_blank" rel="noreferrer">
+                                    <a
+                                        href={`${PUBLIC_BASE}/${page.slug}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
                                         <ExternalLink aria-hidden /> {t("page.open")}
                                     </a>
                                 </Button>
                             ) : null}
-                            <Button variant="outline" onClick={() => setShowPreview((on) => !on)} aria-pressed={showPreview}>
-                                <Eye aria-hidden /> {showPreview ? t("page.hidePreview") : t("page.preview")}
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowPreview((on) => !on)}
+                                aria-pressed={showPreview}
+                            >
+                                <Eye aria-hidden />{" "}
+                                {showPreview ? t("page.hidePreview") : t("page.preview")}
                             </Button>
-                            <Button variant="outline" size="icon" aria-label={t("page.edit")} title={t("page.edit")} onClick={() => setEditing(true)}>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                aria-label={t("page.edit")}
+                                title={t("page.edit")}
+                                onClick={() => setEditing(true)}
+                            >
                                 <Pencil aria-hidden />
                             </Button>
                         </div>
@@ -280,7 +331,11 @@ function PageEditor({ pageId }: { pageId: string }) {
                     <EmptyState
                         title={t("errors.loadFailed")}
                         description={failed}
-                        action={<Button variant="outline" onClick={load}>{t("actions.retry")}</Button>}
+                        action={
+                            <Button variant="outline" onClick={load}>
+                                {t("actions.retry")}
+                            </Button>
+                        }
                     />
                 ) : (
                     <div className="space-y-2" aria-busy>
@@ -299,7 +354,11 @@ function PageEditor({ pageId }: { pageId: string }) {
 
             {showPreview ? (
                 <div className="mb-6 rounded-lg border border-border">
-                    {preview ? <StatusView view={preview} t={t} locale={locale} /> : <Skeleton className="h-64 w-full" />}
+                    {preview ? (
+                        <StatusView view={preview} t={t} locale={locale} />
+                    ) : (
+                        <Skeleton className="h-64 w-full" />
+                    )}
                 </div>
             ) : null}
 
@@ -308,12 +367,19 @@ function PageEditor({ pageId }: { pageId: string }) {
                     <h2 id="sp-components" className="text-sm font-semibold">
                         {t("component.heading")}
                     </h2>
-                    <Button variant="outline" size="sm" onClick={() => setComponent({ id: null, name: "", description: "" })}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setComponent({ id: null, name: "", description: "" })}
+                    >
                         <Plus aria-hidden /> {t("component.add")}
                     </Button>
                 </div>
                 {page.components.length === 0 ? (
-                    <EmptyState title={t("component.emptyTitle")} description={t("component.emptyBody")} />
+                    <EmptyState
+                        title={t("component.emptyTitle")}
+                        description={t("component.emptyBody")}
+                    />
                 ) : (
                     page.components.map((entry) => (
                         <div key={entry.id} className="rounded-lg border border-border bg-card">
@@ -323,10 +389,16 @@ function PageEditor({ pageId }: { pageId: string }) {
                                         {entry.name}
                                     </p>
                                     {entry.description ? (
-                                        <p className="truncate text-xs text-muted-foreground">{entry.description}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {entry.description}
+                                        </p>
                                     ) : null}
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => setCheck({ componentId: entry.id, check: null })}>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setCheck({ componentId: entry.id, check: null })}
+                                >
                                     <Plus aria-hidden /> {t("check.add")}
                                 </Button>
                                 <Button
@@ -334,7 +406,13 @@ function PageEditor({ pageId }: { pageId: string }) {
                                     size="icon-sm"
                                     aria-label={t("component.edit")}
                                     title={t("component.edit")}
-                                    onClick={() => setComponent({ id: entry.id, name: entry.name, description: entry.description })}
+                                    onClick={() =>
+                                        setComponent({
+                                            id: entry.id,
+                                            name: entry.name,
+                                            description: entry.description
+                                        })
+                                    }
                                 >
                                     <Pencil aria-hidden />
                                 </Button>
@@ -343,17 +421,28 @@ function PageEditor({ pageId }: { pageId: string }) {
                                     size="icon-sm"
                                     aria-label={t("component.delete")}
                                     title={t("component.delete")}
-                                    onClick={() => setDeleting({ kind: "component", id: entry.id, name: entry.name })}
+                                    onClick={() =>
+                                        setDeleting({
+                                            kind: "component",
+                                            id: entry.id,
+                                            name: entry.name
+                                        })
+                                    }
                                 >
                                     <Trash2 aria-hidden />
                                 </Button>
                             </div>
                             {entry.checks.length === 0 ? (
-                                <p className="px-4 py-3 text-xs text-muted-foreground">{t("check.none")}</p>
+                                <p className="px-4 py-3 text-xs text-muted-foreground">
+                                    {t("check.none")}
+                                </p>
                             ) : (
                                 <ul className="divide-y divide-border">
                                     {entry.checks.map((row) => (
-                                        <li key={row.id} className="flex items-center gap-2 px-4 py-2">
+                                        <li
+                                            key={row.id}
+                                            className="flex items-center gap-2 px-4 py-2"
+                                        >
                                             <span
                                                 className={cn(
                                                     "size-2 shrink-0 rounded-full",
@@ -368,8 +457,12 @@ function PageEditor({ pageId }: { pageId: string }) {
                                                 aria-hidden
                                             />
                                             <div className="min-w-0 flex-1">
-                                                <p className="truncate text-xs font-medium" title={row.target}>
-                                                    {t(`check.kinds.${row.kind as "http"}`)} - {row.target}
+                                                <p
+                                                    className="truncate text-xs font-medium"
+                                                    title={row.target}
+                                                >
+                                                    {t(`check.kinds.${row.kind as "http"}`)} -{" "}
+                                                    {row.target}
                                                     {row.port ? `:${row.port}` : ""}
                                                 </p>
                                                 <p className="truncate text-[0.6875rem] text-muted-foreground">
@@ -381,7 +474,9 @@ function PageEditor({ pageId }: { pageId: string }) {
                                                 size="icon-xs"
                                                 aria-label={t("check.edit")}
                                                 title={t("check.edit")}
-                                                onClick={() => setCheck({ componentId: entry.id, check: row })}
+                                                onClick={() =>
+                                                    setCheck({ componentId: entry.id, check: row })
+                                                }
                                             >
                                                 <Pencil aria-hidden />
                                             </Button>
@@ -390,7 +485,13 @@ function PageEditor({ pageId }: { pageId: string }) {
                                                 size="icon-xs"
                                                 aria-label={t("check.delete")}
                                                 title={t("check.delete")}
-                                                onClick={() => setDeleting({ kind: "check", id: row.id, name: row.target })}
+                                                onClick={() =>
+                                                    setDeleting({
+                                                        kind: "check",
+                                                        id: row.id,
+                                                        name: row.target
+                                                    })
+                                                }
                                             >
                                                 <Trash2 aria-hidden />
                                             </Button>
@@ -419,26 +520,47 @@ function PageEditor({ pageId }: { pageId: string }) {
                         {page.incidents.map((incident) => (
                             <li key={incident.id} className="flex items-start gap-2 px-4 py-3">
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={incident.title}>
+                                    <p
+                                        className="truncate text-sm font-medium"
+                                        title={incident.title}
+                                    >
                                         {incident.title}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {t(`impact.${incident.impact as "minor"}`)} - {t(`incidentState.${incident.state as "resolved"}`)} -{" "}
-                                        {new Date(incident.startedAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })}
+                                        {t(`impact.${incident.impact as "minor"}`)} -{" "}
+                                        {t(`incidentState.${incident.state as "resolved"}`)} -{" "}
+                                        {new Date(incident.startedAt).toLocaleString(locale, {
+                                            dateStyle: "medium",
+                                            timeStyle: "short"
+                                        })}
                                     </p>
                                     {incident.updates[0] ? (
-                                        <p className="mt-1 line-clamp-2 break-words text-xs">{incident.updates[0].body}</p>
+                                        <p className="mt-1 line-clamp-2 break-words text-xs">
+                                            {incident.updates[0].body}
+                                        </p>
                                     ) : null}
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => setUpdating(incident)}>
-                                    {incident.state === "resolved" ? t("incident.reopen") : t("incident.postUpdate")}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setUpdating(incident)}
+                                >
+                                    {incident.state === "resolved"
+                                        ? t("incident.reopen")
+                                        : t("incident.postUpdate")}
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon-sm"
                                     aria-label={t("incident.delete")}
                                     title={t("incident.delete")}
-                                    onClick={() => setDeleting({ kind: "incident", id: incident.id, name: incident.title })}
+                                    onClick={() =>
+                                        setDeleting({
+                                            kind: "incident",
+                                            id: incident.id,
+                                            name: incident.title
+                                        })
+                                    }
                                 >
                                     <Trash2 aria-hidden />
                                 </Button>
@@ -464,12 +586,22 @@ function PageEditor({ pageId }: { pageId: string }) {
                         {page.maintenance.map((window) => (
                             <li key={window.id} className="flex items-start gap-2 px-4 py-3">
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium" title={window.title}>
+                                    <p
+                                        className="truncate text-sm font-medium"
+                                        title={window.title}
+                                    >
                                         {window.title}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {new Date(window.startsAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })} -{" "}
-                                        {new Date(window.endsAt).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })}
+                                        {new Date(window.startsAt).toLocaleString(locale, {
+                                            dateStyle: "medium",
+                                            timeStyle: "short"
+                                        })}{" "}
+                                        -{" "}
+                                        {new Date(window.endsAt).toLocaleString(locale, {
+                                            dateStyle: "medium",
+                                            timeStyle: "short"
+                                        })}
                                     </p>
                                 </div>
                                 <Button
@@ -477,7 +609,13 @@ function PageEditor({ pageId }: { pageId: string }) {
                                     size="icon-sm"
                                     aria-label={t("maintenance.delete")}
                                     title={t("maintenance.delete")}
-                                    onClick={() => setDeleting({ kind: "maintenance", id: window.id, name: window.title })}
+                                    onClick={() =>
+                                        setDeleting({
+                                            kind: "maintenance",
+                                            id: window.id,
+                                            name: window.title
+                                        })
+                                    }
                                 >
                                     <Trash2 aria-hidden />
                                 </Button>
@@ -487,7 +625,12 @@ function PageEditor({ pageId }: { pageId: string }) {
                 )}
             </section>
 
-            <DomainSection pageId={page.id} domain={page.customDomain} published={page.published} onChanged={load} />
+            <DomainSection
+                pageId={page.id}
+                domain={page.customDomain}
+                published={page.published}
+                onChanged={load}
+            />
 
             <section className="mt-10 rounded-lg border border-danger/40 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -501,7 +644,12 @@ function PageEditor({ pageId }: { pageId: string }) {
                 </div>
             </section>
 
-            <PageDialog open={editing} onOpenChange={setEditing} initial={pageInitial} onSaved={load} />
+            <PageDialog
+                open={editing}
+                onOpenChange={setEditing}
+                initial={pageInitial}
+                onSaved={load}
+            />
             {component ? (
                 <ComponentDialog
                     open
@@ -520,8 +668,19 @@ function PageEditor({ pageId }: { pageId: string }) {
                     onSaved={load}
                 />
             ) : null}
-            <IncidentDialog open={incidentOpen} onOpenChange={setIncidentOpen} pageId={page.id} components={componentNames} onSaved={load} />
-            <UpdateDialog open={updating !== null} onOpenChange={(open) => !open && setUpdating(null)} incident={updating} onSaved={load} />
+            <IncidentDialog
+                open={incidentOpen}
+                onOpenChange={setIncidentOpen}
+                pageId={page.id}
+                components={componentNames}
+                onSaved={load}
+            />
+            <UpdateDialog
+                open={updating !== null}
+                onOpenChange={(open) => !open && setUpdating(null)}
+                incident={updating}
+                onSaved={load}
+            />
             <MaintenanceDialog
                 open={maintenanceOpen}
                 onOpenChange={setMaintenanceOpen}
@@ -550,6 +709,8 @@ function checkLine(row: CheckView, t: ReturnType<typeof useStatusT>, locale: str
     if (row.lastStatus === "up") {
         return t("check.lastUp", { at, ms: (row.lastLatencyMs ?? 0).toString() });
     }
-    const reason = row.lastError ? t(`checkError.${row.lastError as "timeout"}`) : t("checkError.network");
+    const reason = row.lastError
+        ? t(`checkError.${row.lastError as "timeout"}`)
+        : t("checkError.network");
     return t("check.lastDown", { at, reason });
 }

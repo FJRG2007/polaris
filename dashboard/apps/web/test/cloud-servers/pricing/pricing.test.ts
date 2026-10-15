@@ -7,19 +7,33 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { priceFresh, PRICE_TTL_MS } from "@polaris-app/cloud-servers/src/lib/service";
-import { e2Rates, machineHourly, type Sku } from "@polaris-app/cloud-servers/src/lib/pricing/gcp-pricing";
-import { awsHourlyPrice, priceFilters, readHourlyUsd } from "@polaris-app/cloud-servers/src/lib/pricing/aws-pricing";
+import {
+    e2Rates,
+    machineHourly,
+    type Sku
+} from "@polaris-app/cloud-servers/src/lib/pricing/gcp-pricing";
+import {
+    awsHourlyPrice,
+    priceFilters,
+    readHourlyUsd
+} from "@polaris-app/cloud-servers/src/lib/pricing/aws-pricing";
 
 afterEach(() => vi.unstubAllGlobals());
 
 function awsProduct(operation: string, usd: string, unit = "Hrs"): string {
     return JSON.stringify({
-        product: { productFamily: "Compute Instance", attributes: { instanceType: "t3.micro", operation }, sku: "FIXTURESKU" },
+        product: {
+            productFamily: "Compute Instance",
+            attributes: { instanceType: "t3.micro", operation },
+            sku: "FIXTURESKU"
+        },
         serviceCode: "AmazonEC2",
         terms: {
             OnDemand: {
                 "FIXTURESKU.JRTCKXETXF": {
-                    priceDimensions: { "FIXTURESKU.JRTCKXETXF.6YS6EN2CT7": { unit, pricePerUnit: { USD: usd } } }
+                    priceDimensions: {
+                        "FIXTURESKU.JRTCKXETXF.6YS6EN2CT7": { unit, pricePerUnit: { USD: usd } }
+                    }
                 }
             }
         }
@@ -39,7 +53,12 @@ describe("AWS price list", () => {
     });
 
     it("prefers RunInstances over a licensed operation and ignores non-hourly units", () => {
-        expect(readHourlyUsd([awsProduct("RunInstances:0010", "0.05"), awsProduct("RunInstances", "0.0114")])).toBe(0.0114);
+        expect(
+            readHourlyUsd([
+                awsProduct("RunInstances:0010", "0.05"),
+                awsProduct("RunInstances", "0.0114")
+            ])
+        ).toBe(0.0114);
         expect(readHourlyUsd([awsProduct("RunInstances", "0.1", "GB-Mo")])).toBeNull();
         expect(readHourlyUsd([])).toBeNull();
     });
@@ -48,7 +67,12 @@ describe("AWS price list", () => {
         const calls: { url: string; init: RequestInit }[] = [];
         vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
             calls.push({ url, init });
-            return new Response(JSON.stringify({ FormatVersion: "aws_v1", PriceList: [awsProduct("RunInstances", "0.0114")] }));
+            return new Response(
+                JSON.stringify({
+                    FormatVersion: "aws_v1",
+                    PriceList: [awsProduct("RunInstances", "0.0114")]
+                })
+            );
         });
         const price = await awsHourlyPrice(
             { accessKeyId: "AKIDEXAMPLEFIXTURE", secretAccessKey: "fixture/secret" },
@@ -60,23 +84,51 @@ describe("AWS price list", () => {
         expect(calls[0]!.url).toBe("https://api.pricing.us-east-1.amazonaws.com/");
         expect(headers["x-amz-target"]).toBe("AWSPriceListService.GetProducts");
         expect(headers["content-type"]).toBe("application/x-amz-json-1.1");
-        expect(headers.authorization).toMatch(/\/us-east-1\/pricing\/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-target, /);
-        expect(JSON.parse(calls[0]!.init.body as string)).toMatchObject({ ServiceCode: "AmazonEC2", FormatVersion: "aws_v1" });
+        expect(headers.authorization).toMatch(
+            /\/us-east-1\/pricing\/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-target, /
+        );
+        expect(JSON.parse(calls[0]!.init.body as string)).toMatchObject({
+            ServiceCode: "AmazonEC2",
+            FormatVersion: "aws_v1"
+        });
     });
 });
 
-function sku(description: string, group: string, unit: string, units: string, nanos: number, regions = ["europe-west1"], usageType = "OnDemand"): Sku {
+function sku(
+    description: string,
+    group: string,
+    unit: string,
+    units: string,
+    nanos: number,
+    regions = ["europe-west1"],
+    usageType = "OnDemand"
+): Sku {
     return {
         description,
         category: { resourceFamily: "Compute", resourceGroup: group, usageType },
         serviceRegions: regions,
-        pricingInfo: [{ pricingExpression: { usageUnit: unit, tieredRates: [{ unitPrice: { currencyCode: "USD", units, nanos } }] } }]
+        pricingInfo: [
+            {
+                pricingExpression: {
+                    usageUnit: unit,
+                    tieredRates: [{ unitPrice: { currencyCode: "USD", units, nanos } }]
+                }
+            }
+        ]
     };
 }
 
 describe("Google billing catalog", () => {
     const skus = [
-        sku("E2 Instance Core running in Belgium", "CPU", "h", "0", 21_811_590, ["europe-west1"], "Preemptible"),
+        sku(
+            "E2 Instance Core running in Belgium",
+            "CPU",
+            "h",
+            "0",
+            21_811_590,
+            ["europe-west1"],
+            "Preemptible"
+        ),
         sku("E2 Instance Core running in Belgium", "CPU", "h", "0", 21_811_590),
         sku("E2 Instance Ram running in Belgium", "RAM", "GiBy.h", "0", 2_923_530),
         sku("N2 Instance Core running in Belgium", "CPU", "h", "0", 34_773_200),
@@ -84,7 +136,11 @@ describe("Google billing catalog", () => {
     ];
 
     it("picks the region's on-demand E2 core and RAM rates", () => {
-        expect(e2Rates(skus, "europe-west1")).toEqual({ core: 0.02181159, ramGiB: 0.00292353, currency: "USD" });
+        expect(e2Rates(skus, "europe-west1")).toEqual({
+            core: 0.02181159,
+            ramGiB: 0.00292353,
+            currency: "USD"
+        });
         expect(e2Rates(skus, "us-central1")).toBeNull();
     });
 

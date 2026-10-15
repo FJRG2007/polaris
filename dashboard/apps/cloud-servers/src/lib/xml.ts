@@ -16,12 +16,20 @@ export interface XmlNode {
     text: string;
 }
 
-const ENTITIES: Readonly<Record<string, string>> = { lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" };
+const ENTITIES: Readonly<Record<string, string>> = {
+    lt: "<",
+    gt: ">",
+    amp: "&",
+    quot: '"',
+    apos: "'"
+};
 
 function decode(raw: string): string {
     return raw.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-z]+);/g, (whole, entity: string) => {
-        if (entity.startsWith("#x")) return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
-        if (entity.startsWith("#")) return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
+        if (entity.startsWith("#x"))
+            return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
+        if (entity.startsWith("#"))
+            return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
         return ENTITIES[entity] ?? whole;
     });
 }

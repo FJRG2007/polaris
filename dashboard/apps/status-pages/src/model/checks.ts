@@ -32,7 +32,12 @@ export interface CheckSpec {
 
 /** What the network half saw. `error` is set when nothing usable came back. */
 export type ProbeResult =
-    | { readonly kind: "http"; readonly status: number; readonly body: string; readonly latencyMs: number }
+    | {
+          readonly kind: "http";
+          readonly status: number;
+          readonly body: string;
+          readonly latencyMs: number;
+      }
     | { readonly kind: "tcp"; readonly latencyMs: number }
     | { readonly kind: "dns"; readonly answers: readonly string[]; readonly latencyMs: number }
     | { readonly kind: "error"; readonly error: CheckError; readonly latencyMs: number | null };
@@ -132,7 +137,10 @@ export function addressAllowed(address: string): boolean {
         return true;
     }
     const parts = value.split(".").map((part) => Number(part));
-    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    if (
+        parts.length !== 4 ||
+        parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+    ) {
         return false;
     }
     const [a = 0, b = 0] = parts;

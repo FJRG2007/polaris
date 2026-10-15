@@ -107,7 +107,10 @@ export async function runDueChecks(now = new Date()): Promise<number> {
             } catch (caught) {
                 // A check deleted mid-run, or a database hiccup: the next pass
                 // picks it up again, since nextRunAt did not move.
-                console.warn(`[status-pages] check ${row.id} not recorded:`, (caught as Error).message);
+                console.warn(
+                    `[status-pages] check ${row.id} not recorded:`,
+                    (caught as Error).message
+                );
             }
         }
     };

@@ -71,7 +71,11 @@ function useMoney() {
         (amount: number | null, currency: string | null) =>
             amount === null || !currency
                 ? null
-                : new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 4 }).format(amount),
+                : new Intl.NumberFormat(locale, {
+                      style: "currency",
+                      currency,
+                      maximumFractionDigits: 4
+                  }).format(amount),
         [locale]
     );
 }
@@ -172,7 +176,10 @@ export function CloudServersScreen() {
             </header>
 
             {error && (
-                <p role="alert" className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
@@ -213,7 +220,11 @@ export function CloudServersScreen() {
                     <EmptyState
                         icon={<Cloud className="size-5" />}
                         title={t("servers.empty")}
-                        description={accounts.length === 0 ? t("servers.needAccount") : t("servers.emptyHint")}
+                        description={
+                            accounts.length === 0
+                                ? t("servers.needAccount")
+                                : t("servers.emptyHint")
+                        }
                     />
                 ) : (
                     <ServerTable
@@ -300,7 +311,9 @@ function AccountCard({
                 <p className="text-xs text-muted-foreground">{PROVIDER_NAMES[account.provider]}</p>
                 <p className="mt-1 text-sm">
                     {t("accounts.monthTotal")}:{" "}
-                    {sums.length === 0 ? "-" : sums.map(([currency, amount]) => money(amount, currency)).join(" + ")}
+                    {sums.length === 0
+                        ? "-"
+                        : sums.map(([currency, amount]) => money(amount, currency)).join(" + ")}
                 </p>
                 {(totals?.unpriced ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">
@@ -344,25 +357,39 @@ function ServerTable({
     const t = useCloudT();
     const money = useMoney();
     const priceCell = (amount: number | null, currency: string | null) =>
-        money(amount, currency) ?? <span className="text-muted-foreground">{t("servers.noPrice")}</span>;
+        money(amount, currency) ?? (
+            <span className="text-muted-foreground">{t("servers.noPrice")}</span>
+        );
     const menu = (server: ServerView) =>
         server.status === "destroyed" ? null : (
-            <ServerMenu server={server} onPower={onPower} onRefresh={onRefresh} onResize={onResize} onDestroy={onDestroy} />
+            <ServerMenu
+                server={server}
+                onPower={onPower}
+                onRefresh={onRefresh}
+                onResize={onResize}
+                onDestroy={onDestroy}
+            />
         );
     const status = (server: ServerView) => (
-        <Badge variant={TONE[server.status] ?? "neutral"}>{t(`status.${server.status}` as "status.unknown")}</Badge>
+        <Badge variant={TONE[server.status] ?? "neutral"}>
+            {t(`status.${server.status}` as "status.unknown")}
+        </Badge>
     );
     return (
         <>
             {/* Below 640px each server is a stacked card: nothing scrolls sideways. */}
             <ul className="flex flex-col gap-2 sm:hidden">
                 {servers.map((server) => (
-                    <li key={server.id} className="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-3">
+                    <li
+                        key={server.id}
+                        className="flex min-w-0 flex-col gap-2 rounded-lg border border-border p-3"
+                    >
                         <div className="flex min-w-0 items-start justify-between gap-2">
                             <div className="min-w-0">
                                 <ServerName server={server} />
                                 <p className="truncate text-xs text-muted-foreground">
-                                    {PROVIDER_NAMES[server.provider]} - {accountName.get(server.accountId)}
+                                    {PROVIDER_NAMES[server.provider]} -{" "}
+                                    {accountName.get(server.accountId)}
                                 </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-1">
@@ -376,15 +403,25 @@ function ServerTable({
                             <dt className="text-muted-foreground">{t("servers.size")}</dt>
                             <dd className="min-w-0 truncate">{server.size}</dd>
                             <dt className="text-muted-foreground">{t("servers.address")}</dt>
-                            <dd className="min-w-0 truncate font-mono text-xs">{server.ipv4 ?? "-"}</dd>
+                            <dd className="min-w-0 truncate font-mono text-xs">
+                                {server.ipv4 ?? "-"}
+                            </dd>
                             <dt className="text-muted-foreground">{t("servers.hourly")}</dt>
-                            <dd className="min-w-0">{priceCell(server.priceHourly, server.currency)}</dd>
+                            <dd className="min-w-0">
+                                {priceCell(server.priceHourly, server.currency)}
+                            </dd>
                             <dt className="text-muted-foreground">{t("servers.monthly")}</dt>
-                            <dd className="min-w-0">{priceCell(server.priceMonthly, server.currency)}</dd>
+                            <dd className="min-w-0">
+                                {priceCell(server.priceMonthly, server.currency)}
+                            </dd>
                             <dt className="text-muted-foreground">{t("servers.thisMonth")}</dt>
-                            <dd className="min-w-0">{money(server.thisMonth, server.currency) ?? "-"}</dd>
+                            <dd className="min-w-0">
+                                {money(server.thisMonth, server.currency) ?? "-"}
+                            </dd>
                             <dt className="text-muted-foreground">{t("servers.sinceCreation")}</dt>
-                            <dd className="min-w-0">{money(server.sinceCreation, server.currency) ?? "-"}</dd>
+                            <dd className="min-w-0">
+                                {money(server.sinceCreation, server.currency) ?? "-"}
+                            </dd>
                         </dl>
                     </li>
                 ))}
@@ -414,16 +451,28 @@ function ServerTable({
                                 </td>
                                 <td className="px-3 py-2">
                                     <span className="block">{PROVIDER_NAMES[server.provider]}</span>
-                                    <span className="block text-xs text-muted-foreground">{accountName.get(server.accountId)}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {accountName.get(server.accountId)}
+                                    </span>
                                 </td>
                                 <td className="px-3 py-2">{server.region}</td>
                                 <td className="px-3 py-2">{server.size}</td>
                                 <td className="px-3 py-2">{status(server)}</td>
-                                <td className="px-3 py-2 font-mono text-xs">{server.ipv4 ?? "-"}</td>
-                                <td className="px-3 py-2">{priceCell(server.priceHourly, server.currency)}</td>
-                                <td className="px-3 py-2">{priceCell(server.priceMonthly, server.currency)}</td>
-                                <td className="px-3 py-2">{money(server.thisMonth, server.currency) ?? "-"}</td>
-                                <td className="px-3 py-2">{money(server.sinceCreation, server.currency) ?? "-"}</td>
+                                <td className="px-3 py-2 font-mono text-xs">
+                                    {server.ipv4 ?? "-"}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {priceCell(server.priceHourly, server.currency)}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {priceCell(server.priceMonthly, server.currency)}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {money(server.thisMonth, server.currency) ?? "-"}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {money(server.sinceCreation, server.currency) ?? "-"}
+                                </td>
                                 <td className="px-3 py-2 text-right">{menu(server)}</td>
                             </tr>
                         ))}
@@ -452,7 +501,9 @@ function ServerName({ server }: { server: ServerView }) {
                     {server.name}
                 </span>
             )}
-            {server.error && <span className="block break-words text-xs text-danger-ink">{server.error}</span>}
+            {server.error && (
+                <span className="block break-words text-xs text-danger-ink">{server.error}</span>
+            )}
         </>
     );
 }
@@ -489,15 +540,24 @@ function ServerMenu({
                     {t("servers.refresh")}
                 </DropdownMenuItem>
                 {server.status === "off" ? (
-                    <DropdownMenuItem onSelect={() => onPower(server, "power_on")}>{t("servers.powerOn")}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onPower(server, "power_on")}>
+                        {t("servers.powerOn")}
+                    </DropdownMenuItem>
                 ) : (
-                    <DropdownMenuItem onSelect={() => onPower(server, "power_off")}>{t("servers.powerOff")}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onPower(server, "power_off")}>
+                        {t("servers.powerOff")}
+                    </DropdownMenuItem>
                 )}
-                <DropdownMenuItem disabled={server.status === "off"} onSelect={() => onPower(server, "reboot")}>
+                <DropdownMenuItem
+                    disabled={server.status === "off"}
+                    onSelect={() => onPower(server, "reboot")}
+                >
                     {t("servers.reboot")}
                 </DropdownMenuItem>
                 {server.resize !== "none" && (
-                    <DropdownMenuItem onSelect={() => onResize(server)}>{t("servers.resize")}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onResize(server)}>
+                        {t("servers.resize")}
+                    </DropdownMenuItem>
                 )}
                 <DropdownMenuItem className="text-danger-ink" onSelect={() => onDestroy(server)}>
                     {t("servers.destroy")}
@@ -507,7 +567,15 @@ function ServerMenu({
     );
 }
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function Field({
+    label,
+    children,
+    hint
+}: {
+    label: string;
+    children: React.ReactNode;
+    hint?: string;
+}) {
     return (
         <label className="flex min-w-0 flex-col gap-1 text-sm">
             <span className="font-medium">{label}</span>
@@ -533,13 +601,20 @@ function ConnectDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fields = CREDENTIAL_FIELDS[provider];
-    const complete = name.trim().length > 0 && fields.every((f) => (values[f.key] ?? "").trim().length > 0);
+    const complete =
+        name.trim().length > 0 && fields.every((f) => (values[f.key] ?? "").trim().length > 0);
 
     async function submit() {
         setBusy(true);
         setError(null);
-        const credentials = Object.fromEntries(fields.map((f) => [f.key, (values[f.key] ?? "").trim()]));
-        const answer = await actions.connectAccountAction({ provider, name: name.trim(), credentials });
+        const credentials = Object.fromEntries(
+            fields.map((f) => [f.key, (values[f.key] ?? "").trim()])
+        );
+        const answer = await actions.connectAccountAction({
+            provider,
+            name: name.trim(),
+            credentials
+        });
         setBusy(false);
         if (!answer.ok) return setError(answer.error);
         setValues({});
@@ -580,7 +655,8 @@ function ConnectDialog({
                     </Field>
                     {fields.map((field) => {
                         const label = `${t(`accounts.fields.${field.key}` as "accounts.fields.token")} *`;
-                        const set = (value: string) => setValues((v) => ({ ...v, [field.key]: value }));
+                        const set = (value: string) =>
+                            setValues((v) => ({ ...v, [field.key]: value }));
                         return (
                             <Field key={field.key} label={label}>
                                 {field.multiline ? (
@@ -613,7 +689,11 @@ function ConnectDialog({
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         {t("cancel")}
                     </Button>
-                    <Button onClick={submit} disabled={busy || !complete} aria-disabled={busy || !complete}>
+                    <Button
+                        onClick={submit}
+                        disabled={busy || !complete}
+                        aria-disabled={busy || !complete}
+                    >
                         {busy ? t("accounts.checking") : t("accounts.connect")}
                     </Button>
                 </DialogFooter>
@@ -623,7 +703,13 @@ function ConnectDialog({
 }
 
 function useOptions(accountId: string, region: string | null) {
-    const [state, setState] = useState<{ regions: Choice[]; sizes: SizeChoice[]; images: Choice[]; error: string | null; loading: boolean }>({
+    const [state, setState] = useState<{
+        regions: Choice[];
+        sizes: SizeChoice[];
+        images: Choice[];
+        error: string | null;
+        loading: boolean;
+    }>({
         regions: [],
         sizes: [],
         images: [],
@@ -633,14 +719,21 @@ function useOptions(accountId: string, region: string | null) {
     useEffect(() => {
         if (!accountId) return;
         let live = true;
-        setState((s) => ({ ...s, loading: true, error: null, ...(region ? { sizes: [], images: [] } : { regions: [] }) }));
+        setState((s) => ({
+            ...s,
+            loading: true,
+            error: null,
+            ...(region ? { sizes: [], images: [] } : { regions: [] })
+        }));
         void actions.optionsAction({ accountId, region }).then((answer) => {
             if (!live) return;
             if (!answer.ok) return setState((s) => ({ ...s, loading: false, error: answer.error }));
             setState((s) => ({
                 ...s,
                 loading: false,
-                ...(region ? { sizes: [...answer.sizes], images: [...answer.images] } : { regions: [...answer.regions] })
+                ...(region
+                    ? { sizes: [...answer.sizes], images: [...answer.images] }
+                    : { regions: [...answer.regions] })
             }));
         });
         return () => {
@@ -707,7 +800,11 @@ function CreateDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{created ? t("create.progressTitle", { name: created.name }) : t("create.title")}</DialogTitle>
+                    <DialogTitle>
+                        {created
+                            ? t("create.progressTitle", { name: created.name })
+                            : t("create.title")}
+                    </DialogTitle>
                 </DialogHeader>
                 {created ? (
                     <Progress server={created} />
@@ -751,7 +848,11 @@ function CreateDialog({
                                     setImage("");
                                 }}
                             >
-                                <option value="">{regions.loading ? t("create.loading") : t("create.chooseRegion")}</option>
+                                <option value="">
+                                    {regions.loading
+                                        ? t("create.loading")
+                                        : t("create.chooseRegion")}
+                                </option>
                                 {regions.regions.map((r) => (
                                     <option key={r.id} value={r.id}>
                                         {r.label}
@@ -766,11 +867,17 @@ function CreateDialog({
                                 disabled={!region || regional.loading}
                                 onChange={(e) => setSize(e.target.value)}
                             >
-                                <option value="">{regional.loading ? t("create.loading") : t("create.chooseSize")}</option>
+                                <option value="">
+                                    {regional.loading
+                                        ? t("create.loading")
+                                        : t("create.chooseSize")}
+                                </option>
                                 {regional.sizes.map((s) => (
                                     <option key={s.id} value={s.id}>
                                         {s.label}
-                                        {money(s.priceMonthly, s.currency) ? ` - ${money(s.priceMonthly, s.currency)}` : ""}
+                                        {money(s.priceMonthly, s.currency)
+                                            ? ` - ${money(s.priceMonthly, s.currency)}`
+                                            : ""}
                                     </option>
                                 ))}
                             </select>
@@ -782,7 +889,11 @@ function CreateDialog({
                                 disabled={!region || regional.loading}
                                 onChange={(e) => setImage(e.target.value)}
                             >
-                                <option value="">{regional.loading ? t("create.loading") : t("create.chooseImage")}</option>
+                                <option value="">
+                                    {regional.loading
+                                        ? t("create.loading")
+                                        : t("create.chooseImage")}
+                                </option>
                                 {regional.images.map((i) => (
                                     <option key={i.id} value={i.id}>
                                         {i.label}
@@ -793,7 +904,12 @@ function CreateDialog({
                         {chosenSize && (
                             <p className="text-xs text-muted-foreground">
                                 {money(chosenSize.priceMonthly, chosenSize.currency)
-                                    ? t("create.priceNote", { price: money(chosenSize.priceMonthly, chosenSize.currency)! })
+                                    ? t("create.priceNote", {
+                                          price: money(
+                                              chosenSize.priceMonthly,
+                                              chosenSize.currency
+                                          )!
+                                      })
                                     : t("create.noPriceNote")}
                             </p>
                         )}
@@ -812,7 +928,11 @@ function CreateDialog({
                             <Button variant="outline" onClick={onClose}>
                                 {t("cancel")}
                             </Button>
-                            <Button onClick={submit} disabled={busy || !complete} aria-disabled={busy || !complete}>
+                            <Button
+                                onClick={submit}
+                                disabled={busy || !complete}
+                                aria-disabled={busy || !complete}
+                            >
                                 {busy ? t("create.creating") : t("create.submit")}
                             </Button>
                         </>
@@ -857,7 +977,15 @@ function Progress({ server }: { server: ServerView }) {
     );
 }
 
-function ResizeDialog({ server, onClose, onDone }: { server: ServerView; onClose: () => void; onDone: () => void }) {
+function ResizeDialog({
+    server,
+    onClose,
+    onDone
+}: {
+    server: ServerView;
+    onClose: () => void;
+    onDone: () => void;
+}) {
     const t = useCloudT();
     const money = useMoney();
     const options = useOptions(server.accountId, server.region);
@@ -888,13 +1016,17 @@ function ResizeDialog({ server, onClose, onDone }: { server: ServerView; onClose
                         disabled={options.loading || mustStop}
                         onChange={(e) => setSize(e.target.value)}
                     >
-                        <option value="">{options.loading ? t("create.loading") : t("create.chooseSize")}</option>
+                        <option value="">
+                            {options.loading ? t("create.loading") : t("create.chooseSize")}
+                        </option>
                         {options.sizes
                             .filter((s) => s.id !== server.size)
                             .map((s) => (
                                 <option key={s.id} value={s.id}>
                                     {s.label}
-                                    {money(s.priceMonthly, s.currency) ? ` - ${money(s.priceMonthly, s.currency)}` : ""}
+                                    {money(s.priceMonthly, s.currency)
+                                        ? ` - ${money(s.priceMonthly, s.currency)}`
+                                        : ""}
                                 </option>
                             ))}
                     </select>
@@ -908,7 +1040,11 @@ function ResizeDialog({ server, onClose, onDone }: { server: ServerView; onClose
                     <Button variant="outline" onClick={onClose}>
                         {t("cancel")}
                     </Button>
-                    <Button onClick={submit} disabled={busy || !size || mustStop} aria-disabled={busy || !size || mustStop}>
+                    <Button
+                        onClick={submit}
+                        disabled={busy || !size || mustStop}
+                        aria-disabled={busy || !size || mustStop}
+                    >
                         {t("resize.submit")}
                     </Button>
                 </DialogFooter>
@@ -917,7 +1053,15 @@ function ResizeDialog({ server, onClose, onDone }: { server: ServerView; onClose
     );
 }
 
-function DestroyDialog({ server, onClose, onDone }: { server: ServerView; onClose: () => void; onDone: () => void }) {
+function DestroyDialog({
+    server,
+    onClose,
+    onDone
+}: {
+    server: ServerView;
+    onClose: () => void;
+    onDone: () => void;
+}) {
     const t = useCloudT();
     const [typed, setTyped] = useState("");
     const [busy, setBusy] = useState(false);
@@ -940,7 +1084,12 @@ function DestroyDialog({ server, onClose, onDone }: { server: ServerView; onClos
                     <DialogDescription>{t("destroy.body")}</DialogDescription>
                 </DialogHeader>
                 <Field label={t("destroy.typeName", { name: server.name })}>
-                    <Input value={typed} autoComplete="off" spellCheck={false} onChange={(e) => setTyped(e.target.value)} />
+                    <Input
+                        value={typed}
+                        autoComplete="off"
+                        spellCheck={false}
+                        onChange={(e) => setTyped(e.target.value)}
+                    />
                 </Field>
                 {error && (
                     <p role="alert" className="text-sm text-danger-ink">
@@ -951,7 +1100,12 @@ function DestroyDialog({ server, onClose, onDone }: { server: ServerView; onClos
                     <Button variant="outline" onClick={onClose}>
                         {t("cancel")}
                     </Button>
-                    <Button variant="danger" onClick={submit} disabled={busy || !matches} aria-disabled={busy || !matches}>
+                    <Button
+                        variant="danger"
+                        onClick={submit}
+                        disabled={busy || !matches}
+                        aria-disabled={busy || !matches}
+                    >
                         {t("destroy.submit")}
                     </Button>
                 </DialogFooter>

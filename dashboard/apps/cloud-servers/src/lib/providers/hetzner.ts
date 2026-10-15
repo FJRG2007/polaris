@@ -11,12 +11,21 @@
 
 import { z } from "zod";
 import { bearer, callJson, callVoid, ProviderError } from "../http";
-import { isLtsImage, type CloudMachine, type Credentials, type MachineStatus, type ProviderAdapter, type SizeChoice } from "./types";
+import {
+    isLtsImage,
+    type CloudMachine,
+    type Credentials,
+    type MachineStatus,
+    type ProviderAdapter,
+    type SizeChoice
+} from "./types";
 
 const API = "https://api.hetzner.cloud/v1";
 
 const locationsSchema = z.object({
-    locations: z.array(z.object({ name: z.string(), description: z.string(), city: z.string() })).max(200)
+    locations: z
+        .array(z.object({ name: z.string(), description: z.string(), city: z.string() }))
+        .max(200)
 });
 const typeSchema = z.object({
     name: z.string(),
@@ -34,7 +43,15 @@ const typeSchema = z.object({
 });
 const typesSchema = z.object({ server_types: z.array(typeSchema).max(500) });
 const imagesSchema = z.object({
-    images: z.array(z.object({ name: z.string().nullable(), description: z.string(), architecture: z.string() })).max(500)
+    images: z
+        .array(
+            z.object({
+                name: z.string().nullable(),
+                description: z.string(),
+                architecture: z.string()
+            })
+        )
+        .max(500)
 });
 const serverSchema = z.object({
     id: z.number(),
@@ -83,7 +100,11 @@ export function createAdapter(credentials: Credentials<"hetzner">): ProviderAdap
     const headers = bearer(credentials.token);
     const serverPath = (id: string) => `${API}/servers/${encodeURIComponent(id)}`;
     const act = (id: string, verb: string, body: object = {}) =>
-        callVoid(`${serverPath(id)}/actions/${verb}`, { method: "POST", headers, body: JSON.stringify(body) });
+        callVoid(`${serverPath(id)}/actions/${verb}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body)
+        });
     const sizes = async (region: string) =>
         (await callJson(typesSchema, `${API}/server_types?per_page=50`, { headers })).server_types
             .filter((t) => !t.deprecated)
@@ -92,14 +113,20 @@ export function createAdapter(credentials: Credentials<"hetzner">): ProviderAdap
 
     return {
         async listRegions() {
-            const { locations } = await callJson(locationsSchema, `${API}/locations?per_page=50`, { headers });
+            const { locations } = await callJson(locationsSchema, `${API}/locations?per_page=50`, {
+                headers
+            });
             return locations.map((l) => ({ id: l.name, label: `${l.city} (${l.name})` }));
         },
         listSizes: sizes,
         async listImages() {
-            const { images } = await callJson(imagesSchema, `${API}/images?type=system&status=available&per_page=50`, {
-                headers
-            });
+            const { images } = await callJson(
+                imagesSchema,
+                `${API}/images?type=system&status=available&per_page=50`,
+                {
+                    headers
+                }
+            );
             return images
                 .filter((i) => i.name && i.architecture === "x86" && isLtsImage(i.description))
                 .map((i) => ({ id: i.name!, label: i.description }));
@@ -123,14 +150,25 @@ export function createAdapter(credentials: Credentials<"hetzner">): ProviderAdap
         },
         async get(ref) {
             try {
-                return machine((await callJson(z.object({ server: serverSchema }), serverPath(ref.providerId), { headers })).server);
+                return machine(
+                    (
+                        await callJson(
+                            z.object({ server: serverSchema }),
+                            serverPath(ref.providerId),
+                            { headers }
+                        )
+                    ).server
+                );
             } catch (caught) {
                 if (caught instanceof ProviderError && caught.status === 404) return null;
                 throw caught;
             }
         },
         async action(ref, action) {
-            await act(ref.providerId, action === "power_on" ? "poweron" : action === "power_off" ? "poweroff" : "reboot");
+            await act(
+                ref.providerId,
+                action === "power_on" ? "poweron" : action === "power_off" ? "poweroff" : "reboot"
+            );
         },
         async resize(ref, size) {
             // `upgrade_disk: false` keeps the disk, so a smaller type stays possible.

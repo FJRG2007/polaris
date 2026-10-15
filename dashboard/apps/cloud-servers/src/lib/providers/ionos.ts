@@ -23,7 +23,13 @@
 import { z } from "zod";
 import { throwawaySshKey } from "../auth/throwaway";
 import { bearer, callJson, callVoid, ProviderError } from "../http";
-import type { CloudMachine, Credentials, MachineStatus, ProviderAdapter, SizeChoice } from "./types";
+import type {
+    CloudMachine,
+    Credentials,
+    MachineStatus,
+    ProviderAdapter,
+    SizeChoice
+} from "./types";
 
 const API = "https://api.ionos.com/cloudapi/v6";
 
@@ -43,13 +49,28 @@ const locationSchema = z.object({
 const serverSchema = z.object({
     id: z.string(),
     metadata: z.object({ state: z.string() }),
-    properties: z.object({ name: z.string(), cores: z.number(), ram: z.number(), vmState: z.string().optional() }),
+    properties: z.object({
+        name: z.string(),
+        cores: z.number(),
+        ram: z.number(),
+        vmState: z.string().optional()
+    }),
     entities: z
         .object({
             nics: z
-                .object({ items: z.array(z.object({ properties: z.object({ ips: z.array(z.string()).default([]) }) })).default([]) })
+                .object({
+                    items: z
+                        .array(
+                            z.object({
+                                properties: z.object({ ips: z.array(z.string()).default([]) })
+                            })
+                        )
+                        .default([])
+                })
                 .optional(),
-            volumes: z.object({ items: z.array(z.object({ id: z.string() })).default([]) }).optional()
+            volumes: z
+                .object({ items: z.array(z.object({ id: z.string() })).default([]) })
+                .optional()
         })
         .optional()
 });
@@ -77,7 +98,11 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
     const split = (providerId: string) => {
         const [dc, server] = providerId.split("/");
         if (!dc || !server) throw new ProviderError("Unknown IONOS server.", null);
-        return { dc, server, url: `${API}/datacenters/${encodeURIComponent(dc)}/servers/${encodeURIComponent(server)}` };
+        return {
+            dc,
+            server,
+            url: `${API}/datacenters/${encodeURIComponent(dc)}/servers/${encodeURIComponent(server)}`
+        };
     };
 
     async function readServer(providerId: string, location: string): Promise<CloudMachine> {
@@ -96,11 +121,22 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
     async function datacenter(location: string): Promise<{ dc: string; lan: string }> {
         const name = `polaris-cloud-servers-${location.replace("/", "-")}`;
         const list = await callJson(
-            z.object({ items: z.array(z.object({ id: z.string(), properties: z.object({ name: z.string(), location: z.string() }) })).max(1000) }),
+            z.object({
+                items: z
+                    .array(
+                        z.object({
+                            id: z.string(),
+                            properties: z.object({ name: z.string(), location: z.string() })
+                        })
+                    )
+                    .max(1000)
+            }),
             `${API}/datacenters?depth=1`,
             { headers }
         );
-        let dc = list.items.find((d) => d.properties.name === name && d.properties.location === location)?.id;
+        let dc = list.items.find(
+            (d) => d.properties.name === name && d.properties.location === location
+        )?.id;
         if (!dc) {
             dc = (
                 await callJson(z.object({ id: z.string() }), `${API}/datacenters`, {
@@ -111,7 +147,13 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
             ).id;
         }
         const lans = await callJson(
-            z.object({ items: z.array(z.object({ id: z.string(), properties: z.object({ public: z.boolean() }) })).max(100) }),
+            z.object({
+                items: z
+                    .array(
+                        z.object({ id: z.string(), properties: z.object({ public: z.boolean() }) })
+                    )
+                    .max(100)
+            }),
             `${API}/datacenters/${dc}/lans?depth=1`,
             { headers }
         );
@@ -139,16 +181,24 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
 
     return {
         async listRegions() {
-            const answer = await callJson(z.object({ items: z.array(locationSchema).max(100) }), `${API}/locations?depth=1`, { headers });
+            const answer = await callJson(
+                z.object({ items: z.array(locationSchema).max(100) }),
+                `${API}/locations?depth=1`,
+                { headers }
+            );
             return answer.items.map((l) => ({ id: l.id, label: `${l.properties.name} (${l.id})` }));
         },
         async listSizes() {
             return sizes();
         },
         async listImages(region) {
-            const location = await callJson(locationSchema, `${API}/locations/${region.split("/").map(encodeURIComponent).join("/")}`, {
-                headers
-            });
+            const location = await callJson(
+                locationSchema,
+                `${API}/locations/${region.split("/").map(encodeURIComponent).join("/")}`,
+                {
+                    headers
+                }
+            );
             return location.properties.imageAliases
                 .filter((a) => /^(ubuntu|debian):/.test(a) && !a.endsWith("_iso"))
                 .map((a) => ({ id: a, label: a }));
@@ -156,31 +206,39 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
         async create(spec) {
             const { cores, ram } = parseSize(spec.size);
             const { dc, lan } = await datacenter(spec.region);
-            const created = await callJson(z.object({ id: z.string() }), `${API}/datacenters/${dc}/servers`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                    properties: { name: spec.name, cores, ram },
-                    entities: {
-                        volumes: {
-                            items: [
-                                {
-                                    properties: {
-                                        name: `${spec.name}-disk`,
-                                        size: 20,
-                                        type: "SSD Standard",
-                                        imageAlias: spec.image,
-                                        // Public Linux images take keys; Polaris never uses this one.
-                                        sshKeys: [throwawaySshKey()],
-                                        userData: Buffer.from(spec.userData).toString("base64")
+            const created = await callJson(
+                z.object({ id: z.string() }),
+                `${API}/datacenters/${dc}/servers`,
+                {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                        properties: { name: spec.name, cores, ram },
+                        entities: {
+                            volumes: {
+                                items: [
+                                    {
+                                        properties: {
+                                            name: `${spec.name}-disk`,
+                                            size: 20,
+                                            type: "SSD Standard",
+                                            imageAlias: spec.image,
+                                            // Public Linux images take keys; Polaris never uses this one.
+                                            sshKeys: [throwawaySshKey()],
+                                            userData: Buffer.from(spec.userData).toString("base64")
+                                        }
                                     }
-                                }
-                            ]
-                        },
-                        nics: { items: [{ properties: { name: "public", lan: Number(lan), dhcp: true } }] }
-                    }
-                })
-            });
+                                ]
+                            },
+                            nics: {
+                                items: [
+                                    { properties: { name: "public", lan: Number(lan), dhcp: true } }
+                                ]
+                            }
+                        }
+                    })
+                }
+            );
             return {
                 providerId: `${dc}/${created.id}`,
                 name: spec.name,
@@ -200,14 +258,21 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
         },
         async action(ref, action) {
             const { url } = split(ref.providerId);
-            await callVoid(`${url}/${action === "power_on" ? "start" : action === "power_off" ? "stop" : "reboot"}`, {
-                method: "POST",
-                headers
-            });
+            await callVoid(
+                `${url}/${action === "power_on" ? "start" : action === "power_off" ? "stop" : "reboot"}`,
+                {
+                    method: "POST",
+                    headers
+                }
+            );
         },
         async resize(ref, size) {
             const { url } = split(ref.providerId);
-            await callVoid(url, { method: "PATCH", headers, body: JSON.stringify(parseSize(size)) });
+            await callVoid(url, {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify(parseSize(size))
+            });
         },
         async destroy(ref) {
             const { dc, url } = split(ref.providerId);
@@ -216,13 +281,20 @@ export function createAdapter(credentials: Credentials<"ionos">): ProviderAdapte
             await callVoid(url, { method: "DELETE", headers });
             let kept = 0;
             for (const volume of server.entities?.volumes?.items ?? []) {
-                await callVoid(`${API}/datacenters/${encodeURIComponent(dc)}/volumes/${encodeURIComponent(volume.id)}`, {
-                    method: "DELETE",
-                    headers
-                }).catch(() => kept++);
+                await callVoid(
+                    `${API}/datacenters/${encodeURIComponent(dc)}/volumes/${encodeURIComponent(volume.id)}`,
+                    {
+                        method: "DELETE",
+                        headers
+                    }
+                ).catch(() => kept++);
             }
             // A disk left behind is still billed, so it is said rather than swallowed.
-            if (kept > 0) throw new ProviderError("The server was removed but IONOS kept its disk; delete the disk at IONOS.", null);
+            if (kept > 0)
+                throw new ProviderError(
+                    "The server was removed but IONOS kept its disk; delete the disk at IONOS.",
+                    null
+                );
         },
         async monthlyCost() {
             return null;

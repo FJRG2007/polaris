@@ -24,7 +24,11 @@ export function throwawaySshKey(comment = "polaris-unused"): string {
 
 /** RFC 4253 section 6.6: string "ssh-rsa", mpint e, mpint n. */
 export function opensshRsaLine(e: Buffer, n: Buffer, comment: string): string {
-    const blob = Buffer.concat([sshString(Buffer.from("ssh-rsa")), sshString(mpint(e)), sshString(mpint(n))]);
+    const blob = Buffer.concat([
+        sshString(Buffer.from("ssh-rsa")),
+        sshString(mpint(e)),
+        sshString(mpint(n))
+    ]);
     return `ssh-rsa ${blob.toString("base64")} ${comment}`;
 }
 

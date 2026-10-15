@@ -67,7 +67,9 @@ export async function send(url: string, init: CallInit = {}): Promise<Response> 
         } catch (caught) {
             const timedOut = caught instanceof Error && caught.name === "TimeoutError";
             throw new ProviderError(
-                timedOut ? "The provider did not answer in time." : "The provider could not be reached.",
+                timedOut
+                    ? "The provider did not answer in time."
+                    : "The provider could not be reached.",
                 null
             );
         }

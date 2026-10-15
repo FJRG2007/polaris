@@ -13,7 +13,15 @@ import { securityCatalogs } from "../../messages";
 import type { SecurityTranslator } from "../lib/i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, FileDiff, Package, ServerCog, ShieldCheck } from "lucide-react";
-import { Button, Card, CardBody, ConfirmDeleteDialog, EmptyState, Skeleton, Switch } from "@polaris/ui";
+import {
+    Button,
+    Card,
+    CardBody,
+    ConfirmDeleteDialog,
+    EmptyState,
+    Skeleton,
+    Switch
+} from "@polaris/ui";
 
 function useSecurityT(): SecurityTranslator {
     return securityCatalogs.translator(hostUi.i18nProvider.useLocale(), "security");
@@ -22,7 +30,10 @@ function useSecurityT(): SecurityTranslator {
 type Servers = Extract<Awaited<ReturnType<typeof actions.serversAction>>, { ok: true }>["data"];
 type Overview = Extract<Awaited<ReturnType<typeof actions.overviewAction>>, { ok: true }>["data"];
 type Scan = Overview["scans"][number];
-type Finding = Extract<Awaited<ReturnType<typeof actions.findingsAction>>, { ok: true }>["data"][number];
+type Finding = Extract<
+    Awaited<ReturnType<typeof actions.findingsAction>>,
+    { ok: true }
+>["data"][number];
 type Tab = "malware" | "files" | "host" | "images";
 
 const TABS: readonly { id: Tab; icon: typeof Bug }[] = [
@@ -31,7 +42,12 @@ const TABS: readonly { id: Tab; icon: typeof Bug }[] = [
     { id: "host", icon: ServerCog },
     { id: "images", icon: Package }
 ];
-const KIND_OF: Record<Tab, string> = { malware: "malware", files: "files", host: "audit", images: "image" };
+const KIND_OF: Record<Tab, string> = {
+    malware: "malware",
+    files: "files",
+    host: "audit",
+    images: "image"
+};
 const SEVERITY_TONE: Record<string, string> = {
     critical: "text-danger",
     high: "text-danger",
@@ -68,7 +84,10 @@ export function SecurityView() {
     const [failed, setFailed] = useState(false);
     const [notice, setNotice] = useState<string | null>(null);
 
-    const error = useCallback((code: string) => setNotice(t(`errors.${code}` as never) || t("errors.failed")), [t]);
+    const error = useCallback(
+        (code: string) => setNotice(t(`errors.${code}` as never) || t("errors.failed")),
+        [t]
+    );
 
     useEffect(() => {
         void actions.serversAction().then((result) => {
@@ -96,7 +115,9 @@ export function SecurityView() {
     }, [current, load]);
 
     // While something is queued or running, look again every few seconds.
-    const busy = overview?.scans.some((scan) => scan.state === "queued" || scan.state === "running");
+    const busy = overview?.scans.some(
+        (scan) => scan.state === "queued" || scan.state === "running"
+    );
     useEffect(() => {
         if (!busy) return;
         const timer = setInterval(() => void load(), 5000);
@@ -155,7 +176,9 @@ export function SecurityView() {
                         aria-selected={tab === id}
                         onClick={() => setTab(id)}
                         className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${
-                            tab === id ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
+                            tab === id
+                                ? "border-primary text-foreground"
+                                : "border-transparent text-muted-foreground"
                         }`}
                     >
                         <Icon className="size-4" aria-hidden /> {t(`tabs.${id}`)}
@@ -182,7 +205,12 @@ export function SecurityView() {
             ) : (
                 <>
                     {tab === "malware" ? (
-                        <MalwarePanel t={t} overview={overview} targetId={current} submit={submit} />
+                        <MalwarePanel
+                            t={t}
+                            overview={overview}
+                            targetId={current}
+                            submit={submit}
+                        />
                     ) : tab === "files" ? (
                         <FilesPanel t={t} overview={overview} targetId={current} submit={submit} />
                     ) : tab === "host" ? (
@@ -197,7 +225,10 @@ export function SecurityView() {
     );
 }
 
-type Submit = (work: () => Promise<{ ok: boolean; error?: string }>, done?: string) => Promise<void>;
+type Submit = (
+    work: () => Promise<{ ok: boolean; error?: string }>,
+    done?: string
+) => Promise<void>;
 
 function MalwarePanel({
     t,
@@ -257,7 +288,10 @@ function MalwarePanel({
                                 () =>
                                     actions.scanMalwareAction({
                                         targetId,
-                                        volumes: [...chosen].map((volumeId) => ({ volumeId, subpath: folder }))
+                                        volumes: [...chosen].map((volumeId) => ({
+                                            volumeId,
+                                            subpath: folder
+                                        }))
                                     }),
                                 t("queued")
                             )
@@ -274,20 +308,30 @@ function MalwarePanel({
                         {overview.quarantine.map((item) => (
                             <li key={item.id} className="flex min-w-0 items-center gap-2 text-sm">
                                 <span className="min-w-0 flex-1 truncate" title={item.path}>
-                                    {item.path} <span className="text-muted-foreground">({item.signature})</span>
+                                    {item.path}{" "}
+                                    <span className="text-muted-foreground">
+                                        ({item.signature})
+                                    </span>
                                 </span>
                                 <Button
                                     size="xs"
                                     variant="outline"
                                     onClick={() =>
                                         void submit(() =>
-                                            actions.settleQuarantineAction({ quarantineId: item.id, op: "restore" })
+                                            actions.settleQuarantineAction({
+                                                quarantineId: item.id,
+                                                op: "restore"
+                                            })
                                         )
                                     }
                                 >
                                     {t("malware.restore")}
                                 </Button>
-                                <Button size="xs" variant="danger" onClick={() => setRemoving(item.id)}>
+                                <Button
+                                    size="xs"
+                                    variant="danger"
+                                    onClick={() => setRemoving(item.id)}
+                                >
                                     {t("malware.delete")}
                                 </Button>
                             </li>
@@ -303,7 +347,10 @@ function MalwarePanel({
                     onConfirm={() => {
                         const id = removing;
                         setRemoving(null);
-                        if (id) void submit(() => actions.settleQuarantineAction({ quarantineId: id, op: "delete" }));
+                        if (id)
+                            void submit(() =>
+                                actions.settleQuarantineAction({ quarantineId: id, op: "delete" })
+                            );
                     }}
                 />
             </CardBody>
@@ -325,7 +372,10 @@ function FilesPanel({
     const [volumeId, setVolumeId] = useState(overview.volumes[0]?.id ?? "");
     const [folder, setFolder] = useState("");
     const run = (mode: "baseline" | "check", vId = volumeId, subpath = folder) =>
-        void submit(() => actions.scanFilesAction({ targetId, volumeId: vId, subpath, mode }), t("queued"));
+        void submit(
+            () => actions.scanFilesAction({ targetId, volumeId: vId, subpath, mode }),
+            t("queued")
+        );
     return (
         <Card>
             <CardBody className="flex flex-col gap-3">
@@ -367,7 +417,11 @@ function FilesPanel({
                                         {t("files.fileCount", { count: b.files })}
                                     </span>
                                 </span>
-                                <Button size="xs" variant="outline" onClick={() => run("check", b.volumeId, b.subpath)}>
+                                <Button
+                                    size="xs"
+                                    variant="outline"
+                                    onClick={() => run("check", b.volumeId, b.subpath)}
+                                >
                                     {t("files.check")}
                                 </Button>
                             </li>
@@ -415,7 +469,11 @@ function HostPanel({
                 <div className="flex flex-col gap-2">
                     <p className="text-sm text-muted-foreground">{t("host.hint")}</p>
                     <div>
-                        <Button onClick={() => void submit(() => actions.auditAction({ targetId }), t("queued"))}>
+                        <Button
+                            onClick={() =>
+                                void submit(() => actions.auditAction({ targetId }), t("queued"))
+                            }
+                        >
                             {t("host.run")}
                         </Button>
                     </div>
@@ -440,7 +498,8 @@ function HostPanel({
                                 setPending(true);
                                 await submit(async () => {
                                     const result = await actions.updatesStatusAction({ targetId });
-                                    if (result.ok && result.data.state) setUpdates(result.data.state);
+                                    if (result.ok && result.data.state)
+                                        setUpdates(result.data.state);
                                     return result;
                                 });
                                 setPending(false);
@@ -470,7 +529,10 @@ function HostPanel({
                             const previous = every;
                             setEvery(next);
                             void submit(async () => {
-                                const result = await actions.scheduleAction({ targetId, everyHours: next });
+                                const result = await actions.scheduleAction({
+                                    targetId,
+                                    everyHours: next
+                                });
                                 if (!result.ok) setEvery(previous);
                                 return result;
                             });
@@ -514,7 +576,11 @@ function ImagesPanel({
                                 variant="outline"
                                 onClick={() =>
                                     void submit(
-                                        () => actions.scanImageAction({ targetId, applicationId: app.id }),
+                                        () =>
+                                            actions.scanImageAction({
+                                                targetId,
+                                                applicationId: app.id
+                                            }),
                                         t("queued")
                                     )
                                 }
@@ -535,7 +601,11 @@ function summaryLine(t: SecurityTranslator, scan: Scan): string {
     if (scan.kind === "malware") return t("malware.found", { count: Number(s.found ?? 0) });
     if (scan.kind === "files") {
         return s.mode === "check"
-            ? t("files.changes", { added: Number(s.added), removed: Number(s.removed), changed: Number(s.changed) })
+            ? t("files.changes", {
+                  added: Number(s.added),
+                  removed: Number(s.removed),
+                  changed: Number(s.changed)
+              })
             : t("files.fileCount", { count: Number(s.files ?? 0) });
     }
     if (scan.kind === "audit") {
@@ -566,20 +636,33 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                     {scans.map((scan) => (
                         <li key={scan.id} className="rounded-md border border-border p-2 text-sm">
                             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                                <span className="min-w-0 flex-1 truncate font-medium" title={scan.label}>
+                                <span
+                                    className="min-w-0 flex-1 truncate font-medium"
+                                    title={scan.label}
+                                >
                                     {scan.kind === "audit" ? t("thisServer") : scan.label}
                                 </span>
-                                <span className="text-muted-foreground">{t(`state.${scan.state}` as never)}</span>
+                                <span className="text-muted-foreground">
+                                    {t(`state.${scan.state}` as never)}
+                                </span>
                                 <span className="text-muted-foreground">
                                     {new Date(scan.createdAt).toLocaleString()}
                                 </span>
-                                {scan.kind === "image" && (scan.summary as { sbom?: boolean }).sbom ? (
-                                    <a className="text-primary underline" href={`/api/security/sbom/${scan.id}`}>
+                                {scan.kind === "image" &&
+                                (scan.summary as { sbom?: boolean }).sbom ? (
+                                    <a
+                                        className="text-primary underline"
+                                        href={`/api/security/sbom/${scan.id}`}
+                                    >
                                         {t("images.download")}
                                     </a>
                                 ) : null}
                                 {scan.state === "done" ? (
-                                    <Button size="xs" variant="ghost" onClick={() => void show(scan.id)}>
+                                    <Button
+                                        size="xs"
+                                        variant="ghost"
+                                        onClick={() => void show(scan.id)}
+                                    >
                                         {open === scan.id ? t("hide") : t("details")}
                                     </Button>
                                 ) : null}
@@ -593,30 +676,55 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
                                 ) : (
                                     <ul className="mt-2 flex max-h-96 flex-col gap-1 overflow-y-auto">
                                         {findings.map((f) => (
-                                            <li key={f.id} className="flex min-w-0 flex-wrap items-center gap-2">
-                                                <span className={`shrink-0 font-medium ${SEVERITY_TONE[f.severity] ?? ""}`}>
+                                            <li
+                                                key={f.id}
+                                                className="flex min-w-0 flex-wrap items-center gap-2"
+                                            >
+                                                <span
+                                                    className={`shrink-0 font-medium ${SEVERITY_TONE[f.severity] ?? ""}`}
+                                                >
                                                     {severityLabel(t, f.severity)}
                                                 </span>
-                                                <span className="min-w-0 flex-1 truncate" title={`${f.title} ${f.location}`}>
+                                                <span
+                                                    className="min-w-0 flex-1 truncate"
+                                                    title={`${f.title} ${f.location}`}
+                                                >
                                                     {f.url ? (
-                                                        <a href={f.url} target="_blank" rel="noreferrer noopener" className="underline">
+                                                        <a
+                                                            href={f.url}
+                                                            target="_blank"
+                                                            rel="noreferrer noopener"
+                                                            className="underline"
+                                                        >
                                                             {f.title}
                                                         </a>
                                                     ) : (
                                                         f.title
                                                     )}{" "}
-                                                    <span className="text-muted-foreground">{f.location}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {f.location}
+                                                    </span>
                                                 </span>
                                                 {scan.kind === "image" ? (
                                                     <span className="shrink-0 text-muted-foreground">
-                                                        {f.fixedIn ? t("images.fixedIn", { version: f.fixedIn }) : t("images.noFix")}
+                                                        {f.fixedIn
+                                                            ? t("images.fixedIn", {
+                                                                  version: f.fixedIn
+                                                              })
+                                                            : t("images.noFix")}
                                                     </span>
                                                 ) : null}
                                                 {scan.kind === "malware" && f.volumeId ? (
                                                     <Button
                                                         size="xs"
                                                         variant="danger"
-                                                        onClick={() => void submit(() => actions.quarantineAction({ findingId: f.id }))}
+                                                        onClick={() =>
+                                                            void submit(() =>
+                                                                actions.quarantineAction({
+                                                                    findingId: f.id
+                                                                })
+                                                            )
+                                                        }
                                                     >
                                                         {t("malware.quarantine")}
                                                     </Button>
@@ -636,7 +744,8 @@ function History({ t, scans, submit }: { t: SecurityTranslator; scans: Scan[]; s
 
 function severityLabel(t: SecurityTranslator, severity: string): string {
     if (severity === "warning" || severity === "suggestion") return t(`host.${severity}`);
-    if (severity === "added" || severity === "removed" || severity === "changed") return t(`files.${severity}`);
+    if (severity === "added" || severity === "removed" || severity === "changed")
+        return t(`files.${severity}`);
     if (severity === "found") return t("tabs.malware");
     return t(`images.severity.${severity}` as never);
 }

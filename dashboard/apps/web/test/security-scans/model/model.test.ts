@@ -63,7 +63,9 @@ describe("file manifests", () => {
     });
 
     it("caps the lists but keeps the real totals", () => {
-        const now = new Map(Array.from({ length: 300 }, (_, i) => [`f${i}`, HASH_A] as [string, string]));
+        const now = new Map(
+            Array.from({ length: 300 }, (_, i) => [`f${i}`, HASH_A] as [string, string])
+        );
         const diff = parse.diffManifests(new Map(), now, 10);
         expect(diff.added).toHaveLength(10);
         expect(diff.totals.added).toBe(300);
@@ -143,14 +145,22 @@ describe("image vulnerabilities", () => {
                 artifact: { name: "openssl", version: "1.2.3" }
             },
             {
-                vulnerability: { id: "CVE-2024-0002", severity: "Critical", fix: { versions: [] }, dataSource: "javascript:x" },
+                vulnerability: {
+                    id: "CVE-2024-0002",
+                    severity: "Critical",
+                    fix: { versions: [] },
+                    dataSource: "javascript:x"
+                },
                 artifact: { name: "zlib", version: "1.0" }
             },
             {
                 vulnerability: { id: "CVE-2024-0002", severity: "Critical" },
                 artifact: { name: "zlib", version: "1.0" }
             },
-            { vulnerability: { id: "GHSA-x", severity: "weird" }, artifact: { name: "left-pad", version: "1" } },
+            {
+                vulnerability: { id: "GHSA-x", severity: "weird" },
+                artifact: { name: "left-pad", version: "1" }
+            },
             { vulnerability: {}, artifact: {} }
         ]
     };
@@ -162,7 +172,11 @@ describe("image vulnerabilities", () => {
         expect(report.counts.critical).toBe(1);
         expect(report.counts.high).toBe(1);
         expect(report.counts.unknown).toBe(1);
-        expect(report.items.map((item) => item.id)).toEqual(["CVE-2024-0002", "CVE-2024-0001", "GHSA-x"]);
+        expect(report.items.map((item) => item.id)).toEqual([
+            "CVE-2024-0002",
+            "CVE-2024-0001",
+            "GHSA-x"
+        ]);
         expect(report.items[1]!.fixedIn).toBe("1.2.4");
         expect(report.items[0]!.fixedIn).toBeNull();
         expect(report.items[0]!.url).toBeNull();
@@ -176,7 +190,11 @@ describe("image vulnerabilities", () => {
 
     it("summarizes a CycloneDX inventory", () => {
         expect(
-            parse.summarizeSbom({ bomFormat: "CycloneDX", specVersion: "1.6", components: [{}, {}] })
+            parse.summarizeSbom({
+                bomFormat: "CycloneDX",
+                specVersion: "1.6",
+                components: [{}, {}]
+            })
         ).toEqual({ format: "CycloneDX", specVersion: "1.6", components: 2 });
         expect(parse.summarizeSbom({ spdxVersion: "SPDX-2.3" })).toBeNull();
     });
@@ -202,7 +220,12 @@ describe("one-off specs", () => {
         expect(svc.pullPolicy).toBe("missing");
         expect(svc.restart).toBe("no");
         expect(svc.entrypoint).toEqual(["/bin/sh", "-c"]);
-        expect(svc.command).toEqual([specs.MALWARE_SCRIPT, "polaris", "/scan/0", "/scan/1/up loads"]);
+        expect(svc.command).toEqual([
+            specs.MALWARE_SCRIPT,
+            "polaris",
+            "/scan/0",
+            "/scan/1/up loads"
+        ]);
         expect(spec.volumes).toEqual(["signatures"]);
         expect(spec.externalVolumes).toEqual(["polaris-aaaa_data", "polaris-bbbb_files"]);
         expect(svc.volumes.map((v) => v.target)).toEqual(["/var/lib/clamav", "/scan/0", "/scan/1"]);
@@ -212,15 +235,29 @@ describe("one-off specs", () => {
     it("never splices a person's value into a script", () => {
         const evil = 'a"; rm -rf / #';
         const hold = specs.quarantineSpec("hold", "polaris-aaaa_data", evil, "f-1");
-        expect(hold.services[0]!.command).toEqual([specs.QUARANTINE_SCRIPTS.hold, "polaris", evil, "f-1"]);
-        for (const script of [specs.MALWARE_SCRIPT, specs.FILES_SCRIPT, ...Object.values(specs.QUARANTINE_SCRIPTS)]) {
+        expect(hold.services[0]!.command).toEqual([
+            specs.QUARANTINE_SCRIPTS.hold,
+            "polaris",
+            evil,
+            "f-1"
+        ]);
+        for (const script of [
+            specs.MALWARE_SCRIPT,
+            specs.FILES_SCRIPT,
+            ...Object.values(specs.QUARANTINE_SCRIPTS)
+        ]) {
             expect(script).not.toMatch(/[\n\r]/);
             expect(script).not.toContain(evil);
         }
     });
 
     it("pins every image by digest", () => {
-        for (const image of [specs.TOOLS_IMAGE, specs.MALWARE_IMAGE, specs.VULN_IMAGE, specs.SBOM_IMAGE]) {
+        for (const image of [
+            specs.TOOLS_IMAGE,
+            specs.MALWARE_IMAGE,
+            specs.VULN_IMAGE,
+            specs.SBOM_IMAGE
+        ]) {
             expect(image).toMatch(/@sha256:[0-9a-f]{64}$/);
         }
     });
@@ -242,7 +279,12 @@ describe("one-off specs", () => {
         expect(vuln.volumes).toEqual(["cache"]);
         expect(vuln.externalVolumes).toEqual([VOLUME]);
         expect(vuln.services[0]!.volumes.map((v) => v.target)).toEqual(["/cache", "/in"]);
-        expect(vuln.services[0]!.command).toEqual(["docker-archive:/in/image.tar", "-o", "json", "-q"]);
+        expect(vuln.services[0]!.command).toEqual([
+            "docker-archive:/in/image.tar",
+            "-o",
+            "json",
+            "-q"
+        ]);
         expect(sbom.services[0]!.command).toEqual([
             "docker-archive:/in/image.tar",
             "-o",
@@ -261,7 +303,8 @@ describe("one-off specs", () => {
             expect(command.join(" ")).not.toContain("docker.sock");
         }
         expect(argv.remove).toEqual(["docker", "volume", "rm", "-f", VOLUME]);
-        const df = "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 100 50 2097152 50% /in\n";
+        const df =
+            "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 100 50 2097152 50% /in\n";
         expect(specs.parseDfFree(df)).toBe(2 * 1024 ** 3);
         expect(specs.parseDfFree("nonsense")).toBeNull();
         expect(specs.hasRoom(1024, 2 * 1024 ** 3)).toBe(true);
@@ -271,7 +314,14 @@ describe("one-off specs", () => {
     it("sweeps only exports no running scan owns", () => {
         const other = "0190a5f2-8c3e-7d4a-9b1c-aaaaaaaaaaaa";
         const leftover = specs.exportVolumeName(other);
-        const listed = [VOLUME, leftover, ` ${leftover}`, "polaris-abcd_data", "x-polaris-secscan-image-0123abcd", ""];
+        const listed = [
+            VOLUME,
+            leftover,
+            ` ${leftover}`,
+            "polaris-abcd_data",
+            "x-polaris-secscan-image-0123abcd",
+            ""
+        ];
         expect(specs.staleExports(listed, [SCAN_ID])).toEqual([leftover]);
         expect(specs.staleExports(listed, [SCAN_ID, other])).toEqual([]);
         expect(specs.staleExports(listed, [])).toEqual([VOLUME, leftover]);
@@ -333,10 +383,17 @@ describe("inputs", () => {
         const id = "0190a5f2-8c3e-7d4a-9b1c-2e3f4a5b6c7d";
         expect(schemas.malwareInput.safeParse({ targetId: id, volumes: [] }).success).toBe(false);
         expect(
-            schemas.malwareInput.safeParse({ targetId: id, volumes: [{ volumeId: id }] }).data?.volumes[0]
+            schemas.malwareInput.safeParse({ targetId: id, volumes: [{ volumeId: id }] }).data
+                ?.volumes[0]
         ).toEqual({ volumeId: id, subpath: "" });
-        expect(schemas.scheduleInput.safeParse({ targetId: id, everyHours: 5 }).success).toBe(false);
-        expect(schemas.scheduleInput.safeParse({ targetId: id, everyHours: 24 }).success).toBe(true);
-        expect(schemas.updatesInput.safeParse({ targetId: "x", enabled: true }).success).toBe(false);
+        expect(schemas.scheduleInput.safeParse({ targetId: id, everyHours: 5 }).success).toBe(
+            false
+        );
+        expect(schemas.scheduleInput.safeParse({ targetId: id, everyHours: 24 }).success).toBe(
+            true
+        );
+        expect(schemas.updatesInput.safeParse({ targetId: "x", enabled: true }).success).toBe(
+            false
+        );
     });
 });

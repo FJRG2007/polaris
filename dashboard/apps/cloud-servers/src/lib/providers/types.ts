@@ -6,7 +6,16 @@
 
 import { z } from "zod";
 
-export const PROVIDERS = ["digitalocean", "hetzner", "vultr", "linode", "aws", "azure", "gcp", "ionos"] as const;
+export const PROVIDERS = [
+    "digitalocean",
+    "hetzner",
+    "vultr",
+    "linode",
+    "aws",
+    "azure",
+    "gcp",
+    "ionos"
+] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 
 export const PROVIDER_NAMES: Readonly<Record<ProviderId, string>> = {
@@ -29,7 +38,10 @@ export const credentialSchemas = {
     vultr: z.object({ token: secret(200) }),
     linode: z.object({ token: secret(200) }),
     aws: z.object({
-        accessKeyId: z.string().trim().regex(/^[A-Z0-9]{16,128}$/),
+        accessKeyId: z
+            .string()
+            .trim()
+            .regex(/^[A-Z0-9]{16,128}$/),
         secretAccessKey: secret(128)
     }),
     azure: z.object({
@@ -45,7 +57,9 @@ export const credentialSchemas = {
 export type Credentials<P extends ProviderId> = z.infer<(typeof credentialSchemas)[P]>;
 
 /** The fields each provider's form asks for, in order. */
-export const CREDENTIAL_FIELDS: Readonly<Record<ProviderId, readonly { key: string; secret: boolean; multiline?: boolean }[]>> = {
+export const CREDENTIAL_FIELDS: Readonly<
+    Record<ProviderId, readonly { key: string; secret: boolean; multiline?: boolean }[]>
+> = {
     digitalocean: [{ key: "token", secret: true }],
     hetzner: [{ key: "token", secret: true }],
     vultr: [{ key: "token", secret: true }],

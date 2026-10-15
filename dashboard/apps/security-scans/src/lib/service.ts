@@ -72,7 +72,13 @@ async function volumesOf(targetId: string, ids?: readonly string[]): Promise<Vol
             applicationId: { not: null },
             ...(ids ? { id: { in: [...ids] } } : {})
         },
-        select: { id: true, name: true, source: true, applicationId: true, application: { select: { name: true } } },
+        select: {
+            id: true,
+            name: true,
+            source: true,
+            applicationId: true,
+            application: { select: { name: true } }
+        },
         orderBy: { createdAt: "asc" },
         take: 200
     });
@@ -154,7 +160,14 @@ export async function serverOverview(targetId: string) {
         }),
         prisma.securityBaseline.findMany({
             where: { targetId },
-            select: { id: true, volumeId: true, subpath: true, label: true, files: true, createdAt: true },
+            select: {
+                id: true,
+                volumeId: true,
+                subpath: true,
+                label: true,
+                files: true,
+                createdAt: true
+            },
             take: 100
         })
     ]);
@@ -228,7 +241,10 @@ export async function queueMalware(
     chosen: readonly { volumeId: string; subpath: string }[],
     userId: string | null
 ): Promise<string> {
-    const volumes = await volumesOf(targetId, chosen.map((c) => c.volumeId));
+    const volumes = await volumesOf(
+        targetId,
+        chosen.map((c) => c.volumeId)
+    );
     if (volumes.length === 0) throw new ScanFailure("noVolumes");
     const label = volumes.length === 1 ? volumes[0]!.label : `${volumes.length} volumes`;
     return enqueue(targetId, "malware", label, { volumes: chosen }, userId);
@@ -370,7 +386,8 @@ async function execute(scanId: string): Promise<void> {
         ]);
     } catch (caught) {
         const code = caught instanceof ScanFailure ? caught.code : "failed";
-        if (!(caught instanceof ScanFailure)) console.error(`polaris: security scan ${scanId}:`, caught);
+        if (!(caught instanceof ScanFailure))
+            console.error(`polaris: security scan ${scanId}:`, caught);
         await prisma.securityScan.update({
             where: { id: scanId },
             data: { state: "failed", finishedAt: new Date(), error: code }
@@ -397,7 +414,10 @@ async function runMalware(target: ScanTarget, input: Record<string, unknown>): P
     const chosen = Array.isArray(input.volumes)
         ? (input.volumes as { volumeId: string; subpath: string }[])
         : [];
-    const rows = await volumesOf(target.id, chosen.map((c) => c.volumeId));
+    const rows = await volumesOf(
+        target.id,
+        chosen.map((c) => c.volumeId)
+    );
     const volumes = chosen.flatMap((c) => {
         const row = rows.find((r) => r.id === c.volumeId);
         return row ? [{ row, subpath: c.subpath }] : [];
@@ -405,7 +425,9 @@ async function runMalware(target: ScanTarget, input: Record<string, unknown>): P
     if (volumes.length === 0) throw new ScanFailure("noVolumes");
     const { exitCode, log } = await runOneShot(
         await portsFor(target),
-        specs.malwareSpec(volumes.map((v) => ({ dockerName: v.row.dockerName, subpath: v.subpath })))
+        specs.malwareSpec(
+            volumes.map((v) => ({ dockerName: v.row.dockerName, subpath: v.subpath }))
+        )
     );
     const report = parse.parseMalwareLog(log);
     if (report.noSignatures || exitCode === 20) throw new ScanFailure("noSignatures");
@@ -444,14 +466,26 @@ async function runFiles(target: ScanTarget, input: Record<string, unknown>): Pro
     if (input.mode !== "check") {
         await prisma.securityBaseline.upsert({
             where: key,
-            create: { targetId: target.id, volumeId, subpath, label, manifest, files: report.manifest.size },
+            create: {
+                targetId: target.id,
+                volumeId,
+                subpath,
+                label,
+                manifest,
+                files: report.manifest.size
+            },
             update: { label, manifest, files: report.manifest.size, createdAt: new Date() }
         });
         return { findings: [], summary: { mode: "baseline", files: report.manifest.size } };
     }
-    const baseline = await prisma.securityBaseline.findUnique({ where: key, select: { manifest: true } });
+    const baseline = await prisma.securityBaseline.findUnique({
+        where: key,
+        select: { manifest: true }
+    });
     if (!baseline) throw new ScanFailure("noBaseline");
-    const before = parse.decodeManifest((await unzip(Buffer.from(baseline.manifest))).toString("utf8"));
+    const before = parse.decodeManifest(
+        (await unzip(Buffer.from(baseline.manifest))).toString("utf8")
+    );
     const diff = parse.diffManifests(before, report.manifest, 150);
     return {
         findings: [
@@ -551,7 +585,12 @@ export async function quarantineFinding(findingId: string): Promise<void> {
     }
     const target = finding.scan.target;
     const held = await prisma.securityQuarantine.findFirst({
-        where: { targetId: target.id, volumeId: finding.volumeId, path: finding.fixedIn, state: "held" },
+        where: {
+            targetId: target.id,
+            volumeId: finding.volumeId,
+            path: finding.fixedIn,
+            state: "held"
+        },
         select: { id: true }
     });
     if (held) return;
@@ -602,7 +641,10 @@ export async function settleQuarantine(id: string, op: "restore" | "delete"): Pr
 /* -------------------------------------------------------------------------- */
 
 async function targetRow(targetId: string): Promise<ScanTarget> {
-    const target = await prisma.deployTarget.findUnique({ where: { id: targetId }, select: TARGET_SELECT });
+    const target = await prisma.deployTarget.findUnique({
+        where: { id: targetId },
+        select: TARGET_SELECT
+    });
     if (!target) throw new ScanFailure("notFound");
     return target;
 }
@@ -610,12 +652,17 @@ async function targetRow(targetId: string): Promise<ScanTarget> {
 /** Read the host's automatic updates state, or switch it, and record it. */
 export async function automaticUpdates(targetId: string, enabled?: boolean) {
     const target = await targetRow(targetId);
-    const action = enabled === undefined ? "updates-status" : enabled ? "updates-on" : "updates-off";
+    const action =
+        enabled === undefined ? "updates-status" : enabled ? "updates-on" : "updates-off";
     const { output } = await runHostAction(target, action);
     const report = parse.parseUpdatesLog(output);
     if (!report.state) throw new ScanFailure("updatesFailed");
     const data = { updates: report.state, distro: report.distro, updatesAt: new Date() };
-    await prisma.securitySetting.upsert({ where: { targetId }, create: { targetId, ...data }, update: data });
+    await prisma.securitySetting.upsert({
+        where: { targetId },
+        create: { targetId, ...data },
+        update: data
+    });
     return report;
 }
 
@@ -640,10 +687,16 @@ async function planSchedules(now: Date): Promise<void> {
         take: 100
     });
     for (const setting of due) {
-        if (setting.lastPlanned && now.getTime() - setting.lastPlanned.getTime() < setting.everyHours * 3_600_000) {
+        if (
+            setting.lastPlanned &&
+            now.getTime() - setting.lastPlanned.getTime() < setting.everyHours * 3_600_000
+        ) {
             continue;
         }
-        await prisma.securitySetting.update({ where: { targetId: setting.targetId }, data: { lastPlanned: now } });
+        await prisma.securitySetting.update({
+            where: { targetId: setting.targetId },
+            data: { lastPlanned: now }
+        });
         const pending = await prisma.securityScan.count({
             where: { targetId: setting.targetId, state: { in: ["queued", "running"] } }
         });
@@ -662,7 +715,9 @@ async function planSchedules(now: Date): Promise<void> {
             take: 50
         });
         for (const b of baselines) {
-            await queueFiles(setting.targetId, b.volumeId, b.subpath, "check", null).catch(() => undefined);
+            await queueFiles(setting.targetId, b.volumeId, b.subpath, "check", null).catch(
+                () => undefined
+            );
         }
         await enqueue(setting.targetId, "audit", "host", {}, null);
         for (const app of await appsOf(setting.targetId)) {
@@ -674,7 +729,10 @@ async function planSchedules(now: Date): Promise<void> {
 /** Keep the newest scans per server and kind, and nothing older than the window. */
 async function prune(now: Date): Promise<void> {
     await prisma.securityScan.deleteMany({
-        where: { createdAt: { lt: new Date(now.getTime() - HISTORY_MS) }, state: { in: ["done", "failed"] } }
+        where: {
+            createdAt: { lt: new Date(now.getTime() - HISTORY_MS) },
+            state: { in: ["done", "failed"] }
+        }
     });
     const groups = await prisma.securityScan.groupBy({
         by: ["targetId", "kind"],
@@ -683,7 +741,11 @@ async function prune(now: Date): Promise<void> {
     });
     for (const group of groups) {
         const old = await prisma.securityScan.findMany({
-            where: { targetId: group.targetId, kind: group.kind, state: { in: ["done", "failed"] } },
+            where: {
+                targetId: group.targetId,
+                kind: group.kind,
+                state: { in: ["done", "failed"] }
+            },
             orderBy: { createdAt: "desc" },
             skip: KEEP_PER_KIND,
             select: { id: true },
@@ -692,7 +754,10 @@ async function prune(now: Date): Promise<void> {
         await prisma.securityScan.deleteMany({ where: { id: { in: old.map((row) => row.id) } } });
     }
     await prisma.securityQuarantine.deleteMany({
-        where: { state: { in: ["restored", "deleted"] }, settledAt: { lt: new Date(now.getTime() - HISTORY_MS) } }
+        where: {
+            state: { in: ["restored", "deleted"] },
+            settledAt: { lt: new Date(now.getTime() - HISTORY_MS) }
+        }
     });
 }
 
@@ -728,7 +793,10 @@ async function sweepExports(now: Date): Promise<void> {
                 await removeExport(target, volume);
             }
         } catch (caught) {
-            console.error(`polaris: security scans could not sweep exports on ${target.id}:`, caught);
+            console.error(
+                `polaris: security scans could not sweep exports on ${target.id}:`,
+                caught
+            );
         }
     }
 }

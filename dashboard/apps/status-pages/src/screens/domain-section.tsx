@@ -71,7 +71,9 @@ export function DomainSection({
                 setStatus(answer.status);
                 onChanged();
             })
-            .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
+            .catch((caught: Error) =>
+                toast.show({ title: t("errors.saveFailed"), body: caught.message })
+            )
             .finally(() => setPending(false));
     };
 
@@ -108,7 +110,11 @@ export function DomainSection({
                         </p>
                     ) : null}
                 </div>
-                <Button type="submit" aria-disabled={!ready} className={ready ? undefined : "opacity-60"}>
+                <Button
+                    type="submit"
+                    aria-disabled={!ready}
+                    className={ready ? undefined : "opacity-60"}
+                >
                     {domain ? t("actions.save") : t("domain.add")}
                 </Button>
                 {domain ? (
@@ -135,9 +141,14 @@ export function DomainSection({
                     <div className="flex items-center justify-between gap-2">
                         <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
                             {status.state === "ready" ? (
-                                <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden />
+                                <CheckCircle2
+                                    className="size-4 shrink-0 text-success"
+                                    aria-hidden
+                                />
                             ) : null}
-                            <span className="min-w-0 break-words">{t(`domain.state.${status.state}`)}</span>
+                            <span className="min-w-0 break-words">
+                                {t(`domain.state.${status.state}`)}
+                            </span>
                         </p>
                         <Button
                             variant="ghost"
@@ -147,7 +158,10 @@ export function DomainSection({
                             disabled={checking}
                             onClick={check}
                         >
-                            <RefreshCw className={checking ? "animate-spin" : undefined} aria-hidden />
+                            <RefreshCw
+                                className={checking ? "animate-spin" : undefined}
+                                aria-hidden
+                            />
                         </Button>
                     </div>
                     {status.state !== "ready" && status.ip ? (

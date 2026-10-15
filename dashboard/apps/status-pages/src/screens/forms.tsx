@@ -142,7 +142,9 @@ function FormDialog({
                         setPending(true);
                         onSubmit()
                             .then(() => onOpenChange(false))
-                            .catch((caught: Error) => toast.show({ title: t("errors.saveFailed"), body: caught.message }))
+                            .catch((caught: Error) =>
+                                toast.show({ title: t("errors.saveFailed"), body: caught.message })
+                            )
                             .finally(() => setPending(false));
                     }}
                 >
@@ -151,7 +153,11 @@ function FormDialog({
                         <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
                             {t("actions.cancel")}
                         </Button>
-                        <Button type="submit" aria-disabled={!ready} className={ready ? undefined : "opacity-60"}>
+                        <Button
+                            type="submit"
+                            aria-disabled={!ready}
+                            className={ready ? undefined : "opacity-60"}
+                        >
                             {submitLabel}
                         </Button>
                     </DialogFooter>
@@ -216,13 +222,20 @@ export function PageDialog({
                                     setValues((current) => ({
                                         ...current,
                                         title,
-                                        slug: slugTouched ? current.slug : normalizeSlug(title).replace(/[^a-z0-9-]/g, "")
+                                        slug: slugTouched
+                                            ? current.slug
+                                            : normalizeSlug(title).replace(/[^a-z0-9-]/g, "")
                                     }));
                                 }}
                             />
                         )}
                     </Field>
-                    <Field label={t("page.slug")} required error={errors.slug ? t("errors.slug") : null} hint={t("page.slugHint", { slug: normalized.slug || "..." })}>
+                    <Field
+                        label={t("page.slug")}
+                        required
+                        error={errors.slug ? t("errors.slug") : null}
+                        hint={t("page.slugHint", { slug: normalized.slug || "..." })}
+                    >
                         {(id) => (
                             <Input
                                 id={id}
@@ -230,7 +243,10 @@ export function PageDialog({
                                 maxLength={50}
                                 onChange={(event) => {
                                     setSlugTouched(true);
-                                    setValues((current) => ({ ...current, slug: event.target.value }));
+                                    setValues((current) => ({
+                                        ...current,
+                                        slug: event.target.value
+                                    }));
                                 }}
                             />
                         )}
@@ -242,19 +258,28 @@ export function PageDialog({
                                 value={values.description}
                                 maxLength={500}
                                 rows={2}
-                                onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        description: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                             <p className="text-xs font-medium">{t("page.published")}</p>
-                            <p className="text-xs text-muted-foreground">{t("page.publishedHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("page.publishedHint")}
+                            </p>
                         </div>
                         <Switch
                             checked={values.published}
                             aria-label={t("page.published")}
-                            onChange={(published) => setValues((current) => ({ ...current, published }))}
+                            onChange={(published) =>
+                                setValues((current) => ({ ...current, published }))
+                            }
                         />
                     </div>
                 </>
@@ -304,7 +329,12 @@ export function ComponentDialog({
                                 value={values.name}
                                 maxLength={80}
                                 placeholder={t("component.namePlaceholder")}
-                                onChange={(event) => setValues((current) => ({ ...current, name: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        name: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
@@ -314,7 +344,12 @@ export function ComponentDialog({
                                 id={id}
                                 value={values.description}
                                 maxLength={300}
-                                onChange={(event) => setValues((current) => ({ ...current, description: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        description: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
@@ -360,7 +395,8 @@ function checkPayload(componentId: string, id: string | null, values: CheckValue
         kind: values.kind,
         target: values.target.trim(),
         intervalSec: values.intervalSec.trim(),
-        timeoutMs: values.timeoutSec.trim() === "" ? "" : Math.round(Number(values.timeoutSec) * 1000),
+        timeoutMs:
+            values.timeoutSec.trim() === "" ? "" : Math.round(Number(values.timeoutSec) * 1000),
         enabled: values.enabled
     };
     switch (values.kind) {
@@ -446,7 +482,10 @@ export function CheckDialog({
                                     value=""
                                     placeholder={t("check.deployedPlaceholder")}
                                     onValueChange={(url) => set({ target: url })}
-                                    options={targets.map((target) => ({ value: target.url, label: target.label }))}
+                                    options={targets.map((target) => ({
+                                        value: target.url,
+                                        label: target.label
+                                    }))}
                                 />
                             )}
                         </Field>
@@ -463,25 +502,39 @@ export function CheckDialog({
                                 value={values.target}
                                 maxLength={2048}
                                 inputMode="url"
-                                placeholder={values.kind === "http" ? "https://example.com/health" : "example.com"}
+                                placeholder={
+                                    values.kind === "http"
+                                        ? "https://example.com/health"
+                                        : "example.com"
+                                }
                                 onChange={(event) => set({ target: event.target.value })}
                             />
                         )}
                     </Field>
                     {values.kind === "http" ? (
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <Field label={t("check.expectStatus")} error={errors.expectStatus} hint={t("check.expectStatusHint")}>
+                            <Field
+                                label={t("check.expectStatus")}
+                                error={errors.expectStatus}
+                                hint={t("check.expectStatusHint")}
+                            >
                                 {(id) => (
                                     <Input
                                         id={id}
                                         value={values.expectStatus}
                                         inputMode="numeric"
                                         maxLength={3}
-                                        onChange={(event) => set({ expectStatus: event.target.value })}
+                                        onChange={(event) =>
+                                            set({ expectStatus: event.target.value })
+                                        }
                                     />
                                 )}
                             </Field>
-                            <Field label={t("check.keyword")} error={errors.keyword} hint={t("check.keywordHint")}>
+                            <Field
+                                label={t("check.keyword")}
+                                error={errors.keyword}
+                                hint={t("check.keywordHint")}
+                            >
                                 {(id) => (
                                     <Input
                                         id={id}
@@ -520,11 +573,18 @@ export function CheckDialog({
                                         id={id}
                                         value={values.dnsType}
                                         onValueChange={(dnsType) => set({ dnsType })}
-                                        options={DNS_TYPES.map((type) => ({ value: type, label: type }))}
+                                        options={DNS_TYPES.map((type) => ({
+                                            value: type,
+                                            label: type
+                                        }))}
                                     />
                                 )}
                             </Field>
-                            <Field label={t("check.dnsExpect")} error={errors.dnsExpect} hint={t("check.dnsExpectHint")}>
+                            <Field
+                                label={t("check.dnsExpect")}
+                                error={errors.dnsExpect}
+                                hint={t("check.dnsExpectHint")}
+                            >
                                 {(id) => (
                                     <Input
                                         id={id}
@@ -541,7 +601,10 @@ export function CheckDialog({
                             label={t("check.interval")}
                             required
                             error={errors.intervalSec}
-                            hint={t("check.intervalHint", { min: MIN_INTERVAL_SEC.toString(), max: MAX_INTERVAL_SEC.toString() })}
+                            hint={t("check.intervalHint", {
+                                min: MIN_INTERVAL_SEC.toString(),
+                                max: MAX_INTERVAL_SEC.toString()
+                            })}
                         >
                             {(id) => (
                                 <Input
@@ -553,7 +616,12 @@ export function CheckDialog({
                                 />
                             )}
                         </Field>
-                        <Field label={t("check.timeout")} required error={errors.timeoutMs} hint={t("check.timeoutHint")}>
+                        <Field
+                            label={t("check.timeout")}
+                            required
+                            error={errors.timeoutMs}
+                            hint={t("check.timeoutHint")}
+                        >
                             {(id) => (
                                 <Input
                                     id={id}
@@ -567,7 +635,11 @@ export function CheckDialog({
                     </div>
                     <div className="flex items-center justify-between gap-3">
                         <p className="text-xs font-medium">{t("check.enabled")}</p>
-                        <Switch checked={values.enabled} aria-label={t("check.enabled")} onChange={(enabled) => set({ enabled })} />
+                        <Switch
+                            checked={values.enabled}
+                            aria-label={t("check.enabled")}
+                            onChange={(enabled) => set({ enabled })}
+                        />
                     </div>
                 </>
             )}
@@ -598,14 +670,18 @@ function ComponentPicker({
                             type="button"
                             aria-pressed={on}
                             onClick={() =>
-                                onChange(on ? selected.filter((id) => id !== component.id) : [...selected, component.id])
-                            }
-                            className={
-                                cn(
-                                    "max-w-full truncate rounded-full border px-2.5 py-0.5 text-xs",
-                                    on ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"
+                                onChange(
+                                    on
+                                        ? selected.filter((id) => id !== component.id)
+                                        : [...selected, component.id]
                                 )
                             }
+                            className={cn(
+                                "max-w-full truncate rounded-full border px-2.5 py-0.5 text-xs",
+                                on
+                                    ? "border-primary bg-primary/10 text-foreground"
+                                    : "border-border text-muted-foreground"
+                            )}
                         >
                             {component.name}
                         </button>
@@ -630,7 +706,13 @@ export function IncidentDialog({
     onSaved: () => void;
 }) {
     const t = useStatusT();
-    const empty = { title: "", impact: "minor", state: "investigating", body: "", componentIds: [] as string[] };
+    const empty = {
+        title: "",
+        impact: "minor",
+        state: "investigating",
+        body: "",
+        componentIds: [] as string[]
+    };
     const [values, setValues] = useState(empty);
     useEffect(() => {
         if (open) setValues(empty);
@@ -658,7 +740,12 @@ export function IncidentDialog({
                                 id={id}
                                 value={values.title}
                                 maxLength={120}
-                                onChange={(event) => setValues((current) => ({ ...current, title: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        title: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
@@ -668,8 +755,13 @@ export function IncidentDialog({
                                 <Select
                                     id={id}
                                     value={values.impact}
-                                    onValueChange={(impact) => setValues((current) => ({ ...current, impact }))}
-                                    options={INCIDENT_IMPACTS.map((impact) => ({ value: impact, label: t(`impact.${impact}`) }))}
+                                    onValueChange={(impact) =>
+                                        setValues((current) => ({ ...current, impact }))
+                                    }
+                                    options={INCIDENT_IMPACTS.map((impact) => ({
+                                        value: impact,
+                                        label: t(`impact.${impact}`)
+                                    }))}
                                 />
                             )}
                         </Field>
@@ -678,8 +770,13 @@ export function IncidentDialog({
                                 <Select
                                     id={id}
                                     value={values.state}
-                                    onValueChange={(state) => setValues((current) => ({ ...current, state }))}
-                                    options={INCIDENT_STATES.map((state) => ({ value: state, label: t(`incidentState.${state}`) }))}
+                                    onValueChange={(state) =>
+                                        setValues((current) => ({ ...current, state }))
+                                    }
+                                    options={INCIDENT_STATES.map((state) => ({
+                                        value: state,
+                                        label: t(`incidentState.${state}`)
+                                    }))}
                                 />
                             )}
                         </Field>
@@ -687,7 +784,9 @@ export function IncidentDialog({
                     <ComponentPicker
                         components={components}
                         selected={values.componentIds}
-                        onChange={(componentIds) => setValues((current) => ({ ...current, componentIds }))}
+                        onChange={(componentIds) =>
+                            setValues((current) => ({ ...current, componentIds }))
+                        }
                     />
                     <Field label={t("incident.message")} required error={errors.body}>
                         {(id) => (
@@ -697,7 +796,12 @@ export function IncidentDialog({
                                 maxLength={2000}
                                 value={values.body}
                                 placeholder={t("incident.messagePlaceholder")}
-                                onChange={(event) => setValues((current) => ({ ...current, body: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        body: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
@@ -722,7 +826,10 @@ export function UpdateDialog({
     const [values, setValues] = useState({ state: "identified", body: "" });
     useEffect(() => {
         if (open && incident) {
-            setValues({ state: incident.state === "resolved" ? "investigating" : incident.state, body: "" });
+            setValues({
+                state: incident.state === "resolved" ? "investigating" : incident.state,
+                body: ""
+            });
         }
     }, [open, incident]);
     if (!incident) return null;
@@ -748,8 +855,13 @@ export function UpdateDialog({
                             <Select
                                 id={id}
                                 value={values.state}
-                                onValueChange={(state) => setValues((current) => ({ ...current, state }))}
-                                options={allowed.map((state) => ({ value: state, label: t(`incidentState.${state}`) }))}
+                                onValueChange={(state) =>
+                                    setValues((current) => ({ ...current, state }))
+                                }
+                                options={allowed.map((state) => ({
+                                    value: state,
+                                    label: t(`incidentState.${state}`)
+                                }))}
                             />
                         )}
                     </Field>
@@ -760,7 +872,12 @@ export function UpdateDialog({
                                 rows={4}
                                 maxLength={2000}
                                 value={values.body}
-                                onChange={(event) => setValues((current) => ({ ...current, body: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        body: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
@@ -832,7 +949,12 @@ export function MaintenanceDialog({
                                 id={id}
                                 value={values.title}
                                 maxLength={120}
-                                onChange={(event) => setValues((current) => ({ ...current, title: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        title: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>
@@ -843,17 +965,31 @@ export function MaintenanceDialog({
                                     id={id}
                                     type="datetime-local"
                                     value={values.startsAt}
-                                    onChange={(event) => setValues((current) => ({ ...current, startsAt: event.target.value }))}
+                                    onChange={(event) =>
+                                        setValues((current) => ({
+                                            ...current,
+                                            startsAt: event.target.value
+                                        }))
+                                    }
                                 />
                             )}
                         </Field>
-                        <Field label={t("maintenance.ends")} required error={errors.endsAt ? t("errors.endsBeforeStart") : null}>
+                        <Field
+                            label={t("maintenance.ends")}
+                            required
+                            error={errors.endsAt ? t("errors.endsBeforeStart") : null}
+                        >
                             {(id) => (
                                 <Input
                                     id={id}
                                     type="datetime-local"
                                     value={values.endsAt}
-                                    onChange={(event) => setValues((current) => ({ ...current, endsAt: event.target.value }))}
+                                    onChange={(event) =>
+                                        setValues((current) => ({
+                                            ...current,
+                                            endsAt: event.target.value
+                                        }))
+                                    }
                                 />
                             )}
                         </Field>
@@ -861,7 +997,9 @@ export function MaintenanceDialog({
                     <ComponentPicker
                         components={components}
                         selected={values.componentIds}
-                        onChange={(componentIds) => setValues((current) => ({ ...current, componentIds }))}
+                        onChange={(componentIds) =>
+                            setValues((current) => ({ ...current, componentIds }))
+                        }
                     />
                     <Field label={t("maintenance.details")} error={errors.body}>
                         {(id) => (
@@ -870,7 +1008,12 @@ export function MaintenanceDialog({
                                 rows={3}
                                 maxLength={2000}
                                 value={values.body}
-                                onChange={(event) => setValues((current) => ({ ...current, body: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        body: event.target.value
+                                    }))
+                                }
                             />
                         )}
                     </Field>

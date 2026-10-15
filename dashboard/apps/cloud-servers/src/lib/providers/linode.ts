@@ -14,7 +14,14 @@
 import { z } from "zod";
 import { throwawayPassword } from "../auth/throwaway";
 import { bearer, callJson, callVoid, ProviderError } from "../http";
-import { isLtsImage, type CloudMachine, type Credentials, type MachineStatus, type ProviderAdapter, type SizeChoice } from "./types";
+import {
+    isLtsImage,
+    type CloudMachine,
+    type Credentials,
+    type MachineStatus,
+    type ProviderAdapter,
+    type SizeChoice
+} from "./types";
 
 const API = "https://api.linode.com/v4";
 
@@ -81,16 +88,24 @@ function sizeChoice(t: z.infer<typeof typeSchema>, region: string): SizeChoice {
 export function createAdapter(credentials: Credentials<"linode">): ProviderAdapter {
     const headers = bearer(credentials.token);
     const path = (id: string) => `${API}/linode/instances/${encodeURIComponent(id)}`;
-    const post = (url: string, body: object = {}) => callVoid(url, { method: "POST", headers, body: JSON.stringify(body) });
+    const post = (url: string, body: object = {}) =>
+        callVoid(url, { method: "POST", headers, body: JSON.stringify(body) });
     const sizes = async (region: string) =>
-        (await callJson(page(typeSchema), `${API}/linode/types?page_size=500`, { headers })).data.map((t) =>
-            sizeChoice(t, region)
-        );
+        (
+            await callJson(page(typeSchema), `${API}/linode/types?page_size=500`, { headers })
+        ).data.map((t) => sizeChoice(t, region));
 
     return {
         async listRegions() {
             const { data } = await callJson(
-                page(z.object({ id: z.string(), label: z.string(), status: z.string(), capabilities: z.array(z.string()) })),
+                page(
+                    z.object({
+                        id: z.string(),
+                        label: z.string(),
+                        status: z.string(),
+                        capabilities: z.array(z.string())
+                    })
+                ),
                 `${API}/regions?page_size=500`,
                 { headers }
             );
@@ -102,12 +117,26 @@ export function createAdapter(credentials: Credentials<"linode">): ProviderAdapt
         listSizes: sizes,
         async listImages() {
             const { data } = await callJson(
-                page(z.object({ id: z.string(), label: z.string(), is_public: z.boolean(), deprecated: z.boolean(), capabilities: z.array(z.string()).default([]) })),
+                page(
+                    z.object({
+                        id: z.string(),
+                        label: z.string(),
+                        is_public: z.boolean(),
+                        deprecated: z.boolean(),
+                        capabilities: z.array(z.string()).default([])
+                    })
+                ),
                 `${API}/images?page_size=500`,
                 { headers }
             );
             return data
-                .filter((i) => i.is_public && !i.deprecated && i.capabilities.includes("cloud-init") && isLtsImage(i.label))
+                .filter(
+                    (i) =>
+                        i.is_public &&
+                        !i.deprecated &&
+                        i.capabilities.includes("cloud-init") &&
+                        isLtsImage(i.label)
+                )
                 .map((i) => ({ id: i.id, label: i.label }));
         },
         async create(spec) {
@@ -136,10 +165,15 @@ export function createAdapter(credentials: Credentials<"linode">): ProviderAdapt
             }
         },
         async action(ref, action) {
-            await post(`${path(ref.providerId)}/${action === "power_on" ? "boot" : action === "power_off" ? "shutdown" : "reboot"}`);
+            await post(
+                `${path(ref.providerId)}/${action === "power_on" ? "boot" : action === "power_off" ? "shutdown" : "reboot"}`
+            );
         },
         async resize(ref, size) {
-            await post(`${path(ref.providerId)}/resize`, { type: size, allow_auto_disk_resize: false });
+            await post(`${path(ref.providerId)}/resize`, {
+                type: size,
+                allow_auto_disk_resize: false
+            });
         },
         async destroy(ref) {
             await callVoid(path(ref.providerId), { method: "DELETE", headers });

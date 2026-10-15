@@ -33,7 +33,8 @@ export interface SigV4Input {
 }
 
 const sha256 = (data: string) => createHash("sha256").update(data, "utf8").digest("hex");
-const hmac = (key: Buffer | string, data: string) => createHmac("sha256", key).update(data, "utf8").digest();
+const hmac = (key: Buffer | string, data: string) =>
+    createHmac("sha256", key).update(data, "utf8").digest();
 
 /** RFC 3986 encoding, which is what AWS signs: `encodeURIComponent` leaves
  *  `!'()*` alone and AWS does not. */
@@ -46,20 +47,30 @@ export function uriEncode(value: string): string {
 
 /** `20150830T123600Z` and `20150830` for an instant. */
 export function amzDates(now: Date): { amzDate: string; dateStamp: string } {
-    const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const amzDate = now
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d{3}/, "");
     return { amzDate, dateStamp: amzDate.slice(0, 8) };
 }
 
 function canonicalQuery(search: URLSearchParams): string {
     return [...search.entries()]
         .map(([key, value]) => [uriEncode(key), uriEncode(value)] as const)
-        .sort(([ak, av], [bk, bv]) => (ak === bk ? (av < bv ? -1 : av > bv ? 1 : 0) : ak < bk ? -1 : 1))
+        .sort(([ak, av], [bk, bv]) =>
+            ak === bk ? (av < bv ? -1 : av > bv ? 1 : 0) : ak < bk ? -1 : 1
+        )
         .map(([key, value]) => `${key}=${value}`)
         .join("&");
 }
 
 /** The derived key: specific to one day, one region and one service. */
-export function signingKey(secret: string, dateStamp: string, region: string, service: string): Buffer {
+export function signingKey(
+    secret: string,
+    dateStamp: string,
+    region: string,
+    service: string
+): Buffer {
     return hmac(hmac(hmac(hmac(`AWS4${secret}`, dateStamp), region), service), "aws4_request");
 }
 
@@ -90,11 +101,17 @@ export function signV4(input: SigV4Input): Record<string, string> {
         host: new URL(input.url).host,
         "x-amz-date": amzDate
     };
-    if (input.credentials.sessionToken) headers["x-amz-security-token"] = input.credentials.sessionToken;
+    if (input.credentials.sessionToken)
+        headers["x-amz-security-token"] = input.credentials.sessionToken;
     const { text, signedHeaders } = canonicalRequest(input, headers);
     const scope = `${dateStamp}/${input.region}/${input.service}/aws4_request`;
     const toSign = ["AWS4-HMAC-SHA256", amzDate, scope, sha256(text)].join("\n");
-    const key = signingKey(input.credentials.secretAccessKey, dateStamp, input.region, input.service);
+    const key = signingKey(
+        input.credentials.secretAccessKey,
+        dateStamp,
+        input.region,
+        input.service
+    );
     const signature = createHmac("sha256", key).update(toSign, "utf8").digest("hex");
     headers.authorization = `AWS4-HMAC-SHA256 Credential=${input.credentials.accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
     return headers;
