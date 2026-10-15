@@ -1,0 +1,24 @@
+{
+    "name": "@polaris-app/status-pages",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Status pages: public pages that show whether a set of services is up, from checks Polaris runs, with incidents and maintenance. An installable Polaris app.",
+    "polaris": {
+        "id": "status-pages",
+        "extension": "src/lib/status-extension.ts#statusExtension"
+    },
+    "dependencies": {
+        "@polaris/app-host": "0.1.0",
+        "@polaris/core": "0.1.0",
+        "@polaris/db": "0.1.0",
+        "@polaris/ui": "0.1.0",
+        "lucide-react": "0.469.0",
+        "zod": "3.24.1"
+    },
+    "peerDependencies": {
+        "next": "*",
+        "react": "^19",
+        "react-dom": "^19"
+    }
+}

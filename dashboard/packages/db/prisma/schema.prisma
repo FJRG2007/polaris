@@ -13307,3 +13307,152 @@ model CrmRoleRule {
 
     @@unique([orgId, role, object])
 }
+// Status pages (apps/status-pages): public pages that say whether a set of
+// services is working, from checks Polaris runs itself, with the incidents and
+// maintenance the operator posts. Untouched by uninstalling the app.
+model StatusPage {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    // The address it is published at: /status/<slug>.
+    slug        String   @unique
+    title       String
+    description String   @default("")
+    // An unpublished page answers 404 publicly.
+    published   Boolean  @default(false)
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    components  StatusComponent[]
+    incidents   StatusIncident[]
+    maintenance StatusMaintenance[]
+
+    @@index([createdAt])
+}
+
+// One thing a status page reports on ("API", "Website"), made of checks.
+model StatusComponent {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    pageId      String   @db.Uuid
+    name        String
+    description String   @default("")
+    position    Float    @default(0)
+    createdAt   DateTime @default(now())
+
+    page   StatusPage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    checks StatusCheck[]
+
+    @@index([pageId, position])
+}
+
+// One probe Polaris runs on a schedule. Its target is never shown publicly.
+model StatusCheck {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    componentId   String    @db.Uuid
+    // http | tcp | dns | ping
+    kind          String
+    // A URL for http, a host name or address for the others.
+    target        String
+    port          Int?
+    // http: the status expected; null takes any 2xx or 3xx.
+    expectStatus  Int?
+    // http: text the body must contain; empty checks nothing.
+    keyword       String    @default("")
+    // dns: A | AAAA | CNAME | MX | TXT
+    dnsType       String?
+    // dns: a value one of the answers must equal; empty takes any answer.
+    dnsExpect     String    @default("")
+    intervalSec   Int       @default(60)
+    timeoutMs     Int       @default(10000)
+    enabled       Boolean   @default(true)
+    nextRunAt     DateTime  @default(now())
+    // up | down, null before the first run.
+    lastStatus    String?
+    lastLatencyMs Int?
+    lastError     String?
+    lastCheckedAt DateTime?
+    createdAt     DateTime  @default(now())
+
+    component StatusComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+    samples   StatusSample[]
+    days      StatusDay[]
+
+    @@index([enabled, nextRunAt])
+    @@index([componentId])
+}
+
+// One result of one check. Kept for a day; StatusDay keeps the history.
+model StatusSample {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    checkId   String   @db.Uuid
+    at        DateTime @default(now())
+    ok        Boolean
+    latencyMs Int?
+
+    check StatusCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+    @@index([checkId, at])
+    @@index([at])
+}
+
+// One check's results over one UTC day: the uptime bars are drawn from these.
+model StatusDay {
+    checkId    String   @db.Uuid
+    day        DateTime @db.Date
+    total      Int      @default(0)
+    up         Int      @default(0)
+    // Sum of the latencies of the runs that answered, for the day's average.
+    latencySum Int      @default(0)
+
+    check StatusCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+    @@id([checkId, day])
+    @@index([day])
+}
+
+model StatusIncident {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    pageId       String    @db.Uuid
+    title        String
+    // investigating | identified | monitoring | resolved
+    state        String    @default("investigating")
+    // minor | major | critical
+    impact       String    @default("minor")
+    componentIds String[]  @db.Uuid
+    startedAt    DateTime  @default(now())
+    resolvedAt   DateTime?
+    createdAt    DateTime  @default(now())
+    updatedAt    DateTime  @updatedAt
+
+    page    StatusPage             @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    updates StatusIncidentUpdate[]
+
+    @@index([pageId, startedAt])
+    @@index([pageId, resolvedAt])
+}
+
+model StatusIncidentUpdate {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    incidentId String   @db.Uuid
+    state      String
+    body       String
+    createdAt  DateTime @default(now())
+
+    incident StatusIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+    @@index([incidentId, createdAt])
+}
+
+model StatusMaintenance {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    pageId       String   @db.Uuid
+    title        String
+    body         String   @default("")
+    componentIds String[] @db.Uuid
+    startsAt     DateTime
+    endsAt       DateTime
+    createdAt    DateTime @default(now())
+
+    page StatusPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+    @@index([pageId, endsAt])
+}
