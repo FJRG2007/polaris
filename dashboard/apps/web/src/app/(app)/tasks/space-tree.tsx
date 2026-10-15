@@ -364,7 +364,9 @@ function TreeRow({
                 // names a key nothing listens for is worse than a menu with no
                 // key on it at all.
                 if (shortcutPressed(event, DELETE_SHORTCUT)) {
-                    const removal = rowActions.find((action) => action.shortcut === DELETE_SHORTCUT);
+                    const removal = rowActions.find(
+                        (action) => action.shortcut === DELETE_SHORTCUT
+                    );
                     if (!removal) return;
                     event.preventDefault();
                     removal.onSelect();
@@ -604,10 +606,7 @@ export function SpaceTree({
     const openNewSpace = useCallback(() => {
         setNewSpace(true);
         void (async () => {
-            const result = await runAction(
-                () => actions.spaceOwnerOptionsAction(),
-                setError
-            );
+            const result = await runAction(() => actions.spaceOwnerOptionsAction(), setError);
             setSpaceOrgs(result?.orgs ?? []);
             setMe(result?.me ?? null);
             // Start on the shelf that is open. Somebody
@@ -631,7 +630,10 @@ export function SpaceTree({
     }, [asked, canManage, canCreate, openNewSpace, router, pathname]);
 
     return (
-        <nav aria-label={t("tree.spaces")} className="flex w-full flex-col gap-3 md:w-60 md:shrink-0">
+        <nav
+            aria-label={t("tree.spaces")}
+            className="flex w-full flex-col gap-3 md:w-60 md:shrink-0"
+        >
             <div className="flex items-center justify-between">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {t("tree.spaces")}
@@ -687,7 +689,9 @@ export function SpaceTree({
                                                     image: me ? avatarUrl(me.id) : null
                                                 }}
                                             />
-                                            <span className="truncate">{me?.name ?? t("tree.you")}</span>
+                                            <span className="truncate">
+                                                {me?.name ?? t("tree.you")}
+                                            </span>
                                         </span>
                                     )
                                 },
@@ -729,15 +733,16 @@ export function SpaceTree({
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-2 py-1.5 text-xs text-danger-ink"
+                >
                     {error}
                 </p>
             )}
 
             {spaces.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                    {t("tree.empty")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("tree.empty")}</p>
             )}
 
             {spaces.map((space) => (
@@ -780,7 +785,11 @@ export function SpaceTree({
                 title={confirm?.kind === "list" ? t("tree.deleteList") : t("tree.deleteFolder")}
                 question={t.rich("deleteTask.question", {
                     name: confirm?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={
                     confirm?.empty
@@ -789,7 +798,9 @@ export function SpaceTree({
                           ? t("tree.deleteFolderDescription")
                           : t("tree.deleteListDescription")
                 }
-                confirmLabel={confirm?.kind === "folder" ? t("tree.deleteFolder") : t("tree.deleteList")}
+                confirmLabel={
+                    confirm?.kind === "folder" ? t("tree.deleteFolder") : t("tree.deleteList")
+                }
                 onConfirm={async () => {
                     if (!confirm) return;
                     await run(() =>
@@ -1174,7 +1185,9 @@ function SpaceSection({
                             type="button"
                             onClick={() => onToggle(space.id)}
                             aria-label={
-                                open ? t("tree.collapse", { name: space.name }) : t("tree.expand", { name: space.name })
+                                open
+                                    ? t("tree.collapse", { name: space.name })
+                                    : t("tree.expand", { name: space.name })
                             }
                             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
@@ -1368,7 +1381,9 @@ function DraftRow({
                 ref={field}
                 value={value}
                 aria-label={draft.kind === "folder" ? t("tree.folderName") : t("tree.listName")}
-                placeholder={draft.kind === "folder" ? t("tree.folderNameHint") : t("tree.listNameHint")}
+                placeholder={
+                    draft.kind === "folder" ? t("tree.folderNameHint") : t("tree.listNameHint")
+                }
                 onChange={(event) => setValue(event.target.value)}
                 onBlur={() => void commit()}
                 onKeyDown={(event) => {

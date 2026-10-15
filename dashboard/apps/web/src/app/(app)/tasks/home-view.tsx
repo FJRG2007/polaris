@@ -27,7 +27,14 @@ import { bulkOverlay, taskOverlay, type TaskOverlay } from "./optimistic";
 import type { TaskBulkEdit, TaskEdit, TaskListRef } from "./views/shared";
 import { CircleAlert, Clock, ListChecks, Loader2, Play, Plus, Square } from "lucide-react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
-import { AvatarStack, DueBadge, PriorityMark, StatusDot, StatusMarker, TaskLocation } from "./pickers";
+import {
+    AvatarStack,
+    DueBadge,
+    PriorityMark,
+    StatusDot,
+    StatusMarker,
+    TaskLocation
+} from "./pickers";
 
 export interface HomeCounts {
     readonly assigned: number;
@@ -35,7 +42,17 @@ export interface HomeCounts {
     readonly dueToday: number;
 }
 
-function Stat({ label, value, tone, icon: Icon }: { label: string; value: number; tone?: string; icon: typeof Clock }) {
+function Stat({
+    label,
+    value,
+    tone,
+    icon: Icon
+}: {
+    label: string;
+    value: number;
+    tone?: string;
+    icon: typeof Clock;
+}) {
     return (
         <Card>
             <CardBody className="flex items-center gap-3 p-4">
@@ -98,7 +115,10 @@ export function HomeView({
     // wholesale on the reload that follows, which is what the server derived from the
     // same change (a completion date, a recurrence) comes back in.
     const [pending, setPending] = useState<Record<string, TaskOverlay>>({});
-    const rows = useMemo(() => tasks.map((task) => ({ ...task, ...pending[task.id] })), [tasks, pending]);
+    const rows = useMemo(
+        () => tasks.map((task) => ({ ...task, ...pending[task.id] })),
+        [tasks, pending]
+    );
 
     /** `settled` names the task the write covered, so a second row changed while
      *  the first is still reloading keeps the paint it was given. */
@@ -139,9 +159,10 @@ export function HomeView({
             if (existing) existing.push(task);
             else buckets.set(bucket, [task]);
         }
-        return core.DUE_BUCKETS.map((bucket) => ({ bucket, tasks: buckets.get(bucket) ?? [] })).filter(
-            (group) => group.tasks.length > 0
-        );
+        return core.DUE_BUCKETS.map((bucket) => ({
+            bucket,
+            tasks: buckets.get(bucket) ?? []
+        })).filter((group) => group.tasks.length > 0);
     }, [arranged, rows, format.weekStartsOn]);
 
     // The panel belongs to the space of whatever task is open.
@@ -159,7 +180,10 @@ export function HomeView({
                 [task.id]: { ...current[task.id], ...taskOverlay(change, context) }
             }));
         }
-        const result = await runAction(() => actions.updateTaskAction({ taskId: task.id, ...change }), setError);
+        const result = await runAction(
+            () => actions.updateTaskAction({ taskId: task.id, ...change }),
+            setError
+        );
         if (result?.error) setError(result.error);
         refresh(task.id);
     };
@@ -184,7 +208,10 @@ export function HomeView({
                 [task.id]: { ...current[task.id], ...bulkOverlay(task, change, context) }
             }));
         }
-        const result = await runAction(() => actions.bulkUpdateAction({ taskIds: [task.id], ...change }), setError);
+        const result = await runAction(
+            () => actions.bulkUpdateAction({ taskIds: [task.id], ...change }),
+            setError
+        );
         if (result?.error) setError(result.error);
         refresh(task.id);
     };
@@ -203,7 +230,10 @@ export function HomeView({
             onApply: (change) => void apply(task, change),
             onDuplicate: async () => {
                 setError("");
-                const result = await runAction(() => actions.duplicateTaskAction(task.id), setError);
+                const result = await runAction(
+                    () => actions.duplicateTaskAction(task.id),
+                    setError
+                );
                 if (result?.error) setError(result.error);
                 refresh();
             },
@@ -220,8 +250,18 @@ export function HomeView({
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Stat label={t("home.assigned")} value={counts.assigned} icon={ListChecks} />
-                <Stat label={t("home.dueToday")} value={counts.dueToday} icon={Clock} tone="text-warning" />
-                <Stat label={t("home.overdue")} value={counts.overdue} icon={CircleAlert} tone="text-danger" />
+                <Stat
+                    label={t("home.dueToday")}
+                    value={counts.dueToday}
+                    icon={Clock}
+                    tone="text-warning"
+                />
+                <Stat
+                    label={t("home.overdue")}
+                    value={counts.overdue}
+                    icon={CircleAlert}
+                    tone="text-danger"
+                />
             </div>
 
             {timer && (
@@ -252,14 +292,20 @@ export function HomeView({
             )}
 
             {error && (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             )}
 
             {groups.length === 0 &&
                 (hasSpaces ? (
-                    <EmptyState title={t("home.emptyTitle")} description={t("home.emptyDescription")} />
+                    <EmptyState
+                        title={t("home.emptyTitle")}
+                        description={t("home.emptyDescription")}
+                    />
                 ) : (
                     /* A first visit. "Open a list and put your name on
                        something" is advice about a list that does not exist -
@@ -302,7 +348,9 @@ export function HomeView({
                         )}
                     >
                         {optionLabel(t, "dueBucket", group.bucket)}
-                        <span className="ml-2 text-xs font-normal text-muted-foreground">{group.tasks.length}</span>
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            {group.tasks.length}
+                        </span>
                     </h2>
                     <ul className="divide-y divide-border rounded-lg border border-border">
                         {group.tasks.map((task) => {
@@ -366,12 +414,12 @@ export function HomeView({
             ))}
 
             {openContext && (
-            <TaskPanel
-                taskId={openTaskId}
-                context={openContext}
-                onClose={() => setOpenTaskId(null)}
-                onChanged={() => refresh()}
-            />
+                <TaskPanel
+                    taskId={openTaskId}
+                    context={openContext}
+                    onClose={() => setOpenTaskId(null)}
+                    onChanged={() => refresh()}
+                />
             )}
 
             <ConfirmDeleteDialog
@@ -383,13 +431,20 @@ export function HomeView({
                 title={t("deleteTask.title")}
                 question={t.rich("deleteTask.question", {
                     name: deleting?.name ?? "",
-                    strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                    strong: (chunks) => (
+                        <span key="name" className="font-medium text-foreground">
+                            {chunks}
+                        </span>
+                    )
                 })}
                 description={t("deleteTask.description")}
                 confirmLabel={t("deleteTask.title")}
                 onConfirm={async () => {
                     if (!deleting) return;
-                    const result = await runAction(() => actions.deleteTaskAction(deleting.id), setError);
+                    const result = await runAction(
+                        () => actions.deleteTaskAction(deleting.id),
+                        setError
+                    );
                     if (result?.error) setError(result.error);
                     setDeleting(null);
                     refresh();

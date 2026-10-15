@@ -64,7 +64,8 @@ export default async function TasksHomePage() {
     const contexts: Record<string, SpaceContext> = {};
     for (const spaceId of involved) {
         const role = await scopedSpaceRole(actor, scope, spaceId);
-        if (role) contexts[spaceId] = await buildSpaceContext(spaceId, role, user.id, mayManage, scope);
+        if (role)
+            contexts[spaceId] = await buildSpaceContext(spaceId, role, user.id, mayManage, scope);
     }
 
     return (
