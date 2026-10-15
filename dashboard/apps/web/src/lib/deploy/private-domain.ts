@@ -23,8 +23,12 @@
  */
 
 import { z } from "zod";
-import { principalVerdict } from "@polaris/core/waf";
-import { WAF_LIST_MAX, wafPrincipalGrantSchema, type WafPrincipalGrant } from "@polaris/core";
+import {
+    WAF_LIST_MAX,
+    principalVerdict,
+    wafPrincipalGrantSchema,
+    type WafPrincipalGrant
+} from "@polaris/core";
 
 /** How long a sign-in to a private address lasts before it is asked again. Short on
  *  purpose: project membership is checked when the token is minted, not after. */

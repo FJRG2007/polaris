@@ -118,6 +118,7 @@ export * from "./analytics-report.js";
 export * from "./waf-intel.js";
 export * from "./certificates.js";
 export * from "./waf-presets.js";
+export * from "./waf-principals.js";
 export * from "./waf-managed.js";
 export * from "./waf-expression.js";
 export * from "./waf-analytics.js";
