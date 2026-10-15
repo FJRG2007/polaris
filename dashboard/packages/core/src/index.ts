@@ -138,6 +138,7 @@ export * from "./schemas/database.js";
 export * from "./schemas/database-statements.js";
 export * from "./schemas/database-maintenance.js";
 export * from "./schemas/database-accounts.js";
+export * from "./schemas/database-tuning.js";
 export * from "./schemas/file-access.js";
 export * from "./schemas/redis-cluster.js";
 export * from "./schemas/database-topology.js";
