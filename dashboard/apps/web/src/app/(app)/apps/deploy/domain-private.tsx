@@ -46,7 +46,7 @@ export function DomainPrivateButton({
     const [enabled, setEnabled] = useState(access !== null);
     const [draft, setDraft] = useState<PrivateAccess>(access ?? DEFAULT_ACCESS);
     const [error, setError] = useState<string | null>(null);
-    const [saved, setSaved] = useState(false);
+    const [saved, setSaved] = useState<"published" | "unpublished" | null>(null);
     const [pending, startTransition] = useTransition();
     const valid = !enabled || privateAccessSchema.safeParse(draft).success;
     const dirty =
@@ -58,14 +58,14 @@ export function DomainPrivateButton({
             setEnabled(access !== null);
             setDraft(access ?? DEFAULT_ACCESS);
             setError(null);
-            setSaved(false);
+            setSaved(null);
         }
         setOpen(next);
     }
 
     function save() {
         setError(null);
-        setSaved(false);
+        setSaved(null);
         startTransition(async () => {
             const result = await setDomainPrivateAction({
                 domainId,
@@ -73,7 +73,7 @@ export function DomainPrivateButton({
             });
             if (result.error) setError(result.error);
             else {
-                setSaved(true);
+                setSaved(result.unpublished ? "unpublished" : "published");
                 onChanged();
             }
         });
@@ -88,7 +88,7 @@ export function DomainPrivateButton({
                 aria-label={label}
                 onClick={() => show(true)}
                 className={cn(
-                    "shrink-0 rounded p-0.5 transition-colors hover:text-foreground",
+                    "shrink-0 rounded p-1 transition-colors hover:text-foreground",
                     access ? "text-primary" : "text-muted-foreground"
                 )}
             >
@@ -160,8 +160,11 @@ export function DomainPrivateButton({
                             </div>
                         ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        {saved && !dirty ? (
+                        {saved === "published" && !dirty ? (
                             <p className="text-sm text-success">{t("private.saved")}</p>
+                        ) : null}
+                        {saved === "unpublished" && !dirty ? (
+                            <p className="text-sm text-warning">{t("private.savedUnpublished")}</p>
                         ) : null}
                     </div>
                     <DialogFooter>
@@ -169,7 +172,7 @@ export function DomainPrivateButton({
                             {t("private.close")}
                         </Button>
                         <Button
-                            disabled={pending || !canManage || !valid || !dirty}
+                            disabled={pending || !canManage || !valid || (!dirty && saved !== "unpublished")}
                             onClick={save}
                         >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}{" "}

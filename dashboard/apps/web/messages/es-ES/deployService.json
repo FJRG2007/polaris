@@ -435,7 +435,8 @@
         "needsAudience": "Elige quién puede abrir esta dirección.",
         "save": "Guardar",
         "close": "Cerrar",
-        "saved": "Guardado. El borde lo aplica en unos segundos.",
+        "saved": "Guardado. Se aplica en unos segundos.",
+        "savedUnpublished": "Guardado, pero aún sin aplicar. Vuelve a guardar en un momento.",
         "noManage": "No puedes cambiar los dominios de este proyecto.",
         "namedEmpty": "Nadie añadido. Elige un rol, un grupo o una persona para dejarle entrar.",
         "namedFilled": "Estos también entran, sean o no miembros."

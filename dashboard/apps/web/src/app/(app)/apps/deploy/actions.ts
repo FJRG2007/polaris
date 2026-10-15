@@ -1470,13 +1470,13 @@ export async function removeDomainAction(domainId: string): Promise<void> {
  *  it - or public again with `access: null`. */
 export async function setDomainPrivateAction(
     input: z.input<typeof domainPrivateInputSchema>
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; unpublished?: true }> {
     const parsed = domainPrivateInputSchema.safeParse(input);
     if (!parsed.success) return { error: await firstIssue(parsed.error, "domains.updateFailed") };
     const user = await requirePermission("deploy.manage");
     try {
         const access = await requireDomainAccess(parsed.data.domainId, user.id, "domains.manage");
-        await deployService.setApplicationDomainPrivate(
+        const { published } = await deployService.setApplicationDomainPrivate(
             parsed.data.domainId,
             access.ownerId,
             parsed.data.access
@@ -1488,7 +1488,7 @@ export async function setDomainPrivateAction(
             targetId: parsed.data.domainId
         });
         revalidatePath(DEPLOY_PATH);
-        return {};
+        return published ? {} : { unpublished: true };
     } catch (caught) {
         return {
             error: caught instanceof Error ? caught.message : await reply("domains.updateFailed")

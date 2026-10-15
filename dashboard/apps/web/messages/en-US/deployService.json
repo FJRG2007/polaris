@@ -435,7 +435,8 @@
         "needsAudience": "Choose who may open this address.",
         "save": "Save",
         "close": "Close",
-        "saved": "Saved. The edge applies it within a few seconds.",
+        "saved": "Saved. It takes effect in a few seconds.",
+        "savedUnpublished": "Saved, but not applied yet. Save again in a moment to retry.",
         "noManage": "You cannot change this project's domains.",
         "namedEmpty": "Nobody named. Pick a role, a group or a person to let them in.",
         "namedFilled": "These get in too, whether or not they are members."

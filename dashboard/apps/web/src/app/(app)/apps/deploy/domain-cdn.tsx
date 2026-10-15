@@ -78,7 +78,7 @@ export function DomainCdnButton({
                 aria-label="Cloudflare CDN"
                 onClick={() => setOpen(true)}
                 className={cn(
-                    "shrink-0 rounded p-0.5 transition-colors hover:text-foreground",
+                    "shrink-0 rounded p-1 transition-colors hover:text-foreground",
                     enabled ? "text-primary" : "text-muted-foreground"
                 )}
             >

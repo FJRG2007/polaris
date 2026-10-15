@@ -1913,18 +1913,26 @@ export async function setApplicationDomainEnabled(
 }
 
 /** Make one address private (only people signed in and allowed in reach it) or
- *  public again (`null`), and republish the edge so it takes effect now. */
+ *  public again (`null`), and republish the edge so it takes effect now. Whether the
+ *  edge took it comes back; a setting it did not is still stored and goes out with
+ *  the next publish. */
 export async function setApplicationDomainPrivate(
     domainId: string,
     ownerId: string,
     access: PrivateAccess | null
-): Promise<void> {
+): Promise<{ published: boolean }> {
     const result = await prisma.domain.updateMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
         data: { privateAccess: storePrivateAccess(access) }
     });
     if (result.count === 0) throw new Error("Domain not found");
-    await syncAppRoutes();
+    try {
+        await syncAppRoutes();
+        return { published: true };
+    } catch (error) {
+        console.error(`polaris: could not publish the private setting of domain ${domainId}:`, error);
+        return { published: false };
+    }
 }
 
 /**
@@ -2878,6 +2886,11 @@ async function buildAppPlan(
                   loginKeys: resolvedWaf.requireLogin ? await edgeLoginKeys() : undefined
               }
             : undefined;
+    // A private address keeps asking for a sign-in on the route its labels draw, so
+    // it stays closed whenever the edge's own route for it is missing.
+    const privateLogin = app.domains.some((domain) => parsePrivateAccess(domain.privateAccess))
+        ? { loginUrl: await appBaseUrl(), loginKeys: await edgeLoginKeys() }
+        : null;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
     // (intranet) with no proxy. The container port is the app's stored listening
@@ -3054,12 +3067,28 @@ async function buildAppPlan(
                     domain.enabled &&
                     (kept ? domain.deploymentId === release.id : domain.deploymentId === null)
             )
-            .map((domain) => ({
-                hostname: domain.hostname,
-                targetPort: domain.targetPort,
-                pathPrefix: domain.pathPrefix ?? undefined,
-                certResolver: domain.certResolver as "le" | "internal" | "none"
-            })),
+            .map((domain) => {
+                const access = parsePrivateAccess(domain.privateAccess);
+                return {
+                    hostname: domain.hostname,
+                    targetPort: domain.targetPort,
+                    pathPrefix: domain.pathPrefix ?? undefined,
+                    certResolver: domain.certResolver as "le" | "internal" | "none",
+                    ...(access && privateLogin
+                        ? {
+                              waf: withPrivateAccess(
+                                  {
+                                      ...resolvedWaf,
+                                      frameAncestors: frameRuleOf(resolvedWaf),
+                                      challenge,
+                                      ...privateLogin
+                                  },
+                                  access
+                              )
+                          }
+                        : {})
+                };
+            }),
         volumes: app.volumes.map((volume) => ({
             mountPath: volume.mountPath,
             ...volumeMountSource(volume)

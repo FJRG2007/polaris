@@ -23,7 +23,6 @@
  */
 
 import { z } from "zod";
-import type { AppRoute } from "@/lib/deploy/router";
 import { principalVerdict } from "@polaris/core/waf";
 import { WAF_LIST_MAX, wafPrincipalGrantSchema, type WafPrincipalGrant } from "@polaris/core";
 
@@ -69,13 +68,20 @@ export function parsePrivateAccess(raw: string | null | undefined): PrivateAcces
 }
 
 /**
- * The route with its private rule folded in. Login is required whatever the
+ * The route (or a deploy's label rule) with its private rule folded in. Login is required whatever the
  * service's firewall says; a named list is added as one more list a visitor must
  * satisfy (lists AND, entries within one OR) - but only when members are not
  * admitted, because a list the guard enforces would shut members out. Refusals
  * always reach the guard.
  */
-export function withPrivateAccess(route: AppRoute, access: PrivateAccess | null): AppRoute {
+export function withPrivateAccess<
+    T extends {
+        readonly requireLogin?: boolean;
+        readonly loginAllowLists?: readonly (readonly WafPrincipalGrant[])[];
+        readonly loginDeny?: readonly WafPrincipalGrant[];
+        readonly loginMaxAge?: number;
+    }
+>(route: T, access: PrivateAccess | null): T {
     if (!access) return route;
     return {
         ...route,

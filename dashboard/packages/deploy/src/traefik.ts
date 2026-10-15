@@ -25,6 +25,9 @@ export interface TraefikDomain {
     readonly targetPort: number;
     readonly pathPrefix?: string;
     readonly certResolver: CertResolver;
+    /** This address's own WAF rule in place of the service's - a private address
+     *  asks for a sign-in the service's other addresses do not. */
+    readonly waf?: TraefikWaf;
 }
 
 /** Resolved WAF decision for a service, materialized into edge labels. Mirrors
@@ -86,6 +89,8 @@ export interface TraefikWaf {
     /** The public keys a login token must be signed with, so this server's guard
      *  verifies a sign-in with nothing that could mint one. */
     readonly loginKeys?: readonly string[];
+    /** The oldest a login token may be, in seconds (see `GuardRule.loginMaxAge`). */
+    readonly loginMaxAge?: number;
 }
 
 export interface TraefikServiceInput {
@@ -167,6 +172,7 @@ function wafMiddlewares(
                 loginAllowLists: waf.loginAllowLists ?? [],
                 loginDeny: waf.loginDeny ?? [],
                 keys: waf.loginKeys,
+                loginMaxAge: waf.loginMaxAge,
                 browserIntegrity: waf.browserIntegrity === true,
                 sqlInjectionProtection: waf.sqlInjectionProtection === true,
                 xssProtection: waf.xssProtection === true,
@@ -338,8 +344,9 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
         labels[`${balancer}.healthcheck.interval`] = "10s";
         labels[`${balancer}.healthcheck.timeout`] = "3s";
     }
-    // WAF middlewares are per-service (one app -> one rule), shared by every domain.
-    const waf = input.waf
+    // WAF middlewares are per-service (one app -> one rule), shared by every domain
+    // that does not carry a rule of its own.
+    const serviceWaf = input.waf
         ? wafMiddlewares(input.serviceName, input.waf, labels)
         : { app: [], http: [] };
     const siblings = new Set(domains.map((domain) => domain.hostname));
@@ -355,8 +362,11 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
             domain,
             siblings,
             labels,
-            input.waf?.frameAncestors
+            (domain.waf ?? input.waf)?.frameAncestors
         );
+        const waf = domain.waf
+            ? wafMiddlewares(`${router}-own`, domain.waf, labels)
+            : serviceWaf;
         // The allowlist first, then the flood limits, then the guard, then what the
         // service asked to change about its answers - the local edge's order.
         const allow = waf.http;

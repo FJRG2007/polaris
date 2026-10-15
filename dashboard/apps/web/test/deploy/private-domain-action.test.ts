@@ -19,7 +19,7 @@ vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({
     requirePermission: vi.fn(async () => ({ id: "member-1", isAdmin: false })),
     requireDomainAccess: vi.fn(async () => ({ ownerId: "owner-1", environmentId: "env-1" })),
-    setApplicationDomainPrivate: vi.fn(async () => undefined),
+    setApplicationDomainPrivate: vi.fn(async () => ({ published: true })),
     recordDeployAudit: vi.fn(async () => undefined)
 }));
 
@@ -66,6 +66,15 @@ describe("making an address private", () => {
         expect(result.error).toBe("Domain not found");
         expect(mocks.setApplicationDomainPrivate).not.toHaveBeenCalled();
         expect(mocks.recordDeployAudit).not.toHaveBeenCalled();
+    });
+
+    it("still audits a saved setting the edge did not take yet, and says so", async () => {
+        mocks.setApplicationDomainPrivate.mockResolvedValueOnce({ published: false });
+        const result = await setDomainPrivateAction({ domainId: DOMAIN, access: null });
+        expect(result).toEqual({ unpublished: true });
+        expect(mocks.recordDeployAudit).toHaveBeenCalledWith(
+            expect.objectContaining({ action: "deploy.domain.private.off", targetId: DOMAIN })
+        );
     });
 
     it("refuses an audience nobody could match before asking anything else", async () => {
