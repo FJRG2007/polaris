@@ -19,6 +19,7 @@ import {
     Handshake,
     Activity,
     ShieldCheck,
+    Cloud,
     House,
     Mails,
     MessagesSquare,
@@ -338,6 +339,24 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Malware, file changes, host hardening and image vulnerabilities on your servers.",
         description:
             "Scan app data for malware and quarantine what is found, record file fingerprints and see what changed since, audit each server's own settings and switch on its automatic security updates, and check every app's image for known vulnerabilities with a downloadable software inventory. Scans run one at a time per server, on demand or on a schedule, and nothing keeps running between them.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Servers at the operator's cloud accounts. Installing it runs nothing
+        // but an hourly read of what those servers cost; uninstalling stops that
+        // and leaves every server and account where it was.
+        id: "cloud-servers",
+        name: "Cloud servers",
+        category: "Tools",
+        icon: Cloud,
+        opensAt: "/cloud-servers",
+        summary: "Create servers at your cloud providers, ready in Polaris as they boot.",
+        description:
+            "Connect DigitalOcean, Hetzner Cloud, Vultr, Linode, AWS, Azure, Google Cloud or IONOS and create servers from here. Each one joins your Polaris servers on its first boot. Switch them on and off, restart, resize and destroy them, and see what each costs where the provider publishes its prices.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",

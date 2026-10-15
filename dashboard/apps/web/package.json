@@ -113,6 +113,7 @@
         "@breezystack/lamejs": "1.2.7",
         "@mediapipe/tasks-vision": "1.0.1",
         "@polaris-app/calendar": "0.1.0",
+        "@polaris-app/cloud-servers": "0.1.0",
         "@polaris-app/crm": "0.1.0",
         "@polaris-app/status-pages": "0.1.0",
         "@polaris-app/game-servers": "0.1.0",

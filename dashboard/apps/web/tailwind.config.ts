@@ -15,7 +15,9 @@ const config: Config = {
         "../game-servers/src/**/*.{ts,tsx}",
         "../calendar/src/**/*.{ts,tsx}",
         "../crm/src/**/*.{ts,tsx}",
-        "../status-pages/src/**/*.{ts,tsx}"
+        "../status-pages/src/**/*.{ts,tsx}",
+        "../security-scans/src/**/*.{ts,tsx}",
+        "../cloud-servers/src/**/*.{ts,tsx}"
     ]
 };
 

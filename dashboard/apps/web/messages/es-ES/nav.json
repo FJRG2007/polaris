@@ -156,6 +156,9 @@
         },
         "security-scans": {
             "description": "Malware, cambios en archivos, endurecimiento del sistema y vulnerabilidades de imágenes"
+        },
+        "cloud-servers": {
+            "description": "Crea y gestiona servidores en tus proveedores cloud"
         }
     },
     "labels": {
@@ -333,7 +336,8 @@
         "Dashboards": "Paneles",
         "Forecast": "Previsión",
         "Audit log": "Auditoría",
-        "Security scans": "Seguridad"
+        "Security scans": "Seguridad",
+        "Cloud servers": "Servidores cloud"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

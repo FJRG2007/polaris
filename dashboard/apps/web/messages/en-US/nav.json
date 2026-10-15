@@ -156,6 +156,9 @@
         },
         "security-scans": {
             "description": "Malware, file changes, host hardening and image vulnerabilities"
+        },
+        "cloud-servers": {
+            "description": "Create and run servers at your cloud providers"
         }
     },
     "labels": {
@@ -333,7 +336,8 @@
         "Dashboards": "Dashboards",
         "Forecast": "Forecast",
         "Audit log": "Audit log",
-        "Security scans": "Security scans"
+        "Security scans": "Security scans",
+        "Cloud servers": "Cloud servers"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",
