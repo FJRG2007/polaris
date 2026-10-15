@@ -134,7 +134,10 @@ async function runImport(id: string, input: StartImportInput): Promise<void> {
             status: "succeeded",
             step: "finishing",
             projectId: result.projectId,
-            result: { ...result },
+            result: {
+                ...result,
+                warnings: result.warnings.map((warning) => ({ code: warning.code, ...(warning.name ? { name: warning.name } : {}) }))
+            },
             finishedAt: new Date()
         });
         await recordDeployAudit({

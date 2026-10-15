@@ -73,6 +73,15 @@
             "databases": "Cargando bases de datos ({done} de {total})...",
             "sites": "Copiando sitios ({done} de {total})...",
             "finishing": "Terminando..."
+        },
+        "warning": {
+            "noDomains": "No se encontraron dominios en la copia; añádelos al proyecto tras importar.",
+            "noHome": "La copia no tiene carpeta personal, así que no se importaron archivos del sitio.",
+            "databaseFailed": "No se pudo importar la base de datos {name}.",
+            "folderMissing": "La carpeta de {name} no está en la copia, así que no se importó.",
+            "domainTaken": "No se pudo asociar {name}; puede que ya esté en uso.",
+            "notDeploying": "{name} se importó pero no empezó a desplegarse; despliégalo desde su página.",
+            "unknown": "Algo de la copia no se pudo traer."
         }
     }
 }

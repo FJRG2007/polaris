@@ -75,6 +75,6 @@ describe("cPanel backup plan", () => {
 
     it("warns when the backup has no domains or no home folder", () => {
         const plan = planFrom({ account: null, userdataMain: null, userdata: {}, dumps: [], hasHome: false });
-        expect(plan.warnings).toHaveLength(2);
+        expect(plan.warnings).toEqual([{ code: "noDomains" }, { code: "noHome" }]);
     });
 });

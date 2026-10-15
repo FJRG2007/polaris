@@ -32,8 +32,17 @@ const resultSchema = z.object({
     services: z.number(),
     databases: z.number(),
     domains: z.array(z.string()),
-    warnings: z.array(z.string())
+    warnings: z.array(z.object({ code: z.string(), name: z.string().optional() }))
 });
+
+/** The warnings the dialog has words for (`IMPORT_WARNING_CODES` on the server);
+ *  one it does not know, from a newer server, gets the general sentence. */
+const WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying"] as const;
+
+function warningKey(code: string): `importSite.warning.${(typeof WARNING_CODES)[number] | "unknown"}` {
+    const known = WARNING_CODES.find((candidate) => candidate === code);
+    return `importSite.warning.${known ?? "unknown"}`;
+}
 
 /** One import's row, as the server shows it. */
 const importSchema = z.object({
@@ -275,9 +284,11 @@ export function ImportSiteButton() {
                                 <div className="rounded-lg border border-warning-edge bg-warning-soft px-3 py-2 text-warning-ink">
                                     <p className="font-medium">{t("importSite.warnings")}</p>
                                     <ul className="mt-1 list-disc pl-5">
-                                        {job.result.warnings.map((warning) => (
-                                            <li key={warning} className="break-words">
-                                                {warning}
+                                        {job.result.warnings.map((warning, index) => (
+                                            <li key={`${warning.code}-${warning.name ?? index}`} className="break-words">
+                                                {t(warningKey(warning.code), {
+                                                    name: warning.name ?? ""
+                                                })}
                                             </li>
                                         ))}
                                     </ul>

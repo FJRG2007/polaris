@@ -35,6 +35,16 @@ const USERDATA_SKIP = new Set(["main", "cache", "cache.json"]);
 /** The folders that mark the root of a cPanel backup. */
 const MARKERS = ["cp", "userdata", "homedir", "homedir.tar", "mysql"];
 
+/** Something an import could not carry over, as a code the screen words in the
+ *  reader's language and the value it names. */
+export const IMPORT_WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying"] as const;
+export type ImportWarningCode = (typeof IMPORT_WARNING_CODES)[number];
+export interface ImportWarning {
+    readonly code: ImportWarningCode;
+    /** The database, site or domain it is about, for the codes that name one. */
+    readonly name?: string;
+}
+
 export interface ImportDomain {
     readonly name: string;
     readonly primary: boolean;
@@ -56,7 +66,7 @@ export interface CpanelPlan {
     /** Whether the home folder is in the backup at all. */
     readonly hasHome: boolean;
     /** Things the import cannot carry over, for the reader to see before it runs. */
-    readonly warnings: string[];
+    readonly warnings: ImportWarning[];
 }
 
 /**
@@ -142,7 +152,7 @@ export function planFrom(input: {
     dumps: readonly { file: string; bytes: number }[];
     hasHome: boolean;
 }): CpanelPlan {
-    const warnings: string[] = [];
+    const warnings: ImportWarning[] = [];
     const main = parseKeyValues(input.userdataMain ?? "");
     const mainDomain = main.main_domain?.toLowerCase() ?? null;
     const domains: ImportDomain[] = [];
@@ -158,8 +168,8 @@ export function planFrom(input: {
         });
     }
     domains.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
-    if (domains.length === 0) warnings.push("No domains were found in the backup; add them after the import.");
-    if (!input.hasHome) warnings.push("The backup has no home folder, so no site files will be imported.");
+    if (domains.length === 0) warnings.push({ code: "noDomains" });
+    if (!input.hasHome) warnings.push({ code: "noHome" });
     const databases = input.dumps
         .filter((dump) => dump.file.endsWith(".sql"))
         .map((dump) => ({ name: dump.file.slice(0, -4), dump: `mysql/${dump.file}`, bytes: dump.bytes }))

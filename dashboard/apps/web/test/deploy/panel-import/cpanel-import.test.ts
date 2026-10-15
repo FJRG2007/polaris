@@ -145,7 +145,10 @@ describe("importCpanelBackup", () => {
         expect(result).toMatchObject({ projectId: "project-1", services: 2, databases: 2 });
         expect(result.domains).toEqual(["main.test", "www-alias.test", "addon.test"]);
         // taken.test, and the folder gone.test serves.
-        expect(result.warnings).toHaveLength(2);
+        expect(result.warnings).toEqual([
+            { code: "domainTaken", name: "taken.test" },
+            { code: "folderMissing", name: "gone.test" }
+        ]);
         expect(createDatabase.mock.calls[0]?.[1]).toMatchObject({ engine: "mysql", databaseName: "acct_shop", environmentId: "env-1" });
         await expect(stat(scratch)).rejects.toThrow();
     });
@@ -155,7 +158,7 @@ describe("importCpanelBackup", () => {
         const result = await importCpanelBackup(input());
         expect(result.databases).toBe(1);
         expect(events).toContain("database acct_wp");
-        expect(result.warnings.some((warning) => warning.includes("acct_shop"))).toBe(true);
+        expect(result.warnings).toContainEqual({ code: "databaseFailed", name: "acct_shop" });
     });
 
     it("picks another project name when the first is taken", async () => {

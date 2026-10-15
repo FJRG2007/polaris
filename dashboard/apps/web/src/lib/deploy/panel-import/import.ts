@@ -33,7 +33,7 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { storeSourceFolder } from "@/lib/deploy/source-upload";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
-import { inspectCpanelBackup, type CpanelPlan, type ImportDomain } from "./cpanel";
+import { inspectCpanelBackup, type CpanelPlan, type ImportDomain, type ImportWarning } from "./cpanel";
 
 /** The port an imported site is served on: the PHP image a detected site builds
  *  into answers there. */
@@ -55,7 +55,7 @@ export interface CpanelImportResult {
     readonly services: number;
     readonly databases: number;
     readonly domains: string[];
-    readonly warnings: string[];
+    readonly warnings: ImportWarning[];
 }
 
 /** Where an import is, for whoever watches it. */
@@ -229,7 +229,7 @@ export async function importCpanelBackup(
                 databases += 1;
             } catch (error) {
                 console.error(`panel-import: database ${database.name} was not carried over:`, error);
-                warnings.push(`The database ${database.name} could not be imported.`);
+                warnings.push({ code: "databaseFailed", name: database.name });
             }
         }
 
@@ -241,7 +241,7 @@ export async function importCpanelBackup(
             const folder = join(root, "homedir", ...site.documentRoot.split("/").filter(Boolean));
             const name = site.domains[0]?.name ?? (site.documentRoot || "site");
             if (!(await isFolder(folder))) {
-                warnings.push(`The folder of ${name} is not in the backup, so it was not imported.`);
+                warnings.push({ code: "folderMissing", name });
                 continue;
             }
             const application = await deployService.createApplication(ownerId, {
@@ -263,12 +263,12 @@ export async function importCpanelBackup(
                     );
                 } catch (error) {
                     console.error(`panel-import: domain ${domain.name} was not attached:`, error);
-                    warnings.push(`${domain.name} could not be attached; it may already be in use.`);
+                    warnings.push({ code: "domainTaken", name: domain.name });
                 }
             }
             await deployService.deployApplication(application.id, ownerId, actorId, { trigger: "upload" }).catch((error: unknown) => {
                 console.error(`panel-import: service ${application.id} did not start deploying:`, error);
-                warnings.push(`${name} was imported but did not start deploying; deploy it from its page.`);
+                warnings.push({ code: "notDeploying", name });
             });
         }
         await report("finishing", sites.length, sites.length);
