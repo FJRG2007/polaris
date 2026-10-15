@@ -619,7 +619,8 @@ export async function openCopy(
     // once opened is not the stored one, so none is claimed.
     const sealed = isSealedCopy(copy);
     const fileName = plainName(stored);
-    const reveal = (stream: ReadableStream<Uint8Array>) => (sealed ? openSealed(ownerId, stream) : stream);
+    const reveal = (stream: ReadableStream<Uint8Array>) =>
+        sealed ? openSealed(ownerId, stream) : stream;
     const sizeBytes = sealed ? 0 : Number(copy.sizeBytes);
     if (isSourceLocal(copy.destination)) {
         const resource = toSourceResource(copy.point.resource);
@@ -840,10 +841,14 @@ export async function listDestinations(ownerId: string) {
     const sizes = await prisma.recoveryPointCopy.groupBy({
         by: ["destinationId"],
         where: { destination: { ownerId }, status: "available" },
-        _sum: { sizeBytes: true }
+        _sum: { sizeBytes: true },
+        _count: { _all: true }
     });
     const bytesByDestination = new Map(
         sizes.map((row) => [row.destinationId, Number(row._sum.sizeBytes ?? 0n)])
+    );
+    const availableByDestination = new Map(
+        sizes.map((row) => [row.destinationId, row._count._all])
     );
     return rows.map((row) => ({
         id: row.id,
@@ -857,6 +862,7 @@ export async function listDestinations(ownerId: string) {
         via: row.connection?.name ?? row.host?.name ?? null,
         viaKind: row.connection?.kind ?? (row.host ? "host" : null),
         copyCount: row._count.copies,
+        movableCount: availableByDestination.get(row.id) ?? 0,
         usedByPlans: row._count.plans,
         storedBytes: bytesByDestination.get(row.id) ?? 0
     }));

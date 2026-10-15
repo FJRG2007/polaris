@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import * as manage from "@/lib/backups/manage";
 import * as keyring from "@/lib/backups/keyring";
+import * as relocate from "@/lib/backups/relocate";
 import { recordAudit } from "@/lib/audit-service";
 import { runBackup } from "@/lib/backups/service";
 import { destinationSchema, planSchema, protectSchema, restoreSchema } from "@/lib/backups/schemas";
@@ -35,7 +36,9 @@ async function say(key: BackupsKey): Promise<string> {
 /** Turn a thrown failure into the sentence the dialog shows, in the reader's words. */
 async function failed(error: unknown): Promise<{ error: string }> {
     const t = await getTranslations("backups");
-    return { error: error instanceof Error ? backupRefusalText(t, error.message) : t("errors.failed") };
+    return {
+        error: error instanceof Error ? backupRefusalText(t, error.message) : t("errors.failed")
+    };
 }
 
 /** The schemas' own sentences, keyed by their English. */
@@ -56,7 +59,8 @@ async function schemaSay(message: string | undefined, fallback: BackupsKey): Pro
 export async function protectAction(input: unknown): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = protectSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalid") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalid") };
     try {
         const created = await manage.protectResource(user.id, parsed.data);
         await recordAudit({
@@ -169,10 +173,14 @@ export async function restoreAction(input: unknown): Promise<Result> {
     }
 }
 
-export async function savePlanAction(input: unknown, planId?: string): Promise<Result<{ id: string }>> {
+export async function savePlanAction(
+    input: unknown,
+    planId?: string
+): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = planSchema.safeParse(input);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidPlan") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidPlan") };
     try {
         const saved = await manage.savePlan(user.id, parsed.data, planId);
         await recordAudit({
@@ -200,7 +208,12 @@ export async function deletePlanAction(planId: string): Promise<Result> {
     const user = await requireAdmin();
     try {
         await manage.deletePlan(user.id, planId);
-        await recordAudit({ actorId: user.id, action: "backup.plan.delete", targetType: "backup-plan", targetId: planId });
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.plan.delete",
+            targetType: "backup-plan",
+            targetId: planId
+        });
         revalidatePath("/apps/backups");
         return {};
     } catch (error) {
@@ -208,14 +221,21 @@ export async function deletePlanAction(planId: string): Promise<Result> {
     }
 }
 
-export async function createDestinationAction(input: unknown): Promise<Result<{ id: string }>> {
+export async function createDestinationAction(
+    input: unknown,
+    makeDefault: unknown = false
+): Promise<Result<{ id: string; notDefault?: string }>> {
     const user = await requireAdmin();
     const parsed = destinationSchema.safeParse(input);
-    if (!parsed.success) {
-        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidDestination") };
+    const asDefault = z.boolean().safeParse(makeDefault);
+    if (!parsed.success || !asDefault.success) {
+        return {
+            error: await schemaSay(parsed.error?.issues[0]?.message, "errors.invalidDestination")
+        };
     }
+    let created: { id: string };
     try {
-        const created = await manage.createDestination(user.id, parsed.data);
+        created = await manage.createDestination(user.id, parsed.data);
         await recordAudit({
             actorId: user.id,
             action: "backup.destination.create",
@@ -223,8 +243,76 @@ export async function createDestinationAction(input: unknown): Promise<Result<{ 
             targetId: created.id,
             metadata: { kind: parsed.data.kind }
         });
-        revalidatePath("/apps/backups");
+    } catch (error) {
+        return failed(error);
+    }
+    revalidatePath("/apps/backups");
+    if (!asDefault.data) return created;
+    try {
+        await relocate.setDefaultDestination(user.id, created.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.default",
+            targetType: "backup-destination",
+            targetId: created.id
+        });
         return created;
+    } catch (error) {
+        return { id: created.id, notDefault: (await failed(error)).error };
+    }
+}
+
+const destinationIdSchema = z.string().uuid();
+
+/** Make one destination the one copies go to when a plan names none. */
+export async function setDefaultDestinationAction(destinationId: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = destinationIdSchema.safeParse(destinationId);
+    if (!parsed.success) return { error: await say("refusals.destinationMissing") };
+    try {
+        await relocate.setDefaultDestination(user.id, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.default",
+            targetType: "backup-destination",
+            targetId: parsed.data
+        });
+        revalidatePath("/apps/backups");
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const moveCopiesSchema = z.object({
+    fromId: destinationIdSchema,
+    toId: destinationIdSchema,
+    makeDefault: z.boolean()
+});
+
+/** Move every copy a destination holds to another, and optionally make that one the default. */
+export async function moveCopiesAction(input: unknown): Promise<Result<{ count: number }>> {
+    const user = await requireAdmin();
+    const parsed = moveCopiesSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("refusals.destinationMissing") };
+    try {
+        const started = await relocate.startMovingCopies({
+            ownerId: user.id,
+            fromId: parsed.data.fromId,
+            toId: parsed.data.toId,
+            actorId: user.id
+        });
+        if (parsed.data.makeDefault)
+            await relocate.setDefaultDestination(user.id, parsed.data.toId);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.move",
+            targetType: "backup-destination",
+            targetId: parsed.data.fromId,
+            metadata: { to: parsed.data.toId, copies: started.count }
+        });
+        revalidatePath("/apps/backups");
+        return { count: started.count };
     } catch (error) {
         return failed(error);
     }
@@ -254,7 +342,10 @@ export async function testDestinationAction(
     try {
         const result = await manage.testDestination(user.id, destinationId);
         if (!result.error) return result;
-        return { ...result, error: backupRefusalText(await getTranslations("backups"), result.error) };
+        return {
+            ...result,
+            error: backupRefusalText(await getTranslations("backups"), result.error)
+        };
     } catch (error) {
         // Every other action here catches, and this one has to for a reason the
         // others do not: an error thrown out of a Server Action is rethrown in the
@@ -288,7 +379,12 @@ export async function rotateBackupKeyAction(): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     try {
         const created = await keyring.rotateKey(user.id);
-        await recordAudit({ actorId: user.id, action: "backup.key.rotate", targetType: "backup-key", targetId: created.id });
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.key.rotate",
+            targetType: "backup-key",
+            targetId: created.id
+        });
         return created;
     } catch (error) {
         return failed(error);
@@ -301,13 +397,21 @@ export async function rotateBackupKeyAction(): Promise<Result<{ id: string }>> {
  * its owner - but it is the only thing that opens them once this database is gone,
  * so reading it is recorded.
  */
-export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ recoveryKey: string }>> {
+export async function revealRecoveryKeyAction(
+    keyId: string
+): Promise<Result<{ recoveryKey: string }>> {
     const user = await requireAdmin();
     const parsed = keyIdSchema.safeParse(keyId);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.notAKey") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.notAKey") };
     try {
         const recoveryKey = await keyring.recoveryKey(user.id, parsed.data);
-        await recordAudit({ actorId: user.id, action: "backup.key.reveal", targetType: "backup-key", targetId: parsed.data });
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.key.reveal",
+            targetType: "backup-key",
+            targetId: parsed.data
+        });
         return { recoveryKey };
     } catch (error) {
         return failed(error);
@@ -318,7 +422,8 @@ export async function revealRecoveryKeyAction(keyId: string): Promise<Result<{ r
 export async function addRecoveryKeyAction(text: string): Promise<Result<{ added: boolean }>> {
     const user = await requireAdmin();
     const parsed = recoveryKeySchema.safeParse(text);
-    if (!parsed.success) return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.pasteKey") };
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.pasteKey") };
     try {
         const outcome = await keyring.addRecoveryKey(user.id, parsed.data);
         await recordAudit({ actorId: user.id, action: "backup.key.add", targetType: "backup-key" });

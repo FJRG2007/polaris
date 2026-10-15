@@ -163,7 +163,21 @@
         "noServers": "Aún no hay servidores conectados.",
         "folder": "Carpeta",
         "folderHint": "Todo se escribe dentro de esta, así que las copias nunca comparten carpeta con nada más.",
-        "addShort": "Añadir"
+        "addShort": "Añadir",
+        "makeDefault": "Por defecto",
+        "makeAsDefault": "Usarlo por defecto",
+        "makeAsDefaultHint": "Lo protegido sin un plan propio manda sus copias aquí.",
+        "move": "Mover copias",
+        "moveTitle": "Mover copias de {name}",
+        "moveIntro": "{count, plural, one {# copia se escribe} other {# copias se escriben}} primero en el destino nuevo y solo después se quitan de aquí, así nunca falta ninguna.",
+        "moveTo": "Mover a",
+        "moveConfirm": "Mover copias",
+        "moveNoTarget": "Añade antes un NAS, un bucket o un servidor como destino.",
+        "moveStarted": "Moviendo {count, plural, one {# copia} other {# copias}}. Actividad muestra cuándo termina.",
+        "sameDiskTitle": "Tus copias están en el propio disco de este servidor",
+        "sameDiskBody": "Si ese disco falla, las copias se van con él. Añade tu NAS u otro servidor como destino y hazlo el destino por defecto.",
+        "sameDiskMove": "Moverlas a {name}",
+        "moveAlso": "Mover también aquí {count, plural, one {la # copia} other {las # copias}} de {name}"
     },
     "keys": {
         "rotated": "Las copias nuevas se sellan con la clave nueva. Guarda también su clave de recuperación.",
@@ -362,6 +376,11 @@
         "exportArchive": "Falló el archivado de la exportación: {reason}",
         "exportUnpack": "Falló el desempaquetado de la exportación: {reason}",
         "archiveFailed": "Falló el archivado de {path}: {reason}",
-        "unpackFailed": "Falló el desempaquetado en {path}: {reason}"
+        "unpackFailed": "Falló el desempaquetado en {path}: {reason}",
+        "besideSourceDefault": "Las copias junto al origen no pueden ser el destino por defecto",
+        "besideSourceMove": "Las copias junto al origen no se pueden mover",
+        "moveSameDestination": "Elige otro destino al que mover las copias",
+        "alreadyMoving": "Esas copias ya se están moviendo",
+        "nothingToMove": "Ese destino no tiene copias que mover"
     }
 }
