@@ -18,7 +18,8 @@ describe("the library of starting points", () => {
     it("starts with a blank one and has something in every other", () => {
         expect(LIBRARY_KEYS[0]).toBe("blank");
         expect(planItems(librarySpec("blank"))).toEqual([]);
-        for (const key of LIBRARY_KEYS.slice(1)) expect(planItems(librarySpec(key)).length).toBeGreaterThan(0);
+        for (const key of LIBRARY_KEYS.slice(1))
+            expect(planItems(librarySpec(key)).length).toBeGreaterThan(0);
     });
 
     it("keeps SSH open to keys and root reachable by key, so Polaris is not locked out", () => {
@@ -36,11 +37,19 @@ describe("the library of starting points", () => {
 
     it.each(LOCALES)("names and describes each one in %s", (locale) => {
         const { servers } = webCatalogs.pick(locale, ["servers"]) as unknown as {
-            servers: { templates: { editor: { library: Record<string, string>; libraryAbout: Record<string, string> } } };
+            servers: {
+                templates: {
+                    editor: {
+                        library: Record<string, string>;
+                        libraryAbout: Record<string, string>;
+                    };
+                };
+            };
         };
         for (const key of LIBRARY_KEYS) {
             expect(servers.templates.editor.library[key], key).toBeTruthy();
-            if (key !== "blank") expect(servers.templates.editor.libraryAbout[key], key).toBeTruthy();
+            if (key !== "blank")
+                expect(servers.templates.editor.libraryAbout[key], key).toBeTruthy();
         }
     });
 });

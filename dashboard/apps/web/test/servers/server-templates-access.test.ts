@@ -56,10 +56,19 @@ vi.mock("@polaris/db", () => {
         Prisma: { DbNull: null, PrismaClientKnownRequestError: class extends Error {} },
         prisma: {
             hostTemplateAssignment: {
-                findFirst: async ({ where }: { where: Parameters<typeof owns>[0] }) => (owns(where) ? row : null),
+                findFirst: async ({ where }: { where: Parameters<typeof owns>[0] }) =>
+                    owns(where) ? row : null,
                 update: async (args: unknown) => {
                     updates.push(args);
-                    return { ...row, status: "unknown", error: null, checkedAt: null, fixedAt: null, templateId: "t", template: { name: "Web" } };
+                    return {
+                        ...row,
+                        status: "unknown",
+                        error: null,
+                        checkedAt: null,
+                        fixedAt: null,
+                        templateId: "t",
+                        template: { name: "Web" }
+                    };
                 },
                 delete: async () => row
             },
@@ -103,35 +112,53 @@ describe("without the Servers permission", () => {
 
 describe("with it", () => {
     it("refuses an id that is not one before touching the database", async () => {
-        expect(await actions.fixAssignmentAction({ assignmentId: "1; drop table" })).toEqual({ ok: false, error: "invalid" });
+        expect(await actions.fixAssignmentAction({ assignmentId: "1; drop table" })).toEqual({
+            ok: false,
+            error: "invalid"
+        });
         expect(await actions.deleteTemplateAction("nope")).toEqual({ ok: false, error: "invalid" });
     });
 
     it("finds another owner's assignment as missing", async () => {
-        await expect(service.fixAssignment("someone-else", ID)).rejects.toMatchObject({ code: "notFound" });
-        await expect(service.unassignTemplate("someone-else", ID)).rejects.toMatchObject({ code: "notFound" });
+        await expect(service.fixAssignment("someone-else", ID)).rejects.toMatchObject({
+            code: "notFound"
+        });
+        await expect(service.unassignTemplate("someone-else", ID)).rejects.toMatchObject({
+            code: "notFound"
+        });
     });
 
     it("refuses a fix without root, and never opens SSH for it", async () => {
-        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({ ok: false, error: "noRoot" });
+        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({
+            ok: false,
+            error: "noRoot"
+        });
         expect(ssh).not.toHaveBeenCalled();
     });
 
     it("refuses a fix for an item the last check did not find wrong", async () => {
         connection = { username: "root", sudo: false };
-        expect(await actions.fixAssignmentAction({ assignmentId: ID, keys: ["pkg:other"] })).toEqual({ ok: false, error: "nothingToFix" });
+        expect(
+            await actions.fixAssignmentAction({ assignmentId: ID, keys: ["pkg:other"] })
+        ).toEqual({ ok: false, error: "nothingToFix" });
         expect(ssh).not.toHaveBeenCalled();
     });
 
     it("says the server did not answer when SSH cannot open, as root or through sudo", async () => {
         connection = { username: "deploy", sudo: true };
-        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({ ok: false, error: "unreachable" });
+        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({
+            ok: false,
+            error: "unreachable"
+        });
         expect(ssh).toHaveBeenCalledTimes(1);
     });
 
     it("says the saved login cannot be read rather than that the server is gone", async () => {
         unsealable = true;
-        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({ ok: false, error: "credentials" });
+        expect(await actions.fixAssignmentAction({ assignmentId: ID })).toEqual({
+            ok: false,
+            error: "credentials"
+        });
         expect(ssh).not.toHaveBeenCalled();
     });
 });

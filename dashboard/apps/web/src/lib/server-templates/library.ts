@@ -27,12 +27,16 @@ export const TEMPLATE_LIBRARY = {
     blank: {},
     sshHardened: {
         packages: ["openssh-server"],
-        files: [{ path: "/etc/ssh/sshd_config.d/10-polaris.conf", content: SSH_BASELINE, mode: "644" }]
+        files: [
+            { path: "/etc/ssh/sshd_config.d/10-polaris.conf", content: SSH_BASELINE, mode: "644" }
+        ]
     },
     securityUpdates: {
         packages: ["unattended-upgrades"],
         services: [{ name: "unattended-upgrades", running: true, enabled: true }],
-        files: [{ path: "/etc/apt/apt.conf.d/20auto-upgrades", content: AUTO_UPGRADES, mode: "644" }]
+        files: [
+            { path: "/etc/apt/apt.conf.d/20auto-upgrades", content: AUTO_UPGRADES, mode: "644" }
+        ]
     },
     webServer: {
         packages: ["nginx", "certbot"],

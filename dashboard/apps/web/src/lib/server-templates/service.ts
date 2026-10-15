@@ -23,11 +23,29 @@ import {
     type TemplateSpec,
     type TemplateStatus
 } from "@polaris/core";
-import { CHECK_SCRIPT, FIX_SCRIPT, computeDrift, fixWords, parseReport, planItems, scriptCommand } from "./model";
+import {
+    CHECK_SCRIPT,
+    FIX_SCRIPT,
+    computeDrift,
+    fixWords,
+    parseReport,
+    planItems,
+    scriptCommand
+} from "./model";
 
 /** A refusal the screen words, by code. */
 export class TemplateRefusal extends Error {
-    constructor(readonly code: "notFound" | "nameTaken" | "noRoot" | "unreachable" | "failed" | "nothingToFix" | "local" | "credentials") {
+    constructor(
+        readonly code:
+            | "notFound"
+            | "nameTaken"
+            | "noRoot"
+            | "unreachable"
+            | "failed"
+            | "nothingToFix"
+            | "local"
+            | "credentials"
+    ) {
         super(code);
     }
 }
@@ -70,7 +88,13 @@ function driftOf(value: unknown): DriftItem[] {
 export async function listTemplates(ownerId: string): Promise<TemplateView[]> {
     const rows = await prisma.hostTemplate.findMany({
         where: { ownerId },
-        select: { id: true, name: true, description: true, spec: true, _count: { select: { assignments: true } } },
+        select: {
+            id: true,
+            name: true,
+            description: true,
+            spec: true,
+            _count: { select: { assignments: true } }
+        },
         orderBy: { name: "asc" },
         take: 200
     });
@@ -84,9 +108,17 @@ export async function listTemplates(ownerId: string): Promise<TemplateView[]> {
 }
 
 /** Create a template, or replace one of this owner's. */
-export async function saveTemplate(ownerId: string, id: string | null, raw: HostTemplateInput): Promise<string> {
+export async function saveTemplate(
+    ownerId: string,
+    id: string | null,
+    raw: HostTemplateInput
+): Promise<string> {
     const input = hostTemplateInputSchema.parse(raw);
-    const data = { name: input.name, description: input.description, spec: input.spec as Prisma.InputJsonValue };
+    const data = {
+        name: input.name,
+        description: input.description,
+        spec: input.spec as Prisma.InputJsonValue
+    };
     try {
         if (id) {
             const updated = await prisma.hostTemplate.updateMany({ where: { id, ownerId }, data });
@@ -98,7 +130,10 @@ export async function saveTemplate(ownerId: string, id: string | null, raw: Host
             });
             return id;
         }
-        const created = await prisma.hostTemplate.create({ data: { ...data, ownerId }, select: { id: true } });
+        const created = await prisma.hostTemplate.create({
+            data: { ...data, ownerId },
+            select: { id: true }
+        });
         return created.id;
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -152,7 +187,12 @@ export async function hostAssignments(ownerId: string, hostId: string): Promise<
     return rows.map(viewOf);
 }
 
-export async function assignTemplate(ownerId: string, templateId: string, hostId: string, autoFix: boolean): Promise<string> {
+export async function assignTemplate(
+    ownerId: string,
+    templateId: string,
+    hostId: string,
+    autoFix: boolean
+): Promise<string> {
     const [template, host] = await Promise.all([
         prisma.hostTemplate.findFirst({ where: { id: templateId, ownerId }, select: { id: true } }),
         prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { id: true } })
@@ -170,7 +210,13 @@ export async function assignTemplate(ownerId: string, templateId: string, hostId
 async function ownedAssignment(ownerId: string, id: string) {
     const row = await prisma.hostTemplateAssignment.findFirst({
         where: { id, host: { ownerId }, template: { ownerId } },
-        select: { id: true, hostId: true, autoFix: true, drift: true, template: { select: { ownerId: true, spec: true } } }
+        select: {
+            id: true,
+            hostId: true,
+            autoFix: true,
+            drift: true,
+            template: { select: { ownerId: true, spec: true } }
+        }
     });
     if (!row) throw new TemplateRefusal("notFound");
     return row;
@@ -242,8 +288,17 @@ async function connectionFor(hostId: string, ownerId: string): Promise<HostConne
     }
 }
 
-async function record(id: string, data: Prisma.HostTemplateAssignmentUpdateInput): Promise<AssignmentView> {
-    return viewOf(await prisma.hostTemplateAssignment.update({ where: { id }, data, select: ASSIGNMENT_SELECT }));
+async function record(
+    id: string,
+    data: Prisma.HostTemplateAssignmentUpdateInput
+): Promise<AssignmentView> {
+    return viewOf(
+        await prisma.hostTemplateAssignment.update({
+            where: { id },
+            data,
+            select: ASSIGNMENT_SELECT
+        })
+    );
 }
 
 /** Read one server against one template and keep what was found. A server that
@@ -258,7 +313,11 @@ export async function checkAssignment(ownerId: string, id: string): Promise<Assi
     try {
         const connection = await connectionFor(row.hostId, ownerId);
         const { sudo } = rootOf(connection);
-        const command = scriptCommand(CHECK_SCRIPT, items.flatMap((item) => [...item.check]), sudo);
+        const command = scriptCommand(
+            CHECK_SCRIPT,
+            items.flatMap((item) => [...item.check]),
+            sudo
+        );
         const { output } = await runScript(connection, command, undefined, CHECK_TIMEOUT_MS);
         const report = parseReport(output);
         if (report.size === 0) throw new TemplateRefusal("failed");
@@ -271,14 +330,19 @@ export async function checkAssignment(ownerId: string, id: string): Promise<Assi
         });
     } catch (error) {
         const code = error instanceof TemplateRefusal ? error.code : "failed";
-        if (!(error instanceof TemplateRefusal)) console.error("[server-templates] check failed", error);
+        if (!(error instanceof TemplateRefusal))
+            console.error("[server-templates] check failed", error);
         return record(id, { status: "failed", error: code, checkedAt: new Date() });
     }
 }
 
 /** Put back the drift the last check found - the items named, or every
  *  fixable one - then check again so the screen shows what is true now. */
-export async function fixAssignment(ownerId: string, id: string, keys?: readonly string[]): Promise<AssignmentView> {
+export async function fixAssignment(
+    ownerId: string,
+    id: string,
+    keys?: readonly string[]
+): Promise<AssignmentView> {
     const row = await ownedAssignment(ownerId, id);
     const spec = specOf(row.template.spec);
     const plan = fixWords(spec, driftOf(row.drift), keys);
@@ -287,7 +351,12 @@ export async function fixAssignment(ownerId: string, id: string, keys?: readonly
     const { root, sudo } = rootOf(connection);
     if (!root) throw new TemplateRefusal("noRoot");
 
-    const { output } = await runScript(connection, scriptCommand(FIX_SCRIPT, plan.words, sudo), plan.input, FIX_TIMEOUT_MS);
+    const { output } = await runScript(
+        connection,
+        scriptCommand(FIX_SCRIPT, plan.words, sudo),
+        plan.input,
+        FIX_TIMEOUT_MS
+    );
     const results = parseReport(output);
     await prisma.hostTemplateAssignment.update({ where: { id }, data: { fixedAt: new Date() } });
     const after = await checkAssignment(ownerId, id);
@@ -308,7 +377,9 @@ const PASS_BUDGET_MS = 5 * 60_000;
  *  drift back where the assignment asks for that. */
 export async function runTemplateSweep(): Promise<number> {
     const due = await prisma.hostTemplateAssignment.findMany({
-        where: { OR: [{ checkedAt: null }, { checkedAt: { lt: new Date(Date.now() - CHECK_EVERY_MS) } }] },
+        where: {
+            OR: [{ checkedAt: null }, { checkedAt: { lt: new Date(Date.now() - CHECK_EVERY_MS) } }]
+        },
         select: { id: true, autoFix: true, template: { select: { ownerId: true } } },
         orderBy: { checkedAt: { sort: "asc", nulls: "first" } },
         take: PER_PASS
@@ -321,10 +392,17 @@ export async function runTemplateSweep(): Promise<number> {
         const ownerId = row.template.ownerId;
         try {
             const checked = await checkAssignment(ownerId, row.id);
-            if (row.autoFix && checked.status === "drifted" && checked.drift.some((item) => item.fixable)) {
+            if (
+                row.autoFix &&
+                checked.status === "drifted" &&
+                checked.drift.some((item) => item.fixable)
+            ) {
                 await fixAssignment(ownerId, row.id).catch(async (error) => {
                     const code = error instanceof TemplateRefusal ? error.code : "failed";
-                    await prisma.hostTemplateAssignment.update({ where: { id: row.id }, data: { error: code } });
+                    await prisma.hostTemplateAssignment.update({
+                        where: { id: row.id },
+                        data: { error: code }
+                    });
                 });
             }
         } catch (error) {

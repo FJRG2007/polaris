@@ -39,11 +39,18 @@ export async function listTemplatesAction(): Promise<Result<templates.TemplateVi
     }
 }
 
-export async function saveTemplateAction(id: string | null, input: HostTemplateInput): Promise<Result<string>> {
+export async function saveTemplateAction(
+    id: string | null,
+    input: HostTemplateInput
+): Promise<Result<string>> {
     const user = await requirePermission("system.manage");
     try {
         const templateId = id === null ? null : hostTemplateIdSchema.parse(id);
-        const saved = await templates.saveTemplate(user.id, templateId, hostTemplateInputSchema.parse(input));
+        const saved = await templates.saveTemplate(
+            user.id,
+            templateId,
+            hostTemplateInputSchema.parse(input)
+        );
         return { ok: true, value: saved };
     } catch (error) {
         return refused(error);
@@ -60,20 +67,32 @@ export async function deleteTemplateAction(id: string): Promise<Result> {
     }
 }
 
-export async function hostAssignmentsAction(hostId: string): Promise<Result<templates.AssignmentView[]>> {
+export async function hostAssignmentsAction(
+    hostId: string
+): Promise<Result<templates.AssignmentView[]>> {
     const user = await requirePermission("system.manage");
     try {
-        return { ok: true, value: await templates.hostAssignments(user.id, z.string().uuid().parse(hostId)) };
+        return {
+            ok: true,
+            value: await templates.hostAssignments(user.id, z.string().uuid().parse(hostId))
+        };
     } catch (error) {
         return refused(error);
     }
 }
 
-export async function assignTemplateAction(input: z.input<typeof templateAssignInputSchema>): Promise<Result<templates.AssignmentView>> {
+export async function assignTemplateAction(
+    input: z.input<typeof templateAssignInputSchema>
+): Promise<Result<templates.AssignmentView>> {
     const user = await requirePermission("system.manage");
     try {
         const parsed = templateAssignInputSchema.parse(input);
-        const id = await templates.assignTemplate(user.id, parsed.templateId, parsed.hostId, parsed.autoFix);
+        const id = await templates.assignTemplate(
+            user.id,
+            parsed.templateId,
+            parsed.hostId,
+            parsed.autoFix
+        );
         return { ok: true, value: await templates.checkAssignment(user.id, id) };
     } catch (error) {
         return refused(error);
@@ -93,23 +112,34 @@ export async function unassignTemplateAction(assignmentId: string): Promise<Resu
 export async function setAutoFixAction(assignmentId: string, autoFix: boolean): Promise<Result> {
     const user = await requirePermission("system.manage");
     try {
-        await templates.setAutoFix(user.id, z.string().uuid().parse(assignmentId), z.boolean().parse(autoFix));
+        await templates.setAutoFix(
+            user.id,
+            z.string().uuid().parse(assignmentId),
+            z.boolean().parse(autoFix)
+        );
         return { ok: true, value: undefined };
     } catch (error) {
         return refused(error);
     }
 }
 
-export async function checkAssignmentAction(assignmentId: string): Promise<Result<templates.AssignmentView>> {
+export async function checkAssignmentAction(
+    assignmentId: string
+): Promise<Result<templates.AssignmentView>> {
     const user = await requirePermission("system.manage");
     try {
-        return { ok: true, value: await templates.checkAssignment(user.id, z.string().uuid().parse(assignmentId)) };
+        return {
+            ok: true,
+            value: await templates.checkAssignment(user.id, z.string().uuid().parse(assignmentId))
+        };
     } catch (error) {
         return refused(error);
     }
 }
 
-export async function fixAssignmentAction(input: z.input<typeof templateFixInputSchema>): Promise<Result<templates.AssignmentView>> {
+export async function fixAssignmentAction(
+    input: z.input<typeof templateFixInputSchema>
+): Promise<Result<templates.AssignmentView>> {
     const user = await requirePermission("system.manage");
     try {
         const parsed = templateFixInputSchema.parse(input);

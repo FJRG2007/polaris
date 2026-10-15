@@ -11,12 +11,22 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { templateSpecSchema, type DriftItem, type TemplateSpecInput } from "@polaris/core";
-import { CHECK_SCRIPT, FIX_SCRIPT, computeDrift, fixWords, parseReport, planItems, scriptCommand, sha256 } from "@/lib/server-templates/model";
+import {
+    CHECK_SCRIPT,
+    FIX_SCRIPT,
+    computeDrift,
+    fixWords,
+    parseReport,
+    planItems,
+    scriptCommand,
+    sha256
+} from "@/lib/server-templates/model";
 
 const spec = (input: TemplateSpecInput) => templateSpecSchema.parse(input);
 
 /** Report lines for items 1..n. */
-const report = (...values: string[]) => parseReport(values.map((value, index) => `@${index + 1} ${value}`).join("\n"));
+const report = (...values: string[]) =>
+    parseReport(values.map((value, index) => `@${index + 1} ${value}`).join("\n"));
 
 /** Split a POSIX command line built from bare and single-quoted words back into
  *  its words, failing on anything a shell would expand. */
@@ -39,7 +49,8 @@ function words(line: string): string[] {
                 word += "'";
                 i += 2;
             } else {
-                if (!/[a-zA-Z0-9_./:=-]/.test(line[i]!)) throw new Error(`bare ${JSON.stringify(line[i])} would be read by the shell`);
+                if (!/[a-zA-Z0-9_./:=-]/.test(line[i]!))
+                    throw new Error(`bare ${JSON.stringify(line[i])} would be read by the shell`);
                 word += line[i];
                 i++;
             }
@@ -61,7 +72,14 @@ describe("the items a template becomes", () => {
                 packages: ["nginx"]
             })
         );
-        expect(items.map((item) => item.key)).toEqual(["pkg:nginx", "svc:nginx", "file:/etc/motd", "sysctl:vm.swappiness", "user:deploy", "fw:443/tcp"]);
+        expect(items.map((item) => item.key)).toEqual([
+            "pkg:nginx",
+            "svc:nginx",
+            "file:/etc/motd",
+            "sysctl:vm.swappiness",
+            "user:deploy",
+            "fw:443/tcp"
+        ]);
         expect(items.map((item) => item.fix)).toEqual([
             ["pkg", "nginx", "-"],
             ["svc", "nginx", "10"],
@@ -91,7 +109,17 @@ describe("what a report line means", () => {
             users: [{ name: "deploy", groups: ["sudo"] }],
             firewall: [{ port: 22 }]
         });
-        const drift = computeDrift(s, report("installed", "active enabled", `644 ${sha256("hi")}`, "=1 ", "=deploy sudo", "allow"));
+        const drift = computeDrift(
+            s,
+            report(
+                "installed",
+                "active enabled",
+                `644 ${sha256("hi")}`,
+                "=1 ",
+                "=deploy sudo",
+                "allow"
+            )
+        );
         expect(drift).toEqual([]);
     });
 
@@ -113,7 +141,10 @@ describe("what a report line means", () => {
                 { name: "gone", running: true, enabled: true }
             ]
         });
-        const drift = computeDrift(s, report("inactive disabled", "active enabled", "active static", "unknown"));
+        const drift = computeDrift(
+            s,
+            report("inactive disabled", "active enabled", "active static", "unknown")
+        );
         expect(drift.map((item) => [item.key, item.code, item.actual])).toEqual([
             ["svc:up", "serviceStopped", "inactive"],
             ["svc:up", "serviceNotEnabled", "disabled"],
@@ -135,28 +166,65 @@ describe("what a report line means", () => {
         expect(drift).toEqual([
             { key: "file:/a", code: "fileMissing", name: "/a", fixable: true },
             { key: "file:/b", code: "fileContent", name: "/b", fixable: true },
-            { key: "file:/b", code: "fileMode", name: "/b", expected: "600", actual: "644", fixable: true },
+            {
+                key: "file:/b",
+                code: "fileMode",
+                name: "/b",
+                expected: "600",
+                actual: "644",
+                fixable: true
+            },
             { key: "file:/c", code: "unreadable", name: "/c", fixable: false }
         ]);
     });
 
     it("sysctl: compares values with their whitespace squashed", () => {
-        const s = spec({ sysctl: [{ key: "net.ipv4.ip_local_port_range", value: "1024 65000" }, { key: "vm.swappiness", value: "10" }] });
+        const s = spec({
+            sysctl: [
+                { key: "net.ipv4.ip_local_port_range", value: "1024 65000" },
+                { key: "vm.swappiness", value: "10" }
+            ]
+        });
         const drift = computeDrift(s, report("=1024\t 65000 ", "=60"));
-        expect(drift).toEqual([{ key: "sysctl:vm.swappiness", code: "sysctlValue", name: "vm.swappiness", expected: "10", actual: "60", fixable: true }]);
+        expect(drift).toEqual([
+            {
+                key: "sysctl:vm.swappiness",
+                code: "sysctlValue",
+                name: "vm.swappiness",
+                expected: "10",
+                actual: "60",
+                fixable: true
+            }
+        ]);
     });
 
     it("users: missing, and the groups still to join", () => {
-        const s = spec({ users: [{ name: "a" }, { name: "b", groups: ["sudo", "docker", "adm"] }] });
+        const s = spec({
+            users: [{ name: "a" }, { name: "b", groups: ["sudo", "docker", "adm"] }]
+        });
         const drift = computeDrift(s, report("absent", "=b adm"));
         expect(drift).toEqual([
             { key: "user:a", code: "userMissing", name: "a", fixable: true },
-            { key: "user:b", code: "userGroups", name: "b", expected: "sudo, docker", fixable: true }
+            {
+                key: "user:b",
+                code: "userGroups",
+                name: "b",
+                expected: "sudo, docker",
+                fixable: true
+            }
         ]);
     });
 
     it("firewall: a missing rule is fixable, a firewall that is off or absent is not", () => {
-        const s = spec({ firewall: [{ port: 22 }, { port: 80 }, { port: 443 }, { port: 53, protocol: "udp" }, { port: 8080 }] });
+        const s = spec({
+            firewall: [
+                { port: 22 },
+                { port: 80 },
+                { port: 443 },
+                { port: 53, protocol: "udp" },
+                { port: 8080 }
+            ]
+        });
         const drift = computeDrift(s, report("allow", "missing", "inactive", "noufw", "unknown"));
         expect(drift.map((item) => [item.key, item.code, item.fixable])).toEqual([
             ["fw:80/tcp", "firewallMissing", true],
@@ -188,7 +256,12 @@ describe("the command a fix sends", () => {
     });
 
     it("goes through password-less sudo only when asked", () => {
-        expect(words(scriptCommand(CHECK_SCRIPT, ["pkg", "a", "-"], true)).slice(0, 4)).toEqual(["sudo", "-n", "sh", "-c"]);
+        expect(words(scriptCommand(CHECK_SCRIPT, ["pkg", "a", "-"], true)).slice(0, 4)).toEqual([
+            "sudo",
+            "-n",
+            "sh",
+            "-c"
+        ]);
         expect(words(scriptCommand(CHECK_SCRIPT, ["pkg", "a", "-"], false))[0]).toBe("sh");
     });
 
@@ -200,10 +273,26 @@ describe("the command a fix sends", () => {
     });
 
     it("puts back only the drift asked for, in template order, and never what it cannot fix", () => {
-        const withUnreadable: DriftItem[] = [...drift, { key: "pkg:other", code: "unreadable", name: "other", fixable: false }];
-        expect(fixWords(hostile, withUnreadable).keys).toEqual(["pkg:nginx", "file:/tmp/$(reboot);`id` 'x' \"y\"", "sysctl:vm.swappiness", "user:deploy"]);
-        const some = fixWords(hostile, withUnreadable, ["user:deploy", "pkg:other", "pkg:not-drift"]);
-        expect(some).toEqual({ keys: ["user:deploy"], words: ["user", "deploy", "sudo"], input: "" });
+        const withUnreadable: DriftItem[] = [
+            ...drift,
+            { key: "pkg:other", code: "unreadable", name: "other", fixable: false }
+        ];
+        expect(fixWords(hostile, withUnreadable).keys).toEqual([
+            "pkg:nginx",
+            "file:/tmp/$(reboot);`id` 'x' \"y\"",
+            "sysctl:vm.swappiness",
+            "user:deploy"
+        ]);
+        const some = fixWords(hostile, withUnreadable, [
+            "user:deploy",
+            "pkg:other",
+            "pkg:not-drift"
+        ]);
+        expect(some).toEqual({
+            keys: ["user:deploy"],
+            words: ["user", "deploy", "sudo"],
+            input: ""
+        });
         expect(fixWords(hostile, []).keys).toEqual([]);
     });
 
@@ -216,15 +305,23 @@ describe("the command a fix sends", () => {
             // Run from the scratch directory, so a command that did run would
             // leave its mark there.
             const path = `${dir.replace(/\\/g, "/")}/a$(touch ran)\`touch ran\`;id`;
-            const check = spawnSync("sh", ["-c", CHECK_SCRIPT, "polaris-template", "file", path, "-"], { cwd: dir, encoding: "utf8" });
+            const check = spawnSync(
+                "sh",
+                ["-c", CHECK_SCRIPT, "polaris-template", "file", path, "-"],
+                { cwd: dir, encoding: "utf8" }
+            );
             expect(check.stdout.trim()).toBe("@1 absent");
 
             const content = "one\n$(touch ran)\n";
-            const fix = spawnSync("sh", ["-c", FIX_SCRIPT, "polaris-template", "file", path, "600"], {
-                cwd: dir,
-                encoding: "utf8",
-                input: `${Buffer.from(content).toString("base64")}\n`
-            });
+            const fix = spawnSync(
+                "sh",
+                ["-c", FIX_SCRIPT, "polaris-template", "file", path, "600"],
+                {
+                    cwd: dir,
+                    encoding: "utf8",
+                    input: `${Buffer.from(content).toString("base64")}\n`
+                }
+            );
             expect(fix.stdout.trim()).toBe("@1 ok");
             expect(readFileSync(path, "utf8")).toBe(content);
             expect(existsSync(join(dir, "ran"))).toBe(false);

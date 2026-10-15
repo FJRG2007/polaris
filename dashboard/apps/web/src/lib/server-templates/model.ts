@@ -112,26 +112,57 @@ export function sha256(text: string): string {
 export function planItems(spec: TemplateSpec): PlanItem[] {
     const items: PlanItem[] = [];
     for (const name of spec.packages) {
-        items.push({ key: `pkg:${name}`, name, check: ["pkg", name, "-"], fix: ["pkg", name, "-"] });
+        items.push({
+            key: `pkg:${name}`,
+            name,
+            check: ["pkg", name, "-"],
+            fix: ["pkg", name, "-"]
+        });
     }
     for (const svc of spec.services) {
         const flags = `${svc.running ? 1 : 0}${svc.enabled ? 1 : 0}`;
-        items.push({ key: `svc:${svc.name}`, name: svc.name, check: ["svc", svc.name, "-"], fix: ["svc", svc.name, flags] });
+        items.push({
+            key: `svc:${svc.name}`,
+            name: svc.name,
+            check: ["svc", svc.name, "-"],
+            fix: ["svc", svc.name, flags]
+        });
     }
     for (const file of spec.files) {
         const payload = Buffer.from(file.content, "utf8").toString("base64");
-        items.push({ key: `file:${file.path}`, name: file.path, check: ["file", file.path, "-"], fix: ["file", file.path, file.mode], payload });
+        items.push({
+            key: `file:${file.path}`,
+            name: file.path,
+            check: ["file", file.path, "-"],
+            fix: ["file", file.path, file.mode],
+            payload
+        });
     }
     for (const entry of spec.sysctl) {
-        items.push({ key: `sysctl:${entry.key}`, name: entry.key, check: ["sysctl", entry.key, "-"], fix: ["sysctl", entry.key, entry.value] });
+        items.push({
+            key: `sysctl:${entry.key}`,
+            name: entry.key,
+            check: ["sysctl", entry.key, "-"],
+            fix: ["sysctl", entry.key, entry.value]
+        });
     }
     for (const user of spec.users) {
         const groups = user.groups.join(",");
-        items.push({ key: `user:${user.name}`, name: user.name, check: ["user", user.name, "-"], fix: ["user", user.name, groups] });
+        items.push({
+            key: `user:${user.name}`,
+            name: user.name,
+            check: ["user", user.name, "-"],
+            fix: ["user", user.name, groups]
+        });
     }
     for (const rule of spec.firewall) {
         const port = String(rule.port);
-        items.push({ key: `fw:${port}/${rule.protocol}`, name: `${port}/${rule.protocol}`, check: ["fw", port, rule.protocol], fix: ["fw", port, rule.protocol] });
+        items.push({
+            key: `fw:${port}/${rule.protocol}`,
+            name: `${port}/${rule.protocol}`,
+            check: ["fw", port, rule.protocol],
+            fix: ["fw", port, rule.protocol]
+        });
     }
     return items;
 }
@@ -161,7 +192,8 @@ const squash = (text: string) => text.trim().replace(/\s+/g, " ");
 export function computeDrift(spec: TemplateSpec, report: Map<number, string>): DriftItem[] {
     const drift: DriftItem[] = [];
     const items = planItems(spec);
-    const unreadable = (item: PlanItem) => drift.push({ key: item.key, code: "unreadable", name: item.name, fixable: false });
+    const unreadable = (item: PlanItem) =>
+        drift.push({ key: item.key, code: "unreadable", name: item.name, fixable: false });
 
     let n = 0;
     const next = () => report.get(++n);
@@ -170,7 +202,8 @@ export function computeDrift(spec: TemplateSpec, report: Map<number, string>): D
         const item = items[n]!;
         const value = next();
         if (value === "installed") continue;
-        if (value === "absent") drift.push({ key: item.key, code: "packageMissing", name, fixable: true });
+        if (value === "absent")
+            drift.push({ key: item.key, code: "packageMissing", name, fixable: true });
         else unreadable(item);
     }
     for (const svc of spec.services) {
@@ -181,10 +214,26 @@ export function computeDrift(spec: TemplateSpec, report: Map<number, string>): D
             continue;
         }
         const [active = "", enabled = ""] = value.split(" ");
-        if (svc.running && active !== "active") drift.push({ key: item.key, code: "serviceStopped", name: svc.name, actual: active || undefined, fixable: true });
-        if (!svc.running && active === "active") drift.push({ key: item.key, code: "serviceRunning", name: svc.name, fixable: true });
-        if (svc.enabled && !ENABLED.has(enabled)) drift.push({ key: item.key, code: "serviceNotEnabled", name: svc.name, actual: enabled || undefined, fixable: true });
-        if (!svc.enabled && enabled === "enabled") drift.push({ key: item.key, code: "serviceEnabled", name: svc.name, fixable: true });
+        if (svc.running && active !== "active")
+            drift.push({
+                key: item.key,
+                code: "serviceStopped",
+                name: svc.name,
+                actual: active || undefined,
+                fixable: true
+            });
+        if (!svc.running && active === "active")
+            drift.push({ key: item.key, code: "serviceRunning", name: svc.name, fixable: true });
+        if (svc.enabled && !ENABLED.has(enabled))
+            drift.push({
+                key: item.key,
+                code: "serviceNotEnabled",
+                name: svc.name,
+                actual: enabled || undefined,
+                fixable: true
+            });
+        if (!svc.enabled && enabled === "enabled")
+            drift.push({ key: item.key, code: "serviceEnabled", name: svc.name, fixable: true });
     }
     for (const file of spec.files) {
         const item = items[n]!;
@@ -198,8 +247,17 @@ export function computeDrift(spec: TemplateSpec, report: Map<number, string>): D
             unreadable(item);
             continue;
         }
-        if (match[2] !== sha256(file.content)) drift.push({ key: item.key, code: "fileContent", name: file.path, fixable: true });
-        if (match[1] !== file.mode) drift.push({ key: item.key, code: "fileMode", name: file.path, expected: file.mode, actual: match[1], fixable: true });
+        if (match[2] !== sha256(file.content))
+            drift.push({ key: item.key, code: "fileContent", name: file.path, fixable: true });
+        if (match[1] !== file.mode)
+            drift.push({
+                key: item.key,
+                code: "fileMode",
+                name: file.path,
+                expected: file.mode,
+                actual: match[1],
+                fixable: true
+            });
     }
     for (const entry of spec.sysctl) {
         const item = items[n]!;
@@ -209,7 +267,15 @@ export function computeDrift(spec: TemplateSpec, report: Map<number, string>): D
             continue;
         }
         const actual = squash(value.slice(1));
-        if (actual !== squash(entry.value)) drift.push({ key: item.key, code: "sysctlValue", name: entry.key, expected: squash(entry.value), actual, fixable: true });
+        if (actual !== squash(entry.value))
+            drift.push({
+                key: item.key,
+                code: "sysctlValue",
+                name: entry.key,
+                expected: squash(entry.value),
+                actual,
+                fixable: true
+            });
     }
     for (const user of spec.users) {
         const item = items[n]!;
@@ -224,15 +290,25 @@ export function computeDrift(spec: TemplateSpec, report: Map<number, string>): D
         }
         const has = new Set(squash(value.slice(1)).split(" "));
         const missing = user.groups.filter((group) => !has.has(group));
-        if (missing.length > 0) drift.push({ key: item.key, code: "userGroups", name: user.name, expected: missing.join(", "), fixable: true });
+        if (missing.length > 0)
+            drift.push({
+                key: item.key,
+                code: "userGroups",
+                name: user.name,
+                expected: missing.join(", "),
+                fixable: true
+            });
     }
     for (const _rule of spec.firewall) {
         const item = items[n]!;
         const value = next();
         if (value === "allow") continue;
-        if (value === "missing") drift.push({ key: item.key, code: "firewallMissing", name: item.name, fixable: true });
-        else if (value === "inactive") drift.push({ key: item.key, code: "firewallOff", name: item.name, fixable: false });
-        else if (value === "noufw") drift.push({ key: item.key, code: "firewallAbsent", name: item.name, fixable: false });
+        if (value === "missing")
+            drift.push({ key: item.key, code: "firewallMissing", name: item.name, fixable: true });
+        else if (value === "inactive")
+            drift.push({ key: item.key, code: "firewallOff", name: item.name, fixable: false });
+        else if (value === "noufw")
+            drift.push({ key: item.key, code: "firewallAbsent", name: item.name, fixable: false });
         else unreadable(item);
     }
     return drift;
@@ -241,10 +317,16 @@ export function computeDrift(spec: TemplateSpec, report: Map<number, string>): D
 /** The fix words for the drift keys asked for, in template order. Keys that are
  *  not drift, or not fixable, are dropped: a fix only ever puts back what the
  *  last check found wrong. */
-export function fixWords(spec: TemplateSpec, drift: readonly DriftItem[], keys?: readonly string[]): { keys: string[]; words: string[]; input: string } {
+export function fixWords(
+    spec: TemplateSpec,
+    drift: readonly DriftItem[],
+    keys?: readonly string[]
+): { keys: string[]; words: string[]; input: string } {
     const fixable = new Set(drift.filter((item) => item.fixable).map((item) => item.key));
     const wanted = keys ? new Set(keys) : null;
-    const chosen = planItems(spec).filter((item) => fixable.has(item.key) && (!wanted || wanted.has(item.key)));
+    const chosen = planItems(spec).filter(
+        (item) => fixable.has(item.key) && (!wanted || wanted.has(item.key))
+    );
     const payloads = chosen.flatMap((item) => (item.payload === undefined ? [] : [item.payload]));
     return {
         keys: chosen.map((item) => item.key),

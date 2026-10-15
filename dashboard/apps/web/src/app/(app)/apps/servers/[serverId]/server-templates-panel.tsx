@@ -55,8 +55,15 @@ export function ServerTemplatesPanel({
     const load = useCallback(async () => {
         // A request that never answers would otherwise leave the tab on its
         // skeletons for good: settle both lists so the error has a place to show.
-        const [mine, all] = await Promise.all([hostAssignmentsAction(hostId), listTemplatesAction()]).catch(
-            () => [{ ok: false, error: "failed" } as const, { ok: false, error: "failed" } as const] as const
+        const [mine, all] = await Promise.all([
+            hostAssignmentsAction(hostId),
+            listTemplatesAction()
+        ]).catch(
+            () =>
+                [
+                    { ok: false, error: "failed" } as const,
+                    { ok: false, error: "failed" } as const
+                ] as const
         );
         if (mine.ok) setAssignments(mine.value);
         else {
@@ -78,7 +85,10 @@ export function ServerTemplatesPanel({
                 : [...list, next];
         });
 
-    async function run<R>(key: string, work: () => Promise<{ ok: true; value: R } | { ok: false; error: string }>) {
+    async function run<R>(
+        key: string,
+        work: () => Promise<{ ok: true; value: R } | { ok: false; error: string }>
+    ) {
         setBusy(key);
         setError(null);
         try {
@@ -95,7 +105,9 @@ export function ServerTemplatesPanel({
 
     async function assign() {
         if (!picked) return;
-        const value = await run("assign", () => assignTemplateAction({ templateId: picked, hostId, autoFix: false }));
+        const value = await run("assign", () =>
+            assignTemplateAction({ templateId: picked, hostId, autoFix: false })
+        );
         if (value) {
             replace(value);
             setPicked("");
@@ -132,7 +144,8 @@ export function ServerTemplatesPanel({
         });
         if (!ok) return;
         const removed = await run(`rm:${row.id}`, () => unassignTemplateAction(row.id));
-        if (removed !== null) setAssignments((current) => (current ?? []).filter((entry) => entry.id !== row.id));
+        if (removed !== null)
+            setAssignments((current) => (current ?? []).filter((entry) => entry.id !== row.id));
     }
 
     async function toggleAutoFix(row: AssignmentView, autoFix: boolean) {
@@ -147,13 +160,17 @@ export function ServerTemplatesPanel({
     return (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 text-sm text-muted-foreground">{t("templates.intro")}</p>
+                <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                    {t("templates.intro")}
+                </p>
                 <Button variant="secondary" size="sm" onClick={() => setManaging(true)}>
                     <Settings2 className="size-3.5" /> {t("templates.manage")}
                 </Button>
             </div>
 
-            {!root ? <p className="text-xs text-muted-foreground">{t("templates.noRoot")}</p> : null}
+            {!root ? (
+                <p className="text-xs text-muted-foreground">{t("templates.noRoot")}</p>
+            ) : null}
 
             {templates === null ? (
                 <Skeleton className="h-8 w-72" />
@@ -164,7 +181,10 @@ export function ServerTemplatesPanel({
                             value={picked}
                             onValueChange={setPicked}
                             placeholder={t("templates.pickTemplate")}
-                            options={open.map((template) => ({ value: template.id, label: template.name }))}
+                            options={open.map((template) => ({
+                                value: template.id,
+                                label: template.name
+                            }))}
                         />
                     </div>
                     <Button size="sm" disabled={!picked || busy !== null} onClick={assign}>
@@ -191,27 +211,38 @@ export function ServerTemplatesPanel({
                         const fixable = row.drift.filter((item) => item.fixable);
                         const working = busy === `fix:${row.id}` || busy === `check:${row.id}`;
                         return (
-                            <li key={row.id} className="flex flex-col gap-2 rounded-lg border border-border/60 p-3">
+                            <li
+                                key={row.id}
+                                className="flex flex-col gap-2 rounded-lg border border-border/60 p-3"
+                            >
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="min-w-0 truncate font-medium" title={row.templateName}>
+                                    <span
+                                        className="min-w-0 truncate font-medium"
+                                        title={row.templateName}
+                                    >
                                         {row.templateName}
                                     </span>
                                     <Badge
                                         variant={
                                             row.status === "compliant"
                                                 ? "success"
-                                                : row.status === "drifted" || row.status === "failed"
+                                                : row.status === "drifted" ||
+                                                    row.status === "failed"
                                                   ? "warning"
                                                   : "neutral"
                                         }
                                     >
                                         {row.status === "drifted"
-                                            ? t("templates.status.drifted", { count: row.drift.length })
+                                            ? t("templates.status.drifted", {
+                                                  count: row.drift.length
+                                              })
                                             : t(`templates.status.${row.status}`)}
                                     </Badge>
                                     {row.checkedAt ? (
                                         <span className="text-xs text-muted-foreground">
-                                            {t("templates.checkedAt", { when: new Date(row.checkedAt).toLocaleString() })}
+                                            {t("templates.checkedAt", {
+                                                when: new Date(row.checkedAt).toLocaleString()
+                                            })}
                                         </span>
                                     ) : null}
                                     <div className="ml-auto flex items-center gap-1">
@@ -220,11 +251,17 @@ export function ServerTemplatesPanel({
                                             size="sm"
                                             disabled={working}
                                             onClick={async () => {
-                                                const value = await run(`check:${row.id}`, () => checkAssignmentAction(row.id));
+                                                const value = await run(`check:${row.id}`, () =>
+                                                    checkAssignmentAction(row.id)
+                                                );
                                                 if (value) replace(value);
                                             }}
                                         >
-                                            <RefreshCw className={working ? "size-3.5 animate-spin" : "size-3.5"} />
+                                            <RefreshCw
+                                                className={
+                                                    working ? "size-3.5 animate-spin" : "size-3.5"
+                                                }
+                                            />
                                             {t("templates.checkNow")}
                                         </Button>
                                         {fixable.length > 0 ? (
@@ -232,10 +269,13 @@ export function ServerTemplatesPanel({
                                                 variant="secondary"
                                                 size="sm"
                                                 disabled={!root || working}
-                                                title={root ? undefined : t("templates.errors.noRoot")}
+                                                title={
+                                                    root ? undefined : t("templates.errors.noRoot")
+                                                }
                                                 onClick={() => fix(row)}
                                             >
-                                                <Wrench className="size-3.5" /> {t("templates.fixAll")}
+                                                <Wrench className="size-3.5" />{" "}
+                                                {t("templates.fixAll")}
                                             </Button>
                                         ) : null}
                                         <Button
@@ -256,14 +296,22 @@ export function ServerTemplatesPanel({
                                         {t(`templates.errors.${row.error}` as Parameters<T>[0])}
                                     </p>
                                 ) : row.error === "partial" ? (
-                                    <p className="text-xs text-destructive">{t("templates.errors.partial")}</p>
+                                    <p className="text-xs text-destructive">
+                                        {t("templates.errors.partial")}
+                                    </p>
                                 ) : null}
 
                                 {row.drift.length > 0 ? (
                                     <ul className="flex flex-col divide-y divide-border/50 text-sm">
                                         {row.drift.map((item) => (
-                                            <li key={`${item.key}:${item.code}`} className="flex items-center gap-2 py-1.5">
-                                                <span className="min-w-0 flex-1 truncate" title={driftWords(t, item)}>
+                                            <li
+                                                key={`${item.key}:${item.code}`}
+                                                className="flex items-center gap-2 py-1.5"
+                                            >
+                                                <span
+                                                    className="min-w-0 flex-1 truncate"
+                                                    title={driftWords(t, item)}
+                                                >
                                                     {driftWords(t, item)}
                                                 </span>
                                                 {item.fixable ? (
@@ -271,7 +319,11 @@ export function ServerTemplatesPanel({
                                                         variant="ghost"
                                                         size="sm"
                                                         disabled={!root || working}
-                                                        title={root ? undefined : t("templates.errors.noRoot")}
+                                                        title={
+                                                            root
+                                                                ? undefined
+                                                                : t("templates.errors.noRoot")
+                                                        }
                                                         onClick={() => fix(row, item)}
                                                     >
                                                         {t("templates.fix")}
@@ -293,7 +345,9 @@ export function ServerTemplatesPanel({
                                         onChange={(value: boolean) => toggleAutoFix(row, value)}
                                         aria-label={t("templates.autoFix")}
                                     />
-                                    <span title={t("templates.autoFixHint")}>{t("templates.autoFix")}</span>
+                                    <span title={t("templates.autoFixHint")}>
+                                        {t("templates.autoFix")}
+                                    </span>
                                 </label>
                             </li>
                         );

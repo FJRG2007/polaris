@@ -33,7 +33,10 @@ export const templateFileSchema = z.object({
         .regex(/^\/[^\0-\x1f\x7f]*$/, "filePath")
         .refine((path) => !path.split("/").includes(".."), "filePath")
         .refine((path) => !path.endsWith("/"), "filePath"),
-    content: z.string().max(TEMPLATE_FILE_MAX).refine((text) => !text.includes("\0"), "fileContent"),
+    content: z
+        .string()
+        .max(TEMPLATE_FILE_MAX)
+        .refine((text) => !text.includes("\0"), "fileContent"),
     mode: z
         .string()
         .trim()
@@ -75,21 +78,50 @@ export const templateSpecSchema = z
         firewall: z.array(templateFirewallSchema).max(50).default([])
     })
     .superRefine((spec, ctx) => {
-        const once = <T>(list: readonly T[], identity: (item: T) => string, path: (index: number) => (string | number)[]) => {
+        const once = <T>(
+            list: readonly T[],
+            identity: (item: T) => string,
+            path: (index: number) => (string | number)[]
+        ) => {
             const seen = new Set<string>();
             list.forEach((item, index) => {
                 const id = identity(item);
-                if (seen.has(id)) ctx.addIssue({ code: "custom", message: "duplicate", path: path(index) });
+                if (seen.has(id))
+                    ctx.addIssue({ code: "custom", message: "duplicate", path: path(index) });
                 seen.add(id);
             });
         };
-        once(spec.packages, (name) => name, (i) => ["packages", i]);
+        once(
+            spec.packages,
+            (name) => name,
+            (i) => ["packages", i]
+        );
         // `nginx` and `nginx.service` are the same unit.
-        once(spec.services, (svc) => svc.name.replace(/\.service$/, ""), (i) => ["services", i, "name"]);
-        once(spec.files, (file) => file.path, (i) => ["files", i, "path"]);
-        once(spec.sysctl, (entry) => entry.key, (i) => ["sysctl", i, "key"]);
-        once(spec.users, (user) => user.name, (i) => ["users", i, "name"]);
-        once(spec.firewall, (rule) => `${rule.port}/${rule.protocol}`, (i) => ["firewall", i, "port"]);
+        once(
+            spec.services,
+            (svc) => svc.name.replace(/\.service$/, ""),
+            (i) => ["services", i, "name"]
+        );
+        once(
+            spec.files,
+            (file) => file.path,
+            (i) => ["files", i, "path"]
+        );
+        once(
+            spec.sysctl,
+            (entry) => entry.key,
+            (i) => ["sysctl", i, "key"]
+        );
+        once(
+            spec.users,
+            (user) => user.name,
+            (i) => ["users", i, "name"]
+        );
+        once(
+            spec.firewall,
+            (rule) => `${rule.port}/${rule.protocol}`,
+            (i) => ["firewall", i, "port"]
+        );
     });
 
 export type TemplateSpec = z.infer<typeof templateSpecSchema>;
