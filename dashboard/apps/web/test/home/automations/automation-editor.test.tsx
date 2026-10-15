@@ -208,12 +208,10 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor } = await import(
-    "@polaris-app/places/src/screens/automations/automation-editor"
-);
-const { AutomationsView } = await import(
-    "@polaris-app/places/src/screens/automations/automations-view"
-);
+const { AutomationEditor } =
+    await import("@polaris-app/places/src/screens/automations/automation-editor");
+const { AutomationsView } =
+    await import("@polaris-app/places/src/screens/automations/automations-view");
 
 async function painted(): Promise<void> {
     await act(async () => {
