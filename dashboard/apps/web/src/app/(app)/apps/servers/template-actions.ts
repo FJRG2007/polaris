@@ -23,7 +23,9 @@ type Result<T = undefined> = { ok: true; value: T } | { ok: false; error: string
 
 function refused(error: unknown): { ok: false; error: string } {
     if (error instanceof templates.TemplateRefusal) return { ok: false, error: error.code };
-    if (error instanceof z.ZodError) return { ok: false, error: "invalid" };
+    // By name: the schemas come from @polaris/core, whose own copy of zod
+    // throws a ZodError that is not an instance of this file's.
+    if (error instanceof Error && error.name === "ZodError") return { ok: false, error: "invalid" };
     console.error("[server-templates] action failed", error);
     return { ok: false, error: "failed" };
 }
