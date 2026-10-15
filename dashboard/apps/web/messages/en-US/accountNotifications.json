@@ -470,7 +470,7 @@
     },
     "quiet": {
         "title": "Quiet hours",
-        "description": "Mail, webhooks and texts wait until the end. The bell still records everything. Times are in {zone}.",
+        "description": "Mail, webhooks and texts are not sent during these hours. The bell still records everything. Times are in {zone}.",
         "toggle": "Quiet hours",
         "from": "From",
         "until": "Until",

@@ -13,7 +13,7 @@ const SECRET = "whsec_fixture_secret";
 const enc = new TextEncoder();
 
 let hook: { id: string; userId: string; applicationId: string; enabled: boolean } | null;
-let receipts: Array<{ hookId: string; deliveryId: string; expiresAt: Date }>;
+let receipts: Array<{ id: string; hookId: string; deliveryId: string; expiresAt: Date }>;
 let hasPermission = true;
 let projectAccessOk = true;
 let rateOk = true;
@@ -31,12 +31,13 @@ vi.mock("@polaris/db", () => ({
                 if (receipts.some((r) => r.hookId === data.hookId && r.deliveryId === data.deliveryId)) {
                     throw Object.assign(new Error("unique"), { code: "P2002" });
                 }
-                receipts.push(data);
-                return data;
+                const row = { ...data, id: `r-${receipts.length + 1}` };
+                receipts.push(row);
+                return row;
             },
-            deleteMany: async ({ where }: { where: { expiresAt: { lt: Date } } }) => {
+            deleteMany: async ({ where }: { where: { id?: string; expiresAt?: { lt: Date } } }) => {
                 const before = receipts.length;
-                receipts = receipts.filter((r) => r.expiresAt >= where.expiresAt.lt);
+                receipts = receipts.filter((r) => (where.id ? r.id !== where.id : r.expiresAt >= where.expiresAt!.lt));
                 return { count: before - receipts.length };
             }
         },
@@ -109,10 +110,25 @@ describe("the deploy-hook gateway", () => {
         expect((await receiveInbound(signed("{}", { ts: now - 299, delivery: "d-3" }))).status).toBe(202);
     });
 
-    it("refuses the same delivery id twice", async () => {
-        expect((await receiveInbound(signed("{}"))).status).toBe(202);
-        expect((await receiveInbound(signed("{}"))).status).toBe(409);
+    it("refuses the same request twice", async () => {
+        const request = signed("{}");
+        expect((await receiveInbound(request)).status).toBe(202);
+        expect((await receiveInbound(request)).status).toBe(409);
         expect(deploy).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses a signed request replayed under a new delivery id", async () => {
+        const ts = Math.floor(Date.now() / 1000);
+        expect((await receiveInbound(signed("{}", { ts, delivery: "d-1" }))).status).toBe(202);
+        expect((await receiveInbound(signed("{}", { ts, delivery: "d-other" }))).status).toBe(409);
+        expect(deploy).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets a request be retried when the deploy did not start", async () => {
+        deploy.mockRejectedValueOnce(new Error("daemon down"));
+        const request = signed("{}");
+        await expect(receiveInbound(request)).rejects.toThrow("daemon down");
+        expect(await receiveInbound(request)).toEqual({ status: 202, deploymentId: "dep-1" });
     });
 
     it("forgets delivery ids once they could no longer pass", async () => {

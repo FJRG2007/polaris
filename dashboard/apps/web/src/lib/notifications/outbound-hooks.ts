@@ -398,6 +398,7 @@ export async function attemptDelivery(
     options: { final?: boolean; now?: Date } = {}
 ): Promise<"sent" | "pending" | "failed" | null> {
     const now = options.now ?? new Date();
+    const later = () => Math.max(now.getTime(), Date.now());
     const row = await prisma.outboundWebhookDelivery.findUnique({
         where: { id: deliveryId },
         select: {
@@ -428,7 +429,7 @@ export async function attemptDelivery(
     // The claim: only the runner whose update matched sends it.
     const claimed = await prisma.outboundWebhookDelivery.updateMany({
         where: { id: row.id, status: "pending", attempts: row.attempts, nextAttemptAt: { lte: now } },
-        data: { attempts: { increment: 1 }, nextAttemptAt: new Date(now.getTime() + CLAIM_MS) }
+        data: { attempts: { increment: 1 }, nextAttemptAt: new Date(later() + CLAIM_MS) }
     });
     if (claimed.count !== 1) return null;
     const attempts = row.attempts + 1;
@@ -486,7 +487,7 @@ export async function attemptDelivery(
         await prisma.outboundWebhookDelivery.update({
             where: { id: row.id },
             data: {
-                nextAttemptAt: new Date(now.getTime() + retryIn),
+                nextAttemptAt: new Date(later() + retryIn),
                 responseStatus: result.status,
                 error: result.error,
                 durationMs

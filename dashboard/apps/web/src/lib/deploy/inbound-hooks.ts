@@ -4,9 +4,12 @@
  *
  * A request must carry, with the secret shown once when the hook was made:
  *
- *   X-Polaris-Delivery:  a unique id for this request (replays are refused)
+ *   X-Polaris-Delivery:  a unique id for this request
  *   X-Polaris-Timestamp: unix seconds, within five minutes of this server's clock
  *   X-Polaris-Signature: sha256=<hex HMAC-SHA256(secret, "<timestamp>.<body>")>
+ *
+ * A signature is accepted once: the delivery id is not signed, so it is the
+ * signature, not the id, that refuses a replay.
  *
  * The same scheme Polaris signs its own outbound webhooks with, so one verifier
  * serves both directions.
@@ -30,7 +33,7 @@ import { newSigningSecret, signPayload } from "@/lib/notifications/outbound-hook
 /** How far a request's timestamp may be from this server's clock. */
 export const MAX_SKEW_SECONDS = 5 * 60;
 
-/** How long an accepted delivery id is remembered: longer than any timestamp
+/** How long an accepted signature is remembered: longer than any timestamp
  *  that could still pass, so a replay is always caught. */
 const RECEIPT_TTL_MS = 2 * MAX_SKEW_SECONDS * 1000;
 
@@ -233,7 +236,7 @@ export async function receiveInbound(input: {
     });
     if (!hook || !hook.enabled) return unsigned;
 
-    const { delivery, timestamp, signature } = headers.data;
+    const { timestamp, signature } = headers.data;
     if (Math.abs(now.getTime() / 1000 - timestamp) > MAX_SKEW_SECONDS) {
         return { status: 401, reason: "Timestamp is more than five minutes off." };
     }
@@ -250,25 +253,41 @@ export async function receiveInbound(input: {
 
     // Recorded before anything runs, so two copies of one request arriving
     // together cannot both get past this line.
+    let receiptId: string;
     try {
-        await prisma.inboundWebhookReceipt.create({
-            data: { hookId: hook.id, deliveryId: delivery, expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS) }
+        const receipt = await prisma.inboundWebhookReceipt.create({
+            data: { hookId: hook.id, deliveryId: signature.toLowerCase(), expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS) },
+            select: { id: true }
         });
+        receiptId = receipt.id;
     } catch (error) {
         if (isUniqueViolation(error)) return { status: 409, reason: "This delivery was already received." };
         throw error;
     }
+    const release = () => prisma.inboundWebhookReceipt.deleteMany({ where: { id: receiptId } }).catch(() => null);
 
-    const granted = await redeployAccess(hook.applicationId, hook.userId);
-    if (!granted) return { status: 403, reason: "The account that made this hook may no longer deploy this service." };
+    const granted = await redeployAccess(hook.applicationId, hook.userId).catch(async (error: unknown) => {
+        await release();
+        throw error;
+    });
+    if (!granted) {
+        await release();
+        return { status: 403, reason: "The account that made this hook may no longer deploy this service." };
+    }
 
     const deployService = await import("@/lib/deploy-service");
-    const deploymentId = await deployService.deployApplication(hook.applicationId, granted.ownerId, hook.userId);
+    let deploymentId: string;
+    try {
+        deploymentId = await deployService.deployApplication(hook.applicationId, granted.ownerId, hook.userId);
+    } catch (error) {
+        await release();
+        throw error;
+    }
     await prisma.inboundWebhook.update({ where: { id: hook.id }, data: { lastUsedAt: now } }).catch(() => null);
     return { status: 202, deploymentId };
 }
 
-/** Forget delivery ids that could no longer pass the timestamp check anyway. */
+/** Forget signatures that could no longer pass the timestamp check anyway. */
 export async function pruneInboundReceipts(now: Date = new Date()): Promise<number> {
     return (await prisma.inboundWebhookReceipt.deleteMany({ where: { expiresAt: { lt: now } } })).count;
 }

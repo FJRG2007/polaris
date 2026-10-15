@@ -5,6 +5,7 @@
  */
 
 import { originIp } from "@polaris/core";
+import { readCappedBody } from "@/lib/request-body";
 import { MAX_BODY_BYTES, receiveInbound } from "@/lib/deploy/inbound-hooks";
 
 export const runtime = "nodejs";
@@ -14,6 +15,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { id } = await context.params;
     const declared = Number(request.headers.get("content-length") ?? 0);
     if (declared > MAX_BODY_BYTES) return Response.json({ error: "Body too large." }, { status: 413 });
+    const bytes = await readCappedBody(request, MAX_BODY_BYTES).catch(() => null);
+    if (!bytes) return Response.json({ error: "Body too large." }, { status: 413 });
     try {
         const outcome = await receiveInbound({
             id,
@@ -23,7 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
                 timestamp: request.headers.get("x-polaris-timestamp"),
                 signature: request.headers.get("x-polaris-signature")
             },
-            body: await request.text()
+            body: new TextDecoder().decode(bytes)
         });
         return outcome.status === 202
             ? Response.json({ deploymentId: outcome.deploymentId }, { status: 202 })

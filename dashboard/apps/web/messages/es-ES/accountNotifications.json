@@ -470,7 +470,7 @@
     },
     "quiet": {
         "title": "Modo silencio",
-        "description": "Correo, webhooks y SMS esperan hasta el final. La campana lo registra todo. Horas en {zone}.",
+        "description": "Correo, webhooks y SMS no se envían durante estas horas. La campana lo registra todo. Horas en {zone}.",
         "toggle": "Modo silencio",
         "from": "Desde",
         "until": "Hasta",
