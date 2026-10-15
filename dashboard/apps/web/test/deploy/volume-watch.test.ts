@@ -36,6 +36,10 @@ const DEAD = {
     output: "ls: /app/secrets: Host is down\nls: /app/uploads: Host is down\n"
 };
 const FINE = { code: 0, output: "/app/secrets\n/app/uploads\n" };
+const ON_SHARE = [
+    "40 22 0:52 /p/secrets /app/secrets rw - cifs //nas/share rw",
+    "41 22 0:52 /p/uploads /app/uploads rw - cifs //nas/share rw"
+].join("\n");
 
 /** What `ls` inside the service answers, one entry per call, the last repeating. */
 let looks: Array<{ code: number; output: string } | Error> = [];
@@ -44,7 +48,9 @@ let restartedByShare: string[] = [];
 
 const ports = {
     ensureMount: vi.fn(() => mount()),
-    runIn: vi.fn(async () => {
+    runIn: vi.fn(async (_container: string, argv: readonly string[]) => {
+        // Where the volumes are mounted: on the share, both of them.
+        if (argv[0] === "cat") return { code: 0, output: ON_SHARE };
         const next = looks.length > 1 ? looks.shift()! : looks[0]!;
         if (next instanceof Error) throw next;
         return next;
