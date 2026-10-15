@@ -478,7 +478,9 @@ function deploySubtitle(
               ? t("deployments.viaScale")
               : deployment.trigger === "upload"
                 ? t("deployments.viaUpload")
-                : deployment.trigger === "preview"
+                : deployment.trigger === "promotion"
+                  ? t("deployments.viaPromotion")
+                  : deployment.trigger === "preview"
                   ? t("deployments.viaPreview", { source })
                   : deployment.trigger === "push"
                     ? t("deployments.viaPush", { source })
