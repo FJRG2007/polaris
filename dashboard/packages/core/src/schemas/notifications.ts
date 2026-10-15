@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { alertMinLevelSchema } from "./alert-filters.js";
 
 /** How an alert can travel. `inapp` and `email` are built in; the other two
  *  need a destination the account added. */
@@ -816,7 +817,9 @@ export const webhookDestinationSchema = z.object({
         .max(2048)
         .refine((value) => value.startsWith("https://"), "The URL has to be https")
         .refine((value) => webhookUrlProblem(value) === null, TELEGRAM_URL_HINT),
-    format: z.enum([...WEBHOOK_FORMATS, "auto"]).default("auto")
+    format: z.enum([...WEBHOOK_FORMATS, "auto"]).default("auto"),
+    /** The lowest severity sent here. */
+    minLevel: alertMinLevelSchema.default("info")
 });
 
 /** An SMS recipient. Stored in E.164 so a provider never has to guess a country. */
@@ -825,7 +828,8 @@ export const smsDestinationSchema = z.object({
     phone: z
         .string()
         .trim()
-        .regex(/^\+[1-9]\d{6,14}$/, "Enter the number in international form, like +34600111222")
+        .regex(/^\+[1-9]\d{6,14}$/, "Enter the number in international form, like +34600111222"),
+    minLevel: alertMinLevelSchema.default("info")
 });
 
 export const destinationInputSchema = z.discriminatedUnion("kind", [

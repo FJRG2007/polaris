@@ -1316,7 +1316,9 @@
         "destinationOff": "The destination is switched off, deleted, or its target cannot be read.",
         "noAddress": "No confirmed address on the account.",
         "markedRead": "Marked read: you had the page it points at open.",
-        "eventOff": "Turned off for this event."
+        "eventOff": "Turned off for this event.",
+        "belowSeverity": "Below the lowest severity set for this destination.",
+        "quietHours": "Held back: it arrived during your quiet hours."
     },
     "runtimeLogs": {
         "live": "Live",

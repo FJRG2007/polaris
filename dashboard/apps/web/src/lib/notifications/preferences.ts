@@ -13,7 +13,9 @@
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import {
+    parseQuietHours,
     NOTIFICATION_EVENTS,
+    type QuietHours,
     parseNotificationPreferences,
     resolveRule,
     stringifyNotificationPreferences,
@@ -65,4 +67,14 @@ export async function forgetDestination(userId: string, destinationId: string): 
         next[event] = { ...rule, destinations };
     }
     if (changed) await saveNotificationPreferences(userId, next);
+}
+
+/** The hours this account's mail, webhooks and texts hold off. */
+export async function getQuietHours(userId: string): Promise<QuietHours> {
+    const row = await prisma.user.findUnique({ where: { id: userId }, select: { notifyQuietHours: true } });
+    return parseQuietHours(row?.notifyQuietHours);
+}
+
+export async function saveQuietHours(userId: string, quiet: QuietHours): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { notifyQuietHours: JSON.stringify(quiet) } });
 }

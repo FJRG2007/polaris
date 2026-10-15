@@ -17,16 +17,24 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { testDestination } from "@/lib/notifications/dispatch";
 import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
 import { saveSoundVolume } from "@/lib/notifications/sound-volume-service";
-import { destinationInputSchema, isNotificationEvent, notificationRuleSchema } from "@polaris/core";
+import {
+    alertMinLevelSchema,
+    destinationInputSchema,
+    isNotificationEvent,
+    notificationRuleSchema,
+    quietHoursSchema
+} from "@polaris/core";
 import {
     getNotificationPreferences,
-    saveNotificationPreferences
+    saveNotificationPreferences,
+    saveQuietHours
 } from "@/lib/notifications/preferences";
 import {
     createDestination,
     deleteDestination,
     ownsDestinations,
     setDestinationEnabled,
+    setDestinationMinLevel,
     type DestinationView
 } from "@/lib/notifications/destinations";
 import {
@@ -229,4 +237,24 @@ export async function testDestinationAction(id: string): Promise<{ error?: strin
     const result = await testDestination(user.id, id);
     revalidatePath("/account/notifications");
     return result;
+}
+
+/** The lowest severity one of this account's destinations is sent. */
+export async function setDestinationMinLevelAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.object({ id: z.string().uuid(), minLevel: alertMinLevelSchema }).safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    await setDestinationMinLevel(user.id, parsed.data.id, parsed.data.minLevel);
+    revalidatePath("/account/notifications");
+    return {};
+}
+
+/** When this account's mail, webhooks and texts hold off. */
+export async function saveQuietHoursAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = quietHoursSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    await saveQuietHours(user.id, parsed.data);
+    revalidatePath("/account/notifications");
+    return {};
 }

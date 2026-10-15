@@ -1316,7 +1316,9 @@
         "destinationOff": "El destino está desactivado, eliminado o no se puede leer su dirección.",
         "noAddress": "La cuenta no tiene ninguna dirección confirmada.",
         "markedRead": "Marcada como leída: tenías abierta la página a la que apunta.",
-        "eventOff": "Desactivada para este evento."
+        "eventOff": "Desactivada para este evento.",
+        "belowSeverity": "Por debajo de la gravedad mínima de este destino.",
+        "quietHours": "Retenida: llegó durante tus horas de silencio."
     },
     "runtimeLogs": {
         "live": "Directo",

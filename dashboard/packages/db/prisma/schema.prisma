@@ -112,6 +112,10 @@ model User {
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.
     notifyPrefs   String?
+    // Hours this account's mail, webhooks and texts hold off, as stringified
+    // JSON ({ enabled, start, end, criticalBypass }) read in the account's own
+    // timezone. Null is no quiet hours. The bell is never held.
+    notifyQuietHours String?
     // How loud Polaris' own sounds are for this account - the chime for an
     // alert, a message, a ring - as a percentage. Null follows the default in
     // code, which is full volume, so an account that never chose keeps what it
@@ -3714,6 +3718,9 @@ model NotificationDestination {
     encryptedTarget Bytes
     targetNonce     Bytes
     targetKeyId     String?
+    // The lowest severity this destination is sent: info | warning | danger.
+    // A critical event goes whatever this says.
+    minLevel        String    @default("info")
     enabled         Boolean   @default(true)
     // ok | error | untested - the result of the last send or test.
     status          String    @default("untested")
