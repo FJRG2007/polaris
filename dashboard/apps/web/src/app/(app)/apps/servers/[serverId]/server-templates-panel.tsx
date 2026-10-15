@@ -53,10 +53,17 @@ export function ServerTemplatesPanel({
     const [managing, setManaging] = useState(false);
 
     const load = useCallback(async () => {
-        const [mine, all] = await Promise.all([hostAssignmentsAction(hostId), listTemplatesAction()]);
+        // A request that never answers would otherwise leave the tab on its
+        // skeletons for good: settle both lists so the error has a place to show.
+        const [mine, all] = await Promise.all([hostAssignmentsAction(hostId), listTemplatesAction()]).catch(
+            () => [{ ok: false, error: "failed" } as const, { ok: false, error: "failed" } as const] as const
+        );
         if (mine.ok) setAssignments(mine.value);
-        else setError(mine.error);
-        if (all.ok) setTemplates(all.value);
+        else {
+            setAssignments((current) => current ?? []);
+            setError(mine.error);
+        }
+        setTemplates(all.ok ? all.value : (current) => current ?? []);
     }, [hostId]);
 
     useEffect(() => {
