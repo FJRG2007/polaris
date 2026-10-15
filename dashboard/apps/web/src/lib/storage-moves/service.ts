@@ -435,9 +435,7 @@ export async function listMoves(): Promise<MoveView[]> {
                 rows
                     .filter((row) => row.state === "moved")
                     .map(async (row) =>
-                        (await originShared(row, plan.parsePlacement(row.origin)))
-                            ? row.id
-                            : null
+                        (await originShared(row, plan.parsePlacement(row.origin))) ? row.id : null
                     )
             )
         ).filter((id): id is string => id !== null)

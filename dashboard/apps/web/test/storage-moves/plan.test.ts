@@ -599,7 +599,7 @@ describe("moveForgettable", () => {
 });
 
 describe("which volumes still reach a moved original", () => {
-    it("scopes a named volume to its own app, so another app's \"data\" is not the same files", () => {
+    it('scopes a named volume to its own app, so another app\'s "data" is not the same files', () => {
         const where = plan.volumesReaching(
             { kind: "volume", source: "data", connectionId: null },
             { applicationId: "app-ark", dockerName: "polaris-dad2fc8a_data" }
