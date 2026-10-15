@@ -55,6 +55,9 @@ export interface MailThreadAnswer {
 
 const NOTHING: MailListAnswer = { threads: [], cursor: "" };
 
+/** What a list that could not be fetched says - `refusals.listNotLoaded` on screen. */
+export const LIST_NOT_LOADED = "That list could not be loaded.";
+
 /**
  * What the device kept for `id`, read once per subject and only while there is
  * nothing better on screen. Null until it has been read, and for ever when
@@ -132,7 +135,7 @@ async function fetchThread(
 
 async function readJson<T>(url: string, signal: AbortSignal | undefined): Promise<T> {
     const response = await fetch(url, { cache: "no-store", signal });
-    if (!response.ok) throw new Error("That list could not be loaded.");
+    if (!response.ok) throw new Error(LIST_NOT_LOADED);
     return (await response.json()) as T;
 }
 

@@ -25,6 +25,7 @@ import { refusalOf } from "./refusal";
 import { Composer } from "./composer";
 import { MailRail } from "./mail-rail";
 import { moveToFolderAction } from "./actions";
+import { settleFrames } from "./stream-settle";
 import { useMailStream } from "./use-mail-stream";
 import { Menu, PenLine, Plus } from "lucide-react";
 import { MAIL_PALETTE, coloursFor } from "./palette";
@@ -226,6 +227,8 @@ export function useMail(): MailContextValue {
  *  for again. One action lands as several frames, and each of them used to be a
  *  fetch of the whole page. */
 const STREAM_SETTLE_MS = 400;
+/** The longest a steady stream of frames can hold that back - see `settleFrames`. */
+const STREAM_MAX_WAIT_MS = 2_000;
 
 /** Where the rail's mailboxes, folders and counts come from between renders. */
 const RAIL_PATH = "/api/mail/rail";
@@ -524,25 +527,22 @@ export function MailShell({
      * A short pause after the last frame is enough: nothing here is watching a
      * clock, and a screen that redraws a beat after the mail moved is what a
      * mailbox has always looked like.
+     *
+     * Never only that, though: a mailbox in its first sync never pauses, and
+     * the screen is asked for again at least every `STREAM_MAX_WAIT_MS` while
+     * the frames keep coming.
      */
-    const settling = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const onFrame = useCallback(() => {
-        if (settling.current) clearTimeout(settling.current);
-        settling.current = setTimeout(() => {
-            settling.current = null;
-            // The lists this tab fetches for itself, and the rail. Deliberately
-            // NOT the router: see `rail`. Everything a frame can change is in
-            // one of those two, and the things that are not - a label written, a
-            // mailbox added - are actions whose own handler refreshes.
-            refreshMailbox();
-        }, STREAM_SETTLE_MS);
-    }, [refreshMailbox]);
-    useEffect(
-        () => () => {
-            if (settling.current) clearTimeout(settling.current);
-        },
-        []
+    const latestRefresh = useRef(refreshMailbox);
+    latestRefresh.current = refreshMailbox;
+    const [settler] = useState(() =>
+        // The lists this tab fetches for itself, and the rail. Deliberately NOT
+        // the router: see `rail`. Everything a frame can change is in one of
+        // those two, and the things that are not - a label written, a mailbox
+        // added - are actions whose own handler refreshes.
+        settleFrames(() => latestRefresh.current(), STREAM_SETTLE_MS, STREAM_MAX_WAIT_MS)
     );
+    useEffect(() => () => settler.cancel(), [settler]);
+    const onFrame = settler.frame;
     useMailStream(onFrame);
 
     /**
