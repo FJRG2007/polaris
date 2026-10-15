@@ -293,7 +293,11 @@ describe("a new automation from the switch-off template", () => {
         );
         await painted();
         fireEvent.change(screen.getByLabelText(/^For/), { target: { value: "0" } });
-        expect(screen.getByText("That is too small.")).toBeDefined();
+        expect(
+            screen.getByText(
+                'At least 1 minute. To act the moment it happens, use "A device changes".'
+            )
+        ).toBeDefined();
         expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
             "true"
         );

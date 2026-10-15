@@ -162,14 +162,14 @@ const needed = word.min(1, "automations.errors.state");
 
 /** A whole number within bounds, where an empty field (NaN) is "fill this in"
  *  rather than a type error nobody can read. */
-function count(min: number, max: number) {
+function count(min: number, max: number, tooSmall = "automations.errors.tooSmall") {
     return z
         .number({
             required_error: "automations.errors.number",
             invalid_type_error: "automations.errors.number"
         })
         .int("automations.errors.whole")
-        .min(min, "automations.errors.tooSmall")
+        .min(min, tooSmall)
         .max(max, "automations.errors.tooBig");
 }
 
@@ -280,7 +280,9 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         deviceId: deviceRef,
         attribute,
         is: needed,
-        minutes: count(1, LIMITS.minutes)
+        // Zero is "the moment it happens", which is what "A device changes"
+        // is for - so the complaint says so instead of only "too small".
+        minutes: count(1, LIMITS.minutes, "automations.errors.staysRightAway")
     }),
     z.object({
         id: nodeId,

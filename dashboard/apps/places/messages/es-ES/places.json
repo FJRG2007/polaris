@@ -1926,6 +1926,7 @@
             "number": "Escribe un número.",
             "whole": "Usa un número entero.",
             "tooSmall": "Es demasiado pequeño.",
+            "staysRightAway": "Mínimo 1 minuto. Para actuar en el momento, usa \"Un aparato cambia\".",
             "tooBig": "Es demasiado grande.",
             "tooLong": "Es demasiado largo.",
             "tooMany": "Es el máximo que admite una automatización.",

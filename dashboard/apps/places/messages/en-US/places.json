@@ -1926,6 +1926,7 @@
             "number": "Enter a number.",
             "whole": "Use a whole number.",
             "tooSmall": "That is too small.",
+            "staysRightAway": "At least 1 minute. To act the moment it happens, use \"A device changes\".",
             "tooBig": "That is too large.",
             "tooLong": "That is too long.",
             "tooMany": "That is as many as one automation can hold.",

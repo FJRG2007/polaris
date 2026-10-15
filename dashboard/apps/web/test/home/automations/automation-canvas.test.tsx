@@ -295,7 +295,11 @@ describe("an automation saved by the form, opened as a diagram", () => {
         await painted();
         fireEvent.change(screen.getByLabelText(/^For/), { target: { value: "0" } });
         await painted();
-        expect(screen.getByText("That is too small.")).toBeDefined();
+        expect(
+            screen.getByText(
+                'At least 1 minute. To act the moment it happens, use "A device changes".'
+            )
+        ).toBeDefined();
         expect(node("trig01").getAttribute("aria-label")).toContain("Needs a fix.");
         expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
             "true"
