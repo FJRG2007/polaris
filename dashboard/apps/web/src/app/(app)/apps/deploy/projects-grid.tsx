@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RecycleBinButton } from "./recycle-bin";
+import { ImportSiteButton } from "./import-site";
 import { RegistryCredentialsButton } from "./registry-credentials";
 import { useShowManaged } from "./show-managed";
 import { createProjectAction, deleteProjectAction } from "./actions";
@@ -155,6 +156,7 @@ export function ProjectsGrid({
                     <RecycleBinButton canManage={canManage} isAdmin={canSetBinDays} />
                     {canManage && (
                         <>
+                            <ImportSiteButton />
                             <RegistryCredentialsButton />
                             <CreateProjectButton />
                         </>
