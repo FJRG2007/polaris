@@ -25,6 +25,7 @@ export const PERMISSIONS = [
     "mailserver.manage",
     "calendar.use",
     "crm.use",
+    "status.manage",
     "chat.use",
     "chat.spaces",
     "chat.groups",
@@ -218,6 +219,9 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
     // Opening the CRM at all. A personal CRM is reached by this alone; an
     // organization's records are governed by that organization's roles.
     "crm.use": { area: "CRM", label: "Keep companies, people and deals" },
+    // Status pages make Polaris dial addresses somebody typed, from inside the
+    // network, and publish what it finds. Admin only, like adding a camera.
+    "status.manage": { area: "Status pages", label: "Run status pages and their checks" },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split
     // out because "has the chat" and "may start a server in it" are different

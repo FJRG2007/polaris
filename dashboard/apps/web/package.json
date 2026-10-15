@@ -113,6 +113,7 @@
         "@mediapipe/tasks-vision": "1.0.1",
         "@polaris-app/calendar": "0.1.0",
         "@polaris-app/crm": "0.1.0",
+        "@polaris-app/status-pages": "0.1.0",
         "@polaris-app/game-servers": "0.1.0",
         "@polaris-app/places": "0.1.0",
         "@testing-library/react": "16.3.2",

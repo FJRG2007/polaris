@@ -148,6 +148,9 @@
         "account": {
             "description": "Perfil, seguridad y claves de API"
         },
+        "status-pages": {
+            "description": "Páginas públicas que muestran si tus servicios funcionan"
+        },
         "crm": {
             "description": "Empresas, personas y los tratos que llevas"
         }
@@ -317,6 +320,7 @@
         "Games": "Juegos",
         "Keyboard shortcuts": "Atajos de teclado",
         "CRM": "CRM",
+        "Status pages": "Páginas de estado",
         "Companies": "Empresas",
         "Opportunities": "Oportunidades",
         "Storage locations": "Ubicaciones de datos",

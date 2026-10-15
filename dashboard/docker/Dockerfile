@@ -27,6 +27,7 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
 COPY apps/calendar/package.json ./apps/calendar/
 COPY apps/crm/package.json ./apps/crm/
+COPY apps/status-pages/package.json ./apps/status-pages/
 COPY apps/game-servers/package.json ./apps/game-servers/
 COPY apps/places/package.json ./apps/places/
 # Every workspace manifest, one line each and all of them: a package missing here

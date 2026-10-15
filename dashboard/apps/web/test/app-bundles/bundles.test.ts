@@ -81,7 +81,8 @@ describe("app bundles", () => {
             "calendar",
             "crm",
             "game-servers",
-            "home"
+            "home",
+            "status-pages"
         ]);
     });
 

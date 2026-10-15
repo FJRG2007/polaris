@@ -364,6 +364,22 @@ export const POLARIS_APPS: AppEntry[] = [
         favorites: true
     },
     {
+        /**
+         * Public pages that say whether services are up, from checks Polaris
+         * runs, with the incidents and maintenance the operator posts.
+         *
+         * Installable: a Polaris that publishes no status carries no entry for it.
+         */
+        id: "status-pages",
+        category: "work",
+        label: "Status pages", // i18n-ignore
+        description: "Public pages that show whether your services are up", // i18n-ignore
+        icon: Activity,
+        href: "/status-pages",
+        permission: "status.manage",
+        requiresApp: "status-pages"
+    },
+    {
         id: "notes",
         category: "work",
         label: "Notes", // i18n-ignore

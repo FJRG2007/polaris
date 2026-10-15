@@ -2299,7 +2299,8 @@
             "tasks": "Tareas",
             "inbox": "Bandeja",
             "management": "Gestión",
-            "crm": "CRM"
+            "crm": "CRM",
+            "statusPages": "Páginas de estado"
         },
         "permissions": {
             "drive": {
@@ -2387,6 +2388,9 @@
             },
             "system": {
                 "manage": "Versiones, copias y mantenimiento"
+            },
+            "status": {
+                "manage": "Gestionar páginas de estado y sus comprobaciones"
             },
             "crm": {
                 "use": "Llevar empresas, personas y tratos"

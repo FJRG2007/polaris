@@ -122,6 +122,10 @@
             "summary": "Un agente de IA de Hermes para tus canales de mensajería.",
             "description": "Despliega un agente de IA de Hermes que usa el puente de mensajería para llevar conversaciones por su cuenta y pasar a una persona cuando hace falta."
         },
+        "status-pages": {
+            "summary": "Páginas públicas que muestran si tus servicios funcionan.",
+            "description": "Publica una página que muestra si tus servicios funcionan, con 90 días de disponibilidad a partir de comprobaciones HTTP, TCP, DNS y de latencia que hace el propio Polaris. Publica incidencias según avanzan y programa mantenimientos con antelación. Apunta las comprobaciones a tus apps desplegadas o a cualquier dirección. Al desinstalarla se detienen las comprobaciones y se conservan todas las páginas."
+        },
         "crm": {
             "summary": "Empresas, personas y los tratos que llevas, en un solo embudo.",
             "description": "Guarda las empresas con las que trabajas, las personas que hay en ellas y cada oportunidad desde la primera llamada hasta el trato firmado, en tablas que se editan en el sitio y con totales bajo cada columna. Un CRM personal para ti, o uno compartido para una organización con sus propios roles. Instalarlo no ejecuta nada; desinstalarlo conserva cada registro para cuando vuelva."

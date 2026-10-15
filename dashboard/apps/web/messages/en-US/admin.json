@@ -2299,7 +2299,8 @@
             "tasks": "Tasks",
             "inbox": "Inbox",
             "management": "Management",
-            "crm": "CRM"
+            "crm": "CRM",
+            "statusPages": "Status pages"
         },
         "permissions": {
             "drive": {
@@ -2387,6 +2388,9 @@
             },
             "system": {
                 "manage": "Updates, backups and maintenance"
+            },
+            "status": {
+                "manage": "Run status pages and their checks"
             },
             "crm": {
                 "use": "Keep companies, people and deals"

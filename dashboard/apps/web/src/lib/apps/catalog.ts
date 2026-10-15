@@ -17,6 +17,7 @@ import {
     CalendarDays,
     Gamepad2,
     Handshake,
+    Activity,
     House,
     Mails,
     MessagesSquare,
@@ -299,6 +300,24 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Companies, people and the deals you are working, in one pipeline.",
         description:
             "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Public status pages. Installing it adds two scheduled jobs and the
+        // screens; nothing is checked until somebody adds a check, and
+        // uninstalling stops the checks and keeps every page and its history.
+        id: "status-pages",
+        name: "Status pages",
+        category: "Productivity",
+        icon: Activity,
+        opensAt: "/status-pages",
+        summary: "Public pages that show whether your services are up.",
+        description:
+            "Publish a page that shows whether your services are up, with 90 days of uptime from HTTP, TCP, DNS and latency checks Polaris runs itself. Post incidents as they unfold and schedule maintenance ahead. Point checks at your own deployed apps or any address. Uninstalling stops the checks and keeps every page.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
