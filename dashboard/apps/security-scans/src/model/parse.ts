@@ -317,7 +317,7 @@ export function parseVulnJson(value: unknown, cap = 500): VulnReport | null {
             packageName: name,
             version,
             fixedIn: fixed ? fixed.slice(0, 200) : null,
-            url: safeUrl(vuln.dataSource)
+            url: httpsLink(vuln.dataSource)
         });
     }
     const rank = (s: Severity) => SEVERITIES.indexOf(s);
@@ -326,7 +326,7 @@ export function parseVulnJson(value: unknown, cap = 500): VulnReport | null {
 }
 
 /** Only an https link is kept: it is drawn as a link. */
-function safeUrl(value: unknown): string | null {
+function httpsLink(value: unknown): string | null {
     const text = str(value);
     if (!text) return null;
     try {

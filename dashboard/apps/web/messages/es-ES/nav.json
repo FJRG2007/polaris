@@ -150,6 +150,9 @@
         },
         "crm": {
             "description": "Empresas, personas y los tratos que llevas"
+        },
+        "security-scans": {
+            "description": "Malware, cambios en archivos, endurecimiento del sistema y vulnerabilidades de imágenes"
         }
     },
     "labels": {
@@ -325,7 +328,8 @@
         "New opportunity": "Nueva oportunidad",
         "Dashboards": "Paneles",
         "Forecast": "Previsión",
-        "Audit log": "Auditoría"
+        "Audit log": "Auditoría",
+        "Security scans": "Seguridad"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

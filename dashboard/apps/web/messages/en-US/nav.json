@@ -150,6 +150,9 @@
         },
         "crm": {
             "description": "Companies, people and the deals you are working"
+        },
+        "security-scans": {
+            "description": "Malware, file changes, host hardening and image vulnerabilities"
         }
     },
     "labels": {
@@ -325,7 +328,8 @@
         "New opportunity": "New opportunity",
         "Dashboards": "Dashboards",
         "Forecast": "Forecast",
-        "Audit log": "Audit log"
+        "Audit log": "Audit log",
+        "Security scans": "Security scans"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

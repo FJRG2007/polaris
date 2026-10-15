@@ -125,6 +125,10 @@
         "crm": {
             "summary": "Empresas, personas y los tratos que llevas, en un solo embudo.",
             "description": "Guarda las empresas con las que trabajas, las personas que hay en ellas y cada oportunidad desde la primera llamada hasta el trato firmado, en tablas que se editan en el sitio y con totales bajo cada columna. Un CRM personal para ti, o uno compartido para una organización con sus propios roles. Instalarlo no ejecuta nada; desinstalarlo conserva cada registro para cuando vuelva."
+        },
+        "security-scans": {
+            "summary": "Malware, cambios en archivos, endurecimiento del sistema y vulnerabilidades de imágenes en tus servidores.",
+            "description": "Analiza los datos de las apps en busca de malware y aísla lo que encuentre, registra la huella de los archivos y mira qué cambió desde entonces, audita los ajustes de cada servidor y activa sus actualizaciones de seguridad automáticas, y comprueba la imagen de cada app en busca de vulnerabilidades conocidas con un inventario de software descargable. Los análisis se ejecutan de uno en uno por servidor, a demanda o con un horario, y nada sigue en marcha entre ellos."
         }
     },
     "help": {

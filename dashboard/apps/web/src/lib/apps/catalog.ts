@@ -17,6 +17,7 @@ import {
     CalendarDays,
     Gamepad2,
     Handshake,
+    ShieldCheck,
     House,
     Mails,
     MessagesSquare,
@@ -299,6 +300,25 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Companies, people and the deals you are working, in one pipeline.",
         description:
             "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Malware, file changes, host hardening and image vulnerabilities on
+        // the servers Polaris runs. Installing it runs nothing and downloads
+        // nothing: every scan is a one-off container pulled the first time it
+        // is needed, and uninstalling keeps every result.
+        id: "security-scans",
+        name: "Security scans",
+        category: "Tools",
+        icon: ShieldCheck,
+        opensAt: "/security",
+        summary: "Malware, file changes, host hardening and image vulnerabilities on your servers.",
+        description:
+            "Scan app data for malware and quarantine what is found, record file fingerprints and see what changed since, audit each server's own settings and switch on its automatic security updates, and check every app's image for known vulnerabilities with a downloadable software inventory. Scans run one at a time per server, on demand or on a schedule, and nothing keeps running between them.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
