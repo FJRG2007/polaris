@@ -29,6 +29,10 @@ const OAUTH_TOKEN = "https://oauth2.googleapis.com/token";
 const USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo";
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
+/** How long any one request to Google may take. Without a bound a connection
+ *  that stops answering keeps the screen waiting on it with nothing to show. */
+const GOOGLE_TIMEOUT_MS = 15_000;
+
 /** Read the calendar, learn who authorized, and nothing else. */
 export const GOOGLE_SCOPES = [
     "openid",
@@ -229,7 +233,8 @@ async function refusedCredentials(
             code: NOT_A_CODE,
             redirect_uri: redirectUri
         }),
-        cache: "no-store"
+        cache: "no-store",
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS)
     }).catch(() => null);
     if (!response) return null;
 
@@ -248,7 +253,8 @@ async function refusedRedirectUri(
 ): Promise<string | null> {
     const probe = await fetch(googleAuthorizeUrl(client, redirectUri, NOT_A_CODE), {
         redirect: "manual",
-        cache: "no-store"
+        cache: "no-store",
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS)
     }).catch(() => null);
     // 4xx is Google declining to show a consent screen at all, which is what
     // everybody pressing Connect would get. Anything else means it would.
@@ -512,7 +518,8 @@ async function postToken(
             client_id: client.clientId,
             client_secret: client.clientSecret
         }),
-        cache: "no-store"
+        cache: "no-store",
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS)
     });
     if (response.status === 400 || response.status === 401)
         throw new GoogleAuthExpiredError(await refusalReason(response));
@@ -528,7 +535,11 @@ async function fetchJson<Shape extends z.ZodTypeAny>(
     schema: Shape,
     headers: HeadersInit
 ): Promise<z.infer<Shape>> {
-    const response = await fetch(url, { headers, cache: "no-store" });
+    const response = await fetch(url, {
+        headers,
+        cache: "no-store",
+        signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS)
+    });
     if (response.status === 401 || response.status === 403) throw new GoogleAuthExpiredError();
     if (!response.ok) throw new Error(`Google returned ${response.status}`);
     const parsed = schema.safeParse(await response.json());

@@ -47,6 +47,7 @@ import { getConnection, listConnections, readCredential } from "@/lib/connection
 import {
     GOOGLE_DRIVE_FILE_SCOPE,
     GOOGLE_DRIVE_READ_SCOPE,
+    GoogleAuthExpiredError,
     getGoogleOAuthClient,
     googleAccessToken
 } from "@/lib/google-calendar/service";
@@ -166,8 +167,13 @@ async function tokenFor(userId: string, connectionId: string, need: string): Pro
     if (!refreshToken) throw new OfficeGoogleError("relink");
     try {
         return await googleAccessToken(client, refreshToken);
-    } catch {
-        throw new OfficeGoogleError("relink");
+    } catch (caught) {
+        // Only Google turning the authorization down is a reason to link again.
+        // A token request that timed out or was answered with a 5xx is Google
+        // not answering, and linking again would not change that.
+        if (caught instanceof GoogleAuthExpiredError) throw new OfficeGoogleError("relink");
+        console.error("[office] google token refresh failed", caught);
+        throw new OfficeGoogleError("failed");
     }
 }
 
