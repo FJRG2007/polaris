@@ -170,7 +170,16 @@
             "detect": "Detect from the URL",
             "rawJson": "Raw JSON",
             "number": "Number",
-            "numberHint": "International form, including the country code."
+            "numberHint": "International form, including the country code.",
+            "botToken": "Bot token",
+            "chatId": "Chat ID",
+            "chatIdHint": "The chat, group or channel the bot posts to, like -1001234567890 or @yourchannel."
+        },
+        "levelLabel": "Send",
+        "level": {
+            "info": "Everything",
+            "warning": "Warnings and up",
+            "danger": "Errors only"
         }
     },
     "deliveries": {
@@ -454,5 +463,15 @@
         "label": "Clear a badge when I open its screen",
         "onHint": "An update or a report stops counting once you have opened its screen. Something new counts again.",
         "offHint": "Badges stay until the work is done: the update installed, the report settled."
+    },
+    "quiet": {
+        "title": "Quiet hours",
+        "description": "Mail, webhooks and texts wait until the end. The bell still records everything. Times are in {zone}.",
+        "toggle": "Quiet hours",
+        "from": "From",
+        "until": "Until",
+        "critical": "Let critical alerts through",
+        "invalid": "Enter both times as HH:MM.",
+        "save": "Save"
     }
 }

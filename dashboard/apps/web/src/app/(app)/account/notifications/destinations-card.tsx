@@ -14,11 +14,18 @@ import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Plus, Send, Smartphone, Trash2, Webhook } from "lucide-react";
 import type { DestinationView } from "@/lib/notifications/destinations";
-import { destinationInputSchema, WEBHOOK_FORMAT_LABEL, WEBHOOK_FORMATS } from "@polaris/core";
+import {
+    ALERT_MIN_LEVELS,
+    destinationInputSchema,
+    WEBHOOK_FORMAT_LABEL,
+    WEBHOOK_FORMATS,
+    type AlertMinLevel
+} from "@polaris/core";
 import {
     createDestinationAction,
     deleteDestinationAction,
     setDestinationEnabledAction,
+    setDestinationMinLevelAction,
     testDestinationAction
 } from "./actions";
 import {
@@ -50,6 +57,28 @@ export function DestinationsCard({
     const [adding, setAdding] = useState(false);
     const [testResult, setTestResult] = useState<{ id: string; error: string | null } | null>(null);
     const [pending, startTransition] = useTransition();
+    // The floor each row shows, changed here first and put back if the save fails.
+    const [floors, setFloors] = useState<Record<string, AlertMinLevel>>({});
+    const [floorError, setFloorError] = useState<{ id: string; error: string } | null>(null);
+    const levelOptions = ALERT_MIN_LEVELS.map((level) => ({
+        value: level,
+        label: t(`destinations.level.${level}`)
+    }));
+
+    function setFloor(id: string, previous: AlertMinLevel, next: AlertMinLevel) {
+        if (next === previous) return;
+        setFloorError(null);
+        setFloors((current) => ({ ...current, [id]: next }));
+        startTransition(async () => {
+            const result = await setDestinationMinLevelAction({ id, minLevel: next });
+            if (result.error) {
+                setFloors((current) => ({ ...current, [id]: previous }));
+                setFloorError({ id, error: result.error });
+                return;
+            }
+            router.refresh();
+        });
+    }
 
     function test(id: string) {
         setTestResult(null);
@@ -97,6 +126,19 @@ export function DestinationsCard({
                                         </div>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-1.5">
+                                        <Select
+                                            className="h-8 w-36 text-xs"
+                                            aria-label={t("destinations.levelLabel")}
+                                            value={floors[destination.id] ?? destination.minLevel}
+                                            onValueChange={(value) =>
+                                                setFloor(
+                                                    destination.id,
+                                                    floors[destination.id] ?? destination.minLevel,
+                                                    value as AlertMinLevel
+                                                )
+                                            }
+                                            options={levelOptions}
+                                        />
                                         {destination.status === "error" ? (
                                             <Badge variant="danger">{t("destinations.failing")}</Badge>
                                         ) : destination.status === "ok" ? (
@@ -149,6 +191,9 @@ export function DestinationsCard({
                                         })}
                                     </p>
                                 ) : null}
+                                {floorError?.id === destination.id ? (
+                                    <p className="text-xs text-danger">{floorError.error}</p>
+                                ) : null}
                                 {testResult?.id === destination.id ? (
                                     <p className={testResult.error ? "text-xs text-danger" : "text-xs text-success"}>
                                         {testResult.error ?? t("destinations.testSent")}
@@ -190,7 +235,11 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
     const [url, setUrl] = useState("");
     const [format, setFormat] = useState<string>("auto");
     const [phone, setPhone] = useState("");
+    const [botToken, setBotToken] = useState("");
+    const [chatId, setChatId] = useState("");
+    const [minLevel, setMinLevel] = useState<AlertMinLevel>("info");
     const [error, setError] = useState<string | null>(null);
+    const telegram = kind === "webhook" && format === "telegram";
 
     /**
      * The form, as the schema wants it.
@@ -201,10 +250,15 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
      * into a validation error - the reader was told to check a form they had not
      * filled in yet, about a field the message did not name.
      */
+    // Telegram is asked for as the bot token and the chat it posts to, and sent
+    // as the one URL the server already reads, checks and keeps encrypted.
+    const target = telegram
+        ? `https://api.telegram.org/bot${botToken.trim()}/sendMessage?chat_id=${encodeURIComponent(chatId.trim())}`
+        : url.trim();
     const input =
         kind === "webhook"
-            ? { kind, label: label.trim(), url: url.trim(), format }
-            : { kind, label: label.trim(), phone: phone.trim() };
+            ? { kind, label: label.trim(), url: target, format, minLevel }
+            : { kind, label: label.trim(), phone: phone.trim(), minLevel };
     const checked = destinationInputSchema.safeParse(input);
 
     function submit() {
@@ -253,6 +307,30 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                     </label>
                     {kind === "webhook" ? (
                         <>
+                            {telegram ? (
+                                <>
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="font-medium">{t("destinations.dialog.botToken")}</span>
+                                        <Input
+                                            type="password"
+                                            autoComplete="off"
+                                            value={botToken}
+                                            onChange={(event) => setBotToken(event.target.value)}
+                                        />
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-sm">
+                                        <span className="font-medium">{t("destinations.dialog.chatId")}</span>
+                                        <Input
+                                            value={chatId}
+                                            onChange={(event) => setChatId(event.target.value)}
+                                            placeholder="-1001234567890"
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            {t("destinations.dialog.chatIdHint")}
+                                        </span>
+                                    </label>
+                                </>
+                            ) : (
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">{t("destinations.dialog.url")}</span>
                                 <Input
@@ -266,6 +344,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                     })}
                                 </span>
                             </label>
+                            )}
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">{t("destinations.dialog.format")}</span>
                                 <Select
@@ -295,6 +374,17 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             <span className="text-xs text-muted-foreground">{t("destinations.dialog.numberHint")}</span>
                         </label>
                     )}
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{t("destinations.levelLabel")}</span>
+                        <Select
+                            value={minLevel}
+                            onValueChange={(value) => setMinLevel(value as AlertMinLevel)}
+                            options={ALERT_MIN_LEVELS.map((level) => ({
+                                value: level,
+                                label: t(`destinations.level.${level}`)
+                            }))}
+                        />
+                    </label>
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button variant="ghost" onClick={onClose} disabled={pending}>

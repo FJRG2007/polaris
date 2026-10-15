@@ -170,7 +170,16 @@
             "detect": "Detectar por la URL",
             "rawJson": "JSON puro",
             "number": "Número",
-            "numberHint": "En formato internacional, con el prefijo del país."
+            "numberHint": "En formato internacional, con el prefijo del país.",
+            "botToken": "Token",
+            "chatId": "ID chat",
+            "chatIdHint": "El chat, grupo o canal donde publica el bot, como -1001234567890 o @tucanal."
+        },
+        "levelLabel": "Enviar",
+        "level": {
+            "info": "Todo",
+            "warning": "Avisos y más",
+            "danger": "Solo errores"
         }
     },
     "deliveries": {
@@ -454,5 +463,15 @@
         "label": "Quitar el aviso al abrir su pantalla",
         "onHint": "Una actualización o un reporte deja de contar en cuanto abres su pantalla. Lo nuevo vuelve a contar.",
         "offHint": "Los avisos siguen hasta que se resuelve: la actualización instalada, el reporte cerrado."
+    },
+    "quiet": {
+        "title": "Modo silencio",
+        "description": "Correo, webhooks y SMS esperan hasta el final. La campana lo registra todo. Horas en {zone}.",
+        "toggle": "Modo silencio",
+        "from": "Desde",
+        "until": "Hasta",
+        "critical": "Dejar pasar alertas críticas",
+        "invalid": "Escribe ambas horas como HH:MM.",
+        "save": "Guardar"
     }
 }

@@ -6,6 +6,7 @@
  * me" is nearly always one click away from the alert that did not arrive.
  */
 
+import type { QuietHours } from "@polaris/core";
 import { useState } from "react";
 import { Bell, SlidersHorizontal } from "lucide-react";
 import { cn } from "@polaris/ui";
@@ -25,7 +26,8 @@ export function NotificationsPageView({
     deliveries,
     messagesInGame,
     inGameReady = true,
-    badgesClearOnVisit = null
+    badgesClearOnVisit = null,
+    quiet = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -37,6 +39,8 @@ export function NotificationsPageView({
     inGameReady?: boolean;
     /** Whether opening a screen clears its badge, or null for nobody with one. */
     badgesClearOnVisit?: boolean | null;
+    /** Quiet hours and the zone they are read in; null leaves the card out. */
+    quiet?: { hours: QuietHours; timeZone: string } | null;
 }) {
     const [tab, setTab] = useState<"history" | "settings">("history");
     const t = useTranslations("accountNotifications");
@@ -77,6 +81,7 @@ export function NotificationsPageView({
                     messagesInGame={messagesInGame}
                     inGameReady={inGameReady}
                     badgesClearOnVisit={badgesClearOnVisit}
+                    quiet={quiet}
                 />
             ) : null}
         </div>

@@ -11,11 +11,13 @@
  * failed to send.
  */
 
+import type { QuietHours } from "@polaris/core";
 import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
 import { eventDescription, eventLabel, groupLabel } from "./event-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DestinationsCard } from "./destinations-card";
+import { QuietHoursCard } from "./quiet-hours-card";
 import {
     saveNotificationRuleAction,
     saveSoundVolumeAction,
@@ -91,7 +93,8 @@ export function NotificationSettingsView({
     deliveries,
     messagesInGame = null,
     inGameReady = true,
-    badgesClearOnVisit = null
+    badgesClearOnVisit = null,
+    quiet = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -105,6 +108,8 @@ export function NotificationSettingsView({
     /** Whether opening a screen clears its badge, or null for an account with
      *  no such badge. */
     badgesClearOnVisit?: boolean | null;
+    /** Quiet hours and the zone they are read in; null leaves the card out. */
+    quiet?: { hours: QuietHours; timeZone: string } | null;
 }) {
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
@@ -161,6 +166,7 @@ export function NotificationSettingsView({
                 destinations={destinations}
                 smsReady={senders.some((s) => s.status === "connected")}
             />
+            {quiet ? <QuietHoursCard initial={quiet.hours} timeZone={quiet.timeZone} /> : null}
             <DeliveryLog deliveries={deliveries} />
         </div>
     );
