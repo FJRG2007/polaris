@@ -39,7 +39,8 @@ export type BadgeKey = (typeof BADGE_SCREENS)[BadgeScreen];
 export const DISMISSED_KEYS = {
     reports: "dismissed.admin.reports",
     cases: "dismissed.admin.cases",
-    update: "dismissed.admin.update"
+    update: "dismissed.admin.update",
+    apis: "dismissed.admin.apis"
 } as const;
 
 export type DismissedKey = (typeof DISMISSED_KEYS)[keyof typeof DISMISSED_KEYS];

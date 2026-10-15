@@ -16,7 +16,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
-import { clearConnectionFailure } from "@/lib/connections/attention";
+import { markConnectionFailureSeen } from "@/lib/connections/attention";
+import { dismissAdminWaiting } from "@/lib/admin-waiting";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
@@ -119,9 +120,10 @@ export async function saveConnectionSignInAction(
 }
 
 /**
- * Mark a service's last refusal as seen: the card stops saying it needs
- * attention and its alert is answered in every operator's bell. For a failure
- * the operator has dealt with outside Polaris, or decided to leave.
+ * Mark a service's last failure as seen: its alert is answered in every
+ * operator's bell and the count on Integrations goes, but the card keeps saying
+ * it needs attention - marking it read does not make the service work. Only the
+ * service working again clears that.
  */
 export async function dismissConnectionFailureAction(
     provider: string
@@ -131,8 +133,11 @@ export async function dismissConnectionFailureAction(
     if (typeof provider !== "string" || !findConnectionProvider(provider))
         return { error: t("integrations.errors.unknownService") };
 
-    if (!(await clearConnectionFailure(provider)))
+    if (!(await markConnectionFailureSeen(provider)))
         return { error: t("integrations.errors.notSaved") };
+    // A Google API turned off is what Integrations counts; seen here, it is
+    // seen there too, until another one goes off.
+    if (provider === "google") await dismissAdminWaiting(user.id, ["apis"]).catch(() => undefined);
     await recordAudit({
         actorId: user.id,
         action: "integration.configure",

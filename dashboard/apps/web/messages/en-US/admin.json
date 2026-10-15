@@ -1403,7 +1403,8 @@
             "seenNamed": "Mark {name} as seen",
             "apiOffTitle": "An API {name} needs is turned off",
             "apiOffReason": "The last request was turned away: {reason}",
-            "apiOffClears": "Mark it as seen once it is turned on."
+            "apiOffClears": "It clears itself as soon as Drive answers again.",
+            "alreadySeen": "Already marked as seen"
         },
         "signIn": {
             "label": "Allow signing in with {name}",

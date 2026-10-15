@@ -1403,7 +1403,8 @@
             "seenNamed": "Marcar {name} como visto",
             "apiOffTitle": "Una API que {name} necesita está desactivada",
             "apiOffReason": "Se rechazó la última petición: {reason}",
-            "apiOffClears": "Márcalo como visto cuando esté activada."
+            "apiOffClears": "Desaparece en cuanto Drive vuelva a responder.",
+            "alreadySeen": "Ya marcado como visto"
         },
         "signIn": {
             "label": "Permitir iniciar sesión con {name}",

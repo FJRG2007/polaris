@@ -38,7 +38,8 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { adminWaiting, dismissAdminWaiting, markScreenSeen } = await import("@/lib/admin-waiting");
+const { adminWaiting, apiOffMarks, dismissAdminWaiting, markScreenSeen, unseenApisOff } =
+    await import("@/lib/admin-waiting");
 const { clearsOnVisit, isBadgeScreen } = await import("@/lib/badge-seen");
 
 beforeEach(() => {
@@ -150,12 +151,54 @@ describe("marking entries seen from the app menu", () => {
         ]);
     });
 
-    it("writes the build for the update and a moment for each queue, never the APIs", async () => {
+    it("writes the build for the update, a moment for each queue, and the APIs off now", async () => {
         await dismissAdminWaiting("ada", ["update", "reports", "apis", "reports"]);
         expect(written.map((row) => row.key)).toEqual([
             "dismissed.admin.update",
-            "dismissed.admin.reports"
+            "dismissed.admin.reports",
+            "dismissed.admin.apis"
         ]);
         expect(written[0]?.mark).toBe("new4567");
+    });
+});
+
+describe("switched-off APIs marked seen", () => {
+    const off = (since: string) =>
+        JSON.stringify({
+            state: "disabled",
+            project: "1",
+            activationUrl: null,
+            since,
+            checkedAt: since
+        });
+    const on = JSON.stringify({
+        state: "enabled",
+        project: null,
+        activationUrl: null,
+        since: "2026-10-01T00:00:00.000Z",
+        checkedAt: "2026-10-01T00:00:00.000Z"
+    });
+
+    it("marks each API that is off by when it went off", () => {
+        expect(
+            apiOffMarks([
+                { id: "drive", raw: off("2026-10-15T15:58:17.429Z") },
+                { id: "calendar", raw: on },
+                { id: "tasks", raw: null }
+            ])
+        ).toEqual(["drive@2026-10-15T15:58:17.429Z"]);
+    });
+
+    it("stops counting what was seen, and counts it again once it goes off anew", () => {
+        const seen = "drive@2026-10-15T15:58:17.429Z";
+        expect(unseenApisOff(["drive@2026-10-15T15:58:17.429Z"], undefined)).toBe(1);
+        expect(unseenApisOff(["drive@2026-10-15T15:58:17.429Z"], seen)).toBe(0);
+        expect(unseenApisOff(["drive@2026-10-20T08:00:00.000Z"], seen)).toBe(1);
+        expect(
+            unseenApisOff(
+                ["drive@2026-10-15T15:58:17.429Z", "tasks@2026-10-16T00:00:00.000Z"],
+                seen
+            )
+        ).toBe(1);
     });
 });
