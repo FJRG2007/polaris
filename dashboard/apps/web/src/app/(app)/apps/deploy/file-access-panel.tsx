@@ -12,6 +12,7 @@
 import * as core from "@polaris/core";
 import { useProjectCan } from "./access-context";
 import { useEffect, useState, useTransition } from "react";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { KeyRound, Loader2, Lock, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, ConfirmDeleteDialog, CopyButton, Input, Switch, Textarea } from "@polaris/ui";
@@ -53,7 +54,8 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
     // untouched form is incomplete, not wrong.
     const touched = form.username !== "" || form.password !== "" || form.publicKey !== "";
     const parsed = core.fileAccessAccountSchema.safeParse(form);
-    const issue = touched && !parsed.success ? parsed.error.issues[0]?.message : null;
+    const issueKey = touched && !parsed.success ? parsed.error.issues[0]?.message : null;
+    const issue = issueKey ? (t.has(issueKey) ? t(issueKey as NamespaceKey<"deployData">) : t("fileAccess.issues.invalid")) : null;
 
     function submit() {
         if (!parsed.success) return;
@@ -163,6 +165,7 @@ export function FileAccessPanel({ applicationId }: { applicationId: string }) {
                         <Textarea
                             rows={2}
                             value={form.publicKey}
+                            // i18n-ignore: an example key line
                             placeholder="ssh-ed25519 AAAA..."
                             onChange={(event) => setForm({ ...form, publicKey: event.target.value })}
                         />

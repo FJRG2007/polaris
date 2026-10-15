@@ -8,6 +8,9 @@
  * pattern AND quoted the way the engine quotes it, every password must be one
  * Polaris generated, and a connection id must be a positive integer - so no
  * value that reaches a statement can end the literal or identifier it sits in.
+ *
+ * Refusals, from a schema or a builder, are keys of the `deployServer`
+ * catalog's `databases.issues` group, translated by the action that shows them.
  */
 
 import { z } from "zod";
@@ -60,25 +63,25 @@ export const dbAccountCreateSchema = z.object({
         .string()
         .trim()
         .toLowerCase()
-        .regex(USERNAME, "Use lowercase letters, digits and underscores, starting with a letter, up to 32 characters.")
-        .refine((name) => !isReservedAccount(name), "That name belongs to the engine. Pick another.")
+        .regex(USERNAME, "databases.issues.accountName")
+        .refine((name) => !isReservedAccount(name), "databases.issues.accountReserved")
 });
 
 export const dbAccountGrantSchema = z.object({
-    username: z.string().trim().regex(USERNAME),
-    database: z.string().trim().regex(DATABASE),
+    username: z.string().trim().regex(USERNAME, "databases.issues.notManagedAccount"),
+    database: z.string().trim().regex(DATABASE, "databases.issues.notManagedDatabase"),
     privileges: z.enum(DB_PRIVILEGES)
 });
 
 export const dbAccountRevokeSchema = dbAccountGrantSchema.omit({ privileges: true });
 
 function checkUsername(username: string): string {
-    if (!USERNAME.test(username)) throw new Error("That is not an account name Polaris manages.");
+    if (!USERNAME.test(username)) throw new Error("databases.issues.notManagedAccount");
     return username;
 }
 
 function checkDatabase(database: string): string {
-    if (!DATABASE.test(database)) throw new Error("That is not a database name Polaris manages.");
+    if (!DATABASE.test(database)) throw new Error("databases.issues.notManagedDatabase");
     return database;
 }
 
@@ -177,8 +180,8 @@ export function parseAccounts(engine: AccountEngine, output: string, adminUser: 
 /** Create a login account with a generated password and no database yet. */
 export function createAccountCommand(target: AccountTarget, username: string, password: string): AccountCommand {
     checkUsername(username);
-    if (isReservedAccount(username)) throw new Error("That name belongs to the engine.");
-    if (!GENERATED_PASSWORD.test(password)) throw new Error("A password has to be one Polaris generated.");
+    if (isReservedAccount(username)) throw new Error("databases.issues.engineAccount");
+    if (!GENERATED_PASSWORD.test(password)) throw new Error("databases.issues.generatedPassword");
     const describe = `Creating the account ${username}`;
     if (target.engine === "postgres") {
         return {
@@ -195,7 +198,7 @@ export function createAccountCommand(target: AccountTarget, username: string, pa
 /** Drop an account. PostgreSQL refuses while it still owns something, and says so. */
 export function dropAccountCommand(target: AccountTarget, username: string): AccountCommand {
     checkUsername(username);
-    if (isReservedAccount(username)) throw new Error("That account belongs to the engine.");
+    if (isReservedAccount(username)) throw new Error("databases.issues.engineAccount");
     const describe = `Removing the account ${username}`;
     if (target.engine === "postgres") {
         return { argv: psql(target, "postgres", `DROP ROLE IF EXISTS ${quoteIdent(username)}`), describe };
@@ -256,7 +259,7 @@ export function grantAccountCommands(
 ): AccountCommand[] {
     const username = checkUsername(grant.username);
     const database = checkDatabase(grant.database);
-    if (isReservedAccount(username)) throw new Error("That account belongs to the engine.");
+    if (isReservedAccount(username)) throw new Error("databases.issues.engineAccount");
     const describe = `Giving ${username} ${grant.privileges} access to ${database}`;
     if (target.engine === "postgres") {
         const user = quoteIdent(username);
@@ -298,7 +301,7 @@ export function revokeAccountCommands(
 ): AccountCommand[] {
     const username = checkUsername(revoke.username);
     const database = checkDatabase(revoke.database);
-    if (isReservedAccount(username)) throw new Error("That account belongs to the engine.");
+    if (isReservedAccount(username)) throw new Error("databases.issues.engineAccount");
     const describe = `Taking ${username}'s access to ${database} away`;
     if (target.engine === "postgres") {
         const user = quoteIdent(username);
@@ -386,11 +389,13 @@ export function parseProcessList(engine: AccountEngine, output: string): DbProce
     return processes;
 }
 
-export const dbProcessKillSchema = z.object({ processId: z.number().int().positive().max(2 ** 53 - 1) });
+export const dbProcessKillSchema = z.object({
+    processId: z.number({ message: "databases.issues.connectionId" }).int("databases.issues.connectionId").positive("databases.issues.connectionId").max(2 ** 53 - 1, "databases.issues.connectionId")
+});
 
 /** End one connection, by its numeric id only. */
 export function killProcessCommand(target: AccountTarget, processId: number): AccountCommand {
-    if (!Number.isSafeInteger(processId) || processId <= 0) throw new Error("That is not a connection id.");
+    if (!Number.isSafeInteger(processId) || processId <= 0) throw new Error("databases.issues.connectionId");
     const describe = `Ending connection ${processId}`;
     if (target.engine === "postgres") {
         return { argv: psql(target, "postgres", `SELECT pg_terminate_backend(${processId})`), describe };

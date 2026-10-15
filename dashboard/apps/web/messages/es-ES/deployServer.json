@@ -127,7 +127,28 @@
         "accountFailed": "No se cambió la cuenta",
         "processesFailed": "No se leyeron las conexiones",
         "killFailed": "No se cerró la conexión",
-        "tuningFailed": "No se aplicaron los ajustes"
+        "tuningFailed": "No se aplicaron los ajustes",
+        "accountsEngine": "Los usuarios y las conexiones se gestionan en PostgreSQL, MySQL y MariaDB.",
+        "accountsHosted": "Esta base de datos vive dentro de otra instancia. Gestiona sus usuarios desde esa instancia.",
+        "accountsCluster": "Los usuarios y las conexiones se gestionan en una sola instancia, no en un clúster.",
+        "accountProtected": "Polaris y tus servicios entran con esta cuenta, así que no se puede cambiar aquí.",
+        "statementFailed": "La base de datos lo rechazó: {said}",
+        "statementFailedQuiet": "La base de datos lo rechazó.",
+        "memoryUnknown": "El contenedor no indicó cuánta memoria tiene.",
+        "tuningRefused": {
+            "mariadb": "MariaDB no puede guardar un ajuste desde una conexión, así que aquí solo se pueden leer.",
+            "mysqlOld": "Guardar un ajuste desde una conexión requiere MySQL 8 o posterior.",
+            "noLimit": "Pon primero un límite de memoria a esta base de datos, para que los ajustes se ciñan a lo que puede usar."
+        },
+        "issues": {
+            "accountName": "Usa minúsculas, dígitos y guiones bajos, empezando por una letra, hasta 32 caracteres.",
+            "accountReserved": "Ese nombre pertenece al motor. Elige otro.",
+            "notManagedAccount": "Ese no es un nombre de cuenta que gestione Polaris.",
+            "notManagedDatabase": "Ese no es un nombre de base de datos que gestione Polaris.",
+            "engineAccount": "Esa cuenta pertenece al motor.",
+            "generatedPassword": "La contraseña tiene que ser una que haya generado Polaris.",
+            "connectionId": "Ese no es un id de conexión."
+        }
     },
     "registry": {
         "saveFailed": "No se pudo guardar el acceso al registro"
@@ -262,6 +283,14 @@
     "fileAccess": {
         "loadFailed": "No se pudieron leer las cuentas SFTP",
         "saveFailed": "No se pudo añadir la cuenta SFTP",
-        "removeFailed": "No se pudo quitar la cuenta SFTP"
+        "removeFailed": "No se pudo quitar la cuenta SFTP",
+        "serviceGone": "Ese servicio ya no existe.",
+        "noVolumes": "Este servicio no tiene volúmenes, así que no hay archivos a los que acceder. Añade un volumen primero.",
+        "reservedFolder": "Un volumen de este servicio apunta a una carpeta del servidor que pertenece a Polaris. Elige otra ruta para él.",
+        "portsFull": "Todos los puertos SFTP de este servidor están en uso.",
+        "startFailed": "El servidor SFTP no se inició. Comprueba que nada más en este servidor use el puerto {port}.",
+        "nameTaken": "Este servicio ya tiene una cuenta con ese nombre.",
+        "breached": "Esa contraseña aparece en filtraciones de datos conocidas. Elige otra.",
+        "accountGone": "Esa cuenta ya no existe."
     }
 }

@@ -4,22 +4,36 @@
  * A service's SFTP accounts. Reading them asks for `files.read`; adding or
  * removing one reaches the service's files, so it asks for `files.write`.
  * Nothing here returns a password: it is sealed as it is saved and only ever
- * opened to start the server.
+ * opened to be hashed for the server.
  */
 
 import { z } from "zod";
 import * as core from "@polaris/core";
-import { firstIssue, reply } from "./reply";
+import { reply } from "./reply";
 import { requirePermission } from "@/lib/session";
+import { getTranslations } from "@/lib/i18n/request";
 import * as access from "@/lib/deploy/file-access";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 
 async function failure(caught: unknown, fallback: NamespaceKey<"deployServer">): Promise<{ error: string }> {
-    if (caught instanceof access.FileAccessError) return { error: caught.message };
+    if (caught instanceof access.FileAccessError) return { error: await refusal(caught.message, caught.params) ?? (await reply(fallback)) };
     console.error("polaris: an SFTP account action failed:", caught);
     return { error: await reply(fallback) };
+}
+
+/** A refusal key of the `fileAccess` group in the reader's language, or null for one this build does not know. */
+async function refusal(key: string, params?: core.MessageParams): Promise<string | null> {
+    const t = await getTranslations("deployServer");
+    return t.has(key) ? t(key as NamespaceKey<"deployServer">, params) : null;
+}
+
+/** The account schema's issue keys live in the `deployData` catalog, where the form reads them too. */
+async function accountIssue(error: { issues: readonly { message: string }[] }): Promise<string> {
+    const t = await getTranslations("deployData");
+    const key = error.issues[0]?.message;
+    return key && t.has(key) ? t(key as NamespaceKey<"deployData">) : reply("fileAccess.saveFailed");
 }
 
 const idSchema = z.string().uuid();
@@ -32,7 +46,11 @@ export async function fileAccessAction(
     try {
         const user = await requirePermission("deploy.read");
         const granted = await requireApplicationAccess(parsed.data, user.id, "files.read");
-        return { view: await access.fileAccessView(parsed.data, granted.ownerId) };
+        const view = await access.fileAccessView(parsed.data, granted.ownerId);
+        const lastError = view.server?.lastError;
+        if (!view.server || !lastError) return { view };
+        const said = (await refusal(lastError, { port: view.server.port })) ?? (await reply("fileAccess.startFailed", { port: view.server.port }));
+        return { view: { ...view, server: { ...view.server, lastError: said } } };
     } catch (caught) {
         return failure(caught, "fileAccess.loadFailed");
     }
@@ -45,7 +63,7 @@ export async function createFileAccessAccountAction(
     const id = idSchema.safeParse(applicationId);
     if (!id.success) return { error: await reply("fileAccess.saveFailed") };
     const parsed = core.fileAccessAccountSchema.safeParse(input);
-    if (!parsed.success) return { error: await firstIssue(parsed.error, "fileAccess.saveFailed") };
+    if (!parsed.success) return { error: await accountIssue(parsed.error) };
     try {
         const user = await requirePermission("deploy.manage");
         const granted = await requireApplicationAccess(id.data, user.id, "files.write");

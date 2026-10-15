@@ -72,8 +72,19 @@ describe("tuningView", () => {
         const view = await tuning.tuningView(DB, "owner");
         expect(view.ramSource).toBe("container");
         expect(view.ramMb).toBe(4096);
-        expect(view.applyRefusal).toMatch(/MariaDB/);
-        await expect(tuning.applyTuning(DB, "owner")).rejects.toThrow(/MariaDB/);
+        expect(view.applyRefusal).toBe("mariadb");
+        await expect(tuning.applyTuning(DB, "owner")).rejects.toThrow(
+            "databases.tuningRefused.mariadb"
+        );
+    });
+
+    it("never offers to apply what was sized for the whole machine", async () => {
+        state.runIn
+            .mockResolvedValueOnce({ code: 0, output: "MemTotal: 16777216 kB\n" })
+            .mockResolvedValueOnce({ code: 0, output: "shared_buffers|128MB\n" });
+        const view = await tuning.tuningView(DB, "owner");
+        expect(view.ramSource).toBe("container");
+        expect(view.applyRefusal).toBe("noLimit");
     });
 });
 
@@ -89,7 +100,18 @@ describe("applyTuning", () => {
 
     it("refuses MySQL before 8", async () => {
         state.context = context("mysql", "5.7");
-        await expect(tuning.applyTuning(DB, "owner")).rejects.toThrow(/MySQL 8/);
+        await expect(tuning.applyTuning(DB, "owner")).rejects.toThrow(
+            "databases.tuningRefused.mysqlOld"
+        );
+        expect(state.container).not.toHaveBeenCalled();
+    });
+
+    it("refuses a database with no memory limit, writing nothing and restarting nothing", async () => {
+        state.runIn.mockResolvedValueOnce({ code: 0, output: "MemTotal: 16777216 kB\n" });
+        await expect(tuning.applyTuning(DB, "owner")).rejects.toThrow(
+            "databases.tuningRefused.noLimit"
+        );
+        expect(state.runIn).toHaveBeenCalledTimes(1);
         expect(state.container).not.toHaveBeenCalled();
     });
 });

@@ -55,9 +55,15 @@ export interface InstanceContext {
     readonly mongoSeeds: string | null;
 }
 
-/** Raised for a refusal whose words are meant for the screen. */
+/**
+ * Raised for a refusal whose words are meant for the screen: the words
+ * themselves, or a key of the `deployServer` catalog read with `params`.
+ */
 export class DatabaseOperationError extends Error {
-    public constructor(message: string) {
+    public constructor(
+        message: string,
+        public readonly params?: Record<string, string | number>
+    ) {
         super(message);
         this.name = "DatabaseOperationError";
     }

@@ -29,10 +29,8 @@ CREATE TABLE IF NOT EXISTS "FileAccessServer" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "FileAccessServer_targetId_port_key" ON "FileAccessServer"("targetId", "port");
 
-DO $$ BEGIN
-    ALTER TABLE "FileAccessAccount" ADD CONSTRAINT "FileAccessAccount_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "FileAccessAccount" DROP CONSTRAINT IF EXISTS "FileAccessAccount_applicationId_fkey";
+ALTER TABLE "FileAccessAccount" ADD CONSTRAINT "FileAccessAccount_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$ BEGIN
-    ALTER TABLE "FileAccessServer" ADD CONSTRAINT "FileAccessServer_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+ALTER TABLE "FileAccessServer" DROP CONSTRAINT IF EXISTS "FileAccessServer_applicationId_fkey";
+ALTER TABLE "FileAccessServer" ADD CONSTRAINT "FileAccessServer_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE CASCADE ON UPDATE CASCADE;

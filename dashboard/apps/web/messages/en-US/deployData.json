@@ -293,12 +293,16 @@
             "current": "Now",
             "suggested": "Suggested",
             "changes": "Changes",
-            "notSupported": "Applying is not available: {reason}",
             "upToDate": "Already set as suggested.",
             "apply": "Apply suggestions",
             "applyTitle": "Apply and restart?",
             "applyBody": "The settings are saved and the database restarts. It is unavailable for a few seconds while it does.",
-            "applyConfirm": "Apply and restart"
+            "applyConfirm": "Apply and restart",
+            "refusal": {
+                "mariadb": "Applying is not available: MariaDB cannot save a setting from a connection.",
+                "mysqlOld": "Applying is not available: it needs MySQL 8 or later.",
+                "noLimit": "Set a memory limit to apply these. Without one they are sized for the whole server, which runs everything else too."
+            }
         }
     },
     "volume": {
@@ -629,6 +633,18 @@
         "noVolumes": "This service has no volumes. Add one to reach its files over SFTP.",
         "firstStarts": "The first account starts the SFTP server, which can take a minute while it downloads.",
         "lastStops": "This is the last account, so the SFTP server stops too.",
-        "unreadable": "Could not read the SFTP accounts."
+        "unreadable": "Could not read the SFTP accounts.",
+        "issues": {
+            "username": "Use 3 to 32 lowercase letters, digits, - or _, starting with a letter.",
+            "reservedName": "That name is kept for the system. Pick another.",
+            "passwordLong": "Use at most 128 characters.",
+            "passwordLineBreak": "A password cannot contain a line break.",
+            "passwordShort": "Use at least 12 characters.",
+            "keyLong": "That key is too long.",
+            "keyShape": "That is not an OpenSSH public key line.",
+            "needOne": "Give a password, a public key, or both.",
+            "passwordHasName": "The password cannot contain the username.",
+            "invalid": "Check the account's details."
+        }
     }
 }

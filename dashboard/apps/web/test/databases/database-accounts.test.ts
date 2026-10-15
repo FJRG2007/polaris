@@ -23,6 +23,7 @@ vi.mock("@/lib/database-ops/ops", async (original) => {
 });
 
 import * as accounts from "@/lib/database-ops/accounts";
+import { DatabaseOperationError } from "@/lib/database-ops/ops";
 
 function context(overrides: Record<string, unknown> = {}) {
     return {
@@ -46,11 +47,11 @@ beforeEach(() => {
 describe("which instances", () => {
     it("refuses other engines, hosted databases and clusters", async () => {
         state.context = context({ engine: "redis" });
-        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow(/PostgreSQL, MySQL and MariaDB/);
+        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow("databases.accountsEngine");
         state.context = context({ hosted: true });
-        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow(/inside another instance/);
+        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow("databases.accountsHosted");
         state.context = context({ engine: "mysql", topology: { kind: "replicas", replicas: 1 } });
-        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow(/single instance/);
+        await expect(accounts.listProcesses(DB, "owner")).rejects.toThrow("databases.accountsCluster");
         expect(state.runIn).not.toHaveBeenCalled();
     });
 });
@@ -78,14 +79,16 @@ describe("accounts", () => {
     it("masks passwords in an engine's error", async () => {
         state.runIn.mockImplementation(async (_container, argv) => ({ code: 1, output: `ERROR: near ${argv.at(-1)} own-password-0000` }));
         const error = await accounts.createAccount(DB, "owner", "reporting").catch((caught: Error) => caught);
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toMatch(/^Creating the account reporting failed/);
-        expect((error as Error).message).not.toContain("own-password-0000");
-        expect((error as Error).message).not.toMatch(/PASSWORD '[A-Za-z0-9_-]{32}'/);
+        expect(error).toBeInstanceOf(DatabaseOperationError);
+        const said = String((error as DatabaseOperationError).params?.said);
+        expect((error as Error).message).toBe("databases.statementFailed");
+        expect(said).toContain("ERROR: near");
+        expect(said).not.toContain("own-password-0000");
+        expect(said).not.toMatch(/PASSWORD '[A-Za-z0-9_-]{32}'/);
     });
 
     it("never drops or regrants the account Polaris signs in with", async () => {
-        await expect(accounts.dropAccount(DB, "owner", "shop")).rejects.toThrow(/cannot be changed here/);
+        await expect(accounts.dropAccount(DB, "owner", "shop")).rejects.toThrow("databases.accountProtected");
         await expect(accounts.grantAccount(DB, "owner", { username: "shop", database: "shop", privileges: "readonly" })).rejects.toThrow();
         expect(state.runIn).not.toHaveBeenCalled();
     });

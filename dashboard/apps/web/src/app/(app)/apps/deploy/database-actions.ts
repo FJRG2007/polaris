@@ -23,6 +23,8 @@ import * as accounts from "@/lib/database-ops/accounts";
 import * as tuning from "@/lib/database-ops/tuning";
 import { requirePermission } from "@/lib/session";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import { getTranslations } from "@/lib/i18n/request";
+import { DatabaseOperationError } from "@/lib/database-ops/ops";
 import { copyInto } from "@/lib/database-ops/copy";
 import * as store from "@/lib/object-storage/store";
 import * as upgrade from "@/lib/database-ops/upgrade";
@@ -46,8 +48,8 @@ async function invalid(error: z.ZodError): Promise<{ error: string }> {
     return { error: await firstIssue(error, "common.invalidRequestShort") };
 }
 
-/** An error's words for the screen. Refusals are written for it; anything else
- *  is logged and replaced, since it may name internals. */
+/** An error's words for the screen. Refusals are written for it, or give a key
+ *  of this catalog; anything else is logged and replaced, since it may name internals. */
 async function failure(
     caught: unknown,
     fallback: NamespaceKey<"deployServer">
@@ -57,7 +59,10 @@ async function failure(
         !(caught instanceof TypeError) &&
         !caught.name.startsWith("Prisma")
     ) {
-        return { error: caught.message };
+        const t = await getTranslations("deployServer");
+        if (!t.has(caught.message)) return { error: caught.message };
+        const params = caught instanceof DatabaseOperationError ? caught.params : undefined;
+        return { error: t(caught.message as NamespaceKey<"deployServer">, params) };
     }
     console.error(`deploy: ${fallback}:`, caught);
     return { error: await reply(fallback) };

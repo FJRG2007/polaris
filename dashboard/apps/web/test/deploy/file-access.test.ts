@@ -9,7 +9,8 @@ vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/deployment-addresses", () => ({ reachableAddresses: async () => [] }));
 
 import * as core from "@polaris/core";
-import { fileAccessSpec } from "@/lib/deploy/file-access";
+import { sha512Crypt } from "@/lib/deploy/sha512-crypt";
+import { fileAccessMounts, fileAccessSpec } from "@/lib/deploy/file-access";
 
 const service = {
     id: "0190f3a2-7c41-7000-8000-000000000001",
@@ -63,7 +64,7 @@ describe("fileAccessSpec", () => {
         service,
         port: 42222,
         logins: [
-            { username: "deploy", password: "pa:ss\tword", readOnly: false },
+            { username: "deploy", passwordHash: "$6$salt$hash", readOnly: false },
             { username: "viewer", publicKey: "ssh-ed25519 AAAA me", readOnly: true }
         ]
     });
@@ -85,6 +86,7 @@ describe("fileAccessSpec", () => {
         expect(server.image).toBe(core.FILE_ACCESS_IMAGE);
         expect(server.entrypoint?.[2]).toContain("ChrootDirectory $ROOT");
         expect(server.entrypoint?.[2]).toContain("internal-sftp -R");
+        expect(server.entrypoint?.[2]).not.toContain("chpasswd");
         expect(spec.project).toMatch(/^polaris-sftp-[0-9a-f]{8}$/);
     });
 
@@ -93,10 +95,27 @@ describe("fileAccessSpec", () => {
         const lines = decodeAccounts(server.env.POLARIS_SFTP_ACCOUNTS);
         expect(lines[0][0]).toBe("deploy");
         expect(lines[0][1]).toBe("rw");
-        expect(Buffer.from(lines[0][2], "base64").toString("utf8")).toBe("pa:ss\tword");
+        expect(Buffer.from(lines[0][2], "base64").toString("utf8")).toBe("$6$salt$hash");
         expect(lines[0][3]).toBe("-");
         expect(lines[1].slice(0, 3)).toEqual(["viewer", "ro", "-"]);
         expect(server.env.POLARIS_FIRST_FOLDER).toBe("uploads");
+    });
+});
+
+describe("fileAccessMounts", () => {
+    it("refuses a server folder Polaris keeps for itself, as the deploy does", () => {
+        const reserved = { id: service.id, volumes: [{ name: "homes", kind: "bind", source: "agent-homes/someone", connectionId: null }] };
+        expect(() => fileAccessMounts(reserved)).toThrow(/belongs to Polaris/);
+    });
+});
+
+describe("sha512Crypt", () => {
+    it("matches the reference vector and salts each hash", () => {
+        expect(sha512Crypt("Hello world!", "saltstring")).toBe(
+            "$6$saltstring$svn8UoSVapNtMuq1ukKS4tPQd8iKwSMHWjl/O817G3uBnIFNjnQJuesI68u4OTLiBFdcbYEdFCoEOfaS35inz1"
+        );
+        expect(sha512Crypt("correct-horse-battery")).toMatch(/^\$6\$[./0-9A-Za-z]{16}\$[./0-9A-Za-z]{86}$/);
+        expect(sha512Crypt("correct-horse-battery")).not.toBe(sha512Crypt("correct-horse-battery"));
     });
 });
 

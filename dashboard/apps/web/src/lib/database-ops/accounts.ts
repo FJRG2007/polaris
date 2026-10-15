@@ -26,13 +26,13 @@ export interface AccountScope {
 export async function accountScope(databaseId: string, ownerId: string): Promise<AccountScope> {
     const context = await instanceContext(databaseId, ownerId);
     if (!core.isAccountEngine(context.engine)) {
-        throw new DatabaseOperationError("Users and connections are managed for PostgreSQL, MySQL and MariaDB.");
+        throw new DatabaseOperationError("databases.accountsEngine");
     }
     if (context.hosted) {
-        throw new DatabaseOperationError("This database lives inside another instance. Manage its users from that instance.");
+        throw new DatabaseOperationError("databases.accountsHosted");
     }
     if (context.topology.kind !== "single") {
-        throw new DatabaseOperationError("Users and connections are managed on a single instance, not on a cluster.");
+        throw new DatabaseOperationError("databases.accountsCluster");
     }
     return {
         context,
@@ -40,7 +40,7 @@ export async function accountScope(databaseId: string, ownerId: string): Promise
     };
 }
 
-/** Run commands in order inside the instance; a failure names the step and the engine's last line. */
+/** Run commands in order inside the instance; a failure carries the engine's last line, passwords masked. */
 export async function runCommands(
     scope: AccountScope,
     commands: readonly core.AccountCommand[],
@@ -53,7 +53,7 @@ export async function runCommands(
             const result = await runWithin(ports, scope.context.container, command.argv, STATEMENT_LIMIT_MS);
             if (result.code !== 0) {
                 const said = lastLine(result.output, masked);
-                throw new DatabaseOperationError(`${command.describe} failed${said ? `: ${said}` : ""}`);
+                throw new DatabaseOperationError(said ? "databases.statementFailed" : "databases.statementFailedQuiet", { said });
             }
             outputs.push(result.output);
         }
@@ -85,7 +85,7 @@ export async function listAccounts(databaseId: string, ownerId: string): Promise
 /** Accounts Polaris and the services depend on: never dropped or regranted from here. */
 function refuseProtected(scope: AccountScope, username: string): void {
     if (username === scope.context.own.username || username === scope.target.adminUser) {
-        throw new DatabaseOperationError("Polaris and your services sign in with this account, so it cannot be changed here.");
+        throw new DatabaseOperationError("databases.accountProtected");
     }
 }
 

@@ -48,9 +48,12 @@ export function suggestTuning(engine: AccountTarget["engine"], ramMb: number): T
             { name: "max_connections", value: String(connections) }
         ];
     }
-    // The pool is sized in 128 MB chunks, so the suggestion is too.
+    // The engine raises the pool to a multiple of its 128 MB chunk times its
+    // instances, which are 8 from 1 GB up, so the suggestion is already one -
+    // rounded down, never past the share of the memory it was given.
     const share = ram >= 2048 ? 0.7 : 0.5;
-    const pool = Math.max(128, Math.floor((ram * share) / 128) * 128);
+    const wanted = Math.floor(ram * share);
+    const pool = wanted >= 1024 ? Math.floor(wanted / 1024) * 1024 : Math.max(128, Math.floor(wanted / 128) * 128);
     const temp = ram >= 4096 ? 64 : ram >= 1024 ? 32 : 16;
     return [
         { name: "innodb_buffer_pool_size", value: String(pool * MB) },

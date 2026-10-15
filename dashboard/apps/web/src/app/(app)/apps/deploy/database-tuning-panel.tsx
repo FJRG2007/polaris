@@ -22,12 +22,33 @@ interface Confirmation {
 
 type View = NonNullable<Awaited<ReturnType<typeof actions.databaseTuningAction>>["tuning"]>;
 
-/** Bytes as MB or GB; anything else (a count, `128MB`) as the engine said it. */
+const UNIT_BYTES = { kB: 1024, MB: 1024 ** 2, GB: 1024 ** 3, TB: 1024 ** 4 } as const;
+
+/**
+ * A memory setting in bytes, however the engine wrote it: PostgreSQL's `128MB`
+ * or `1GB`, MySQL's plain bytes. Null for anything else, such as a count.
+ */
+export function settingBytes(value: string): number | null {
+    const sized = /^(\d+)(kB|MB|GB|TB)$/.exec(value);
+    if (sized) return Number(sized[1]) * UNIT_BYTES[sized[2] as keyof typeof UNIT_BYTES];
+    return /^\d{7,}$/.test(value) ? Number(value) : null;
+}
+
+/** Memory as kB, MB or GB; anything else (a count) as the engine said it. */
 export function readableSetting(value: string | null): string {
     if (value === null) return "-";
-    if (!/^\d{7,}$/.test(value)) return value;
-    const mb = Number(value) / (1024 * 1024);
+    const bytes = settingBytes(value);
+    if (bytes === null) return value;
+    if (bytes < UNIT_BYTES.MB) return `${Math.round(bytes / UNIT_BYTES.kB)}kB`;
+    const mb = bytes / UNIT_BYTES.MB;
     return mb >= 1024 && mb % 1024 === 0 ? `${mb / 1024}GB` : `${Math.round(mb)}MB`;
+}
+
+/** Whether a setting differs from its suggestion: by size for memory, as written for the rest. */
+export function settingDiffers(current: string | null, suggested: string): boolean {
+    if (current === null) return true;
+    const [now, wanted] = [settingBytes(current), settingBytes(suggested)];
+    return now !== null && wanted !== null ? now !== wanted : current !== suggested;
 }
 
 export function TuningSection({
@@ -55,7 +76,7 @@ export function TuningSection({
         void load();
     }, [load]);
 
-    const differs = (entry: View["settings"][number]) => readableSetting(entry.current) !== readableSetting(entry.suggested);
+    const differs = (entry: View["settings"][number]) => settingDiffers(entry.current, entry.suggested);
     const changes = view ? view.settings.filter(differs) : [];
     const memory = view ? readableSetting(String(view.ramMb * 1024 * 1024)) : "";
 
@@ -110,7 +131,7 @@ export function TuningSection({
                     </div>
                     {view.applyRefusal ? (
                         <p className="text-xs text-muted-foreground">
-                            {t("database.tuning.notSupported", { reason: view.applyRefusal })}
+                            {t(`database.tuning.refusal.${view.applyRefusal}`)}
                         </p>
                     ) : manage ? (
                         <div>

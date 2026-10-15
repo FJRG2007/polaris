@@ -55,34 +55,35 @@ export const fileAccessUsernameSchema = z
     .string()
     .trim()
     .toLowerCase()
-    .regex(/^[a-z][a-z0-9_-]{2,31}$/, "Use 3 to 32 lowercase letters, digits, - or _, starting with a letter.")
-    .refine((name) => !RESERVED_USERNAMES.has(name), "That name is kept for the system. Pick another.");
+    .regex(/^[a-z][a-z0-9_-]{2,31}$/, "fileAccess.issues.username")
+    .refine((name) => !RESERVED_USERNAMES.has(name), "fileAccess.issues.reservedName");
 
+/** Its messages are keys of the `deployData` catalog, translated where they are shown. */
 export const fileAccessAccountSchema = z
     .object({
         username: fileAccessUsernameSchema,
         // No newline: the boot script reads one account per line.
         password: z
             .string()
-            .max(128, "Use at most 128 characters.")
-            .refine((value) => !/[\r\n\0]/.test(value), "A password cannot contain a line break.")
+            .max(128, "fileAccess.issues.passwordLong")
+            .refine((value) => !/[\r\n\0]/.test(value), "fileAccess.issues.passwordLineBreak")
             .optional()
             .transform((value) => (value ? value : undefined))
-            .refine((value) => value === undefined || value.length >= 12, "Use at least 12 characters."),
+            .refine((value) => value === undefined || value.length >= 12, "fileAccess.issues.passwordShort"),
         publicKey: z
             .string()
-            .max(4000, "That key is too long.")
+            .max(4000, "fileAccess.issues.keyLong")
             .optional()
             .transform((value) => (value ? normalizePublicKey(value) : undefined))
-            .refine((value) => value === undefined || PUBLIC_KEY.test(value), "That is not an OpenSSH public key line."),
+            .refine((value) => value === undefined || PUBLIC_KEY.test(value), "fileAccess.issues.keyShape"),
         readOnly: z.boolean().default(false)
     })
     .refine((account) => account.password !== undefined || account.publicKey !== undefined, {
-        message: "Give a password, a public key, or both.",
+        message: "fileAccess.issues.needOne",
         path: ["password"]
     })
     .refine((account) => !account.password || !account.password.toLowerCase().includes(account.username), {
-        message: "The password cannot contain the username.",
+        message: "fileAccess.issues.passwordHasName",
         path: ["password"]
     });
 
@@ -92,7 +93,8 @@ export type FileAccessAccount = z.output<typeof fileAccessAccountSchema>;
 /** What the boot script needs of one account. */
 export interface FileAccessLogin {
     readonly username: string;
-    readonly password?: string;
+    /** The password as `/etc/shadow` takes it (`$6$...`), never the password itself. */
+    readonly passwordHash?: string;
     readonly publicKey?: string;
     readonly readOnly: boolean;
 }
@@ -124,7 +126,7 @@ function b64(value: string): string {
 
 /**
  * The accounts as one environment value: base64 of one line per account,
- * `name<TAB>ro|rw<TAB>base64(password)<TAB>base64(key)`. Base64 twice over so
+ * `name<TAB>ro|rw<TAB>base64(hash)<TAB>base64(key)`. Base64 twice over so
  * no value carries a control character into the container's environment.
  */
 export function fileAccessAccountsEnv(logins: readonly FileAccessLogin[]): string {
@@ -132,7 +134,7 @@ export function fileAccessAccountsEnv(logins: readonly FileAccessLogin[]): strin
         [
             login.username,
             login.readOnly ? "ro" : "rw",
-            login.password ? b64(login.password) : "-",
+            login.passwordHash ? b64(login.passwordHash) : "-",
             login.publicKey ? b64(login.publicKey) : "-"
         ].join("\t")
     );
@@ -169,8 +171,9 @@ export const FILE_ACCESS_BOOT_SCRIPT = [
     '  [ -n "$NAME" ] || continue',
     '  sed -i "/^$NAME:/d" /etc/passwd /etc/shadow /etc/group 2>/dev/null || true',
     '  echo "$NAME:x:$OWNER_UID:$OWNER_GID::/:/sbin/nologin" >> /etc/passwd',
-    '  echo "$NAME:*:19000:0:99999:7:::" >> /etc/shadow',
-    '  if [ "$PASS" != "-" ]; then printf "%s:%s\\n" "$NAME" "$(echo "$PASS" | base64 -d)" | chpasswd; fi',
+    '  HASH="*"',
+    '  if [ "$PASS" != "-" ]; then HASH=$(echo "$PASS" | base64 -d); fi',
+    '  echo "$NAME:$HASH:19000:0:99999:7:::" >> /etc/shadow',
     '  rm -f "$AUTH/$NAME"',
     '  if [ "$KEY" != "-" ]; then echo "$KEY" | base64 -d > "$AUTH/$NAME"; echo >> "$AUTH/$NAME"; chmod 644 "$AUTH/$NAME"; fi',
     '  ALLOW="$ALLOW $NAME"',

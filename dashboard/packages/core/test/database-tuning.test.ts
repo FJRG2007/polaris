@@ -28,10 +28,12 @@ describe("suggestTuning", () => {
         expect(byName(tuning.suggestTuning("postgres", 262144)).maintenance_work_mem).toBe("2048MB");
     });
 
-    it("sizes InnoDB's pool in 128 MB chunks", () => {
+    it("sizes InnoDB's pool in 128 MB chunks below 1 GB and whole gigabytes above, so the engine never rounds it up", () => {
         const values = byName(tuning.suggestTuning("mysql", 8192));
-        expect(Number(values.innodb_buffer_pool_size) / (1024 * 1024)).toBe(5632);
-        expect(Number(values.innodb_buffer_pool_size) % (128 * 1024 * 1024)).toBe(0);
+        expect(Number(values.innodb_buffer_pool_size) / (1024 * 1024)).toBe(5120);
+        expect(Number(values.innodb_buffer_pool_size) % (8 * 128 * 1024 * 1024)).toBe(0);
+        expect(byName(tuning.suggestTuning("mysql", 2048)).innodb_buffer_pool_size).toBe(String(1024 * 1024 * 1024));
+        expect(byName(tuning.suggestTuning("mysql", 1536)).innodb_buffer_pool_size).toBe(String(768 * 1024 * 1024));
         expect(byName(tuning.suggestTuning("mysql", 512)).innodb_buffer_pool_size).toBe(String(256 * 1024 * 1024));
     });
 });

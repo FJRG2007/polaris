@@ -293,12 +293,16 @@
             "current": "Ahora",
             "suggested": "Sugerido",
             "changes": "Cambia",
-            "notSupported": "No se puede aplicar: {reason}",
             "upToDate": "Ya está como se sugiere.",
             "apply": "Aplicar sugerencias",
             "applyTitle": "¿Aplicar y reiniciar?",
             "applyBody": "Se guardan los ajustes y la base de datos se reinicia. No responde durante unos segundos.",
-            "applyConfirm": "Aplicar y reiniciar"
+            "applyConfirm": "Aplicar y reiniciar",
+            "refusal": {
+                "mariadb": "No se puede aplicar: MariaDB no guarda ajustes desde una conexión.",
+                "mysqlOld": "No se puede aplicar: requiere MySQL 8 o posterior.",
+                "noLimit": "Pon un límite de memoria para aplicarlos. Sin él se calculan para todo el servidor, que también ejecuta todo lo demás."
+            }
         }
     },
     "volume": {
@@ -629,6 +633,18 @@
         "noVolumes": "Este servicio no tiene volúmenes. Añade uno para acceder a sus archivos por SFTP.",
         "firstStarts": "La primera cuenta inicia el servidor SFTP, que puede tardar un minuto mientras se descarga.",
         "lastStops": "Es la última cuenta, así que el servidor SFTP también se detiene.",
-        "unreadable": "No se pudieron leer las cuentas SFTP."
+        "unreadable": "No se pudieron leer las cuentas SFTP.",
+        "issues": {
+            "username": "Usa de 3 a 32 minúsculas, dígitos, - o _, empezando por una letra.",
+            "reservedName": "Ese nombre lo usa el sistema. Elige otro.",
+            "passwordLong": "Usa como mucho 128 caracteres.",
+            "passwordLineBreak": "La contraseña no puede tener saltos de línea.",
+            "passwordShort": "Usa al menos 12 caracteres.",
+            "keyLong": "Esa clave es demasiado larga.",
+            "keyShape": "Eso no es una línea de clave pública OpenSSH.",
+            "needOne": "Indica una contraseña, una clave pública o ambas.",
+            "passwordHasName": "La contraseña no puede contener el usuario.",
+            "invalid": "Revisa los datos de la cuenta."
+        }
     }
 }
