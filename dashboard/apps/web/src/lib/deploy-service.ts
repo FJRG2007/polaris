@@ -98,6 +98,7 @@ import {
 import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { refuseWhileCopying } from "./apps/install-copy-hold";
 import { notifyVolumeHealth } from "./notifications/volume-events";
+import { nasBinding } from "./deploy/nas-binding";
 import {
     appEdgeConfigSchema,
     applicationDefaultWafPresets,
@@ -1963,7 +1964,7 @@ function restartingOnRemount(
 
 /**
  * Restart every running app on one machine that binds onto a share which has just
- * been mounted there again.
+ * been mounted there again - but only the ones that lost their files.
  *
  * A container's bind is resolved once, when it starts, onto whatever filesystem
  * held the path then. When that mount dies - the NAS rebooted, or came back on a
@@ -1971,6 +1972,13 @@ function restartingOnRemount(
  * and every container started before it is still bound to the dead one, where
  * every file answers "Host is down". Nothing short of a restart moves the bind, so
  * whoever re-creates the mount (a deploy, Drive, the boot reconcile) calls this.
+ *
+ * A share mounted again is not by itself a service without its files, though. An
+ * update that recreates the host daemon, or a session the kernel reconnected on its
+ * own, leaves every running service on the mount it started with, still alive, and
+ * restarting those was downtime for nothing. So each service is asked first
+ * (`nasBinding`) and restarted only when its volumes are dead, are not on the share
+ * at all (it started before the share was mounted), or it cannot be asked.
  *
  * `except` is the app a deploy is bringing up right now, whose new container binds
  * the fresh mount anyway. Each service restarted is told to its owner and
@@ -2002,7 +2010,7 @@ export async function restartAppsOnShare(
                 environment: { select: { project: { select: { ownerId: true, slug: true } } } },
                 volumes: {
                     where: { kind: "nas", connectionId },
-                    select: { name: true, connection: { select: { name: true } } }
+                    select: { name: true, mountPath: true, connection: { select: { name: true } } }
                 }
             }
         })
@@ -2026,8 +2034,16 @@ export async function restartAppsOnShare(
                 app.slug,
                 app.id
             ).name;
+            const binding = await nasBinding(
+                ports,
+                container,
+                app.volumes.map((volume) => volume.mountPath)
+            );
+            if (binding === "share") continue;
             await ports.container(container, "restart");
-            console.log(`polaris: share ${connectionId} was mounted again, restarted ${app.slug}`);
+            console.log(
+                `polaris: share ${connectionId} was mounted again, restarted ${app.slug} (${binding})`
+            );
             restarted.push(app.id);
             forgetVolumeNotice(app.id);
             // Its files were unreadable until now, which the owner hears about

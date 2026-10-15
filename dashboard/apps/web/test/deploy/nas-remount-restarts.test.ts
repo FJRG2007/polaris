@@ -21,7 +21,7 @@ interface AppRow {
         proxyNetwork: string;
     };
     environment: { project: { ownerId: string; slug: string } };
-    volumes?: Array<{ connectionId: string }>;
+    volumes?: Array<{ connectionId: string; mountPath: string }>;
 }
 
 const LOCAL = { id: "t-local", kind: "local", hostId: null, runtime: "compose", proxyNetwork: "p" };
@@ -32,7 +32,7 @@ function app(id: string, connectionId = "share-1"): AppRow {
         slug: id,
         target: LOCAL,
         environment: { project: { ownerId: "owner-1", slug: "proj" } },
-        volumes: [{ connectionId }]
+        volumes: [{ connectionId, mountPath: "/data" }]
     };
 }
 
@@ -43,8 +43,16 @@ const findMany = vi.fn(async (args: { where: { id?: { not: string } } }) =>
 const restarted: string[] = [];
 let created = true;
 const ensureMount = vi.fn(async () => created);
+/** What each service answers when asked where its volumes are; by default it
+ *  cannot be asked, which is restarted the way it always was. */
+let inside: (argv: readonly string[]) => { code: number; output: string } = () => {
+    throw new Error("exec failed: no such tool");
+};
+const SHARE_TABLE = "40 30 0:52 /proj/vol /data rw,relatime - cifs //nas/share rw,mfsymlinks\n";
+const LOCAL_TABLE = "41 30 8:1 /var/lib/docker/x /data rw,relatime - ext4 /dev/sda1 rw\n";
 const ports = {
     ensureMount,
+    runIn: vi.fn(async (_container: string, argv: readonly string[]) => inside(argv)),
     container: vi.fn(async (name: string) => {
         restarted.push(name);
     }),
@@ -67,6 +75,9 @@ const { reconcileNasMounts, restartAppsOnShare } = await import("@/lib/deploy-se
 beforeEach(() => {
     rows = [];
     created = true;
+    inside = () => {
+        throw new Error("exec failed: no such tool");
+    };
     restarted.length = 0;
     findMany.mockClear();
     ensureMount.mockClear();
@@ -102,6 +113,35 @@ describe("a share mounted again", () => {
         await restartAppsOnShare("share-1", "host-9");
         const [args] = findMany.mock.calls[0] as [{ where: Record<string, unknown> }];
         expect(args.where.target).toEqual({ kind: { not: "local" }, hostId: "host-9" });
+    });
+
+    it("leaves running a service still on a live mount of the share", async () => {
+        // An update that recreated the host daemon mounts the share again, while
+        // every service keeps the mount it started with. Restarting those was the
+        // downtime.
+        rows = [app("a"), app("b")];
+        inside = (argv) =>
+            argv[0] === "cat" ? { code: 0, output: SHARE_TABLE } : { code: 0, output: "/data" };
+        await expect(restartAppsOnShare("share-1", null)).resolves.toEqual([]);
+        expect(restarted).toHaveLength(0);
+        expect(notifyVolumeHealth).not.toHaveBeenCalled();
+    });
+
+    it("restarts a service whose mount is dead", async () => {
+        rows = [app("a")];
+        inside = (argv) =>
+            argv[0] === "cat"
+                ? { code: 0, output: SHARE_TABLE }
+                : { code: 1, output: "ls: /data: Host is down" };
+        await expect(restartAppsOnShare("share-1", null)).resolves.toEqual(["a"]);
+    });
+
+    it("restarts a service that started before the share was mounted", async () => {
+        // Its volume is a folder on the machine's own disk, not the NAS.
+        rows = [app("a")];
+        inside = (argv) =>
+            argv[0] === "cat" ? { code: 0, output: LOCAL_TABLE } : { code: 0, output: "/data" };
+        await expect(restartAppsOnShare("share-1", null)).resolves.toEqual(["a"]);
     });
 
     it("keeps going when one service cannot be restarted", async () => {
