@@ -116,6 +116,8 @@ export interface AppRoute {
     /** The public keys a login token for this route must be signed with (see
      *  `GuardRule.keys`). Only written into a rule that requires a login. */
     readonly loginKeys?: readonly string[];
+    /** The oldest a login token for this route may be (see `GuardRule.loginMaxAge`). */
+    readonly loginMaxAge?: number;
 }
 
 /** An edge that can be told the full set of app routes it should serve. */
@@ -351,6 +353,7 @@ function routeMiddlewares(
             loginAllowLists: route.loginAllowLists ?? [],
             loginDeny: route.loginDeny ?? [],
             keys: route.loginKeys,
+            loginMaxAge: route.loginMaxAge,
             browserIntegrity: route.browserIntegrity === true,
             sqlInjectionProtection: route.sqlInjectionProtection === true,
             xssProtection: route.xssProtection === true,

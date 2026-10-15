@@ -5477,6 +5477,10 @@ model Domain {
     certPem       String?
     certKey       String?
     pathPrefix    String?
+    // Set when the address only answers people signed in to Polaris and allowed in:
+    // JSON {members, allow, deny} (see lib/deploy/private-domain.ts). Null is public,
+    // which is every domain created before this existed.
+    privateAccess String?
     // Who answers this hostname: "server" - the machine the service runs on, by
     // its own edge - or "polaris" - this instance's edge, dialling that machine.
     //

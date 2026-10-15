@@ -249,6 +249,7 @@
         "purgeFailed": "Could not empty the cache"
     },
     "issues": {
+        "privateAudience": "Choose who may open this address.",
         "notAPrefix": "That is not a prefix",
         "nameRequired": "Give it a name",
         "repoRequired": "Polaris needs the repository",

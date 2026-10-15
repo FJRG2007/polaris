@@ -423,6 +423,24 @@
         "close": "Close",
         "empty": "Empty cache"
     },
+    "private": {
+        "title": "Private address",
+        "open": "Private: only people you allow",
+        "public": "Public: anyone can open it",
+        "description": "Visitors to {hostname} sign in to Polaris first. Anyone else sees a page saying they have no access.",
+        "toggle": "Only allowed people",
+        "members": "Members of this project",
+        "membersHint": "Checked again every 15 minutes, so a removed member loses access soon after.",
+        "named": "Also allow these people, groups and roles",
+        "needsAudience": "Choose who may open this address.",
+        "save": "Save",
+        "close": "Close",
+        "saved": "Saved. It takes effect in a few seconds.",
+        "savedUnpublished": "Saved, but not applied yet. Save again in a moment to retry.",
+        "noManage": "You cannot change this project's domains.",
+        "namedEmpty": "Nobody named. Pick a role, a group or a person to let them in.",
+        "namedFilled": "These get in too, whether or not they are members."
+    },
     "fix": {
         "startCommand": "Start command",
         "buildCommand": "Build command (blank for none)",

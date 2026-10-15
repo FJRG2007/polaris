@@ -6,6 +6,12 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import {
+    parsePrivateAccess,
+    storePrivateAccess,
+    withPrivateAccess,
+    type PrivateAccess
+} from "@/lib/deploy/private-domain";
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
@@ -1287,6 +1293,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
             id: true,
             hostname: true,
             pathPrefix: true,
+            privateAccess: true,
             certResolver: true,
             targetPort: true,
             portPinned: true,
@@ -1526,39 +1533,45 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                   ? (serverAddress.get(remoteHostId) ?? "")
                   : localIp;
             if (!dialHost) continue;
-            localRoutes.push({
-                id: domain.id,
-                hostname: domain.hostname,
-                pathPrefix: domain.pathPrefix ?? undefined,
-                ...edgeOf.get(domain.applicationId),
-                certResolver: domain.certResolver,
-                dialHost,
-                dialPort: privately
-                    ? (pinnedPort ?? containerPortOf({ ...domain.application, domains: [domain] }))
-                    : hostPortForApp(dialTarget(domain, isolated)),
-                ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
-                ...canaryRoute(
-                    edgeOf.get(domain.applicationId)?.edge?.canary,
-                    liveCanaries,
-                    own ? domain.application.currentDeploymentId : null,
-                    localIp
-                ),
-                asleep: domain.application.asleepSince !== null,
-                allowLists: rule.allowLists,
-                deny: rule.deny,
-                presets: rule.presets,
-                rules: rule.rules,
-                requireLogin: rule.requireLogin,
-                loginUrl,
-                loginAllowLists: rule.loginAllowLists,
-                loginDeny: rule.loginDeny,
-                browserIntegrity: rule.browserIntegrity,
-                sqlInjectionProtection: rule.sqlInjectionProtection,
-                xssProtection: rule.xssProtection,
-                emailObfuscation: rule.emailObfuscation,
-                frameAncestors: frameRuleOf(rule),
-                loginKeys
-            });
+            localRoutes.push(
+                withPrivateAccess(
+                    {
+                        id: domain.id,
+                        hostname: domain.hostname,
+                        pathPrefix: domain.pathPrefix ?? undefined,
+                        ...edgeOf.get(domain.applicationId),
+                        certResolver: domain.certResolver,
+                        dialHost,
+                        dialPort: privately
+                            ? (pinnedPort ??
+                              containerPortOf({ ...domain.application, domains: [domain] }))
+                            : hostPortForApp(dialTarget(domain, isolated)),
+                        ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
+                        ...canaryRoute(
+                            edgeOf.get(domain.applicationId)?.edge?.canary,
+                            liveCanaries,
+                            own ? domain.application.currentDeploymentId : null,
+                            localIp
+                        ),
+                        asleep: domain.application.asleepSince !== null,
+                        allowLists: rule.allowLists,
+                        deny: rule.deny,
+                        presets: rule.presets,
+                        rules: rule.rules,
+                        requireLogin: rule.requireLogin,
+                        loginUrl,
+                        loginAllowLists: rule.loginAllowLists,
+                        loginDeny: rule.loginDeny,
+                        browserIntegrity: rule.browserIntegrity,
+                        sqlInjectionProtection: rule.sqlInjectionProtection,
+                        xssProtection: rule.xssProtection,
+                        emailObfuscation: rule.emailObfuscation,
+                        frameAncestors: frameRuleOf(rule),
+                        loginKeys
+                    },
+                    parsePrivateAccess(domain.privateAccess)
+                )
+            );
         }
         for (const app of localTunnelApps) {
             const rule = waf.get(app.id) ?? emptyWaf;
@@ -1637,6 +1650,7 @@ type RoutableDomain = {
     id: string;
     hostname: string;
     pathPrefix: string | null;
+    privateAccess: string | null;
     certResolver: string;
     targetPort: number;
     servedBy: string;
@@ -1727,49 +1741,52 @@ async function pushRemoteRoutes(
                         ),
                         serving.get(domain.application.currentDeploymentId ?? "")
                     );
-                    return {
-                        id: domain.id,
-                        hostname: domain.hostname,
-                        pathPrefix: domain.pathPrefix ?? undefined,
-                        ...edgeOf.get(domain.applicationId),
-                        certResolver: domain.certResolver,
-                        // The container itself, by name, on the proxy network both
-                        // it and that server's edge are on. Never a published host
-                        // port: the edge is a container, and the host is not a name
-                        // it can be relied on to have. The serving release's own
-                        // names: ranked above both releases' labels, this is what
-                        // moves that server's edge from the old copies to the new
-                        // ones, once the new ones are serving (see `edgeDialName`).
-                        dialHost: name,
-                        dialPort: domain.targetPort,
-                        ...balancedOver(
-                            copiesOf(
-                                domain.application,
-                                name,
-                                serving.get(domain.application.currentDeploymentId ?? "")
+                    return withPrivateAccess(
+                        {
+                            id: domain.id,
+                            hostname: domain.hostname,
+                            pathPrefix: domain.pathPrefix ?? undefined,
+                            ...edgeOf.get(domain.applicationId),
+                            certResolver: domain.certResolver,
+                            // The container itself, by name, on the proxy network both
+                            // it and that server's edge are on. Never a published host
+                            // port: the edge is a container, and the host is not a name
+                            // it can be relied on to have. The serving release's own
+                            // names: ranked above both releases' labels, this is what
+                            // moves that server's edge from the old copies to the new
+                            // ones, once the new ones are serving (see `edgeDialName`).
+                            dialHost: name,
+                            dialPort: domain.targetPort,
+                            ...balancedOver(
+                                copiesOf(
+                                    domain.application,
+                                    name,
+                                    serving.get(domain.application.currentDeploymentId ?? "")
+                                ),
+                                edgeOf.get(domain.applicationId)?.edge
                             ),
-                            edgeOf.get(domain.applicationId)?.edge
-                        ),
-                        allowLists: rule?.allowLists ?? [],
-                        deny: rule?.deny ?? [],
-                        presets: rule?.presets ?? [],
-                        rules: rule?.rules ?? [],
-                        requireLogin: rule?.requireLogin ?? false,
-                        loginUrl,
-                        loginAllowLists: rule?.loginAllowLists ?? [],
-                        loginDeny: rule?.loginDeny ?? [],
-                        browserIntegrity: rule?.browserIntegrity ?? false,
-                        sqlInjectionProtection: rule?.sqlInjectionProtection ?? true,
-                        xssProtection: rule?.xssProtection ?? true,
-                        // Never on a pushed remote route: rewriting a response means
-                        // dialling that server's guard instead of the container, and
-                        // Polaris cannot see whether it is listening. See
-                        // `router-remote`.
-                        emailObfuscation: false,
-                        // The fallback header only, for the same reason.
-                        frameAncestors: rule ? frameRuleOf(rule) : [],
-                        loginKeys
-                    } satisfies AppRoute;
+                            allowLists: rule?.allowLists ?? [],
+                            deny: rule?.deny ?? [],
+                            presets: rule?.presets ?? [],
+                            rules: rule?.rules ?? [],
+                            requireLogin: rule?.requireLogin ?? false,
+                            loginUrl,
+                            loginAllowLists: rule?.loginAllowLists ?? [],
+                            loginDeny: rule?.loginDeny ?? [],
+                            browserIntegrity: rule?.browserIntegrity ?? false,
+                            sqlInjectionProtection: rule?.sqlInjectionProtection ?? true,
+                            xssProtection: rule?.xssProtection ?? true,
+                            // Never on a pushed remote route: rewriting a response means
+                            // dialling that server's guard instead of the container, and
+                            // Polaris cannot see whether it is listening. See
+                            // `router-remote`.
+                            emailObfuscation: false,
+                            // The fallback header only, for the same reason.
+                            frameAncestors: rule ? frameRuleOf(rule) : [],
+                            loginKeys
+                        } satisfies AppRoute,
+                        parsePrivateAccess(domain.privateAccess)
+                    );
                 });
                 await new RemoteRouter({
                     address: connection.address,
@@ -1907,6 +1924,63 @@ export async function setApplicationDomainEnabled(
     });
     if (result.count === 0) throw new Error("Domain not found");
     await syncAppRoutes().catch(() => undefined);
+}
+
+/** Make one address private (only people signed in and allowed in reach it) or
+ *  public again (`null`), and republish the edge so it takes effect now. Whether the
+ *  edge took it comes back; a setting it did not is still stored and goes out with
+ *  the next publish. */
+export async function setApplicationDomainPrivate(
+    domainId: string,
+    ownerId: string,
+    access: PrivateAccess | null
+): Promise<{ published: boolean }> {
+    const result = await prisma.domain.updateMany({
+        where: { id: domainId, application: { environment: { project: { ownerId } } } },
+        data: { privateAccess: storePrivateAccess(access) }
+    });
+    if (result.count === 0) throw new Error("Domain not found");
+    try {
+        await syncAppRoutes();
+        return { published: true };
+    } catch (error) {
+        console.error(
+            `polaris: could not publish the private setting of domain ${domainId}:`,
+            error
+        );
+        return { published: false };
+    }
+}
+
+/**
+ * Every private rule on the host a visitor is headed for, with the project each one
+ * belongs to - what `/edge/authorize` decides a private address against.
+ *
+ * All of them, not the best match: the token minted for a host is good on every
+ * path of it and under both the exact name and the wildcard that covers it, so one
+ * public row beside a private one (a public `/` and a private `/admin`, or a public
+ * `api.example.com/v1` under a private `*.example.com`) must not decide the host as
+ * public. Empty when nothing on the host is private.
+ */
+export async function privateDomainsForHost(
+    host: string
+): Promise<{ access: PrivateAccess; projectId: string }[]> {
+    const name = host.trim().toLowerCase();
+    if (!name) return [];
+    const dot = name.indexOf(".");
+    const names = dot > 0 ? [name, `*.${name.slice(dot + 1)}`] : [name];
+    const rows = await prisma.domain.findMany({
+        where: { enabled: true, hostname: { in: names }, privateAccess: { not: null } },
+        select: {
+            privateAccess: true,
+            application: { select: { environment: { select: { projectId: true } } } }
+        },
+        take: 100
+    });
+    return rows.flatMap((row) => {
+        const access = parsePrivateAccess(row.privateAccess);
+        return access ? [{ access, projectId: row.application.environment.projectId }] : [];
+    });
 }
 
 /**
@@ -2829,6 +2903,11 @@ async function buildAppPlan(
                   loginKeys: resolvedWaf.requireLogin ? await edgeLoginKeys() : undefined
               }
             : undefined;
+    // A private address keeps asking for a sign-in on the route its labels draw, so
+    // it stays closed whenever the edge's own route for it is missing.
+    const privateLogin = app.domains.some((domain) => parsePrivateAccess(domain.privateAccess))
+        ? { loginUrl: await appBaseUrl(), loginKeys: await edgeLoginKeys() }
+        : null;
 
     // Publish the app on a stable host port so it is reachable over the host's IP
     // (intranet) with no proxy. The container port is the app's stored listening
@@ -3005,12 +3084,28 @@ async function buildAppPlan(
                     domain.enabled &&
                     (kept ? domain.deploymentId === release.id : domain.deploymentId === null)
             )
-            .map((domain) => ({
-                hostname: domain.hostname,
-                targetPort: domain.targetPort,
-                pathPrefix: domain.pathPrefix ?? undefined,
-                certResolver: domain.certResolver as "le" | "internal" | "none"
-            })),
+            .map((domain) => {
+                const access = parsePrivateAccess(domain.privateAccess);
+                return {
+                    hostname: domain.hostname,
+                    targetPort: domain.targetPort,
+                    pathPrefix: domain.pathPrefix ?? undefined,
+                    certResolver: domain.certResolver as "le" | "internal" | "none",
+                    ...(access && privateLogin
+                        ? {
+                              waf: withPrivateAccess(
+                                  {
+                                      ...resolvedWaf,
+                                      frameAncestors: frameRuleOf(resolvedWaf),
+                                      challenge,
+                                      ...privateLogin
+                                  },
+                                  access
+                              )
+                          }
+                        : {})
+                };
+            }),
         volumes: app.volumes.map((volume) => ({
             mountPath: volume.mountPath,
             ...volumeMountSource(volume)

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { parsePrivateAccess } from "@/lib/deploy/private-domain";
 import type { AppDomain } from "../domain-rank";
 import { ProjectDetail } from "../project-detail";
 import { getPublicIp } from "@/lib/domain-service";
@@ -182,6 +183,7 @@ export default async function DeployProjectPage({
                             // Whether one was supplied, never the material itself: the
                             // panel only needs to say which certificate is in use.
                             hasCertificate: domain.certPem !== null,
+                            privateAccess: parsePrivateAccess(domain.privateAccess),
                             servedBy: domain.servedBy,
                             cdn: domain.cdn,
                             // What the edge dials for it: its own port where one was

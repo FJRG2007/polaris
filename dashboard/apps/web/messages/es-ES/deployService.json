@@ -423,6 +423,24 @@
         "close": "Cerrar",
         "empty": "Vaciar caché"
     },
+    "private": {
+        "title": "Dirección privada",
+        "open": "Privada: solo quien tú permitas",
+        "public": "Pública: cualquiera puede abrirla",
+        "description": "Quien visite {hostname} inicia sesión en Polaris antes. El resto ve una página de acceso denegado.",
+        "toggle": "Solo personas permitidas",
+        "members": "Miembros de este proyecto",
+        "membersHint": "Se comprueba cada 15 minutos; quien deje el proyecto pierde el acceso al poco.",
+        "named": "Permitir también a estas personas, grupos y roles",
+        "needsAudience": "Elige quién puede abrir esta dirección.",
+        "save": "Guardar",
+        "close": "Cerrar",
+        "saved": "Guardado. Se aplica en unos segundos.",
+        "savedUnpublished": "Guardado, pero aún sin aplicar. Vuelve a guardar en un momento.",
+        "noManage": "No puedes cambiar los dominios de este proyecto.",
+        "namedEmpty": "Nadie añadido. Elige un rol, un grupo o una persona para dejarle entrar.",
+        "namedFilled": "Estos también entran, sean o no miembros."
+    },
     "fix": {
         "startCommand": "Comando de inicio",
         "buildCommand": "Comando de compilación (o vacío)",

@@ -58,12 +58,17 @@ export function DomainCdnButton({
         setError(null);
         setDone(null);
         startTransition(async () => {
-            const result = await purgeDomainCacheAction({ domainId, ...(prefix.trim() ? { prefix: prefix.trim() } : {}) });
+            const result = await purgeDomainCacheAction({
+                domainId,
+                ...(prefix.trim() ? { prefix: prefix.trim() } : {})
+            });
             if (result.error) setError(result.error);
             else
                 setDone(
                     prefix.trim()
-                        ? t("cdn.emptiedPath", { path: `${hostname}/${prefix.trim().replace(/^\/+/, "")}` })
+                        ? t("cdn.emptiedPath", {
+                              path: `${hostname}/${prefix.trim().replace(/^\/+/, "")}`
+                          })
                         : t("cdn.emptied", { hostname })
                 );
         });
@@ -78,7 +83,7 @@ export function DomainCdnButton({
                 aria-label="Cloudflare CDN"
                 onClick={() => setOpen(true)}
                 className={cn(
-                    "shrink-0 rounded p-0.5 transition-colors hover:text-foreground",
+                    "shrink-0 rounded p-1 transition-colors hover:text-foreground",
                     enabled ? "text-primary" : "text-muted-foreground"
                 )}
             >
@@ -89,13 +94,16 @@ export function DomainCdnButton({
                     <DialogHeader>
                         {/* i18n-ignore: a product name */}
                         <DialogTitle>Cloudflare CDN</DialogTitle>
-                        <DialogDescription>
-                            {t("cdn.description", { hostname })}
-                        </DialogDescription>
+                        <DialogDescription>{t("cdn.description", { hostname })}</DialogDescription>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
                         <label className="flex items-center gap-2 text-sm">
-                            <Switch checked={enabled} disabled={pending} onChange={toggle} aria-label={t("cdn.serve")} />
+                            <Switch
+                                checked={enabled}
+                                disabled={pending}
+                                onChange={toggle}
+                                aria-label={t("cdn.serve")}
+                            />
                             {enabled ? t("cdn.served") : t("cdn.notServed")}
                         </label>
                         {enabled ? (
@@ -109,7 +117,9 @@ export function DomainCdnButton({
                                     placeholder={t("cdn.pathPlaceholder")}
                                 />
                                 {prefix.trim() && !valid.success ? (
-                                    <p className="text-xs text-warning">{valid.error.issues[0]?.message}</p>
+                                    <p className="text-xs text-warning">
+                                        {valid.error.issues[0]?.message}
+                                    </p>
                                 ) : null}
                             </div>
                         ) : null}
@@ -122,7 +132,8 @@ export function DomainCdnButton({
                         </Button>
                         {enabled ? (
                             <Button disabled={pending || !valid.success} onClick={purge}>
-                                {pending ? <Loader2 className="size-4 animate-spin" /> : null} {t("cdn.empty")}
+                                {pending ? <Loader2 className="size-4 animate-spin" /> : null}{" "}
+                                {t("cdn.empty")}
                             </Button>
                         ) : null}
                     </DialogFooter>
