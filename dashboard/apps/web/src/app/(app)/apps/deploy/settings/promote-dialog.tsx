@@ -161,7 +161,7 @@ export function PromoteDialog({
                     {plan === null && !error ? (
                         <div className="h-20 animate-pulse rounded-md bg-muted" aria-hidden />
                     ) : plan ? (
-                        <div className="flex max-h-64 min-w-0 flex-col gap-2 overflow-y-auto rounded-md border border-border/60 p-3 text-sm">
+                        <div className="flex max-h-64 min-w-0 flex-col gap-2 overflow-y-auto overscroll-contain rounded-md border border-border/60 p-3 text-sm">
                             <p className="font-medium">{t("promotion.overwrites", { name: target?.name ?? "" })}</p>
                             {plan.services.length === 0 && (!includeData || plan.databases.length === 0) ? (
                                 <p className="text-muted-foreground">{t("promotion.nothing")}</p>
