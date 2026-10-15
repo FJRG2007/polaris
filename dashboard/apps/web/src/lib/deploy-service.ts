@@ -4764,6 +4764,9 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
         await notifyDeployFinished({ deploymentId, ownerId, ok: false }).catch(() => undefined);
 }
 
+/** Services read per page when repairing pointers at startup. */
+const REPOINT_BATCH = 500;
+
 /**
  * Put back the release a cancelled deploy displaced on record.
  *
@@ -4773,11 +4776,27 @@ export async function cancelDeployment(deploymentId: string, ownerId: string): P
  * still running; one with none keeps the pointer and reads as not running.
  */
 async function repointCancelledReleases(): Promise<void> {
-    const apps = await prisma.application.findMany({
-        where: { currentDeploymentId: { not: null } },
-        select: { id: true, currentDeploymentId: true }
-    });
-    if (apps.length === 0) return;
+    let cursor: string | undefined;
+    for (;;) {
+        const apps = await prisma.application.findMany({
+            where: {
+                currentDeploymentId: { not: null },
+                ...(cursor ? { id: { gt: cursor } } : {})
+            },
+            select: { id: true, currentDeploymentId: true },
+            orderBy: { id: "asc" },
+            take: REPOINT_BATCH
+        });
+        if (apps.length === 0) return;
+        cursor = apps[apps.length - 1]?.id;
+        await repointBatch(apps);
+        if (apps.length < REPOINT_BATCH) return;
+    }
+}
+
+async function repointBatch(
+    apps: readonly { id: string; currentDeploymentId: string | null }[]
+): Promise<void> {
     const cancelled = new Set(
         (
             await prisma.deployment.findMany({

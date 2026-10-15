@@ -38,7 +38,7 @@ export const BIN_RETENTION_KEY = "deploy.recycleBin.days";
 export { DEFAULT_BIN_DAYS, binDaysSchema, binPolicySchema, type BinPolicy };
 /** Items purged per scheduled pass, so one pass never runs for long. */
 const PURGE_BATCH = 10;
-/** Scopes with a policy of their own read per purge pass. */
+/** Stored policies read per page during a purge pass. */
 const POLICY_SCAN = 5000;
 const ORG_POLICY_PREFIX = "deploy.recycleBin.org.";
 const USER_POLICY_PREFIX = "deploy.recycleBin.user.";
@@ -511,14 +511,47 @@ export function retentionGroups(
         (isOrg ? allOrgs : allUsers).push(id);
         byDays.set(days, group);
     }
-    const chose = scopeClauses(allOrgs, allUsers);
     return [
         ...[...byDays].map(([days, group]) => ({
             days,
             project: { OR: scopeClauses(group.orgIds, group.userIds) }
         })),
-        { days: fallback.days, project: chose.length > 0 ? { NOT: chose } : {} }
+        { days: fallback.days, project: unchosenScopes(allOrgs, allUsers) }
     ];
+}
+
+/** Every project whose owner has no policy of its own, never negating a nullable column. */
+function unchosenScopes(orgIds: readonly string[], userIds: readonly string[]): ProjectScopeWhere {
+    if (orgIds.length === 0 && userIds.length === 0) return {};
+    return {
+        OR: [
+            { orgId: orgIds.length > 0 ? { not: null, notIn: [...orgIds] } : { not: null } },
+            userIds.length > 0 ? { orgId: null, ownerId: { notIn: [...userIds] } } : { orgId: null }
+        ]
+    };
+}
+
+/** Every stored policy, read in pages so no owner is left to the default. */
+async function storedPolicies(): Promise<{ key: string; value: string }[]> {
+    const rows: { key: string; value: string }[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+        const page = await prisma.setting.findMany({
+            where: {
+                OR: [
+                    { key: { startsWith: ORG_POLICY_PREFIX } },
+                    { key: { startsWith: USER_POLICY_PREFIX } }
+                ],
+                ...(cursor ? { key: { gt: cursor } } : {})
+            },
+            select: { key: true, value: true },
+            orderBy: { key: "asc" },
+            take: POLICY_SCAN
+        });
+        rows.push(...page);
+        if (page.length < POLICY_SCAN) return rows;
+        cursor = page[page.length - 1]?.key;
+    }
 }
 
 /**
@@ -526,21 +559,11 @@ export function retentionGroups(
  * retention. Bounded: a few items per pass, a few reads per retention in use.
  */
 export async function purgeRecycleBin(now = new Date()): Promise<{ purged: number }> {
-    const [stored, fallback] = await Promise.all([
-        prisma.setting.findMany({
-            where: {
-                OR: [
-                    { key: { startsWith: ORG_POLICY_PREFIX } },
-                    { key: { startsWith: USER_POLICY_PREFIX } }
-                ]
-            },
-            select: { key: true, value: true },
-            take: POLICY_SCAN
-        }),
-        defaultBinPolicy()
-    ]);
+    const [stored, fallback] = await Promise.all([storedPolicies(), defaultBinPolicy()]);
     const queue: Array<[BinKind, string, string]> = [];
-    const ownerOf = { environment: { select: { project: { select: { ownerId: true } } } } } as const;
+    const ownerOf = {
+        environment: { select: { project: { select: { ownerId: true } } } }
+    } as const;
     for (const group of retentionGroups(stored, fallback)) {
         if (queue.length >= PURGE_BATCH) break;
         const expired = { binnedAt: { lt: new Date(now.getTime() - group.days * 86_400_000) } };

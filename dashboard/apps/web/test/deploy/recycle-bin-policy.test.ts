@@ -27,12 +27,15 @@ const prisma = new Proxy(
                     get: (__, method: string) => async (args: unknown) => {
                         const name = `${model}.${method}`;
                         calls.push({ name, args });
-                        if (name === "setting.findMany")
+                        const answer = respond(name, args);
+                        if (
+                            name === "setting.findMany" &&
+                            (answer === undefined || answer === null)
+                        )
                             return Object.entries(settings).map(([key, value]) => ({
                                 key,
                                 value
                             }));
-                        const answer = respond(name, args);
                         if (answer !== undefined && answer !== null) return answer;
                         return method === "findMany" ? [] : null;
                     }
@@ -165,13 +168,25 @@ describe("retention groups", () => {
             {
                 days: 30,
                 project: {
-                    NOT: [
-                        { orgId: { in: [ORG] } },
-                        { orgId: null, ownerId: { in: [USER, OTHER_USER] } }
+                    OR: [
+                        { orgId: { not: null, notIn: [ORG] } },
+                        { orgId: null, ownerId: { notIn: [USER, OTHER_USER] } }
                     ]
                 }
             }
         ]);
+    });
+
+    it("keeps personal projects in the default once only an organization chose", () => {
+        const groups = recycleBin.retentionGroups(
+            [{ key: `deploy.recycleBin.org.${ORG}`, value: '{"enabled":true,"days":7}' }],
+            { enabled: true, days: 30 }
+        );
+        expect(groups[1]).toEqual({
+            days: 30,
+            project: { OR: [{ orgId: { not: null, notIn: [ORG] } }, { orgId: null }] }
+        });
+        expect(JSON.stringify(groups)).not.toContain("NOT");
     });
 
     it("is only the default when nobody chose", () => {
@@ -196,14 +211,38 @@ describe("the scheduled purge", () => {
         const orgRead = projectReads[0]?.where as unknown as Record<string, unknown>;
         expect(orgRead.OR).toEqual([{ orgId: { in: [ORG] } }]);
         const restRead = projectReads[1]?.where as unknown as Record<string, unknown>;
-        expect(restRead.NOT).toEqual([{ orgId: { in: [ORG] } }]);
+        expect(restRead.OR).toEqual([{ orgId: { not: null, notIn: [ORG] } }, { orgId: null }]);
+    });
+
+    it("reads every stored policy, page by page, before choosing a retention", async () => {
+        const pages = [
+            Array.from({ length: 5000 }, (_, i) => ({
+                key: `deploy.recycleBin.user.u${String(i).padStart(5, "0")}`,
+                value: '{"enabled":true,"days":7}'
+            })),
+            [{ key: `deploy.recycleBin.user.${USER}`, value: '{"enabled":true,"days":90}' }]
+        ];
+        respond = (name) => (name === "setting.findMany" ? (pages.shift() ?? []) : null);
+        await recycleBin.purgeRecycleBin(NOW);
+        const settingReads = calls
+            .filter((call) => call.name === "setting.findMany")
+            .map((call) => call.args as { where: { key?: { gt: string } } });
+        expect(settingReads).toHaveLength(2);
+        expect(settingReads[1]?.where.key?.gt).toBe("deploy.recycleBin.user.u04999");
+        const cutoffs = calls
+            .filter((call) => call.name === "project.findMany")
+            .map((call) => (call.args as { where: { binnedAt: { lt: Date } } }).where.binnedAt.lt);
+        expect(cutoffs.map((lt) => lt.getTime())).toContain(NOW.getTime() - 90 * DAY);
     });
 
     it("deletes for good what one owner's retention has run out on", async () => {
         settings[`deploy.recycleBin.org.${ORG}`] = '{"enabled":true,"days":3}';
         respond = (name, args) => {
-            const where = (args as { where?: Record<string, unknown> }).where ?? {};
-            if (name === "project.findMany" && "OR" in where)
+            const where = (args as { where?: { binnedAt?: { lt: Date } } }).where;
+            if (
+                name === "project.findMany" &&
+                where?.binnedAt?.lt.getTime() === NOW.getTime() - 3 * DAY
+            )
                 return [{ id: PROJECT, ownerId: USER }];
             if (name === "project.findFirst") return { ownerId: USER };
             return null;
