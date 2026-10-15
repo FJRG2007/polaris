@@ -79,8 +79,10 @@ export interface PreflightChecks {
     readonly deployed: boolean;
     readonly running: boolean;
     /** How the target answered for the hostname when asked directly. `skipped` when it
-     *  shares the edge with the source, where asking would reach the source. */
-    readonly answers: "up" | "down" | "not-routed" | "skipped";
+     *  shares the edge with the source, where asking would reach the source; `unknown`
+     *  when nothing answered from here - a router that does not loop its own public
+     *  address back looks exactly like that, so it warns rather than stops. */
+    readonly answers: "up" | "down" | "not-routed" | "skipped" | "unknown";
     /** The code it answered with, when it answered. */
     readonly code: number | null;
     /** The address the record has to name once switched, or null when there is none. */
@@ -93,7 +95,7 @@ export interface PreflightChecks {
 export const preflightChecksSchema = z.object({
     deployed: z.boolean(),
     running: z.boolean(),
-    answers: z.enum(["up", "down", "not-routed", "skipped"]),
+    answers: z.enum(["up", "down", "not-routed", "skipped", "unknown"]),
     code: z.number().int().nullable(),
     newValue: z.string().nullable(),
     tls: z.enum(["ready", "on-switch"])
