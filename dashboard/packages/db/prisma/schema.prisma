@@ -4522,6 +4522,7 @@ model Project {
     webhooks     ProjectWebhook[]
     tokens       ApiKey[]
     telemetry    TelemetryProject[]
+    promotions   EnvironmentPromotion[]
 
     @@unique([ownerId, slug])
     @@index([ownerId])
@@ -4674,6 +4675,10 @@ model Environment {
     // network, as every environment made before this was), "environment" (a
     // private network of its own), or "links" (only services linked on the canvas).
     networkMode   String   @default("shared")
+    // production | staging | development, or null when nobody said. Null reads
+    // as production on the default environment and as nothing elsewhere, so an
+    // environment made before this keeps meaning what it meant.
+    stage         String?
     createdAt DateTime @default(now())
 
     project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -4684,6 +4689,33 @@ model Environment {
 
     @@unique([projectId, slug])
     @@index([projectId])
+}
+
+// One promotion of an environment into another: each service in the target
+// redeployed with what the same service in the source runs, and - when asked -
+// each database's contents replaced with the source's, after a restore point.
+// Names are kept as they read, so the history still says what happened once
+// either environment is gone.
+model EnvironmentPromotion {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    projectId           String    @db.Uuid
+    sourceEnvironmentId String    @db.Uuid
+    targetEnvironmentId String    @db.Uuid
+    sourceName          String
+    targetName          String
+    includeData         Boolean   @default(false)
+    // running | succeeded | partial | failed
+    status              String    @default("running")
+    // JSON array of { kind, name, outcome, detail? }, one per service or database.
+    steps               String    @default("[]")
+    actorId             String?   @db.Uuid
+    createdAt           DateTime  @default(now())
+    finishedAt          DateTime?
+
+    project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    @@index([projectId, createdAt])
+    @@index([targetEnvironmentId, status])
 }
 
 // A way through from one project into another: the application `sourceId` may
