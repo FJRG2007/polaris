@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { decodeGuardRule } from "@polaris/core/waf";
 import { renderDynamicConfig, type AppRoute } from "@/lib/deploy/router";
 import {
+    PRIVATE_TOKEN_TTL_SECONDS,
     domainPrivateInputSchema,
     parsePrivateAccess,
     privateVerdict,
@@ -71,6 +72,8 @@ describe("a private address in the routing file", () => {
         expect(rule?.loginUrl).toBe("https://polaris.example.com");
         // Members are decided at sign-in, never by a list the guard would enforce.
         expect(rule?.loginAllowLists ?? []).toEqual([]);
+        // And the guard refuses a token older than that decision, whatever it says.
+        expect(rule?.loginMaxAge).toBe(PRIVATE_TOKEN_TTL_SECONDS);
     });
 
     it("carries a named list and the refusals to the guard when members are not admitted", () => {
