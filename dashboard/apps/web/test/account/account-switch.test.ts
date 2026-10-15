@@ -60,6 +60,7 @@ function seedTraces(): void {
     window.localStorage.setItem("polaris.search.recent", '["salary"]');
     window.localStorage.setItem("polaris.place.drive", "/drive/f/ana");
     window.localStorage.setItem("polaris.apps.usage", "{}");
+    window.localStorage.setItem("polaris.apps.usage.menu", '{"usage":{},"at":0}');
     window.localStorage.setItem("polaris.mail.announced", "x");
     window.localStorage.setItem("polaris.chat.drafts", '{"c1":"see you at"}');
     window.localStorage.setItem("polaris.tasks.clipboard", '["Pay rent"]');

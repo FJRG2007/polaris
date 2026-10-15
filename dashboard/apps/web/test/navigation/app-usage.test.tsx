@@ -17,7 +17,10 @@ let pathname = "/drive";
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
 
 const { VisitRecorder } = await import("@/components/overview/visit-recorder");
-const { readAppUsage, rememberAppOpen } = await import("@/lib/app-usage");
+const { MENU_ORDER_HOLD_MS, readAppUsage, readMenuUsage, rememberAppOpen } = await import(
+    "@/lib/app-usage"
+);
+const { launcherOrder } = await import("@/lib/app-launcher");
 
 const KEY = "polaris.apps.usage";
 
@@ -103,5 +106,50 @@ describe("the app usage history", () => {
         expect(readAppUsage()).toEqual({});
         expect(() => rememberAppOpen("chat")).not.toThrow();
         expect(() => render(<VisitRecorder />)).not.toThrow();
+    });
+});
+
+describe("the order the menu shows", () => {
+    const apps = ["chat", "drive", "mail", "tasks"];
+    const order = (now: number) => {
+        const { usage, at } = readMenuUsage(now);
+        return launcherOrder({ available: apps, favorites: [], usage, now: at });
+    };
+
+    it("holds still while the reader opens apps, and follows use the next day", () => {
+        const start = Date.UTC(2026, 9, 15, 9);
+        window.localStorage.setItem(KEY, "{}");
+        rememberAppOpen("mail");
+        const first = order(start);
+
+        // Opening other apps over and over does not move a tile today.
+        for (let i = 0; i < 5; i += 1) rememberAppOpen("tasks");
+        rememberAppOpen("chat");
+        expect(order(start + 60_000)).toEqual(first);
+        expect(order(start + MENU_ORDER_HOLD_MS - 1)).toEqual(first);
+
+        // A day later it has caught up with what was used most.
+        expect(order(start + MENU_ORDER_HOLD_MS)[0]).toBe("tasks");
+    });
+
+    it("takes a fresh copy when the held one is unreadable", () => {
+        window.localStorage.setItem(KEY, "{}");
+        window.localStorage.setItem("polaris.apps.usage.menu", "{not json");
+        rememberAppOpen("drive");
+        expect(order(Date.now())[0]).toBe("drive");
+    });
+
+    it("still orders when storage refuses to be read", () => {
+        stubStorage({
+            getItem: () => {
+                throw new Error("blocked");
+            },
+            setItem: () => {
+                throw new Error("blocked");
+            },
+            removeItem: () => undefined,
+            clear: () => undefined
+        });
+        expect(order(Date.now())).toEqual(apps);
     });
 });

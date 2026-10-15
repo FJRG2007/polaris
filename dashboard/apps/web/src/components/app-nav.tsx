@@ -31,7 +31,7 @@ import * as nav from "@/lib/apps";
 import { useEffect, useState } from "react";
 import { readPlace } from "@/lib/last-place";
 import { usePathname } from "next/navigation";
-import { readAppUsage } from "@/lib/app-usage";
+import { readMenuUsage } from "@/lib/app-usage";
 import { ArrowUpDown, CheckCheck, Store } from "lucide-react";
 import { badgeLabel } from "@/lib/notification-badge";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
@@ -94,7 +94,7 @@ export function AppNav({
             if (place) found[app.id] = place;
         }
         setPlaces(found);
-        setUsage({ usage: readAppUsage(), at: Date.now() });
+        setUsage(readMenuUsage());
     }, [pathname]);
 
     const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
