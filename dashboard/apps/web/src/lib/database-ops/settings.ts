@@ -170,7 +170,7 @@ export async function setDatabaseLimits(
     if (row.parentId) throw new DatabaseOperationError("This database lives inside another instance; change the instance.");
     if (row.cpuLimit === limits.cpus && row.memoryLimitMb === limits.memoryMb) return { deploymentId: null };
     await quota.assertOrgReservation(
-        await quota.orgIdOfDatabase(databaseId),
+        () => quota.orgIdOfDatabase(databaseId),
         {
             cpus: quotas.reservationOf(row.cpuLimit, row.members),
             memoryMb: quotas.reservationOf(row.memoryLimitMb, row.members)

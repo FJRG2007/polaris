@@ -226,7 +226,14 @@ describe("saving a new count", () => {
     };
 
     beforeEach(() => {
-        Object.assign(prisma, { application: { findFirst: async () => app, update: async () => app } });
+        Object.assign(prisma, {
+            application: {
+                findFirst: async () => app,
+                update: async () => app,
+                // A personal service: no organization, so no caps.
+                findUnique: async () => ({ environment: { project: { orgId: null } } })
+            }
+        });
         vi.mocked(syncAppRoutes).mockResolvedValue(undefined);
         vi.mocked(restartFromKeptImage).mockClear();
     });

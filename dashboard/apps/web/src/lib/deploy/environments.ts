@@ -222,7 +222,7 @@ export async function cloneEnvironment(
             // The copy takes on its original's limits, so it is held to the
             // organization's caps on what those reserve.
             await quota.assertOrgReservation(
-                await quota.orgIdOfEnvironment(environment.id),
+                () => quota.orgIdOfEnvironment(environment.id),
                 { cpus: 0, memoryMb: 0 },
                 {
                     cpus: quotas.reservationOf(application.cpuLimit, application.replicas),

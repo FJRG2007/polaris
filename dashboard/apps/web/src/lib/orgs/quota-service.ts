@@ -212,17 +212,22 @@ export interface Reservation {
  * Refuse a service or database growing what it reserves past the organization's
  * caps. `previous` is what it reserved before the change (zero for a new one)
  * and `exclude` names it, so it is not counted twice. Shrinking always passes.
+ * `org` is the organization, or a lookup of it that only runs when something
+ * grows.
  */
 export async function assertOrgReservation(
-    orgId: string | null | undefined,
+    org: string | null | undefined | (() => Promise<string | null>),
     previous: Reservation,
     next: Reservation,
     exclude: ReservationExclusion = {}
 ): Promise<void> {
+    // A change that grows nothing is never refused, so it costs no read at all -
+    // not even the organization's, which a caller may pass as a lookup.
+    if (next.cpus <= previous.cpus && next.memoryMb <= previous.memoryMb) return;
+    const orgId = typeof org === "function" ? await org() : org;
     if (!orgId) return;
     const quota = await getOrgQuota(orgId);
     if (!quota || (quota.cpus === null && quota.memoryMb === null)) return;
-    if (next.cpus <= previous.cpus && next.memoryMb <= previous.memoryMb) return;
     const others = await reservedByOrg(orgId, exclude);
     for (const dimension of quotas.ORG_QUOTA_RESERVATIONS) {
         const limit = quota[dimension];

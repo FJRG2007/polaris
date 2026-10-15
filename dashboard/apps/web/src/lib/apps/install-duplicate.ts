@@ -188,7 +188,7 @@ export async function createInstallCopy(
     // organization's caps before anything is made; the service count is checked
     // by `createApplication` itself.
     await quota.assertOrgReservation(
-        await quota.orgIdOfEnvironment(source.environmentId),
+        () => quota.orgIdOfEnvironment(source.environmentId),
         { cpus: 0, memoryMb: 0 },
         {
             cpus: quotas.reservationOf(source.cpuLimit, source.replicas),
