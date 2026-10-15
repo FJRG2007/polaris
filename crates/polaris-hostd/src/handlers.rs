@@ -15,6 +15,7 @@ use serde::Deserialize;
 use crate::config::Config;
 use crate::deploy::{self, DeploySpec};
 use crate::docker;
+use crate::host_security;
 use crate::http::{Request, Response};
 use crate::networks;
 use crate::security::{self, PathError};
@@ -264,6 +265,8 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/networks/cut") => deploy_networks_cut(state, req, body),
         ("POST", "/v1/deploy/dirs") => deploy_dirs_list(state),
         ("POST", "/v1/deploy/dirs/remove") => deploy_dirs_remove(state, req, body),
+        ("POST", "/v1/host/security") => host_security_run(req, body),
+        ("POST", "/v1/host/security/image") => host_security_image(req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
         }
@@ -1312,6 +1315,84 @@ fn deploy_volume_wipe<R: Read>(req: &Request, body: &mut R) -> Response {
     match deploy::exec_run(&request.container, &argv, None, true) {
         Ok(reader) => stream_response(reader),
         Err(_) => Response::text(502, "Bad Gateway", "could not wipe the volume"),
+    }
+}
+
+/// Run one host-level security action (the hardening audit or the automatic
+/// updates switch) and answer what it printed. The body names the action and
+/// nothing else; the command is fixed in `host_security`. 409 while another is
+/// still running.
+fn host_security_run<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: host_security::HostSecurityRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid host security request"),
+    };
+    match host_security::run(request.action) {
+        Ok(Some(run)) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "exitCode": run.exit_code, "output": run.output }),
+        ),
+        Ok(None) => Response::text(409, "Conflict", "another host scan is still running"),
+        Err(_) => Response::text(502, "Bad Gateway", "could not start the host scan"),
+    }
+}
+
+/// Export an image built here into a short-lived `polaris-secscan-image-*`
+/// volume for a scan to read, or remove that volume. Only that volume name
+/// shape and a plain image reference are accepted; the commands are fixed.
+fn host_security_image<R: Read>(req: &Request, body: &mut R) -> Response {
+    let raw = match read_control_body(req, body) {
+        Ok(b) => b,
+        Err(resp) => return resp,
+    };
+    let request: host_security::ImageExportRequest = match serde_json::from_slice(&raw) {
+        Ok(r) => r,
+        Err(_) => return Response::bad_request("invalid image export request"),
+    };
+    if request.action == host_security::ExportAction::List {
+        return match host_security::list_exports() {
+            Some(volumes) => Response::json(200, "OK", &serde_json::json!({ "volumes": volumes })),
+            None => Response::text(502, "Bad Gateway", "could not list export volumes"),
+        };
+    }
+    if !host_security::valid_export_volume(&request.volume) {
+        return Response::bad_request("invalid export volume");
+    }
+    match request.action {
+        host_security::ExportAction::List => unreachable!("answered above"),
+        host_security::ExportAction::Remove => {
+            if host_security::remove_export(&request.volume) {
+                Response::json(200, "OK", &serde_json::json!({ "removed": true }))
+            } else {
+                Response::text(502, "Bad Gateway", "could not remove the export volume")
+            }
+        }
+        host_security::ExportAction::Export => {
+            let image = match request.image.as_deref() {
+                Some(image) if host_security::valid_export_image(image) => image,
+                _ => return Response::bad_request("invalid image reference"),
+            };
+            match host_security::export_image(image, &request.volume) {
+                Ok(size) => Response::json(200, "OK", &serde_json::json!({ "size": size })),
+                Err(host_security::ExportError::Busy) => {
+                    Response::text(409, "Conflict", "another host scan is still running")
+                }
+                Err(host_security::ExportError::NoImage) => {
+                    Response::text(404, "Not Found", "no such image on this host")
+                }
+                Err(host_security::ExportError::NoRoom) => {
+                    Response::text(507, "Insufficient Storage", "not enough free disk")
+                }
+                Err(host_security::ExportError::Failed) => {
+                    Response::text(502, "Bad Gateway", "could not export the image")
+                }
+            }
+        }
     }
 }
 

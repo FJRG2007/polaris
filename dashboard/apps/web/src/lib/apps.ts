@@ -419,6 +419,20 @@ export const POLARIS_APPS: AppEntry[] = [
         permission: "deploy.read"
     },
     {
+        /**
+         * Malware, file changes, host hardening and image vulnerabilities on
+         * the servers Polaris runs. Installable: no entry until it is.
+         */
+        id: "security-scans",
+        category: "infrastructure",
+        label: "Security scans", // i18n-ignore
+        description: "Malware, file changes, host hardening and image vulnerabilities", // i18n-ignore
+        icon: ShieldCheck,
+        href: "/security",
+        permission: "system.manage",
+        requiresApp: "security-scans"
+    },
+    {
         id: "admin",
         category: "infrastructure",
         label: "Management", // i18n-ignore

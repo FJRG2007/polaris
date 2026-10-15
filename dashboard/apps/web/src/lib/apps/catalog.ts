@@ -18,6 +18,7 @@ import {
     Gamepad2,
     Handshake,
     Activity,
+    ShieldCheck,
     House,
     Mails,
     MessagesSquare,
@@ -318,6 +319,25 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Public pages that show whether your services are up.",
         description:
             "Publish a page that shows whether your services are up, with 90 days of uptime from HTTP, TCP, DNS and latency checks Polaris runs itself. Post incidents as they unfold and schedule maintenance ahead. Point checks at your own deployed apps or any address. Uninstalling stops the checks and keeps every page.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Malware, file changes, host hardening and image vulnerabilities on
+        // the servers Polaris runs. Installing it runs nothing and downloads
+        // nothing: every scan is a one-off container pulled the first time it
+        // is needed, and uninstalling keeps every result.
+        id: "security-scans",
+        name: "Security scans",
+        category: "Tools",
+        icon: ShieldCheck,
+        opensAt: "/security",
+        summary: "Malware, file changes, host hardening and image vulnerabilities on your servers.",
+        description:
+            "Scan app data for malware and quarantine what is found, record file fingerprints and see what changed since, audit each server's own settings and switch on its automatic security updates, and check every app's image for known vulnerabilities with a downloadable software inventory. Scans run one at a time per server, on demand or on a schedule, and nothing keeps running between them.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",
