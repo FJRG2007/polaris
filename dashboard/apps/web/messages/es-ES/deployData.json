@@ -9,7 +9,9 @@
             "copy": "Importar datos",
             "buckets": "Buckets",
             "activity": "Actividad",
-            "database": "Base"
+            "database": "Base",
+            "users": "Usuarios",
+            "processes": "Conexiones"
         },
         "hosted": "Vive dentro de {host}. Su versión y sus ajustes son los de la instancia.",
         "anotherInstance": "otra instancia",
@@ -232,7 +234,55 @@
             "deleteTitle": "Borrar bucket"
         },
         "fullScreen": "Ampliar",
-        "exitFullScreen": "Ventana normal"
+        "exitFullScreen": "Ventana normal",
+        "users": {
+            "title": "Cuentas",
+            "hint": "Quién entra en esta instancia y a qué bases de datos llega cada uno.",
+            "name": "Cuenta",
+            "namePlaceholder": "informes",
+            "nameInvalid": "Minúsculas, dígitos y guiones bajos; empieza por una letra.",
+            "nameReserved": "Ese nombre es del motor. Elige otro.",
+            "add": "Añadir cuenta",
+            "created": "{name} está lista. Copia la contraseña:",
+            "shownOnce": "Es la única vez que se muestra la contraseña.",
+            "dismiss": "Cerrar",
+            "unreadable": "No se leyeron las cuentas.",
+            "retry": "Reintentar",
+            "empty": "Aún no hay cuentas.",
+            "protected": "Gestionada por Polaris",
+            "grant": "Dar acceso",
+            "grantConfirm": "Dar acceso",
+            "noDatabases": "No hay ninguna base de datos que dar.",
+            "noAccess": "Sin bases de datos.",
+            "remove": "Quitar {name}",
+            "removeTitle": "¿Quitar {name}?",
+            "removeBody": "Las apps que entran con ella dejan de conectar. Los datos quedan.",
+            "removeConfirm": "Quitar",
+            "revoke": "Quitar acceso a {database}",
+            "revokeTitle": "¿Quitar acceso a {database}?",
+            "revokeBody": "{name} ya no puede leer ni cambiar {database}.",
+            "revokeConfirm": "Quitar acceso",
+            "database": "Base de datos",
+            "access": "Acceso",
+            "privileges": {
+                "owner": "Total",
+                "readwrite": "Leer y escribir",
+                "readonly": "Solo lectura"
+            }
+        },
+        "processes": {
+            "title": "Conexiones abiertas",
+            "hint": "Las {count} más largas; se actualiza cada pocos segundos.",
+            "unreadable": "No se leyeron las conexiones.",
+            "empty": "No hay nada conectado.",
+            "self": "Esta lista",
+            "system": "sistema",
+            "seconds": "{seconds} s",
+            "kill": "Cerrar",
+            "killTitle": "¿Cerrar la conexión #{id}?",
+            "killBody": "Lo que ejecuta {user} se cancela y la app tiene que reconectar.",
+            "killConfirm": "Cerrar conexión"
+        }
     },
     "volume": {
         "tabs": {

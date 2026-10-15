@@ -33,6 +33,7 @@ import {
     Trash2
 } from "lucide-react";
 import { DatabaseWorkspace } from "./database-workspace";
+import { ProcessesSection, UsersSection, hasAccountTabs } from "./database-accounts-panel";
 import {
     Badge,
     Button,
@@ -57,6 +58,8 @@ type Tab =
     | "database"
     | "versions"
     | "settings"
+    | "users"
+    | "processes"
     | "network"
     | "pitr"
     | "copy"
@@ -133,6 +136,12 @@ export function DatabaseManageDialog({
                   : []),
               ...(overview.redis || overview.mongo || overview.limits || overview.topology
                   ? [{ value: "settings" as const, label: t("database.tabs.settings") }]
+                  : []),
+              ...(manage && deployManage && hasAccountTabs(overview)
+                  ? [
+                        { value: "users" as const, label: t("database.tabs.users") },
+                        { value: "processes" as const, label: t("database.tabs.processes") }
+                    ]
                   : []),
               // A database inside another instance is reached through that one's container.
               ...(!overview.hosted
@@ -274,6 +283,10 @@ export function DatabaseManageDialog({
                                 <LimitsSection overview={overview} manage={manage} ask={ask} />
                                 <SettingsSection overview={overview} manage={manage} ask={ask} />
                             </div>
+                        ) : current === "users" ? (
+                            <UsersSection databaseId={database.id} manage={manage} ask={ask} />
+                        ) : current === "processes" ? (
+                            <ProcessesSection databaseId={database.id} manage={manage} ask={ask} />
                         ) : current === "network" ? (
                             <PrivateNetworkPanel kind="database" id={database.id} />
                         ) : current === "pitr" && overview.pitr ? (

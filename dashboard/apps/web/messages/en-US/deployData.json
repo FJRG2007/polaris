@@ -9,7 +9,9 @@
             "copy": "Copy data in",
             "buckets": "Buckets",
             "activity": "Activity",
-            "database": "Database"
+            "database": "Database",
+            "users": "Users",
+            "processes": "Connections"
         },
         "hosted": "Lives inside {host}. Its version and settings are the instance's.",
         "anotherInstance": "another instance",
@@ -232,7 +234,55 @@
             "deleteTitle": "Delete bucket"
         },
         "fullScreen": "Full screen",
-        "exitFullScreen": "Exit full screen"
+        "exitFullScreen": "Exit full screen",
+        "users": {
+            "title": "Accounts",
+            "hint": "Who can sign in to this instance, and which databases each one reaches.",
+            "name": "Account name",
+            "namePlaceholder": "reporting",
+            "nameInvalid": "Lowercase letters, digits and underscores, starting with a letter.",
+            "nameReserved": "That name belongs to the engine. Pick another.",
+            "add": "Add account",
+            "created": "{name} is ready. Copy its password now:",
+            "shownOnce": "This is the only time the password is shown.",
+            "dismiss": "Close",
+            "unreadable": "Could not read the accounts.",
+            "retry": "Try again",
+            "empty": "No accounts yet.",
+            "protected": "Managed by Polaris",
+            "grant": "Give access",
+            "grantConfirm": "Give access",
+            "noDatabases": "There is no database to give access to.",
+            "noAccess": "No databases yet.",
+            "remove": "Remove {name}",
+            "removeTitle": "Remove {name}?",
+            "removeBody": "Apps signing in with it stop connecting. Its data stays.",
+            "removeConfirm": "Remove",
+            "revoke": "Remove access to {database}",
+            "revokeTitle": "Remove access to {database}?",
+            "revokeBody": "{name} can no longer read or change {database}.",
+            "revokeConfirm": "Remove access",
+            "database": "Database name",
+            "access": "Access",
+            "privileges": {
+                "owner": "Full",
+                "readwrite": "Read and write",
+                "readonly": "Read only"
+            }
+        },
+        "processes": {
+            "title": "Open connections",
+            "hint": "The {count} longest-running, refreshed every few seconds.",
+            "unreadable": "Could not read the connections.",
+            "empty": "Nothing is connected.",
+            "self": "This list",
+            "system": "system",
+            "seconds": "{seconds}s",
+            "kill": "End",
+            "killTitle": "End connection #{id}?",
+            "killBody": "Whatever {user} is running is cancelled and the app has to reconnect.",
+            "killConfirm": "End connection"
+        }
     },
     "volume": {
         "tabs": {
