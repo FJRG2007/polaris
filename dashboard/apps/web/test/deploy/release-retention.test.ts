@@ -53,6 +53,19 @@ describe("what goes", () => {
         expect(gone.sort()).toEqual([1, 2, 3, 4, 5, 6].map((n) => ref(n)).sort());
     });
 
+    it("keeps no rollback target when the disk is running out, only what serves and what is pinned", () => {
+        const listed = [1, 2, 3, 4].map((n) => image(n));
+        const rows = [
+            row("d4", 4, { status: "running" }),
+            row("d3", 3),
+            row("d2", 2, { pinned: true }),
+            row("d1", 1)
+        ];
+        const { refs } = retention.protectedReleaseRefs(rows, new Map([["app-1", "d4"]]), 0);
+        const gone = retention.releaseImagesToRemove(listed, refs, NOW).map((one) => one.ref);
+        expect(gone.sort()).toEqual([ref(1), ref(3)].sort());
+    });
+
     it("removes the pin of a failed deploy the database never kept", () => {
         const listed = [image(1), image(2)];
         const rows = [row("d1", 1, { status: "running" })];

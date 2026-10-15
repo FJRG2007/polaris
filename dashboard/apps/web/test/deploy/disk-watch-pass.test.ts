@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
     settings: new Map<string, string>(),
     df: new Map<string, string | null>(),
     notified: [] as { body: string }[],
+    swept: [] as { machine?: string; window?: number }[],
     sweep: [] as {
         machine: string;
         removed: number;
@@ -45,7 +46,10 @@ vi.mock("@/lib/deploy/host-space", () => ({
 }));
 vi.mock("@/lib/deploy/release-retention", () => ({
     parseEngineSize: () => 0,
-    sweepReleaseImages: async () => state.sweep
+    sweepReleaseImages: async (machine?: string, window?: number) => {
+        state.swept.push({ machine, window });
+        return state.sweep;
+    }
 }));
 vi.mock("@/lib/deploy/server-space", () => ({
     DF_ROOT: "df",
@@ -64,6 +68,7 @@ const CRITICAL_DF =
 beforeEach(() => {
     state.settings.clear();
     state.df.clear();
+    state.swept = [];
     state.notified.length = 0;
     state.sweep = [];
     state.reclaim = () => Promise.resolve(0);
@@ -105,6 +110,12 @@ describe("freeing a disk", () => {
         state.reclaim = () => Promise.reject(new ImageStoreBusy());
         state.sweep = [{ machine: "host-1", removed: 1, freed: 500, ran: true }];
         expect(await freeDiskSpace("host-1")).toBe(500);
+    });
+
+    it("lets the rollback images go, since the disk is running out", async () => {
+        state.sweep = [{ machine: "host-1", removed: 1, freed: 500, ran: true }];
+        await freeDiskSpace("host-1");
+        expect(state.swept.at(-1)).toEqual({ machine: "host-1", window: 0 });
     });
 
     it("is nothing when it ran and found nothing", async () => {

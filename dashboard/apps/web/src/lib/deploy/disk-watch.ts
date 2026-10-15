@@ -202,14 +202,16 @@ export async function keepDiskReading(reading: DiskReading): Promise<void> {
 }
 
 /**
- * Hand back what Polaris can safely remove on one machine: release images
- * nothing can still want, then build cache and images no container is on.
+ * Hand back what Polaris can safely remove on one machine that is running out:
+ * release images nothing can still want - the earlier ones kept only for a
+ * rollback included, since only the serving and pinned ones are needed to run -
+ * then build cache and images no container is on.
  * Never a volume. Returns the bytes freed, `busy` when nothing ran because a
  * deploy is fetching or building there, or null when the machine could not be
  * reached at all.
  */
 export async function freeDiskSpace(machine: string): Promise<number | "busy" | null> {
-    const releases = await sweepReleaseImages(machine).catch(() => []);
+    const releases = await sweepReleaseImages(machine, 0).catch(() => []);
     const fromReleases = releases.reduce((sum, one) => sum + one.freed, 0);
     let busy = releases.some((one) => one.busy);
     const reclaim =
