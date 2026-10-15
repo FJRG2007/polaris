@@ -39,7 +39,9 @@ export interface GroupRights {
 
 /** Thrown for anything the caller may say on screen as it is. */
 export class VariableGroupError extends Error {
-    constructor(readonly code: "notFound" | "readOnly" | "secretLink" | "otherShelf" | "tooMany" | "taken") {
+    constructor(
+        readonly code: "notFound" | "readOnly" | "secretLink" | "otherShelf" | "tooMany" | "taken"
+    ) {
         super(code);
         this.name = "VariableGroupError";
     }
@@ -223,11 +225,17 @@ export interface LinkedGroupView {
 
 /** The groups one service links, in the order they are layered. Any project
  *  reader may see their names and keys; values stay behind the group's rights. */
-export async function linkedGroups(actor: OrgActor, applicationId: string): Promise<LinkedGroupView[]> {
+export async function linkedGroups(
+    actor: OrgActor,
+    applicationId: string
+): Promise<LinkedGroupView[]> {
     const links = await prisma.variableGroupLink.findMany({
         where: { applicationId },
         orderBy: [{ position: "asc" }, { createdAt: "asc" }],
-        select: { position: true, group: { select: { id: true, name: true, ownerId: true, orgId: true } } }
+        select: {
+            position: true,
+            group: { select: { id: true, name: true, ownerId: true, orgId: true } }
+        }
     });
     if (links.length === 0) return [];
     const keys = await prisma.envVar.findMany({
@@ -252,7 +260,9 @@ export async function linkedGroups(actor: OrgActor, applicationId: string): Prom
 }
 
 /** The project shelf one service sits on. */
-async function serviceShelf(applicationId: string): Promise<{ ownerId: string; orgId: string | null }> {
+async function serviceShelf(
+    applicationId: string
+): Promise<{ ownerId: string; orgId: string | null }> {
     const app = await prisma.application.findUnique({
         where: { id: applicationId },
         select: { environment: { select: { project: { select: { ownerId: true, orgId: true } } } } }
@@ -268,11 +278,16 @@ export async function linkableGroups(
     applicationId: string
 ): Promise<Array<{ id: string; name: string }>> {
     const shelf = await serviceShelf(applicationId);
-    const rights = await rightsOn(actor, { ownerId: shelf.orgId === null ? shelf.ownerId : actor.id, orgId: shelf.orgId });
+    const rights = await rightsOn(actor, {
+        ownerId: shelf.orgId === null ? shelf.ownerId : actor.id,
+        orgId: shelf.orgId
+    });
     if (!rights.canRead) return [];
     const rows = await prisma.variableGroup.findMany({
         where: {
-            ...(shelf.orgId === null ? { ownerId: shelf.ownerId, orgId: null } : { orgId: shelf.orgId }),
+            ...(shelf.orgId === null
+                ? { ownerId: shelf.ownerId, orgId: null }
+                : { orgId: shelf.orgId }),
             links: { none: { applicationId } }
         },
         orderBy: { name: "asc" },
@@ -300,7 +315,11 @@ async function groupsHoldingSecrets(groupIds: string[]): Promise<string[]> {
  * this refuses a group the actor cannot read, one holding a secret they could
  * not reveal, and one off the project's shelf.
  */
-export async function linkGroup(actor: OrgActor, applicationId: string, groupId: string): Promise<void> {
+export async function linkGroup(
+    actor: OrgActor,
+    applicationId: string,
+    groupId: string
+): Promise<void> {
     const group = await requireGroup(actor, groupId, "read");
     if (!group.canEdit && (await groupsHoldingSecrets([group.id])).length > 0)
         throw new VariableGroupError("secretLink");
@@ -378,7 +397,11 @@ export async function copyGroupLinks(
     const secretRows =
         options.secrets === false
             ? await prisma.envVar.findMany({
-                  where: { scopeType: "group", scopeId: { in: links.map((link) => link.groupId) }, isSecret: true },
+                  where: {
+                      scopeType: "group",
+                      scopeId: { in: links.map((link) => link.groupId) },
+                      isSecret: true
+                  },
                   select: { scopeId: true, key: true }
               })
             : [];
@@ -431,7 +454,9 @@ export async function servicesLinking(
                     id: true,
                     name: true,
                     currentDeploymentId: true,
-                    environment: { select: { name: true, project: { select: { id: true, name: true } } } }
+                    environment: {
+                        select: { name: true, project: { select: { id: true, name: true } } }
+                    }
                 }
             }
         }
@@ -439,9 +464,11 @@ export async function servicesLinking(
     const services: LinkingService[] = [];
     let hidden = 0;
     for (const { application } of rows) {
-        const access = await requireApplicationAccess(application.id, actor.id, "project.read").catch(
-            () => null
-        );
+        const access = await requireApplicationAccess(
+            application.id,
+            actor.id,
+            "project.read"
+        ).catch(() => null);
         if (!access) {
             hidden += 1;
             continue;
@@ -587,7 +614,11 @@ export async function resolvedVariables(
     for (const row of rows) {
         if (!row.isSecret) continue;
         const kind =
-            row.scopeType === "group" ? `group:${row.scopeId}` : row.scopeType === "environment" ? "environment" : "service";
+            row.scopeType === "group"
+                ? `group:${row.scopeId}`
+                : row.scopeType === "environment"
+                  ? "environment"
+                  : "service";
         secret.add(`${kind}\u0000${row.key}`);
     }
     return core.layerVariables(layers).map((one) => ({

@@ -109,7 +109,10 @@ export interface ResolvedVariable {
  * an earlier one. Answers every key once, sorted by key.
  */
 export function layerVariables(layers: readonly VariableLayer[]): ResolvedVariable[] {
-    const winners = new Map<string, { value: string | null; source: VariableSource; lost: VariableSource[] }>();
+    const winners = new Map<
+        string,
+        { value: string | null; source: VariableSource; lost: VariableSource[] }
+    >();
     for (const layer of layers) {
         for (const [key, value] of Object.entries(layer.values)) {
             const previous = winners.get(key);

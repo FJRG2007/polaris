@@ -49,7 +49,10 @@ const VIEW = {
             id: "g-1",
             name: "Payments",
             position: 0,
-            keys: [{ key: "STRIPE_KEY", isSecret: true }, { key: "REGION", isSecret: false }],
+            keys: [
+                { key: "STRIPE_KEY", isSecret: true },
+                { key: "REGION", isSecret: false }
+            ],
             canEdit: false
         }
     ],
@@ -104,16 +107,24 @@ describe("LinkedGroupsPanel", () => {
         mocks.redeployEnvScopeAction.mockResolvedValue({});
         show();
         await userEvent.click(await screen.findByRole("button", { name: /Payments/ }));
-        expect(mocks.unlinkVariableGroupAction).toHaveBeenCalledWith({ applicationId: "app-1", groupId: "g-1" });
+        expect(mocks.unlinkVariableGroupAction).toHaveBeenCalledWith({
+            applicationId: "app-1",
+            groupId: "g-1"
+        });
         const redeploy = await screen.findByRole("button", { name: /redeploy/i });
         await userEvent.click(redeploy);
         await waitFor(() =>
-            expect(mocks.redeployEnvScopeAction).toHaveBeenCalledWith({ scope: "application", scopeId: "app-1" })
+            expect(mocks.redeployEnvScopeAction).toHaveBeenCalledWith({
+                scope: "application",
+                scopeId: "app-1"
+            })
         );
     });
 
     it("says what went wrong when the service's groups cannot be read", async () => {
-        mocks.serviceVariableGroupsAction.mockResolvedValue({ error: "That variable group is not there any more." });
+        mocks.serviceVariableGroupsAction.mockResolvedValue({
+            error: "That variable group is not there any more."
+        });
         show();
         expect(await screen.findByText("That variable group is not there any more.")).toBeTruthy();
     });
@@ -163,7 +174,10 @@ describe("the projects list", () => {
         render(
             <MessagesWrapper>
                 <ProjectsGrid
-                    projects={[card("p1", "Website", ["production"]), card("p2", "Sandbox", ["staging"])]}
+                    projects={[
+                        card("p1", "Website", ["production"]),
+                        card("p2", "Sandbox", ["staging"])
+                    ]}
                     canManage={false}
                     localReady
                     viewerId="ada"

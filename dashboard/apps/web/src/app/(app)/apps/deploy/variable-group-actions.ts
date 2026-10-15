@@ -19,7 +19,11 @@ import { requirePermission } from "@/lib/session";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as groups from "@/lib/deploy/variable-groups";
-import { accessCan, requireApplicationAccess, requireProjectAccess } from "@/lib/deploy-project-access";
+import {
+    accessCan,
+    requireApplicationAccess,
+    requireProjectAccess
+} from "@/lib/deploy-project-access";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -95,7 +99,9 @@ export async function updateVariableGroupAction(input: unknown): Promise<Result>
     }
 }
 
-export async function deleteVariableGroupAction(input: unknown): Promise<Result<{ linked: number }>> {
+export async function deleteVariableGroupAction(
+    input: unknown
+): Promise<Result<{ linked: number }>> {
     const user = await requirePermission("deploy.manage");
     const parsed = z.object({ groupId: id }).safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.notFound") };
@@ -154,7 +160,11 @@ export async function serviceVariableGroupsAction(
 
 async function changeLink(
     input: unknown,
-    change: (actor: { id: string; isAdmin: boolean }, applicationId: string, groupId: string) => Promise<void>,
+    change: (
+        actor: { id: string; isAdmin: boolean },
+        applicationId: string,
+        groupId: string
+    ) => Promise<void>,
     action: string
 ): Promise<Result> {
     const user = await requirePermission("deploy.manage");
@@ -259,7 +269,11 @@ export async function serviceTagsAction(
     const parsed = z.object({ applicationId: id }).safeParse(input);
     if (!parsed.success) return { error: await reply("variableGroups.notFound") };
     try {
-        const access = await requireApplicationAccess(parsed.data.applicationId, user.id, "project.read");
+        const access = await requireApplicationAccess(
+            parsed.data.applicationId,
+            user.id,
+            "project.read"
+        );
         const app = await prisma.application.findUnique({
             where: { id: parsed.data.applicationId },
             select: { tags: true }

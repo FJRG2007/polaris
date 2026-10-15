@@ -13,7 +13,18 @@ import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { normalizeTag, TAGS_MAX } from "@polaris/core/variable-groups";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { ArrowLeft, Layers, Lock, MoreVertical, Plus, RotateCw, Tag, Trash2, Unlink, X } from "lucide-react";
+import {
+    ArrowLeft,
+    Layers,
+    Lock,
+    MoreVertical,
+    Plus,
+    RotateCw,
+    Tag,
+    Trash2,
+    Unlink,
+    X
+} from "lucide-react";
 import {
     Badge,
     Button,
@@ -136,7 +147,9 @@ export function VariableGroupsManager() {
                     ))}
                 </div>
             ) : view.groups.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">{t("groups.empty")}</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                    {t("groups.empty")}
+                </p>
             ) : (
                 <ul className="flex max-h-[60vh] flex-col divide-y divide-border overflow-y-auto rounded-md border border-border">
                     {view.groups.map((one) => (
@@ -147,7 +160,10 @@ export function VariableGroupsManager() {
                                 className="flex w-full min-w-0 items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/60"
                             >
                                 <span className="min-w-0">
-                                    <span className="block truncate text-sm font-medium" title={one.name}>
+                                    <span
+                                        className="block truncate text-sm font-medium"
+                                        title={one.name}
+                                    >
                                         {one.name}
                                     </span>
                                     {one.description && (
@@ -182,7 +198,9 @@ function GroupDetail({
     const [name, setName] = useState(group.name);
     const [description, setDescription] = useState(group.description);
     const [deployed, setDeployed] = useState(0);
-    const [usedBy, setUsedBy] = useState<{ services: LinkingService[]; hidden: number } | null>(null);
+    const [usedBy, setUsedBy] = useState<{ services: LinkingService[]; hidden: number } | null>(
+        null
+    );
     const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -198,7 +216,11 @@ function GroupDetail({
     function save(): void {
         setError(null);
         startTransition(async () => {
-            const result = await groupActions.updateVariableGroupAction({ groupId: group.id, name, description });
+            const result = await groupActions.updateVariableGroupAction({
+                groupId: group.id,
+                name,
+                description
+            });
             if (result.error) setError(result.error);
         });
     }
@@ -405,7 +427,10 @@ export function LinkedGroupsPanel({
 
     function redeploy(): void {
         startTransition(async () => {
-            const result = await redeployEnvScopeAction({ scope: "application", scopeId: applicationId });
+            const result = await redeployEnvScopeAction({
+                scope: "application",
+                scopeId: applicationId
+            });
             if (result.error) return setError(result.error);
             setChanged(false);
             setRedeploying(true);
@@ -443,9 +468,13 @@ export function LinkedGroupsPanel({
                             {view.linkable.map((one) => (
                                 <DropdownMenuItem
                                     key={one.id}
-                                    onSelect={() => change(groupActions.linkVariableGroupAction, one.id)}
+                                    onSelect={() =>
+                                        change(groupActions.linkVariableGroupAction, one.id)
+                                    }
                                 >
-                                    <span className="truncate" title={one.name}>{one.name}</span>
+                                    <span className="truncate" title={one.name}>
+                                        {one.name}
+                                    </span>
                                 </DropdownMenuItem>
                             ))}
                         </DropdownMenuContent>
@@ -470,7 +499,9 @@ export function LinkedGroupsPanel({
                     </Button>
                 </div>
             )}
-            {redeploying && <p className="text-xs text-muted-foreground">{t("groups.redeploying")}</p>}
+            {redeploying && (
+                <p className="text-xs text-muted-foreground">{t("groups.redeploying")}</p>
+            )}
             {view && view.linked.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("groups.noneLinked")}</p>
             ) : (
@@ -492,7 +523,9 @@ export function LinkedGroupsPanel({
                                         type="button"
                                         className={ICON_BUTTON}
                                         disabled={!view.canLink || pending}
-                                        onClick={() => change(groupActions.unlinkVariableGroupAction, one.id)}
+                                        onClick={() =>
+                                            change(groupActions.unlinkVariableGroupAction, one.id)
+                                        }
                                         aria-label={t("groups.unlink", { name: one.name })}
                                         title={
                                             view.canLink
@@ -513,15 +546,21 @@ export function LinkedGroupsPanel({
     );
 }
 
-export function ResolutionOrder({ view }: { view: Pick<ServiceGroupsView, "resolved" | "linked"> }) {
+export function ResolutionOrder({
+    view
+}: {
+    view: Pick<ServiceGroupsView, "resolved" | "linked">;
+}) {
     const t = useTranslations("deployConfig");
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <h4 className="text-xs font-medium text-muted-foreground">{t("groups.orderTitle")}</h4>
             <p className="text-xs text-muted-foreground">
-                {[...view.linked.map((one) => one.name), t("groups.sourceShared"), t("groups.sourceService")].join(
-                    " -> "
-                )}
+                {[
+                    ...view.linked.map((one) => one.name),
+                    t("groups.sourceShared"),
+                    t("groups.sourceService")
+                ].join(" -> ")}
             </p>
             <div className="overflow-x-auto rounded-md border border-border">
                 <table className="w-full text-xs">
@@ -535,12 +574,17 @@ export function ResolutionOrder({ view }: { view: Pick<ServiceGroupsView, "resol
                     <tbody>
                         {view.resolved.map((one) => (
                             <tr key={one.key} className="border-t border-border">
-                                <td className="max-w-[14rem] truncate px-3 py-1.5 font-mono" title={one.key}>
+                                <td
+                                    className="max-w-[14rem] truncate px-3 py-1.5 font-mono"
+                                    title={one.key}
+                                >
                                     {one.key}
                                 </td>
                                 <td className="px-3 py-1.5">
                                     <span className="flex flex-wrap items-center gap-1">
-                                        <Badge variant="neutral">{sourceLabel(one.source, t)}</Badge>
+                                        <Badge variant="neutral">
+                                            {sourceLabel(one.source, t)}
+                                        </Badge>
                                         {one.overridden.map((lost, index) => (
                                             <span
                                                 key={index}
@@ -662,7 +706,11 @@ export function TagsEditor({
                         size="sm"
                         variant="outline"
                         disabled={pending || !normalizeTag(draft) || current.length >= TAGS_MAX}
-                        title={current.length >= TAGS_MAX ? t("tags.full", { max: TAGS_MAX }) : undefined}
+                        title={
+                            current.length >= TAGS_MAX
+                                ? t("tags.full", { max: TAGS_MAX })
+                                : undefined
+                        }
                     >
                         {t("tags.add")}
                     </Button>
@@ -679,11 +727,14 @@ export function TagsEditor({
 export function ServiceTags({ applicationId }: { applicationId: string }) {
     const [state, setState] = useState<{ tags: string[]; canEdit: boolean } | null>(null);
     useEffect(() => {
-        void groupActions.serviceTagsAction({ applicationId }).then((result) =>
-            setState({ tags: result.tags ?? [], canEdit: Boolean(result.canEdit) })
-        );
+        void groupActions
+            .serviceTagsAction({ applicationId })
+            .then((result) =>
+                setState({ tags: result.tags ?? [], canEdit: Boolean(result.canEdit) })
+            );
     }, [applicationId]);
-    if (state === null) return <div className="h-8 animate-pulse rounded-md bg-muted" aria-busy="true" />;
+    if (state === null)
+        return <div className="h-8 animate-pulse rounded-md bg-muted" aria-busy="true" />;
     return (
         <TagsEditor
             tags={state.tags}

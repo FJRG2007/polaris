@@ -171,7 +171,10 @@ export function ProjectsGrid({
         [kept, showManaged]
     );
     const allTags = useMemo(
-        () => [...new Set(kept.flatMap((project) => [...project.tags, ...project.serviceTags]))].sort(),
+        () =>
+            [
+                ...new Set(kept.flatMap((project) => [...project.tags, ...project.serviceTags]))
+            ].sort(),
         [kept]
     );
     // A tag that no project carries any more stops filtering instead of emptying the list.
@@ -266,7 +269,9 @@ export function ProjectsGrid({
                                 </DropdownMenuItem>
                                 {allTags.map((one) => (
                                     <DropdownMenuItem key={one} onSelect={() => setTag(one)}>
-                                        <span className="truncate" title={one}>{one}</span>
+                                        <span className="truncate" title={one}>
+                                            {one}
+                                        </span>
                                     </DropdownMenuItem>
                                 ))}
                             </DropdownMenuContent>

@@ -59,7 +59,11 @@ describe("the instance permission", () => {
         mocks.deleteGroup.mockResolvedValue({ linked: 0, orgId: null });
         mocks.updateGroup.mockResolvedValue({ orgId: null });
         await actions.createVariableGroupAction({ name: "Payments", description: "" });
-        await actions.updateVariableGroupAction({ groupId: "g-1", name: "Payments", description: "" });
+        await actions.updateVariableGroupAction({
+            groupId: "g-1",
+            name: "Payments",
+            description: ""
+        });
         await actions.deleteVariableGroupAction({ groupId: "g-1" });
         await actions.linkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" });
         await actions.unlinkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" });
@@ -82,16 +86,26 @@ describe("deleting", () => {
 describe("linking", () => {
     it("is refused without the right to change the service's variables", async () => {
         mocks.requireApplicationAccess.mockRejectedValue(new Error("forbidden"));
-        const result = await actions.linkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" });
+        const result = await actions.linkVariableGroupAction({
+            applicationId: "app-1",
+            groupId: "g-1"
+        });
         expect(result).toEqual({ error: "words:variableGroups.failed" });
-        expect(mocks.requireApplicationAccess).toHaveBeenCalledWith("app-1", "user-1", "variables.write");
+        expect(mocks.requireApplicationAccess).toHaveBeenCalledWith(
+            "app-1",
+            "user-1",
+            "variables.write"
+        );
         expect(mocks.linkGroup).not.toHaveBeenCalled();
     });
 
     it("says why a group cannot be linked", async () => {
         mocks.requireApplicationAccess.mockResolvedValue({ ownerId: "owner-1" });
         mocks.linkGroup.mockRejectedValue(new VariableGroupError("notFound"));
-        const result = await actions.linkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" });
+        const result = await actions.linkVariableGroupAction({
+            applicationId: "app-1",
+            groupId: "g-1"
+        });
         expect(result).toEqual({ error: "words:variableGroups.notFound" });
         expect(mocks.recordDeployAudit).not.toHaveBeenCalled();
     });
@@ -99,8 +113,14 @@ describe("linking", () => {
     it("links and records who did it", async () => {
         mocks.requireApplicationAccess.mockResolvedValue({ ownerId: "owner-1" });
         mocks.linkGroup.mockResolvedValue(undefined);
-        expect(await actions.linkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" })).toEqual({});
-        expect(mocks.linkGroup).toHaveBeenCalledWith({ id: "user-1", isAdmin: false }, "app-1", "g-1");
+        expect(
+            await actions.linkVariableGroupAction({ applicationId: "app-1", groupId: "g-1" })
+        ).toEqual({});
+        expect(mocks.linkGroup).toHaveBeenCalledWith(
+            { id: "user-1", isAdmin: false },
+            "app-1",
+            "g-1"
+        );
         expect(mocks.recordDeployAudit).toHaveBeenCalledWith(
             expect.objectContaining({ action: "deploy.variable-group.link", targetId: "app-1" })
         );
@@ -122,7 +142,9 @@ describe("creating", () => {
 
     it("creates on the open workspace's shelf", async () => {
         mocks.createGroup.mockResolvedValue({ id: "g-new" });
-        expect(await actions.createVariableGroupAction({ name: "Payments", description: "" })).toEqual({
+        expect(
+            await actions.createVariableGroupAction({ name: "Payments", description: "" })
+        ).toEqual({
             id: "g-new"
         });
         expect(mocks.createGroup.mock.calls[0][1]).toBe("org-1");
@@ -132,9 +154,16 @@ describe("creating", () => {
 describe("project tags", () => {
     it("stores normalized tags once the project's settings may be changed", async () => {
         mocks.requireProjectAccess.mockResolvedValue({});
-        const result = await actions.setProjectTagsAction({ projectId: "p-1", tags: ["Production", "production"] });
+        const result = await actions.setProjectTagsAction({
+            projectId: "p-1",
+            tags: ["Production", "production"]
+        });
         expect(result.error).toBeUndefined();
-        expect(mocks.requireProjectAccess).toHaveBeenCalledWith("p-1", "user-1", "project.settings");
+        expect(mocks.requireProjectAccess).toHaveBeenCalledWith(
+            "p-1",
+            "user-1",
+            "project.settings"
+        );
         const stored = JSON.parse(mocks.projectUpdate.mock.calls[0][0].data.tags) as string[];
         expect(stored).toEqual(result.tags);
     });

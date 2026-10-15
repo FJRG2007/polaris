@@ -141,7 +141,10 @@ async function loadNames(names: Set<string>, scope: Scope, values: Values): Prom
         );
         if (application) {
             // Its linked groups underneath its own variables, as it runs with them.
-            const grouped = Object.assign({}, ...(await groupLayers(application.id)).map((layer) => layer.values));
+            const grouped = Object.assign(
+                {},
+                ...(await groupLayers(application.id)).map((layer) => layer.values)
+            );
             remember(name, {
                 ...grouped,
                 ...(await scopeValues("application", application.id)),

@@ -49,8 +49,11 @@ async function redeployScope(
     ownerId: string
 ): Promise<{ skipped: number }> {
     if (scope === "group") {
-        const { skipped } = await groups.redeployLinked(actor, scopeId, (applicationId, appOwnerId) =>
-            redeployForEnvScope("application", applicationId, appOwnerId, actor.id)
+        const { skipped } = await groups.redeployLinked(
+            actor,
+            scopeId,
+            (applicationId, appOwnerId) =>
+                redeployForEnvScope("application", applicationId, appOwnerId, actor.id)
         );
         return { skipped };
     }
@@ -108,8 +111,7 @@ export async function saveEnvVarChangesAction(
             "variables.write"
         );
         // Asked before anything is written, so a refusal leaves nothing half-done.
-        if (redeploy)
-            await groups.requireVariableScopeAccess(scope, scopeId, user, "deploy.run");
+        if (redeploy) await groups.requireVariableScopeAccess(scope, scopeId, user, "deploy.run");
 
         const keys = new Map<string, string>();
         for (const id of [...remove, ...secrecy.map((item) => item.id)]) {
@@ -169,8 +171,11 @@ export async function saveEnvVarChangesAction(
 
         if (scope === "group") await groups.touchGroup(scopeId);
         const skipped = redeploy
-            ? (await redeployScope(user, scope, scopeId, access.ownerId).catch(() => ({ skipped: 0 })))
-                  .skipped
+            ? (
+                  await redeployScope(user, scope, scopeId, access.ownerId).catch(() => ({
+                      skipped: 0
+                  }))
+              ).skipped
             : 0;
         revalidatePath(DEPLOY_PATH);
         return {

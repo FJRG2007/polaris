@@ -14,7 +14,11 @@ import * as follow from "@/lib/follow/follow";
 import { listHosts } from "@/lib/host-service";
 import { firstIssue, reply } from "./reply";
 import { normalizeRoot } from "@polaris/deploy";
-import { requireVariableScopeAccess, variableScopeSchema, variableTargetType } from "@/lib/deploy/variable-groups";
+import {
+    requireVariableScopeAccess,
+    variableScopeSchema,
+    variableTargetType
+} from "@/lib/deploy/variable-groups";
 import { requirePermission } from "@/lib/session";
 import * as activity from "@/lib/activity/activity";
 import * as comments from "@/lib/comments/comments";

@@ -1059,7 +1059,8 @@ async function removeVariable(
             ? { activity: { applicationId: removed.scopeId, action: "variable-removed" } }
             : {})
     });
-    if (removed.scope !== "group") applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, redeploy);
+    if (removed.scope !== "group")
+        applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, redeploy);
     return { redeployed: redeploy };
 }
 
