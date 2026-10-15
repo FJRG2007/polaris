@@ -476,12 +476,33 @@ export class SshPorts implements RuntimePorts {
         // cannot be read or even stat'ed, so it is recognised from the table and
         // detached - otherwise `mkdir -p` fails on it and every later deploy of
         // the service dies on a path nobody can touch.
+        //
+        // A live mount missing a flag it is asked for now (`mfsymlinks`: a share
+        // mounted without it refuses every link) is remounted in place, once per
+        // option set - the marker keeps a flag the kernel never lists from
+        // remounting on every call. A refused remount leaves the mount as it was.
+        const flags = staticOpts
+            .split(",")
+            .map((option) => option.trim())
+            .filter((option) => option && !option.includes("="));
         const lines = [
             "set -e",
             `t=${quoteArg(target)}`,
+            `m=${quoteArg(`${REMOTE_MOUNT_ROOT}/.remount-${spec.id}`)}`,
+            "remount=",
             "if awk -v t=\"$t\" '$5 == t { found = 1 } END { exit !found }' /proc/self/mountinfo 2>/dev/null; then",
-            '    if ls "$t" >/dev/null 2>&1; then echo polaris:already; exit 0; fi',
-            '    umount -f "$t" 2>/dev/null || umount -l "$t"',
+            '    if ls "$t" >/dev/null 2>&1; then',
+            '        have=$(awk -v t="$t" \'$5 == t { for (i = 7; i <= NF; i++) if ($i == "-") o = $6 "," $(i + 3) } END { print o }\' /proc/self/mountinfo)',
+            ...(flags.length > 0
+                ? [
+                      `        for f in ${flags.map(quoteArg).join(" ")}; do case ",$have," in *",$f,"*) ;; *) remount=1 ;; esac; done`
+                  ]
+                : []),
+            `        if [ -z "$remount" ] || [ "$(cat "$m" 2>/dev/null)" = ${quoteArg(staticOpts)} ]; then echo polaris:already; exit 0; fi`,
+            `        printf '%s' ${quoteArg(staticOpts)} > "$m" 2>/dev/null || true`,
+            "    else",
+            '        umount -f "$t" 2>/dev/null || umount -l "$t"',
+            "    fi",
             "fi",
             'mkdir -p "$t"'
         ];
@@ -498,8 +519,16 @@ export class SshPorts implements RuntimePorts {
         }
         // The source is quoted; the option value is our own controlled string plus the
         // $creds shell var, so it is embedded in double quotes to let $creds expand.
+        const mount = `mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}`;
+        const cleanup = useCreds ? ['    rm -f "$creds"'] : [];
         lines.push(
-            `mount -t ${fstype} ${quoteArg(spec.source)} ${quoteArg(target)}${optionValue ? ` -o "${optionValue}"` : ""}`
+            'if [ -n "$remount" ]; then',
+            `    ${mount} -o "remount,${optionValue}" || true`,
+            ...cleanup,
+            "    echo polaris:already",
+            "    exit 0",
+            "fi",
+            `${mount}${optionValue ? ` -o "${optionValue}"` : ""}`
         );
         if (useCreds) lines.push('rm -f "$creds"');
         lines.push("echo polaris:created");

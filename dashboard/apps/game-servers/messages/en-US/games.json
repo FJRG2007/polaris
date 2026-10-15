@@ -1328,7 +1328,7 @@
         "errors": {
             "mismatch": "The copy didn't match the original, so it wasn't used.",
             "mismatchFile": "The copy of {file} didn't match the original, so it wasn't used.",
-            "noLinks": "The NAS couldn't store the link {file}, so nothing was copied. Links work there after the machine running Polaris restarts.",
+            "noLinks": "The NAS couldn't store the link {file}, so nothing was copied. Try again: Polaris turns links on for the NAS first. If it still fails, links work there after the machine running Polaris restarts.",
             "noSpace": "There isn't enough free space there.",
             "unreadable": "Its files couldn't be read.",
             "unwritable": "Nothing could be written there. Check that the NAS share allows writing.",

@@ -1328,7 +1328,7 @@
         "errors": {
             "mismatch": "La copia no coincidía con el original, así que no se usó.",
             "mismatchFile": "La copia de {file} no coincidía con el original, así que no se usó.",
-            "noLinks": "El NAS no pudo guardar el enlace {file}, así que no se copió nada. Los enlaces funcionan allí cuando se reinicia el equipo donde corre Polaris.",
+            "noLinks": "El NAS no pudo guardar el enlace {file}, así que no se copió nada. Vuelve a intentarlo: Polaris activa antes los enlaces en el NAS. Si sigue fallando, los enlaces funcionan allí cuando se reinicia el equipo donde corre Polaris.",
             "noSpace": "No hay suficiente espacio libre allí.",
             "unreadable": "No se pudieron leer sus archivos.",
             "unwritable": "No se pudo escribir allí. Comprueba que la carpeta del NAS permite escribir.",
