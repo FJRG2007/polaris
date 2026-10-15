@@ -42,8 +42,15 @@ import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
 import { inspectCpanelBackup, type CpanelPlan, type ImportDomain, type ImportWarning } from "./cpanel";
 
-/** The port an imported site is served on: the PHP image a detected site builds
- *  into answers there. */
+/**
+ * The port an imported site is served on. Nixpacks' PHP provider serves through
+ * nginx, whose config it renders at start from `nginx.template.conf` with
+ * `listen ${PORT};` (and `[::]:${PORT}`), and it sets PORT=80 as its own default
+ * (`vars.insert("PORT", "80")` in `src/providers/php/mod.rs`, railwayapp/nixpacks).
+ * So it honours $PORT, and the deploy sets PORT to the service's port for every
+ * built source (see `env.PORT` in `deploy-service.ts`): the service port, the
+ * domains' target port and nginx all agree on the provider's own default, 80.
+ */
 const SITE_PORT = 80;
 
 /** A database name the engine takes as it is; anything else gets one made from it. */
