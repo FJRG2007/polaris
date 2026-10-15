@@ -17,6 +17,9 @@ import {
     CalendarDays,
     Gamepad2,
     Handshake,
+    Activity,
+    ShieldCheck,
+    Cloud,
     House,
     Mails,
     MessagesSquare,
@@ -299,6 +302,61 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Companies, people and the deals you are working, in one pipeline.",
         description:
             "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Public status pages. Installing it adds two scheduled jobs and the
+        // screens; nothing is checked until somebody adds a check, and
+        // uninstalling stops the checks and keeps every page and its history.
+        id: "status-pages",
+        name: "Status pages",
+        category: "Productivity",
+        icon: Activity,
+        opensAt: "/status-pages",
+        summary: "Public pages that show whether your services are up.",
+        description:
+            "Publish a page that shows whether your services are up, with 90 days of uptime from HTTP, TCP, DNS and latency checks Polaris runs itself. Post incidents as they unfold and schedule maintenance ahead. Point checks at your own deployed apps or any address. Uninstalling stops the checks and keeps every page.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Malware, file changes, host hardening and image vulnerabilities on
+        // the servers Polaris runs. Installing it runs nothing and downloads
+        // nothing: every scan is a one-off container pulled the first time it
+        // is needed, and uninstalling keeps every result.
+        id: "security-scans",
+        name: "Security scans",
+        category: "Tools",
+        icon: ShieldCheck,
+        opensAt: "/security",
+        summary: "Malware, file changes, host hardening and image vulnerabilities on your servers.",
+        description:
+            "Scan app data for malware and quarantine what is found, record file fingerprints and see what changed since, audit each server's own settings and switch on its automatic security updates, and check every app's image for known vulnerabilities with a downloadable software inventory. Scans run one at a time per server, on demand or on a schedule, and nothing keeps running between them.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Servers at the operator's cloud accounts. Installing it runs nothing
+        // but an hourly read of what those servers cost; uninstalling stops that
+        // and leaves every server and account where it was.
+        id: "cloud-servers",
+        name: "Cloud servers",
+        category: "Tools",
+        icon: Cloud,
+        opensAt: "/cloud-servers",
+        summary: "Create servers at your cloud providers, ready in Polaris as they boot.",
+        description:
+            "Connect DigitalOcean, Hetzner Cloud, Vultr, Linode, AWS, Azure, Google Cloud or IONOS and create servers from here. Each one joins your Polaris servers on its first boot. Switch them on and off, restart, resize and destroy them, and see what each costs where the provider publishes its prices.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",

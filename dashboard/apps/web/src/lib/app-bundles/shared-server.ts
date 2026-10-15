@@ -38,6 +38,7 @@ import * as appHost from "@polaris/app-host";
 import * as jsxRuntime from "react/jsx-runtime";
 import * as nextNavigation from "next/navigation";
 import { markRevalidated } from "./action-context";
+import * as hostdClient from "@polaris/hostd-client";
 import * as linkPassword from "@polaris/core/link-password";
 import * as catalogSearch from "@polaris/core/catalog-search";
 
@@ -73,6 +74,7 @@ const MODULES: Modules = {
     "@polaris/core/link-password": linkPassword,
     "@polaris/db": db,
     "@polaris/deploy": deploy,
+    "@polaris/hostd-client": hostdClient,
     "@polaris/ssh": ssh,
     "@polaris/storage": storage,
     "@polaris/ui": ui,

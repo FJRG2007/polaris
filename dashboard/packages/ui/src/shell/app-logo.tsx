@@ -242,6 +242,20 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // A status page: a header and a row of uptime bars.
+    "status-pages": {
+        palette: ["#6EE7B7", "#10B981", "#047857"],
+        draw: ({ base, face }) => (
+            <>
+                <rect x="4" y="5" width="24" height="22" rx="5" fill={base} />
+                <path d="M4 10a5 5 0 0 1 5-5h14a5 5 0 0 1 5 5v1.5H4z" fill={face} />
+                <rect x="8.2" y="15" width="2.8" height="8" rx="1.4" fill={WHITE} />
+                <rect x="12.7" y="15" width="2.8" height="8" rx="1.4" fill={WHITE} />
+                <rect x="17.2" y="15" width="2.8" height="8" rx="1.4" fill={WHITE} />
+                <rect x="21.7" y="18" width="2.8" height="5" rx="1.4" fill={WHITE} />
+            </>
+        )
+    },
     // A sticky note with a turned-up corner and two lines.
     notes: {
         palette: ["#FDE68A", "#EAB308", "#B45309"],
@@ -267,6 +281,20 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             </>
         )
     },
+    // A server box in front of a cloud.
+    "cloud-servers": {
+        palette: ["#D8B4FE", "#A855F7", "#6B21A8"],
+        draw: ({ base, face }) => (
+            <>
+                <circle cx="11" cy="14" r="5" fill={base} />
+                <circle cx="17.5" cy="11.5" r="6.5" fill={base} />
+                <circle cx="23" cy="15.5" r="4.5" fill={base} />
+                <rect x="6" y="14" width="21.5" height="6" rx="3" fill={base} />
+                <rect x="9" y="18" width="14" height="10" rx="3" fill={face} />
+                <path d="M12.5 23h7" {...LINE} strokeWidth={2.6} />
+            </>
+        )
+    },
     // A pulse inside a dial: something is being watched.
     watch: {
         palette: ["#F9A8D4", "#EC4899", "#9D174D"],
@@ -274,6 +302,20 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
             <>
                 <circle cx="16" cy="16" r="12.5" fill={base} />
                 <path d="M7.8 16.5h3.6l2.4-5 4.4 10 2.4-5h3.6" {...LINE} strokeWidth={2.8} />
+            </>
+        )
+    },
+    // A magnifying glass with a tick in its lens: a scan that came back.
+    "security-scans": {
+        palette: ["#FCD34D", "#D97706", "#92400E"],
+        draw: ({ base, face }) => (
+            <>
+                <g transform="rotate(-45 13.5 13.5)">
+                    <rect x="11.3" y="20" width="4.4" height="9.5" rx="2.2" fill={base} />
+                </g>
+                <circle cx="13.5" cy="13.5" r="9" fill={base} />
+                <circle cx="13.5" cy="13.5" r="6" fill={face} />
+                <path d="M10.6 13.8l2 2 3.9-4.3" {...LINE} strokeWidth={2.6} />
             </>
         )
     },

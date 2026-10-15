@@ -230,6 +230,80 @@ export class HostdClient {
         };
     }
 
+    /**
+     * Run one of the daemon's fixed host security actions to the end: the
+     * hardening audit or the automatic security updates switch. Null from a
+     * daemon that predates the call, "busy" while another is running, "timeout"
+     * when it ran too long and the daemon stopped it.
+     */
+    public async hostSecurity(
+        action: "audit" | "updates-status" | "updates-on" | "updates-off"
+    ): Promise<{ exitCode: number; output: string } | "busy" | "timeout" | null> {
+        const response = await this.call("POST", "/v1/host/security", JSON.stringify({ action }));
+        if (response.status === 404) return null;
+        if (response.status === 409) return "busy";
+        if (response.status === 504) return "timeout";
+        if (response.status !== 200) {
+            throw new Error(`hostd host security failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as { exitCode?: unknown; output?: unknown };
+        return {
+            exitCode: typeof parsed.exitCode === "number" ? parsed.exitCode : -1,
+            output: typeof parsed.output === "string" ? parsed.output : ""
+        };
+    }
+
+    /**
+     * Save an image on this host into a short-lived `polaris-secscan-image-*`
+     * volume as `/in/image.tar`, for a scan to read. Null from a daemon that
+     * predates the call; otherwise the archive's size or why it was not made.
+     */
+    public async hostImageExport(
+        image: string,
+        volume: string
+    ): Promise<{ size: number } | "busy" | "imageMissing" | "noRoom" | "timeout" | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/host/security/image",
+            JSON.stringify({ action: "export", volume, image })
+        );
+        if (response.status === 404 && !response.body.includes("no such image")) return null;
+        if (response.status === 404) return "imageMissing";
+        if (response.status === 409) return "busy";
+        if (response.status === 507) return "noRoom";
+        if (response.status === 504) return "timeout";
+        if (response.status !== 200) {
+            throw new Error(`hostd image export failed (${response.status}): ${response.body}`);
+        }
+        const parsed = JSON.parse(response.body) as { size?: unknown };
+        return { size: typeof parsed.size === "number" ? parsed.size : 0 };
+    }
+
+    /** The export volumes on this host. Null from a daemon that predates it. */
+    public async hostImageExports(): Promise<string[] | null> {
+        const response = await this.call(
+            "POST",
+            "/v1/host/security/image",
+            JSON.stringify({ action: "list" })
+        );
+        if (response.status !== 200) return null;
+        const parsed = JSON.parse(response.body) as { volumes?: unknown };
+        if (!Array.isArray(parsed.volumes)) return null;
+        return parsed.volumes.filter((name): name is string => typeof name === "string");
+    }
+
+    /** Remove an export volume made by `hostImageExport`. Throws unless gone. */
+    public async hostImageRemove(volume: string): Promise<void> {
+        const response = await this.call(
+            "POST",
+            "/v1/host/security/image",
+            JSON.stringify({ action: "remove", volume })
+        );
+        if (response.status !== 200) {
+            throw new Error(`hostd export removal failed (${response.status}): ${response.body}`);
+        }
+    }
+
     /** Take every container off a link network between two projects, now. Throws
      *  unless the daemon says nothing is left on it. */
     public async cutPrivateNetwork(name: string): Promise<void> {

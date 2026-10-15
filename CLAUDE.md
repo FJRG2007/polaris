@@ -88,8 +88,8 @@ Traefik ranks routers by **the length of the rule** unless a priority says
 otherwise, and the dashboard's own host rule is long enough to outrank every path
 router in the deployment. **Give every router an explicit `priority`.** The
 ordering in use: 110 guarded call path, 100 path prefixes with no host of their
-own (`/api/deploy/ws`, `/livekit`), 50 the dashboard's public hostnames, 10 the
-compose-label catch-all.
+own (`/api/deploy/ws`, `/livekit`), 50 the dashboard's public hostnames and an
+installed app's own custom-domain routes, 10 the compose-label catch-all.
 
 One malformed file in Traefik's dynamic directory freezes the whole edge on its
 last good configuration, silently. Generated route files are rendered by a pure
@@ -106,6 +106,17 @@ write never truncates. The health probe (`lib/watch/health-probe.ts`) also treat
 that edge 404 - and the vacant page - as down rather than up, and republishes the
 app routes itself the first time it finds an address unrouted, since that is the
 one outage here Polaris can end without a terminal.
+
+**An installed app can own edge routes too**, through
+`apps/web/src/lib/app-edge.ts`: one dynamic file of its own,
+`polaris-app-<id>.yml`, written and cleared with `writeAppEdge`/`clearAppEdge` -
+both going through `writeDynamicFile` like every other edge file, never a direct
+write. The app renders its own routes as a pure function (asserted in its own
+test, e.g. Status pages' `renderStatusEdge`) and calls only `writeAppEdge` on
+every change and `clearAppEdge` on uninstall; emptied to `http: {}` rather than
+deleted, since an absent file is a case `writeDynamicFile`'s rename does not need
+to handle. `edgeHostnameTaken` is how an app checks a hostname before accepting
+it: taken by the dashboard's own public names or by a deployed domain.
 
 ## The browser bundle never carries this machine's paths
 
