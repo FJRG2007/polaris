@@ -407,5 +407,69 @@
         "hint": "Aquí corren contenedores ajenos a Polaris, así que la limpieza solo quita imágenes sin uso y la caché de compilación, nunca un contenedor parado ni una red. Se activa solo cuando Polaris encuentra contenedores que no inició.",
         "loadFailed": "No se pudo leer este ajuste",
         "saveFailed": "No se pudo guardar este ajuste"
+    },
+    "onboard": {
+        "stepsLabel": "Pasos para agregar el servidor",
+        "steps": {
+            "command": "Comando generado",
+            "fetched": "Comando ejecutado",
+            "checked": "La máquina se revisó",
+            "connect": "Polaris se conecta",
+            "registered": "Ya en Polaris",
+            "setup": "Listo para desplegar"
+        },
+        "next": {
+            "command": "Generando el comando.",
+            "fetched": "Pega el comando en una terminal de la máquina y ejecútalo.",
+            "checked": "La máquina crea el usuario y revisa su servidor SSH.",
+            "connect": "Esperando a que la máquina responda.",
+            "registered": "Esperando a que Polaris entre en la máquina.",
+            "setup": "Esperando a que se agregue el servidor."
+        },
+        "status": {
+            "waiting": "Sin empezar",
+            "active": "En curso",
+            "done": "Hecho",
+            "failed": "Falló"
+        },
+        "log": {
+            "created": "Comando listo, válido 15 minutos",
+            "scriptFetched": "La máquina descargó el script",
+            "refused": "La máquina se detuvo antes de registrarse",
+            "machineReported": "La máquina dice: {system}.",
+            "machineReportedBare": "La máquina respondió",
+            "dockerYes": "Docker instalado.",
+            "dockerNo": "Aún sin Docker.",
+            "rootYes": "Con acceso root.",
+            "rootNo": "Sin acceso root.",
+            "trying": "Probando {address}",
+            "unreachable": "Sin respuesta en el puerto SSH de {address}",
+            "keyRefused": "{address} rechazó la clave de Polaris",
+            "wrongMachine": "{address} respondió como otra máquina",
+            "connectFailed": "No se pudo conectar a {address}",
+            "noAddress": "No hay dirección para llegar a la máquina",
+            "noHostKey": "La máquina no envió una clave de host útil",
+            "connected": "Conectado en {address}, identidad verificada",
+            "registered": "Agregado como {name}",
+            "setupQueued": "Instalando Docker y el router de borde",
+            "setupDone": "Listo para desplegar",
+            "setupFailed": "La preparación se detuvo: {reason}"
+        },
+        "whatToDo": "Qué hacer:",
+        "fix": {
+            "unreachable": "Permite conexiones entrantes al puerto SSH de la máquina (normalmente 22) desde la red de Polaris, en su firewall y en cualquier grupo de seguridad de la nube; luego genera un comando nuevo y ejecútalo otra vez.",
+            "keyRefused": "El servidor SSH de la máquina no acepta claves. Pon PubkeyAuthentication en yes en su configuración SSH, reinicia el servicio y prueba con un comando nuevo.",
+            "wrongMachine": "Otro dispositivo respondió en la dirección indicada, a menudo el router. Ejecuta el comando nuevo en la propia máquina, en la misma red que Polaris si puedes.",
+            "connectFailed": "Comprueba que la máquina esté encendida y su servidor SSH activo, y prueba con un comando nuevo.",
+            "noAddress": "La máquina no indicó una dirección útil para Polaris. Conéctala a la red de Polaris o dale una dirección pública y prueba otra vez.",
+            "noHostKey": "El servidor SSH de la máquina no tiene claves de host. Instala o reinstala OpenSSH server y prueba otra vez.",
+            "setupFailed": "El servidor se agregó, pero aún no se pudo preparar para desplegar. Ábrelo y usa Preparar este servidor en Sirve sus propios dominios.",
+            "generic": "Prueba con un comando nuevo. Si sigue fallando, agrega el servidor a mano con un usuario SSH."
+        },
+        "ready": "{name} está listo",
+        "addedNotReady": "{name} se agregó; revisa la preparación",
+        "openServer": "Abrir servidor",
+        "close": "Cerrar",
+        "retry": "Comando nuevo"
     }
 }

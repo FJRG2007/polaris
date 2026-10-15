@@ -407,5 +407,69 @@
         "hint": "Something besides Polaris runs containers here, so clean-up only removes unused images and build cache, never a stopped container or a network. Switched on by itself when Polaris finds containers it did not start.",
         "loadFailed": "Could not read this setting",
         "saveFailed": "Could not save this setting"
+    },
+    "onboard": {
+        "stepsLabel": "Steps to add this server",
+        "steps": {
+            "command": "Command generated",
+            "fetched": "Command run on the machine",
+            "checked": "Machine checked itself",
+            "connect": "Polaris connects to it",
+            "registered": "Server added",
+            "setup": "Prepared for deployments"
+        },
+        "next": {
+            "command": "Generating the command.",
+            "fetched": "Paste the command into a terminal on the machine and run it.",
+            "checked": "The machine is creating the login and checking its SSH server.",
+            "connect": "Waiting for the machine to report back.",
+            "registered": "Waiting for Polaris to sign in to the machine.",
+            "setup": "Waiting for the server to be added."
+        },
+        "status": {
+            "waiting": "Not started",
+            "active": "In progress",
+            "done": "Done",
+            "failed": "Failed"
+        },
+        "log": {
+            "created": "Command ready, valid for 15 minutes",
+            "scriptFetched": "The machine downloaded the setup script",
+            "refused": "The machine stopped before registering",
+            "machineReported": "Machine reported {system}.",
+            "machineReportedBare": "The machine reported back",
+            "dockerYes": "Docker installed.",
+            "dockerNo": "No Docker yet.",
+            "rootYes": "Root access granted.",
+            "rootNo": "No root access.",
+            "trying": "Trying {address}",
+            "unreachable": "No answer on the SSH port at {address}",
+            "keyRefused": "{address} refused the key Polaris installed",
+            "wrongMachine": "{address} answered as a different machine",
+            "connectFailed": "Could not connect to {address}",
+            "noAddress": "No address to reach the machine at",
+            "noHostKey": "The machine sent no usable SSH host key",
+            "connected": "Signed in at {address}, identity verified",
+            "registered": "Added as {name}",
+            "setupQueued": "Installing Docker and the edge router",
+            "setupDone": "Ready to deploy to",
+            "setupFailed": "Setup stopped: {reason}"
+        },
+        "whatToDo": "What to do:",
+        "fix": {
+            "unreachable": "Allow incoming connections to the machine's SSH port (usually 22) from the network Polaris is on, in its firewall and in any cloud security group, then generate a new command and run it again.",
+            "keyRefused": "The machine's SSH server does not accept key sign-in. Set PubkeyAuthentication to yes in its SSH settings, restart the SSH service, then try again with a new command.",
+            "wrongMachine": "Another device answered at the address the machine reported, often the router. Run the new command from the machine itself, on the same network as Polaris if you can.",
+            "connectFailed": "Check that the machine is on and its SSH server is running, then try again with a new command.",
+            "noAddress": "The machine reported no address Polaris can use. Connect it to the same network as Polaris, or give it a public address, then try again.",
+            "noHostKey": "The machine's SSH server has no host keys. Install or reinstall OpenSSH server there, then try again.",
+            "setupFailed": "The server was added, but could not be prepared for deployments yet. Open it and use Set this server up under Serving its own domains.",
+            "generic": "Try again with a new command. If it keeps failing, add the server by hand with an SSH login."
+        },
+        "ready": "{name} is ready",
+        "addedNotReady": "{name} was added, setup needs attention",
+        "openServer": "Open server",
+        "close": "Close",
+        "retry": "New command"
     }
 }

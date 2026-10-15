@@ -2199,6 +2199,9 @@ model Enrollment {
     // Why the claim did not finish, shown next to the command so the operator can
     // fix the machine rather than guess.
     error        String?
+    // Every stage the machine went through, appended as it happens, so the dialog
+    // can draw each step with its own log. Read with `readEnrollmentProgress`.
+    progress     Json?
     expiresAt    DateTime
     createdAt    DateTime  @default(now())
 
