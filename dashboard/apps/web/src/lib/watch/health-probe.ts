@@ -113,7 +113,6 @@ async function edgeSaysNotRouted(response: Response): Promise<boolean> {
     return (await response.text().catch(() => "")).trim() === EDGE_NO_ROUTE;
 }
 
-/** Probe one domain and return its health without persisting. */
 /**
  * A connection that opens to one address whatever the hostname resolves to, so a
  * server can be asked about a name before DNS sends anybody there. The hostname
@@ -133,9 +132,10 @@ function pinnedTo(address: string): Agent {
 }
 
 /**
- * Ask a hostname for an answer. `address` sends the request to that server instead
- * of wherever the name resolves today - how a DNS cutover checks that the service
- * it is moving to answers for the name before the record is changed.
+ * Probe one domain and return its health without persisting. `address` sends the
+ * request to that server instead of wherever the name resolves today - how a DNS
+ * cutover checks that the service it is moving to answers for the name before the
+ * record is changed.
  */
 export async function checkDomain(
     target: ProbeTarget,
