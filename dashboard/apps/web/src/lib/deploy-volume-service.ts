@@ -46,6 +46,37 @@ export function isReservedBindSource(source: string): boolean {
 }
 
 /**
+ * Where one of a service's volumes is mounted from, as compose takes it. A nas
+ * volume's source is confined under the mount root as `<connectionId>/<subpath>`,
+ * so it resolves onto that connection's host mount; bind and named volumes pass
+ * through. A server folder Polaris keeps for itself (an agent home, a database
+ * archive) is refused where it is written; this stops one stored before.
+ */
+export function volumeMountSource(volume: {
+    readonly name: string;
+    readonly kind: string;
+    readonly source: string | null;
+    readonly connectionId: string | null;
+}): { kind: "bind" | "nas" | "volume"; source: string } {
+    const kind = volume.kind === "bind" ? "bind" : volume.kind === "nas" ? "nas" : "volume";
+    const stored = volume.source ?? volume.name;
+    if (kind === "bind" && isReservedBindSource(stored))
+        throw new Error(
+            `The server folder of volume ${volume.name} belongs to Polaris. Choose a different path.`
+        );
+    const source =
+        kind === "nas" && volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
+    return { kind, source };
+}
+
+/** The service's SFTP server mounts its volumes; start it again on what they are now. */
+async function refreshFileAccessOf(applicationId: string | null, ownerId: string): Promise<void> {
+    if (!applicationId) return;
+    const { refreshFileAccess } = await import("@/lib/deploy/file-access");
+    await refreshFileAccess(applicationId, ownerId);
+}
+
+/**
  * Whether a service in `projectSlug` may use this normalized bind source. Refuses
  * the reserved folders, and anything in Deploy's own tree that is not this
  * project's: the tree's ancestors would mount every project's folders at once,
@@ -289,6 +320,7 @@ export async function createVolume(ownerId: string, input: DeployVolumeInput): P
     if (parsed.kind === "nas" && parsed.connectionId) {
         await ensureNasFolders(parsed.connectionId, [source], ownerId);
     }
+    await refreshFileAccessOf(parsed.applicationId, ownerId);
 
     return {
         id: created.id,
@@ -407,6 +439,7 @@ export async function updateVolume(
     });
 
     if (kind === "nas" && connectionId) await ensureNasFolders(connectionId, [source], ownerId);
+    await refreshFileAccessOf(existing.applicationId, ownerId);
 
     return {
         id: updated.id,
@@ -434,13 +467,14 @@ export async function deleteVolume(
 ): Promise<void> {
     const volume = await prisma.volume.findFirst({
         where: { id, target: { ownerId } },
-        select: { id: true }
+        select: { id: true, applicationId: true }
     });
     if (!volume) throw new Error("Volume not found");
     // Wipe before detaching: once the row is gone there is nothing left that
     // knows where the data was.
     if (options?.wipe) await wipeVolume(id, ownerId);
     await prisma.volume.delete({ where: { id } });
+    await refreshFileAccessOf(volume.applicationId, ownerId);
 }
 
 // --- usage and wiping -------------------------------------------------------

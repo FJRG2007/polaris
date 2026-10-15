@@ -17,13 +17,16 @@ import { prisma } from "@polaris/db";
 import { isViewing } from "./presence";
 import { sendSms } from "./sms-service";
 import { sendWebhook } from "./webhook-sender";
+import { queueOutboundHooks } from "./outbound-hooks";
 import { sendAuthEmail } from "@/lib/auth-mail";
 import { appBaseUrl } from "@/lib/domain-service";
 import { wordsFor } from "./notice-words";
-import { getNotificationPreferences } from "./preferences";
+import { getNotificationPreferences, getQuietHours } from "./preferences";
 import { createNotification, type NotificationAudience } from "@/lib/notification-service";
 import { destinationSummary, recordDestinationResult, resolveDestination } from "./destinations";
 import {
+    clearsMinLevel,
+    heldByQuietHours,
     notificationEvent,
     resolveRule,
     type NotificationLevel,
@@ -141,7 +144,12 @@ async function deliverEmail(input: NotifyInput, level: NotificationLevel): Promi
     const link = await absoluteHref(input.href);
     const { text, html } = emailBody(input, link);
     const prefix = level === "danger" ? "[Alert] " : "";
-    const result = await sendAuthEmail({ to: address, subject: `${prefix}${input.title}`, text, html });
+    const result = await sendAuthEmail({
+        to: address,
+        subject: `${prefix}${input.title}`,
+        text,
+        html
+    });
     await record({
         userId: input.userId,
         event: input.event,
@@ -154,7 +162,8 @@ async function deliverEmail(input: NotifyInput, level: NotificationLevel): Promi
 async function deliverDestination(
     input: NotifyInput,
     level: NotificationLevel,
-    destinationId: string
+    destinationId: string,
+    critical: boolean
 ): Promise<void> {
     const destination = await resolveDestination(input.userId, destinationId);
     if (!destination) {
@@ -171,6 +180,19 @@ async function deliverDestination(
         return;
     }
 
+    if (!clearsMinLevel(level, destination.minLevel, critical)) {
+        await record({
+            userId: input.userId,
+            event: input.event,
+            kind: destination.kind,
+            destinationId: destination.id,
+            destinationHint: destination.targetHint,
+            status: "skipped",
+            detail: QUIET_SEVERITY
+        });
+        return;
+    }
+
     const result =
         destination.kind === "sms"
             ? await sendSms(
@@ -178,15 +200,21 @@ async function deliverDestination(
                   destination.target,
                   input.body ? `${input.title}\n${input.body}` : input.title
               )
-            : await sendWebhook(destination.target, (destination.format ?? "generic") as WebhookFormat, {
-                  openLabel: (await wordsFor(input.userId, "notices"))("delivery.openInPolaris"),
-                  event: input.event,
-                  level,
-                  title: input.title,
-                  body: input.body ?? null,
-                  url: await absoluteHref(input.href),
-                  at: new Date().toISOString()
-              });
+            : await sendWebhook(
+                  destination.target,
+                  (destination.format ?? "generic") as WebhookFormat,
+                  {
+                      openLabel: (await wordsFor(input.userId, "notices"))(
+                          "delivery.openInPolaris"
+                      ),
+                      event: input.event,
+                      level,
+                      title: input.title,
+                      body: input.body ?? null,
+                      url: await absoluteHref(input.href),
+                      at: new Date().toISOString()
+                  }
+              );
 
     await recordDestinationResult(destination.id, result.error ?? null);
     await record({
@@ -200,12 +228,73 @@ async function deliverDestination(
     });
 }
 
+/** The delivery log's reasons for an alert held back on purpose. Matched back
+ *  to the reader's words by delivery-words. */
+export const QUIET_SEVERITY = "Below the lowest severity set for this destination.";
+export const QUIET_HOURS = "Held back: it arrived during your quiet hours.";
+
+/**
+ * Whether the account's quiet hours hold this alert back now, read on its own
+ * clock. Unreadable settings never hold anything back: a missed alert costs
+ * more than an untimely one.
+ */
+async function quietNow(userId: string, critical: boolean): Promise<boolean> {
+    try {
+        // Loaded here rather than at the top: it reads the deployment's settings
+        // on import, and most alerts never need a clock at all.
+        const { resolveDisplayPreferencesFor } = await import("@/lib/display-prefs-service");
+        const [quiet, display] = await Promise.all([
+            getQuietHours(userId),
+            resolveDisplayPreferencesFor(userId)
+        ]);
+        return heldByQuietHours(quiet, new Date(), display.timeZone, critical);
+    } catch {
+        return false;
+    }
+}
+
 /** Everything the rule asks for beyond the bell, run together. */
-async function fanOut(input: NotifyInput, level: NotificationLevel, rule: NotificationRule): Promise<void> {
+async function fanOut(
+    input: NotifyInput,
+    level: NotificationLevel,
+    rule: NotificationRule,
+    critical: boolean
+): Promise<void> {
+    if ((rule.email || rule.destinations.length > 0) && (await quietNow(input.userId, critical))) {
+        const held: Array<Promise<void>> = [];
+        if (rule.email) {
+            held.push(
+                record({
+                    userId: input.userId,
+                    event: input.event,
+                    kind: "email",
+                    status: "skipped",
+                    detail: QUIET_HOURS
+                })
+            );
+        }
+        for (const destinationId of rule.destinations) {
+            held.push(
+                destinationSummary(input.userId, destinationId).then((summary) =>
+                    record({
+                        userId: input.userId,
+                        event: input.event,
+                        kind: summary?.kind ?? "webhook",
+                        destinationId,
+                        destinationHint: summary?.targetHint ?? null,
+                        status: "skipped",
+                        detail: QUIET_HOURS
+                    })
+                )
+            );
+        }
+        await Promise.allSettled(held);
+        return;
+    }
     const work: Array<Promise<void>> = [];
     if (rule.email) work.push(deliverEmail(input, level));
     for (const destinationId of rule.destinations) {
-        work.push(deliverDestination(input, level, destinationId));
+        work.push(deliverDestination(input, level, destinationId, critical));
     }
     await Promise.allSettled(work);
 }
@@ -276,8 +365,22 @@ export async function notify(input: NotifyInput): Promise<void> {
         });
     }
 
-    void fanOut(input, level, rule).catch((error) => {
+    void fanOut(input, level, rule, event.critical === true).catch((error) => {
         console.error("polaris: notification fan-out failed:", error);
+    });
+
+    // The account's signed webhooks choose their own events, so they follow
+    // neither the rule above nor quiet hours: a program does not sleep.
+    void (async () =>
+        queueOutboundHooks(input.userId, {
+            event: input.event,
+            level,
+            title: input.title,
+            body: input.body ?? null,
+            url: await absoluteHref(input.href),
+            at: new Date().toISOString()
+        }))().catch((error) => {
+        console.error("polaris: queueing signed webhooks failed:", error);
     });
 }
 
@@ -286,7 +389,10 @@ export async function notify(input: NotifyInput): Promise<void> {
  * number finds out it works before an incident does. Returns the provider's
  * reason on failure, which is the whole point of the button.
  */
-export async function testDestination(userId: string, destinationId: string): Promise<{ error?: string }> {
+export async function testDestination(
+    userId: string,
+    destinationId: string
+): Promise<{ error?: string }> {
     const destination = await resolveDestination(userId, destinationId);
     const t = await wordsFor(userId, "notices");
     if (!destination) return { error: t("test.gone") };
@@ -296,16 +402,22 @@ export async function testDestination(userId: string, destinationId: string): Pr
     const result =
         destination.kind === "sms"
             ? await sendSms(userId, destination.target, `${title}: ${body}`)
-            : await sendWebhook(destination.target, (destination.format ?? "generic") as WebhookFormat, {
-                  openLabel: t("delivery.openInPolaris"),
-                  event: "test",
-                  level: "info",
-                  title,
-                  body,
-                  url: await absoluteHref("/account/notifications"),
-                  at: new Date().toISOString()
-              });
+            : await sendWebhook(
+                  destination.target,
+                  (destination.format ?? "generic") as WebhookFormat,
+                  {
+                      openLabel: t("delivery.openInPolaris"),
+                      event: "test",
+                      level: "info",
+                      title,
+                      body,
+                      url: await absoluteHref("/account/notifications"),
+                      at: new Date().toISOString()
+                  }
+              );
 
     await recordDestinationResult(destination.id, result.error ?? null);
-    return result.error ? { error: deliveryText(await wordsFor(userId, "components"), result.error) } : result;
+    return result.error
+        ? { error: deliveryText(await wordsFor(userId, "components"), result.error) }
+        : result;
 }

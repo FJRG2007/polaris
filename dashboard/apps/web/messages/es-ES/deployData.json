@@ -9,7 +9,10 @@
             "copy": "Importar datos",
             "buckets": "Buckets",
             "activity": "Actividad",
-            "database": "Base"
+            "database": "Base",
+            "users": "Usuarios",
+            "processes": "Conexiones",
+            "tuning": "Ajustes"
         },
         "hosted": "Vive dentro de {host}. Su versión y sus ajustes son los de la instancia.",
         "anotherInstance": "otra instancia",
@@ -232,7 +235,75 @@
             "deleteTitle": "Borrar bucket"
         },
         "fullScreen": "Ampliar",
-        "exitFullScreen": "Ventana normal"
+        "exitFullScreen": "Ventana normal",
+        "users": {
+            "title": "Cuentas",
+            "hint": "Quién entra en esta instancia y a qué bases de datos llega cada uno.",
+            "name": "Cuenta",
+            "namePlaceholder": "informes",
+            "nameInvalid": "Minúsculas, dígitos y guiones bajos; empieza por una letra.",
+            "nameReserved": "Ese nombre es del motor. Elige otro.",
+            "add": "Añadir cuenta",
+            "created": "{name} está lista. Copia la contraseña:",
+            "shownOnce": "Es la única vez que se muestra la contraseña.",
+            "dismiss": "Cerrar",
+            "unreadable": "No se leyeron las cuentas.",
+            "retry": "Reintentar",
+            "empty": "Aún no hay cuentas.",
+            "protected": "Gestionada por Polaris",
+            "grant": "Dar acceso",
+            "grantConfirm": "Dar acceso",
+            "noDatabases": "No hay ninguna base de datos que dar.",
+            "noAccess": "Sin bases de datos.",
+            "remove": "Quitar {name}",
+            "removeTitle": "¿Quitar {name}?",
+            "removeBody": "Las apps que entran con ella dejan de conectar. Los datos quedan.",
+            "removeConfirm": "Quitar",
+            "revoke": "Quitar acceso a {database}",
+            "revokeTitle": "¿Quitar acceso a {database}?",
+            "revokeBody": "{name} ya no puede leer ni cambiar {database}.",
+            "revokeConfirm": "Quitar acceso",
+            "database": "Base de datos",
+            "access": "Acceso",
+            "privileges": {
+                "owner": "Total",
+                "readwrite": "Leer y escribir",
+                "readonly": "Solo lectura"
+            }
+        },
+        "processes": {
+            "title": "Conexiones abiertas",
+            "hint": "Las {count} más largas; se actualiza cada pocos segundos.",
+            "unreadable": "No se leyeron las conexiones.",
+            "empty": "No hay nada conectado.",
+            "self": "Esta lista",
+            "system": "sistema",
+            "seconds": "{seconds} s",
+            "kill": "Cerrar",
+            "killTitle": "¿Cerrar la conexión #{id}?",
+            "killBody": "Lo que ejecuta {user} se cancela y la app tiene que reconectar.",
+            "killConfirm": "Cerrar conexión"
+        },
+        "tuning": {
+            "title": "Ajustes de memoria",
+            "fromLimit": "Calculados para su límite de {size}.",
+            "fromContainer": "Calculados para los {size} que indica su contenedor. Pon un límite de memoria para usar menos.",
+            "unreadable": "No se leyeron los ajustes.",
+            "setting": "Ajuste",
+            "current": "Ahora",
+            "suggested": "Sugerido",
+            "changes": "Cambia",
+            "upToDate": "Ya está como se sugiere.",
+            "apply": "Aplicar sugerencias",
+            "applyTitle": "¿Aplicar y reiniciar?",
+            "applyBody": "Se guardan los ajustes y la base de datos se reinicia. No responde durante unos segundos.",
+            "applyConfirm": "Aplicar y reiniciar",
+            "refusal": {
+                "mariadb": "No se puede aplicar: MariaDB no guarda ajustes desde una conexión.",
+                "mysqlOld": "No se puede aplicar: requiere MySQL 8 o posterior.",
+                "noLimit": "Pon un límite de memoria para aplicarlos. Sin él se calculan para todo el servidor, que también ejecuta todo lo demás."
+            }
+        }
     },
     "volume": {
         "tabs": {
@@ -537,6 +608,43 @@
             "portInvalid": "Usa de 1024 a 65535, fuera de 20000 a 39999.",
             "noAddress": "Publicada en el puerto {port}, pero Polaris no conoce la dirección de este servidor. Ponla en Dominios.",
             "hostedPrivate": "Esta base de datos vive dentro de otra instancia. Publica esa instancia para llegar desde fuera."
+        }
+    },
+    "fileAccess": {
+        "title": "Acceso SFTP",
+        "intro": "Cuentas que acceden a los volúmenes de este servicio desde un cliente SFTP, y a nada más.",
+        "add": "Añadir cuenta",
+        "address": "Dirección",
+        "port": "Puerto {port} de este servidor",
+        "username": "Usuario",
+        "password": "Contraseña",
+        "publicKey": "Clave pública",
+        "readOnly": "Solo lectura",
+        "readOnlyBadge": "Solo lectura",
+        "readWriteBadge": "Lee y escribe",
+        "cancel": "Cancelar",
+        "create": "Crear cuenta",
+        "withPassword": "Entra con contraseña",
+        "withKey": "Entra con clave",
+        "remove": "Quitar cuenta",
+        "removeNamed": "Quitar {name}",
+        "kind": "cuenta SFTP",
+        "empty": "Aún no hay cuentas. Nada se ejecuta hasta que añadas una.",
+        "noVolumes": "Este servicio no tiene volúmenes. Añade uno para acceder a sus archivos por SFTP.",
+        "firstStarts": "La primera cuenta inicia el servidor SFTP, que puede tardar un minuto mientras se descarga.",
+        "lastStops": "Es la última cuenta, así que el servidor SFTP también se detiene.",
+        "unreadable": "No se pudieron leer las cuentas SFTP.",
+        "issues": {
+            "username": "Usa de 3 a 32 minúsculas, dígitos, - o _, empezando por una letra.",
+            "reservedName": "Ese nombre lo usa el sistema. Elige otro.",
+            "passwordLong": "Usa como mucho 128 caracteres.",
+            "passwordLineBreak": "La contraseña no puede tener saltos de línea.",
+            "passwordShort": "Usa al menos 12 caracteres.",
+            "keyLong": "Esa clave es demasiado larga.",
+            "keyShape": "Eso no es una línea de clave pública OpenSSH.",
+            "needOne": "Indica una contraseña, una clave pública o ambas.",
+            "passwordHasName": "La contraseña no puede contener el usuario.",
+            "invalid": "Revisa los datos de la cuenta."
         }
     }
 }

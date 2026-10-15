@@ -16,6 +16,8 @@ import { recordAudit } from "@/lib/audit-service";
 import { verifyIp } from "@/lib/integrations/dymo";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
+import { connectionFailure, markConnectionFailureSeen } from "@/lib/connections/attention";
+import { dismissAdminWaiting } from "@/lib/admin-waiting";
 import { verifyKey } from "@/lib/integrations/virustotal";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip";
 import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
@@ -114,6 +116,38 @@ export async function saveConnectionSignInAction(
     });
     revalidatePath("/admin/integrations");
     revalidatePath("/account/security");
+    return {};
+}
+
+/**
+ * Mark a service's last failure as seen: its alert is answered in every
+ * operator's bell and the count on Integrations goes, but the card keeps saying
+ * it needs attention - marking it read does not make the service work. Only the
+ * service working again clears that.
+ */
+export async function dismissConnectionFailureAction(
+    provider: string
+): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    if (typeof provider !== "string" || !findConnectionProvider(provider))
+        return { error: t("integrations.errors.unknownService") };
+
+    const failure = await connectionFailure(provider).catch(() => null);
+    if (!(await markConnectionFailureSeen(provider)))
+        return { error: t("integrations.errors.notSaved") };
+    // A Google API turned off is what Integrations counts; seen here, it is
+    // seen there too, until another one goes off.
+    if (provider === "google" && failure?.kind === "api-off")
+        await dismissAdminWaiting(user.id, ["apis"]).catch(() => undefined);
+    await recordAudit({
+        actorId: user.id,
+        action: "integration.configure",
+        targetType: "integration",
+        targetId: provider,
+        metadata: { failureDismissed: true }
+    });
+    revalidatePath("/admin/integrations");
     return {};
 }
 

@@ -17,16 +17,24 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { testDestination } from "@/lib/notifications/dispatch";
 import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
 import { saveSoundVolume } from "@/lib/notifications/sound-volume-service";
-import { destinationInputSchema, isNotificationEvent, notificationRuleSchema } from "@polaris/core";
+import {
+    alertMinLevelSchema,
+    destinationInputSchema,
+    isNotificationEvent,
+    notificationRuleSchema,
+    quietHoursSchema
+} from "@polaris/core";
 import {
     getNotificationPreferences,
-    saveNotificationPreferences
+    saveNotificationPreferences,
+    saveQuietHours
 } from "@/lib/notifications/preferences";
 import {
     createDestination,
     deleteDestination,
     ownsDestinations,
     setDestinationEnabled,
+    setDestinationMinLevel,
     type DestinationView
 } from "@/lib/notifications/destinations";
 import {
@@ -41,11 +49,7 @@ import {
 } from "@/lib/notification-service";
 import { openShelfFor } from "@/lib/workspace-scope";
 import { chatRelayReady } from "@/lib/app-extensions/registry";
-import {
-    IN_GAME_CHOICES,
-    storedInGame,
-    type InGameChoice
-} from "@/lib/chat/in-game-choice";
+import { IN_GAME_CHOICES, storedInGame, type InGameChoice } from "@/lib/chat/in-game-choice";
 
 /**
  * Which of this account's Chat messages are shown inside the game it is playing
@@ -56,7 +60,8 @@ export async function setMessagesInGameAction(
 ): Promise<{ choice?: InGameChoice; error?: string }> {
     const user = await requireUser();
     const parsed = z.enum(IN_GAME_CHOICES).safeParse(choice);
-    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
     // The same test the screen draws from: nothing to choose until a server
     // knows which of its players is this account.
     if (!(await chatRelayReady(user.id).catch(() => false))) {
@@ -73,12 +78,11 @@ export async function setMessagesInGameAction(
  * Whether opening the screen a badge points at clears it, until something new
  * arrives. Saved on the account, so it holds on every device.
  */
-export async function setBadgesClearOnVisitAction(
-    enabled: unknown
-): Promise<{ error?: string }> {
+export async function setBadgesClearOnVisitAction(enabled: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = z.boolean().safeParse(enabled);
-    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
     await prisma.user.update({
         where: { id: user.id },
         data: { badgesClearOnVisit: parsed.data }
@@ -156,7 +160,8 @@ export async function loadNotificationHistoryAction(input: unknown): Promise<Not
 export async function saveSoundVolumeAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = z.object({ volume: soundVolumeSchema }).safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("accountNotifications"))("errors.volume") };
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.volume") };
     await saveSoundVolume(user.id, parsed.data.volume);
     return {};
 }
@@ -175,7 +180,11 @@ export async function saveNotificationRuleAction(input: unknown): Promise<{ erro
     const user = await requireUser();
     const parsed = saveRuleSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountNotifications"))("errors.checkChoice") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountNotifications"))("errors.checkChoice")
+        };
     }
 
     if (!(await ownsDestinations(user.id, parsed.data.rule.destinations))) {
@@ -197,7 +206,11 @@ export async function createDestinationAction(
     const user = await requireUser();
     const parsed = destinationInputSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("accountNotifications"))("errors.checkForm") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("accountNotifications"))("errors.checkForm")
+        };
     }
     const result = await createDestination(user.id, parsed.data);
     if (!result.error) revalidatePath("/account/notifications");
@@ -225,8 +238,33 @@ export async function deleteDestinationAction(id: string): Promise<void> {
 export async function testDestinationAction(id: string): Promise<{ error?: string }> {
     const user = await requireUser();
     const throttle = await rateLimit(`notify-test:${user.id}`, TEST_LIMIT, TEST_WINDOW_MS);
-    if (!throttle.ok) return { error: (await getTranslations("accountNotifications"))("errors.tooManyTests") };
+    if (!throttle.ok)
+        return { error: (await getTranslations("accountNotifications"))("errors.tooManyTests") };
     const result = await testDestination(user.id, id);
     revalidatePath("/account/notifications");
     return result;
+}
+
+/** The lowest severity one of this account's destinations is sent. */
+export async function setDestinationMinLevelAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z
+        .object({ id: z.string().uuid(), minLevel: alertMinLevelSchema })
+        .safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    await setDestinationMinLevel(user.id, parsed.data.id, parsed.data.minLevel);
+    revalidatePath("/account/notifications");
+    return {};
+}
+
+/** When this account's mail, webhooks and texts hold off. */
+export async function saveQuietHoursAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = quietHoursSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
+    await saveQuietHours(user.id, parsed.data);
+    revalidatePath("/account/notifications");
+    return {};
 }

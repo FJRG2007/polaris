@@ -35,7 +35,8 @@ vi.mock("@polaris/db", () => ({
         },
         notificationDelivery: { create: async () => ({}) },
         organization: {
-            findFirst: async ({ where }: { where: { id: string } }) => (where.id === "acme" ? { id: "acme" } : null)
+            findFirst: async ({ where }: { where: { id: string } }) =>
+                where.id === "acme" ? { id: "acme" } : null
         },
         user: { findUnique: async () => null, findMany: async () => [] },
         userEmail: { findFirst: async () => null }
@@ -56,6 +57,9 @@ vi.mock("../../src/lib/notifications/destinations", () => ({
 }));
 
 const service = await import("@/lib/notification-service");
+vi.mock("../../src/lib/notifications/outbound-hooks", () => ({
+    queueOutboundHooks: async () => {}
+}));
 const { notify } = await import("@/lib/notifications/dispatch");
 
 const ON_SHELF = { OR: [{ shelf: null }, { shelf: "acme" }] };
@@ -91,12 +95,22 @@ describe("the feed on the open shelf", () => {
 
 describe("raising an alert", () => {
     it("files one about an organization's work under its shelf", async () => {
-        await notify({ userId: "u1", event: "deploy.failed", title: "Deploy failed", shelf: { orgId: "acme" } });
+        await notify({
+            userId: "u1",
+            event: "deploy.failed",
+            title: "Deploy failed",
+            shelf: { orgId: "acme" }
+        });
         expect(created[0]?.shelf).toBe("acme");
     });
 
     it("files one about somebody's own work under the personal shelf", async () => {
-        await notify({ userId: "u1", event: "deploy.failed", title: "Deploy failed", shelf: { orgId: null } });
+        await notify({
+            userId: "u1",
+            event: "deploy.failed",
+            title: "Deploy failed",
+            shelf: { orgId: null }
+        });
         expect(created[0]?.shelf).toBe("personal");
     });
 

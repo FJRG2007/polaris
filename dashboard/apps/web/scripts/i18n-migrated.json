@@ -530,9 +530,11 @@
         "web/src/app/(app)/apps/deploy/build-machine-section.tsx",
         "web/src/app/(app)/apps/deploy/cron-actions.ts",
         "web/src/app/(app)/apps/deploy/cron-panel.tsx",
+        "web/src/app/(app)/apps/deploy/database-accounts-panel.tsx",
         "web/src/app/(app)/apps/deploy/database-actions.ts",
         "web/src/app/(app)/apps/deploy/database-panel.tsx",
         "web/src/app/(app)/apps/deploy/database-topology-field.tsx",
+        "web/src/app/(app)/apps/deploy/database-tuning-panel.tsx",
         "web/src/app/(app)/apps/deploy/deploy-behaviour-section.tsx",
         "web/src/app/(app)/apps/deploy/deploy-callouts.tsx",
         "web/src/app/(app)/apps/deploy/deploy-canvas.tsx",
@@ -543,6 +545,8 @@
         "web/src/app/(app)/apps/deploy/edge-settings.tsx",
         "web/src/app/(app)/apps/deploy/elsewhere-view.tsx",
         "web/src/app/(app)/apps/deploy/external-actions.ts",
+        "web/src/app/(app)/apps/deploy/file-access-actions.ts",
+        "web/src/app/(app)/apps/deploy/file-access-panel.tsx",
         "web/src/app/(app)/apps/deploy/files-panel.tsx",
         "web/src/app/(app)/apps/deploy/fix-actions.ts",
         "web/src/app/(app)/apps/deploy/folder-picker.tsx",
@@ -1506,6 +1510,7 @@
         "web/src/lib/update-watcher.ts",
         "web/src/lib/address-health.ts",
         "web/src/lib/admin-waiting.ts",
+        "web/src/lib/deploy/file-access.ts",
         "web/src/lib/deploy/leftover-volumes.ts",
         "web/src/lib/integrations/github-permission-notice.ts",
         "web/src/lib/update-runner.ts",
@@ -1890,6 +1895,8 @@
         "web/src/lib/deploy/panel-import/jobs.ts",
         "web/src/lib/deploy/promotion.ts",
         "web/src/lib/restore-points/service.ts",
-        "web/src/lib/env-var-service.ts"
+        "web/src/lib/env-var-service.ts",
+        "web/src/lib/database-ops/accounts.ts",
+        "web/src/lib/database-ops/tuning.ts"
     ]
 }

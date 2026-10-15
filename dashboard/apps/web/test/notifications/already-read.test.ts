@@ -17,8 +17,16 @@ const deliveries: Array<{ kind: string; status: string; detail: string | null }>
 vi.mock("@polaris/db", () => ({
     prisma: {
         notificationDelivery: {
-            create: async ({ data }: { data: { kind: string; status: string; detail: string | null } }) => {
-                deliveries.push({ kind: data.kind, status: data.status, detail: data.detail ?? null });
+            create: async ({
+                data
+            }: {
+                data: { kind: string; status: string; detail: string | null };
+            }) => {
+                deliveries.push({
+                    kind: data.kind,
+                    status: data.status,
+                    detail: data.detail ?? null
+                });
                 return data;
             }
         },
@@ -26,7 +34,9 @@ vi.mock("@polaris/db", () => ({
         userEmail: { findFirst: async () => null }
     }
 }));
-vi.mock("@/lib/notification-service", () => ({ createNotification: (input: unknown) => created(input as never) }));
+vi.mock("@/lib/notification-service", () => ({
+    createNotification: (input: unknown) => created(input as never)
+}));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.test" }));
 vi.mock("@/lib/auth-mail", () => ({ sendAuthEmail: async () => ({}) }));
 vi.mock("../../src/lib/notifications/preferences", () => ({
@@ -42,6 +52,9 @@ vi.mock("../../src/lib/notifications/destinations", () => ({
     resolveDestination: async () => null
 }));
 vi.mock("../../src/lib/notifications/webhook-sender", () => ({ sendWebhook: async () => ({}) }));
+vi.mock("../../src/lib/notifications/outbound-hooks", () => ({
+    queueOutboundHooks: async () => {}
+}));
 vi.mock("../../src/lib/notifications/sms-service", () => ({ sendSms: async () => ({}) }));
 
 const { notify } = await import("../../src/lib/notifications/dispatch");
@@ -105,7 +118,12 @@ describe("raising an alert at somebody watching the page", () => {
 
     it("leaves an alert with no page to be on unread", async () => {
         recordPresence(USER, TAB, "/apps/deploy/p1");
-        await notify({ userId: USER, event: "deploy.failed", title: "Deploy failed", body: "exit 1" });
+        await notify({
+            userId: USER,
+            event: "deploy.failed",
+            title: "Deploy failed",
+            body: "exit 1"
+        });
         expect(written().read).toBe(false);
     });
 

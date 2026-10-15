@@ -13,6 +13,7 @@ import { HardDrive, Plus, Server, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@polaris/ui";
 import { deleteVolumeAction, listVolumesAction } from "./actions";
 import { VolumeForm, type EditVolume } from "./volume-form";
+import { FileAccessPanel } from "./file-access-panel";
 import { useProjectCan } from "./access-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ProjectApp } from "./deploy-view";
@@ -169,6 +170,7 @@ export function VolumesTab({ app }: { app: ProjectApp }) {
                     </div>
                 ))}
             </div>
+            <FileAccessPanel applicationId={app.id} />
         </div>
     );
 }

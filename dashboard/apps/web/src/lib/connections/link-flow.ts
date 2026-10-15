@@ -586,7 +586,7 @@ async function finishLink(
         if ((await connectionOAuthClient(provider))?.clientId === client.clientId) {
             await markConnectionProven(provider);
             // Whatever it last refused, it does not refuse now.
-            await clearConnectionFailure(provider);
+            await clearConnectionFailure(provider, "refusal");
         }
         return endLink(origin, provider, "linked", screen, extra);
     } catch (caught) {

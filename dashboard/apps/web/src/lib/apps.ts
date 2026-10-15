@@ -1503,6 +1503,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["alerts", "email"]
         },
         {
+            label: "Webhooks", // i18n-ignore
+            href: "/account/webhooks",
+            icon: Webhook,
+            keywords: ["webhook", "signed", "endpoint", "events", "integration", "deploy hook"]
+        },
+        {
             label: "Connected accounts", // i18n-ignore
             href: "/account/connections",
             icon: Link2,

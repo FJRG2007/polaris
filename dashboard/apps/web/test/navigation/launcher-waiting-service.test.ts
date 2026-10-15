@@ -98,7 +98,7 @@ describe("what the menu lists", () => {
         expect(admin?.items.map((item) => [item.id, item.dismissable])).toEqual([
             ["reports", true],
             ["update", true],
-            ["apis", false]
+            ["apis", true]
         ]);
     });
 
@@ -137,6 +137,6 @@ describe("marking read", () => {
         await markLauncherRead("ada", "admin", "update");
         await markLauncherRead("ada", "admin", "nonsense");
         await markLauncherRead("ada", "admin", null);
-        expect(dismissed).toEqual([["update"], ["reports", "cases", "update"]]);
+        expect(dismissed).toEqual([["update"], ["reports", "cases", "update", "apis"]]);
     });
 });

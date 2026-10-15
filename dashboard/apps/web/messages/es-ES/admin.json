@@ -1398,7 +1398,13 @@
         "attention": {
             "title": "Alguien no ha podido conectar su cuenta",
             "reason": "Se rechazó el último intento. {name} dijo: {reason}",
-            "clears": "Desaparece en cuanto una autorización se complete."
+            "clears": "Desaparece en cuanto una autorización se complete.",
+            "seen": "Marcar visto",
+            "seenNamed": "Marcar {name} como visto",
+            "apiOffTitle": "Una API que {name} necesita está desactivada",
+            "apiOffReason": "Se rechazó la última petición: {reason}",
+            "apiOffClears": "Desaparece en cuanto Drive vuelva a responder.",
+            "alreadySeen": "Ya marcado como visto"
         },
         "signIn": {
             "label": "Permitir iniciar sesión con {name}",

@@ -9,7 +9,10 @@
             "copy": "Copy data in",
             "buckets": "Buckets",
             "activity": "Activity",
-            "database": "Database"
+            "database": "Database",
+            "users": "Users",
+            "processes": "Connections",
+            "tuning": "Tuning"
         },
         "hosted": "Lives inside {host}. Its version and settings are the instance's.",
         "anotherInstance": "another instance",
@@ -232,7 +235,75 @@
             "deleteTitle": "Delete bucket"
         },
         "fullScreen": "Full screen",
-        "exitFullScreen": "Exit full screen"
+        "exitFullScreen": "Exit full screen",
+        "users": {
+            "title": "Accounts",
+            "hint": "Who can sign in to this instance, and which databases each one reaches.",
+            "name": "Account name",
+            "namePlaceholder": "reporting",
+            "nameInvalid": "Lowercase letters, digits and underscores, starting with a letter.",
+            "nameReserved": "That name belongs to the engine. Pick another.",
+            "add": "Add account",
+            "created": "{name} is ready. Copy its password now:",
+            "shownOnce": "This is the only time the password is shown.",
+            "dismiss": "Close",
+            "unreadable": "Could not read the accounts.",
+            "retry": "Try again",
+            "empty": "No accounts yet.",
+            "protected": "Managed by Polaris",
+            "grant": "Give access",
+            "grantConfirm": "Give access",
+            "noDatabases": "There is no database to give access to.",
+            "noAccess": "No databases yet.",
+            "remove": "Remove {name}",
+            "removeTitle": "Remove {name}?",
+            "removeBody": "Apps signing in with it stop connecting. Its data stays.",
+            "removeConfirm": "Remove",
+            "revoke": "Remove access to {database}",
+            "revokeTitle": "Remove access to {database}?",
+            "revokeBody": "{name} can no longer read or change {database}.",
+            "revokeConfirm": "Remove access",
+            "database": "Database name",
+            "access": "Access",
+            "privileges": {
+                "owner": "Full",
+                "readwrite": "Read and write",
+                "readonly": "Read only"
+            }
+        },
+        "processes": {
+            "title": "Open connections",
+            "hint": "The {count} longest-running, refreshed every few seconds.",
+            "unreadable": "Could not read the connections.",
+            "empty": "Nothing is connected.",
+            "self": "This list",
+            "system": "system",
+            "seconds": "{seconds}s",
+            "kill": "End",
+            "killTitle": "End connection #{id}?",
+            "killBody": "Whatever {user} is running is cancelled and the app has to reconnect.",
+            "killConfirm": "End connection"
+        },
+        "tuning": {
+            "title": "Memory settings",
+            "fromLimit": "Sized for its {size} memory limit.",
+            "fromContainer": "Sized for the {size} its container reports. Set a memory limit to size it for less.",
+            "unreadable": "Could not read the settings.",
+            "setting": "Setting",
+            "current": "Now",
+            "suggested": "Suggested",
+            "changes": "Changes",
+            "upToDate": "Already set as suggested.",
+            "apply": "Apply suggestions",
+            "applyTitle": "Apply and restart?",
+            "applyBody": "The settings are saved and the database restarts. It is unavailable for a few seconds while it does.",
+            "applyConfirm": "Apply and restart",
+            "refusal": {
+                "mariadb": "Applying is not available: MariaDB cannot save a setting from a connection.",
+                "mysqlOld": "Applying is not available: it needs MySQL 8 or later.",
+                "noLimit": "Set a memory limit to apply these. Without one they are sized for the whole server, which runs everything else too."
+            }
+        }
     },
     "volume": {
         "tabs": {
@@ -537,6 +608,43 @@
             "portInvalid": "Use 1024 to 65535, outside 20000 to 39999.",
             "noAddress": "Published on port {port}, but Polaris does not know this server's address. Set it under Domains.",
             "hostedPrivate": "This database lives inside another instance. Publish that instance to reach it from outside."
+        }
+    },
+    "fileAccess": {
+        "title": "SFTP access",
+        "intro": "Accounts that reach this service's volumes from an SFTP client, and nothing else.",
+        "add": "Add account",
+        "address": "Address",
+        "port": "Port {port} on this server",
+        "username": "Username",
+        "password": "Password",
+        "publicKey": "Public key",
+        "readOnly": "Read only",
+        "readOnlyBadge": "Read only",
+        "readWriteBadge": "Read and write",
+        "cancel": "Cancel",
+        "create": "Create account",
+        "withPassword": "Signs in with a password",
+        "withKey": "Signs in with a key",
+        "remove": "Remove account",
+        "removeNamed": "Remove {name}",
+        "kind": "SFTP account",
+        "empty": "No accounts yet. Nothing runs until you add one.",
+        "noVolumes": "This service has no volumes. Add one to reach its files over SFTP.",
+        "firstStarts": "The first account starts the SFTP server, which can take a minute while it downloads.",
+        "lastStops": "This is the last account, so the SFTP server stops too.",
+        "unreadable": "Could not read the SFTP accounts.",
+        "issues": {
+            "username": "Use 3 to 32 lowercase letters, digits, - or _, starting with a letter.",
+            "reservedName": "That name is kept for the system. Pick another.",
+            "passwordLong": "Use at most 128 characters.",
+            "passwordLineBreak": "A password cannot contain a line break.",
+            "passwordShort": "Use at least 12 characters.",
+            "keyLong": "That key is too long.",
+            "keyShape": "That is not an OpenSSH public key line.",
+            "needOne": "Give a password, a public key, or both.",
+            "passwordHasName": "The password cannot contain the username.",
+            "invalid": "Check the account's details."
         }
     }
 }

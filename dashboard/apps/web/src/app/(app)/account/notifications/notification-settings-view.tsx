@@ -11,11 +11,13 @@
  * failed to send.
  */
 
+import type { QuietHours } from "@polaris/core";
 import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
 import { eventDescription, eventLabel, groupLabel } from "./event-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DestinationsCard } from "./destinations-card";
+import { QuietHoursCard } from "./quiet-hours-card";
 import {
     saveNotificationRuleAction,
     saveSoundVolumeAction,
@@ -91,7 +93,8 @@ export function NotificationSettingsView({
     deliveries,
     messagesInGame = null,
     inGameReady = true,
-    badgesClearOnVisit = null
+    badgesClearOnVisit = null,
+    quiet = null
 }: {
     rules: Array<{ event: string; rule: NotificationRule }>;
     destinations: DestinationView[];
@@ -105,6 +108,8 @@ export function NotificationSettingsView({
     /** Whether opening a screen clears its badge, or null for an account with
      *  no such badge. */
     badgesClearOnVisit?: boolean | null;
+    /** Quiet hours and the zone they are read in; null leaves the card out. */
+    quiet?: { hours: QuietHours; timeZone: string } | null;
 }) {
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
@@ -161,6 +166,7 @@ export function NotificationSettingsView({
                 destinations={destinations}
                 smsReady={senders.some((s) => s.status === "connected")}
             />
+            {quiet ? <QuietHoursCard initial={quiet.hours} timeZone={quiet.timeZone} /> : null}
             <DeliveryLog deliveries={deliveries} />
         </div>
     );
@@ -224,7 +230,9 @@ function InGameCard({ initial, ready }: { initial: inGame.InGameChoice; ready: b
                 </div>
                 {ready ? null : (
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                        <p className="min-w-0 text-xs text-muted-foreground">{t("inGame.notReady")}</p>
+                        <p className="min-w-0 text-xs text-muted-foreground">
+                            {t("inGame.notReady")}
+                        </p>
                         <Button asChild size="sm" variant="outline" className="shrink-0">
                             <Link href="/account/connections">{t("inGame.connectedAccounts")}</Link>
                         </Button>
@@ -311,11 +319,7 @@ function BrowserNoticesCard() {
             body: t("browser.testBody"),
             tag: "polaris:test"
         });
-        setShown(
-            notice
-                ? t("browser.testSent")
-                : t("browser.testRefused")
-        );
+        setShown(notice ? t("browser.testSent") : t("browser.testRefused"));
     }
 
     return (
@@ -380,7 +384,9 @@ function BrowserNoticesCard() {
                                 // allowed, and a row of dead switches teaches
                                 // nobody which of them was on.
                                 onChange={(next) => choose(kind, next)}
-                                aria-label={t("browser.outsideTab", { kind: t(`browser.kinds.${kind}.title` as const) })}
+                                aria-label={t("browser.outsideTab", {
+                                    kind: t(`browser.kinds.${kind}.title` as const)
+                                })}
                             />
                         </div>
                     ))}
@@ -431,11 +437,7 @@ function SoundCard() {
                         >
                             <Volume2 className="size-4" />
                         </button>
-                        <Switch
-                            checked={enabled}
-                            onChange={toggle}
-                            aria-label={t("sound.label")}
-                        />
+                        <Switch checked={enabled} onChange={toggle} aria-label={t("sound.label")} />
                     </div>
                 </div>
                 {/* Not disabled with the switch: the switch governs the chimes
@@ -522,23 +524,26 @@ function VolumeSlider() {
     const waiting = useRef<number | null>(null);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const commit = useCallback(async (next: number, preview: boolean) => {
-        waiting.current = null;
-        if (saved.current === next) return;
-        // Heard at the level just chosen, which is the question a slider asks.
-        // Not while leaving the page: a chime on the way out is a chime about
-        // nothing.
-        if (preview) playNotificationSound();
-        const before = saved.current ?? next;
-        saved.current = next;
-        const result = await saveSoundVolumeAction({ volume: next }).catch(() => ({
-            error: t("sound.volumeNotSaved")
-        }));
-        if (!result.error) return;
-        setError(result.error);
-        saved.current = before;
-        adoptSoundVolume(before);
-    }, [t]);
+    const commit = useCallback(
+        async (next: number, preview: boolean) => {
+            waiting.current = null;
+            if (saved.current === next) return;
+            // Heard at the level just chosen, which is the question a slider asks.
+            // Not while leaving the page: a chime on the way out is a chime about
+            // nothing.
+            if (preview) playNotificationSound();
+            const before = saved.current ?? next;
+            saved.current = next;
+            const result = await saveSoundVolumeAction({ volume: next }).catch(() => ({
+                error: t("sound.volumeNotSaved")
+            }));
+            if (!result.error) return;
+            setError(result.error);
+            saved.current = before;
+            adoptSoundVolume(before);
+        },
+        [t]
+    );
 
     useEffect(
         () => () => {
@@ -625,7 +630,9 @@ function TabIconCard() {
                     </span>
                     <div className="min-w-0">
                         <p className="text-sm font-medium">{t("tabIcon.title")}</p>
-                        <p className="text-xs text-muted-foreground">{t(`tabIcon.styles.${style}.hint` as const)}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t(`tabIcon.styles.${style}.hint` as const)}
+                        </p>
                     </div>
                 </div>
                 <SegmentedControl
@@ -672,7 +679,9 @@ function EventGroup({
                             <li key={entry.id} className="flex flex-col gap-2 px-4 py-3">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                        <p className="text-sm font-medium">{eventLabel(t, entry.id)}</p>
+                                        <p className="text-sm font-medium">
+                                            {eventLabel(t, entry.id)}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
                                             {eventDescription(t, entry.id)}
                                         </p>
@@ -746,11 +755,7 @@ function RuleChips({
                     label={destination.name}
                     on={rule.destinations.includes(destination.id)}
                     disabled={!destination.enabled}
-                    title={
-                        destination.enabled
-                            ? destination.targetHint
-                            : t("rules.destinationOff")
-                    }
+                    title={destination.enabled ? destination.targetHint : t("rules.destinationOff")}
                     onClick={() => toggleDestination(destination.id)}
                 />
             ))}

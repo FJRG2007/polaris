@@ -23,8 +23,9 @@
  *   with. Nobody's Google calendar or tasks come through until the
  *   administrator turns it on, and the person who notices is not the one who
  *   can: so it is counted here, on Integrations, where it is switched on - and
- *   the Calendar's own screen only says to ask. Counted until it is on again,
- *   never cleared by a visit: it is a fault, not news.
+ *   the Calendar's own screen only says to ask. Never cleared by a visit, but an
+ *   administrator can mark it seen: the count goes until another API goes off
+ *   (or the same one goes off again), while Integrations keeps saying it is off.
  *
  * Deliberately cheap: two counts and a few settings reads, no network. The update
  * check itself is a registry call and belongs to the watcher that already makes
@@ -72,13 +73,33 @@ export function googleApisOff(raws: readonly (string | null | undefined)[]): num
     return raws.filter((raw) => core.readProviderApiState(raw)?.state === "disabled").length;
 }
 
-/** The Google APIs switched off for this Polaris, as their states were stored by
- *  whichever learned first - the Calendar's sync or the Integrations probe. */
-async function apisOff(): Promise<number> {
-    const raws = await Promise.all(
-        core.GOOGLE_APIS.map((api) => getSetting(core.googleApiStateKey(api.id)).catch(() => null))
+/** One switched-off API as a mark: which, and since when, so the same API
+ *  going off again after it came back is new. Pure. */
+export function apiOffMarks(
+    states: readonly { readonly id: string; readonly raw: string | null | undefined }[]
+): string[] {
+    return states.flatMap(({ id, raw }) => {
+        const state = core.readProviderApiState(raw);
+        return state?.state === "disabled" ? [`${id}@${state.since}`] : [];
+    });
+}
+
+/** The switched-off APIs not among the ones an account marked seen. Pure. */
+export function unseenApisOff(marks: readonly string[], seen: string | undefined): number {
+    const already = new Set(seen ? seen.split(" ") : []);
+    return marks.filter((mark) => !already.has(mark)).length;
+}
+
+/** The Google APIs switched off for this Polaris, as marks, read from the states
+ *  whichever learned first stored - the Calendar's sync or the Integrations probe. */
+async function apisOff(): Promise<string[]> {
+    const states = await Promise.all(
+        core.GOOGLE_APIS.map(async (api) => ({
+            id: api.id,
+            raw: await getSetting(core.googleApiStateKey(api.id)).catch(() => null)
+        }))
     );
-    return googleApisOff(raws);
+    return apiOffMarks(states);
 }
 
 /**
@@ -161,7 +182,7 @@ export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
         const at = laterOf(visit, seenAt(marks?.dismissed.get(key)));
         return at ? { createdAt: { gt: at } } : {};
     };
-    const [reports, cases, build, apis] = await Promise.all([
+    const [reports, cases, build, apiMarks] = await Promise.all([
         prisma.chatReport
             .count({ where: { status: "open", ...since(DISMISSED_KEYS.reports) } })
             .catch(() => 0),
@@ -169,8 +190,9 @@ export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
             .count({ where: { status: "open", ...since(DISMISSED_KEYS.cases) } })
             .catch(() => 0),
         updateWaiting().catch(() => null),
-        apisOff().catch(() => 0)
+        apisOff().catch(() => [] as string[])
     ]);
+    const apis = unseenApisOff(apiMarks, marks?.dismissed.get(DISMISSED_KEYS.apis));
     const update =
         build !== null &&
         marks?.seen?.get("admin.update") !== build &&
@@ -181,8 +203,8 @@ export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
 /**
  * Somebody marked Management entries seen from the app menu: remember what was
  * there, so only something newer counts again. An update is marked by the
- * build it is, a queue by the moment. Switched-off APIs are not marked - a
- * fault stays counted until it is fixed - and are simply skipped.
+ * build it is, a queue by the moment, switched-off APIs by which ones are off
+ * now and since when.
  */
 export async function dismissAdminWaiting(
     userId: string,
@@ -195,6 +217,8 @@ export async function dismissAdminWaiting(
         } else if (entry === "update") {
             const build = await announcedBuild();
             if (build) await markSeen(userId, DISMISSED_KEYS.update, build);
+        } else if (entry === "apis") {
+            await markSeen(userId, DISMISSED_KEYS.apis, (await apisOff()).join(" "));
         }
     }
 }

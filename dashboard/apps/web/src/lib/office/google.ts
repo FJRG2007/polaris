@@ -44,6 +44,7 @@ import {
     readDocument
 } from "./documents";
 import { getConnection, listConnections, readCredential } from "@/lib/connections/store";
+import { clearConnectionFailure, recordConnectionFailure } from "@/lib/connections/attention";
 import {
     GOOGLE_DRIVE_FILE_SCOPE,
     GOOGLE_DRIVE_READ_SCOPE,
@@ -54,6 +55,10 @@ import {
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3";
+
+/** What the Integrations screen keeps for the Drive API being off. */
+const DRIVE_OFF_REASON =
+    "The Google Drive API is disabled in the Google Cloud project Polaris signs in with. Enable it there.";
 
 /** The largest export Polaris reads back. Google itself stops exporting at ten
  *  megabytes, and an Office import is held in memory. */
@@ -177,6 +182,11 @@ async function tokenFor(userId: string, connectionId: string, need: string): Pro
     }
 }
 
+/** Whether a "Drive is turned off" may still be held on the Google card. True
+ *  from start, so the first call that works after a restart clears one; false
+ *  after that, so a working Drive does not read the integration on every call. */
+let driveOffHeld = true;
+
 /** Google's answer, refused as a sentence somebody can act on. */
 async function driveFetch(token: string, url: string, init: RequestInit = {}): Promise<Response> {
     const response = await fetch(url, {
@@ -185,7 +195,11 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
         cache: "no-store",
         signal: AbortSignal.timeout(30_000)
     });
-    if (response.ok) return response;
+    if (response.ok) {
+        if (driveOffHeld && (await clearConnectionFailure("google", "api-off")))
+            driveOffHeld = false;
+        return response;
+    }
     if (response.status === 404) throw new OfficeGoogleError("not-found");
     // Read the way every other Google call here is read, so the Drive API being
     // off in the operator's project is said as that - not as a file somebody
@@ -194,7 +208,22 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
         response.status,
         await response.json().catch(() => undefined)
     );
-    if (problem.kind === "setup") throw new OfficeGoogleError("api-off");
+    if (problem.kind === "setup") {
+        driveOffHeld = true;
+        // Nothing the reader can do: the switch is in the operator's Google
+        // Cloud project. Recorded on the integration and raised to whoever may
+        // configure it, once an hour however many people run into it.
+        await recordConnectionFailure("google", DRIVE_OFF_REASON, "api-off", {
+            // i18n-ignore the fallback; each operator reads `say` in their language
+            title: "Google Drive is turned off for Polaris",
+            body: DRIVE_OFF_REASON,
+            say: (t) => ({
+                title: t("connections.driveOffTitle"),
+                body: t("connections.driveOffBody")
+            })
+        });
+        throw new OfficeGoogleError("api-off");
+    }
     if (problem.kind === "auth" || problem.kind === "consent")
         throw new OfficeGoogleError("relink");
     if (problem.kind === "rate") throw new OfficeGoogleError("busy");

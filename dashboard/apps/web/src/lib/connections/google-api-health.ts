@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { readCredential } from "@/lib/connections/store";
 import { getSetting, setSetting } from "@/lib/setting-store";
+import { clearConnectionFailure } from "@/lib/connections/attention";
 import { getGoogleOAuthClient, googleAccessToken } from "@/lib/google-calendar/service";
 
 /** An answer younger than this is shown without asking Google again. */
@@ -124,6 +125,9 @@ async function refresh(
         );
     if (!next) return previous;
     await setSetting(core.googleApiStateKey(api.id), JSON.stringify(next));
+    // Drive answering again is what ends the "turned off" on the Google card.
+    if (api.id === "drive" && next.state === "enabled")
+        await clearConnectionFailure("google", "api-off");
     if (api.id === "calendar" && previous?.state === "disabled" && next.state === "enabled") {
         // The calendars waiting on it are tried on the next sync pass rather than
         // at the end of their growing gap.
