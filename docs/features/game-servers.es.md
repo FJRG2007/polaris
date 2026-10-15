@@ -13,12 +13,14 @@ sigue tu ajuste claro u oscuro. Las versiones para móvil están en
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="../assets/media/games-light-es-desktop.webp">
-  <img src="../assets/media/games-dark-es-desktop.webp" alt="Cada servidor de juegos con su dirección, jugadores y estado">
+  <img src="../assets/media/games-dark-es-desktop.webp" alt="Todos los servidores, y luego un recorrido por uno: sus jugadores, el inventario y la skin de uno, sus eventos y sus ajustes, y los ajustes de los otros juegos">
 </picture>
 
 Cada servidor muestra si está encendido, quién juega y la dirección que
 escriben los jugadores. Desde aquí se inicia, se detiene, se duplica o se
-archiva.
+archiva. La imagen sigue dentro de uno de ellos: sus jugadores, el inventario
+y la skin de un jugador, los eventos en curso, y los ajustes de Minecraft,
+ARK y FiveM.
 
 ## Jugadores
 
