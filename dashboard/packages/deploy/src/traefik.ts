@@ -364,9 +364,7 @@ export function traefikLabels(input: TraefikServiceInput): Record<string, string
             labels,
             (domain.waf ?? input.waf)?.frameAncestors
         );
-        const waf = domain.waf
-            ? wafMiddlewares(`${router}-own`, domain.waf, labels)
-            : serviceWaf;
+        const waf = domain.waf ? wafMiddlewares(`${router}-own`, domain.waf, labels) : serviceWaf;
         // The allowlist first, then the flood limits, then the guard, then what the
         // service asked to change about its answers - the local edge's order.
         const allow = waf.http;

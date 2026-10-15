@@ -155,7 +155,9 @@ export function DomainPrivateButton({
                                     />
                                 </div>
                                 {!valid ? (
-                                    <p className="text-xs text-warning">{t("private.needsAudience")}</p>
+                                    <p className="text-xs text-warning">
+                                        {t("private.needsAudience")}
+                                    </p>
                                 ) : null}
                             </div>
                         ) : null}
@@ -172,7 +174,12 @@ export function DomainPrivateButton({
                             {t("private.close")}
                         </Button>
                         <Button
-                            disabled={pending || !canManage || !valid || (!dirty && saved !== "unpublished")}
+                            disabled={
+                                pending ||
+                                !canManage ||
+                                !valid ||
+                                (!dirty && saved !== "unpublished")
+                            }
                             onClick={save}
                         >
                             {pending ? <Loader2 className="size-4 animate-spin" /> : null}{" "}

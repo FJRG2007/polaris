@@ -32,8 +32,12 @@ describe("a private address on labels", () => {
     });
 
     it("puts the guard in front of the private address with its sign-in rule", () => {
-        expect(labels["traefik.http.routers.web-1.middlewares"]).toContain("web-1-own-waf-ctx@docker");
-        expect(labels["traefik.http.routers.web-1.middlewares"]).toContain("polaris-waf-guard@docker");
+        expect(labels["traefik.http.routers.web-1.middlewares"]).toContain(
+            "web-1-own-waf-ctx@docker"
+        );
+        expect(labels["traefik.http.routers.web-1.middlewares"]).toContain(
+            "polaris-waf-guard@docker"
+        );
         const rule = decodeGuardRule(labels[WAF_HEADER("web-1-own-waf-ctx")]!);
         expect(rule.requireLogin).toBe(true);
         expect(rule.loginMaxAge).toBe(900);

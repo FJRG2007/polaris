@@ -58,7 +58,12 @@ describe("a route with a login max age", () => {
         expect(decodeGuardRule(rule(900)).loginMaxAge).toBe(900);
         expect(decodeGuardRule(rule()).loginMaxAge).toBeUndefined();
         // Never written for a route that asks for no login: it would mean nothing there.
-        const open = encodeGuardRule({ deny: [], requireLogin: false, loginMaxAge: 900, rules: [] });
+        const open = encodeGuardRule({
+            deny: [],
+            requireLogin: false,
+            loginMaxAge: 900,
+            rules: []
+        });
         expect(decodeGuardRule(open).loginMaxAge).toBeUndefined();
     });
 
@@ -94,9 +99,9 @@ describe("a route with a login max age", () => {
         const decision = evaluate(request(rule(900), { uri }), config());
         expect(decision.status).toBe(302);
         expect(decision.status === 302 && decision.setCookie).toBeFalsy();
-        expect(decision.status === 302 && decision.location.startsWith(`${POLARIS}/edge/authorize`)).toBe(
-            true
-        );
+        expect(
+            decision.status === 302 && decision.location.startsWith(`${POLARIS}/edge/authorize`)
+        ).toBe(true);
     });
 
     it("sets a host-only, HttpOnly, Secure, SameSite cookie from a fresh callback token", () => {

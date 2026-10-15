@@ -39,7 +39,9 @@ vi.mock("@/lib/deploy-audit", async (importOriginal) => ({
 }));
 vi.mock("@/lib/i18n/request", async () => {
     const { translatorFor } = await import("@/lib/i18n/translate");
-    return { getTranslations: async (namespace: "deployServer") => translatorFor("en-US", namespace) };
+    return {
+        getTranslations: async (namespace: "deployServer") => translatorFor("en-US", namespace)
+    };
 });
 
 const { setDomainPrivateAction } = await import("@/app/(app)/apps/deploy/actions");
@@ -53,7 +55,11 @@ describe("making an address private", () => {
         const access = { members: true, allow: [{ ref: "group:eng" }], deny: [] };
         expect(await setDomainPrivateAction({ domainId: DOMAIN, access })).toEqual({});
         expect(mocks.requirePermission).toHaveBeenCalledWith("deploy.manage");
-        expect(mocks.requireDomainAccess).toHaveBeenCalledWith(DOMAIN, "member-1", "domains.manage");
+        expect(mocks.requireDomainAccess).toHaveBeenCalledWith(
+            DOMAIN,
+            "member-1",
+            "domains.manage"
+        );
         expect(mocks.setApplicationDomainPrivate).toHaveBeenCalledWith(DOMAIN, "owner-1", access);
         expect(mocks.recordDeployAudit).toHaveBeenCalledWith(
             expect.objectContaining({ action: "deploy.domain.private.on", targetId: DOMAIN })

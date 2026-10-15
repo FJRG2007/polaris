@@ -6,7 +6,12 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
-import { parsePrivateAccess, storePrivateAccess, withPrivateAccess, type PrivateAccess } from "@/lib/deploy/private-domain";
+import {
+    parsePrivateAccess,
+    storePrivateAccess,
+    withPrivateAccess,
+    type PrivateAccess
+} from "@/lib/deploy/private-domain";
 import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
@@ -1528,39 +1533,45 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
                   ? (serverAddress.get(remoteHostId) ?? "")
                   : localIp;
             if (!dialHost) continue;
-            localRoutes.push(withPrivateAccess({
-                id: domain.id,
-                hostname: domain.hostname,
-                pathPrefix: domain.pathPrefix ?? undefined,
-                ...edgeOf.get(domain.applicationId),
-                certResolver: domain.certResolver,
-                dialHost,
-                dialPort: privately
-                    ? (pinnedPort ?? containerPortOf({ ...domain.application, domains: [domain] }))
-                    : hostPortForApp(dialTarget(domain, isolated)),
-                ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
-                ...canaryRoute(
-                    edgeOf.get(domain.applicationId)?.edge?.canary,
-                    liveCanaries,
-                    own ? domain.application.currentDeploymentId : null,
-                    localIp
-                ),
-                asleep: domain.application.asleepSince !== null,
-                allowLists: rule.allowLists,
-                deny: rule.deny,
-                presets: rule.presets,
-                rules: rule.rules,
-                requireLogin: rule.requireLogin,
-                loginUrl,
-                loginAllowLists: rule.loginAllowLists,
-                loginDeny: rule.loginDeny,
-                browserIntegrity: rule.browserIntegrity,
-                sqlInjectionProtection: rule.sqlInjectionProtection,
-                xssProtection: rule.xssProtection,
-                emailObfuscation: rule.emailObfuscation,
-                frameAncestors: frameRuleOf(rule),
-                loginKeys
-            }, parsePrivateAccess(domain.privateAccess)));
+            localRoutes.push(
+                withPrivateAccess(
+                    {
+                        id: domain.id,
+                        hostname: domain.hostname,
+                        pathPrefix: domain.pathPrefix ?? undefined,
+                        ...edgeOf.get(domain.applicationId),
+                        certResolver: domain.certResolver,
+                        dialHost,
+                        dialPort: privately
+                            ? (pinnedPort ??
+                              containerPortOf({ ...domain.application, domains: [domain] }))
+                            : hostPortForApp(dialTarget(domain, isolated)),
+                        ...balancedOver(copies, edgeOf.get(domain.applicationId)?.edge),
+                        ...canaryRoute(
+                            edgeOf.get(domain.applicationId)?.edge?.canary,
+                            liveCanaries,
+                            own ? domain.application.currentDeploymentId : null,
+                            localIp
+                        ),
+                        asleep: domain.application.asleepSince !== null,
+                        allowLists: rule.allowLists,
+                        deny: rule.deny,
+                        presets: rule.presets,
+                        rules: rule.rules,
+                        requireLogin: rule.requireLogin,
+                        loginUrl,
+                        loginAllowLists: rule.loginAllowLists,
+                        loginDeny: rule.loginDeny,
+                        browserIntegrity: rule.browserIntegrity,
+                        sqlInjectionProtection: rule.sqlInjectionProtection,
+                        xssProtection: rule.xssProtection,
+                        emailObfuscation: rule.emailObfuscation,
+                        frameAncestors: frameRuleOf(rule),
+                        loginKeys
+                    },
+                    parsePrivateAccess(domain.privateAccess)
+                )
+            );
         }
         for (const app of localTunnelApps) {
             const rule = waf.get(app.id) ?? emptyWaf;
@@ -1730,49 +1741,52 @@ async function pushRemoteRoutes(
                         ),
                         serving.get(domain.application.currentDeploymentId ?? "")
                     );
-                    return withPrivateAccess({
-                        id: domain.id,
-                        hostname: domain.hostname,
-                        pathPrefix: domain.pathPrefix ?? undefined,
-                        ...edgeOf.get(domain.applicationId),
-                        certResolver: domain.certResolver,
-                        // The container itself, by name, on the proxy network both
-                        // it and that server's edge are on. Never a published host
-                        // port: the edge is a container, and the host is not a name
-                        // it can be relied on to have. The serving release's own
-                        // names: ranked above both releases' labels, this is what
-                        // moves that server's edge from the old copies to the new
-                        // ones, once the new ones are serving (see `edgeDialName`).
-                        dialHost: name,
-                        dialPort: domain.targetPort,
-                        ...balancedOver(
-                            copiesOf(
-                                domain.application,
-                                name,
-                                serving.get(domain.application.currentDeploymentId ?? "")
+                    return withPrivateAccess(
+                        {
+                            id: domain.id,
+                            hostname: domain.hostname,
+                            pathPrefix: domain.pathPrefix ?? undefined,
+                            ...edgeOf.get(domain.applicationId),
+                            certResolver: domain.certResolver,
+                            // The container itself, by name, on the proxy network both
+                            // it and that server's edge are on. Never a published host
+                            // port: the edge is a container, and the host is not a name
+                            // it can be relied on to have. The serving release's own
+                            // names: ranked above both releases' labels, this is what
+                            // moves that server's edge from the old copies to the new
+                            // ones, once the new ones are serving (see `edgeDialName`).
+                            dialHost: name,
+                            dialPort: domain.targetPort,
+                            ...balancedOver(
+                                copiesOf(
+                                    domain.application,
+                                    name,
+                                    serving.get(domain.application.currentDeploymentId ?? "")
+                                ),
+                                edgeOf.get(domain.applicationId)?.edge
                             ),
-                            edgeOf.get(domain.applicationId)?.edge
-                        ),
-                        allowLists: rule?.allowLists ?? [],
-                        deny: rule?.deny ?? [],
-                        presets: rule?.presets ?? [],
-                        rules: rule?.rules ?? [],
-                        requireLogin: rule?.requireLogin ?? false,
-                        loginUrl,
-                        loginAllowLists: rule?.loginAllowLists ?? [],
-                        loginDeny: rule?.loginDeny ?? [],
-                        browserIntegrity: rule?.browserIntegrity ?? false,
-                        sqlInjectionProtection: rule?.sqlInjectionProtection ?? true,
-                        xssProtection: rule?.xssProtection ?? true,
-                        // Never on a pushed remote route: rewriting a response means
-                        // dialling that server's guard instead of the container, and
-                        // Polaris cannot see whether it is listening. See
-                        // `router-remote`.
-                        emailObfuscation: false,
-                        // The fallback header only, for the same reason.
-                        frameAncestors: rule ? frameRuleOf(rule) : [],
-                        loginKeys
-                    } satisfies AppRoute, parsePrivateAccess(domain.privateAccess));
+                            allowLists: rule?.allowLists ?? [],
+                            deny: rule?.deny ?? [],
+                            presets: rule?.presets ?? [],
+                            rules: rule?.rules ?? [],
+                            requireLogin: rule?.requireLogin ?? false,
+                            loginUrl,
+                            loginAllowLists: rule?.loginAllowLists ?? [],
+                            loginDeny: rule?.loginDeny ?? [],
+                            browserIntegrity: rule?.browserIntegrity ?? false,
+                            sqlInjectionProtection: rule?.sqlInjectionProtection ?? true,
+                            xssProtection: rule?.xssProtection ?? true,
+                            // Never on a pushed remote route: rewriting a response means
+                            // dialling that server's guard instead of the container, and
+                            // Polaris cannot see whether it is listening. See
+                            // `router-remote`.
+                            emailObfuscation: false,
+                            // The fallback header only, for the same reason.
+                            frameAncestors: rule ? frameRuleOf(rule) : [],
+                            loginKeys
+                        } satisfies AppRoute,
+                        parsePrivateAccess(domain.privateAccess)
+                    );
                 });
                 await new RemoteRouter({
                     address: connection.address,
@@ -1930,7 +1944,10 @@ export async function setApplicationDomainPrivate(
         await syncAppRoutes();
         return { published: true };
     } catch (error) {
-        console.error(`polaris: could not publish the private setting of domain ${domainId}:`, error);
+        console.error(
+            `polaris: could not publish the private setting of domain ${domainId}:`,
+            error
+        );
         return { published: false };
     }
 }

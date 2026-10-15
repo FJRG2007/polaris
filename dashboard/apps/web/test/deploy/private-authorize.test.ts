@@ -37,7 +37,8 @@ vi.mock("@/lib/waf-service", () => ({
     resolveWaf: async () => ({ loginAllowLists: [], loginDeny: [] })
 }));
 vi.mock("@/lib/deploy-project-access", () => ({
-    projectAccess: async (projectId: string) => (state.members.has(projectId) ? { projectId } : null)
+    projectAccess: async (projectId: string) =>
+        state.members.has(projectId) ? { projectId } : null
 }));
 vi.mock("@/lib/deploy-service", () => ({
     deployAppIdForHost: async (host: string) => (state.routed.has(host) ? "app-1" : null),
@@ -48,7 +49,9 @@ const { GET } = await import("@/app/edge/authorize/route");
 
 function call(redirect: string): Promise<Response> {
     return GET(
-        new Request(`https://polaris.example.com/edge/authorize?redirect=${encodeURIComponent(redirect)}`)
+        new Request(
+            `https://polaris.example.com/edge/authorize?redirect=${encodeURIComponent(redirect)}`
+        )
     );
 }
 

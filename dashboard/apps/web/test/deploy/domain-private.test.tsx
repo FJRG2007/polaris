@@ -72,9 +72,11 @@ describe("the Private switch on an address", () => {
         expect(toggle.hasAttribute("disabled")).toBe(true);
         expect(toggle.getAttribute("aria-checked")).toBe("true");
         expect(screen.getByText("You cannot change this project's domains.")).toBeTruthy();
-        expect(screen.getByRole("checkbox", { name: /Members of this project/ }).hasAttribute("disabled")).toBe(
-            true
-        );
+        expect(
+            screen
+                .getByRole("checkbox", { name: /Members of this project/ })
+                .hasAttribute("disabled")
+        ).toBe(true);
         expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
         expect(actions.setDomainPrivateAction).not.toHaveBeenCalled();
     });
@@ -89,11 +91,17 @@ describe("the Private switch on an address", () => {
 
     it("shows what the server answered when it refuses", async () => {
         actions.setDomainPrivateAction.mockResolvedValueOnce({ error: "Domain not found" });
-        const { onChanged } = open({ canManage: true, access: { members: true, allow: [], deny: [] } });
+        const { onChanged } = open({
+            canManage: true,
+            access: { members: true, allow: [], deny: [] }
+        });
         fireEvent.click(screen.getByRole("switch", { name: "Only allowed people" }));
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         expect(await screen.findByText("Domain not found")).toBeTruthy();
-        expect(actions.setDomainPrivateAction).toHaveBeenCalledWith({ domainId: DOMAIN, access: null });
+        expect(actions.setDomainPrivateAction).toHaveBeenCalledWith({
+            domainId: DOMAIN,
+            access: null
+        });
         expect(onChanged).not.toHaveBeenCalled();
     });
 });

@@ -93,7 +93,10 @@ export function withPrivateAccess<
         // The edge refuses a token older than this whatever it claims about itself, so
         // one minted before the address turned private - a twelve-hour token from when
         // it only asked for a login - is sent back to be decided like any other.
-        loginMaxAge: Math.min(route.loginMaxAge ?? PRIVATE_TOKEN_TTL_SECONDS, PRIVATE_TOKEN_TTL_SECONDS)
+        loginMaxAge: Math.min(
+            route.loginMaxAge ?? PRIVATE_TOKEN_TTL_SECONDS,
+            PRIVATE_TOKEN_TTL_SECONDS
+        )
     };
 }
 

@@ -65,7 +65,8 @@ describe("a private address in the routing file", () => {
         for (const line of config.split("\n").filter((l) => /^ {4}\S.*:$/.test(l))) {
             const name = line.trim().slice(0, -1);
             const body = block(config, name);
-            if (/\n {6}rule:/.test(body)) expect(body, `${name} has a priority`).toMatch(/priority: \d+/);
+            if (/\n {6}rule:/.test(body))
+                expect(body, `${name} has a priority`).toMatch(/priority: \d+/);
         }
         const rule = guardRuleOf(config, "polaris-app-d1");
         expect(rule?.requireLogin).toBe(true);
@@ -84,7 +85,10 @@ describe("a private address in the routing file", () => {
     });
 
     it("adds to the service's own firewall lists rather than replacing them", () => {
-        const held = route({ loginAllowLists: [[{ ref: "role:staff" }]], loginDeny: [{ ref: "user:x" }] });
+        const held = route({
+            loginAllowLists: [[{ ref: "role:staff" }]],
+            loginDeny: [{ ref: "user:x" }]
+        });
         const merged = withPrivateAccess(held, named);
         expect(merged.loginAllowLists).toEqual([[{ ref: "role:staff" }], named.allow]);
         expect(merged.loginDeny).toEqual([{ ref: "user:x" }, ...named.deny]);
@@ -108,7 +112,9 @@ describe("who a private address admits", () => {
     });
 
     it("admits somebody through a group the address names", () => {
-        expect(privateVerdict(named, new Set(["user:bob", "group:eng"]), false, NOW)).toBe("admitted");
+        expect(privateVerdict(named, new Set(["user:bob", "group:eng"]), false, NOW)).toBe(
+            "admitted"
+        );
     });
 
     it("refuses a named refusal even when the account is a member", () => {
@@ -117,7 +123,11 @@ describe("who a private address admits", () => {
     });
 
     it("stops admitting a named entry once its window has passed", () => {
-        const lapsed: PrivateAccess = { members: false, allow: [{ ref: "user:ana", until: NOW - 1 }], deny: [] };
+        const lapsed: PrivateAccess = {
+            members: false,
+            allow: [{ ref: "user:ana", until: NOW - 1 }],
+            deny: []
+        };
         expect(privateVerdict(lapsed, new Set(["user:ana"]), false, NOW)).toBe("not-admitted");
     });
 });
@@ -133,8 +143,10 @@ describe("the stored setting", () => {
     it("refuses a private address nobody could open, and a malformed principal", () => {
         const id = "0190b6a2-0000-7000-8000-000000000001";
         expect(
-            domainPrivateInputSchema.safeParse({ domainId: id, access: { members: false, allow: [], deny: [] } })
-                .success
+            domainPrivateInputSchema.safeParse({
+                domainId: id,
+                access: { members: false, allow: [], deny: [] }
+            }).success
         ).toBe(false);
         expect(
             domainPrivateInputSchema.safeParse({
@@ -142,7 +154,11 @@ describe("the stored setting", () => {
                 access: { members: false, allow: [{ ref: "admin:*" }], deny: [] }
             }).success
         ).toBe(false);
-        expect(domainPrivateInputSchema.safeParse({ domainId: "x", access: null }).success).toBe(false);
-        expect(domainPrivateInputSchema.safeParse({ domainId: id, access: null }).success).toBe(true);
+        expect(domainPrivateInputSchema.safeParse({ domainId: "x", access: null }).success).toBe(
+            false
+        );
+        expect(domainPrivateInputSchema.safeParse({ domainId: id, access: null }).success).toBe(
+            true
+        );
     });
 });
