@@ -21,9 +21,12 @@ import { listPromotionsAction, previewPromotionAction, promoteEnvironmentAction 
 
 export function PromoteDialog({
     environments,
+    canCopyData,
     source,
     onClose
 }: {
+    /** Whether the reader may replace data, as the page was told. */
+    canCopyData: boolean;
     environments: readonly ProjectEnvironmentView[];
     /** The environment to promote from; null keeps the dialog closed. */
     source: ProjectEnvironmentView | null;
@@ -138,7 +141,7 @@ export function PromoteDialog({
                         <input
                             type="checkbox"
                             checked={includeData}
-                            disabled={preview !== null && !preview.canCopyData}
+                            disabled={!canCopyData || (preview !== null && !preview.canCopyData)}
                             onChange={(event) => {
                                 setIncludeData(event.target.checked);
                                 setTyped("");
@@ -148,7 +151,7 @@ export function PromoteDialog({
                         <span className="min-w-0">
                             {t("promotion.includeData")}
                             <span className="block text-xs text-muted-foreground">
-                                {preview !== null && !preview.canCopyData
+                                {!canCopyData || (preview !== null && !preview.canCopyData)
                                     ? t("promotion.cannotCopyData")
                                     : t("promotion.includeDataHint")}
                             </span>

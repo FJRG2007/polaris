@@ -18,7 +18,7 @@ import { DangerSection } from "./settings/danger-section";
 import { GeneralSection } from "./settings/general-section";
 import { MembersSection } from "./settings/members-section";
 import { WebhooksSection } from "./settings/webhooks-section";
-import { EnvironmentsSection } from "./settings/environments-section";
+import { EnvironmentsSection, type PromotionReach } from "./settings/environments-section";
 import { IntegrationsSection } from "./settings/integrations-section";
 import { FeatureFlagsSection } from "./settings/feature-flags-section";
 import type { ProjectSettingsView } from "@/lib/deploy-project-service";
@@ -28,7 +28,8 @@ export function ProjectSettings({
     settings,
     section,
     canManage,
-    isOwner
+    isOwner,
+    promotion
 }: {
     settings: ProjectSettingsView;
     section: string;
@@ -36,6 +37,9 @@ export function ProjectSettings({
     canManage: boolean;
     /** Only the owner may delete or hand over the project itself. */
     isOwner: boolean;
+    /** Where the reader may promote: environments they can deploy into, and
+     *  whether they may replace data on the way. */
+    promotion: PromotionReach;
 }) {
     const t = useTranslations("deploySettings");
     const base = `/apps/deploy/${settings.id}/settings`;
@@ -79,7 +83,7 @@ export function ProjectSettings({
                     {current.slug === "general" && <GeneralSection settings={settings} canManage={canManage} />}
                     {current.slug === "usage" && <UsageSection projectId={settings.id} />}
                     {current.slug === "environments" && (
-                        <EnvironmentsSection settings={settings} canManage={canManage} />
+                        <EnvironmentsSection settings={settings} canManage={canManage} promotion={promotion} />
                     )}
                     {current.slug === "variables" && <SharedVariablesSection settings={settings} canManage={canManage} />}
                     {current.slug === "webhooks" && <WebhooksSection projectId={settings.id} />}

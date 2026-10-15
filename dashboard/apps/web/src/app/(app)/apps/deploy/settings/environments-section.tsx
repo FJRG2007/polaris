@@ -30,12 +30,21 @@ import {
 } from "../project-actions";
 import type { ProjectEnvironmentView, ProjectSettingsView } from "@/lib/deploy-project-service";
 
+/** Where the reader may promote, decided on the server by the action's checks. */
+export interface PromotionReach {
+    /** Environments the reader can deploy into, and so promote between. */
+    readonly environmentIds: readonly string[];
+    readonly canCopyData: boolean;
+}
+
 export function EnvironmentsSection({
     settings,
-    canManage
+    canManage,
+    promotion
 }: {
     settings: ProjectSettingsView;
     canManage: boolean;
+    promotion: PromotionReach;
 }) {
     const router = useRouter();
     const t = useTranslations("deploySettings");
@@ -48,6 +57,7 @@ export function EnvironmentsSection({
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const display = useDisplayFormat();
+    const reachable = new Set(promotion.environmentIds);
 
     function startRename(environment: ProjectEnvironmentView) {
         setRenaming(environment.id);
@@ -199,6 +209,22 @@ export function EnvironmentsSection({
                                 )}
                             </div>
 
+                            {reachable.has(environment.id) && renaming !== environment.id && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    disabled={reachable.size < 2}
+                                    onClick={() => setPromoting(environment)}
+                                    aria-label={t("environments.promoteNamed", { name: environment.name })}
+                                    title={
+                                        reachable.size < 2
+                                            ? t("environments.promoteNeedsTwo")
+                                            : t("environments.promote")
+                                    }
+                                >
+                                    <ArrowUpRight className="size-4" />
+                                </Button>
+                            )}
                             {canManage && renaming !== environment.id && (
                                 <div className="flex shrink-0 items-center gap-1">
                                     <Select
@@ -214,20 +240,6 @@ export function EnvironmentsSection({
                                             }))
                                         ]}
                                     />
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        disabled={settings.environments.length < 2}
-                                        onClick={() => setPromoting(environment)}
-                                        aria-label={t("environments.promoteNamed", { name: environment.name })}
-                                        title={
-                                            settings.environments.length < 2
-                                                ? t("environments.promoteNeedsTwo")
-                                                : t("environments.promote")
-                                        }
-                                    >
-                                        <ArrowUpRight className="size-4" />
-                                    </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -281,7 +293,8 @@ export function EnvironmentsSection({
             <NetworkingCard settings={settings} canManage={canManage} />
 
             <PromoteDialog
-                environments={settings.environments}
+                environments={settings.environments.filter((environment) => reachable.has(environment.id))}
+                canCopyData={promotion.canCopyData}
                 source={promoting}
                 onClose={() => {
                     setPromoting(null);

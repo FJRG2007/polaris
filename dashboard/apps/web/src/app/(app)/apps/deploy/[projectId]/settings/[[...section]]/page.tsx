@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, userHasManage } from "@/lib/session";
 import { ProjectSettings } from "../../../project-settings";
 import { SETTINGS_SECTIONS } from "../../../settings/sections";
 import { getProjectSettings } from "@/lib/deploy-project-service";
-import { accessCan, requireProjectAccess } from "@/lib/deploy-project-access";
+import { accessCan, accessInEnvironment, requireProjectAccess } from "@/lib/deploy-project-access";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,19 @@ export default async function ProjectSettingsPage({
     const slug = section?.[0] ?? "general";
     if (!SETTINGS_SECTIONS.some((entry) => entry.slug === slug)) notFound();
 
-    const settings = await getProjectSettings(projectId);
+    const [settings, manages] = await Promise.all([
+        getProjectSettings(projectId),
+        userHasManage(user, "deploy.manage")
+    ]);
+    // The same checks promoteEnvironmentAction makes, so the screen offers a
+    // promotion exactly where the action would take it.
+    const canDeploy = manages && accessCan(access, "deploy.run");
+    const promotion = {
+        environmentIds: canDeploy
+            ? settings.environments.filter((environment) => accessInEnvironment(access, environment.id)).map((environment) => environment.id)
+            : [],
+        canCopyData: canDeploy && accessCan(access, "databases.manage")
+    };
 
     return (
         <ProjectSettings
@@ -39,6 +51,7 @@ export default async function ProjectSettingsPage({
             section={slug}
             canManage={accessCan(access, "project.settings")}
             isOwner={access.isOwner}
+            promotion={promotion}
         />
     );
 }
