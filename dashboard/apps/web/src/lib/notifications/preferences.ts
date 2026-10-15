@@ -13,7 +13,9 @@
 import { cache } from "react";
 import { prisma } from "@polaris/db";
 import {
+    parseQuietHours,
     NOTIFICATION_EVENTS,
+    type QuietHours,
     parseNotificationPreferences,
     resolveRule,
     stringifyNotificationPreferences,
@@ -22,10 +24,15 @@ import {
 } from "@polaris/core";
 
 /** One account's saved rules. Events it never touched are absent. */
-export const getNotificationPreferences = cache(async (userId: string): Promise<NotificationPreferences> => {
-    const row = await prisma.user.findUnique({ where: { id: userId }, select: { notifyPrefs: true } });
-    return parseNotificationPreferences(row?.notifyPrefs);
-});
+export const getNotificationPreferences = cache(
+    async (userId: string): Promise<NotificationPreferences> => {
+        const row = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { notifyPrefs: true }
+        });
+        return parseNotificationPreferences(row?.notifyPrefs);
+    }
+);
 
 /** The rule in force for one event, defaults filled in. */
 export async function ruleFor(userId: string, eventId: string): Promise<NotificationRule> {
@@ -37,7 +44,10 @@ export async function describeNotificationRules(
     userId: string
 ): Promise<Array<{ event: string; rule: NotificationRule }>> {
     const preferences = await getNotificationPreferences(userId);
-    return NOTIFICATION_EVENTS.map((event) => ({ event: event.id, rule: resolveRule(preferences, event.id) }));
+    return NOTIFICATION_EVENTS.map((event) => ({
+        event: event.id,
+        rule: resolveRule(preferences, event.id)
+    }));
 }
 
 export async function saveNotificationPreferences(
@@ -65,4 +75,20 @@ export async function forgetDestination(userId: string, destinationId: string): 
         next[event] = { ...rule, destinations };
     }
     if (changed) await saveNotificationPreferences(userId, next);
+}
+
+/** The hours this account's mail, webhooks and texts hold off. */
+export async function getQuietHours(userId: string): Promise<QuietHours> {
+    const row = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { notifyQuietHours: true }
+    });
+    return parseQuietHours(row?.notifyQuietHours);
+}
+
+export async function saveQuietHours(userId: string, quiet: QuietHours): Promise<void> {
+    await prisma.user.update({
+        where: { id: userId },
+        data: { notifyQuietHours: JSON.stringify(quiet) }
+    });
 }

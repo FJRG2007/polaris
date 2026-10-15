@@ -112,6 +112,10 @@ model User {
     // keyed by event id. Events absent here (and a null column) follow the
     // catalogue default, so a newly added event never arrives muted.
     notifyPrefs   String?
+    // Hours this account's mail, webhooks and texts hold off, as stringified
+    // JSON ({ enabled, start, end, criticalBypass }) read in the account's own
+    // timezone. Null is no quiet hours. The bell is never held.
+    notifyQuietHours String?
     // How loud Polaris' own sounds are for this account - the chime for an
     // alert, a message, a ring - as a percentage. Null follows the default in
     // code, which is full volume, so an account that never chose keeps what it
@@ -276,6 +280,8 @@ model User {
     emailVerifications  EmailVerification[]
     passkeys            Passkey[]
     notifyDestinations  NotificationDestination[]
+    outboundWebhooks    OutboundWebhook[]
+    inboundWebhooks     InboundWebhook[]
     notifyDeliveries    NotificationDelivery[]
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
@@ -3714,6 +3720,9 @@ model NotificationDestination {
     encryptedTarget Bytes
     targetNonce     Bytes
     targetKeyId     String?
+    // The lowest severity this destination is sent: info | warning | danger.
+    // A critical event goes whatever this says.
+    minLevel        String    @default("info")
     enabled         Boolean   @default(true)
     // ok | error | untested - the result of the last send or test.
     status          String    @default("untested")
@@ -3752,6 +3761,107 @@ model NotificationDelivery {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId, createdAt])
+}
+
+// An endpoint of the account's own that is told, as signed JSON, whenever one of
+// the events it picked happens to that account. Unlike a NotificationDestination
+// this is for a program, not a person: the body is the raw event, signed with a
+// secret only Polaris and the endpoint hold, and a failed send is retried.
+//
+// The URL and the signing secret are envelope-encrypted like every other
+// credential; urlHint is what the list renders. A run of failed deliveries
+// switches the endpoint off and says why in disabledReason.
+model OutboundWebhook {
+    id                  String    @id @default(uuid(7)) @db.Uuid
+    userId              String    @db.Uuid
+    name                String
+    urlHint             String
+    encryptedUrl        Bytes
+    urlNonce            Bytes
+    urlKeyId            String?
+    encryptedSecret     Bytes
+    secretNonce         Bytes
+    secretKeyId         String?
+    // Catalogue event ids this endpoint is sent.
+    events              String[]
+    enabled             Boolean   @default(true)
+    // Deliveries in a row that ran out of attempts. Reset by any success.
+    consecutiveFailures Int       @default(0)
+    disabledReason      String?
+    lastDeliveryAt      DateTime?
+    createdAt           DateTime  @default(now())
+    updatedAt           DateTime  @updatedAt
+
+    user       User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    deliveries OutboundWebhookDelivery[]
+
+    @@index([userId])
+}
+
+// One event sent, or being sent, to one OutboundWebhook. The body is kept so a
+// delivery can be sent again exactly as it was; rows go after the retention
+// window whatever their state.
+model OutboundWebhookDelivery {
+    id             String    @id @default(uuid(7)) @db.Uuid
+    webhookId      String    @db.Uuid
+    event          String
+    // The JSON body as signed and sent.
+    payload        String
+    // pending | sent | failed
+    status         String    @default("pending")
+    attempts       Int       @default(0)
+    // When the next attempt is due; null once sent or given up on.
+    nextAttemptAt  DateTime?
+    responseStatus Int?
+    error          String?
+    durationMs     Int?
+    deliveredAt    DateTime?
+    createdAt      DateTime  @default(now())
+
+    webhook OutboundWebhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+    @@index([webhookId, createdAt])
+    @@index([status, nextAttemptAt])
+    @@index([createdAt])
+}
+
+// A signed URL that redeploys one service when something outside posts to it.
+// Runs as the account that made it, and only while that account may still
+// deploy the service.
+model InboundWebhook {
+    id              String    @id @default(uuid(7)) @db.Uuid
+    userId          String    @db.Uuid
+    applicationId   String    @db.Uuid
+    name            String
+    encryptedSecret Bytes
+    secretNonce     Bytes
+    secretKeyId     String?
+    enabled         Boolean   @default(true)
+    lastUsedAt      DateTime?
+    createdAt       DateTime  @default(now())
+    updatedAt       DateTime  @updatedAt
+
+    user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    application Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+    receipts    InboundWebhookReceipt[]
+
+    @@index([userId])
+    @@index([applicationId])
+}
+
+// A delivery id already accepted, kept until its timestamp could no longer pass,
+// so the same signed request cannot be replayed.
+model InboundWebhookReceipt {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    hookId     String   @db.Uuid
+    deliveryId String
+    expiresAt  DateTime
+    createdAt  DateTime @default(now())
+
+    hook InboundWebhook @relation(fields: [hookId], references: [id], onDelete: Cascade)
+
+    @@unique([hookId, deliveryId])
+    @@index([expiresAt])
 }
 
 // The result of an integration scanning a stored file (e.g. VirusTotal on a
@@ -4848,6 +4958,7 @@ model Application {
     volumes     Volume[]
     crons       ServiceCron[]
     runtimeLogs RuntimeLogLine[]
+    inboundHooks       InboundWebhook[]
     fileAccessAccounts FileAccessAccount[]
     fileAccessServer   FileAccessServer?
 

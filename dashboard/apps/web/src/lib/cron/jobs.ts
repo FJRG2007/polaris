@@ -758,6 +758,25 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // it stopped and start two.
         leaseMs: 10 * MINUTE,
         run: async () => (await import("@/lib/object-storage/store")).sweepReplications()
+    },
+    {
+        key: "outbound-webhooks",
+        // Every minute: the first retry of a signed webhook is due a minute after
+        // the try that failed. Also drops log rows past their thirty days, and
+        // the inbound gateway's expired replay ids.
+        everyMs: MINUTE,
+        // Leased, although every row is claimed on its own: two passes would only
+        // race each other for the same rows and both lose time doing it.
+        leaseMs: 5 * MINUTE,
+        run: async () => {
+            const [outbound, inbound] = await Promise.all([
+                import("@/lib/notifications/outbound-hooks"),
+                import("@/lib/deploy/inbound-hooks")
+            ]);
+            // The inbound gateway's replay ids ride along: they expire by the minute too.
+            const sent = await outbound.runOutboundHooks();
+            return { ...sent, receiptsPruned: await inbound.pruneInboundReceipts() };
+        }
     }
 ];
 

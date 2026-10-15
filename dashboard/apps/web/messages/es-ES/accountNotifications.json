@@ -170,7 +170,16 @@
             "detect": "Detectar por la URL",
             "rawJson": "JSON puro",
             "number": "Número",
-            "numberHint": "En formato internacional, con el prefijo del país."
+            "numberHint": "En formato internacional, con el prefijo del país.",
+            "botToken": "Token",
+            "chatId": "ID chat",
+            "chatIdHint": "El chat, grupo o canal donde publica el bot, como -1001234567890 o @tucanal."
+        },
+        "levelLabel": "Enviar",
+        "level": {
+            "info": "Todo",
+            "warning": "Avisos y más",
+            "danger": "Solo errores"
         }
     },
     "deliveries": {
@@ -434,6 +443,10 @@
         "storageMoved": {
             "label": "Almacenamiento con nueva dirección",
             "description": "Un NAS tomó otra dirección en la red local y Polaris lo encontró y lo sigue. Solo llega a administradores."
+        },
+        "webhookDisabled": {
+            "label": "Se desactivó un webhook",
+            "description": "Uno de tus webhooks falló cinco entregas seguidas, así que Polaris dejó de enviarle."
         }
     },
     "groups": {
@@ -454,5 +467,133 @@
         "label": "Quitar el aviso al abrir su pantalla",
         "onHint": "Una actualización o un reporte deja de contar en cuanto abres su pantalla. Lo nuevo vuelve a contar.",
         "offHint": "Los avisos siguen hasta que se resuelve: la actualización instalada, el reporte cerrado."
+    },
+    "quiet": {
+        "title": "Modo silencio",
+        "description": "Correo, webhooks y SMS no se envían durante estas horas. La campana lo registra todo. Horas en {zone}.",
+        "toggle": "Modo silencio",
+        "from": "Desde",
+        "until": "Hasta",
+        "critical": "Dejar pasar alertas críticas",
+        "invalid": "Escribe ambas horas como HH:MM.",
+        "save": "Guardar"
+    },
+    "webhooks": {
+        "page": {
+            "title": "Webhooks",
+            "intro": "Polaris envía los eventos que elijas a tus propios destinos, firmados para que sepan que vienen de aquí."
+        },
+        "list": {
+            "title": "Destinos",
+            "add": "Añadir destino",
+            "empty": "Aún no hay destinos. Añade uno para que Polaris le envíe eventos.",
+            "limit": "Tienes el máximo de {max} destinos. Quita uno para añadir otro.",
+            "eventCount": "{count, plural, one {# evento} other {# eventos}}",
+            "off": "Parado",
+            "switchedOff": "Se desactivó tras cinco entregas fallidas seguidas. Arregla el destino y vuelve a activarlo.",
+            "lastDelivery": "Última entrega {time}",
+            "neverDelivered": "Nada entregado aún",
+            "switchOn": "Activar",
+            "switchOff": "Desactivar",
+            "test": "Enviar una prueba",
+            "editEvents": "Cambiar eventos",
+            "rotate": "Nuevo secreto",
+            "remove": "Quitar destino",
+            "log": "Entregas",
+            "testSent": "Evento de prueba entregado.",
+            "testFailed": "La prueba falló: {reason}"
+        },
+        "form": {
+            "title": "Añadir un destino",
+            "description": "Polaris envía un POST con un cuerpo JSON a esta dirección por cada evento que elijas.",
+            "name": "Nombre",
+            "namePlaceholder": "Bot de deploy",
+            "url": "URL",
+            "events": "Eventos",
+            "selectAll": "Todos",
+            "selectNone": "Ninguno",
+            "eventsPicked": "{count, plural, one {# evento elegido} other {# eventos elegidos}}",
+            "save": "Guardar",
+            "editTitle": "Eventos de {name}",
+            "editDescription": "Polaris solo envía estos eventos a este destino."
+        },
+        "secret": {
+            "title": "Secreto de firma",
+            "description": "Cópialo ahora. Solo se muestra esta vez; si lo pierdes, crea otro.",
+            "verify": "Cada petición lleva X-Polaris-Timestamp y X-Polaris-Signature: sha256= seguido del HMAC-SHA256 en hex de la marca de tiempo, un punto y el cuerpo, con este secreto.",
+            "done": "Ya lo he copiado"
+        },
+        "rotate": {
+            "title": "¿Crear un secreto nuevo?",
+            "question": "Las peticiones a {name} se firman con el secreto nuevo desde ya, y el anterior deja de valer.",
+            "confirm": "Crear secreto"
+        },
+        "remove": {
+            "question": "¿Quitar {name}? Su registro de entregas se borra y Polaris deja de enviarle.",
+            "confirm": "Quitar"
+        },
+        "deliveries": {
+            "title": "Entregas a {name}",
+            "description": "Los últimos 30 días, lo más reciente primero.",
+            "empty": "Nada enviado a este destino en los últimos 30 días.",
+            "loadFailed": "No se pudo cargar el registro.",
+            "retry": "Reintentar",
+            "more": "Cargar más",
+            "redeliver": "Reenviar",
+            "redelivered": "Enviado de nuevo.",
+            "attempts": "{count, plural, one {# intento} other {# intentos}}",
+            "nextTry": "Próximo intento {time}",
+            "took": "{ms} ms",
+            "status": {
+                "pending": "Pendiente",
+                "sent": "Entregado",
+                "failed": "Fallido"
+            },
+            "errors": {
+                "refused": "La dirección no es pública, así que Polaris no le envía.",
+                "redirect": "Respondió con una redirección ({status}). Usa la dirección final.",
+                "http": "Respondió {status}.",
+                "timeout": "No respondió en 10 segundos.",
+                "network": "No se pudo contactar.",
+                "unreadable": "No se pudo leer la dirección guardada. Quita el destino y vuelve a añadirlo.",
+                "disabled": "No enviado: el destino estaba desactivado."
+            }
+        },
+        "errors": {
+            "limit": "Tienes el máximo de {max} destinos.",
+            "rateLimited": "Demasiados intentos. Espera unos minutos y vuelve a probar.",
+            "unreachable": "Esa dirección no es pública, así que Polaris no puede enviarle.",
+            "notFound": "Ese destino ya no existe.",
+            "invalid": "Revisa el formulario: un nombre, una URL completa y al menos un evento.",
+            "notSaved": "No se guardó. Vuelve a probar."
+        },
+        "inbound": {
+            "title": "Hooks de deploy",
+            "description": "Una URL firmada que vuelve a desplegar un servicio cuando tu CI o tu registro le envía algo.",
+            "add": "Añadir hook",
+            "empty": "Aún no hay hooks de despliegue.",
+            "noServices": "No hay servicios que puedas volver a desplegar, así que no hay nada para lo que crear un hook.",
+            "service": "Servicio",
+            "servicePlaceholder": "Elige un servicio",
+            "name": "Nombre",
+            "namePlaceholder": "CI en main",
+            "url": "Dirección",
+            "redeploys": "Despliega {service}",
+            "lastUsed": "Usado {time}",
+            "neverUsed": "Sin usar aún",
+            "switchOn": "Activar",
+            "switchOff": "Desactivar",
+            "remove": "Quitar hook",
+            "removeQuestion": "¿Quitar {name}? Lo que siga enviando a su URL se rechaza desde ahora.",
+            "secretVerify": "Firma cada POST igual: X-Polaris-Timestamp (segundos unix, a menos de 5 minutos), un id único en X-Polaris-Delivery y X-Polaris-Signature: sha256= seguido del HMAC-SHA256 en hex de la marca de tiempo, un punto y el cuerpo.",
+            "dialogTitle": "Añadir hook de deploy",
+            "dialogDescription": "Polaris vuelve a desplegar el servicio con cada petición bien firmada, mientras puedas desplegarlo.",
+            "errors": {
+                "invalid": "Elige un servicio y ponle un nombre al hook.",
+                "rateLimited": "Demasiados intentos. Espera unos minutos y vuelve a probar.",
+                "limit": "Tienes el máximo de {max} hooks de despliegue.",
+                "forbidden": "No puedes volver a desplegar ese servicio."
+            }
+        }
     }
 }

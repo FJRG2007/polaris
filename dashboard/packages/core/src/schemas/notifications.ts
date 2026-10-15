@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { alertMinLevelSchema } from "./alert-filters.js";
 
 /** How an alert can travel. `inapp` and `email` are built in; the other two
  *  need a destination the account added. */
@@ -723,6 +724,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: true }
     },
     {
+        id: "webhook.disabled",
+        group: "system",
+        label: "A webhook was switched off",
+        description:
+            "One of your webhooks failed five deliveries in a row, so Polaris stopped sending to it.",
+        level: "warning",
+        // Mailed by default: whatever reads that endpoint has stopped hearing
+        // from Polaris, and nothing else will say so.
+        defaults: { inapp: true, email: true }
+    },
+    {
         id: "system.updated",
         group: "system",
         label: "Update installed on its own",
@@ -816,7 +828,9 @@ export const webhookDestinationSchema = z.object({
         .max(2048)
         .refine((value) => value.startsWith("https://"), "The URL has to be https")
         .refine((value) => webhookUrlProblem(value) === null, TELEGRAM_URL_HINT),
-    format: z.enum([...WEBHOOK_FORMATS, "auto"]).default("auto")
+    format: z.enum([...WEBHOOK_FORMATS, "auto"]).default("auto"),
+    /** The lowest severity sent here. */
+    minLevel: alertMinLevelSchema.default("info")
 });
 
 /** An SMS recipient. Stored in E.164 so a provider never has to guess a country. */
@@ -825,7 +839,8 @@ export const smsDestinationSchema = z.object({
     phone: z
         .string()
         .trim()
-        .regex(/^\+[1-9]\d{6,14}$/, "Enter the number in international form, like +34600111222")
+        .regex(/^\+[1-9]\d{6,14}$/, "Enter the number in international form, like +34600111222"),
+    minLevel: alertMinLevelSchema.default("info")
 });
 
 export const destinationInputSchema = z.discriminatedUnion("kind", [
@@ -834,6 +849,36 @@ export const destinationInputSchema = z.discriminatedUnion("kind", [
 ]);
 
 export type DestinationInput = z.infer<typeof destinationInputSchema>;
+
+/** How many signed webhooks one account may keep. */
+export const MAX_OUTBOUND_WEBHOOKS = 20;
+
+/** A signed webhook as the account's Webhooks page submits it. Unlike an alert
+ *  destination, the body is always Polaris's own JSON, signed with a secret
+ *  only the account was shown. */
+export const outboundWebhookInputSchema = z.object({
+    name: z.string().trim().min(1).max(60),
+    url: z
+        .string()
+        .trim()
+        .url("Enter the full URL, starting with https://")
+        .max(2048)
+        .refine(
+            (value) => /^https?:\/\//i.test(value),
+            "The URL has to start with https:// or http://"
+        ),
+    events: z
+        .array(z.string().trim().min(1).max(80))
+        .min(1, "Pick at least one event")
+        .max(NOTIFICATION_EVENTS.length)
+        .refine(
+            (ids) => ids.every((id) => EVENT_BY_ID.has(id)),
+            "One of those events does not exist"
+        )
+        .transform((ids) => [...new Set(ids)])
+});
+
+export type OutboundWebhookInput = z.infer<typeof outboundWebhookInputSchema>;
 
 /**
  * The body shape a webhook URL wants, guessed from its host. Discord, Slack,

@@ -14,7 +14,9 @@ import { loadEnv } from "@polaris/config";
 import { prisma } from "@polaris/db";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
+    readMinLevel,
     detectWebhookFormat,
+    type AlertMinLevel,
     maskPhone,
     maskWebhookUrl,
     type DestinationInput,
@@ -31,6 +33,8 @@ export interface DestinationView {
     kind: NotificationDestinationKind;
     name: string;
     format: WebhookFormat | null;
+    /** The lowest severity sent here. */
+    minLevel: AlertMinLevel;
     /** Masked URL or number, safe to render. */
     targetHint: string;
     enabled: boolean;
@@ -47,6 +51,7 @@ export interface ResolvedDestination {
     kind: NotificationDestinationKind;
     name: string;
     format: WebhookFormat | null;
+    minLevel: AlertMinLevel;
     targetHint: string;
     target: string;
 }
@@ -56,6 +61,7 @@ const ROW_FIELDS = {
     kind: true,
     name: true,
     format: true,
+    minLevel: true,
     targetHint: true,
     enabled: true,
     status: true,
@@ -68,6 +74,7 @@ function toView(row: {
     kind: string;
     name: string;
     format: string | null;
+    minLevel: string;
     targetHint: string;
     enabled: boolean;
     status: string;
@@ -79,6 +86,7 @@ function toView(row: {
         kind: row.kind === "sms" ? "sms" : "webhook",
         name: row.name,
         format: (row.format as WebhookFormat | null) ?? null,
+        minLevel: readMinLevel(row.minLevel),
         targetHint: row.targetHint,
         enabled: row.enabled,
         status: row.status,
@@ -127,7 +135,10 @@ export async function destinationSummary(
 
 /** The target and shape of one destination, for a sender. Returns null when the
  *  row is gone, belongs to somebody else, is switched off, or cannot decrypt. */
-export async function resolveDestination(userId: string, id: string): Promise<ResolvedDestination | null> {
+export async function resolveDestination(
+    userId: string,
+    id: string
+): Promise<ResolvedDestination | null> {
     const row = await prisma.notificationDestination.findFirst({
         where: { id, userId, enabled: true }
     });
@@ -152,13 +163,18 @@ export async function resolveDestination(userId: string, id: string): Promise<Re
         kind: row.kind === "sms" ? "sms" : "webhook",
         name: row.name,
         format: (row.format as WebhookFormat | null) ?? null,
+        minLevel: readMinLevel(row.minLevel),
         targetHint: row.targetHint,
         target
     };
 }
 
 /** The target a destination points at, and how it should be displayed. */
-function describeTarget(input: DestinationInput): { target: string; hint: string; format: WebhookFormat | null } {
+function describeTarget(input: DestinationInput): {
+    target: string;
+    hint: string;
+    format: WebhookFormat | null;
+} {
     if (input.kind === "sms") {
         return { target: input.phone, hint: maskPhone(input.phone), format: null };
     }
@@ -178,6 +194,7 @@ export async function createDestination(
             kind: input.kind,
             name: input.label,
             format,
+            minLevel: input.minLevel,
             targetHint: hint,
             encryptedTarget: blob.ciphertext,
             targetNonce: blob.nonce,
@@ -189,8 +206,21 @@ export async function createDestination(
 }
 
 /** Turn a destination on or off without losing it, or where it is routed. */
-export async function setDestinationEnabled(userId: string, id: string, enabled: boolean): Promise<void> {
+export async function setDestinationEnabled(
+    userId: string,
+    id: string,
+    enabled: boolean
+): Promise<void> {
     await prisma.notificationDestination.updateMany({ where: { id, userId }, data: { enabled } });
+}
+
+/** Change the lowest severity a destination is sent. */
+export async function setDestinationMinLevel(
+    userId: string,
+    id: string,
+    minLevel: AlertMinLevel
+): Promise<void> {
+    await prisma.notificationDestination.updateMany({ where: { id, userId }, data: { minLevel } });
 }
 
 /** Remove a destination and stop every rule pointing at it. */
