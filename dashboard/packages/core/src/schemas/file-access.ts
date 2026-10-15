@@ -13,8 +13,11 @@
 
 import { z } from "zod";
 
-/** The image the server runs. Pulled on the first account, never before. */
-export const FILE_ACCESS_IMAGE = "atmoz/sftp:alpine";
+/**
+ * The image the server runs, pinned to a digest so a republished tag cannot
+ * change what holds the account passwords. Pulled on the first account, never before.
+ */
+export const FILE_ACCESS_IMAGE = "atmoz/sftp:alpine@sha256:7e439fabeae536fa254340724c042e11999924d906417dbb5c73602ad518813f";
 
 /** Where the service's volumes appear to an account. */
 export const FILE_ACCESS_ROOT = "/srv";
