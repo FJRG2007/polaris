@@ -32,16 +32,23 @@ vi.mock("@/lib/rate-limit-service", () => ({
 const { POST } = await import("@/app/api/deploy/automations/[id]/[token]/route");
 
 function call(token = TOKEN) {
-    return POST(new Request(`https://polaris.example/api/deploy/automations/${RULE}/${token}`, { method: "POST" }), {
-        params: Promise.resolve({ id: RULE, token })
-    });
+    return POST(
+        new Request(`https://polaris.example/api/deploy/automations/${RULE}/${token}`, {
+            method: "POST"
+        }),
+        {
+            params: Promise.resolve({ id: RULE, token })
+        }
+    );
 }
 
 beforeEach(() => {
     counts = new Map();
-    automationForWebhook.mockReset().mockImplementation(async (id: string, token: string) =>
-        token === TOKEN ? { id, enabled: true } : null
-    );
+    automationForWebhook
+        .mockReset()
+        .mockImplementation(async (id: string, token: string) =>
+            token === TOKEN ? { id, enabled: true } : null
+        );
     fireAutomationWebhook.mockReset().mockResolvedValue({ runId: "run-1" });
 });
 
@@ -61,7 +68,8 @@ describe("the automation webhook", () => {
 
     it("cuts a caller off after too many wrong addresses", async () => {
         let last = 0;
-        for (let attempt = 0; attempt < 61; attempt += 1) last = (await call("b".repeat(43))).status;
+        for (let attempt = 0; attempt < 61; attempt += 1)
+            last = (await call("b".repeat(43))).status;
         expect(last).toBe(429);
     });
 

@@ -460,7 +460,8 @@ export function restoreCommands(target: RestoreTarget): MaintenanceCommand[] {
         from !== target.database ? [`--nsFrom=${from}.*`, `--nsTo=${target.database}.*`] : [];
     const dropped = target.dropCollections ?? [];
     for (const name of dropped)
-        if (!COPY_TABLE_PATTERN.test(name)) throw new Error("A collection name is letters, digits and underscores");
+        if (!COPY_TABLE_PATTERN.test(name))
+            throw new Error("A collection name is letters, digits and underscores");
     const drop: MaintenanceCommand[] =
         dropped.length > 0
             ? [
@@ -982,7 +983,8 @@ export const databaseUpgradeSchema = z.object({
 });
 
 /** A table or collection name as a copy names it: bare, or `schema.name`. */
-export const COPY_TABLE_PATTERN = /^[A-Za-z_][A-Za-z0-9_$-]{0,62}(\.[A-Za-z_][A-Za-z0-9_$-]{0,62})?$/;
+export const COPY_TABLE_PATTERN =
+    /^[A-Za-z_][A-Za-z0-9_$-]{0,62}(\.[A-Za-z_][A-Za-z0-9_$-]{0,62})?$/;
 
 /** At most this many names in each of a copy's two table lists. */
 export const COPY_TABLE_LIMIT = 100;
@@ -990,7 +992,10 @@ export const COPY_TABLE_LIMIT = 100;
 const copyTableName = z
     .string()
     .trim()
-    .regex(COPY_TABLE_PATTERN, "Use a table name: letters, digits and underscores, optionally schema.name");
+    .regex(
+        COPY_TABLE_PATTERN,
+        "Use a table name: letters, digits and underscores, optionally schema.name"
+    );
 
 /**
  * What a copy leaves behind. `skip` is not copied at all - the destination ends
@@ -1012,7 +1017,14 @@ export type CopyTables = z.infer<typeof copyTablesSchema>;
 
 /** Split a typed list - commas, spaces or lines - into distinct names. */
 export function parseTableList(text: string): string[] {
-    return [...new Set(text.split(/[\s,]+/).map((name) => name.trim()).filter(Boolean))];
+    return [
+        ...new Set(
+            text
+                .split(/[\s,]+/)
+                .map((name) => name.trim())
+                .filter(Boolean)
+        )
+    ];
 }
 
 /** A Postgres pattern matching one table exactly, case kept. */
@@ -1094,7 +1106,10 @@ export const databaseCopySchema = z
             !value.tables ||
             (value.tables.skip.length === 0 && value.tables.structureOnly.length === 0) ||
             Boolean(value.fromDatabaseId),
-        { message: "Tables can only be chosen when copying from a managed database", path: ["tables"] }
+        {
+            message: "Tables can only be chosen when copying from a managed database",
+            path: ["tables"]
+        }
     )
     .refine(
         (value) =>

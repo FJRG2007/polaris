@@ -72,12 +72,22 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
         icon: Users,
         hint: "sections.members.hint"
     },
-    { slug: "tokens", label: "sections.tokens.label", icon: KeyRound, hint: "sections.tokens.hint" },
+    {
+        slug: "tokens",
+        label: "sections.tokens.label",
+        icon: KeyRound,
+        hint: "sections.tokens.hint"
+    },
     {
         slug: "integrations",
         label: "sections.integrations.label",
         icon: Blocks,
         hint: "sections.integrations.hint"
     },
-    { slug: "danger", label: "sections.danger.label", icon: TriangleAlert, hint: "sections.danger.hint" }
+    {
+        slug: "danger",
+        label: "sections.danger.label",
+        icon: TriangleAlert,
+        hint: "sections.danger.hint"
+    }
 ];

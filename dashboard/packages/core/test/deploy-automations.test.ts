@@ -45,8 +45,14 @@ describe("deployAutomationInputSchema", () => {
     });
 
     it("lets a deploy event follow one service, but not a domain event", () => {
-        expect(rule({ trigger: "event", event: "deploy.failed", eventApplicationId: SERVICE }).success).toBe(true);
-        const domain = rule({ trigger: "event", event: "domain.down", eventApplicationId: SERVICE });
+        expect(
+            rule({ trigger: "event", event: "deploy.failed", eventApplicationId: SERVICE }).success
+        ).toBe(true);
+        const domain = rule({
+            trigger: "event",
+            event: "domain.down",
+            eventApplicationId: SERVICE
+        });
         expect(domain.success).toBe(false);
         expect(domain.error?.issues[0]?.path).toEqual(["eventApplicationId"]);
     });
@@ -65,17 +71,27 @@ describe("deployAutomationInputSchema", () => {
     });
 
     it("bounds a command's time and refuses a NUL in it", () => {
-        const ok = rule({ actions: [{ type: "command", applicationId: SERVICE, command: "npm run migrate" }] });
+        const ok = rule({
+            actions: [{ type: "command", applicationId: SERVICE, command: "npm run migrate" }]
+        });
         expect(ok.success).toBe(true);
         expect(ok.data?.actions[0]).toMatchObject({ timeoutSeconds: 300 });
         expect(
             rule({
-                actions: [{ type: "command", applicationId: SERVICE, command: "ls", timeoutSeconds: 5 }]
+                actions: [
+                    { type: "command", applicationId: SERVICE, command: "ls", timeoutSeconds: 5 }
+                ]
             }).success
         ).toBe(false);
         expect(
             rule({
-                actions: [{ type: "command", applicationId: SERVICE, command: `ls${String.fromCharCode(0)}` }]
+                actions: [
+                    {
+                        type: "command",
+                        applicationId: SERVICE,
+                        command: `ls${String.fromCharCode(0)}`
+                    }
+                ]
             }).success
         ).toBe(false);
     });
@@ -111,14 +127,22 @@ describe("automationHears", () => {
     };
 
     it("hears its own event from any service when it names none", () => {
-        expect(core.automationHears(base, { event: "deploy.failed", applicationId: SERVICE }, now)).toBe(true);
-        expect(core.automationHears(base, { event: "deploy.succeeded", applicationId: SERVICE }, now)).toBe(false);
+        expect(
+            core.automationHears(base, { event: "deploy.failed", applicationId: SERVICE }, now)
+        ).toBe(true);
+        expect(
+            core.automationHears(base, { event: "deploy.succeeded", applicationId: SERVICE }, now)
+        ).toBe(false);
     });
 
     it("hears only the service it names", () => {
         const one = { ...base, eventApplicationId: SERVICE };
-        expect(core.automationHears(one, { event: "deploy.failed", applicationId: SERVICE }, now)).toBe(true);
-        expect(core.automationHears(one, { event: "deploy.failed", applicationId: OTHER }, now)).toBe(false);
+        expect(
+            core.automationHears(one, { event: "deploy.failed", applicationId: SERVICE }, now)
+        ).toBe(true);
+        expect(
+            core.automationHears(one, { event: "deploy.failed", applicationId: OTHER }, now)
+        ).toBe(false);
     });
 
     it("waits out the cool-off after its last run", () => {
@@ -127,8 +151,12 @@ describe("automationHears", () => {
             ...base,
             lastRunAt: new Date(now.getTime() - core.DEPLOY_AUTOMATION_EVENT_COOLDOWN_MS - 1)
         };
-        expect(core.automationHears(recent, { event: "deploy.failed", applicationId: null }, now)).toBe(false);
-        expect(core.automationHears(old, { event: "deploy.failed", applicationId: null }, now)).toBe(true);
+        expect(
+            core.automationHears(recent, { event: "deploy.failed", applicationId: null }, now)
+        ).toBe(false);
+        expect(
+            core.automationHears(old, { event: "deploy.failed", applicationId: null }, now)
+        ).toBe(true);
     });
 
     it("never hears anything when switched off or not an event rule", () => {

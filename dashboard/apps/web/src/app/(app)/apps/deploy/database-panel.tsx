@@ -1274,15 +1274,17 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                     onClick={() =>
                         ask({
                             title: t("database.copy.confirmTitle", { name: overview.name }),
-                            body: t("database.copy.confirmBody", {
-                                name: overview.name,
-                                source:
-                                    from === "managed"
-                                        ? (sourceName ?? t("database.copy.thatDatabase"))
-                                        : from === "saved"
-                                          ? (connection?.name ?? t("database.copy.thatDatabase"))
-                                          : t("database.copy.thatAddress")
-                            }) +
+                            body:
+                                t("database.copy.confirmBody", {
+                                    name: overview.name,
+                                    source:
+                                        from === "managed"
+                                            ? (sourceName ?? t("database.copy.thatDatabase"))
+                                            : from === "saved"
+                                              ? (connection?.name ??
+                                                t("database.copy.thatDatabase"))
+                                              : t("database.copy.thatAddress")
+                                }) +
                                 (tablesChosen
                                     ? ` ${t("database.copy.confirmTables", {
                                           skipped: tables.skip.length,

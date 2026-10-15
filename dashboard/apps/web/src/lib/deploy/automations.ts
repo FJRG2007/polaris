@@ -176,7 +176,9 @@ export function readRunLog(stored: string): { note: AutomationRunNote; steps: Au
             note,
             steps: steps.map((step) => ({
                 ...step,
-                reason: AUTOMATION_STEP_REASONS.includes(step.reason as AutomationStepReason) ? step.reason : null
+                reason: AUTOMATION_STEP_REASONS.includes(step.reason as AutomationStepReason)
+                    ? step.reason
+                    : null
             }))
         };
     } catch {
@@ -238,7 +240,12 @@ export async function automationServices(
             environment: { projectId },
             ...(environmentIds ? { environmentId: { in: [...environmentIds] } } : {})
         },
-        select: { id: true, name: true, environmentId: true, environment: { select: { name: true } } },
+        select: {
+            id: true,
+            name: true,
+            environmentId: true,
+            environment: { select: { name: true } }
+        },
         orderBy: { name: "asc" },
         take: 500
     });
@@ -256,7 +263,8 @@ function namedServices(input: {
     eventApplicationId?: string | null;
 }): string[] {
     const ids = new Set<string>();
-    for (const action of input.actions) if ("applicationId" in action) ids.add(action.applicationId);
+    for (const action of input.actions)
+        if ("applicationId" in action) ids.add(action.applicationId);
     if (input.eventApplicationId) ids.add(input.eventApplicationId);
     return [...ids];
 }
@@ -297,8 +305,7 @@ export async function saveAutomation(
             },
             select: { id: true }
         });
-        if (found.length !== services.length)
-            throw new AutomationError("foreignService");
+        if (found.length !== services.length) throw new AutomationError("foreignService");
     }
 
     const existing = input.id
@@ -309,9 +316,10 @@ export async function saveAutomation(
         : null;
     if (input.id && !existing) throw new AutomationError("notFound");
     if (!existing) {
-        const count = await prisma.deployAutomation.count({ where: { projectId: input.projectId } });
-        if (count >= core.DEPLOY_AUTOMATION_LIMIT)
-            throw new AutomationError("limit");
+        const count = await prisma.deployAutomation.count({
+            where: { projectId: input.projectId }
+        });
+        if (count >= core.DEPLOY_AUTOMATION_LIMIT) throw new AutomationError("limit");
     }
 
     // A webhook keeps its address while it stays a webhook; becoming one mints
@@ -366,12 +374,18 @@ export async function setAutomationEnabled(
         nextRunAt = null;
     }
     return toView(
-        await prisma.deployAutomation.update({ where: { id: row.id }, data: { enabled, nextRunAt } })
+        await prisma.deployAutomation.update({
+            where: { id: row.id },
+            data: { enabled, nextRunAt }
+        })
     );
 }
 
 /** Give a webhook rule a new address; the old one stops working at once. */
-export async function rotateAutomationWebhook(projectId: string, automationId: string): Promise<string> {
+export async function rotateAutomationWebhook(
+    projectId: string,
+    automationId: string
+): Promise<string> {
     const row = await prisma.deployAutomation.findFirst({
         where: { id: automationId, projectId, trigger: "webhook" },
         select: { id: true }
@@ -387,7 +401,9 @@ export async function rotateAutomationWebhook(projectId: string, automationId: s
 
 /** Remove one of this project's rules and its run history. */
 export async function deleteAutomation(projectId: string, automationId: string): Promise<void> {
-    const removed = await prisma.deployAutomation.deleteMany({ where: { id: automationId, projectId } });
+    const removed = await prisma.deployAutomation.deleteMany({
+        where: { id: automationId, projectId }
+    });
     if (removed.count === 0) throw new AutomationError("notFound");
 }
 
@@ -474,7 +490,10 @@ export async function runAutomationNow(
     // Pressing Run does the actions as the person pressing it, so it asks of
     // them what a schedule asks of the rule's maker.
     if (!(await accessReaches(access, row))) throw new AutomationError("reach");
-    await prisma.deployAutomation.update({ where: { id: row.id }, data: { lastRunAt: new Date() } });
+    await prisma.deployAutomation.update({
+        where: { id: row.id },
+        data: { lastRunAt: new Date() }
+    });
     return startRun(row.id, "manual", actorId);
 }
 
@@ -573,7 +592,12 @@ export async function raiseAutomationEvent(input: {
     try {
         const now = new Date();
         const rules = await prisma.deployAutomation.findMany({
-            where: { projectId: input.projectId, enabled: true, trigger: "event", event: input.event },
+            where: {
+                projectId: input.projectId,
+                enabled: true,
+                trigger: "event",
+                event: input.event
+            },
             select: {
                 id: true,
                 enabled: true,
@@ -692,7 +716,11 @@ export async function runAction(
     try {
         if (applicationId) {
             const inProject = await prisma.application.findFirst({
-                where: { id: applicationId, binnedAt: null, environment: { projectId: context.project.id } },
+                where: {
+                    id: applicationId,
+                    binnedAt: null,
+                    environment: { projectId: context.project.id }
+                },
                 select: { id: true }
             });
             if (!inProject) return { ...step, status: "failed", reason: "gone" };
@@ -713,10 +741,18 @@ export async function runAction(
             case "command": {
                 const app = await prisma.application.findUnique({
                     where: { id: action.applicationId },
-                    include: { target: true, environment: { select: { project: { select: { slug: true } } } } }
+                    include: {
+                        target: true,
+                        environment: { select: { project: { select: { slug: true } } } }
+                    }
                 });
                 if (!app) return { ...step, status: "failed", reason: "gone" };
-                const outcome = await runInService(app, context.ownerId, action.command, action.timeoutSeconds);
+                const outcome = await runInService(
+                    app,
+                    context.ownerId,
+                    action.command,
+                    action.timeoutSeconds
+                );
                 return {
                     ...step,
                     status: outcome.status,
@@ -741,7 +777,10 @@ export async function runAction(
             }
         }
     } catch (caught) {
-        console.error(`polaris: automation ${context.automation.id} could not ${action.type}:`, caught);
+        console.error(
+            `polaris: automation ${context.automation.id} could not ${action.type}:`,
+            caught
+        );
         return { ...step, status: "failed", reason: "failed" };
     }
 }
@@ -777,7 +816,10 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
     let note: AutomationRunNote = null;
     const steps: AutomationStep[] = [];
     if (actions.length === 0) note = "empty";
-    else if (run.trigger !== "manual" && !(await creatorMayRun({ ...automation, projectId: project.id })))
+    else if (
+        run.trigger !== "manual" &&
+        !(await creatorMayRun({ ...automation, projectId: project.id }))
+    )
         note = "creator";
 
     if (note === null) {
@@ -809,7 +851,9 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
         }
     }
 
-    const failedStep = steps.find((step) => step.status === "failed" || step.status === "timed_out");
+    const failedStep = steps.find(
+        (step) => step.status === "failed" || step.status === "timed_out"
+    );
     const status = note !== null || failedStep ? "failed" : "succeeded";
     await prisma.deployAutomationRun.update({
         where: { id: runId },
@@ -835,7 +879,9 @@ async function executeRun(runId: string, manualActorId: string | null): Promise<
             await notify({
                 userId,
                 event: "deploy.automation.failed",
-                title: t("automations.failedTitle", { name: `${project.name} / ${automation.name}` }),
+                title: t("automations.failedTitle", {
+                    name: `${project.name} / ${automation.name}`
+                }),
                 body:
                     note === "creator"
                         ? t("automations.creatorBody")
@@ -870,5 +916,7 @@ async function pruneRuns(automationId: string): Promise<void> {
         select: { id: true }
     });
     if (stale.length > 0)
-        await prisma.deployAutomationRun.deleteMany({ where: { id: { in: stale.map((row) => row.id) } } });
+        await prisma.deployAutomationRun.deleteMany({
+            where: { id: { in: stale.map((row) => row.id) } }
+        });
 }

@@ -48,7 +48,10 @@ let rules: RuleRow[] = [];
 let runs: RunRow[] = [];
 let goneServices = new Set<string>();
 let environments: Record<string, string> = {};
-let users: Record<string, { id: string; isAdmin: boolean; bannedAt: Date | null; disabledAt: Date | null }> = {};
+let users: Record<
+    string,
+    { id: string; isAdmin: boolean; bannedAt: Date | null; disabledAt: Date | null }
+> = {};
 
 const matches = (row: Record<string, unknown>, where: Record<string, unknown>): boolean =>
     Object.entries(where).every(([key, wanted]) => {
@@ -61,7 +64,8 @@ const matches = (row: Record<string, unknown>, where: Record<string, unknown>): 
             if (cond.gt) return value instanceof Date && value > cond.gt;
             return true;
         }
-        if (wanted instanceof Date) return value instanceof Date && value.getTime() === wanted.getTime();
+        if (wanted instanceof Date)
+            return value instanceof Date && value.getTime() === wanted.getTime();
         return value === wanted;
     });
 
@@ -78,7 +82,13 @@ vi.mock("@polaris/db", () => ({
                 const row = rules.find((one) => one.id === where.id);
                 return row ? { ...row, project } : null;
             },
-            updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<RuleRow> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Partial<RuleRow>;
+            }) => {
                 const hit = rules.filter((row) => matches(row as never, where));
                 for (const row of hit) Object.assign(row, data);
                 return { count: hit.length };
@@ -103,7 +113,13 @@ vi.mock("@polaris/db", () => ({
                 runs.push(row);
                 return row;
             },
-            findFirst: async ({ where, orderBy }: { where: Record<string, unknown>; orderBy?: unknown }) =>
+            findFirst: async ({
+                where,
+                orderBy
+            }: {
+                where: Record<string, unknown>;
+                orderBy?: unknown;
+            }) =>
                 [...runs]
                     .sort((a, b) => (orderBy ? b.startedAt.getTime() - a.startedAt.getTime() : 0))
                     .find((row) => matches(row as never, where)) ?? null,
@@ -118,7 +134,15 @@ vi.mock("@polaris/db", () => ({
                 Object.assign(row, data);
                 return row;
             },
-            findMany: async ({ where, skip = 0, take }: { where: { automationId: string }; skip?: number; take?: number }) =>
+            findMany: async ({
+                where,
+                skip = 0,
+                take
+            }: {
+                where: { automationId: string };
+                skip?: number;
+                take?: number;
+            }) =>
                 runs
                     .filter((row) => row.automationId === where.automationId)
                     .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
@@ -132,9 +156,15 @@ vi.mock("@polaris/db", () => ({
         application: {
             findFirst: async ({ where }: { where: { id: string } }) =>
                 goneServices.has(where.id) ? null : { id: where.id },
-            findUnique: async ({ where }: { where: { id: string } }) => ({ id: where.id, name: "web" }),
+            findUnique: async ({ where }: { where: { id: string } }) => ({
+                id: where.id,
+                name: "web"
+            }),
             findMany: async ({ where }: { where: { id?: { in?: string[] } } }) =>
-                (where.id?.in ?? []).map((id) => ({ id, environmentId: environments[id] ?? "env-production" }))
+                (where.id?.in ?? []).map((id) => ({
+                    id,
+                    environmentId: environments[id] ?? "env-production"
+                }))
         },
         user: {
             findUnique: async ({ where }: { where: { id: string } }) => users[where.id] ?? null
@@ -156,7 +186,9 @@ vi.mock("@/lib/deploy-service", () => ({
     deployApplication: (...args: unknown[]) => deployApplication(...args),
     restartApplication: (...args: unknown[]) => restartApplication(...args)
 }));
-vi.mock("@/lib/notifications/dispatch", () => ({ notify: (...args: unknown[]) => notify(...args) }));
+vi.mock("@/lib/notifications/dispatch", () => ({
+    notify: (...args: unknown[]) => notify(...args)
+}));
 vi.mock("@/lib/notifications/notice-words", () => ({
     wordsFor: async () => (key: string) => key
 }));
@@ -165,7 +197,13 @@ vi.mock("@polaris/auth", () => ({ userHasPermission: async () => true }));
 vi.mock("@/lib/deploy-project-access", () => ({
     projectAccess: async () =>
         hasAccess
-            ? { projectId: PROJECT, ownerId: OWNER, orgId: null, capabilities, environmentIds: null }
+            ? {
+                  projectId: PROJECT,
+                  ownerId: OWNER,
+                  orgId: null,
+                  capabilities,
+                  environmentIds: null
+              }
             : null,
     accessCan: (access: { capabilities: string[] }, capability: string) =>
         access.capabilities.includes(capability),
@@ -232,13 +270,21 @@ describe("an event", () => {
         expect(started).toBe(1);
         await settled();
         expect(restartApplication).toHaveBeenCalledTimes(1);
-        expect(runs[0]).toMatchObject({ automationId: "rule-1", trigger: "event", status: "succeeded" });
+        expect(runs[0]).toMatchObject({
+            automationId: "rule-1",
+            trigger: "event",
+            status: "succeeded"
+        });
     });
 
     it("skips a rule that follows another service", async () => {
         rule({ eventApplicationId: WORKER });
         expect(
-            await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: WEB })
+            await automations.raiseAutomationEvent({
+                projectId: PROJECT,
+                event: "deploy.failed",
+                applicationId: WEB
+            })
         ).toBe(0);
         expect(runs).toEqual([]);
     });
@@ -246,7 +292,11 @@ describe("an event", () => {
     it("waits out the cool-off after the last run", async () => {
         rule({ lastRunAt: new Date(Date.now() - 60_000) });
         expect(
-            await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: WEB })
+            await automations.raiseAutomationEvent({
+                projectId: PROJECT,
+                event: "deploy.failed",
+                applicationId: WEB
+            })
         ).toBe(0);
     });
 
@@ -272,7 +322,12 @@ describe("the schedule", () => {
             schedule: "0 3 * * *",
             nextRunAt: new Date("2026-10-15T03:00:00Z")
         });
-        rule({ trigger: "schedule", event: null, schedule: "0 3 * * *", nextRunAt: new Date("2026-10-16T03:00:00Z") });
+        rule({
+            trigger: "schedule",
+            event: null,
+            schedule: "0 3 * * *",
+            nextRunAt: new Date("2026-10-16T03:00:00Z")
+        });
         expect(await automations.tickDeployAutomations(now)).toEqual({ started: 1, skipped: 0 });
         expect(due.nextRunAt?.toISOString()).toBe("2026-10-16T03:00:00.000Z");
         await settled();
@@ -281,7 +336,12 @@ describe("the schedule", () => {
 
     it("records a firing as skipped while the previous run is still going", async () => {
         const now = new Date();
-        const due = rule({ trigger: "schedule", event: null, schedule: "* * * * *", nextRunAt: now });
+        const due = rule({
+            trigger: "schedule",
+            event: null,
+            schedule: "* * * * *",
+            nextRunAt: now
+        });
         runs.push({
             id: "old",
             automationId: due.id,
@@ -301,15 +361,40 @@ describe("a run's actions", () => {
     it("run in order and pass the command's output along", async () => {
         rule({
             actions: JSON.stringify([
-                { type: "command", applicationId: WEB, command: "npm run migrate", timeoutSeconds: 60 },
+                {
+                    type: "command",
+                    applicationId: WEB,
+                    command: "npm run migrate",
+                    timeoutSeconds: 60
+                },
                 { type: "redeploy", applicationId: WORKER }
             ])
         });
-        runInService.mockResolvedValue({ status: "succeeded", error: null, reason: null, exitCode: 0, output: "migrated 3" });
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        runInService.mockResolvedValue({
+            status: "succeeded",
+            error: null,
+            reason: null,
+            exitCode: 0,
+            output: "migrated 3"
+        });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
-        expect(runInService).toHaveBeenCalledWith(expect.objectContaining({ id: WEB }), OWNER, "npm run migrate", 60);
-        expect(deployApplication).toHaveBeenCalledWith(WORKER, OWNER, MAKER, expect.objectContaining({ trigger: "automation" }));
+        expect(runInService).toHaveBeenCalledWith(
+            expect.objectContaining({ id: WEB }),
+            OWNER,
+            "npm run migrate",
+            60
+        );
+        expect(deployApplication).toHaveBeenCalledWith(
+            WORKER,
+            OWNER,
+            MAKER,
+            expect.objectContaining({ trigger: "automation" })
+        );
         const log = automations.readRunLog(runs[0]!.log);
         expect(log.steps.map((step) => step.status)).toEqual(["succeeded", "succeeded"]);
         expect(log.steps[0]?.output).toBe("migrated 3");
@@ -318,12 +403,27 @@ describe("a run's actions", () => {
     it("stop at the first that fails, and the owner hears about it", async () => {
         rule({
             actions: JSON.stringify([
-                { type: "command", applicationId: WEB, command: "npm run migrate", timeoutSeconds: 60 },
+                {
+                    type: "command",
+                    applicationId: WEB,
+                    command: "npm run migrate",
+                    timeoutSeconds: 60
+                },
                 { type: "restart", applicationId: WEB }
             ])
         });
-        runInService.mockResolvedValue({ status: "failed", error: "exit 1", reason: "exited", exitCode: 1, output: "boom" });
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        runInService.mockResolvedValue({
+            status: "failed",
+            error: "exit 1",
+            reason: "exited",
+            exitCode: 1,
+            output: "boom"
+        });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(restartApplication).not.toHaveBeenCalled();
         expect(runs[0]?.status).toBe("failed");
@@ -342,7 +442,11 @@ describe("a run's actions", () => {
     it("do not run for somebody who may no longer deploy the project", async () => {
         rule();
         hasAccess = false;
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(restartApplication).not.toHaveBeenCalled();
         expect(runs[0]?.status).toBe("failed");
@@ -350,7 +454,12 @@ describe("a run's actions", () => {
     });
 
     it("say once, not on every firing, that the maker may no longer deploy", async () => {
-        const due = rule({ trigger: "schedule", event: null, schedule: "* * * * *", nextRunAt: new Date() });
+        const due = rule({
+            trigger: "schedule",
+            event: null,
+            schedule: "* * * * *",
+            nextRunAt: new Date()
+        });
         hasAccess = false;
         await automations.tickDeployAutomations(new Date());
         await settled();
@@ -377,15 +486,26 @@ describe("a run's actions", () => {
             environmentIds: ["env-production"]
         };
         expect(await automations.accessReaches(access as never, one)).toBe(false);
-        expect(await automations.accessReaches({ ...access, environmentIds: ["env-staging"] } as never, one)).toBe(true);
+        expect(
+            await automations.accessReaches(
+                { ...access, environmentIds: ["env-staging"] } as never,
+                one
+            )
+        ).toBe(true);
     });
 
     it("do not run a command once the maker loses the console", async () => {
         rule({
-            actions: JSON.stringify([{ type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }])
+            actions: JSON.stringify([
+                { type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }
+            ])
         });
         capabilities = ["project.read", "deploy.run"];
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(runInService).not.toHaveBeenCalled();
         expect(automations.readRunLog(runs[0]!.log).note).toBe("creator");
@@ -426,10 +546,20 @@ describe("a webhook address", () => {
 describe("running a rule by hand", () => {
     it("asks of the person pressing Run what the rule does", async () => {
         const one = rule({
-            actions: JSON.stringify([{ type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }])
+            actions: JSON.stringify([
+                { type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }
+            ])
         });
-        const access = { projectId: PROJECT, ownerId: OWNER, orgId: null, capabilities: ["deploy.run"], environmentIds: null };
-        await expect(automations.runAutomationNow(access as never, one.id, MAKER)).rejects.toMatchObject({
+        const access = {
+            projectId: PROJECT,
+            ownerId: OWNER,
+            orgId: null,
+            capabilities: ["deploy.run"],
+            environmentIds: null
+        };
+        await expect(
+            automations.runAutomationNow(access as never, one.id, MAKER)
+        ).rejects.toMatchObject({
             code: "reach"
         });
         expect(runs).toEqual([]);
@@ -439,9 +569,15 @@ describe("running a rule by hand", () => {
 describe("the actions themselves", () => {
     it("tell the owner and the maker, in the rule's own words", async () => {
         rule({ actions: JSON.stringify([{ type: "notify", message: "The nightly job ran" }]) });
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
-        const told = notify.mock.calls.map(([call]) => call as { userId: string; body: string; event: string });
+        const told = notify.mock.calls.map(
+            ([call]) => call as { userId: string; body: string; event: string }
+        );
         expect(told.map((call) => call.userId).sort()).toEqual([MAKER, OWNER].sort());
         expect(told.every((call) => call.body === "The nightly job ran")).toBe(true);
         expect(told.every((call) => call.event === "deploy.automation.notice")).toBe(true);
@@ -451,7 +587,11 @@ describe("the actions themselves", () => {
     it("fail, and say why, on a service that has left the project", async () => {
         rule({ actions: JSON.stringify([{ type: "restart", applicationId: WORKER }]) });
         goneServices.add(WORKER);
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(restartApplication).not.toHaveBeenCalled();
         const [step] = automations.readRunLog(runs[0]!.log).steps;
@@ -460,12 +600,21 @@ describe("the actions themselves", () => {
 
     it("turn a thrown error into a failed step instead of a lost run", async () => {
         rule();
-        restartApplication.mockRejectedValue(new Error("connect ECONNREFUSED /var/run/polaris.sock"));
+        restartApplication.mockRejectedValue(
+            new Error("connect ECONNREFUSED /var/run/polaris.sock")
+        );
         const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(runs[0]?.status).toBe("failed");
-        expect(automations.readRunLog(runs[0]!.log).steps[0]).toMatchObject({ status: "failed", reason: "failed" });
+        expect(automations.readRunLog(runs[0]!.log).steps[0]).toMatchObject({
+            status: "failed",
+            reason: "failed"
+        });
         expect(runs[0]!.log).not.toContain("ECONNREFUSED");
         expect(logged).toHaveBeenCalled();
         logged.mockRestore();
@@ -473,11 +622,23 @@ describe("the actions themselves", () => {
 
     it("keep only the end of a long command's output", async () => {
         rule({
-            actions: JSON.stringify([{ type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }])
+            actions: JSON.stringify([
+                { type: "command", applicationId: WEB, command: "ls", timeoutSeconds: 60 }
+            ])
         });
         const output = `${"x".repeat(automations.AUTOMATION_OUTPUT_LIMIT)}the reason`;
-        runInService.mockResolvedValue({ status: "succeeded", error: null, reason: null, exitCode: 0, output });
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        runInService.mockResolvedValue({
+            status: "succeeded",
+            error: null,
+            reason: null,
+            exitCode: 0,
+            output
+        });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         const kept = automations.readRunLog(runs[0]!.log).steps[0]?.output ?? "";
         expect(kept).toHaveLength(automations.AUTOMATION_OUTPUT_LIMIT);
@@ -486,7 +647,11 @@ describe("the actions themselves", () => {
 
     it("record a rule with nothing left to do as an empty run", async () => {
         rule({ actions: "[]" });
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(runs[0]?.status).toBe("failed");
         expect(automations.readRunLog(runs[0]!.log).note).toBe("empty");
@@ -496,7 +661,12 @@ describe("the actions themselves", () => {
 describe("a schedule that no longer parses", () => {
     it("is switched off instead of refused every minute", async () => {
         const now = new Date();
-        const broken = rule({ trigger: "schedule", event: null, schedule: "not a cron", nextRunAt: now });
+        const broken = rule({
+            trigger: "schedule",
+            event: null,
+            schedule: "not a cron",
+            nextRunAt: now
+        });
         expect(await automations.tickDeployAutomations(now)).toEqual({ started: 0, skipped: 0 });
         expect(broken).toMatchObject({ enabled: false, nextRunAt: null });
         expect(runs).toEqual([]);
@@ -548,7 +718,9 @@ describe("the webhook firing", () => {
             startedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
             finishedAt: null
         });
-        expect(await automations.fireAutomationWebhook(one.id)).toMatchObject({ runId: expect.any(String) });
+        expect(await automations.fireAutomationWebhook(one.id)).toMatchObject({
+            runId: expect.any(String)
+        });
     });
 
     it("answers no rule for an id that is not one", async () => {
@@ -603,7 +775,11 @@ describe("the run history", () => {
         );
         const history = await automations.listAutomationRuns(PROJECT, one.id);
         expect(history.map((run) => run.id)).toEqual(["newer", "older"]);
-        expect(history[0]).toMatchObject({ note: "creator", steps: [], finishedAt: "2026-10-15T03:00:00.000Z" });
+        expect(history[0]).toMatchObject({
+            note: "creator",
+            steps: [],
+            finishedAt: "2026-10-15T03:00:00.000Z"
+        });
         expect(history[1]?.steps).toHaveLength(1);
     });
 
@@ -628,7 +804,11 @@ describe("the run history", () => {
                 finishedAt: null
             });
         }
-        await automations.raiseAutomationEvent({ projectId: PROJECT, event: "deploy.failed", applicationId: null });
+        await automations.raiseAutomationEvent({
+            projectId: PROJECT,
+            event: "deploy.failed",
+            applicationId: null
+        });
         await settled();
         expect(runs).toHaveLength(50);
         expect(runs.some((run) => run.id === "past-0")).toBe(false);

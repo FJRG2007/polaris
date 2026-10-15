@@ -311,7 +311,12 @@ const WRAPPER =
     'if command -v timeout >/dev/null 2>&1; then exec timeout "$2" sh -c "$1"; else exec sh -c "$1"; fi';
 
 /** Why a command in a service did not succeed, as a code a screen words itself. */
-export type ServiceCommandFailure = "notRunning" | "unreachable" | "timedOut" | "exited" | "notStarted";
+export type ServiceCommandFailure =
+    | "notRunning"
+    | "unreachable"
+    | "timedOut"
+    | "exited"
+    | "notStarted";
 
 /** What one command run inside a service's container came to. */
 export interface ServiceCommandOutcome {

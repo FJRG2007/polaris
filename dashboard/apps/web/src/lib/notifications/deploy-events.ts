@@ -32,7 +32,12 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
     if (type === "application") {
         const app = await prisma.application.findUnique({
             where: { id },
-            select: { name: true, environment: { select: { project: { select: { id: true, name: true, orgId: true } } } } }
+            select: {
+                name: true,
+                environment: {
+                    select: { project: { select: { id: true, name: true, orgId: true } } }
+                }
+            }
         });
         if (!app) return null;
         const project = app.environment.project;
@@ -48,7 +53,12 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
     if (type === "database") {
         const database = await prisma.managedDatabase.findUnique({
             where: { id },
-            select: { name: true, environment: { select: { id: true, project: { select: { id: true, name: true, orgId: true } } } } }
+            select: {
+                name: true,
+                environment: {
+                    select: { id: true, project: { select: { id: true, name: true, orgId: true } } }
+                }
+            }
         });
         if (!database) return null;
         const project = database.environment.project;
@@ -67,7 +77,10 @@ async function describeDeployable(type: string, id: string): Promise<Deployable 
 /** The failure reason, trimmed to something a phone or a chat card can carry.
  *  The full log is a click away, and the first line is nearly always the cause. */
 function summarize(error: string | null): string {
-    const first = (error ?? "").split("\n").map((line) => line.trim()).find((line) => line.length > 0);
+    const first = (error ?? "")
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.length > 0);
     if (!first) return "No reason was reported. Open the deploy log for the detail.";
     return first.length > 300 ? `${first.slice(0, 297)}...` : first;
 }
@@ -96,11 +109,16 @@ export async function notifyDeployFinished(input: {
         });
         if (!deployment) return;
 
-        const deployable = await describeDeployable(deployment.deployableType, deployment.deployableId);
+        const deployable = await describeDeployable(
+            deployment.deployableType,
+            deployment.deployableId
+        );
         if (!deployable) return;
 
         const event = input.ok ? "deploy.succeeded" : "deploy.failed";
-        const title = input.ok ? `Deployed ${deployable.label}` : `Deploy failed: ${deployable.label}`;
+        const title = input.ok
+            ? `Deployed ${deployable.label}`
+            : `Deploy failed: ${deployable.label}`;
         const body = input.ok
             ? `${deployable.label} is serving the new release.`
             : summarize(deployment.error);

@@ -75,9 +75,11 @@ export async function listAutomationsAction(
 ): Promise<{ error?: string; data?: AutomationsLoad }> {
     const user = await requirePermission("deploy.read");
     try {
-        if (!idSchema.safeParse(projectId).success) throw new automations.AutomationError("notFound");
+        if (!idSchema.safeParse(projectId).success)
+            throw new automations.AutomationError("notFound");
         const access = await requireProjectAccess(projectId, user.id, "project.read");
-        const canEdit = accessCan(access, "deploy.run") && (await userHasManage(user, "deploy.manage"));
+        const canEdit =
+            accessCan(access, "deploy.run") && (await userHasManage(user, "deploy.manage"));
         const [rules, services] = await Promise.all([
             automations.listAutomations(projectId),
             automations.automationServices(projectId, access.environmentIds)
@@ -95,12 +97,15 @@ export async function listAutomationsAction(
     }
 }
 
-export async function saveAutomationAction(
-    input: unknown
-): Promise<{ error?: string; automation?: automations.DeployAutomationView; webhookUrl?: string | null }> {
+export async function saveAutomationAction(input: unknown): Promise<{
+    error?: string;
+    automation?: automations.DeployAutomationView;
+    webhookUrl?: string | null;
+}> {
     const user = await requirePermission("deploy.manage");
     const parsed = core.deployAutomationInputSchema.safeParse(input);
-    if (!parsed.success) return { error: await firstIssue(parsed.error, "automations.checkDetails") };
+    if (!parsed.success)
+        return { error: await firstIssue(parsed.error, "automations.checkDetails") };
     try {
         const access = await editorAccess(parsed.data.projectId, user.id);
         if (automations.needsConsole(parsed.data.actions) && !accessCan(access, "console.use"))
@@ -178,7 +183,9 @@ export async function deleteAutomationAction(input: unknown): Promise<{ error?: 
     }
 }
 
-export async function runAutomationAction(input: unknown): Promise<{ error?: string; runId?: string }> {
+export async function runAutomationAction(
+    input: unknown
+): Promise<{ error?: string; runId?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = targetSchema.safeParse(input);
     if (!parsed.success) return { error: await reply("automations.checkDetails") };
@@ -201,7 +208,10 @@ export async function listAutomationRunsAction(
     try {
         await requireProjectAccess(parsed.data.projectId, user.id, "project.read");
         return {
-            runs: await automations.listAutomationRuns(parsed.data.projectId, parsed.data.automationId)
+            runs: await automations.listAutomationRuns(
+                parsed.data.projectId,
+                parsed.data.automationId
+            )
         };
     } catch (caught) {
         return failure(caught, "automations.runsFailed");

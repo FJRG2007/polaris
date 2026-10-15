@@ -400,7 +400,10 @@ export async function notifyDomainHealthChanges(
                     url: one?.context.href ?? SWEEP_HREF,
                     level: status === "down" ? "danger" : "success"
                 });
-                await raiseDomainAutomations(projectId, status === "down" ? "domain.down" : "domain.up");
+                await raiseDomainAutomations(
+                    projectId,
+                    status === "down" ? "domain.down" : "domain.up"
+                );
             }
         }
     } catch (error) {

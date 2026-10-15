@@ -8,11 +8,21 @@
 import * as core from "@polaris/core";
 import { describe, expect, it } from "vitest";
 
-const MYSQL_BASE = ["mysqldump", "--single-transaction", "--routines", "--triggers", "-uapp", "-psecret", "shop"];
+const MYSQL_BASE = [
+    "mysqldump",
+    "--single-transaction",
+    "--routines",
+    "--triggers",
+    "-uapp",
+    "-psecret",
+    "shop"
+];
 
 describe("filteredDumpArgv", () => {
     it("leaves the command alone when nothing is chosen", () => {
-        expect(core.filteredDumpArgv("postgres", "shop", ["pg_dump", "-d", "shop"], undefined)).toEqual({
+        expect(
+            core.filteredDumpArgv("postgres", "shop", ["pg_dump", "-d", "shop"], undefined)
+        ).toEqual({
             main: ["pg_dump", "-d", "shop"],
             schemaPass: null
         });
@@ -22,10 +32,15 @@ describe("filteredDumpArgv", () => {
     });
 
     it("excludes Postgres tables and their data with exact-case patterns", () => {
-        const { main, schemaPass } = core.filteredDumpArgv("postgres", "shop", ["pg_dump", "-d", "shop"], {
-            skip: ["Audit"],
-            structureOnly: ["public.sessions"]
-        });
+        const { main, schemaPass } = core.filteredDumpArgv(
+            "postgres",
+            "shop",
+            ["pg_dump", "-d", "shop"],
+            {
+                skip: ["Audit"],
+                structureOnly: ["public.sessions"]
+            }
+        );
         expect(main).toEqual([
             "pg_dump",
             "-d",
@@ -78,7 +93,9 @@ describe("filteredDumpArgv", () => {
 
 describe("copyTablesSchema", () => {
     it("accepts bare and schema-qualified names", () => {
-        expect(core.copyTablesSchema.safeParse({ skip: ["users", "public.audit_log"] }).success).toBe(true);
+        expect(
+            core.copyTablesSchema.safeParse({ skip: ["users", "public.audit_log"] }).success
+        ).toBe(true);
     });
 
     it("refuses anything that could reach a shell or a pattern", () => {
@@ -88,7 +105,9 @@ describe("copyTablesSchema", () => {
     });
 
     it("refuses a table both left out and copied empty", () => {
-        expect(core.copyTablesSchema.safeParse({ skip: ["a"], structureOnly: ["a"] }).success).toBe(false);
+        expect(core.copyTablesSchema.safeParse({ skip: ["a"], structureOnly: ["a"] }).success).toBe(
+            false
+        );
     });
 
     it("refuses tables for a source that is not a managed database", () => {

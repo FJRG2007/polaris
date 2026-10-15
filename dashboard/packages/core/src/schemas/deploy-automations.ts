@@ -24,7 +24,10 @@ export const DEPLOY_AUTOMATION_EVENTS = [
 export type DeployAutomationEvent = (typeof DEPLOY_AUTOMATION_EVENTS)[number];
 
 /** Events that name the service they happened to, so a rule can follow one. */
-export const SERVICE_SCOPED_EVENTS: readonly DeployAutomationEvent[] = ["deploy.succeeded", "deploy.failed"];
+export const SERVICE_SCOPED_EVENTS: readonly DeployAutomationEvent[] = [
+    "deploy.succeeded",
+    "deploy.failed"
+];
 
 export const DEPLOY_AUTOMATION_ACTIONS = ["redeploy", "restart", "command", "notify"] as const;
 export type DeployAutomationActionType = (typeof DEPLOY_AUTOMATION_ACTIONS)[number];
@@ -54,11 +57,20 @@ export const deployAutomationActionSchema = z.discriminatedUnion("type", [
             .min(1, "A command is required")
             .max(4000, "Keep the command under 4000 characters")
             .refine((value) => !value.includes(NUL), "The command cannot contain a NUL character"),
-        timeoutSeconds: z.number().int().min(10, "At least 10 seconds").max(3600, "At most an hour").default(300)
+        timeoutSeconds: z
+            .number()
+            .int()
+            .min(10, "At least 10 seconds")
+            .max(3600, "At most an hour")
+            .default(300)
     }),
     z.object({
         type: z.literal("notify"),
-        message: z.string().trim().min(1, "Write the message").max(300, "Keep the message under 300 characters")
+        message: z
+            .string()
+            .trim()
+            .min(1, "Write the message")
+            .max(300, "Keep the message under 300 characters")
     })
 ]);
 
@@ -68,7 +80,11 @@ export const deployAutomationInputSchema = z
     .object({
         id: z.string().uuid().optional(),
         projectId: z.string().uuid(),
-        name: z.string().trim().min(1, "A name is required").max(64, "Keep the name under 64 characters"),
+        name: z
+            .string()
+            .trim()
+            .min(1, "A name is required")
+            .max(64, "Keep the name under 64 characters"),
         enabled: z.boolean().default(true),
         trigger: z.enum(DEPLOY_AUTOMATION_TRIGGERS),
         schedule: z.string().trim().max(128).optional(),
@@ -86,7 +102,10 @@ export const deployAutomationInputSchema = z
         actions: z
             .array(deployAutomationActionSchema)
             .min(1, "Add at least one action")
-            .max(DEPLOY_AUTOMATION_ACTION_LIMIT, `At most ${DEPLOY_AUTOMATION_ACTION_LIMIT} actions`)
+            .max(
+                DEPLOY_AUTOMATION_ACTION_LIMIT,
+                `At most ${DEPLOY_AUTOMATION_ACTION_LIMIT} actions`
+            )
     })
     .superRefine((value, ctx) => {
         if (value.trigger === "schedule") {
@@ -100,7 +119,11 @@ export const deployAutomationInputSchema = z
         }
         if (value.trigger === "event") {
             if (!value.event)
-                ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["event"], message: "Pick an event" });
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["event"],
+                    message: "Pick an event"
+                });
             else if (value.eventApplicationId && !SERVICE_SCOPED_EVENTS.includes(value.event))
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
@@ -145,7 +168,10 @@ export function automationHears(
 ): boolean {
     if (!rule.enabled || rule.trigger !== "event" || rule.event !== event.event) return false;
     if (rule.eventApplicationId && rule.eventApplicationId !== event.applicationId) return false;
-    if (rule.lastRunAt && now.getTime() - rule.lastRunAt.getTime() < DEPLOY_AUTOMATION_EVENT_COOLDOWN_MS)
+    if (
+        rule.lastRunAt &&
+        now.getTime() - rule.lastRunAt.getTime() < DEPLOY_AUTOMATION_EVENT_COOLDOWN_MS
+    )
         return false;
     return true;
 }

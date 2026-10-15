@@ -69,7 +69,11 @@ function rule(overrides: Partial<DeployAutomationView> = {}): DeployAutomationVi
     };
 }
 
-function loaded(data: { automations?: DeployAutomationView[]; canEdit?: boolean; canCommand?: boolean }) {
+function loaded(data: {
+    automations?: DeployAutomationView[];
+    canEdit?: boolean;
+    canCommand?: boolean;
+}) {
     listAutomationsAction.mockResolvedValue({
         data: { automations: [], services, canEdit: true, canCommand: true, ...data }
     });
@@ -97,7 +101,9 @@ describe("the Automations section", () => {
         loaded({ automations: [rule()], canEdit: false, canCommand: false });
         render(<AutomationsSection projectId={PROJECT} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Restart after a failed deploy")).toBeDefined();
-        expect((screen.getByRole("button", { name: "New automation" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByRole("button", { name: "New automation" }) as HTMLButtonElement).disabled
+        ).toBe(true);
         expect(screen.getByText(/changing them needs the right to deploy/)).toBeDefined();
         expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
         expect(screen.queryByRole("button", { name: "Run now" })).toBeNull();
@@ -111,11 +117,15 @@ describe("the Automations section", () => {
         expect(await screen.findByText("When")).toBeDefined();
         expect(screen.getByText("Then")).toBeDefined();
         expect(screen.getByRole("button", { name: /Add action/ })).toBeDefined();
-        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe("true");
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
     });
 
     it("shows a run's steps and why one failed, in the reader's words", async () => {
-        loaded({ automations: [rule({ lastRunAt: "2026-10-15T03:00:00.000Z", lastStatus: "failed" })] });
+        loaded({
+            automations: [rule({ lastRunAt: "2026-10-15T03:00:00.000Z", lastStatus: "failed" })]
+        });
         listAutomationRunsAction.mockResolvedValue({
             runs: [
                 {
@@ -123,7 +133,14 @@ describe("the Automations section", () => {
                     trigger: "event",
                     status: "failed",
                     note: null,
-                    steps: [{ type: "restart", applicationId: WEB, status: "failed", reason: "unreachable" }],
+                    steps: [
+                        {
+                            type: "restart",
+                            applicationId: WEB,
+                            status: "failed",
+                            reason: "unreachable"
+                        }
+                    ],
                     startedAt: "2026-10-15T03:00:00.000Z",
                     finishedAt: "2026-10-15T03:00:05.000Z"
                 }
@@ -132,7 +149,9 @@ describe("the Automations section", () => {
         render(<AutomationsSection projectId={PROJECT} />, { wrapper: MessagesWrapper });
         await screen.findByText("Restart after a failed deploy");
         fireEvent.click(screen.getByRole("button", { name: "Show run history" }));
-        expect(await screen.findByText("The server the service runs on could not be reached.")).toBeDefined();
+        expect(
+            await screen.findByText("The server the service runs on could not be reached.")
+        ).toBeDefined();
         expect(screen.getByRole("list", { name: "Recent runs" })).toBeDefined();
         expect(screen.getByRole("button", { name: "Hide run history" })).toBeDefined();
     });

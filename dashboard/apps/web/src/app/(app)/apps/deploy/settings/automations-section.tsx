@@ -165,7 +165,10 @@ function localTimeZone(): string {
     }
 }
 
-function blankAction(type: core.DeployAutomationActionType, services: readonly AutomationServiceOption[]): ActionDraft {
+function blankAction(
+    type: core.DeployAutomationActionType,
+    services: readonly AutomationServiceOption[]
+): ActionDraft {
     return {
         id: nextKey(),
         type,
@@ -242,7 +245,11 @@ export function inputFrom(draft: AutomationDraft, projectId: string): unknown {
     };
 }
 
-function triggerSummary(rule: DeployAutomationView, t: T, services: readonly AutomationServiceOption[]): string {
+function triggerSummary(
+    rule: DeployAutomationView,
+    t: T,
+    services: readonly AutomationServiceOption[]
+): string {
     if (rule.trigger === "schedule") {
         const when = rule.scheduleText ?? rule.schedule ?? "";
         return rule.timezone === "UTC" ? when : `${when} (${rule.timezone})`;
@@ -300,7 +307,11 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
         setError(null);
         replace({ ...rule, enabled });
         startTransition(async () => {
-            const result = await setAutomationEnabledAction({ projectId, automationId: rule.id, enabled });
+            const result = await setAutomationEnabledAction({
+                projectId,
+                automationId: rule.id,
+                enabled
+            });
             if (result.error || !result.automation) {
                 replace(rule);
                 setError(result.error ?? t("automations.saveFailed"));
@@ -334,7 +345,12 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
             }
             setDeleting(null);
             setData((held) =>
-                held ? { ...held, automations: held.automations.filter((entry) => entry.id !== target.id) } : held
+                held
+                    ? {
+                          ...held,
+                          automations: held.automations.filter((entry) => entry.id !== target.id)
+                      }
+                    : held
             );
         });
     }
@@ -343,7 +359,10 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
         if (!rotating) return;
         const target = rotating;
         startTransition(async () => {
-            const result = await rotateAutomationWebhookAction({ projectId, automationId: target.id });
+            const result = await rotateAutomationWebhookAction({
+                projectId,
+                automationId: target.id
+            });
             if (result.error || !result.webhookUrl) {
                 setError(result.error ?? t("automations.rotateFailed"));
                 return;
@@ -403,7 +422,8 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
                             name={rule.name}
                             summary={
                                 <>
-                                    {t(TRIGGER_LABELS[rule.trigger])}: {triggerSummary(rule, t, services)}
+                                    {t(TRIGGER_LABELS[rule.trigger])}:{" "}
+                                    {triggerSummary(rule, t, services)}
                                     {" / "}
                                     {t("automations.actionCount", { count: rule.actions.length })}
                                 </>
@@ -426,7 +446,9 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
                                       )
                                     : undefined
                             }
-                            last={rule.lastRunAt ? outcomeOf(rule.lastStatus ?? "running", t) : null}
+                            last={
+                                rule.lastRunAt ? outcomeOf(rule.lastStatus ?? "running", t) : null
+                            }
                             lastRun={rule.lastRunAt ? display.dateTime(rule.lastRunAt) : null}
                             neverRan={t("automations.neverRan")}
                             detail={
@@ -442,8 +464,14 @@ export function AutomationsSection({ projectId }: { projectId: string }) {
                             actions={
                                 <>
                                     <rules.RuleAction
-                                        label={open === rule.id ? t("automations.hideRuns") : t("automations.showRuns")}
-                                        onClick={() => setOpen((held) => (held === rule.id ? null : rule.id))}
+                                        label={
+                                            open === rule.id
+                                                ? t("automations.hideRuns")
+                                                : t("automations.showRuns")
+                                        }
+                                        onClick={() =>
+                                            setOpen((held) => (held === rule.id ? null : rule.id))
+                                        }
                                     >
                                         <History className="size-4" />
                                     </rules.RuleAction>
@@ -586,7 +614,8 @@ function RunHistory({
                 setError(null);
                 setRuns(next);
                 setExpanded((held) => held ?? next[0]?.id ?? null);
-                if (next.some((entry) => entry.status === "running")) timer.current = setTimeout(fetchRuns, 3000);
+                if (next.some((entry) => entry.status === "running"))
+                    timer.current = setTimeout(fetchRuns, 3000);
             });
         }
         fetchRuns();
@@ -596,7 +625,8 @@ function RunHistory({
         };
     }, [projectId, automationId]);
 
-    const serviceName = (id: string | null) => services.find((entry) => entry.id === id)?.name ?? null;
+    const serviceName = (id: string | null) =>
+        services.find((entry) => entry.id === id)?.name ?? null;
 
     if (error) return <p className="text-sm text-danger">{error}</p>;
     if (runs === null) {
@@ -606,7 +636,8 @@ function RunHistory({
             </div>
         );
     }
-    if (runs.length === 0) return <p className="text-muted-foreground">{t("automations.runs.empty")}</p>;
+    if (runs.length === 0)
+        return <p className="text-muted-foreground">{t("automations.runs.empty")}</p>;
     return (
         <rules.RunList label={t("automations.runs.title")}>
             {runs.map((entry) => (
@@ -618,7 +649,9 @@ function RunHistory({
                     expanded={expanded === entry.id}
                     onToggle={() => setExpanded((held) => (held === entry.id ? null : entry.id))}
                 >
-                    {entry.note && <p className="text-xs text-muted-foreground">{t(noteKey(entry.note))}</p>}
+                    {entry.note && (
+                        <p className="text-xs text-muted-foreground">{t(noteKey(entry.note))}</p>
+                    )}
                     {entry.steps.length > 0 && (
                         <ol className="flex flex-col gap-1.5 text-xs">
                             {entry.steps.map((step, index) => (
@@ -627,7 +660,9 @@ function RunHistory({
                                         <rules.OutcomeBadge outcome={outcomeOf(step.status, t)} />
                                         <span className="min-w-0 truncate">
                                             {t(ACTION_LABELS[step.type])}
-                                            {serviceName(step.applicationId) ? ` / ${serviceName(step.applicationId)}` : ""}
+                                            {serviceName(step.applicationId)
+                                                ? ` / ${serviceName(step.applicationId)}`
+                                                : ""}
                                             {step.exitCode !== undefined && step.exitCode !== null
                                                 ? ` / ${t("automations.runs.exit", { code: step.exitCode })}`
                                                 : ""}
@@ -740,7 +775,11 @@ export function AutomationEditor({
     const next = useMemo(() => {
         if (draft.trigger !== "schedule") return null;
         try {
-            return core.nextCronRun(core.parseCron(draft.schedule), new Date(), draft.timezone || "UTC");
+            return core.nextCronRun(
+                core.parseCron(draft.schedule),
+                new Date(),
+                draft.timezone || "UTC"
+            );
         } catch {
             return null;
         }
@@ -754,7 +793,9 @@ export function AutomationEditor({
     function setAction(index: number, patch: Partial<ActionDraft>) {
         setDraft((held) => ({
             ...held,
-            actions: held.actions.map((action, at) => (at === index ? { ...action, ...patch } : action))
+            actions: held.actions.map((action, at) =>
+                at === index ? { ...action, ...patch } : action
+            )
         }));
         setTouched((held) => {
             const out = new Set(held);
@@ -794,7 +835,9 @@ export function AutomationEditor({
         <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{draft.id ? t("automations.editTitle") : t("automations.newTitle")}</DialogTitle>
+                    <DialogTitle>
+                        {draft.id ? t("automations.editTitle") : t("automations.newTitle")}
+                    </DialogTitle>
                     <DialogDescription>{t("automations.editorHint")}</DialogDescription>
                 </DialogHeader>
                 <IssueProvider value={lookup}>
@@ -826,29 +869,43 @@ export function AutomationEditor({
                                         value: trigger,
                                         label: t(TRIGGER_LABELS[trigger])
                                     }))}
-                                    onValueChange={(value) => set("trigger", value as core.DeployAutomationTrigger)}
+                                    onValueChange={(value) =>
+                                        set("trigger", value as core.DeployAutomationTrigger)
+                                    }
                                 />
                                 {draft.trigger === "schedule" && (
                                     <div className="flex flex-col gap-2">
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <Field label={t("automations.schedule")} path={["schedule"]} required>
+                                            <Field
+                                                label={t("automations.schedule")}
+                                                path={["schedule"]}
+                                                required
+                                            >
                                                 {(id, invalid) => (
                                                     <Input
                                                         id={id}
                                                         value={draft.schedule}
                                                         aria-invalid={invalid}
                                                         className="font-mono"
-                                                        onChange={(event) => set("schedule", event.target.value)}
+                                                        onChange={(event) =>
+                                                            set("schedule", event.target.value)
+                                                        }
                                                     />
                                                 )}
                                             </Field>
-                                            <Field label={t("automations.timezone")} path={["timezone"]} required>
+                                            <Field
+                                                label={t("automations.timezone")}
+                                                path={["timezone"]}
+                                                required
+                                            >
                                                 {(id, invalid) => (
                                                     <Input
                                                         id={id}
                                                         value={draft.timezone}
                                                         aria-invalid={invalid}
-                                                        onChange={(event) => set("timezone", event.target.value)}
+                                                        onChange={(event) =>
+                                                            set("timezone", event.target.value)
+                                                        }
                                                     />
                                                 )}
                                             </Field>
@@ -871,7 +928,9 @@ export function AutomationEditor({
                                                 <Clock className="size-3.5 shrink-0" />
                                                 {core.describeCron(draft.schedule)}
                                                 {" / "}
-                                                {t("automations.nextRun", { date: display.dateTime(next.toISOString()) })}
+                                                {t("automations.nextRun", {
+                                                    date: display.dateTime(next.toISOString())
+                                                })}
                                             </p>
                                         )}
                                     </div>
@@ -885,39 +944,57 @@ export function AutomationEditor({
                                 )}
                                 {draft.trigger === "event" && (
                                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                        <Field label={t("automations.event")} path={["event"]} required>
+                                        <Field
+                                            label={t("automations.event")}
+                                            path={["event"]}
+                                            required
+                                        >
                                             {(id) => (
                                                 <Select
                                                     id={id}
                                                     value={draft.event}
-                                                    options={core.DEPLOY_AUTOMATION_EVENTS.map((event) => ({
-                                                        value: event,
-                                                        label: t(EVENT_LABELS[event])
-                                                    }))}
+                                                    options={core.DEPLOY_AUTOMATION_EVENTS.map(
+                                                        (event) => ({
+                                                            value: event,
+                                                            label: t(EVENT_LABELS[event])
+                                                        })
+                                                    )}
                                                     onValueChange={(value) => {
-                                                        const event = value as core.DeployAutomationEvent;
+                                                        const event =
+                                                            value as core.DeployAutomationEvent;
                                                         setDraft((held) => ({
                                                             ...held,
                                                             event,
-                                                            eventApplicationId: core.SERVICE_SCOPED_EVENTS.includes(event)
-                                                                ? held.eventApplicationId
-                                                                : ANY_SERVICE
+                                                            eventApplicationId:
+                                                                core.SERVICE_SCOPED_EVENTS.includes(
+                                                                    event
+                                                                )
+                                                                    ? held.eventApplicationId
+                                                                    : ANY_SERVICE
                                                         }));
                                                     }}
                                                 />
                                             )}
                                         </Field>
                                         {scoped && (
-                                            <Field label={t("automations.eventService")} path={["eventApplicationId"]}>
+                                            <Field
+                                                label={t("automations.eventService")}
+                                                path={["eventApplicationId"]}
+                                            >
                                                 {(id) => (
                                                     <Select
                                                         id={id}
                                                         value={draft.eventApplicationId}
                                                         options={[
-                                                            { value: ANY_SERVICE, label: t("automations.anyService") },
+                                                            {
+                                                                value: ANY_SERVICE,
+                                                                label: t("automations.anyService")
+                                                            },
                                                             ...serviceOptions
                                                         ]}
-                                                        onValueChange={(value) => set("eventApplicationId", value)}
+                                                        onValueChange={(value) =>
+                                                            set("eventApplicationId", value)
+                                                        }
                                                     />
                                                 )}
                                             </Field>
@@ -938,7 +1015,10 @@ export function AutomationEditor({
                                     label={t("automations.then")}
                                     handleLabel={t("automations.move")}
                                     onMove={(from, to) =>
-                                        setDraft((held) => ({ ...held, actions: moved(held.actions, from, to) }))
+                                        setDraft((held) => ({
+                                            ...held,
+                                            actions: moved(held.actions, from, to)
+                                        }))
                                     }
                                 >
                                     {(action, index, handle) => (
@@ -953,7 +1033,11 @@ export function AutomationEditor({
                                                     ? () =>
                                                           setDraft((held) => ({
                                                               ...held,
-                                                              actions: moved(held.actions, index, index - 1)
+                                                              actions: moved(
+                                                                  held.actions,
+                                                                  index,
+                                                                  index - 1
+                                                              )
                                                           }))
                                                     : undefined
                                             }
@@ -962,20 +1046,30 @@ export function AutomationEditor({
                                                     ? () =>
                                                           setDraft((held) => ({
                                                               ...held,
-                                                              actions: moved(held.actions, index, index + 1)
+                                                              actions: moved(
+                                                                  held.actions,
+                                                                  index,
+                                                                  index + 1
+                                                              )
                                                           }))
                                                     : undefined
                                             }
                                             onRemove={() =>
                                                 setDraft((held) => ({
                                                     ...held,
-                                                    actions: held.actions.filter((_, at) => at !== index)
+                                                    actions: held.actions.filter(
+                                                        (_, at) => at !== index
+                                                    )
                                                 }))
                                             }
                                             kind={
                                                 <KindPicker
                                                     value={action.type}
-                                                    kinds={offered.includes(action.type) ? offered : [...offered, action.type]}
+                                                    kinds={
+                                                        offered.includes(action.type)
+                                                            ? offered
+                                                            : [...offered, action.type]
+                                                    }
                                                     label={t("automations.actionKind")}
                                                     text={(kind) => t(ACTION_LABELS[kind])}
                                                     onChange={(type) => setAction(index, { type })}
@@ -992,9 +1086,15 @@ export function AutomationEditor({
                                                         <Select
                                                             id={id}
                                                             value={action.applicationId}
-                                                            placeholder={t("automations.pickService")}
+                                                            placeholder={t(
+                                                                "automations.pickService"
+                                                            )}
                                                             options={serviceOptions}
-                                                            onValueChange={(value) => setAction(index, { applicationId: value })}
+                                                            onValueChange={(value) =>
+                                                                setAction(index, {
+                                                                    applicationId: value
+                                                                })
+                                                            }
                                                         />
                                                     )}
                                                 </Field>
@@ -1015,7 +1115,10 @@ export function AutomationEditor({
                                                                 value={action.timeoutSeconds}
                                                                 aria-invalid={invalid}
                                                                 onChange={(event) =>
-                                                                    setAction(index, { timeoutSeconds: event.target.value })
+                                                                    setAction(index, {
+                                                                        timeoutSeconds:
+                                                                            event.target.value
+                                                                    })
                                                                 }
                                                             />
                                                         )}
@@ -1033,9 +1136,13 @@ export function AutomationEditor({
                                                                 value={action.command}
                                                                 aria-invalid={invalid}
                                                                 className="font-mono text-xs"
-                                                                placeholder={t("automations.commandPlaceholder")}
+                                                                placeholder={t(
+                                                                    "automations.commandPlaceholder"
+                                                                )}
                                                                 onChange={(event) =>
-                                                                    setAction(index, { command: event.target.value })
+                                                                    setAction(index, {
+                                                                        command: event.target.value
+                                                                    })
                                                                 }
                                                             />
                                                         )}
@@ -1055,7 +1162,11 @@ export function AutomationEditor({
                                                             value={action.message}
                                                             maxLength={300}
                                                             aria-invalid={invalid}
-                                                            onChange={(event) => setAction(index, { message: event.target.value })}
+                                                            onChange={(event) =>
+                                                                setAction(index, {
+                                                                    message: event.target.value
+                                                                })
+                                                            }
                                                         />
                                                     )}
                                                 </Field>
@@ -1066,23 +1177,33 @@ export function AutomationEditor({
                                 {draft.actions.length < core.DEPLOY_AUTOMATION_ACTION_LIMIT && (
                                     <AddMenu
                                         label={t("automations.addAction")}
-                                        options={offered.map((type) => ({ value: type, label: t(ACTION_LABELS[type]) }))}
+                                        options={offered.map((type) => ({
+                                            value: type,
+                                            label: t(ACTION_LABELS[type])
+                                        }))}
                                         onPick={(type) =>
                                             setDraft((held) => ({
                                                 ...held,
                                                 actions: [
                                                     ...held.actions,
-                                                    blankAction(type as core.DeployAutomationActionType, services)
+                                                    blankAction(
+                                                        type as core.DeployAutomationActionType,
+                                                        services
+                                                    )
                                                 ]
                                             }))
                                         }
                                     />
                                 )}
                                 {services.length === 0 && (
-                                    <p className="text-xs text-muted-foreground">{t("automations.noServices")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("automations.noServices")}
+                                    </p>
                                 )}
                                 {!canCommand && services.length > 0 && (
-                                    <p className="text-xs text-muted-foreground">{t("automations.noCommands")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("automations.noCommands")}
+                                    </p>
                                 )}
                             </Stage>
                         </ol>
