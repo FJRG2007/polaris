@@ -99,7 +99,7 @@ export async function PUT(request: Request): Promise<Response> {
     }
     let driver;
     try {
-        driver = await getDriverForConnection(connectionId);
+        driver = await getDriverForConnection(connectionId, { userId: user.id });
     } catch (caught) {
         // The location would not open - a NAS that is off is the usual one. Said
         // by its name rather than as the framework's bare 500, which is all the

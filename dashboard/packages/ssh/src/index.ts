@@ -16,6 +16,8 @@ export {
     openShell,
     openRootShell,
     openSftp,
+    openRootSftp,
+    ROOT_SFTP_COMMAND,
     forwardOut,
     clampDim,
     type ExecResult,

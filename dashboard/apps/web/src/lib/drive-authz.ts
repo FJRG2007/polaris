@@ -499,5 +499,5 @@ export async function requireDriveDriver(
     opts?: { skipLock?: boolean }
 ): Promise<StorageDriver> {
     await authorizeDrive(userId, connectionId, path, action, opts);
-    return getDriverForConnection(connectionId);
+    return getDriverForConnection(connectionId, { userId });
 }

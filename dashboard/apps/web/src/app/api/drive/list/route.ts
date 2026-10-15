@@ -67,7 +67,7 @@ export async function GET(request: Request): Promise<Response> {
 
     let driver;
     try {
-        driver = await getDriverForConnection(connectionId);
+        driver = await getDriverForConnection(connectionId, { userId: user.id });
     } catch (caught) {
         // A UNAS with no SMB share yet: tell the client to ask for the share name
         // rather than surfacing a generic failure (credentials are reused).

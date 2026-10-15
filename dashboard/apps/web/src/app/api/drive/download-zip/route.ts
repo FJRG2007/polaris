@@ -69,7 +69,7 @@ export async function GET(request: Request): Promise<Response> {
 
     let driver: StorageDriver;
     try {
-        driver = await getDriverForConnection(connectionId);
+        driver = await getDriverForConnection(connectionId, { userId: user.id });
     } catch (caught) {
         if (caught instanceof SmbShareRequiredError)
             return new Response("Share required", { status: 409 });

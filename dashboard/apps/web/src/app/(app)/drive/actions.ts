@@ -66,7 +66,7 @@ import {
 import {
     createConnection,
     discoverUnasShares,
-    getDriver,
+    getDriverForConnection,
     setUnasSmbShare,
     updateConnection
 } from "@/lib/storage-service";
@@ -540,7 +540,7 @@ export async function generateZipAction(
     const fileName = safeName.toLowerCase().endsWith(".zip") ? safeName : `${safeName}.zip`;
     const destPath = normalizeRelPath(destFolder ? `${destFolder}/${fileName}` : fileName);
 
-    const driver = await getDriver(connectionId, user.id);
+    const driver = await getDriverForConnection(connectionId, { userId: user.id });
     let claimed = false;
     try {
         const parent = destPath.split("/").slice(0, -1).join("/");
@@ -613,7 +613,7 @@ export async function previewArchiveAction(
             return { error: (await getTranslations("drive"))("errors.notAllowed") };
         throw caught;
     }
-    const driver = await getDriver(connectionId, user.id);
+    const driver = await getDriverForConnection(connectionId, { userId: user.id });
     try {
         return { entries: await listArchiveEntries(driver, src, format, password || undefined) };
     } catch (caught) {
@@ -654,7 +654,7 @@ export async function extractArchiveAction(
             return { error: (await getTranslations("drive"))("errors.cannotWrite") };
         throw caught;
     }
-    const driver = await getDriver(connectionId, user.id);
+    const driver = await getDriverForConnection(connectionId, { userId: user.id });
     let count = 0;
     try {
         count = await extractArchiveTo(driver, src, format, dest, password || undefined);
@@ -1118,7 +1118,7 @@ export async function setItemNoteAction(
     revalidatePath("/drive");
 }
 
-type Driver = Awaited<ReturnType<typeof getDriver>>;
+type Driver = Awaited<ReturnType<typeof getDriverForConnection>>;
 
 /** Whether a path exists (stat succeeds) on a driver. */
 async function pathExists(driver: Driver, path: string): Promise<boolean> {

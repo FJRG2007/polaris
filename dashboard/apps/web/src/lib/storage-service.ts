@@ -35,6 +35,7 @@ import {
     listHosts,
     type HostConnection
 } from "@/lib/host-service";
+import { hostRootAccess } from "@/lib/drive-root";
 import {
     borrowSftp,
     borrowSmb,
@@ -104,29 +105,40 @@ async function buildHostSftpDriver(hostId: string, ownerId: string): Promise<Sto
 
 /** Same, without the owner check - for routes that have already authorized the
  *  server through `authorizeDrive`. */
-async function buildHostSftpDriverUnscoped(hostId: string): Promise<StorageDriver> {
-    return sftpDriverFor(await getHostConnectionUnscoped(hostId));
+async function buildHostSftpDriverUnscoped(hostId: string, asRoot = false): Promise<StorageDriver> {
+    return sftpDriverFor(await getHostConnectionUnscoped(hostId), asRoot);
 }
 
-async function sftpDriverFor(conn: HostConnection): Promise<StorageDriver> {
+async function sftpDriverFor(conn: HostConnection, asRoot = false): Promise<StorageDriver> {
     // The connection is borrowed, not opened: the handshake costs far more than the
     // listing that follows it, and a server is usually browsed several folders at a
     // time. `dispose` gives the lease back; the pool decides when to close.
     let lease: SftpLease | undefined;
+    const options = {
+        host: conn.address,
+        port: conn.port,
+        username: conn.username,
+        auth: conn.auth,
+        // As before: a server with a key on file is pinned to it, one
+        // without (added by a path that captured none) is trusted on first
+        // use. Tightening that is a separate change, not a side effect here.
+        pinnedHostKey: conn.hostKey
+    };
     const driver = new SftpDriver({
         id: `${HOST_CONNECTION_PREFIX}${conn.id}`,
         root: "/",
         session: async () => {
-            lease = await borrowSftp("drive", conn.id, {
-                host: conn.address,
-                port: conn.port,
-                username: conn.username,
-                auth: conn.auth,
-                // As before: a server with a key on file is pinned to it, one
-                // without (added by a path that captured none) is trusted on first
-                // use. Tightening that is a separate change, not a side effect here.
-                pinnedHostKey: conn.hostKey
-            });
+            if (asRoot && conn.sudo) {
+                // A server whose sudo was taken back since enrollment still
+                // browses, as the login, rather than taking Drive down with it.
+                try {
+                    lease = await borrowSftp("drive-root", conn.id, options);
+                    return lease.sftp;
+                } catch (caught) {
+                    console.warn(`drive: root session refused on ${conn.id}, reading as the login`, caught);
+                }
+            }
+            lease = await borrowSftp("drive", conn.id, options);
             return lease.sftp;
         },
         endSession: () => lease?.release()
@@ -635,10 +647,21 @@ export async function getDriver(connectionId: string, ownerId: string): Promise<
  * public paths (share/file-request access) where a validated token row is the
  * authorization; never call this from a user-facing action, which must scope to
  * the caller with getDriver().
+ *
+ * `viewer` is the signed-in person a Drive route has already authorized: it is
+ * what lets a registered server be read as root for somebody who manages
+ * servers (`hostRootAccess`). Without it a server is read as its login.
  */
-export async function getDriverForConnection(connectionId: string): Promise<StorageDriver> {
+export async function getDriverForConnection(
+    connectionId: string,
+    viewer?: { readonly userId: string }
+): Promise<StorageDriver> {
     if (connectionId.startsWith(HOST_CONNECTION_PREFIX)) {
-        return buildHostSftpDriverUnscoped(connectionId.slice(HOST_CONNECTION_PREFIX.length));
+        const hostId = connectionId.slice(HOST_CONNECTION_PREFIX.length);
+        // A server is read as root only for somebody who manages servers, and
+        // only when a viewer is named: a shared link or a background job never is.
+        const asRoot = viewer ? (await hostRootAccess(viewer.userId, hostId)).asRoot : false;
+        return buildHostSftpDriverUnscoped(hostId, asRoot);
     }
     if (connectionId.startsWith(CONTAINER_CONNECTION_PREFIX)) {
         return buildContainerDriverUnscoped(connectionId.slice(CONTAINER_CONNECTION_PREFIX.length));

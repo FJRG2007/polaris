@@ -79,7 +79,7 @@ export async function GET(request: Request): Promise<Response> {
 
     let driver;
     try {
-        driver = await getDriverForConnection(connectionId);
+        driver = await getDriverForConnection(connectionId, { userId: user.id });
     } catch (caught) {
         if (caught instanceof SmbShareRequiredError) return Response.json({ needsSmbShare: true });
         const message = caught instanceof Error ? caught.message : "Unable to connect";

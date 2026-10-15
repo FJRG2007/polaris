@@ -36,6 +36,7 @@ import type { Client, SFTPWrapper } from "ssh2";
 import { openSmbSession, type SmbConnectOptions, type SmbSession } from "@polaris/storage";
 import {
     LeasePool,
+    openRootSftp,
     openSftp,
     openSshClient,
     SshPool,
@@ -49,7 +50,7 @@ import {
  * as somebody is looking at them, and one that dies takes every other borrower's
  * work with it. Those keep opening their own connection.
  */
-export type SshPurpose = "drive" | "exec" | "docker";
+export type SshPurpose = "drive" | "drive-root" | "exec" | "docker";
 
 const pool = new SshPool();
 
@@ -75,7 +76,9 @@ export interface SftpLease {
     release(): void;
 }
 
-/** Borrow an SFTP channel on a (possibly already open) connection to a machine. */
+/** Borrow an SFTP channel on a (possibly already open) connection to a machine.
+ *  `drive-root` keeps a connection of its own whose SFTP channels run as root
+ *  (`openRootSftp`), so a login's session never shares one with it. */
 export async function borrowSftp(
     purpose: SshPurpose,
     machineId: string,
@@ -83,7 +86,8 @@ export async function borrowSftp(
 ): Promise<SftpLease> {
     const lease = await borrowSsh(purpose, machineId, options);
     try {
-        return { sftp: await channelOn(lease.client), release: () => lease.release() };
+        const open = purpose === "drive-root" ? openRootSftp : openSftp;
+        return { sftp: await channelOn(lease.client, open), release: () => lease.release() };
     } catch (error) {
         lease.release();
         throw error;
@@ -159,10 +163,13 @@ export function dropStorageConnection(connectionId: string): void {
 }
 
 /** The channel for a connection, opening one the first time. */
-function channelOn(client: Client): Promise<SFTPWrapper> {
+function channelOn(
+    client: Client,
+    open: (client: Client) => Promise<SFTPWrapper> = openSftp
+): Promise<SFTPWrapper> {
     const cached = channels.get(client);
     if (cached) return cached;
-    const opening = openSftp(client).then((sftp) => {
+    const opening = open(client).then((sftp) => {
         const forget = (): void => {
             if (channels.get(client) === opening) channels.delete(client);
         };
