@@ -13464,6 +13464,7 @@ model StatusMaintenance {
     page StatusPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
     @@index([pageId, endsAt])
+}
 
 // Security scans (apps/security-scans): malware, file changes, the host's
 // hardening audit and image vulnerabilities, per server. Every scan runs in a
@@ -13568,6 +13569,7 @@ model SecuritySetting {
     target DeployTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
 
     @@index([everyHours])
+}
 
 // A cloud provider account connected to the Cloud servers app. The credential
 // (a token, a key pair, a service-account file) is sealed with the master key
