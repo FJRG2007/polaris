@@ -69,7 +69,239 @@
             "createsCompanion": "Crea un segundo servicio a su lado para {companion}, accesible solo desde este entorno.",
             "secrets": " Los secretos generados están en las Variables del servicio.",
             "setup": " La configuración se ejecuta dentro cuando arranca, y el servicio dice cómo ha ido.",
-            "other": "Otras plantillas"
+            "other": "Otras plantillas",
+            "catalog": {
+                "actual": {
+                    "description": "Presupuestos por sobres sincronizados entre tus dispositivos.",
+                    "firstRun": "Define la contraseña del servidor en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "anythingllm": {
+                    "description": "Chatea con tus documentos usando el modelo que elijas.",
+                    "firstRun": "Elige un proveedor de modelos en la primera visita y activa una contraseña en Settings, Security."
+                },
+                "audiobookshelf": {
+                    "description": "Servidor de audiolibros y podcasts con progreso sincronizado.",
+                    "firstRun": "Crea la cuenta root en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "beszel": {
+                    "description": "Monitorización ligera de servidores con historial y alertas.",
+                    "firstRun": "Crea la cuenta de administrador en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "calibre-web": {
+                    "description": "Explora, lee y descarga libros de una biblioteca de Calibre.",
+                    "firstRun": "Inicia sesión como admin con la contraseña admin123 y cámbiala enseguida. Apunta a /books cuando haya una biblioteca."
+                },
+                "chroma": {
+                    "description": "Base de datos de embeddings para apps de IA.",
+                    "firstRun": "No tiene inicio de sesión: déjala sin dirección pública y accede por su dominio privado, puerto 8000."
+                },
+                "clickhouse": {
+                    "description": "Base de datos columnar para analítica rápida.",
+                    "firstRun": "Conéctate como default con la variable CLICKHOUSE_PASSWORD: HTTP en el puerto 8123, nativo en el 9000."
+                },
+                "code-server": {
+                    "description": "VS Code en el navegador, en tu servidor.",
+                    "firstRun": "Inicia sesión con la variable PASSWORD."
+                },
+                "couchdb": {
+                    "description": "Base de datos documental que se sincroniza por HTTP.",
+                    "firstRun": "Abre /_utils e inicia sesión como admin con la variable COUCHDB_PASSWORD."
+                },
+                "directus": {
+                    "description": "CMS headless con API REST y GraphQL sobre tus datos.",
+                    "firstRun": "Inicia sesión como admin@example.com con la variable ADMIN_PASSWORD."
+                },
+                "flowise": {
+                    "description": "Crea agentes y flujos LLM con un editor visual.",
+                    "firstRun": "Crea la cuenta de administrador en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "freshrss": {
+                    "description": "Lector de feeds RSS y Atom.",
+                    "firstRun": "Cuando termine la configuración, inicia sesión como admin con la variable FRESHRSS_ADMIN_PASSWORD."
+                },
+                "ghost": {
+                    "description": "Plataforma de publicación para blogs, newsletters y membresías.",
+                    "firstRun": "Abre /ghost/ cuanto antes y crea la cuenta de propietario: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "gitea": {
+                    "description": "Alojamiento Git con issues y pull requests.",
+                    "firstRun": "Cuando termine la configuración, inicia sesión como admin con la variable GITEA_ADMIN_PASSWORD. El registro está desactivado."
+                },
+                "gotify": {
+                    "description": "Notificaciones push para tus apps y scripts.",
+                    "firstRun": "Inicia sesión como admin con la variable GOTIFY_DEFAULTUSER_PASS."
+                },
+                "grafana": {
+                    "description": "Paneles de métricas y logs.",
+                    "firstRun": "El primer acceso es admin / admin, y te pide una contraseña nueva."
+                },
+                "grav": {
+                    "description": "CMS de archivos planos, sin base de datos.",
+                    "firstRun": "Abre /admin cuanto antes y crea la cuenta de administrador: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "influxdb": {
+                    "description": "Base de datos de series temporales para métricas y sensores.",
+                    "firstRun": "Inicia sesión como admin con la variable DOCKER_INFLUXDB_INIT_PASSWORD. Los clientes usan la variable DOCKER_INFLUXDB_INIT_ADMIN_TOKEN."
+                },
+                "it-tools": {
+                    "description": "Utilidades para desarrollo y sistemas en una sola página.",
+                    "firstRun": "Sin inicio de sesión."
+                },
+                "jaeger": {
+                    "description": "Trazas distribuidas: sigue una petición entre servicios.",
+                    "firstRun": "Envía trazas OTLP a su dominio privado, puerto 4317 (gRPC) o 4318 (HTTP). Las trazas se guardan en memoria y se pierden al reiniciar."
+                },
+                "jellyfin": {
+                    "description": "Reproduce tus películas, series y música en cualquier dispositivo.",
+                    "firstRun": "Completa el asistente en la primera visita: hasta entonces puede hacerlo cualquiera que la abra. Las bibliotecas van en /media."
+                },
+                "kafka": {
+                    "description": "Broker de eventos, con una consola web para topics, mensajes y grupos de consumidores.",
+                    "firstRun": "Inicia sesión en la consola como admin con la variable SPRING_SECURITY_USER_PASSWORD. Los servicios de este entorno llegan al broker por su dominio privado, puerto 9092."
+                },
+                "keycloak": {
+                    "description": "Inicio de sesión único y gestión de identidades.",
+                    "firstRun": "Inicia sesión como admin con la variable KC_BOOTSTRAP_ADMIN_PASSWORD y crea un administrador permanente; el inicial es temporal."
+                },
+                "langflow": {
+                    "description": "Constructor visual de agentes de IA y pipelines RAG.",
+                    "firstRun": "Inicia sesión como admin con la variable LANGFLOW_SUPERUSER_PASSWORD."
+                },
+                "linkding": {
+                    "description": "Gestor de marcadores con etiquetas y extensión de navegador.",
+                    "firstRun": "Inicia sesión como admin con la variable LD_SUPERUSER_PASSWORD."
+                },
+                "loki": {
+                    "description": "Almacén de logs que consultas desde Grafana.",
+                    "firstRun": "No tiene inicio de sesión: déjalo sin dirección pública y añade su dominio privado, puerto 3100, como origen de datos en Grafana."
+                },
+                "mattermost": {
+                    "description": "Chat de equipo con canales, hilos e integraciones.",
+                    "firstRun": "Crea la primera cuenta cuanto antes: pasa a ser la administradora del sistema."
+                },
+                "meilisearch": {
+                    "description": "Motor de búsqueda tolerante a erratas con API HTTP.",
+                    "firstRun": "Los clientes se autentican con la variable MEILI_MASTER_KEY."
+                },
+                "memos": {
+                    "description": "Notas rápidas y una línea de tiempo privada, en Markdown.",
+                    "firstRun": "Crea la primera cuenta cuanto antes: pasa a ser la administradora."
+                },
+                "metabase": {
+                    "description": "Business intelligence: paneles y preguntas sobre tus datos.",
+                    "firstRun": "Crea la cuenta de administrador en la primera visita."
+                },
+                "miniflux": {
+                    "description": "Lector de feeds minimalista y rápido.",
+                    "firstRun": "Inicia sesión como admin con la variable ADMIN_PASSWORD."
+                },
+                "minio": {
+                    "description": "Almacenamiento de objetos compatible con S3, con consola web.",
+                    "firstRun": "Inicia sesión en la consola como minio con la variable MINIO_ROOT_PASSWORD. La API S3 responde en el puerto 9000 del dominio privado del servicio, y el primer bucket se indica en OPENSHIP_BUCKET."
+                },
+                "n8n": {
+                    "description": "Automatización de flujos con editor visual.",
+                    "firstRun": "Crea la cuenta de propietario en la primera visita."
+                },
+                "navidrome": {
+                    "description": "Servidor de música compatible con apps Subsonic.",
+                    "firstRun": "Crea la cuenta de administrador en la primera visita: hasta entonces puede hacerlo cualquiera que la abra. La música va en /music."
+                },
+                "nextcloud": {
+                    "description": "Archivos, calendarios y contactos con una gran tienda de apps.",
+                    "firstRun": "Inicia sesión como admin con la variable NEXTCLOUD_ADMIN_PASSWORD. El primer arranque tarda unos minutos."
+                },
+                "nocodb": {
+                    "description": "Interfaz de hoja de cálculo sobre una base de datos SQL.",
+                    "firstRun": "Inicia sesión como admin@example.com con la variable NC_ADMIN_PASSWORD."
+                },
+                "ntfy": {
+                    "description": "Envía notificaciones push al móvil con una simple petición HTTP.",
+                    "firstRun": "Cuando termine la configuración, inicia sesión como admin con la variable NTFY_PASSWORD. Los topics son privados hasta que des acceso."
+                },
+                "open-webui": {
+                    "description": "Chatea con modelos locales, con un servidor Ollama al lado.",
+                    "firstRun": "Crea la primera cuenta cuanto antes: pasa a ser la administradora. Descarga un modelo desde Settings, Models."
+                },
+                "paperless-ngx": {
+                    "description": "Escanea, aplica OCR y busca tus documentos en papel.",
+                    "firstRun": "Inicia sesión como admin con la variable PAPERLESS_ADMIN_PASSWORD."
+                },
+                "pgadmin": {
+                    "description": "Consola web para servidores PostgreSQL.",
+                    "firstRun": "Inicia sesión como admin@example.com con la variable PGADMIN_DEFAULT_PASSWORD y añade un servidor con los datos de conexión de una base de datos."
+                },
+                "photoprism": {
+                    "description": "Fototeca con reconocimiento facial, mapas y búsqueda.",
+                    "firstRun": "Inicia sesión como admin con la variable PHOTOPRISM_ADMIN_PASSWORD."
+                },
+                "phpmyadmin": {
+                    "description": "Consola web para servidores MySQL y MariaDB.",
+                    "firstRun": "Inicia sesión con el host, el usuario y la contraseña de un servidor. Los de una base de datos de Polaris están en sus datos de conexión."
+                },
+                "prometheus": {
+                    "description": "Recogida de métricas y alertas.",
+                    "firstRun": "No tiene inicio de sesión: déjalo sin dirección pública y añade su dominio privado, puerto 9090, como origen de datos en Grafana."
+                },
+                "prowlarr": {
+                    "description": "Gestor de indexadores para Sonarr y Radarr.",
+                    "firstRun": "Elige un método de inicio de sesión en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "qdrant": {
+                    "description": "Base de datos vectorial para búsqueda y embeddings, con interfaz web.",
+                    "firstRun": "Los clientes se autentican con la variable QDRANT__SERVICE__API_KEY."
+                },
+                "rabbitmq": {
+                    "description": "Broker de mensajes, con su consola de gestión.",
+                    "firstRun": "Inicia sesión como admin con la variable RABBITMQ_DEFAULT_PASS. Los servicios llegan a AMQP por su dominio privado, puerto 5672."
+                },
+                "radarr": {
+                    "description": "Gestor de colecciones de películas.",
+                    "firstRun": "Elige un método de inicio de sesión en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "searxng": {
+                    "description": "Metabuscador privado que no te rastrea.",
+                    "firstRun": "Ábrelo y busca. No tiene cuentas, así que cualquiera con la dirección puede usarlo."
+                },
+                "sonarr": {
+                    "description": "Gestor de colecciones de series.",
+                    "firstRun": "Elige un método de inicio de sesión en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "stirling-pdf": {
+                    "description": "Divide, une, convierte y aplica OCR a PDF en tu propio servidor.",
+                    "firstRun": "Inicia sesión como admin con la variable SECURITY_INITIALLOGIN_PASSWORD."
+                },
+                "typesense": {
+                    "description": "Motor de búsqueda instantánea con API.",
+                    "firstRun": "Los clientes se autentican con la variable TYPESENSE_API_KEY."
+                },
+                "umami": {
+                    "description": "Analítica web sin cookies.",
+                    "firstRun": "Inicia sesión como admin con la contraseña umami y cámbiala en Settings, Profile."
+                },
+                "uptime-kuma": {
+                    "description": "Monitorización de disponibilidad con páginas de estado y alertas.",
+                    "firstRun": "Crea la cuenta de administrador en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "vaultwarden": {
+                    "description": "Gestor de contraseñas compatible con Bitwarden.",
+                    "firstRun": "Abre /admin con la variable ADMIN_TOKEN para invitar a la primera cuenta."
+                },
+                "vikunja": {
+                    "description": "Tareas y proyectos con vistas kanban y Gantt.",
+                    "firstRun": "Registra la primera cuenta. El registro sigue abierto hasta que lo desactives."
+                },
+                "wikijs": {
+                    "description": "Wiki con editor Markdown, búsqueda y reglas de acceso.",
+                    "firstRun": "Completa la configuración y crea el administrador en la primera visita: hasta entonces puede hacerlo cualquiera que la abra."
+                },
+                "wordpress": {
+                    "description": "Webs y blogs, con temas y plugins.",
+                    "firstRun": "Ábrelo cuanto antes y completa el instalador: hasta entonces puede hacerlo cualquiera que lo abra."
+                }
+            },
+            "search": "Buscar plantillas",
+            "none": "Ninguna plantilla coincide."
         },
         "image": {
             "label": "Imagen",

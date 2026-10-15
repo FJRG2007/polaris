@@ -1097,6 +1097,7 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
     const t = useTranslations("deploy");
     const [picked, setPicked] = useState<ServiceTemplate | null>(null);
     const [name, setName] = useState("");
+    const [query, setQuery] = useState("");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
@@ -1116,48 +1117,77 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
         });
     }
 
+    const describe = (template: ServiceTemplate) =>
+        t(`view.template.catalog.${template.id}.description`);
+    const firstRun = (template: ServiceTemplate) =>
+        t(`view.template.catalog.${template.id}.firstRun`);
+
     if (!picked) {
+        const needle = query.trim().toLowerCase();
+        const shown = [...SERVICE_TEMPLATES]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .filter(
+                (template) =>
+                    !needle ||
+                    template.name.toLowerCase().includes(needle) ||
+                    describe(template).toLowerCase().includes(needle)
+            );
         return (
-            <div className="flex max-h-96 flex-col gap-1 overflow-y-auto overscroll-contain">
-                {SERVICE_TEMPLATES.map((template) => (
-                    <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                            setPicked(template);
-                            setName(template.name);
-                        }}
-                        className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
-                    >
-                        <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-medium text-foreground">
-                                {template.name}
-                                {(() => {
-                                    const extra = templateExtra(template);
-                                    if (!extra) return null;
-                                    return (
-                                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                                            {"engine" in extra
-                                                ? t("view.template.withEngine", {
-                                                      engine: extra.engine
-                                                  })
-                                                : t("view.template.withCompanion", {
-                                                      companion: extra.companion
-                                                  })}
-                                        </span>
-                                    );
-                                })()}
+            <div className="flex flex-col gap-2">
+                <Input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t("view.template.search")}
+                    aria-label={t("view.template.search")}
+                    autoFocus
+                />
+                <div className="flex max-h-96 flex-col gap-1 overflow-y-auto overscroll-contain">
+                    {shown.length === 0 && (
+                        <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                            {t("view.template.none")}
+                        </p>
+                    )}
+                    {shown.map((template) => (
+                        <button
+                            key={template.id}
+                            type="button"
+                            onClick={() => {
+                                setPicked(template);
+                                setName(template.name);
+                            }}
+                            className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted"
+                        >
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-medium text-foreground">
+                                    {template.name}
+                                    {(() => {
+                                        const extra = templateExtra(template);
+                                        if (!extra) return null;
+                                        return (
+                                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                                                {"engine" in extra
+                                                    ? t("view.template.withEngine", {
+                                                          engine: extra.engine
+                                                      })
+                                                    : t("view.template.withCompanion", {
+                                                          companion: extra.companion
+                                                      })}
+                                            </span>
+                                        );
+                                    })()}
+                                </span>
+                                <span
+                                    className="block truncate text-xs text-muted-foreground"
+                                    title={describe(template)}
+                                >
+                                    {describe(template)}
+                                </span>
                             </span>
-                            <span
-                                className="block truncate text-xs text-muted-foreground"
-                                title={template.description}
-                            >
-                                {template.description}
-                            </span>
-                        </span>
-                        <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                    </button>
-                ))}
+                            <ChevronRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                        </button>
+                    ))}
+                </div>
             </div>
         );
     }
@@ -1188,7 +1218,7 @@ function NewTemplateForm({ environmentId, onDone }: { environmentId: string; onD
                 </p>
             )}
             <p className="text-xs text-muted-foreground">
-                {picked.firstRun}
+                {firstRun(picked)}
                 {picked.secrets.length > 0 && t("view.template.secrets")}
                 {picked.prepare?.length ? t("view.template.setup") : ""}
             </p>

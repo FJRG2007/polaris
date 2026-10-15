@@ -69,7 +69,239 @@
             "createsCompanion": "Creates a second service beside it for the {companion}, reachable only from this environment.",
             "secrets": " Generated secrets are in the service's Variables.",
             "setup": " Setup runs inside it once it is up, and the service says how it went.",
-            "other": "Other templates"
+            "other": "Other templates",
+            "catalog": {
+                "actual": {
+                    "description": "Envelope budgeting that syncs across your devices.",
+                    "firstRun": "Set the server password on the first visit - until then anyone who opens it can."
+                },
+                "anythingllm": {
+                    "description": "Chat with your documents through the model of your choice.",
+                    "firstRun": "Pick a model provider on the first visit, then turn on a password under Settings, Security."
+                },
+                "audiobookshelf": {
+                    "description": "Audiobook and podcast server with progress sync.",
+                    "firstRun": "Create the root account on the first visit - until then anyone who opens it can."
+                },
+                "beszel": {
+                    "description": "Lightweight server monitoring with history and alerts.",
+                    "firstRun": "Create the admin account on the first visit - until then anyone who opens it can."
+                },
+                "calibre-web": {
+                    "description": "Browse, read and download books from a Calibre library.",
+                    "firstRun": "Sign in as admin with the password admin123 and change it right away. Point it at /books once a library is there."
+                },
+                "chroma": {
+                    "description": "Embedding database for AI apps.",
+                    "firstRun": "It has no sign-in: leave it without a public address and reach it on its private domain, port 8000."
+                },
+                "clickhouse": {
+                    "description": "Column-oriented database for fast analytics.",
+                    "firstRun": "Connect as default with the CLICKHOUSE_PASSWORD variable: HTTP on port 8123, native on 9000."
+                },
+                "code-server": {
+                    "description": "VS Code in the browser, on your server.",
+                    "firstRun": "Sign in with the PASSWORD variable."
+                },
+                "couchdb": {
+                    "description": "Document database that syncs over HTTP.",
+                    "firstRun": "Open /_utils and sign in as admin with the COUCHDB_PASSWORD variable."
+                },
+                "directus": {
+                    "description": "Headless CMS with a REST and GraphQL API over your data.",
+                    "firstRun": "Sign in as admin@example.com with the ADMIN_PASSWORD variable."
+                },
+                "flowise": {
+                    "description": "Build LLM agents and flows with a visual editor.",
+                    "firstRun": "Create the admin account on the first visit - until then anyone who opens it can."
+                },
+                "freshrss": {
+                    "description": "RSS and Atom feed reader.",
+                    "firstRun": "Once setup has run, sign in as admin with the FRESHRSS_ADMIN_PASSWORD variable."
+                },
+                "ghost": {
+                    "description": "Publishing platform for blogs, newsletters and memberships.",
+                    "firstRun": "Open /ghost/ right away and create the owner account - until then anyone who opens it can."
+                },
+                "gitea": {
+                    "description": "Git hosting with issues and pull requests.",
+                    "firstRun": "Once setup has run, sign in as admin with the GITEA_ADMIN_PASSWORD variable. Registration is off."
+                },
+                "gotify": {
+                    "description": "Push notifications for your own apps and scripts.",
+                    "firstRun": "Sign in as admin with the GOTIFY_DEFAULTUSER_PASS variable."
+                },
+                "grafana": {
+                    "description": "Dashboards for metrics and logs.",
+                    "firstRun": "The first sign-in is admin / admin, and it asks for a new password."
+                },
+                "grav": {
+                    "description": "Flat-file CMS, no database needed.",
+                    "firstRun": "Open /admin right away and create the admin account - until then anyone who opens it can."
+                },
+                "influxdb": {
+                    "description": "Time-series database for metrics and sensor data.",
+                    "firstRun": "Sign in as admin with the DOCKER_INFLUXDB_INIT_PASSWORD variable. Clients use the DOCKER_INFLUXDB_INIT_ADMIN_TOKEN variable."
+                },
+                "it-tools": {
+                    "description": "Developer and sysadmin utilities in one page.",
+                    "firstRun": "No sign-in."
+                },
+                "jaeger": {
+                    "description": "Distributed tracing: follow a request across services.",
+                    "firstRun": "Send OTLP traces to its private domain, port 4317 (gRPC) or 4318 (HTTP). Traces are kept in memory and cleared on restart."
+                },
+                "jellyfin": {
+                    "description": "Stream your movies, shows and music to any device.",
+                    "firstRun": "Finish the setup wizard on the first visit - until then anyone who opens it can. Libraries go under /media."
+                },
+                "kafka": {
+                    "description": "Event-streaming broker, with a web console for topics, messages and consumer groups.",
+                    "firstRun": "Sign in to the console as admin with the SPRING_SECURITY_USER_PASSWORD variable. Services in this environment reach the broker at its private domain, port 9092."
+                },
+                "keycloak": {
+                    "description": "Single sign-on and identity management.",
+                    "firstRun": "Sign in as admin with the KC_BOOTSTRAP_ADMIN_PASSWORD variable, then create a permanent admin; the bootstrap one is temporary."
+                },
+                "langflow": {
+                    "description": "Visual builder for AI agents and RAG pipelines.",
+                    "firstRun": "Sign in as admin with the LANGFLOW_SUPERUSER_PASSWORD variable."
+                },
+                "linkding": {
+                    "description": "Bookmark manager with tags and a browser extension.",
+                    "firstRun": "Sign in as admin with the LD_SUPERUSER_PASSWORD variable."
+                },
+                "loki": {
+                    "description": "Log storage you query from Grafana.",
+                    "firstRun": "It has no sign-in: leave it without a public address and add its private domain, port 3100, as a Grafana data source."
+                },
+                "mattermost": {
+                    "description": "Team chat with channels, threads and integrations.",
+                    "firstRun": "Create the first account right away - it becomes the system admin."
+                },
+                "meilisearch": {
+                    "description": "Typo-tolerant search engine with an HTTP API.",
+                    "firstRun": "Clients authenticate with the MEILI_MASTER_KEY variable."
+                },
+                "memos": {
+                    "description": "Quick notes and a private timeline, in Markdown.",
+                    "firstRun": "Create the first account right away - it becomes the admin."
+                },
+                "metabase": {
+                    "description": "Business intelligence: dashboards and questions over your data.",
+                    "firstRun": "Create the admin account on the first visit."
+                },
+                "miniflux": {
+                    "description": "Minimal, fast feed reader.",
+                    "firstRun": "Sign in as admin with the ADMIN_PASSWORD variable."
+                },
+                "minio": {
+                    "description": "S3-compatible object storage with a web console.",
+                    "firstRun": "Sign in to the console as minio with the MINIO_ROOT_PASSWORD variable. The S3 API answers on port 9000 at the service's private domain, and the first bucket is named in OPENSHIP_BUCKET."
+                },
+                "n8n": {
+                    "description": "Workflow automation with a visual editor.",
+                    "firstRun": "Create the owner account on the first visit."
+                },
+                "navidrome": {
+                    "description": "Music streaming server that works with Subsonic apps.",
+                    "firstRun": "Create the admin account on the first visit - until then anyone who opens it can. Music goes under /music."
+                },
+                "nextcloud": {
+                    "description": "Files, calendars and contacts with a large app store.",
+                    "firstRun": "Sign in as admin with the NEXTCLOUD_ADMIN_PASSWORD variable. The first start takes a few minutes."
+                },
+                "nocodb": {
+                    "description": "Spreadsheet interface over an SQL database.",
+                    "firstRun": "Sign in as admin@example.com with the NC_ADMIN_PASSWORD variable."
+                },
+                "ntfy": {
+                    "description": "Send push notifications to your phone with a plain HTTP request.",
+                    "firstRun": "Once setup has run, sign in as admin with the NTFY_PASSWORD variable. Topics are private until you grant access."
+                },
+                "open-webui": {
+                    "description": "Chat with local models, with an Ollama server beside it.",
+                    "firstRun": "Create the first account right away - it becomes the admin. Pull a model from Settings, Models."
+                },
+                "paperless-ngx": {
+                    "description": "Scan, OCR and search your paper documents.",
+                    "firstRun": "Sign in as admin with the PAPERLESS_ADMIN_PASSWORD variable."
+                },
+                "pgadmin": {
+                    "description": "Web console for PostgreSQL servers.",
+                    "firstRun": "Sign in as admin@example.com with the PGADMIN_DEFAULT_PASSWORD variable, then add a server with a database's connection details."
+                },
+                "photoprism": {
+                    "description": "Photo library with face recognition, maps and search.",
+                    "firstRun": "Sign in as admin with the PHOTOPRISM_ADMIN_PASSWORD variable."
+                },
+                "phpmyadmin": {
+                    "description": "Web console for MySQL and MariaDB servers.",
+                    "firstRun": "Sign in with a server's host, user and password. A Polaris database's are on its connection details."
+                },
+                "prometheus": {
+                    "description": "Metrics collection and alerting.",
+                    "firstRun": "It has no sign-in: leave it without a public address and add its private domain, port 9090, as a Grafana data source."
+                },
+                "prowlarr": {
+                    "description": "Indexer manager for Sonarr and Radarr.",
+                    "firstRun": "Choose a sign-in method on the first visit - until then anyone who opens it can."
+                },
+                "qdrant": {
+                    "description": "Vector database for search and embeddings, with a web UI.",
+                    "firstRun": "Clients authenticate with the QDRANT__SERVICE__API_KEY variable."
+                },
+                "rabbitmq": {
+                    "description": "Message broker, with its management console.",
+                    "firstRun": "Sign in as admin with the RABBITMQ_DEFAULT_PASS variable. Services reach AMQP on its private domain, port 5672."
+                },
+                "radarr": {
+                    "description": "Movie collection manager.",
+                    "firstRun": "Choose a sign-in method on the first visit - until then anyone who opens it can."
+                },
+                "searxng": {
+                    "description": "Private metasearch engine that does not track you.",
+                    "firstRun": "Open it and search. It has no accounts, so anyone with the address can use it."
+                },
+                "sonarr": {
+                    "description": "TV series collection manager.",
+                    "firstRun": "Choose a sign-in method on the first visit - until then anyone who opens it can."
+                },
+                "stirling-pdf": {
+                    "description": "Split, merge, convert and OCR PDFs on your own server.",
+                    "firstRun": "Sign in as admin with the SECURITY_INITIALLOGIN_PASSWORD variable."
+                },
+                "typesense": {
+                    "description": "Instant search engine with an API.",
+                    "firstRun": "Clients authenticate with the TYPESENSE_API_KEY variable."
+                },
+                "umami": {
+                    "description": "Cookie-free web analytics.",
+                    "firstRun": "Sign in as admin with the password umami, then change it under Settings, Profile."
+                },
+                "uptime-kuma": {
+                    "description": "Uptime monitoring with status pages and alerts.",
+                    "firstRun": "Create the admin account on the first visit - until then anyone who opens it can."
+                },
+                "vaultwarden": {
+                    "description": "Bitwarden-compatible password manager.",
+                    "firstRun": "Open /admin with the ADMIN_TOKEN variable to invite the first account."
+                },
+                "vikunja": {
+                    "description": "To-do lists and projects with kanban and Gantt views.",
+                    "firstRun": "Register the first account. Registration stays open until you turn it off."
+                },
+                "wikijs": {
+                    "description": "Wiki with a Markdown editor, search and access rules.",
+                    "firstRun": "Finish setup and create the admin on the first visit - until then anyone who opens it can."
+                },
+                "wordpress": {
+                    "description": "Websites and blogs, with themes and plugins.",
+                    "firstRun": "Open it right away and finish the installer - until then anyone who opens it can."
+                }
+            },
+            "search": "Search templates",
+            "none": "No template matches."
         },
         "image": {
             "label": "Image",
