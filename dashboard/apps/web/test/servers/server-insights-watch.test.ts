@@ -1,0 +1,120 @@
+/**
+ * The hourly check that tells people about their servers: an owner hears about
+ * their own machine, every administrator about the box Polaris runs on, an
+ * unusual stretch is told once, and a disk warning once until it clears.
+ */
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ServerInsight } from "@/lib/server-insights/insights";
+
+const LOCAL = "00000000-0000-4000-8000-000000000001";
+const HOST = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+const NOW = new Date("2026-10-10T12:00:00Z");
+const HOUR = 3_600_000;
+
+const settings = new Map<string, string>();
+const told: { userId: string; event: string; level?: string; audience?: string }[] = [];
+let insights: ServerInsight[] = [];
+
+vi.mock("@polaris/db", () => ({
+    VISIBLE_USER: {},
+    prisma: {
+        host: { findMany: async () => [{ id: HOST, name: "web-1", ownerId: "owner" }] },
+        user: {
+            findMany: async ({ where }: { where: { isAdmin?: boolean; id?: { in: string[] } } }) =>
+                where.isAdmin ? [{ id: "admin" }] : (where.id?.in ?? []).map((id) => ({ id }))
+        }
+    }
+}));
+vi.mock("@/lib/notifications/dispatch", () => ({
+    notify: async (input: { userId: string; event: string; level?: string; audience?: string }) => {
+        told.push(input);
+    }
+}));
+vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: async () => (key: string) => key }));
+vi.mock("@/lib/local-server", () => ({
+    getLocalServerName: async () => "polaris-box",
+    LOCAL_SERVER_FALLBACK_NAME: "This server"
+}));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async (key: string) => settings.get(key) ?? null,
+    setSetting: async (key: string, value: string) => {
+        settings.set(key, value);
+    }
+}));
+vi.mock("@/lib/server-insights/insights", () => ({
+    readServerInsights: async (subjects: string[]) => insights.filter((one) => subjects.includes(one.subject))
+}));
+
+const { freshAnomalies, watchServerInsights } = await import("../../src/lib/server-insights/insights-watch");
+
+const steady = { kind: "steady", usedBytes: 10, totalBytes: 100, bytesPerDay: 0, spanDays: 5 } as const;
+
+function insight(subject: string, starts: number[], diskWarning = false): ServerInsight {
+    return {
+        subject,
+        anomalies: starts.map((start) => ({
+            start,
+            end: start,
+            direction: "high",
+            peakAt: start,
+            peakValue: 95,
+            baseline: 20,
+            score: 8,
+            metric: "cpu",
+            severity: "danger"
+        })),
+        forecast: diskWarning
+            ? { kind: "filling", usedBytes: 90, totalBytes: 100, bytesPerDay: 5, spanDays: 5, days: 2 }
+            : steady,
+        diskWarning
+    };
+}
+
+beforeEach(() => {
+    settings.clear();
+    told.length = 0;
+});
+
+describe("freshAnomalies", () => {
+    it("on a first run looks back only a few hours", () => {
+        const fresh = freshAnomalies([insight(HOST, [NOW.getTime() - 2 * HOUR, NOW.getTime() - 48 * HOUR])], null, NOW.getTime());
+        expect(fresh.map((one) => one.anomaly.start)).toEqual([NOW.getTime() - 2 * HOUR]);
+    });
+
+    it("after that, only what started past the watermark", () => {
+        const mark = NOW.getTime() - HOUR;
+        const fresh = freshAnomalies([insight(HOST, [mark, mark + 1])], mark, NOW.getTime());
+        expect(fresh.map((one) => one.anomaly.start)).toEqual([mark + 1]);
+    });
+});
+
+describe("watchServerInsights", () => {
+    it("tells a host's owner and every admin about the local box, with the severity", async () => {
+        insights = [insight(HOST, [NOW.getTime() - HOUR]), insight(LOCAL, [NOW.getTime() - HOUR])];
+        await watchServerInsights(NOW);
+        expect(told).toEqual([
+            expect.objectContaining({ userId: "owner", event: "server.anomaly", level: "danger", audience: "you" }),
+            expect.objectContaining({ userId: "admin", event: "server.anomaly", level: "danger", audience: "admins" })
+        ]);
+    });
+
+    it("does not tell the same stretch twice", async () => {
+        insights = [insight(HOST, [NOW.getTime() - HOUR])];
+        await watchServerInsights(NOW);
+        await watchServerInsights(new Date(NOW.getTime() + HOUR));
+        expect(told.filter((one) => one.event === "server.anomaly")).toHaveLength(1);
+    });
+
+    it("warns about a filling disk once, and again only after it cleared", async () => {
+        insights = [insight(HOST, [], true)];
+        await watchServerInsights(NOW);
+        await watchServerInsights(NOW);
+        expect(told.filter((one) => one.event === "server.forecast")).toHaveLength(1);
+        insights = [insight(HOST, [], false)];
+        await watchServerInsights(NOW);
+        insights = [insight(HOST, [], true)];
+        await watchServerInsights(NOW);
+        expect(told.filter((one) => one.event === "server.forecast")).toHaveLength(2);
+    });
+});
