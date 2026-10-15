@@ -2,6 +2,9 @@
  * Tell the administrators when a server does something unusual, or its disk is
  * about to fill.
  *
+ * Each server's owner is told; the box Polaris runs on has no owner, so every
+ * administrator is told about that one.
+ *
  * Run from the metrics collector's hourly maintenance, right after the hour's
  * rollups are written - no timer of its own. Each unusual stretch is told once,
  * when it starts: a watermark of the latest start already told is kept in
@@ -58,74 +61,105 @@ async function readWarned(): Promise<Set<string>> {
     }
 }
 
+/** Servers read per query, so one tick holds a bounded number of rollup rows
+ *  (about 340 per server) however many machines are registered. */
+const CHUNK = 25;
+
+/** Who hears about a server: its owner, or every administrator for the box
+ *  Polaris runs on, which has no owner of its own. */
+function recipientsFor(subject: string, owners: Map<string, string>, admins: readonly string[]): string[] {
+    if (subject === LOCAL_HOST_SUBJECT) return [...admins];
+    const owner = owners.get(subject);
+    return owner ? [owner] : [];
+}
+
+async function tell(
+    userId: string,
+    subject: string,
+    server: string,
+    anomalies: readonly InsightAnomaly[],
+    forecast: ServerInsight["forecast"] | null
+): Promise<void> {
+    const t = await wordsFor(userId, "notices");
+    for (const anomaly of anomalies) {
+        await notify({
+            userId,
+            event: "server.anomaly",
+            title: t(anomaly.direction === "high" ? "serverInsights.highTitle" : "serverInsights.lowTitle", {
+                server,
+                metric: t(`serverInsights.metrics.${anomaly.metric}`)
+            }),
+            body: t("serverInsights.anomalyBody", {
+                value: sayValue(anomaly.metric, anomaly.peakValue),
+                usual: sayValue(anomaly.metric, anomaly.baseline)
+            }),
+            level: anomaly.severity,
+            audience: subject === LOCAL_HOST_SUBJECT ? "admins" : "you",
+            href: `/apps/servers/insights?server=${encodeURIComponent(hostRouteId(subject))}`,
+            metadata: { subject, metric: anomaly.metric, start: anomaly.start }
+        }).catch((error: unknown) => console.error("polaris: could not report a server anomaly:", error));
+    }
+    if (!forecast || (forecast.kind !== "filling" && forecast.kind !== "full")) return;
+    await notify({
+        userId,
+        event: "server.forecast",
+        title:
+            forecast.kind === "full"
+                ? t("serverInsights.fullTitle", { server })
+                : t("serverInsights.fillsTitle", { server, days: Math.max(1, Math.round(forecast.days)) }),
+        body: t("serverInsights.fillsBody", {
+            rate: formatBytes(Math.max(0, Math.round(forecast.bytesPerDay))),
+            free: formatBytes(Math.max(0, forecast.totalBytes - forecast.usedBytes))
+        }),
+        level: forecast.kind === "full" ? "danger" : "warning",
+        audience: subject === LOCAL_HOST_SUBJECT ? "admins" : "you",
+        actionRequired: true,
+        href: `/apps/servers/${encodeURIComponent(hostRouteId(subject))}`
+    }).catch((error: unknown) => console.error("polaris: could not report a disk forecast:", error));
+}
+
 export async function watchServerInsights(now = new Date()): Promise<void> {
-    const hosts = await prisma.host.findMany({ select: { id: true, name: true } });
+    const hosts = await prisma.host.findMany({ select: { id: true, name: true, ownerId: true } });
     const names = new Map<string, string>(hosts.map((host) => [host.id, host.name]));
+    const owners = new Map<string, string>(hosts.map((host) => [host.id, host.ownerId]));
     names.set(LOCAL_HOST_SUBJECT, (await getLocalServerName().catch(() => null)) || LOCAL_SERVER_FALLBACK_NAME);
-    const insights = await readServerInsights([...names.keys()], now);
 
     const rawMark = await getSetting(WATERMARK_KEY).catch(() => null);
     const watermark = rawMark && Number.isFinite(Number(rawMark)) ? Number(rawMark) : null;
-    const fresh = freshAnomalies(insights, watermark, now.getTime());
-
     const warned = await readWarned();
-    const toWarn = insights.filter((insight) => insight.diskWarning && !warned.has(insight.subject));
-    const nextWarned = insights.filter((insight) => insight.diskWarning).map((insight) => insight.subject);
+    const admins = (
+        await prisma.user.findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } }).catch(() => [])
+    ).map((user) => user.id);
+    // An owner who was removed or hidden is not told; nor is anybody in their place.
+    const visible = new Set([
+        ...admins,
+        ...(
+            await prisma.user
+                .findMany({ where: { id: { in: [...new Set(owners.values())] }, ...VISIBLE_USER }, select: { id: true } })
+                .catch(() => [])
+        ).map((user) => user.id)
+    ]);
 
-    if (fresh.length > 0 || toWarn.length > 0) {
-        const admins = await prisma.user
-            .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
-            .catch(() => []);
-        for (const admin of admins) {
-            const t = await wordsFor(admin.id, "notices");
-            for (const { subject, anomaly } of fresh) {
-                const metric = t(`serverInsights.metrics.${anomaly.metric}`);
-                await notify({
-                    userId: admin.id,
-                    event: "server.anomaly",
-                    title: t(anomaly.direction === "high" ? "serverInsights.highTitle" : "serverInsights.lowTitle", {
-                        server: names.get(subject) ?? "",
-                        metric
-                    }),
-                    body: t("serverInsights.anomalyBody", {
-                        value: sayValue(anomaly.metric, anomaly.peakValue),
-                        usual: sayValue(anomaly.metric, anomaly.baseline)
-                    }),
-                    level: anomaly.severity,
-                    audience: "admins",
-                    href: "/apps/servers/insights",
-                    metadata: { subject, metric: anomaly.metric, start: anomaly.start }
-                }).catch((error: unknown) => console.error("polaris: could not report a server anomaly:", error));
-            }
-            for (const insight of toWarn) {
-                const forecast = insight.forecast;
-                const server = names.get(insight.subject) ?? "";
-                const full = forecast.kind === "full";
-                await notify({
-                    userId: admin.id,
-                    event: "server.forecast",
-                    title: full
-                        ? t("serverInsights.fullTitle", { server })
-                        : t("serverInsights.fillsTitle", {
-                              server,
-                              days: forecast.kind === "filling" ? Math.max(1, Math.round(forecast.days)) : 0
-                          }),
-                    body:
-                        forecast.kind === "filling" || forecast.kind === "full"
-                            ? t("serverInsights.fillsBody", {
-                                  rate: formatBytes(Math.max(0, Math.round(forecast.bytesPerDay))),
-                                  free: formatBytes(Math.max(0, forecast.totalBytes - forecast.usedBytes))
-                              })
-                            : "",
-                    audience: "admins",
-                    actionRequired: true,
-                    href: `/apps/servers/${encodeURIComponent(hostRouteId(insight.subject))}`
-                }).catch((error: unknown) => console.error("polaris: could not report a disk forecast:", error));
+    const subjects = [...names.keys()];
+    const nextWarned: string[] = [];
+    let latest = watermark ?? now.getTime() - FIRST_RUN_MS;
+    for (let index = 0; index < subjects.length; index += CHUNK) {
+        const insights = await readServerInsights(subjects.slice(index, index + CHUNK), now);
+        const fresh = freshAnomalies(insights, watermark, now.getTime());
+        for (const insight of insights) {
+            if (insight.diskWarning) nextWarned.push(insight.subject);
+            const anomalies = fresh.filter((one) => one.subject === insight.subject).map((one) => one.anomaly);
+            for (const anomaly of anomalies) latest = Math.max(latest, anomaly.start);
+            const forecast = insight.diskWarning && !warned.has(insight.subject) ? insight.forecast : null;
+            if (anomalies.length === 0 && !forecast) continue;
+            const server = names.get(insight.subject) ?? "";
+            for (const userId of recipientsFor(insight.subject, owners, admins)) {
+                if (!visible.has(userId)) continue;
+                await tell(userId, insight.subject, server, anomalies, forecast);
             }
         }
     }
 
-    const latest = Math.max(watermark ?? now.getTime() - FIRST_RUN_MS, ...fresh.map((one) => one.anomaly.start));
     await setSetting(WATERMARK_KEY, String(latest));
     await setSetting(WARNED_KEY, JSON.stringify(nextWarned));
 }

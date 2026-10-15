@@ -44,6 +44,7 @@ import {
     Gauge,
     Handshake,
     Cloud,
+    GitCompareArrows,
     GitPullRequest,
     Globe,
     HardDrive,
@@ -768,6 +769,22 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Server,
             group: MACHINES_GROUP,
             keywords: ["hosts", "machines", "ssh"]
+        },
+        {
+            label: "Compare", // i18n-ignore
+            href: "/apps/servers/compare",
+            needs: "system.manage",
+            icon: GitCompareArrows,
+            group: MACHINES_GROUP,
+            keywords: ["side by side", "cpu", "memory", "disk", "network", "load"]
+        },
+        {
+            label: "Insights", // i18n-ignore
+            href: "/apps/servers/insights",
+            needs: "system.manage",
+            icon: ChartLine,
+            group: MACHINES_GROUP,
+            keywords: ["anomalies", "unusual", "forecast", "disk full", "capacity", "trend"]
         },
         {
             label: "Runners", // i18n-ignore
@@ -2187,36 +2204,6 @@ export const APP_SUBAPPS: AppSubapp[] = [
                 icon: BookOpen,
                 hidden: true,
                 keywords: ["wizard", "getting started", "connect", "install"]
-            }
-        ]
-    },
-    {
-        id: "servers",
-        label: "Servers", // i18n-ignore
-        icon: Server,
-        base: "/apps/servers",
-        parent: { label: "Apps", href: "/apps/deploy" }, // i18n-ignore
-        sections: [
-            {
-                label: "Servers", // i18n-ignore
-                href: "/apps/servers",
-                needs: "system.manage",
-                icon: Server,
-                keywords: ["hosts", "machines", "ssh"]
-            },
-            {
-                label: "Compare", // i18n-ignore
-                href: "/apps/servers/compare",
-                needs: "system.manage",
-                icon: GitCompareArrows,
-                keywords: ["side by side", "cpu", "memory", "disk", "network", "load"]
-            },
-            {
-                label: "Insights", // i18n-ignore
-                href: "/apps/servers/insights",
-                needs: "system.manage",
-                icon: ChartLine,
-                keywords: ["anomalies", "unusual", "forecast", "disk full", "capacity", "trend"]
             }
         ]
     },
