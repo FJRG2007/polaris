@@ -3,6 +3,7 @@ import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import { isInFlightStatus } from "@/lib/deploy/status";
 import { capabilitiesFor } from "@/lib/host-capabilities";
 import { requirePermission, userHasManage } from "@/lib/session";
+import { mayCreateProjectIn } from "@/lib/deploy-project-access";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { ProjectsGrid, type ProjectCardData } from "./projects-grid";
 import { getApplicationDeployStatuses, listProjects } from "@/lib/deploy-service";
@@ -14,8 +15,9 @@ const ONLINE_DB_STATES = new Set(["running", "active", "healthy", "ready"]);
 
 export default async function DeployPage() {
     const user = await requirePermission("deploy.read");
-    const [canManage, orgId] = await Promise.all([
+    const [canManage, canSetBinDays, orgId] = await Promise.all([
         userHasManage(user, "deploy.manage"),
+        userHasManage(user, "system.manage"),
         scopeOrgIdFor(user.id)
     ]);
 
@@ -93,6 +95,8 @@ export default async function DeployPage() {
         };
     });
 
+    const canCreateHere = canManage && (await mayCreateProjectIn({ id: user.id, isAdmin: user.isAdmin }, orgId));
+
     return (
         <ProjectsGrid
             projects={cards}
@@ -102,6 +106,8 @@ export default async function DeployPage() {
             // The instance's administrator is who sees every install land here;
             // for them the list opens on their own projects.
             hideManagedByDefault={user.isAdmin}
+            canSetBinDays={canSetBinDays}
+            canCreateHere={canCreateHere}
         />
     );
 }

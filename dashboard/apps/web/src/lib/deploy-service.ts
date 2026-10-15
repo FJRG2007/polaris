@@ -6,6 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
@@ -252,7 +253,7 @@ export async function listProjects(userId: string, orgId: string | null) {
         orderBy: { createdAt: "asc" },
         include: {
             environments: {
-                include: { applications: { include: { domains: true } }, databases: true },
+                include: { applications: { where: { binnedAt: null }, include: { domains: true } }, databases: { where: { binnedAt: null } } },
                 orderBy: { createdAt: "asc" }
             }
         }
@@ -273,7 +274,7 @@ export async function listProjectScopes(ownerId: string) {
                 select: {
                     id: true,
                     name: true,
-                    applications: {
+                    applications: { where: { binnedAt: null },
                         select: { id: true, name: true },
                         orderBy: { createdAt: "asc" }
                     }
@@ -289,7 +290,7 @@ export async function getProject(projectId: string, ownerId: string) {
         where: { id: projectId, ...(await visibleProjectWhere(ownerId)) },
         include: {
             environments: {
-                include: { applications: true, databases: true },
+                include: { applications: { where: { binnedAt: null } }, databases: { where: { binnedAt: null } } },
                 orderBy: { createdAt: "asc" }
             }
         }
@@ -303,7 +304,7 @@ export async function getProjectFull(projectId: string, ownerId: string) {
         include: {
             environments: {
                 include: {
-                    applications: {
+                    applications: { where: { binnedAt: null },
                         include: {
                             domains: true,
                             target: true,
@@ -313,7 +314,7 @@ export async function getProjectFull(projectId: string, ownerId: string) {
                     // The child count comes along so the screen can say, before an
                     // instance is removed, that the databases hosted inside it go
                     // with it - the one thing about this that is not recoverable.
-                    databases: { include: { _count: { select: { children: true } } } }
+                    databases: { where: { binnedAt: null }, include: { _count: { select: { children: true } } } }
                 },
                 orderBy: { createdAt: "asc" }
             }
@@ -489,6 +490,10 @@ export async function getVolumeOwner(
  * container that outlived its project is exactly where this started.
  */
 async function tearDownEnvironment(environmentId: string, ownerId: string): Promise<void> {
+    // Whatever of it sits in the recycle bin goes too: its data is on the same
+    // servers, and the rows are about to cascade away with the environment.
+    await prisma.application.updateMany({ where: { environmentId }, data: { binnedAt: null, binnedById: null } });
+    await prisma.managedDatabase.updateMany({ where: { environmentId }, data: { binnedAt: null, binnedById: null } });
     const [databases, applications] = await Promise.all([
         prisma.managedDatabase.findMany({
             where: { environmentId },
@@ -826,6 +831,7 @@ export async function addApplicationDomain(
         subdomain?: string;
     }
 ): Promise<string> {
+    await restorePoints.capture("routes", restorePoints.restoreKeys.routes(applicationId));
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         include: {
@@ -1847,7 +1853,14 @@ export async function applicationDomainHealth(
     });
 }
 
+/** Keep a domain's service's routes as a restore point before one of them changes. */
+async function keepRoutesOf(domainId: string): Promise<void> {
+    const row = await prisma.domain.findUnique({ where: { id: domainId }, select: { applicationId: true } });
+    if (row) await restorePoints.capture("routes", restorePoints.restoreKeys.routes(row.applicationId));
+}
+
 export async function removeApplicationDomain(domainId: string, ownerId: string): Promise<void> {
+    await keepRoutesOf(domainId);
     await prisma.domain.deleteMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } }
     });
@@ -1864,6 +1877,7 @@ export async function setApplicationDomainEnabled(
     ownerId: string,
     enabled: boolean
 ): Promise<void> {
+    await keepRoutesOf(domainId);
     const result = await prisma.domain.updateMany({
         where: { id: domainId, application: { environment: { project: { ownerId } } } },
         data: { enabled }

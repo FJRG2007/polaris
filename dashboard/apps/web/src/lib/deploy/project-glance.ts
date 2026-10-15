@@ -94,7 +94,7 @@ export async function readerProjectGlance(
             projectId,
             ...(access.environmentIds !== null ? { id: { in: [...access.environmentIds] } } : {})
         },
-        select: { id: true, applications: { select: { id: true, name: true } } }
+        select: { id: true, applications: { where: { binnedAt: null }, select: { id: true, name: true } } }
     });
     return projectGlance(environments);
 }

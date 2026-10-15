@@ -54,9 +54,54 @@ function boundedUrl(): string | null {
 
 const globalForPrisma = globalThis as unknown as { polarisPrisma?: PrismaClient };
 
+/** The models a delete moves to the recycle bin instead of removing. */
+const BINNABLE = new Set(["Application", "Project", "ManagedDatabase"]);
+const READS = new Set([
+    "findMany",
+    "findFirst",
+    "findFirstOrThrow",
+    "findUnique",
+    "findUniqueOrThrow",
+    "count",
+    "aggregate",
+    "groupBy"
+]);
+
+/**
+ * Spread into a `where` to read rows whether or not they are in the recycle bin.
+ * Only the bin itself, a restore and a purge want this.
+ */
+export const INCLUDING_BINNED = { binnedAt: undefined } as const;
+
+/** Spread into a nested relation read so binned rows stay out of it too. */
+export const NOT_BINNED = { binnedAt: null } as const;
+
+/**
+ * Every top-level read of a binnable model leaves binned rows out, unless the
+ * `where` already says something about `binnedAt`. One rule in one place rather
+ * than a filter at each of the two hundred call sites, so a list, a reconciler
+ * or a poller written tomorrow cannot bring a deleted service back by forgetting
+ * it. Nested relation reads are not reached by a query extension and carry
+ * `NOT_BINNED` themselves.
+ */
+export function hidingBinned(base: PrismaClient): PrismaClient {
+    return base.$extends({
+        query: {
+            $allModels: {
+                async $allOperations({ model, operation, args, query }) {
+                    if (!BINNABLE.has(model) || !READS.has(operation)) return query(args);
+                    const shaped = (args ?? {}) as { where?: Record<string, unknown> };
+                    if (shaped.where && "binnedAt" in shaped.where) return query(args);
+                    return query({ ...shaped, where: { ...shaped.where, binnedAt: null } } as typeof args);
+                }
+            }
+        }
+    }) as unknown as PrismaClient;
+}
+
 function client(): PrismaClient {
     const url = boundedUrl();
-    return url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient();
+    return hidingBinned(url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient());
 }
 
 export const prisma: PrismaClient = globalForPrisma.polarisPrisma ?? client();

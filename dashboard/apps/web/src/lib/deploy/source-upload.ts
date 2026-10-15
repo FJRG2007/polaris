@@ -171,18 +171,9 @@ async function hasDockerfile(dir: string, root: string): Promise<boolean> {
     return (await readdir(at).catch(() => [] as string[])).includes("Dockerfile");
 }
 
-/**
- * Take an uploaded zip as a service's source: unpack and check it, keep it as the
- * service's newest source, forget the one before, and answer what was kept. The
- * service builds with its Dockerfile when the upload has one at its root, and is
- * detected otherwise.
- */
-export async function storeUploadedSource(
-    applicationId: string,
-    ownerId: string,
-    zipFile: string,
-    name: string
-): Promise<UploadedSource> {
+/** The stored source settings of a service that can take an uploaded folder.
+ *  Refuses one that runs an image or builds from a repository. */
+async function uploadableSource(applicationId: string, ownerId: string): Promise<Record<string, unknown>> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { sourceType: true, sourceConfig: true }
@@ -195,37 +186,70 @@ export async function storeUploadedSource(
     if (typeof source.repoUrl === "string" && source.repoUrl) {
         throw new SourceRefusal("This service builds from a repository. Create a new service for an uploaded folder.");
     }
+    return source;
+}
+
+/**
+ * Take an uploaded zip as a service's source: unpack and check it, then keep it
+ * with `storeSourceFolder`.
+ */
+export async function storeUploadedSource(
+    applicationId: string,
+    ownerId: string,
+    zipFile: string,
+    name: string
+): Promise<UploadedSource> {
+    // Refused before the zip is read, so a service that cannot take one costs nothing.
+    await uploadableSource(applicationId, ownerId);
     const zip = await readFile(zipFile);
     const dir = await mkdtemp(join(tmpdir(), "polaris-upload-"));
     try {
         const counted = await unpackSourceZip(zip, dir);
-        const root = typeof source.rootDirectory === "string" ? source.rootDirectory.replace(/^\/+|\/+$/g, "") : "";
-        const dockerfile = await hasDockerfile(dir, root);
-        const upload: UploadedSource = {
-            id: randomUUID(),
-            name: name.trim().slice(0, 200) || "upload",
-            files: counted.files,
-            bytes: counted.bytes,
-            uploadedAt: new Date().toISOString()
-        };
-        const kept = uploadedSourcePath(applicationId, upload.id);
-        await mkdir(dirname(kept), { recursive: true });
-        await run("tar", ["-czf", kept, "-C", dir, "."]);
-        const previous = uploadedSourceOf(source);
-        await prisma.application.update({
-            where: { id: applicationId },
-            data: {
-                sourceType: dockerfile ? "dockerfile" : "nixpacks",
-                sourceConfig: JSON.stringify({ ...source, upload })
-            }
-        });
-        if (previous && previous.id !== upload.id) {
-            await rm(uploadedSourcePath(applicationId, previous.id), { force: true });
-        }
-        return upload;
+        return await storeSourceFolder(applicationId, ownerId, dir, name, counted);
     } finally {
         await rm(dir, { recursive: true, force: true });
     }
+}
+
+/**
+ * Take a folder already on disk (unpacked and checked by the caller) as a
+ * service's source: keep it as the service's newest source, forget the one
+ * before, and answer what was kept. The service builds with its Dockerfile when
+ * the folder has one at its root, and is detected otherwise. The folder itself is
+ * left where it is; removing it is the caller's.
+ */
+export async function storeSourceFolder(
+    applicationId: string,
+    ownerId: string,
+    dir: string,
+    name: string,
+    counted: { files: number; bytes: number }
+): Promise<UploadedSource> {
+    const source = await uploadableSource(applicationId, ownerId);
+    const root = typeof source.rootDirectory === "string" ? source.rootDirectory.replace(/^\/+|\/+$/g, "") : "";
+    const dockerfile = await hasDockerfile(dir, root);
+    const upload: UploadedSource = {
+        id: randomUUID(),
+        name: name.trim().slice(0, 200) || "upload",
+        files: counted.files,
+        bytes: counted.bytes,
+        uploadedAt: new Date().toISOString()
+    };
+    const kept = uploadedSourcePath(applicationId, upload.id);
+    await mkdir(dirname(kept), { recursive: true });
+    await run("tar", ["-czf", kept, "-C", dir, "."]);
+    const previous = uploadedSourceOf(source);
+    await prisma.application.update({
+        where: { id: applicationId },
+        data: {
+            sourceType: dockerfile ? "dockerfile" : "nixpacks",
+            sourceConfig: JSON.stringify({ ...source, upload })
+        }
+    });
+    if (previous && previous.id !== upload.id) {
+        await rm(uploadedSourcePath(applicationId, previous.id), { force: true });
+    }
+    return upload;
 }
 
 /**

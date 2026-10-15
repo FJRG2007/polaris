@@ -11,6 +11,7 @@
  * turns a scope into the token and zone to use and refuses anything outside it.
  */
 
+import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import type { MessageParams } from "@polaris/core";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -253,6 +254,7 @@ export async function saveZoneRecord(
         for (const field of checked.missing) problems[field] ??= t("problems.required");
         throw new DnsEditError(t("errors.checkFields"), problems);
     }
+    await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
     return viewOf(await saveDnsRecord(zone.token, zone.id, recordId, checked.record), zone.name);
 }
 
@@ -267,6 +269,7 @@ async function requireOwnRecord(zone: Zone, recordId: string): Promise<{ type: s
 export async function deleteZoneRecord(scope: DnsScope, recordId: string): Promise<void> {
     const zone = await zoneFor(scope);
     await requireOwnRecord(zone, recordId);
+    await restorePoints.capture("dns", restorePoints.restoreKeys.dns(scope));
     await deleteDnsRecord(zone.token, zone.id, recordId);
 }
 

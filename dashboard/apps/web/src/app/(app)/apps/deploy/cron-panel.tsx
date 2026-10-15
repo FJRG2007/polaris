@@ -9,6 +9,7 @@
  * - "0 3 * * *" is not something anybody should have to check in their head.
  */
 
+import { RestoreHistoryButton } from "@/components/restore-history";
 import * as core from "@polaris/core";
 import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
@@ -182,11 +183,14 @@ export function CronPanel({ applicationId }: { applicationId: string }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
                 {/* The tab's own heading says what this is; this one only names the list. */}
                 <p className="text-sm font-medium">{t("cron.title")}</p>
-                {manage && !draft && (
-                    <Button size="sm" onClick={() => setDraft(emptyDraft())}>
-                        <Plus className="size-4" /> {t("cron.newJob")}
-                    </Button>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                    <RestoreHistoryButton target={{ kind: "cron", applicationId }} canRestore={manage} onRestored={reload} />
+                    {manage && !draft && (
+                        <Button size="sm" onClick={() => setDraft(emptyDraft())}>
+                            <Plus className="size-4" /> {t("cron.newJob")}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {error && <p className="text-sm text-danger">{error}</p>}

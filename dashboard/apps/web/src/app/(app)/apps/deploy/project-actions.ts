@@ -12,6 +12,7 @@
  * role gates the project.
  */
 
+import * as recycleBin from "@/lib/deploy/recycle-bin";
 import { firstIssue, reply } from "./reply";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
@@ -576,7 +577,7 @@ export async function stageServiceDeleteAction(input: {
         if (!app) return { error: await reply("common.serviceNotFound") };
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
-            await deployService.deleteApplication(input.applicationId, access.ownerId);
+            await recycleBin.binApplication(input.applicationId, access.ownerId, user.id);
             await recordDeployAudit({
                 actorId: user.id,
                 orgId: access.orgId ?? undefined,
@@ -615,8 +616,7 @@ export async function stageDatabaseDeleteAction(input: {
         );
 
         if (!(await staged.projectStagesChanges(access.projectId))) {
-            const { deleteDatabase } = await import("@/lib/database-service");
-            await deleteDatabase(input.databaseId, access.ownerId);
+            await recycleBin.binDatabase(input.databaseId, access.ownerId, user.id);
             await recordDeployAudit({
                 actorId: user.id,
                 orgId: access.orgId ?? undefined,

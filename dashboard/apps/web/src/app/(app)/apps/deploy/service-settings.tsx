@@ -7,6 +7,7 @@
  * scroll (see settings-kit.tsx for the pieces).
  */
 
+import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import * as deployActions from "./actions";
 import { DomainCdnButton } from "./domain-cdn";
@@ -1579,6 +1580,7 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                         <Button size="sm" variant="outline" onClick={() => choose("tcp")}>
                             <Network aria-hidden /> {t("publicNet.tcp")}
                         </Button>
+                        <RestoreHistoryButton target={{ kind: "routes", applicationId: app.id }} canRestore onRestored={onChanged} />
                     </>
                 }
             >

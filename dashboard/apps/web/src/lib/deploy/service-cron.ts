@@ -18,6 +18,7 @@
  * that regardless, so a container that never answers cannot hold a job forever.
  */
 
+import * as restorePoints from "@/lib/restore-points/service";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { currentReleaseRef } from "./releases";
@@ -118,6 +119,7 @@ export async function saveServiceCron(
     input: ServiceCronInput,
     userId: string
 ): Promise<ServiceCronView> {
+    await restorePoints.capture("cron", restorePoints.restoreKeys.cron(applicationId), { actorId: userId });
     const data = {
         name: input.name,
         schedule: input.schedule,
@@ -146,6 +148,7 @@ export async function saveServiceCron(
 
 /** Remove one of this service's jobs and its run history. */
 export async function deleteServiceCron(applicationId: string, cronId: string): Promise<void> {
+    await restorePoints.capture("cron", restorePoints.restoreKeys.cron(applicationId));
     const removed = await prisma.serviceCron.deleteMany({ where: { id: cronId, applicationId } });
     if (removed.count === 0) throw new Error("Scheduled job not found");
 }
@@ -189,6 +192,8 @@ export async function tickServiceCrons(now = new Date()): Promise<{ started: num
     let skipped = 0;
     const due = await prisma.serviceCron.findMany({
         where: {
+            // A service in the recycle bin has no container to run anything in.
+            application: { binnedAt: null },
             OR: [
                 { enabled: true, nextRunAt: { lte: now } },
                 { enabled: true, retryAt: { lte: now } }

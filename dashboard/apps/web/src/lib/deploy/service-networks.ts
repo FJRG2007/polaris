@@ -172,8 +172,8 @@ export async function wantedPrivateNetworks(): Promise<string[]> {
         select: {
             id: true,
             networkMode: true,
-            applications: { select: { id: true } },
-            databases: { select: { id: true } }
+            applications: { where: { binnedAt: null }, select: { id: true } },
+            databases: { where: { binnedAt: null }, select: { id: true } }
         }
     });
     const wanted = new Set(environmentNetworksWanted(environments, names));
