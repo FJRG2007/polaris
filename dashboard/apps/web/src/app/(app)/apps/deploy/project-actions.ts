@@ -838,6 +838,9 @@ export async function setEnvironmentStageAction(input: {
     });
 }
 
+/** What the dialog sends; the data stays out unless it says otherwise. */
+type PromotionRequest = { sourceEnvironmentId: string; targetEnvironmentId: string; includeData?: boolean };
+
 /**
  * Who may promote: deploying into the target, being allowed into the source
  * (its releases and, with the data, its contents leave it), and managing the
@@ -855,7 +858,7 @@ async function promotionAccess(input: EnvironmentPromotionInput, userId: string)
 }
 
 export async function previewPromotionAction(
-    input: EnvironmentPromotionInput
+    input: PromotionRequest
 ): Promise<Result<{ preview: PromotionPreview; canDeploy: boolean; canCopyData: boolean }>> {
     return attempt("environment.promoteFailed", async () => {
         const user = await requirePermission("deploy.read");
@@ -873,7 +876,7 @@ export async function previewPromotionAction(
 }
 
 /** Promote one environment into another; runs on, followed in the history. */
-export async function promoteEnvironmentAction(input: EnvironmentPromotionInput): Promise<Result<{ id: string }>> {
+export async function promoteEnvironmentAction(input: PromotionRequest): Promise<Result<{ id: string }>> {
     return attempt("environment.promoteFailed", async () => {
         const user = await requirePermission("deploy.manage");
         const parsed = environmentPromotionSchema.safeParse(input);

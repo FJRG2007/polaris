@@ -18,10 +18,16 @@ import { NetworkingCard } from "./networking-card";
 import { deleteEnvironmentAction } from "../actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, ConfirmDeleteDialog, Input } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, Input, Select } from "@polaris/ui";
 import { NewEnvironmentDialog } from "../new-environment-dialog";
-import { Check, Pencil, Plus, Star, Trash2, X } from "lucide-react";
-import { renameEnvironmentAction, setDefaultEnvironmentAction } from "../project-actions";
+import { PromoteDialog, PromotionHistory } from "./promote-dialog";
+import { ArrowUpRight, Check, Pencil, Plus, Star, Trash2, X } from "lucide-react";
+import { ENVIRONMENT_STAGES, type EnvironmentStage } from "@polaris/core";
+import {
+    renameEnvironmentAction,
+    setDefaultEnvironmentAction,
+    setEnvironmentStageAction
+} from "../project-actions";
 import type { ProjectEnvironmentView, ProjectSettingsView } from "@/lib/deploy-project-service";
 
 export function EnvironmentsSection({
@@ -37,6 +43,8 @@ export function EnvironmentsSection({
     const [draft, setDraft] = useState("");
     const [deleting, setDeleting] = useState<ProjectEnvironmentView | null>(null);
     const [creating, setCreating] = useState(false);
+    const [promoting, setPromoting] = useState<ProjectEnvironmentView | null>(null);
+    const [promotions, setPromotions] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const display = useDisplayFormat();
@@ -68,6 +76,17 @@ export function EnvironmentsSection({
         setError(null);
         startTransition(async () => {
             const result = await setDefaultEnvironmentAction(environment.id);
+            if (result.error) setError(result.error);
+            else router.refresh();
+        });
+    }
+
+    function setStage(environment: ProjectEnvironmentView, value: string) {
+        const stage = value === "none" ? null : (value as EnvironmentStage);
+        if (stage === environment.stage) return;
+        setError(null);
+        startTransition(async () => {
+            const result = await setEnvironmentStageAction({ environmentId: environment.id, stage });
             if (result.error) setError(result.error);
             else router.refresh();
         });
@@ -140,6 +159,11 @@ export function EnvironmentsSection({
                                     <div className="min-w-0">
                                         <p className="flex items-center gap-2 truncate text-sm font-medium">
                                             {environment.name}
+                                            {environment.stage && (
+                                                <span className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-medium text-muted-foreground">
+                                                    {t(`environments.stages.${environment.stage}`)}
+                                                </span>
+                                            )}
                                             {environment.isDefault && (
                                                 <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[0.625rem] font-medium text-primary">
                                                     {t("environments.default")}
@@ -177,6 +201,33 @@ export function EnvironmentsSection({
 
                             {canManage && renaming !== environment.id && (
                                 <div className="flex shrink-0 items-center gap-1">
+                                    <Select
+                                        value={environment.stage ?? "none"}
+                                        onValueChange={(value) => setStage(environment, value)}
+                                        aria-label={t("environments.stageNamed", { name: environment.name })}
+                                        className="h-8 w-36"
+                                        options={[
+                                            { value: "none", label: t("environments.stageNone") },
+                                            ...ENVIRONMENT_STAGES.map((stage) => ({
+                                                value: stage,
+                                                label: t(`environments.stages.${stage}`)
+                                            }))
+                                        ]}
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        disabled={settings.environments.length < 2}
+                                        onClick={() => setPromoting(environment)}
+                                        aria-label={t("environments.promoteNamed", { name: environment.name })}
+                                        title={
+                                            settings.environments.length < 2
+                                                ? t("environments.promoteNeedsTwo")
+                                                : t("environments.promote")
+                                        }
+                                    >
+                                        <ArrowUpRight className="size-4" />
+                                    </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -225,7 +276,18 @@ export function EnvironmentsSection({
                 )}
             </SettingsCard>
 
+            <PromotionHistory projectId={settings.id} version={promotions} />
+
             <NetworkingCard settings={settings} canManage={canManage} />
+
+            <PromoteDialog
+                environments={settings.environments}
+                source={promoting}
+                onClose={() => {
+                    setPromoting(null);
+                    setPromotions((count) => count + 1);
+                }}
+            />
 
             <NewEnvironmentDialog
                 projectId={settings.id}
