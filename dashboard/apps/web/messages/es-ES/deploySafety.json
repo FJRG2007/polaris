@@ -42,5 +42,27 @@
         "daysSave": "Guardar",
         "daysSaved": "Guardado.",
         "daysInvalid": "Usa un número de días entre 1 y 365."
+    },
+    "importSite": {
+        "open": "Importar sitio",
+        "title": "Importar un sitio",
+        "description": "Sube una copia de seguridad completa de cuenta de cPanel (.tar.gz). Sus sitios, bases de datos MySQL y dominios pasan a ser un proyecto nuevo.",
+        "drop": "Suelta la copia aquí",
+        "choose": "Elegir archivo",
+        "wrongType": "Elige la copia como archivo .tar.gz.",
+        "emptyFile": "Ese archivo está vacío.",
+        "tooLarge": "La copia ocupa más de 5 GB.",
+        "uploading": "Subiendo... {percent}%",
+        "importing": "Importando. Los sitios y bases de datos grandes pueden tardar varios minutos; deja esta ventana abierta.",
+        "start": "Importar",
+        "retry": "Reintentar",
+        "cancel": "Cancelar",
+        "close": "Cerrar",
+        "openProject": "Abrir proyecto",
+        "done": "Importados {services, plural, one {# sitio} other {# sitios}}, {databases, plural, one {# base de datos} other {# bases de datos}} y {domains, plural, one {# dominio} other {# dominios}}.",
+        "warnings": "No todo se ha podido traer:",
+        "unreachable": "No se pudo conectar con Polaris. Revisa tu conexión y vuelve a intentarlo.",
+        "notAllowed": "No puedes crear proyectos en esta organización.",
+        "failed": "La importación no terminó. Vuelve a intentarlo en un momento."
     }
 }

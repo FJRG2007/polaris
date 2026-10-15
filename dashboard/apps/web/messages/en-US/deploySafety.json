@@ -42,5 +42,27 @@
         "daysSave": "Save",
         "daysSaved": "Saved.",
         "daysInvalid": "Use a number of days between 1 and 365."
+    },
+    "importSite": {
+        "open": "Import site",
+        "title": "Import a site",
+        "description": "Upload a cPanel full-account backup (.tar.gz). Its sites, MySQL databases and domains become a new project.",
+        "drop": "Drop the backup here",
+        "choose": "Choose file",
+        "wrongType": "Choose the backup as a .tar.gz file.",
+        "emptyFile": "That file is empty.",
+        "tooLarge": "The backup is larger than 5 GB.",
+        "uploading": "Uploading... {percent}%",
+        "importing": "Importing. Large sites and databases can take several minutes; keep this window open.",
+        "start": "Import",
+        "retry": "Try again",
+        "cancel": "Cancel",
+        "close": "Close",
+        "openProject": "Open project",
+        "done": "Imported {services, plural, one {# site} other {# sites}}, {databases, plural, one {# database} other {# databases}} and {domains, plural, one {# domain} other {# domains}}.",
+        "warnings": "Not everything came over:",
+        "unreachable": "Could not reach Polaris. Check your connection and try again.",
+        "notAllowed": "You cannot create projects in this organization.",
+        "failed": "The import did not finish. Try again in a moment."
     }
 }
