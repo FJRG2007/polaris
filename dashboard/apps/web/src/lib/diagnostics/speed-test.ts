@@ -20,11 +20,11 @@ import { TIME_REFERENCE_URL } from "./checks";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
 
-const DOWNLOAD_BYTES = 10_000_000;
-const UPLOAD_BYTES = 2_000_000;
+export const DOWNLOAD_BYTES = 10_000_000;
+export const UPLOAD_BYTES = 2_000_000;
 const DOWNLOAD_URL = `https://speed.cloudflare.com/__down?bytes=${DOWNLOAD_BYTES}`;
 const UPLOAD_URL = "https://speed.cloudflare.com/__up";
-const LEG_TIMEOUT_MS = 20_000;
+export const LEG_TIMEOUT_MS = 20_000;
 const LATENCY_SAMPLES = 3;
 /** Runs per window, for the whole deployment: it is one server's bandwidth. */
 export const SPEED_TEST_LIMIT = 3;
@@ -80,6 +80,12 @@ async function download(): Promise<number | null> {
             const { done, value } = await reader.read();
             if (done) break;
             bytes += value.byteLength;
+            // The endpoint is asked for a fixed size; a body that runs past it
+            // is not read on, whatever the far end sends.
+            if (bytes >= DOWNLOAD_BYTES) {
+                await reader.cancel().catch(() => undefined);
+                break;
+            }
         }
     } catch {
         // The deadline: what arrived before it is the measurement.
@@ -122,10 +128,12 @@ export async function lastSpeedResult(): Promise<SpeedResult | null> {
 /** Run one test, unless one is running or the window is spent. */
 export async function runSpeedTest(): Promise<SpeedTestOutcome> {
     if (running) return { ok: false, reason: "busy", retryAfterMs: LEG_TIMEOUT_MS };
-    const allowed = await rateLimit("diagnostics:speed-test", SPEED_TEST_LIMIT, SPEED_TEST_WINDOW_MS);
-    if (!allowed.ok) return { ok: false, reason: "limited", retryAfterMs: allowed.retryAfterMs };
+    // Taken before the first await, so two clicks that land together cannot both
+    // pass the check while the rate limit is being read.
     running = true;
     try {
+        const allowed = await rateLimit("diagnostics:speed-test", SPEED_TEST_LIMIT, SPEED_TEST_WINDOW_MS);
+        if (!allowed.ok) return { ok: false, reason: "limited", retryAfterMs: allowed.retryAfterMs };
         // One leg at a time: run together they would share the link and each
         // measure half of it.
         const latencyMs = await latency();
