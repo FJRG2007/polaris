@@ -322,3 +322,201 @@ export function TimeSeriesChart({
         </div>
     );
 }
+/** The colours a multi-series chart hands out in order. Four is as many lines as
+ *  one plot stays readable with, which is also the most it is asked to draw. */
+export const SERIES_COLORS = [
+    "hsl(var(--primary))",
+    "hsl(var(--accent))",
+    "hsl(var(--success))",
+    "hsl(var(--warning))"
+] as const;
+
+/** One line of a multi-series chart. */
+export interface ChartSeries {
+    key: string;
+    label: string;
+    points: TimePoint[];
+}
+
+/**
+ * Several series of the same metric on one shared pair of axes, so they can be
+ * read against each other rather than chart by chart. Same drawing rules as
+ * TimeSeriesChart - stretched SVG, HTML labels, nulls as gaps - without the area
+ * fill, which would bury the lines under one another. Pointing at the plot reads
+ * out every series at the nearest sample time.
+ */
+export function MultiSeriesChart({
+    series,
+    from,
+    to,
+    max,
+    format = (value) => String(Math.round(value)),
+    formatTime,
+    label,
+    height = 132,
+    className
+}: {
+    series: ChartSeries[];
+    from: number;
+    to: number;
+    /** Fixed Y max (e.g. 100 for a percentage); derived from the data otherwise. */
+    max?: number;
+    format?: (value: number) => string;
+    formatTime?: (at: number) => string;
+    label?: string;
+    height?: number;
+    className?: string;
+}) {
+    const plotRef = useRef<HTMLDivElement>(null);
+    const [hoverAt, setHoverAt] = useState<number | null>(null);
+    const words = useUiStrings();
+    const width = 600;
+    const span = Math.max(1, to - from);
+    let dataMax = 0;
+    let anyPresent = false;
+    for (const line of series) {
+        for (const point of line.points) {
+            if (point.v == null) continue;
+            anyPresent = true;
+            dataMax = Math.max(dataMax, point.v);
+        }
+    }
+    const yMax = max ?? Math.max(1, dataMax * 1.15);
+    const x = (t: number): number => ((t - from) / span) * width;
+    const y = (v: number): number => height - Math.max(0, Math.min(1, v / yMax)) * height;
+
+    const pathOf = (points: TimePoint[]): string => {
+        let d = "";
+        let open = false;
+        for (const point of points) {
+            if (point.v == null) {
+                open = false;
+                continue;
+            }
+            d += `${open ? "L" : "M"}${x(point.t).toFixed(1)} ${y(point.v).toFixed(1)} `;
+            open = true;
+        }
+        return d.trim();
+    };
+
+    const fallbackTime = useMemo(
+        () =>
+            new Intl.DateTimeFormat(undefined, {
+                ...(span > 36 * 3_600_000 ? { month: "short", day: "numeric" } : {}),
+                hour: "2-digit",
+                minute: "2-digit"
+            }),
+        [span]
+    );
+    const stamp = formatTime ?? ((at: number) => fallbackTime.format(at));
+
+    function nearest(points: TimePoint[], target: number): TimePoint | null {
+        let best: TimePoint | null = null;
+        for (const point of points) {
+            if (!best || Math.abs(point.t - target) < Math.abs(best.t - target)) best = point;
+        }
+        return best;
+    }
+
+    function trackPointer(event: PointerEvent<HTMLDivElement>): void {
+        const rect = plotRef.current?.getBoundingClientRect();
+        if (!rect || rect.width === 0) return;
+        const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+        setHoverAt(from + ratio * span);
+    }
+
+    const hoverLeft = hoverAt == null ? 0 : ((hoverAt - from) / span) * 100;
+    const readoutShift = hoverLeft < 22 ? "translateX(0)" : hoverLeft > 78 ? "translateX(-100%)" : "translateX(-50%)";
+
+    return (
+        <div className={cn("min-w-0 rounded-lg border border-border/60 p-3", className)}>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                {label ? <span className="text-sm font-medium">{label}</span> : <span />}
+                {anyPresent ? <span className="text-xs text-muted-foreground/70">{format(yMax)}</span> : null}
+            </div>
+            {!anyPresent ? (
+                <div
+                    className="mt-2 flex items-center justify-center rounded-md text-xs text-muted-foreground"
+                    style={{ height }}
+                >
+                    {words.noDataInRange}
+                </div>
+            ) : (
+                <div
+                    ref={plotRef}
+                    className="relative mt-2 touch-none"
+                    style={{ height }}
+                    onPointerMove={trackPointer}
+                    onPointerDown={trackPointer}
+                    onPointerLeave={() => setHoverAt(null)}
+                    onPointerCancel={() => setHoverAt(null)}
+                >
+                    <svg
+                        className="block w-full"
+                        width="100%"
+                        height={height}
+                        viewBox={`0 0 ${width} ${height}`}
+                        preserveAspectRatio="none"
+                        role="img"
+                        aria-label={label ?? "History"}
+                    >
+                        {[0.25, 0.5, 0.75].map((fraction) => (
+                            <line
+                                key={fraction}
+                                x1={0}
+                                x2={width}
+                                y1={height * fraction}
+                                y2={height * fraction}
+                                stroke="hsl(var(--border))"
+                                strokeWidth={1}
+                                strokeDasharray="3 4"
+                                vectorEffect="non-scaling-stroke"
+                                opacity={0.5}
+                            />
+                        ))}
+                        {series.map((line, index) => (
+                            <path
+                                key={line.key}
+                                d={pathOf(line.points)}
+                                fill="none"
+                                stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
+                                strokeWidth={1.75}
+                                strokeLinejoin="round"
+                                strokeLinecap="round"
+                                vectorEffect="non-scaling-stroke"
+                            />
+                        ))}
+                    </svg>
+                    {hoverAt != null && (
+                        <div className="pointer-events-none absolute inset-0" aria-hidden>
+                            <div className="absolute inset-y-0 w-px bg-foreground/25" style={{ left: `${hoverLeft}%` }} />
+                            <div
+                                className="absolute top-1 z-10 flex flex-col gap-0.5 whitespace-nowrap rounded-md border border-border-strong bg-elevated px-2 py-1 text-xs shadow-popover"
+                                style={{ left: `${hoverLeft}%`, transform: readoutShift }}
+                            >
+                                <span className="text-muted-foreground">{stamp(hoverAt)}</span>
+                                {series.map((line, index) => {
+                                    const point = nearest(line.points, hoverAt);
+                                    return (
+                                        <span key={line.key} className="flex items-center gap-1.5">
+                                            <span
+                                                className="size-2 shrink-0 rounded-full"
+                                                style={{ background: SERIES_COLORS[index % SERIES_COLORS.length] }}
+                                            />
+                                            <span className="max-w-[10rem] truncate text-muted-foreground">
+                                                {line.label}
+                                            </span>
+                                            <span className="font-medium text-foreground">
+                                                {point?.v != null ? format(point.v) : words.noData}
+                                            </span>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

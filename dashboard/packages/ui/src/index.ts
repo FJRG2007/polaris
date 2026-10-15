@@ -87,7 +87,15 @@ export {
     type SearchableSelectProps
 } from "./components/searchable-select";
 export { SegmentedControl, type SegmentedOption } from "./components/segmented-control";
-export { RadialGauge, TimeSeriesChart, type GaugeTone, type TimePoint } from "./components/charts";
+export {
+    MultiSeriesChart,
+    RadialGauge,
+    SERIES_COLORS,
+    TimeSeriesChart,
+    type ChartSeries,
+    type GaugeTone,
+    type TimePoint
+} from "./components/charts";
 export { summarizeSeries, type SeriesStats, type SeriesSummary } from "./lib/series-summary";
 export * from "./components/dropdown-menu";
 export * from "./components/context-menu";
