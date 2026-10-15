@@ -265,7 +265,8 @@
             "storage": "Storage",
             "connection": "Connection",
             "notes": "Notes",
-            "keys": "SSH keys"
+            "keys": "SSH keys",
+            "templates": "Templates"
         },
         "load": "Load",
         "loadHint": "Read from the machine itself, not only from what Polaris runs on it.",
@@ -535,6 +536,131 @@
             "privateKey": "That is a private key. Paste the public one, from the .pub file.",
             "label": "Use letters, digits, spaces and . _ - @ only.",
             "invalid": "Check what you entered."
+        }
+    },
+    "templates": {
+        "intro": "Describe how this server should be set up, and Polaris checks it every few hours.",
+        "assign": "Assign",
+        "pickTemplate": "Choose a template",
+        "noTemplates": "No templates yet. Create one to describe how a server should be set up.",
+        "manage": "Templates",
+        "none": "No template is assigned to this server.",
+        "status": {
+            "unknown": "Not checked",
+            "compliant": "Compliant",
+            "drifted": "{count, plural, one {# difference} other {# differences}}",
+            "failed": "Check failed"
+        },
+        "checkedAt": "Checked {when}",
+        "checkNow": "Check now",
+        "fixAll": "Fix everything",
+        "fix": "Fix it",
+        "autoFix": "Fix automatically",
+        "autoFixHint": "Puts drift back as soon as a scheduled check finds it.",
+        "remove": "Remove from server",
+        "manual": "Fix by hand",
+        "noRoot": "Polaris has no root on this server, so it can check it but not fix it. Root is granted when the server is enrolled with root access.",
+        "confirmFixAll": {
+            "title": "Fix {name}?",
+            "body": "Polaris will install, start, write and set what this template expects on {server}, as root. Nothing is removed.",
+            "confirm": "Fix it"
+        },
+        "confirmFixOne": {
+            "title": "Fix this on {server}?",
+            "confirm": "Fix it"
+        },
+        "confirmRemove": {
+            "title": "Remove {name} from this server?",
+            "body": "The server is left as it is. It is only no longer checked.",
+            "confirm": "Remove"
+        },
+        "drift": {
+            "packageMissing": "Package {name} is not installed",
+            "serviceStopped": "{name} is not running",
+            "serviceRunning": "{name} is running but should be stopped",
+            "serviceNotEnabled": "{name} does not start at boot",
+            "serviceEnabled": "{name} starts at boot but should not",
+            "fileMissing": "{name} does not exist",
+            "fileContent": "{name} has different content",
+            "fileMode": "{name} has permissions {actual}, expected {expected}",
+            "sysctlValue": "{name} is {actual}, expected {expected}",
+            "userMissing": "Account {name} does not exist",
+            "userGroups": "Account {name} is not in {expected}",
+            "firewallMissing": "Port {name} is not open in the firewall",
+            "firewallOff": "The firewall is off, so port {name} is not enforced",
+            "firewallAbsent": "No firewall (ufw) is installed to open port {name}",
+            "unreadable": "{name} could not be read"
+        },
+        "errors": {
+            "notFound": "That template or server no longer exists.",
+            "nameTaken": "A template with that name already exists.",
+            "noRoot": "Polaris has no root on this server, so it cannot fix it.",
+            "unreachable": "The server did not answer over SSH.",
+            "failed": "The server could not be checked. Try again in a moment.",
+            "nothingToFix": "Nothing left to fix. Check again to refresh.",
+            "partial": "Some items could not be fixed. They are still listed.",
+            "invalid": "Some fields are not valid.",
+            "local": "This server has no SSH login, so it cannot be checked."
+        },
+        "editor": {
+            "new": "New template",
+            "startFrom": "Start from",
+            "edit": "Edit",
+            "delete": "Delete",
+            "servers": "{count, plural, one {# server} other {# servers}}",
+            "name": "Name",
+            "description": "Description",
+            "save": "Save",
+            "cancel": "Cancel",
+            "back": "Back",
+            "packages": "Packages",
+            "packagesHint": "One package per line.",
+            "services": "Services",
+            "service": "Service",
+            "running": "Running",
+            "enabled": "At boot",
+            "files": "Files",
+            "path": "Path",
+            "mode": "Mode",
+            "content": "Content",
+            "sysctl": "Kernel settings",
+            "key": "Setting",
+            "value": "Value",
+            "users": "Accounts",
+            "user": "Account",
+            "groups": "Groups",
+            "groupsHint": "Separated by commas",
+            "firewall": "Firewall",
+            "port": "Port",
+            "protocol": "Protocol",
+            "add": "Add",
+            "removeRow": "Remove",
+            "empty": "No templates yet.",
+            "confirmDelete": {
+                "title": "Delete {name}?",
+                "body": "It is removed from every server it is assigned to. The servers are left as they are.",
+                "confirm": "Delete"
+            },
+            "library": {
+                "blank": "Blank",
+                "webServer": "Web server",
+                "database": "Database server",
+                "dockerHost": "Docker host",
+                "bruteForce": "Login protection",
+                "hardened": "Hardened kernel"
+            }
+        },
+        "invalid": {
+            "packageName": "Lowercase letters, digits and . + - _ only",
+            "serviceName": "Not a service name",
+            "filePath": "An absolute path, like /etc/motd",
+            "fileContent": "Text only",
+            "fileMode": "Three octal digits, like 644",
+            "sysctlKey": "Like net.ipv4.ip_forward",
+            "sysctlValue": "One line of text",
+            "userName": "Lowercase letters, digits, - and _",
+            "required": "Required",
+            "other": "Not valid"
         }
     }
 }

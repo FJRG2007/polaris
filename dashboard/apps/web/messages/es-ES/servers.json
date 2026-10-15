@@ -265,7 +265,8 @@
             "storage": "Espacio",
             "connection": "Conexión",
             "notes": "Notas",
-            "keys": "Claves SSH"
+            "keys": "Claves SSH",
+            "templates": "Plantillas"
         },
         "load": "Carga",
         "loadHint": "Leído de la propia máquina, no solo de lo que Polaris ejecuta en ella.",
@@ -535,6 +536,131 @@
             "privateKey": "Esa es una clave privada. Pega la pública, del archivo .pub.",
             "label": "Usa solo letras, números, espacios y . _ - @",
             "invalid": "Revisa lo que escribiste."
+        }
+    },
+    "templates": {
+        "intro": "Describe cómo debe estar este servidor y Polaris lo comprueba cada pocas horas.",
+        "assign": "Asignar",
+        "pickTemplate": "Elige una plantilla",
+        "noTemplates": "Aún no hay plantillas. Crea una para describir cómo debe estar un servidor.",
+        "manage": "Plantillas",
+        "none": "Este servidor no tiene ninguna plantilla.",
+        "status": {
+            "unknown": "Sin revisar",
+            "compliant": "Conforme",
+            "drifted": "{count, plural, one {# diferencia} other {# diferencias}}",
+            "failed": "Falló"
+        },
+        "checkedAt": "Revisado {when}",
+        "checkNow": "Revisar",
+        "fixAll": "Corregir todo",
+        "fix": "Corregir",
+        "autoFix": "Corregir solo",
+        "autoFixHint": "Corrige las diferencias en cuanto una revisión programada las encuentra.",
+        "remove": "Quitar del servidor",
+        "manual": "Arreglo manual",
+        "noRoot": "Polaris no tiene root en este servidor: puede revisarlo pero no corregirlo. Root se concede al inscribir el servidor con acceso root.",
+        "confirmFixAll": {
+            "title": "¿Corregir {name}?",
+            "body": "Polaris instalará, iniciará, escribirá y fijará lo que pide esta plantilla en {server}, como root. No se quita nada.",
+            "confirm": "Corregir"
+        },
+        "confirmFixOne": {
+            "title": "¿Corregir esto en {server}?",
+            "confirm": "Corregir"
+        },
+        "confirmRemove": {
+            "title": "¿Quitar {name} de este servidor?",
+            "body": "El servidor queda como está. Solo deja de revisarse.",
+            "confirm": "Quitar"
+        },
+        "drift": {
+            "packageMissing": "El paquete {name} no está instalado",
+            "serviceStopped": "{name} no está en marcha",
+            "serviceRunning": "{name} está en marcha y debería estar parado",
+            "serviceNotEnabled": "{name} no arranca al iniciar",
+            "serviceEnabled": "{name} arranca al iniciar y no debería",
+            "fileMissing": "{name} no existe",
+            "fileContent": "{name} tiene otro contenido",
+            "fileMode": "{name} tiene permisos {actual}, se esperaba {expected}",
+            "sysctlValue": "{name} vale {actual}, se esperaba {expected}",
+            "userMissing": "La cuenta {name} no existe",
+            "userGroups": "La cuenta {name} no está en {expected}",
+            "firewallMissing": "El puerto {name} no está abierto en el firewall",
+            "firewallOff": "El firewall está apagado: el puerto {name} no se aplica",
+            "firewallAbsent": "No hay firewall (ufw) instalado para abrir el puerto {name}",
+            "unreadable": "No se pudo leer {name}"
+        },
+        "errors": {
+            "notFound": "Esa plantilla o servidor ya no existe.",
+            "nameTaken": "Ya hay una plantilla con ese nombre.",
+            "noRoot": "Polaris no tiene root en este servidor: no puede corregirlo.",
+            "unreachable": "El servidor no respondió por SSH.",
+            "failed": "No se pudo revisar el servidor. Vuelve a intentarlo en un momento.",
+            "nothingToFix": "No queda nada que corregir. Revisa otra vez para actualizar.",
+            "partial": "Algunos elementos no se pudieron corregir. Siguen en la lista.",
+            "invalid": "Algunos campos no son válidos.",
+            "local": "Este servidor no tiene acceso SSH, así que no se puede revisar."
+        },
+        "editor": {
+            "new": "Nueva plantilla",
+            "startFrom": "Partir de",
+            "edit": "Editar",
+            "delete": "Borrar",
+            "servers": "{count, plural, one {# servidor} other {# servidores}}",
+            "name": "Nombre",
+            "description": "Descripción",
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "back": "Volver",
+            "packages": "Paquetes",
+            "packagesHint": "Un paquete por línea.",
+            "services": "Servicios",
+            "service": "Servicio",
+            "running": "Activo",
+            "enabled": "Al inicio",
+            "files": "Archivos",
+            "path": "Ruta",
+            "mode": "Modo",
+            "content": "Contenido",
+            "sysctl": "Ajustes del kernel",
+            "key": "Ajuste",
+            "value": "Valor",
+            "users": "Cuentas",
+            "user": "Cuenta",
+            "groups": "Grupos",
+            "groupsHint": "Separados por comas",
+            "firewall": "Firewall",
+            "port": "Puerto",
+            "protocol": "Protocolo",
+            "add": "Añadir",
+            "removeRow": "Quitar",
+            "empty": "Aún no hay plantillas.",
+            "confirmDelete": {
+                "title": "¿Borrar {name}?",
+                "body": "Se quita de todos los servidores que la tienen. Los servidores quedan como están.",
+                "confirm": "Borrar"
+            },
+            "library": {
+                "blank": "Vacía",
+                "webServer": "Servidor web",
+                "database": "Base de datos",
+                "dockerHost": "Host Docker",
+                "bruteForce": "Protección login",
+                "hardened": "Kernel reforzado"
+            }
+        },
+        "invalid": {
+            "packageName": "Solo minúsculas, dígitos y . + - _",
+            "serviceName": "Nombre no válido",
+            "filePath": "Una ruta absoluta, como /etc/motd",
+            "fileContent": "Solo texto",
+            "fileMode": "Tres dígitos octales, como 644",
+            "sysctlKey": "Como net.ipv4.ip_forward",
+            "sysctlValue": "Una línea de texto",
+            "userName": "Minúsculas, dígitos, - y _",
+            "required": "Obligatorio",
+            "other": "No es válido"
         }
     }
 }
