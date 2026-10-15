@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import * as manage from "@/lib/backups/manage";
 import * as keyring from "@/lib/backups/keyring";
+import * as relocate from "@/lib/backups/relocate";
 import { recordAudit } from "@/lib/audit-service";
 import { runBackup } from "@/lib/backups/service";
 import { destinationSchema, planSchema, protectSchema, restoreSchema } from "@/lib/backups/schemas";
@@ -208,14 +209,19 @@ export async function deletePlanAction(planId: string): Promise<Result> {
     }
 }
 
-export async function createDestinationAction(input: unknown): Promise<Result<{ id: string }>> {
+export async function createDestinationAction(
+    input: unknown,
+    makeDefault: unknown = false
+): Promise<Result<{ id: string }>> {
     const user = await requireAdmin();
     const parsed = destinationSchema.safeParse(input);
-    if (!parsed.success) {
-        return { error: await schemaSay(parsed.error.issues[0]?.message, "errors.invalidDestination") };
+    const asDefault = z.boolean().safeParse(makeDefault);
+    if (!parsed.success || !asDefault.success) {
+        return { error: await schemaSay(parsed.error?.issues[0]?.message, "errors.invalidDestination") };
     }
     try {
         const created = await manage.createDestination(user.id, parsed.data);
+        if (asDefault.data) await relocate.setDefaultDestination(user.id, created.id);
         await recordAudit({
             actorId: user.id,
             action: "backup.destination.create",
@@ -225,6 +231,61 @@ export async function createDestinationAction(input: unknown): Promise<Result<{ 
         });
         revalidatePath("/apps/backups");
         return created;
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const destinationIdSchema = z.string().uuid();
+
+/** Make one destination the one copies go to when a plan names none. */
+export async function setDefaultDestinationAction(destinationId: unknown): Promise<Result> {
+    const user = await requireAdmin();
+    const parsed = destinationIdSchema.safeParse(destinationId);
+    if (!parsed.success) return { error: await say("refusals.destinationMissing") };
+    try {
+        await relocate.setDefaultDestination(user.id, parsed.data);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.default",
+            targetType: "backup-destination",
+            targetId: parsed.data
+        });
+        revalidatePath("/apps/backups");
+        return {};
+    } catch (error) {
+        return failed(error);
+    }
+}
+
+const moveCopiesSchema = z.object({
+    fromId: destinationIdSchema,
+    toId: destinationIdSchema,
+    makeDefault: z.boolean()
+});
+
+/** Move every copy a destination holds to another, and optionally make that one the default. */
+export async function moveCopiesAction(input: unknown): Promise<Result<{ count: number }>> {
+    const user = await requireAdmin();
+    const parsed = moveCopiesSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("refusals.destinationMissing") };
+    try {
+        const started = await relocate.startMovingCopies({
+            ownerId: user.id,
+            fromId: parsed.data.fromId,
+            toId: parsed.data.toId,
+            actorId: user.id
+        });
+        if (parsed.data.makeDefault) await relocate.setDefaultDestination(user.id, parsed.data.toId);
+        await recordAudit({
+            actorId: user.id,
+            action: "backup.destination.move",
+            targetType: "backup-destination",
+            targetId: parsed.data.fromId,
+            metadata: { to: parsed.data.toId, copies: started.count }
+        });
+        revalidatePath("/apps/backups");
+        return { count: started.count };
     } catch (error) {
         return failed(error);
     }

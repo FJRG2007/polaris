@@ -17,8 +17,14 @@ import { readJson, readReasonText, reasonFor } from "@/lib/read-json";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useDisplayFormat } from "@/components/display-format";
-import { createDestinationAction, deleteDestinationAction, testDestinationAction } from "./actions";
-import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Plus, Server, Trash2 } from "lucide-react";
+import {
+    createDestinationAction,
+    deleteDestinationAction,
+    moveCopiesAction,
+    setDefaultDestinationAction,
+    testDestinationAction
+} from "./actions";
+import { AlertTriangle, ArrowRightLeft, CheckCircle2, HardDrive, Loader2, Plus, Server, Star, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
@@ -33,12 +39,17 @@ import {
     DialogTitle,
     Input,
     Select,
-    Skeleton
+    Skeleton,
+    Switch
 } from "@polaris/ui";
 
-/** What each kind survives, in one line. */
 /** The kinds of destination, and what each one survives: `destinations.notes.<kind>`. */
 const DESTINATION_KINDS = new Set(["local", "source-local", "connection", "host"]);
+
+/** Kinds whose copies leave the machine Polaris runs on. */
+function offMachine(destination: DestinationSummary): boolean {
+    return destination.kind === "connection" || destination.kind === "host";
+}
 
 function kindNote(t: NamespaceTranslator<"backups">, kind: string): string {
     if (!DESTINATION_KINDS.has(kind)) return kind;
@@ -61,6 +72,29 @@ export function DestinationsPanel({
     const [removing, setRemoving] = useState<DestinationSummary | null>(null);
     const [testing, setTesting] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
+    const [moving, setMoving] = useState<DestinationSummary | null>(null);
+    const [defaulting, setDefaulting] = useState<string | null>(null);
+
+    const current = destinations.find((destination) => destination.isDefault) ?? null;
+    // The data dir shares a disk with everything it protects; once a NAS or
+    // another server is a destination, the copies belong there.
+    const sameDisk = current?.kind === "local";
+    const elsewhere = destinations.filter(offMachine);
+
+    async function onMakeDefault(destination: DestinationSummary) {
+        setDefaulting(destination.id);
+        setError(null);
+        try {
+            const result = await setDefaultDestinationAction(destination.id);
+            if (result.error) setError(result.error);
+        } catch (caught) {
+            setError(readReasonText(tc, reasonFor(caught)));
+        } finally {
+            setDefaulting(null);
+        }
+        await onChanged();
+    }
 
     // Each of these catches its own failure, because an error thrown out of a
     // Server Action is rethrown in the React tree: unguarded, one that refused
@@ -113,6 +147,44 @@ export function DestinationsPanel({
             </div>
 
             {error ? <p className="text-sm text-danger">{error}</p> : null}
+            {notice ? <p className="text-sm text-success">{notice}</p> : null}
+
+            {!loading && sameDisk && current ? (
+                <Card>
+                    <CardBody className="flex flex-col gap-2 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-2">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                            <div className="min-w-0">
+                                <p className="font-medium">{t("destinations.sameDiskTitle")}</p>
+                                <p className="text-xs text-muted-foreground">{t("destinations.sameDiskBody")}</p>
+                            </div>
+                        </div>
+                        {elsewhere[0] && current.copyCount > 0 ? (
+                            <Button size="sm" className="min-w-0 shrink-0" onClick={() => setMoving(current)}>
+                                <ArrowRightLeft className="size-4" />
+                                <span className="truncate">
+                                    {t("destinations.sameDiskMove", { name: elsewhere[0].name })}
+                                </span>
+                            </Button>
+                        ) : elsewhere[0] ? (
+                            <Button
+                                size="sm"
+                                className="shrink-0"
+                                disabled={defaulting !== null}
+                                onClick={() => elsewhere[0] && void onMakeDefault(elsewhere[0])}
+                            >
+                                <Star className="size-4" />
+                                {t("destinations.makeDefault")}
+                            </Button>
+                        ) : (
+                            <Button size="sm" className="shrink-0" onClick={() => setAdding(true)}>
+                                <Plus className="size-4" />
+                                {t("destinations.add")}
+                            </Button>
+                        )}
+                    </CardBody>
+                </Card>
+            ) : null}
 
             {loading ? (
                 <div className="flex flex-col gap-2">
@@ -141,7 +213,25 @@ export function DestinationsPanel({
                                             {destination.via ? ` - ${destination.via}` : ""}
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                                        {!destination.isDefault && destination.kind !== "source-local" ? (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                disabled={defaulting !== null}
+                                                onClick={() => void onMakeDefault(destination)}
+                                            >
+                                                {defaulting === destination.id ? (
+                                                    <Loader2 className="size-4 animate-spin" />
+                                                ) : null}
+                                                {t("destinations.makeDefault")}
+                                            </Button>
+                                        ) : null}
+                                        {destination.copyCount > 0 && destination.kind !== "source-local" ? (
+                                            <Button size="sm" variant="ghost" onClick={() => setMoving(destination)}>
+                                                {t("destinations.move")}
+                                            </Button>
+                                        ) : null}
                                         <Button
                                             size="sm"
                                             variant="ghost"
@@ -190,7 +280,26 @@ export function DestinationsPanel({
             )}
 
             {adding ? (
-                <DestinationDialog onClose={() => setAdding(false)} onSaved={onChanged} />
+                <DestinationDialog
+                    current={current}
+                    onClose={() => setAdding(false)}
+                    onSaved={onChanged}
+                    onMoved={(count) => setNotice(t("destinations.moveStarted", { count }))}
+                />
+            ) : null}
+
+            {moving ? (
+                <MoveDialog
+                    from={moving}
+                    targets={destinations.filter(
+                        (destination) => destination.id !== moving.id && destination.kind !== "source-local"
+                    )}
+                    onClose={() => setMoving(null)}
+                    onMoved={async (count) => {
+                        setNotice(t("destinations.moveStarted", { count }));
+                        await onChanged();
+                    }}
+                />
             ) : null}
 
             {removing ? (
@@ -213,12 +322,114 @@ export function DestinationsPanel({
     );
 }
 
+function MoveDialog({
+    from,
+    targets,
+    onClose,
+    onMoved
+}: {
+    from: DestinationSummary;
+    targets: DestinationSummary[];
+    onClose: () => void;
+    onMoved: (count: number) => Promise<void>;
+}) {
+    const t = useTranslations("backups");
+    const tc = useTranslations("components");
+    const tcommon = useTranslations("common");
+    // Off the machine first: that is where a copy is worth moving to.
+    const ordered = [...targets.filter(offMachine), ...targets.filter((target) => !offMachine(target))];
+    const [toId, setToId] = useState(ordered[0]?.id ?? "");
+    const [makeDefault, setMakeDefault] = useState(from.isDefault);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function onMove() {
+        setPending(true);
+        setError(null);
+        try {
+            const result = await moveCopiesAction({ fromId: from.id, toId, makeDefault });
+            if (result.error !== undefined) {
+                setError(result.error);
+                return;
+            }
+            await onMoved(result.count);
+            onClose();
+        } catch (caught) {
+            setError(readReasonText(tc, reasonFor(caught)));
+        } finally {
+            setPending(false);
+        }
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t("destinations.moveTitle", { name: from.name })}</DialogTitle>
+                    <DialogDescription>{t("destinations.moveIntro", { count: from.copyCount })}</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    {ordered.length === 0 ? (
+                        <span className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                            {t("destinations.moveNoTarget")}
+                        </span>
+                    ) : (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">{t("destinations.moveTo")}</span>
+                            <Select
+                                value={toId}
+                                onValueChange={setToId}
+                                aria-label={t("destinations.moveTo")}
+                                options={ordered.map((target) => ({
+                                    value: target.id,
+                                    label: target.via ? `${target.name} - ${target.via}` : target.name
+                                }))}
+                            />
+                        </label>
+                    )}
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <div className="min-w-0">
+                            <p>{t("destinations.makeAsDefault")}</p>
+                            <p className="text-xs text-muted-foreground">{t("destinations.makeAsDefaultHint")}</p>
+                        </div>
+                        <Switch
+                            checked={makeDefault}
+                            onChange={setMakeDefault}
+                            aria-label={t("destinations.makeAsDefault")}
+                        />
+                    </div>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+                    <div className="flex justify-end gap-2">
+                        <DialogClose asChild>
+                            <Button variant="ghost">{tcommon("actions.cancel")}</Button>
+                        </DialogClose>
+                        <Button onClick={() => void onMove()} disabled={pending || !toId}>
+                            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                            {t("destinations.moveConfirm")}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 interface ConnectionOption {
     id: string;
     name: string;
 }
 
-function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
+function DestinationDialog({
+    current,
+    onClose,
+    onSaved,
+    onMoved
+}: {
+    current: DestinationSummary | null;
+    onClose: () => void;
+    onSaved: () => Promise<void>;
+    onMoved: (count: number) => void;
+}) {
     const t = useTranslations("backups");
     const tc = useTranslations("components");
     const tcommon = useTranslations("common");
@@ -231,6 +442,13 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
     const [hosts, setHosts] = useState<ConnectionOption[] | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Copies on the data dir are the reason most people add a NAS: offer to make
+    // it the default and to take the copies already there along with it.
+    const fromSameDisk = current?.kind === "local";
+    const [makeDefault, setMakeDefault] = useState(fromSameDisk);
+    const [moveToo, setMoveToo] = useState(fromSameDisk && (current?.copyCount ?? 0) > 0);
+    const canDefault = kind !== "source-local";
+    const canMove = canDefault && kind !== "local" && fromSameDisk && (current?.copyCount ?? 0) > 0;
 
     // Loaded on open rather than with the console: most visits never add one.
     useEffect(() => {
@@ -279,10 +497,19 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
                   : kind === "local"
                     ? { kind, name: name.trim(), basePath }
                     : { kind, name: name.trim() };
-        const result = await createDestinationAction(payload);
-        if (result.error) {
+        const result = await createDestinationAction(payload, canDefault && makeDefault);
+        if (result.error !== undefined) {
             setError(result.error);
             return;
+        }
+        if (canMove && moveToo && current) {
+            const moved = await moveCopiesAction({ fromId: current.id, toId: result.id, makeDefault: false });
+            if (moved.error !== undefined) {
+                await onSaved();
+                setError(moved.error);
+                return;
+            }
+            onMoved(moved.count);
         }
         await onSaved();
         onClose();
@@ -374,6 +601,33 @@ function DestinationDialog({ onClose, onSaved }: { onClose: () => void; onSaved:
                                 {t("destinations.folderHint")}
                             </span>
                         </label>
+                    ) : null}
+
+                    {canDefault ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                            <div className="min-w-0">
+                                <p>{t("destinations.makeAsDefault")}</p>
+                                <p className="text-xs text-muted-foreground">{t("destinations.makeAsDefaultHint")}</p>
+                            </div>
+                            <Switch
+                                checked={makeDefault}
+                                onChange={setMakeDefault}
+                                aria-label={t("destinations.makeAsDefault")}
+                            />
+                        </div>
+                    ) : null}
+
+                    {canMove && current ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                            <p className="min-w-0">
+                                {t("destinations.moveAlso", { count: current.copyCount, name: current.name })}
+                            </p>
+                            <Switch
+                                checked={moveToo}
+                                onChange={setMoveToo}
+                                aria-label={t("destinations.moveAlso", { count: current.copyCount, name: current.name })}
+                            />
+                        </div>
                     ) : null}
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}

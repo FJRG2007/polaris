@@ -39,6 +39,11 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That destination still holds copies. Delete them first, or keep it so they stay reachable.":
         "refusals.destinationHoldsCopies",
     "That is the default destination. Make another one the default first.": "refusals.defaultDestination",
+    "Copies beside the source cannot be the default": "refusals.besideSourceDefault",
+    "Copies beside the source cannot be moved": "refusals.besideSourceMove",
+    "Choose a different destination to move the copies to": "refusals.moveSameDestination",
+    "Those copies are already being moved": "refusals.alreadyMoving",
+    "That destination holds no copies to move": "refusals.nothingToMove",
     "There is nowhere to keep this server's copies": "refusals.nowhereForServer",
     "That copy was sealed with a passphrase, not a backup key": "refusals.passphraseSealed",
     "That file is not sealed": "refusals.notSealed",

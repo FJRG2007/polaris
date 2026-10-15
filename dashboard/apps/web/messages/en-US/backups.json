@@ -163,7 +163,21 @@
         "noServers": "No servers connected yet.",
         "folder": "Folder",
         "folderHint": "Everything is written under this, so backups never share a folder with anything else.",
-        "addShort": "Add"
+        "addShort": "Add",
+        "makeDefault": "Make default",
+        "makeAsDefault": "Use it as the default",
+        "makeAsDefaultHint": "Protected things without a plan of their own send their copies here.",
+        "move": "Move copies",
+        "moveTitle": "Move copies from {name}",
+        "moveIntro": "{count, plural, one {# copy is} other {# copies are}} written to the new destination first and only then removed from here, so none is ever missing.",
+        "moveTo": "Move to",
+        "moveConfirm": "Move copies",
+        "moveNoTarget": "Add a NAS, bucket or server as a destination first.",
+        "moveStarted": "Moving {count, plural, one {# copy} other {# copies}}. Activity shows when it is done.",
+        "sameDiskTitle": "Your copies are on this server's own disk",
+        "sameDiskBody": "If that disk fails, the copies go with it. Add your NAS or another server as a destination and make it the default.",
+        "sameDiskMove": "Move them to {name}",
+        "moveAlso": "Also move the {count, plural, one {# copy} other {# copies}} on {name} here"
     },
     "keys": {
         "rotated": "New copies are sealed under the new key. Keep its recovery key too.",
@@ -362,6 +376,11 @@
         "exportArchive": "Archiving the export failed: {reason}",
         "exportUnpack": "Unpacking the export failed: {reason}",
         "archiveFailed": "Archiving {path} failed: {reason}",
-        "unpackFailed": "Unpacking into {path} failed: {reason}"
+        "unpackFailed": "Unpacking into {path} failed: {reason}",
+        "besideSourceDefault": "Copies beside the source cannot be the default",
+        "besideSourceMove": "Copies beside the source cannot be moved",
+        "moveSameDestination": "Choose a different destination to move the copies to",
+        "alreadyMoving": "Those copies are already being moved",
+        "nothingToMove": "That destination holds no copies to move"
     }
 }
