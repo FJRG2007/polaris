@@ -16,10 +16,12 @@
  *
  *   node scripts/readme-media/capture.mjs [--only chat,tasks] [--quick] [--check] [--jobs 4]
  *
- * `--check` renders every variant and saves nothing - the test a developer runs
- * before trusting the pictures.
+ * `--check` renders every variant, walking each animated one through its frames,
+ * and saves nothing - the test a developer runs before trusting the pictures, and
+ * the workflow's first step before any picture is replaced.
  *
- * Variants are taken several at a time (`--jobs`, one per core by default), each
+ * Variants are taken several at a time (`--jobs`, one per core but one and at
+ * most four by default, so the frozen-clock waits still get a core), each
  * in a browser context of its own with its own frozen clock. One at a time, the
  * full set took longer than the workflow's limit and no run ever finished.
  */
@@ -75,7 +77,10 @@ const only = onlyAt >= 0 ? new Set(args[onlyAt + 1].split(",")) : null;
 const quick = args.includes("--quick");
 const jobsAt = args.indexOf("--jobs");
 /** How many variants are taken at once. */
-const jobs = Math.max(1, Number(jobsAt >= 0 ? args[jobsAt + 1] : availableParallelism()) || 1);
+const jobs = Math.max(
+    1,
+    Number(jobsAt >= 0 ? args[jobsAt + 1] : Math.min(4, availableParallelism() - 1)) || 1
+);
 
 const TYPES = {
     ".html": "text/html",
@@ -230,18 +235,11 @@ async function run() {
                     for (const viewport of quick ? ["desktop"] : Object.keys(VIEWPORTS))
                         variants.push({ scene, short, locale, theme, viewport });
 
-        const take = async ({ scene, short, locale, theme, viewport }) => {
-            const file = mediaName(scene.id, theme, short, viewport);
-            const name = file.replace(/\.webp$/, "");
-            const context = await browser.newContext({
-                viewport: VIEWPORTS[viewport],
-                deviceScaleFactor: SCALE,
-                colorScheme: theme,
-                locale,
-                timezoneId: "Europe/Madrid",
-                reducedMotion: "reduce"
-            });
-            const problems = [];
+        const shoot = async (
+            context,
+            problems,
+            { scene, short, locale, theme, viewport, file }
+        ) => {
             // Nothing leaves this machine: a request to another site is
             // one the scene forgot to answer, and the picture would
             // depend on whatever that site said today.
@@ -270,9 +268,7 @@ async function run() {
                     problems.push(`${response.status()}: ${response.url()}`);
             });
             await page.clock.install({ time: MOMENT });
-            await page.goto(
-                `${base}/index.html?scene=${scene.id}&theme=${theme}&locale=${locale}`
-            );
+            await page.goto(`${base}/index.html?scene=${scene.id}&theme=${theme}&locale=${locale}`);
             try {
                 await settle(page);
                 await page.evaluate(() => window.__scene.prepare());
@@ -291,60 +287,67 @@ async function run() {
             }
             const missing = await page.evaluate(() => globalThis.__MISSING__ ?? []);
             for (const what of new Set(missing)) problems.push(`not answered: ${what}`);
-            if (problems.length > 0) {
-                failures.push({ name, problems });
-                await context.close();
+            if (problems.length > 0) return;
+            const frames = await page.evaluate(() => window.__scene.frames);
+            if (frames <= 1 || viewport === "mobile") {
+                if (check) return;
+                const image = await picture(page, scene, viewport);
+                writeFileSync(join(output, file), await image.webp({ quality: 82 }).toBuffer());
                 return;
             }
-            if (!check) {
-                const frames = await page.evaluate(() => window.__scene.frames);
-                if (frames <= 1 || viewport === "mobile") {
-                    const image = await picture(page, scene, viewport);
-                    writeFileSync(
-                        join(output, file),
-                        await image.webp({ quality: 82 }).toBuffer()
-                    );
-                } else {
-                    const shots = [];
-                    const delays = [];
-                    for (let index = 0; index < frames; index++) {
-                        await page.evaluate((i) => window.__scene.step(i), index);
-                        await page.clock.runFor(
-                            await page.evaluate((i) => window.__scene.advance(i), index)
-                        );
-                        await page.waitForTimeout(120);
-                        shots.push(
-                            await (await picture(page, scene, viewport))
-                                .resize(VIEWPORTS[viewport].width)
-                                .png()
-                                .toBuffer()
-                        );
-                        delays.push(
-                            await page.evaluate((i) => window.__scene.hold(i), index)
-                        );
-                    }
-                    // A step that opened a screen the scene did not answer,
-                    // or that threw, is the same failure as one at the start.
-                    const late = await page.evaluate(
-                        () => globalThis.__MISSING__ ?? []
-                    );
-                    for (const what of new Set(late))
-                        problems.push(`not answered: ${what}`);
-                    if (problems.length > 0) {
-                        failures.push({ name, problems });
-                        await context.close();
-                        return;
-                    }
-                    const animated = sharp(shots, { join: { animated: true } }).webp({
-                        quality: 75,
-                        delay: delays,
-                        loop: 0
-                    });
-                    writeFileSync(join(output, file), await animated.toBuffer());
-                }
-                saved++;
+            const shots = [];
+            const delays = [];
+            for (let index = 0; index < frames; index++) {
+                await page.evaluate((i) => window.__scene.step(i), index);
+                await page.clock.runFor(
+                    await page.evaluate((i) => window.__scene.advance(i), index)
+                );
+                await page.waitForTimeout(120);
+                if (check) continue;
+                shots.push(
+                    await (
+                        await picture(page, scene, viewport)
+                    )
+                        .resize(VIEWPORTS[viewport].width)
+                        .png()
+                        .toBuffer()
+                );
+                delays.push(await page.evaluate((i) => window.__scene.hold(i), index));
             }
-            await context.close();
+            // A step that opened a screen the scene did not answer, or that
+            // threw, is the same failure as one at the start.
+            const late = await page.evaluate(() => globalThis.__MISSING__ ?? []);
+            for (const what of new Set(late)) problems.push(`not answered: ${what}`);
+            if (problems.length > 0 || check) return;
+            const animated = sharp(shots, { join: { animated: true } }).webp({
+                quality: 75,
+                delay: delays,
+                loop: 0
+            });
+            writeFileSync(join(output, file), await animated.toBuffer());
+        };
+
+        const take = async ({ scene, short, locale, theme, viewport }) => {
+            const file = mediaName(scene.id, theme, short, viewport);
+            const name = file.replace(/\.webp$/, "");
+            const context = await browser.newContext({
+                viewport: VIEWPORTS[viewport],
+                deviceScaleFactor: SCALE,
+                colorScheme: theme,
+                locale,
+                timezoneId: "Europe/Madrid",
+                reducedMotion: "reduce"
+            });
+            const problems = [];
+            try {
+                await shoot(context, problems, { scene, short, locale, theme, viewport, file });
+            } catch (caught) {
+                problems.push(`thrown: ${caught.message}`);
+            } finally {
+                await context.close();
+            }
+            if (problems.length > 0) failures.push({ name, problems });
+            else if (!check) saved++;
         };
 
         let next = 0;
