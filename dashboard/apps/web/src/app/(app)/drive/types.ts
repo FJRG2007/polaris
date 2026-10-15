@@ -137,4 +137,7 @@ export interface ListingFailure {
      *  gone and an account that is refused would fail the same way twice, and a
      *  button that promises otherwise is a button that lies. */
     readonly retryable: boolean;
+    /** A registered server refused the folder to its login, and the reader
+     *  manages servers but the server was enrolled without root access. */
+    readonly noRoot?: boolean;
 }

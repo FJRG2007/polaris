@@ -12,7 +12,11 @@
 import { normalizeRelPath, storageFailure, storageFailureDetail } from "@polaris/core";
 import { apiUser } from "@/lib/api-session";
 import { sessionCan } from "@/lib/session";
-import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
+import {
+    getDriverForConnection,
+    HOST_CONNECTION_PREFIX,
+    SmbShareRequiredError
+} from "@/lib/storage-service";
 import {
     authorizeDrive,
     canManageDriveConnection,
@@ -24,6 +28,8 @@ import { listLocks } from "@/lib/access-lock-service";
 import { isReservedRootPath } from "@/lib/system-paths";
 import { sweepDueDeletions } from "@/lib/scheduled-deletion-service";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { hostRootAccess } from "@/lib/drive-root";
+import { StorageError } from "@polaris/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -146,7 +152,35 @@ async function failed(
         ? storageFailureDetail(caught)
         : null;
     return Response.json(
-        { error: failure.reason, hint: failure.hint, retryable: failure.retryable, detail },
+        {
+            error: failure.reason,
+            hint: failure.hint,
+            retryable: failure.retryable,
+            detail,
+            noRoot: await refusedForWantOfRoot(user.id, connectionId, caught)
+        },
         { status: 502 }
     );
+}
+
+/**
+ * Whether a server refused this folder to its login only because it was
+ * enrolled without root access, for a reader who manages servers - who is read
+ * as root on any server that grants it, so the refusal is the enrollment's, and
+ * the screen says so instead of blaming the folder's permissions.
+ */
+async function refusedForWantOfRoot(
+    userId: string,
+    connectionId: string,
+    caught: unknown
+): Promise<boolean> {
+    if (!connectionId.startsWith(HOST_CONNECTION_PREFIX)) return false;
+    if (!(caught instanceof StorageError) || caught.code !== "permission_denied") return false;
+    try {
+        const access = await hostRootAccess(userId, connectionId.slice(HOST_CONNECTION_PREFIX.length));
+        return access.managesServers && !access.sudo;
+    } catch {
+        // A refinement of the sentence, never a reason to lose the answer.
+        return false;
+    }
 }

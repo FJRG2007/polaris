@@ -266,7 +266,14 @@
             "placeholder": "e.g. Documents/Archive",
             "submit": "Move"
         },
-        "retry": "Try again"
+        "retry": "Try again",
+        "listingError": {
+            "up": "Up one folder",
+            "back": "Go back",
+            "details": "Technical details",
+            "openServer": "Open server",
+            "noRoot": "This server was added without root access, so Drive reads it as its sign-in account. Add it again from its server page with root access to open every folder."
+        }
     },
     "page": {
         "title": "Drive",

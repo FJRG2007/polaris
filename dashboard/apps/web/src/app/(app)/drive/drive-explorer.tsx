@@ -423,7 +423,8 @@ export function DriveExplorer({
                         reason: body.error ?? t("explorer.readFailed"),
                         hint: typeof body.hint === "string" ? body.hint : null,
                         detail: typeof body.detail === "string" ? body.detail : null,
-                        retryable: body.retryable !== false
+                        retryable: body.retryable !== false,
+                        noRoot: body.noRoot === true
                     });
                 } else {
                     // Keep the current array (no re-render) when nothing actually
