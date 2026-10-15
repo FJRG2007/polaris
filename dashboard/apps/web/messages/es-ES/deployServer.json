@@ -249,6 +249,7 @@
         "purgeFailed": "No se pudo vaciar la caché"
     },
     "issues": {
+        "privateAudience": "Elige quién puede abrir esta dirección.",
         "notAPrefix": "Eso no es un prefijo",
         "nameRequired": "Ponle un nombre",
         "repoRequired": "Polaris necesita el repositorio",

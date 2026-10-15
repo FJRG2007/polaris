@@ -44,7 +44,7 @@ export const privateAccessSchema = z
         deny: grantList.default([])
     })
     .refine((access) => access.members || access.allow.length > 0, {
-        message: "Choose who may open this address",
+        message: "issues.privateAudience",
         path: ["allow"]
     });
 
