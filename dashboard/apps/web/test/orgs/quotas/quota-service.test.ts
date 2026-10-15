@@ -16,9 +16,9 @@ const ORG = "00000000-0000-7000-8000-0000000000cc";
 
 const state = vi.hoisted(() => ({
     quota: null as Record<string, number | null> | null,
-    counts: { members: 0, teams: 0, projects: 0, services: 0, databases: 0 } as Record<string, number>,
+    counts: { members: 0, invited: 0, emailed: 0, teams: 0, projects: 0, services: 0, databases: 0 } as Record<string, number>,
     /** Rows `groupBy` answers with, per model. */
-    applicationGroups: [] as { replicas: number; _sum: { cpuLimit: number | null; memoryLimitMb: number | null } }[],
+    applicationGroups: [] as { replicas: number; autoscale?: string | null; _sum: { cpuLimit: number | null; memoryLimitMb: number | null } }[],
     databaseGroups: [] as { members: number; _sum: { cpuLimit: number | null; memoryLimitMb: number | null } }[],
     /** How many usage reads were made, so "unset is never counted" can be asserted. */
     reads: 0,
@@ -35,6 +35,8 @@ vi.mock("@polaris/db", () => {
         prisma: {
             organizationQuota: { findUnique: async () => state.quota },
             organizationMember: { count: count("members") },
+            organizationInvitation: { count: count("invited") },
+            invite: { count: count("emailed") },
             team: { count: count("teams") },
             project: { count: count("projects") },
             application: {
@@ -68,7 +70,7 @@ const NO_CAPS = { members: null, teams: null, projects: null, services: null, da
 
 beforeEach(() => {
     state.quota = null;
-    state.counts = { members: 0, teams: 0, projects: 0, services: 0, databases: 0 };
+    state.counts = { members: 0, invited: 0, emailed: 0, teams: 0, projects: 0, services: 0, databases: 0 };
     state.applicationGroups = [];
     state.databaseGroups = [];
     state.reads = 0;
@@ -137,6 +139,15 @@ describe("the CPU and memory caps", () => {
         await expect(quota.reservedByOrg(ORG)).resolves.toEqual({ cpus: 4, memoryMb: 2048 });
     });
 
+    it("counts an autoscaled service at the most copies it may run", async () => {
+        state.applicationGroups.push({
+            replicas: 2,
+            autoscale: JSON.stringify({ min: 1, max: 4, cpuPercent: 70, requestsPerCopy: null }),
+            _sum: { cpuLimit: 0.5, memoryLimitMb: 256 }
+        });
+        await expect(quota.reservedByOrg(ORG)).resolves.toEqual({ cpus: 6, memoryMb: 3072 });
+    });
+
     it("refuses a new reservation past the core cap", async () => {
         state.quota = { ...NO_CAPS, cpus: 4.5 };
         const refusal = await quota
@@ -174,9 +185,15 @@ describe("the CPU and memory caps", () => {
 
 describe("usage on the Limits screen", () => {
     it("counts the owner as a member, who has no member row", async () => {
-        state.counts = { members: 2, teams: 1, projects: 4, services: 7, databases: 3 };
+        state.counts = { members: 2, invited: 0, emailed: 0, teams: 1, projects: 4, services: 7, databases: 3 };
         const usage = await quota.orgQuotaUsage(ORG);
         expect(usage).toEqual({ members: 3, teams: 1, projects: 4, services: 7, databases: 3, cpus: 0, memoryMb: 0 });
+    });
+
+    it("counts open invitations as people, the way an invitation is refused", async () => {
+        state.counts = { members: 2, invited: 1, emailed: 1, teams: 0, projects: 0, services: 0, databases: 0 };
+        const usage = await quota.orgQuotaUsage(ORG);
+        expect(usage.members).toBe(5);
     });
 });
 

@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { parseAutoscale } from "@polaris/core";
 
 /** Things an organization holds a number of. */
 export const ORG_QUOTA_COUNTS = ["members", "teams", "projects", "services", "databases"] as const;
@@ -90,4 +91,9 @@ export function roomForReservation(limit: number | null, others: number, previou
 /** What one service or database reserves: its limit times the copies it runs. */
 export function reservationOf(limit: number | null | undefined, copies: number): number {
     return limit ? limit * Math.max(1, copies) : 0;
+}
+
+/** The copies a service reserves for: its count, or the most its autoscaling may run. */
+export function copiesReserved(replicas: number, autoscale: string | null | undefined): number {
+    return Math.max(replicas, parseAutoscale(autoscale)?.max ?? 0);
 }

@@ -77,12 +77,39 @@ export async function setOrgQuota(orgId: string, limits: quotas.OrgQuotaInput): 
 
 const inOrg = (orgId: string) => ({ binnedAt: null, environment: { project: { orgId } } });
 
+/**
+ * Places an organization's people take: the owner, the roster, and every
+ * invitation still open, in the app or emailed. `except` leaves out the person
+ * being made room for, so their own invitation is not counted twice.
+ */
+export async function seatsTaken(
+    orgId: string,
+    except: { userId?: string | null; inviteId?: string } = {}
+): Promise<number> {
+    const now = new Date();
+    const [members, invited, emailed] = await Promise.all([
+        prisma.organizationMember.count({ where: { orgId } }),
+        prisma.organizationInvitation.count({
+            where: { orgId, expiresAt: { gt: now }, ...(except.userId ? { userId: { not: except.userId } } : {}) }
+        }),
+        prisma.invite.count({
+            where: {
+                orgId,
+                acceptedAt: null,
+                expiresAt: { gt: now },
+                ...(except.inviteId ? { id: { not: except.inviteId } } : {})
+            }
+        })
+    ]);
+    return members + invited + emailed + 1;
+}
+
 /** How many of one thing the organization holds now. Members count the owner,
  *  who is never a member row. */
 export async function countOrgUsage(orgId: string, dimension: quotas.OrgQuotaCount): Promise<number> {
     switch (dimension) {
         case "members":
-            return (await prisma.organizationMember.count({ where: { orgId } })) + 1;
+            return seatsTaken(orgId);
         case "teams":
             return prisma.team.count({ where: { orgId } });
         case "projects":
@@ -101,8 +128,9 @@ export interface ReservationExclusion {
 
 /**
  * CPU cores and memory reserved across the organization: each limit times the
- * copies it runs. Grouped by copy count in the database, so the answer is a
- * handful of rows however many services there are. A database hosted on another
+ * copies it runs, or the most its autoscaling may run. Grouped by copy count and
+ * autoscaling range in the database, so the answer is a handful of rows however
+ * many services there are. A database hosted on another
  * instance has no container of its own and reserves nothing.
  */
 export async function reservedByOrg(
@@ -111,7 +139,7 @@ export async function reservedByOrg(
 ): Promise<{ cpus: number; memoryMb: number }> {
     const [applications, databases] = await Promise.all([
         prisma.application.groupBy({
-            by: ["replicas"],
+            by: ["replicas", "autoscale"],
             where: { ...inOrg(orgId), ...(exclude.applicationId ? { id: { not: exclude.applicationId } } : {}) },
             _sum: { cpuLimit: true, memoryLimitMb: true }
         }),
@@ -128,8 +156,9 @@ export async function reservedByOrg(
     let cpus = 0;
     let memoryMb = 0;
     for (const group of applications) {
-        cpus += quotas.reservationOf(group._sum.cpuLimit, group.replicas);
-        memoryMb += quotas.reservationOf(group._sum.memoryLimitMb, group.replicas);
+        const copies = quotas.copiesReserved(group.replicas, group.autoscale);
+        cpus += quotas.reservationOf(group._sum.cpuLimit, copies);
+        memoryMb += quotas.reservationOf(group._sum.memoryLimitMb, copies);
     }
     for (const group of databases) {
         cpus += quotas.reservationOf(group._sum.cpuLimit, group.members);

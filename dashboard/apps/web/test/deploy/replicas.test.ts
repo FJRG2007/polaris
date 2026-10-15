@@ -248,6 +248,20 @@ describe("saving a new count", () => {
         expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", "user-1", "settings");
     });
 
+    it("reads re-saving an autoscaled service unchanged as growing nothing", async () => {
+        const autoscale = { min: 2, max: 10, cpuPercent: 70, requestsPerCopy: null };
+        const scaled = { ...app, autoscale: JSON.stringify(autoscale), cpuLimit: 1, memoryLimitMb: 512 };
+        const orgLookup = vi.fn(async () => ({ environment: { project: { orgId: "org-1" } } }));
+        Object.assign(prisma, { application: { findFirst: async () => scaled, update: async () => scaled, findUnique: orgLookup } });
+        await setServiceScaling("app-1", "owner-1", "user-1", {
+            ...input,
+            replicas: 2,
+            autoscale,
+            limits: { cpus: 1, memoryMb: 512 }
+        });
+        expect(orgLookup).not.toHaveBeenCalled();
+    });
+
     it("credits nobody for a step the autoscaler takes", async () => {
         await scaleService("app-1", "owner-1", 3);
         expect(restartFromKeptImage).toHaveBeenCalledWith("app-1", "owner-1", null, "scale");

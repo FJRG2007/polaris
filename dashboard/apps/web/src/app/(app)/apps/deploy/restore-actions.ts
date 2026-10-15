@@ -138,6 +138,7 @@ export async function restoreHistoryAction(
         return {};
     } catch (error) {
         console.error("polaris: could not restore a point:", error);
+        // i18n-ignore a catalog key, said in the reader's words by the screen
         return { error: "restoreFailed" };
     }
 }
@@ -191,8 +192,10 @@ export async function binItemAction(
         return {};
     } catch (error) {
         // A restore past the organization's caps says which one, in the reader's words.
+        // i18n-ignore a catalog key, said in the reader's words by the screen
         if (error instanceof OrgQuotaError) return { error: "binRestoreFailed", message: error.message };
         console.error("polaris: recycle bin action failed:", error);
+        // i18n-ignore a catalog key, said in the reader's words by the screen
         return { error: action === "restore" ? "binRestoreFailed" : "binDeleteFailed" };
     }
 }
@@ -213,6 +216,7 @@ export async function setBinDaysAction(days: number): Promise<{ error?: string }
         });
         return {};
     } catch {
+        // i18n-ignore a catalog key, said in the reader's words by the screen
         return { error: "daysInvalid" };
     }
 }

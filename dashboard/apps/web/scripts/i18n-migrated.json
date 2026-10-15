@@ -326,6 +326,9 @@
         "web/src/app/(app)/account/organizations/[slug]/billing/budget-card.tsx",
         "web/src/app/(app)/account/organizations/[slug]/billing/page.tsx",
         "web/src/app/(app)/account/organizations/[slug]/domains/page.tsx",
+        "web/src/app/(app)/account/organizations/[slug]/limits/actions.ts",
+        "web/src/app/(app)/account/organizations/[slug]/limits/limits-view.tsx",
+        "web/src/app/(app)/account/organizations/[slug]/limits/page.tsx",
         "web/src/app/(app)/account/organizations/[slug]/mailboxes/actions.ts",
         "web/src/app/(app)/account/organizations/[slug]/mailboxes/mailboxes-view.tsx",
         "web/src/app/(app)/account/organizations/[slug]/page.tsx",
@@ -1937,6 +1940,17 @@
         "web/src/lib/restore-points/service.ts",
         "web/src/lib/env-var-service.ts",
         "web/src/lib/database-ops/accounts.ts",
-        "web/src/lib/database-ops/tuning.ts"
+        "web/src/lib/database-ops/tuning.ts",
+        "web/src/app/(app)/apps/deploy/recycle-bin.tsx",
+        "web/src/app/(app)/apps/deploy/restore-actions.ts",
+        "web/src/lib/apps/install-duplicate.ts",
+        "web/src/lib/database-ops/pitr.ts",
+        "web/src/lib/database-ops/settings.ts",
+        "web/src/lib/database-service.ts",
+        "web/src/lib/deploy/recycle-bin.ts",
+        "web/src/lib/deploy/scaling-service.ts",
+        "web/src/lib/orgs/org-service.ts",
+        "web/src/lib/orgs/quota-service.ts",
+        "web/src/lib/orgs/quotas.ts"
     ]
 }

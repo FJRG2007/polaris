@@ -162,11 +162,12 @@ export async function setServiceScaling(
     // What it reserves is its limits times the most copies it may run, so an
     // autoscaler cannot grow it past the organization's caps either.
     const copies = Math.max(replicas, input.autoscale?.max ?? 0);
+    const reserved = quotas.copiesReserved(app.replicas, app.autoscale);
     await quota.assertOrgReservation(
         () => quota.orgIdOfApplication(applicationId),
         {
-            cpus: quotas.reservationOf(app.cpuLimit, app.replicas),
-            memoryMb: quotas.reservationOf(app.memoryLimitMb, app.replicas)
+            cpus: quotas.reservationOf(app.cpuLimit, reserved),
+            memoryMb: quotas.reservationOf(app.memoryLimitMb, reserved)
         },
         {
             cpus: quotas.reservationOf(input.limits.cpus, copies),

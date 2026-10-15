@@ -24,7 +24,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
 import { roomForOne } from "./quotas";
-import { getOrgQuota, quotaRefusal } from "./quota-service";
+import { getOrgQuota, quotaRefusal, seatsTaken } from "./quota-service";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -472,23 +472,12 @@ async function assertRoom(
     forUserId: string | null,
     exceptInviteId?: string
 ): Promise<void> {
-    const [policy, orgQuota] = await Promise.all([organizationPolicy(), getOrgQuota(orgId)]);
-    const [members, invited, emailed] = await Promise.all([
-        prisma.organizationMember.count({ where: { orgId } }),
-        prisma.organizationInvitation.count({
-            where: { orgId, ...live(), ...(forUserId ? { userId: { not: forUserId } } : {}) }
-        }),
-        // Invitations emailed to people with no account hold a place too.
-        prisma.invite.count({
-            where: {
-                orgId,
-                acceptedAt: null,
-                expiresAt: { gt: new Date() },
-                ...(exceptInviteId ? { id: { not: exceptInviteId } } : {})
-            }
-        })
+    const [policy, orgQuota, seats] = await Promise.all([
+        organizationPolicy(),
+        getOrgQuota(orgId),
+        seatsTaken(orgId, { userId: forUserId, inviteId: exceptInviteId })
     ]);
-    if (!core.withinLimit(policy.maxMembers, members + invited + emailed + 1)) {
+    if (!core.withinLimit(policy.maxMembers, seats)) {
         throw new OrgError(
             `This organization is at the ${policy.maxMembers}-member limit for this Polaris, counting invitations nobody has answered`
         );
@@ -496,7 +485,7 @@ async function assertRoom(
     // The organization's own cap, counted the same way: the owner, the roster and
     // every invitation still open.
     const memberCap = orgQuota?.members ?? null;
-    if (memberCap !== null && !roomForOne(memberCap, members + invited + emailed + 1)) {
+    if (memberCap !== null && !roomForOne(memberCap, seats)) {
         throw await quotaRefusal("members", memberCap);
     }
 }
