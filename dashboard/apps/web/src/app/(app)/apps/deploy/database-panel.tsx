@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { DatabaseWorkspace } from "./database-workspace";
 import { ProcessesSection, UsersSection, hasAccountTabs } from "./database-accounts-panel";
+import { TuningSection } from "./database-tuning-panel";
 import {
     Badge,
     Button,
@@ -60,6 +61,7 @@ type Tab =
     | "settings"
     | "users"
     | "processes"
+    | "tuning"
     | "network"
     | "pitr"
     | "copy"
@@ -140,7 +142,8 @@ export function DatabaseManageDialog({
               ...(manage && deployManage && hasAccountTabs(overview)
                   ? [
                         { value: "users" as const, label: t("database.tabs.users") },
-                        { value: "processes" as const, label: t("database.tabs.processes") }
+                        { value: "processes" as const, label: t("database.tabs.processes") },
+                        { value: "tuning" as const, label: t("database.tabs.tuning") }
                     ]
                   : []),
               // A database inside another instance is reached through that one's container.
@@ -287,6 +290,8 @@ export function DatabaseManageDialog({
                             <UsersSection databaseId={database.id} manage={manage} ask={ask} />
                         ) : current === "processes" ? (
                             <ProcessesSection databaseId={database.id} manage={manage} ask={ask} />
+                        ) : current === "tuning" ? (
+                            <TuningSection databaseId={database.id} manage={manage} ask={ask} />
                         ) : current === "network" ? (
                             <PrivateNetworkPanel kind="database" id={database.id} />
                         ) : current === "pitr" && overview.pitr ? (

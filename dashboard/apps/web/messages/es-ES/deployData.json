@@ -11,7 +11,8 @@
             "activity": "Actividad",
             "database": "Base",
             "users": "Usuarios",
-            "processes": "Conexiones"
+            "processes": "Conexiones",
+            "tuning": "Ajustes"
         },
         "hosted": "Vive dentro de {host}. Su versión y sus ajustes son los de la instancia.",
         "anotherInstance": "otra instancia",
@@ -282,6 +283,22 @@
             "killTitle": "¿Cerrar la conexión #{id}?",
             "killBody": "Lo que ejecuta {user} se cancela y la app tiene que reconectar.",
             "killConfirm": "Cerrar conexión"
+        },
+        "tuning": {
+            "title": "Ajustes de memoria",
+            "fromLimit": "Calculados para su límite de {size}.",
+            "fromContainer": "Calculados para los {size} que indica su contenedor. Pon un límite de memoria para usar menos.",
+            "unreadable": "No se leyeron los ajustes.",
+            "setting": "Ajuste",
+            "current": "Ahora",
+            "suggested": "Sugerido",
+            "changes": "Cambia",
+            "notSupported": "No se puede aplicar: {reason}",
+            "upToDate": "Ya está como se sugiere.",
+            "apply": "Aplicar sugerencias",
+            "applyTitle": "¿Aplicar y reiniciar?",
+            "applyBody": "Se guardan los ajustes y la base de datos se reinicia. No responde durante unos segundos.",
+            "applyConfirm": "Aplicar y reiniciar"
         }
     },
     "volume": {

@@ -11,7 +11,8 @@
             "activity": "Activity",
             "database": "Database",
             "users": "Users",
-            "processes": "Connections"
+            "processes": "Connections",
+            "tuning": "Tuning"
         },
         "hosted": "Lives inside {host}. Its version and settings are the instance's.",
         "anotherInstance": "another instance",
@@ -282,6 +283,22 @@
             "killTitle": "End connection #{id}?",
             "killBody": "Whatever {user} is running is cancelled and the app has to reconnect.",
             "killConfirm": "End connection"
+        },
+        "tuning": {
+            "title": "Memory settings",
+            "fromLimit": "Sized for its {size} memory limit.",
+            "fromContainer": "Sized for the {size} its container reports. Set a memory limit to size it for less.",
+            "unreadable": "Could not read the settings.",
+            "setting": "Setting",
+            "current": "Now",
+            "suggested": "Suggested",
+            "changes": "Changes",
+            "notSupported": "Applying is not available: {reason}",
+            "upToDate": "Already set as suggested.",
+            "apply": "Apply suggestions",
+            "applyTitle": "Apply and restart?",
+            "applyBody": "The settings are saved and the database restarts. It is unavailable for a few seconds while it does.",
+            "applyConfirm": "Apply and restart"
         }
     },
     "volume": {

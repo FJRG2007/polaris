@@ -20,6 +20,7 @@ import { revalidatePath } from "next/cache";
 import { firstIssue, reply } from "./reply";
 import * as pitr from "@/lib/database-ops/pitr";
 import * as accounts from "@/lib/database-ops/accounts";
+import * as tuning from "@/lib/database-ops/tuning";
 import { requirePermission } from "@/lib/session";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { copyInto } from "@/lib/database-ops/copy";
@@ -710,5 +711,36 @@ export async function killDatabaseProcessAction(input: z.input<typeof processKil
         return {};
     } catch (caught) {
         return failure(caught, "databases.killFailed");
+    }
+}
+// ---------------------------------------------------------------------------
+// Tuning
+// ---------------------------------------------------------------------------
+
+export async function databaseTuningAction(databaseId: string): Promise<Result<{ tuning: tuning.TuningView }>> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { ownerId } = await manage(parsed.data);
+        return { tuning: await tuning.tuningView(parsed.data, ownerId) };
+    } catch (caught) {
+        return failure(caught, "databases.readFailed");
+    }
+}
+
+/** Saves the settings suggested for the database's memory and restarts it. */
+export async function applyDatabaseTuningAction(databaseId: string): Promise<Result> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data);
+        const applied = await tuning.applyTuning(parsed.data, ownerId);
+        await audit(userId, "deploy.db.tuning", parsed.data, {
+            settings: Object.fromEntries(applied.map((entry) => [entry.name, entry.value]))
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "databases.tuningFailed");
     }
 }
