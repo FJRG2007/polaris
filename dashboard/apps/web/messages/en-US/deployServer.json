@@ -116,7 +116,12 @@
         "limitsFailed": "Could not change the limits",
         "pitrFailed": "Could not change point-in-time recovery",
         "recoveryFailed": "Could not start the recovery",
-        "copyFailed": "Could not start the copy"
+        "copyFailed": "Could not start the copy",
+        "accountsFailed": "Could not read the accounts",
+        "accountFailed": "Could not change the account",
+        "processesFailed": "Could not read the connections",
+        "killFailed": "Could not end the connection",
+        "tuningFailed": "Could not apply the settings"
     },
     "registry": {
         "saveFailed": "Could not save the registry login"

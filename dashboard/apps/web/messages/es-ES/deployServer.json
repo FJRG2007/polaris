@@ -116,7 +116,12 @@
         "limitsFailed": "No se pudieron cambiar los límites",
         "pitrFailed": "No se pudo cambiar la recuperación a un momento dado",
         "recoveryFailed": "No se pudo iniciar la recuperación",
-        "copyFailed": "No se pudo iniciar la copia"
+        "copyFailed": "No se pudo iniciar la copia",
+        "accountsFailed": "No se leyeron las cuentas",
+        "accountFailed": "No se cambió la cuenta",
+        "processesFailed": "No se leyeron las conexiones",
+        "killFailed": "No se cerró la conexión",
+        "tuningFailed": "No se aplicaron los ajustes"
     },
     "registry": {
         "saveFailed": "No se pudo guardar el acceso al registro"
