@@ -25,6 +25,8 @@ export function referenceCopy(t: AccountTranslator, route: DocumentedRoute, id: 
         response: (status: string, english: string) =>
             pick(t, [`${op}.responses.${status}`, `apiKeys.reference.statuses.${status}`], english),
         parameter: (name: string, english: string | null) =>
-            english === null ? null : pick(t, [`${op}.params.${name}`, `apiKeys.reference.params.${name}`], english)
+            english === null
+                ? null
+                : pick(t, [`${op}.params.${name}`, `apiKeys.reference.params.${name}`], english)
     };
 }

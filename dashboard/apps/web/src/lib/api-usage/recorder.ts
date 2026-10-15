@@ -19,7 +19,17 @@ import { matchDocumentedRoute } from "@/lib/api-docs/routes";
 
 /** Upper bounds, in ms, of the latency columns; past the last is `msOver`. */
 export const LATENCY_BOUNDS = [25, 50, 100, 250, 500, 1000, 2500, 5000] as const;
-export const LATENCY_COLUMNS = ["ms25", "ms50", "ms100", "ms250", "ms500", "ms1000", "ms2500", "ms5000", "msOver"] as const;
+export const LATENCY_COLUMNS = [
+    "ms25",
+    "ms50",
+    "ms100",
+    "ms250",
+    "ms500",
+    "ms1000",
+    "ms2500",
+    "ms5000",
+    "msOver"
+] as const;
 export type LatencyColumn = (typeof LATENCY_COLUMNS)[number];
 
 /** How long hourly rows are kept. */
@@ -70,7 +80,10 @@ export function latencyColumn(ms: number): LatencyColumn {
 }
 
 function emptyLatency(): Record<LatencyColumn, number> {
-    return Object.fromEntries(LATENCY_COLUMNS.map((column) => [column, 0])) as Record<LatencyColumn, number>;
+    return Object.fromEntries(LATENCY_COLUMNS.map((column) => [column, 0])) as Record<
+        LatencyColumn,
+        number
+    >;
 }
 
 /** Add one call to the tally. Never throws, never waits. */
@@ -88,7 +101,16 @@ export function recordKeyCall(call: {
     const id = `${call.keyId}|${hour.getTime()}|${method}|${route}|${call.status}`;
     let tally = pending.get(id);
     if (!tally) {
-        tally = { keyId: call.keyId, hour, method, route, status: call.status, calls: 0, totalMs: 0, latency: emptyLatency() };
+        tally = {
+            keyId: call.keyId,
+            hour,
+            method,
+            route,
+            status: call.status,
+            calls: 0,
+            totalMs: 0,
+            latency: emptyLatency()
+        };
         pending.set(id, tally);
     }
     const ms = Math.max(0, Math.round(call.ms));
@@ -136,12 +158,25 @@ export async function flushKeyCalls(now = new Date()): Promise<void> {
         try {
             await prisma.apiKeyCallHour.upsert({
                 where,
-                create: { ...where.apiKeyId_hour_method_route_status, apiKeyId: tally.keyId, calls: tally.calls, totalMs: BigInt(tally.totalMs), ...tally.latency },
-                update: { calls: { increment: tally.calls }, totalMs: { increment: BigInt(tally.totalMs) }, ...increments },
+                create: {
+                    ...where.apiKeyId_hour_method_route_status,
+                    apiKeyId: tally.keyId,
+                    calls: tally.calls,
+                    totalMs: BigInt(tally.totalMs),
+                    ...tally.latency
+                },
+                update: {
+                    calls: { increment: tally.calls },
+                    totalMs: { increment: BigInt(tally.totalMs) },
+                    ...increments
+                },
                 select: { calls: true }
             });
         } catch (caught) {
-            console.warn("[api-usage] could not write a key's call counts", caught instanceof Error ? caught.message : caught);
+            console.warn(
+                "[api-usage] could not write a key's call counts",
+                caught instanceof Error ? caught.message : caught
+            );
         }
     }
 
@@ -153,7 +188,10 @@ export async function flushKeyCalls(now = new Date()): Promise<void> {
                 where: { hour: { lt: new Date(hour - RETENTION_DAYS * 24 * 60 * 60 * 1000) } }
             });
         } catch (caught) {
-            console.warn("[api-usage] could not trim old call counts", caught instanceof Error ? caught.message : caught);
+            console.warn(
+                "[api-usage] could not trim old call counts",
+                caught instanceof Error ? caught.message : caught
+            );
         }
     }
 }

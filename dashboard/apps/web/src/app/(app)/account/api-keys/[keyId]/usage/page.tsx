@@ -20,7 +20,14 @@ export default async function ApiKeyUsagePage({ params }: { params: Promise<{ ke
     if (!/^[0-9a-f-]{36}$/i.test(keyId)) notFound();
     const key = await prisma.apiKey.findFirst({
         where: { id: keyId, userId: user.id },
-        select: { id: true, name: true, prefix: true, lastUsedAt: true, lastUsedIp: true, lastUsedUserAgent: true }
+        select: {
+            id: true,
+            name: true,
+            prefix: true,
+            lastUsedAt: true,
+            lastUsedIp: true,
+            lastUsedUserAgent: true
+        }
     });
     if (!key) notFound();
 

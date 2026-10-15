@@ -87,14 +87,21 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
                         <ArrowLeft className="size-3.5 shrink-0" />
                         {t("apiKeys.usage.back")}
                     </Link>
-                    <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={apiKey.name}>
+                    <h1
+                        className="truncate text-[1.0625rem] font-semibold tracking-tight"
+                        title={apiKey.name}
+                    >
                         {t("apiKeys.usage.title", { name: apiKey.name })}
                     </h1>
                     <p className="truncate text-sm text-muted-foreground">
                         <span className="font-mono text-xs">{apiKey.prefix}</span>
                         {" - "}
                         {t("apiKeys.usage.lastUsed")}:{" "}
-                        {apiKey.lastUsedAt ? <RelativeTime iso={apiKey.lastUsedAt} /> : t("apiKeys.usage.neverUsed")}
+                        {apiKey.lastUsedAt ? (
+                            <RelativeTime iso={apiKey.lastUsedAt} />
+                        ) : (
+                            t("apiKeys.usage.neverUsed")
+                        )}
                         {apiKey.lastUsedUserAgent ? (
                             <span title={apiKey.lastUsedUserAgent}>
                                 {" - "}
@@ -129,7 +136,10 @@ export function KeyUsageView({ apiKey }: { apiKey: UsageKey }) {
                     aria-label={t("apiKeys.usage.range")}
                     value={range}
                     onValueChange={setRange}
-                    options={USAGE_RANGES.map((value) => ({ value, label: t(`apiKeys.usage.ranges.${value}` as const) }))}
+                    options={USAGE_RANGES.map((value) => ({
+                        value,
+                        label: t(`apiKeys.usage.ranges.${value}` as const)
+                    }))}
                 />
                 <p className="text-xs text-muted-foreground">{t("apiKeys.usage.kept")}</p>
             </div>
@@ -145,7 +155,10 @@ export function UsageData({ load, onRetry }: { load: Load; onRetry: () => void }
     if (load.state === "loading") return <UsageSkeleton />;
     if (load.state === "failed") {
         return (
-            <div role="alert" className="flex flex-col items-center gap-3 rounded-lg border border-border px-4 py-10 text-center">
+            <div
+                role="alert"
+                className="flex flex-col items-center gap-3 rounded-lg border border-border px-4 py-10 text-center"
+            >
                 <p className="text-sm text-danger">{t("apiKeys.usage.failed")}</p>
                 <Button size="sm" variant="outline" onClick={onRetry}>
                     <RotateCw className="size-4 shrink-0" />
@@ -171,7 +184,10 @@ function UsageSkeleton() {
         <div className="flex flex-col gap-6" aria-busy="true">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 {Array.from({ length: 6 }, (_, index) => (
-                    <div key={index} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                    <div
+                        key={index}
+                        className="flex flex-col gap-2 rounded-lg border border-border p-3"
+                    >
                         <Skeleton className="h-3 w-20" />
                         <Skeleton className="h-5 w-14" />
                     </div>
@@ -205,7 +221,11 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
     const number = (value: number) => format.number(value);
-    const share = (value: number) => format.number(usage.total > 0 ? value / usage.total : 0, { style: "percent", maximumFractionDigits: 1 });
+    const share = (value: number) =>
+        format.number(usage.total > 0 ? value / usage.total : 0, {
+            style: "percent",
+            maximumFractionDigits: 1
+        });
     const listed = usage.routes.reduce((sum, row) => sum + row.calls, 0);
     const rest = usage.total - listed;
 
@@ -234,7 +254,13 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                         <dt className="truncate text-xs text-muted-foreground" title={tile.label}>
                             {tile.label}
                         </dt>
-                        <dd className={cn("truncate text-base font-semibold tabular-nums", tile.tone)} title={tile.value}>
+                        <dd
+                            className={cn(
+                                "truncate text-base font-semibold tabular-nums",
+                                tile.tone
+                            )}
+                            title={tile.value}
+                        >
                             {tile.value}
                         </dd>
                     </div>
@@ -250,7 +276,10 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                         <table className="w-full min-w-[34rem] text-sm">
                             <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                                 <tr>
-                                    <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
+                                    <th
+                                        scope="col"
+                                        className="w-full max-w-0 px-3 py-2 font-medium"
+                                    >
                                         {t("apiKeys.usage.route")}
                                     </th>
                                     <th scope="col" className="px-3 py-2 text-right font-medium">
@@ -278,22 +307,33 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                                     <Link
                                                         href={`/account/api-keys/reference#${anchor}`}
                                                         className="block truncate font-mono text-xs no-underline hover:underline"
-                                                        aria-label={t("apiKeys.usage.openRoute", { route: label })}
-                                                        title={t("apiKeys.usage.openRoute", { route: label })}
+                                                        aria-label={t("apiKeys.usage.openRoute", {
+                                                            route: label
+                                                        })}
+                                                        title={t("apiKeys.usage.openRoute", {
+                                                            route: label
+                                                        })}
                                                     >
                                                         {label}
                                                     </Link>
                                                 ) : (
-                                                    <span className="block truncate font-mono text-xs" title={label}>
+                                                    <span
+                                                        className="block truncate font-mono text-xs"
+                                                        title={label}
+                                                    >
                                                         {label}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{number(row.calls)}</td>
+                                            <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                                {number(row.calls)}
+                                            </td>
                                             <td
                                                 className={cn(
                                                     "whitespace-nowrap px-3 py-2 text-right tabular-nums",
-                                                    row.errors > 0 ? "text-danger" : "text-muted-foreground"
+                                                    row.errors > 0
+                                                        ? "text-danger"
+                                                        : "text-muted-foreground"
                                                 )}
                                             >
                                                 {number(row.errors)}
@@ -309,8 +349,12 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                 })}
                                 {rest > 0 ? (
                                     <tr className="border-t border-border text-muted-foreground">
-                                        <td className="px-3 py-2 text-xs">{t("apiKeys.usage.other")}</td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{number(rest)}</td>
+                                        <td className="px-3 py-2 text-xs">
+                                            {t("apiKeys.usage.other")}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                            {number(rest)}
+                                        </td>
                                         <td colSpan={3} />
                                     </tr>
                                 ) : null}
@@ -342,12 +386,16 @@ function UsageReport({ usage }: { usage: KeyUsage }) {
                                         <td className="whitespace-nowrap px-3 py-2">
                                             <Badge
                                                 variant={statusTone(row.status)}
-                                                title={t(`apiKeys.usage.classes.${statusClass(row.status)}` as const)}
+                                                title={t(
+                                                    `apiKeys.usage.classes.${statusClass(row.status)}` as const
+                                                )}
                                             >
                                                 {row.status}
                                             </Badge>
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{number(row.calls)}</td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                            {number(row.calls)}
+                                        </td>
                                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
                                             {share(row.calls)}
                                         </td>
@@ -373,11 +421,16 @@ function CallsChart({ usage }: { usage: KeyUsage }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
     const preferences = useDisplayPreferences();
-    const utc = useMemo(() => createDisplayFormat({ ...preferences, timeZone: "UTC" }), [preferences]);
+    const utc = useMemo(
+        () => createDisplayFormat({ ...preferences, timeZone: "UTC" }),
+        [preferences]
+    );
     const peak = Math.max(...usage.series.map((point) => point.calls), 1);
     const width = usage.series.length;
     const when = (time: number) =>
-        usage.bucket === "day" ? t("apiKeys.usage.utcDay", { date: utc.date(time) }) : format.dateTime(time);
+        usage.bucket === "day"
+            ? t("apiKeys.usage.utcDay", { date: utc.date(time) })
+            : format.dateTime(time);
     const first = usage.series[0];
     const last = usage.series[usage.series.length - 1];
 
@@ -413,12 +466,30 @@ function CallsChart({ usage }: { usage: KeyUsage }) {
                                     {`${when(point.t)} - ${t("apiKeys.usage.calls")}: ${format.number(point.calls)}, ${t("apiKeys.usage.errors")}: ${format.number(point.errors)}`}
                                 </title>
                                 {/* The full column is the hover target, so a quiet hour still says it was quiet. */}
-                                <rect x={index} y={0} width={1} height={CHART_HEIGHT} fill="transparent" />
+                                <rect
+                                    x={index}
+                                    y={0}
+                                    width={1}
+                                    height={CHART_HEIGHT}
+                                    fill="transparent"
+                                />
                                 {height > 0 ? (
-                                    <rect x={index + 0.1} y={CHART_HEIGHT - height} width={0.8} height={height} className="fill-primary" />
+                                    <rect
+                                        x={index + 0.1}
+                                        y={CHART_HEIGHT - height}
+                                        width={0.8}
+                                        height={height}
+                                        className="fill-primary"
+                                    />
                                 ) : null}
                                 {failed > 0 ? (
-                                    <rect x={index + 0.1} y={CHART_HEIGHT - failed} width={0.8} height={failed} className="fill-danger" />
+                                    <rect
+                                        x={index + 0.1}
+                                        y={CHART_HEIGHT - failed}
+                                        width={0.8}
+                                        height={failed}
+                                        className="fill-danger"
+                                    />
                                 ) : null}
                             </g>
                         );

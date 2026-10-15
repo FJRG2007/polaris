@@ -72,42 +72,47 @@ export function tooManyCalls(seconds: number): string {
  * the server log; `changes` picks the stricter of the two rate limits.
  */
 export function deployRoute(operation: string, changes: boolean, handler: Handler) {
-    return withKeyUsage(async (
-        request: Request,
-        segment: { params: Promise<Record<string, string>> }
-    ): Promise<Response> => {
-        const principal = await authenticateApiKey(request);
-        if (!principal) return refusal(401, "Unauthorized");
+    return withKeyUsage(
+        async (
+            request: Request,
+            segment: { params: Promise<Record<string, string>> }
+        ): Promise<Response> => {
+            const principal = await authenticateApiKey(request);
+            if (!principal) return refusal(401, "Unauthorized");
 
-        const wait = await throttleDeployKey(principal.keyId, changes);
-        if (wait !== null) {
-            return refusal(429, tooManyCalls(wait), { "Retry-After": String(wait) });
-        }
-
-        const caller: DeployCaller = {
-            userId: principal.userId,
-            scopes: principal.scopes,
-            keyId: principal.keyId,
-            projectId: principal.projectId,
-            via: "api"
-        };
-        try {
-            return await handler({
-                caller,
-                request,
-                url: new URL(request.url),
-                params: await segment.params
-            });
-        } catch (caught) {
-            if (caught instanceof ZodError) {
-                const first = caught.issues[0];
-                const where = first?.path.join(".");
-                return refusal(400, where ? `${where}: ${first?.message}` : (first?.message ?? "Bad request"));
+            const wait = await throttleDeployKey(principal.keyId, changes);
+            if (wait !== null) {
+                return refusal(429, tooManyCalls(wait), { "Retry-After": String(wait) });
             }
-            const failure = publicFailure(caught, operation);
-            return refusal(failure.status, failure.message);
+
+            const caller: DeployCaller = {
+                userId: principal.userId,
+                scopes: principal.scopes,
+                keyId: principal.keyId,
+                projectId: principal.projectId,
+                via: "api"
+            };
+            try {
+                return await handler({
+                    caller,
+                    request,
+                    url: new URL(request.url),
+                    params: await segment.params
+                });
+            } catch (caught) {
+                if (caught instanceof ZodError) {
+                    const first = caught.issues[0];
+                    const where = first?.path.join(".");
+                    return refusal(
+                        400,
+                        where ? `${where}: ${first?.message}` : (first?.message ?? "Bad request")
+                    );
+                }
+                const failure = publicFailure(caught, operation);
+                return refusal(failure.status, failure.message);
+            }
         }
-    });
+    );
 }
 
 /** The request body as JSON, or a refusal saying it was not. An empty body is an
@@ -116,7 +121,8 @@ export function deployRoute(operation: string, changes: boolean, handler: Handle
 export async function readBody(request: Request): Promise<unknown> {
     const tooLarge = `The request body is larger than ${MAX_JSON_BODY / 1024 ** 2} MB.`;
     const declared = Number(request.headers.get("content-length"));
-    if (Number.isFinite(declared) && declared > MAX_JSON_BODY) throw new DeployApiRefusal(413, tooLarge);
+    if (Number.isFinite(declared) && declared > MAX_JSON_BODY)
+        throw new DeployApiRefusal(413, tooLarge);
     const bytes = await readCappedBody(request, MAX_JSON_BODY);
     if (!bytes) throw new DeployApiRefusal(413, tooLarge);
     const text = new TextDecoder().decode(bytes);

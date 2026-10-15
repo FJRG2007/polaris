@@ -21,7 +21,13 @@ vi.mock("@polaris/db", () => ({
                 if (by === "method,route") {
                     return failed
                         ? [{ method: "GET", route: "/api/v1/me", _sum: { calls: 2 } }]
-                        : [{ method: "GET", route: "/api/v1/me", _sum: { calls: 15, ms25: 5, ms50: 5, ms100: 4, msOver: 1 } }];
+                        : [
+                              {
+                                  method: "GET",
+                                  route: "/api/v1/me",
+                                  _sum: { calls: 15, ms25: 5, ms50: 5, ms100: 4, msOver: 1 }
+                              }
+                          ];
                 }
                 return [
                     { status: 200, _sum: { calls: 13 } },
@@ -35,14 +41,30 @@ vi.mock("@polaris/db", () => ({
 
 import * as report from "@/lib/api-usage/report";
 
-const EMPTY = { ms25: 0, ms50: 0, ms100: 0, ms250: 0, ms500: 0, ms1000: 0, ms2500: 0, ms5000: 0, msOver: 0 };
+const EMPTY = {
+    ms25: 0,
+    ms50: 0,
+    ms100: 0,
+    ms250: 0,
+    ms500: 0,
+    ms1000: 0,
+    ms2500: 0,
+    ms5000: 0,
+    msOver: 0
+};
 
 describe("a key's usage report", () => {
     it("reads percentiles off the histogram, interpolating inside the bucket", () => {
         expect(report.percentile(EMPTY, 0.5)).toBeNull();
         expect(report.percentile({ ...EMPTY, ms25: 10 }, 0.5)).toEqual({ ms: 13, over: false });
-        expect(report.percentile({ ...EMPTY, ms25: 5, ms100: 5 }, 0.95)).toEqual({ ms: 95, over: false });
-        expect(report.percentile({ ...EMPTY, ms25: 1, msOver: 9 }, 0.95)).toEqual({ ms: 5000, over: true });
+        expect(report.percentile({ ...EMPTY, ms25: 5, ms100: 5 }, 0.95)).toEqual({
+            ms: 95,
+            over: false
+        });
+        expect(report.percentile({ ...EMPTY, ms25: 1, msOver: 9 }, 0.95)).toEqual({
+            ms: 5000,
+            over: true
+        });
     });
 
     it("aggregates in the database, scoped to the key and the window, and fills quiet hours with zeros", async () => {

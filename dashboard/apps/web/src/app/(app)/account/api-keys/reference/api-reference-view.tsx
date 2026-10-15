@@ -41,9 +41,16 @@ const METHOD_TONE: Record<string, string> = {
     DELETE: "text-red-600 dark:text-red-400"
 };
 
-const CODE = "overflow-x-auto overscroll-x-contain rounded-md bg-muted/60 p-3 font-mono text-xs leading-relaxed";
+const CODE =
+    "overflow-x-auto overscroll-x-contain rounded-md bg-muted/60 p-3 font-mono text-xs leading-relaxed";
 
-export function ApiReferenceView({ entries, placeholder }: { entries: ReferenceEntry[]; placeholder: string }) {
+export function ApiReferenceView({
+    entries,
+    placeholder
+}: {
+    entries: ReferenceEntry[];
+    placeholder: string;
+}) {
     const t = useTranslations("account");
     const base = useAppUrl();
     const tags = [...new Set(entries.map((entry) => entry.tag))];
@@ -59,12 +66,18 @@ export function ApiReferenceView({ entries, placeholder }: { entries: ReferenceE
                         <ArrowLeft className="size-3.5 shrink-0" />
                         {t("apiKeys.reference.back")}
                     </Link>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("apiKeys.reference.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("apiKeys.reference.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("apiKeys.reference.intro")}</p>
                 </div>
                 <Button size="sm" variant="outline" asChild>
                     {/* A plain anchor: a router link would prefetch an API route. */}
-                    <a href="/api/openapi.json" download="polaris-openapi.json" className="no-underline">
+                    <a
+                        href="/api/openapi.json"
+                        download="polaris-openapi.json"
+                        className="no-underline"
+                    >
                         <Download className="size-4 shrink-0" />
                         {t("apiKeys.reference.download")}
                     </a>
@@ -76,13 +89,18 @@ export function ApiReferenceView({ entries, placeholder }: { entries: ReferenceE
                 <p className="text-sm text-muted-foreground">{t("apiKeys.reference.authBody")}</p>
                 <div className="flex items-start gap-2">
                     {/* i18n-ignore: an HTTP header, typed as is */}
-                    <pre className={cn(CODE, "min-w-0 flex-1")}>{`Authorization: Bearer ${placeholder}`}</pre>
+                    <pre
+                        className={cn(CODE, "min-w-0 flex-1")}
+                    >{`Authorization: Bearer ${placeholder}`}</pre>
                     <CopyButton value={`Authorization: Bearer ${placeholder}`} />
                 </div>
             </section>
 
             <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
-                <nav aria-label={t("apiKeys.reference.contents")} className="lg:sticky lg:top-4 lg:self-start">
+                <nav
+                    aria-label={t("apiKeys.reference.contents")}
+                    className="lg:sticky lg:top-4 lg:self-start"
+                >
                     <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         {t("apiKeys.reference.contents")}
                     </h2>
@@ -109,7 +127,12 @@ export function ApiReferenceView({ entries, placeholder }: { entries: ReferenceE
 
                 <div className="flex min-w-0 flex-col gap-8">
                     {entries.map((entry) => (
-                        <Operation key={entry.id} entry={entry} base={base} placeholder={placeholder} />
+                        <Operation
+                            key={entry.id}
+                            entry={entry}
+                            base={base}
+                            placeholder={placeholder}
+                        />
                     ))}
                 </div>
             </div>
@@ -117,29 +140,51 @@ export function ApiReferenceView({ entries, placeholder }: { entries: ReferenceE
     );
 }
 
-function Operation({ entry, base, placeholder }: { entry: ReferenceEntry; base: string; placeholder: string }) {
+function Operation({
+    entry,
+    base,
+    placeholder
+}: {
+    entry: ReferenceEntry;
+    base: string;
+    placeholder: string;
+}) {
     const t = useTranslations("account");
     const example = curlCommand(entry, base, placeholder);
     return (
-        <section id={entry.id} className="flex scroll-mt-4 flex-col gap-3 border-t border-border pt-4">
+        <section
+            id={entry.id}
+            className="flex scroll-mt-4 flex-col gap-3 border-t border-border pt-4"
+        >
             <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold">{entry.summary}</h3>
-                {entry.changes ? <Badge variant="warning">{t("apiKeys.reference.changes")}</Badge> : null}
+                {entry.changes ? (
+                    <Badge variant="warning">{t("apiKeys.reference.changes")}</Badge>
+                ) : null}
             </div>
             <p className="min-w-0 break-all font-mono text-xs">
-                <span className={cn("mr-2 font-semibold", METHOD_TONE[entry.method])}>{entry.method}</span>
+                <span className={cn("mr-2 font-semibold", METHOD_TONE[entry.method])}>
+                    {entry.method}
+                </span>
                 {entry.path}
             </p>
-            {entry.description ? <p className="text-sm text-muted-foreground">{entry.description}</p> : null}
+            {entry.description ? (
+                <p className="text-sm text-muted-foreground">{entry.description}</p>
+            ) : null}
 
             {entry.parameters.length > 0 ? (
                 <div className="flex flex-col gap-1">
-                    <h4 className="text-xs font-medium text-muted-foreground">{t("apiKeys.reference.parameters")}</h4>
+                    <h4 className="text-xs font-medium text-muted-foreground">
+                        {t("apiKeys.reference.parameters")}
+                    </h4>
                     <div className="overflow-x-auto overscroll-x-contain">
                         <table className="w-full text-left text-xs">
                             <tbody>
                                 {entry.parameters.map((parameter) => (
-                                    <tr key={`${parameter.where}:${parameter.name}`} className="border-b border-border/60 align-top">
+                                    <tr
+                                        key={`${parameter.where}:${parameter.name}`}
+                                        className="border-b border-border/60 align-top"
+                                    >
                                         <td className="whitespace-nowrap py-1.5 pr-3 font-mono">
                                             {parameter.name}
                                             {parameter.required ? (
@@ -151,8 +196,12 @@ function Operation({ entry, base, placeholder }: { entry: ReferenceEntry; base: 
                                         <td className="whitespace-nowrap py-1.5 pr-3 text-muted-foreground">
                                             {t(`apiKeys.reference.where.${parameter.where}`)}
                                         </td>
-                                        <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-muted-foreground">{parameter.type}</td>
-                                        <td className="w-full py-1.5 text-muted-foreground">{parameter.description}</td>
+                                        <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-muted-foreground">
+                                            {parameter.type}
+                                        </td>
+                                        <td className="w-full py-1.5 text-muted-foreground">
+                                            {parameter.description}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -170,23 +219,32 @@ function Operation({ entry, base, placeholder }: { entry: ReferenceEntry; base: 
                 </details>
             ) : entry.binaryType ? (
                 <p className="text-xs text-muted-foreground">
-                    {t("apiKeys.reference.body")}: {t("apiKeys.reference.binaryBody", { type: entry.binaryType })}
+                    {t("apiKeys.reference.body")}:{" "}
+                    {t("apiKeys.reference.binaryBody", { type: entry.binaryType })}
                 </p>
             ) : null}
 
             <div className="flex flex-col gap-1">
-                <h4 className="text-xs font-medium text-muted-foreground">{t("apiKeys.reference.responses")}</h4>
+                <h4 className="text-xs font-medium text-muted-foreground">
+                    {t("apiKeys.reference.responses")}
+                </h4>
                 {entry.responses.map((response) =>
                     response.schema ? (
                         <details key={response.status}>
                             <summary className="cursor-pointer text-xs">
-                                <span className="mr-2 font-mono font-semibold">{response.status}</span>
+                                <span className="mr-2 font-mono font-semibold">
+                                    {response.status}
+                                </span>
                                 {response.description}
                                 {response.text ? (
-                                    <span className="ml-2 text-muted-foreground">({t("apiKeys.reference.textToo")})</span>
+                                    <span className="ml-2 text-muted-foreground">
+                                        ({t("apiKeys.reference.textToo")})
+                                    </span>
                                 ) : null}
                             </summary>
-                            <pre className={cn(CODE, "mt-1 max-h-80 overflow-y-auto")}>{response.schema}</pre>
+                            <pre className={cn(CODE, "mt-1 max-h-80 overflow-y-auto")}>
+                                {response.schema}
+                            </pre>
                         </details>
                     ) : (
                         <p key={response.status} className="text-xs">
@@ -198,7 +256,9 @@ function Operation({ entry, base, placeholder }: { entry: ReferenceEntry; base: 
             </div>
 
             <div className="flex flex-col gap-1">
-                <h4 className="text-xs font-medium text-muted-foreground">{t("apiKeys.reference.example")}</h4>
+                <h4 className="text-xs font-medium text-muted-foreground">
+                    {t("apiKeys.reference.example")}
+                </h4>
                 <div className="flex items-start gap-2">
                     <pre className={cn(CODE, "min-w-0 flex-1")}>{example}</pre>
                     <CopyButton value={example} />

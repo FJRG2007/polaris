@@ -65,7 +65,9 @@ describe("a key's usage action", () => {
     });
 
     it("refuses a malformed id or period before touching the database", async () => {
-        expect(await keyUsageAction({ keyId: "not-a-key", range: "24h" })).toEqual({ error: "invalid" });
+        expect(await keyUsageAction({ keyId: "not-a-key", range: "24h" })).toEqual({
+            error: "invalid"
+        });
         expect(await keyUsageAction({ keyId: OWN_KEY, range: "1y" })).toEqual({ error: "invalid" });
         expect(state.lookups).toEqual([]);
     });
@@ -95,7 +97,9 @@ describe("the usage data region", () => {
     };
 
     it("says there were no calls rather than drawing empty tables", () => {
-        const markup = renderToStaticMarkup(withMessages(<UsageData load={{ state: "ready", usage: empty }} onRetry={() => {}} />));
+        const markup = renderToStaticMarkup(
+            withMessages(<UsageData load={{ state: "ready", usage: empty }} onRetry={() => {}} />)
+        );
         expect(markup).toContain("No calls in this period");
         expect(markup).not.toContain("<table");
     });
@@ -117,14 +121,25 @@ describe("the usage data region", () => {
                 { t: Date.UTC(2026, 9, 15, 9), calls: 2, errors: 0 },
                 { t: Date.UTC(2026, 9, 15, 10), calls: 1, errors: 1 }
             ],
-            routes: [{ method: "GET", route: "/api/v1/me", calls: 3, errors: 1, p50: { ms: 20, over: false }, p95: null }],
+            routes: [
+                {
+                    method: "GET",
+                    route: "/api/v1/me",
+                    calls: 3,
+                    errors: 1,
+                    p50: { ms: 20, over: false },
+                    p95: null
+                }
+            ],
             statuses: [
                 { status: 200, calls: 2 },
                 { status: 404, calls: 1 }
             ],
             anchors: ["getMe"]
         };
-        const markup = renderToStaticMarkup(withMessages(<UsageData load={{ state: "ready", usage }} onRetry={() => {}} />));
+        const markup = renderToStaticMarkup(
+            withMessages(<UsageData load={{ state: "ready", usage }} onRetry={() => {}} />)
+        );
         expect(markup).toContain("GET /api/v1/me");
         expect(markup).toContain('href="/account/api-keys/reference#getMe"');
         expect(markup).toContain(">404<");

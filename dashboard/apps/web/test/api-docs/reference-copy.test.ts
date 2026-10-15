@@ -8,7 +8,10 @@ import { referenceCopy } from "@/lib/api-docs/reference-copy";
 
 /** Every parameter of a route with the English its schema describes it in. */
 function describedParameters(route: (typeof DOCUMENTED_ROUTES)[number]): [string, string][] {
-    const schemas = { ...(route.params ?? {}), ...((route.query?.shape ?? {}) as Record<string, ZodTypeAny>) };
+    const schemas = {
+        ...(route.params ?? {}),
+        ...((route.query?.shape ?? {}) as Record<string, ZodTypeAny>)
+    };
     return [
         ...Object.entries(schemas).flatMap(([name, schema]): [string, string][] => {
             const description = toJsonSchema(schema).description;
@@ -29,7 +32,8 @@ describe("API reference copy", () => {
             for (const [status, response] of Object.entries(route.responses)) {
                 expect(copy.response(status, response.description)).toBe(response.description);
             }
-            for (const [name, english] of describedParameters(route)) expect(copy.parameter(name, english)).toBe(english);
+            for (const [name, english] of describedParameters(route))
+                expect(copy.parameter(name, english)).toBe(english);
         }
     });
 
@@ -38,15 +42,21 @@ describe("API reference copy", () => {
             const t = translatorFor(locale, "account");
             for (const route of DOCUMENTED_ROUTES) {
                 const op = `apiKeys.reference.ops.${operationId(route)}`;
-                expect(t.has(`apiKeys.reference.tags.${route.tag}`), `${locale} ${route.tag}`).toBe(true);
+                expect(t.has(`apiKeys.reference.tags.${route.tag}`), `${locale} ${route.tag}`).toBe(
+                    true
+                );
                 expect(t.has(`${op}.summary`), `${locale} ${op}`).toBe(true);
-                if (route.description) expect(t.has(`${op}.description`), `${locale} ${op}`).toBe(true);
+                if (route.description)
+                    expect(t.has(`${op}.description`), `${locale} ${op}`).toBe(true);
                 for (const status of Object.keys(route.responses)) {
-                    const held = t.has(`${op}.responses.${status}`) || t.has(`apiKeys.reference.statuses.${status}`);
+                    const held =
+                        t.has(`${op}.responses.${status}`) ||
+                        t.has(`apiKeys.reference.statuses.${status}`);
                     expect(held, `${locale} ${op} ${status}`).toBe(true);
                 }
                 for (const [name] of describedParameters(route)) {
-                    const held = t.has(`${op}.params.${name}`) || t.has(`apiKeys.reference.params.${name}`);
+                    const held =
+                        t.has(`${op}.params.${name}`) || t.has(`apiKeys.reference.params.${name}`);
                     expect(held, `${locale} ${op} ${name}`).toBe(true);
                 }
             }

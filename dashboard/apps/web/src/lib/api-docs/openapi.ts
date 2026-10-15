@@ -41,13 +41,21 @@ export function operationId(route: DocumentedRoute): string {
         .map((part) => (part.startsWith("{") ? `by-${part.slice(1, -1)}` : part))
         .flatMap((part) => part.split(/[^A-Za-z0-9]+/))
         .filter(Boolean);
-    return [route.method.toLowerCase(), ...words.map((word) => word[0]!.toUpperCase() + word.slice(1))].join("");
+    return [
+        route.method.toLowerCase(),
+        ...words.map((word) => word[0]!.toUpperCase() + word.slice(1))
+    ].join("");
 }
 
 function parameters(route: DocumentedRoute): JsonSchema[] {
     const out: JsonSchema[] = pathParams(route.path).map((name) => {
         const schema = route.params?.[name];
-        return { name, in: "path", required: true, schema: schema ? toJsonSchema(schema) : { type: "string" } };
+        return {
+            name,
+            in: "path",
+            required: true,
+            schema: schema ? toJsonSchema(schema) : { type: "string" }
+        };
     });
     const shape = (route.query?.shape ?? {}) as Record<string, ZodTypeAny>;
     for (const [name, schema] of Object.entries(shape)) {
@@ -70,11 +78,13 @@ function responses(route: DocumentedRoute): Record<string, JsonSchema> {
     const out: Record<string, JsonSchema> = {};
     for (const [status, response] of Object.entries(route.responses)) {
         const content: Record<string, JsonSchema> = {};
-        if (response.schema) content["application/json"] = { schema: toJsonSchema(response.schema) };
+        if (response.schema)
+            content["application/json"] = { schema: toJsonSchema(response.schema) };
         if (response.text) content["text/plain"] = { schema: { type: "string" } };
-        out[status] = Object.keys(content).length > 0
-            ? { description: response.description, content }
-            : { description: response.description };
+        out[status] =
+            Object.keys(content).length > 0
+                ? { description: response.description, content }
+                : { description: response.description };
     }
     for (const [status, description] of Object.entries(COMMON_ERRORS)) {
         if (out[status]) continue;
@@ -95,18 +105,28 @@ function operation(route: DocumentedRoute): JsonSchema {
         responses: responses(route)
     };
     if (route.body) {
-        op.requestBody = { required: true, content: { "application/json": { schema: toJsonSchema(route.body) } } };
+        op.requestBody = {
+            required: true,
+            content: { "application/json": { schema: toJsonSchema(route.body) } }
+        };
     } else if (route.binaryBody) {
         op.requestBody = {
             required: true,
-            content: { [route.binaryBody.contentType]: { schema: { type: "string", contentMediaType: route.binaryBody.contentType } } }
+            content: {
+                [route.binaryBody.contentType]: {
+                    schema: { type: "string", contentMediaType: route.binaryBody.contentType }
+                }
+            }
         };
     }
     return op;
 }
 
 /** The whole document. `baseUrl` is the instance's own address, without a trailing slash. */
-export function buildOpenApi(baseUrl: string, routes: readonly DocumentedRoute[] = DOCUMENTED_ROUTES): JsonSchema {
+export function buildOpenApi(
+    baseUrl: string,
+    routes: readonly DocumentedRoute[] = DOCUMENTED_ROUTES
+): JsonSchema {
     const paths: Record<string, Record<string, JsonSchema>> = {};
     for (const route of routes) {
         (paths[route.path] ??= {})[route.method.toLowerCase()] = operation(route);
@@ -126,7 +146,8 @@ export function buildOpenApi(baseUrl: string, routes: readonly DocumentedRoute[]
                 apiKey: {
                     type: "http",
                     scheme: "bearer",
-                    description: "An API key from Account > API keys, sent as `Authorization: Bearer plk_...`."
+                    description:
+                        "An API key from Account > API keys, sent as `Authorization: Bearer plk_...`."
                 }
             }
         },
@@ -138,7 +159,16 @@ export function buildOpenApi(baseUrl: string, routes: readonly DocumentedRoute[]
 /** A curl line for one route, with the placeholder key and example path values. */
 export function curlExample(route: DocumentedRoute, baseUrl: string): string {
     const bodyExample = route.body ? JSON.stringify(exampleOf(toJsonSchema(route.body))) : null;
-    return curlCommand({ method: route.method, path: route.path, bodyExample, binaryType: route.binaryBody?.contentType }, baseUrl, PLACEHOLDER_KEY);
+    return curlCommand(
+        {
+            method: route.method,
+            path: route.path,
+            bodyExample,
+            binaryType: route.binaryBody?.contentType
+        },
+        baseUrl,
+        PLACEHOLDER_KEY
+    );
 }
 
 /** A minimal example value for a JSON schema: required fields only, defaults where given. */

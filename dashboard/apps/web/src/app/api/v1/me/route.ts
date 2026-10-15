@@ -23,7 +23,11 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
         where: { id: principal.userId },
         select: { id: true, name: true, email: true, username: true }
     });
-    if (!user) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+    if (!user)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
 
     return Response.json({
         user,

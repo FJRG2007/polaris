@@ -20,7 +20,9 @@ export type KeyUsage = KeyUsageReport & {
     anchors: (string | null)[];
 };
 
-export async function keyUsageAction(input: unknown): Promise<{ usage?: KeyUsage; error?: "notFound" | "invalid" }> {
+export async function keyUsageAction(
+    input: unknown
+): Promise<{ usage?: KeyUsage; error?: "notFound" | "invalid" }> {
     const user = await requireUser();
     const parsed = inputSchema.safeParse(input);
     if (!parsed.success) return { error: "invalid" };
@@ -31,7 +33,9 @@ export async function keyUsageAction(input: unknown): Promise<{ usage?: KeyUsage
     if (!key) return { error: "notFound" };
     const report = await keyUsageReport(key.id, parsed.data.range);
     const anchors = report.routes.map((row) => {
-        const route = DOCUMENTED_ROUTES.find((r) => r.method === row.method && r.path === row.route);
+        const route = DOCUMENTED_ROUTES.find(
+            (r) => r.method === row.method && r.path === row.route
+        );
         return route ? operationId(route) : null;
     });
     return { usage: { ...report, anchors } };

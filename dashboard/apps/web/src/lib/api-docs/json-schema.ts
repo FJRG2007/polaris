@@ -53,10 +53,14 @@ function stringSchema(checks: Check[]): JsonSchema {
 }
 
 function numberSchema(checks: Check[]): JsonSchema {
-    const out: JsonSchema = { type: checks.some((check) => check.kind === "int") ? "integer" : "number" };
+    const out: JsonSchema = {
+        type: checks.some((check) => check.kind === "int") ? "integer" : "number"
+    };
     for (const check of checks) {
-        if (check.kind === "min") out[check.inclusive === false ? "exclusiveMinimum" : "minimum"] = check.value;
-        else if (check.kind === "max") out[check.inclusive === false ? "exclusiveMaximum" : "maximum"] = check.value;
+        if (check.kind === "min")
+            out[check.inclusive === false ? "exclusiveMinimum" : "minimum"] = check.value;
+        else if (check.kind === "max")
+            out[check.inclusive === false ? "exclusiveMaximum" : "maximum"] = check.value;
     }
     return out;
 }
@@ -89,14 +93,21 @@ export function toJsonSchema(schema: ZodTypeAny): JsonSchema {
                 additionalProperties: toJsonSchema(def.valueType)
             });
         case "ZodUnion":
-            return withDescription(schema, { anyOf: (def.options as ZodTypeAny[]).map(toJsonSchema) });
+            return withDescription(schema, {
+                anyOf: (def.options as ZodTypeAny[]).map(toJsonSchema)
+            });
         case "ZodNullable": {
-            return withDescription(schema, { anyOf: [toJsonSchema(def.innerType), { type: "null" }] });
+            return withDescription(schema, {
+                anyOf: [toJsonSchema(def.innerType), { type: "null" }]
+            });
         }
         case "ZodOptional":
             return withDescription(schema, toJsonSchema(def.innerType));
         case "ZodDefault":
-            return withDescription(schema, { ...toJsonSchema(def.innerType), default: def.defaultValue() });
+            return withDescription(schema, {
+                ...toJsonSchema(def.innerType),
+                default: def.defaultValue()
+            });
         case "ZodEffects":
             return withDescription(schema, toJsonSchema(def.schema));
         case "ZodObject": {

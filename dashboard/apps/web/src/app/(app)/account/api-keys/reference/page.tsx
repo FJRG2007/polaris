@@ -23,8 +23,16 @@ function entries(t: NamespaceTranslator<"account">): ReferenceEntry[] {
         const copy = referenceCopy(t, route, id);
         const query = Object.entries((route.query?.shape ?? {}) as Record<string, ZodTypeAny>);
         const parameters = [
-            ...Object.entries(route.params ?? {}).map(([name, schema]) => ({ name, where: "path" as const, schema: toJsonSchema(schema) })),
-            ...query.map(([name, schema]) => ({ name, where: "query" as const, schema: toJsonSchema(schema) })),
+            ...Object.entries(route.params ?? {}).map(([name, schema]) => ({
+                name,
+                where: "path" as const,
+                schema: toJsonSchema(schema)
+            })),
+            ...query.map(([name, schema]) => ({
+                name,
+                where: "query" as const,
+                schema: toJsonSchema(schema)
+            })),
             ...Object.entries(route.binaryBody?.headers ?? {}).map(([name, description]) => ({
                 name,
                 where: "header" as const,
@@ -33,11 +41,15 @@ function entries(t: NamespaceTranslator<"account">): ReferenceEntry[] {
         ].map((parameter) => ({
             name: parameter.name,
             where: parameter.where,
-            required: parameter.where === "path" || (parameter.where === "query" && !isOptional(route.query!.shape[parameter.name]!)),
+            required:
+                parameter.where === "path" ||
+                (parameter.where === "query" && !isOptional(route.query!.shape[parameter.name]!)),
             type: describeType(parameter.schema),
             description: copy.parameter(
                 parameter.name,
-                typeof parameter.schema.description === "string" ? parameter.schema.description : null
+                typeof parameter.schema.description === "string"
+                    ? parameter.schema.description
+                    : null
             )
         }));
         const body = route.body ? toJsonSchema(route.body) : null;
@@ -56,7 +68,9 @@ function entries(t: NamespaceTranslator<"account">): ReferenceEntry[] {
             responses: Object.entries(route.responses).map(([status, response]) => ({
                 status: Number(status),
                 description: copy.response(status, response.description),
-                schema: response.schema ? JSON.stringify(toJsonSchema(response.schema), null, 2) : null,
+                schema: response.schema
+                    ? JSON.stringify(toJsonSchema(response.schema), null, 2)
+                    : null,
                 text: Boolean(response.text)
             }))
         };
@@ -68,7 +82,8 @@ function describeType(schema: Record<string, unknown>): string {
     if (Array.isArray(schema.enum)) return schema.enum.join(" | ");
     if (schema.format === "uuid") return "uuid";
     const type = typeof schema.type === "string" ? schema.type : "string";
-    if (typeof schema.minimum === "number" && typeof schema.maximum === "number") return `${type} ${schema.minimum}-${schema.maximum}`;
+    if (typeof schema.minimum === "number" && typeof schema.maximum === "number")
+        return `${type} ${schema.minimum}-${schema.maximum}`;
     return type;
 }
 

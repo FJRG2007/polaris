@@ -13,7 +13,12 @@ import { LATENCY_BOUNDS, LATENCY_COLUMNS, hourOf, type LatencyColumn } from "./r
 
 export { USAGE_RANGES, type UsageRange } from "./ranges";
 
-const RANGE_HOURS: Record<UsageRange, number> = { "24h": 24, "7d": 24 * 7, "30d": 24 * 30, "90d": 24 * 90 };
+const RANGE_HOURS: Record<UsageRange, number> = {
+    "24h": 24,
+    "7d": 24 * 7,
+    "30d": 24 * 30,
+    "90d": 24 * 90
+};
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
@@ -67,10 +72,14 @@ export function percentile(histogram: Histogram, q: number): Percentile | null {
     for (let index = 0; index < LATENCY_COLUMNS.length; index++) {
         const count = histogram[LATENCY_COLUMNS[index]!];
         if (count > 0 && seen + count >= rank) {
-            if (index >= LATENCY_BOUNDS.length) return { ms: LATENCY_BOUNDS[LATENCY_BOUNDS.length - 1]!, over: true };
+            if (index >= LATENCY_BOUNDS.length)
+                return { ms: LATENCY_BOUNDS[LATENCY_BOUNDS.length - 1]!, over: true };
             const lower = index === 0 ? 0 : LATENCY_BOUNDS[index - 1]!;
             const upper = LATENCY_BOUNDS[index]!;
-            return { ms: Math.round(lower + ((upper - lower) * (rank - seen)) / count), over: false };
+            return {
+                ms: Math.round(lower + ((upper - lower) * (rank - seen)) / count),
+                over: false
+            };
         }
         seen += count;
     }
@@ -78,10 +87,15 @@ export function percentile(histogram: Histogram, q: number): Percentile | null {
 }
 
 function histogramOf(sums: Partial<Record<LatencyColumn, number | null>>): Histogram {
-    return Object.fromEntries(LATENCY_COLUMNS.map((column) => [column, sums[column] ?? 0])) as Histogram;
+    return Object.fromEntries(
+        LATENCY_COLUMNS.map((column) => [column, sums[column] ?? 0])
+    ) as Histogram;
 }
 
-const SUM_LATENCY = Object.fromEntries(LATENCY_COLUMNS.map((column) => [column, true])) as Record<LatencyColumn, true>;
+const SUM_LATENCY = Object.fromEntries(LATENCY_COLUMNS.map((column) => [column, true])) as Record<
+    LatencyColumn,
+    true
+>;
 
 /** Empty points for every bucket of the window, so a quiet hour is a zero and not a gap. */
 export function emptySeries(from: number, to: number, step: number): UsagePoint[] {
@@ -108,7 +122,11 @@ export function foldSeries(
     return points;
 }
 
-export async function keyUsageReport(keyId: string, range: UsageRange, now = new Date()): Promise<KeyUsageReport> {
+export async function keyUsageReport(
+    keyId: string,
+    range: UsageRange,
+    now = new Date()
+): Promise<KeyUsageReport> {
     const hours = RANGE_HOURS[range];
     const bucket = hours > 24 * 7 ? "day" : "hour";
     const step = bucket === "day" ? DAY_MS : HOUR_MS;
@@ -128,7 +146,11 @@ export async function keyUsageReport(keyId: string, range: UsageRange, now = new
             orderBy: { _sum: { calls: "desc" } },
             take: 50
         }),
-        prisma.apiKeyCallHour.groupBy({ by: ["method", "route"], where: failed, _sum: { calls: true } }),
+        prisma.apiKeyCallHour.groupBy({
+            by: ["method", "route"],
+            where: failed,
+            _sum: { calls: true }
+        }),
         prisma.apiKeyCallHour.groupBy({
             by: ["status"],
             where,
@@ -149,7 +171,9 @@ export async function keyUsageReport(keyId: string, range: UsageRange, now = new
         step
     );
 
-    const routeErrors = new Map(errorsByRoute.map((row) => [`${row.method} ${row.route}`, row._sum.calls ?? 0]));
+    const routeErrors = new Map(
+        errorsByRoute.map((row) => [`${row.method} ${row.route}`, row._sum.calls ?? 0])
+    );
     const overall = histogramOf({});
     const routes = byRoute.map((row): RouteUsage => {
         const histogram = histogramOf(row._sum);

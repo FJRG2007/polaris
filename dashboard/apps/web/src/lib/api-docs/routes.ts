@@ -44,21 +44,38 @@ export interface DocumentedRoute {
     responses: Record<number, DocumentedResponse>;
 }
 
-const ok = (schema: ZodTypeAny, text = true): DocumentedResponse => ({ description: "OK", schema, text });
-const accepted = (schema: ZodTypeAny): DocumentedResponse => ({ description: "Accepted", schema, text: true });
+const ok = (schema: ZodTypeAny, text = true): DocumentedResponse => ({
+    description: "OK",
+    schema,
+    text
+});
+const accepted = (schema: ZodTypeAny): DocumentedResponse => ({
+    description: "Accepted",
+    schema,
+    text: true
+});
 
 /** An entity whose fields this reference does not pin down. */
 const entity = (description: string) => z.object({}).passthrough().describe(description);
 
-const serviceId = { id: z.string().describe("A service id, or project/service, or project/environment/service") };
+const serviceId = {
+    id: z.string().describe("A service id, or project/service, or project/environment/service")
+};
 const uuidParam = { id: schemas.idSchema };
 const formatQuery = z.object({
-    format: z.enum(["json", "text"]).optional().describe("text answers in plain text instead of JSON")
+    format: z
+        .enum(["json", "text"])
+        .optional()
+        .describe("text answers in plain text instead of JSON")
 });
 const redeployQuery = formatQuery.merge(schemas.redeployQuerySchema);
 const redeployed = z.boolean().describe("Whether the change is being redeployed");
 
-const variableRoutes = (prefix: string, file: string, param: Record<string, ZodTypeAny>): DocumentedRoute[] => [
+const variableRoutes = (
+    prefix: string,
+    file: string,
+    param: Record<string, ZodTypeAny>
+): DocumentedRoute[] => [
     {
         method: "GET",
         path: `${prefix}/variables`,
@@ -74,7 +91,12 @@ const variableRoutes = (prefix: string, file: string, param: Record<string, ZodT
                 z.object({
                     variables: z.array(
                         z
-                            .object({ id: z.string(), key: z.string(), isSecret: z.boolean(), value: z.string().nullable() })
+                            .object({
+                                id: z.string(),
+                                key: z.string(),
+                                isSecret: z.boolean(),
+                                value: z.string().nullable()
+                            })
                             .passthrough()
                     )
                 })
@@ -137,11 +159,15 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         file: "api/cli/session/route.ts",
         tag: "Account",
         summary: "End a CLI sign-in",
-        description: "Only a key issued by `plr login` can end itself; any other key is answered 409.",
+        description:
+            "Only a key issued by `plr login` can end itself; any other key is answered 409.",
         changes: true,
         responses: {
             204: { description: "Signed out" },
-            409: { description: "This key is not a CLI sign-in", schema: z.object({ error: z.string() }) }
+            409: {
+                description: "This key is not a CLI sign-in",
+                schema: z.object({ error: z.string() })
+            }
         }
     },
     {
@@ -164,7 +190,12 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
                 .passthrough(),
             z.array(z.record(z.unknown()))
         ]),
-        responses: { 200: ok(z.record(z.unknown()).describe("A JSON-RPC 2.0 response, or a batch of them"), false) }
+        responses: {
+            200: ok(
+                z.record(z.unknown()).describe("A JSON-RPC 2.0 response, or a batch of them"),
+                false
+            )
+        }
     },
     {
         method: "GET",
@@ -174,7 +205,13 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         summary: "List projects",
         changes: false,
         query: formatQuery,
-        responses: { 200: ok(z.object({ projects: z.array(entity("A project with its environments and services")) })) }
+        responses: {
+            200: ok(
+                z.object({
+                    projects: z.array(entity("A project with its environments and services"))
+                })
+            )
+        }
     },
     {
         method: "GET",
@@ -255,7 +292,13 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
             200: ok(
                 z.object({
                     variables: z.array(
-                        z.object({ key: z.string(), isSecret: z.boolean(), updatedAt: z.string() }).passthrough()
+                        z
+                            .object({
+                                key: z.string(),
+                                isSecret: z.boolean(),
+                                updatedAt: z.string()
+                            })
+                            .passthrough()
                     )
                 })
             )
@@ -322,7 +365,10 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         summary: "Read a service's logs",
         changes: false,
         params: serviceId,
-        query: formatQuery.extend({ tail: schemas.tailSchema, since: z.string().max(64).optional() }),
+        query: formatQuery.extend({
+            tail: schemas.tailSchema,
+            since: z.string().max(64).optional()
+        }),
         responses: { 200: ok(z.object({ log: z.string() })) }
     },
     ...(
@@ -345,7 +391,11 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         })
     ),
     ...variableRoutes("/api/v1/deploy/services/{id}", "api/v1/deploy/services/[id]", serviceId),
-    ...variableRoutes("/api/v1/deploy/environments/{id}", "api/v1/deploy/environments/[id]", uuidParam),
+    ...variableRoutes(
+        "/api/v1/deploy/environments/{id}",
+        "api/v1/deploy/environments/[id]",
+        uuidParam
+    ),
     {
         method: "DELETE",
         path: "/api/v1/deploy/variables/{id}",
