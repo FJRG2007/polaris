@@ -70,7 +70,16 @@
         "messageChannel": "Message #{channel}",
         "replyTo": "Reply to {author}",
         "markReadFailed": "That could not be marked as read",
-        "noticeGone": "That notice can no longer be answered"
+        "noticeGone": "That notice can no longer be answered",
+        "muteChannel": "Mute chat",
+        "mutePerson": "Mute {author}",
+        "muteFailed": "That could not be muted",
+        "muteFor": {
+            "hour": "1 hour",
+            "eightHours": "8 hours",
+            "day": "24 hours",
+            "forever": "Until I unmute"
+        }
     },
     "mailUnread": {
         "title": "New mail",
