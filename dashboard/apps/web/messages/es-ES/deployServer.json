@@ -247,5 +247,10 @@
         "rangeFull": "Todos los puertos públicos del rango de proxies TCP están ocupados en este servidor.",
         "portFixed": "Este dominio llega por el puerto propio del servicio. Cambia el puerto del servicio.",
         "failed": "No se pudo completar. Inténtalo de nuevo en un momento."
+    },
+    "fileAccess": {
+        "loadFailed": "No se pudieron leer las cuentas SFTP",
+        "saveFailed": "No se pudo añadir la cuenta SFTP",
+        "removeFailed": "No se pudo quitar la cuenta SFTP"
     }
 }

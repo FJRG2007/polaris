@@ -247,5 +247,10 @@
         "rangeFull": "Every public port in the TCP proxy range is taken on this server.",
         "portFixed": "This domain is reached on the service's own port. Change the service's port instead.",
         "failed": "That did not go through. Try again in a moment."
+    },
+    "fileAccess": {
+        "loadFailed": "Could not read the SFTP accounts",
+        "saveFailed": "Could not add the SFTP account",
+        "removeFailed": "Could not remove the SFTP account"
     }
 }
