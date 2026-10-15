@@ -1,0 +1,107 @@
+import { describe, expect, it } from "vitest";
+import {
+    effectiveStage,
+    environmentPromotionSchema,
+    nextStage,
+    parseWordpressPrefixes,
+    planPromotion,
+    wordpressAddressCommand
+} from "./environment-promotion.js";
+
+const SOURCE_ID = "00000000-0000-4000-8000-000000000001";
+const TARGET_ID = "00000000-0000-4000-8000-000000000002";
+const CLIENT = { engine: "mariadb", username: "app", password: "fixture-pass", database: "app" } as const;
+
+describe("environment stages", () => {
+    it("reads an unmarked default environment as production and others as unset", () => {
+        expect(effectiveStage({ stage: null, isDefault: true })).toBe("production");
+        expect(effectiveStage({ stage: null, isDefault: false })).toBeNull();
+        expect(effectiveStage({ stage: "staging", isDefault: true })).toBe("staging");
+        expect(effectiveStage({ stage: "nonsense", isDefault: false })).toBeNull();
+    });
+
+    it("moves work development -> staging -> production", () => {
+        expect(nextStage("development")).toBe("staging");
+        expect(nextStage("staging")).toBe("production");
+        expect(nextStage("production")).toBeNull();
+        expect(nextStage(null)).toBeNull();
+    });
+});
+
+describe("environmentPromotionSchema", () => {
+    it("refuses promoting an environment into itself", () => {
+        const result = environmentPromotionSchema.safeParse({
+            sourceEnvironmentId: SOURCE_ID,
+            targetEnvironmentId: SOURCE_ID
+        });
+        expect(result.success).toBe(false);
+    });
+
+    it("leaves the data alone unless asked", () => {
+        const result = environmentPromotionSchema.parse({
+            sourceEnvironmentId: SOURCE_ID,
+            targetEnvironmentId: TARGET_ID
+        });
+        expect(result.includeData).toBe(false);
+    });
+});
+
+describe("planPromotion", () => {
+    it("pairs by slug, names what the target lacks, and never touches the target's extras", () => {
+        const plan = planPromotion(
+            {
+                services: [
+                    { id: "s-web", slug: "web", name: "Web" },
+                    { id: "s-worker", slug: "worker", name: "Worker" }
+                ],
+                databases: [
+                    { id: "s-db", slug: "db", name: "DB", engine: "mariadb" },
+                    { id: "s-cache", slug: "cache", name: "Cache", engine: "redis" }
+                ]
+            },
+            {
+                services: [
+                    { id: "t-web", slug: "web", name: "Web" },
+                    { id: "t-extra", slug: "extra", name: "Extra" }
+                ],
+                databases: [
+                    { id: "t-db", slug: "db", name: "DB", engine: "mysql" },
+                    { id: "t-cache", slug: "cache", name: "Cache", engine: "postgres" }
+                ]
+            }
+        );
+        expect(plan.services).toEqual([{ name: "Web", sourceId: "s-web", targetId: "t-web" }]);
+        expect(plan.databases).toEqual([{ name: "DB", sourceId: "s-db", targetId: "t-db" }]);
+        expect(plan.skipped).toEqual([
+            { kind: "service", name: "Worker", reason: "missing" },
+            { kind: "database", name: "Cache", reason: "engine" }
+        ]);
+    });
+});
+
+describe("WordPress address rewrite", () => {
+    it("keeps only real prefixes from the listing", () => {
+        expect(parseWordpressPrefixes("wp_\nblog_\n\nbad prefix_\nwp_\n")).toEqual(["wp_", "blog_"]);
+    });
+
+    it("rewrites home, siteurl and post links for every install", () => {
+        const command = wordpressAddressCommand(CLIENT, {
+            prefixes: ["wp_"],
+            from: "staging.example.test",
+            to: "www.example.test"
+        });
+        expect(command?.argv.slice(0, 6)).toEqual(["mariadb", "-uapp", "-pfixture-pass", "-N", "-B", "app"]);
+        const sql = command?.argv.at(-1) ?? "";
+        expect(sql).toContain("UPDATE `wp_options`");
+        expect(sql).toContain("'//staging.example.test', '//www.example.test'");
+        expect(sql).toContain("UPDATE `wp_posts`");
+    });
+
+    it("refuses an address that is not a host name instead of quoting it", () => {
+        expect(
+            wordpressAddressCommand(CLIENT, { prefixes: ["wp_"], from: "a.test'; DROP TABLE x; --", to: "b.test" })
+        ).toBeNull();
+        expect(wordpressAddressCommand(CLIENT, { prefixes: ["wp_"], from: "a.test", to: "a.test" })).toBeNull();
+        expect(wordpressAddressCommand(CLIENT, { prefixes: ["x`y_"], from: "a.test", to: "b.test" })).toBeNull();
+    });
+});
