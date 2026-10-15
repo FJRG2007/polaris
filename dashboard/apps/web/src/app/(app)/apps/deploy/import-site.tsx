@@ -37,7 +37,7 @@ const resultSchema = z.object({
 
 /** The warnings the dialog has words for (`IMPORT_WARNING_CODES` on the server);
  *  one it does not know, from a newer server, gets the general sentence. */
-const WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying"] as const;
+const WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying", "databaseUnlinked"] as const;
 
 function warningKey(code: string): `importSite.warning.${(typeof WARNING_CODES)[number] | "unknown"}` {
     const known = WARNING_CODES.find((candidate) => candidate === code);

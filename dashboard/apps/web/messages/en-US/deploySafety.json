@@ -81,7 +81,8 @@
             "folderMissing": "The folder of {name} is not in the backup, so it was not imported.",
             "domainTaken": "{name} could not be attached; it may already be in use.",
             "notDeploying": "{name} was imported but did not start deploying; deploy it from its page.",
-            "unknown": "Something in the backup could not be carried over."
+            "unknown": "Something in the backup could not be carried over.",
+            "databaseUnlinked": "{name} was not pointed at a database; set its connection in its variables."
         }
     }
 }

@@ -11,7 +11,12 @@
  *     through the console's restore path;
  *   - one service per site folder (a document root that more than one domain
  *     shares is one service), its source kept as an uploaded folder;
- *   - every domain attached to the service that serves its folder.
+ *   - every domain attached to the service that serves its folder;
+ *   - each site pointed at its new database: a WordPress `wp-config.php` has its
+ *     DB_NAME, DB_USER, DB_PASSWORD and DB_HOST defines rewritten, and every
+ *     service gets DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD and
+ *     DATABASE_URL for whatever else it runs. Domains stay the same in an
+ *     import, so the site's own URLs are left as they are.
  *
  * Nothing here runs until somebody imports a backup. The scratch folder is
  * removed when the import ends, whether it worked or not. Something that cannot
@@ -27,10 +32,12 @@ import { pipeline } from "node:stream/promises";
 import * as deployService from "@/lib/deploy-service";
 import * as databaseService from "@/lib/database-service";
 import { NEW_ENVIRONMENT_NETWORK_MODE } from "@/lib/deploy/service-networks";
-import { lstat, readdir, rm, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { restoreDumpInto } from "@/lib/database-ops/restore";
 import { createReadStream, createWriteStream } from "node:fs";
 import { storeSourceFolder } from "@/lib/deploy/source-upload";
+import { setEnvVars } from "@/lib/env-var-service";
+import { findDefines, rewriteDefines } from "./php-defines";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { instanceContext, startOperation } from "@/lib/database-ops/ops";
 import { inspectCpanelBackup, type CpanelPlan, type ImportDomain, type ImportWarning } from "./cpanel";
@@ -115,6 +122,66 @@ export async function rollBackImport(made: MadeByImport, ownerId: string): Promi
     for (const id of [...made.databases].reverse()) {
         await attempt(`database ${id}`, () => databaseService.deleteDatabase(id, ownerId));
     }
+}
+
+/** A database the import made, under the name the backup gave it. */
+export interface ImportedDatabase {
+    readonly original: string;
+    readonly id: string;
+}
+
+/** The site's own database: the one its config names, else the only one there is. */
+export function pickDatabase(named: string | null, imported: readonly ImportedDatabase[]): ImportedDatabase | undefined {
+    const found = named ? imported.find((database) => database.original === named) : undefined;
+    return found ?? (imported.length === 1 ? imported[0] : undefined);
+}
+
+/** The largest `wp-config.php` read; a real one is a few KB. */
+const WP_CONFIG_MAX = 1024 * 1024;
+
+/** A site's `wp-config.php`, when it has one at its root that is a plain file. */
+async function readWpConfig(folder: string): Promise<{ path: string; text: string } | null> {
+    const path = join(folder, "wp-config.php");
+    const info = await lstat(path).catch(() => null);
+    if (!info?.isFile() || info.size > WP_CONFIG_MAX) return null;
+    return { path, text: await readFile(path, "utf8") };
+}
+
+/**
+ * Point a site at its database before its folder is stored: the WordPress
+ * config if there is one, and the standard variables on its service. Answers
+ * false when the site has a config naming a database and none could be chosen.
+ */
+async function connectSite(
+    folder: string,
+    applicationId: string,
+    ownerId: string,
+    imported: readonly ImportedDatabase[]
+): Promise<boolean> {
+    const config = await readWpConfig(folder);
+    const named = config ? (findDefines(config.text).find((call) => call.name === "DB_NAME")?.value ?? null) : null;
+    const database = pickDatabase(named, imported);
+    if (!database) return !config;
+    const connection = await databaseService.databaseConnection(database.id, ownerId);
+    if (config) {
+        const { text } = rewriteDefines(config.text, {
+            DB_NAME: connection.database,
+            DB_USER: connection.username,
+            DB_PASSWORD: connection.password,
+            // WordPress takes the port after the host; 3306 is the one it assumes.
+            DB_HOST: connection.port === 3306 ? connection.host : `${connection.host}:${connection.port}`
+        });
+        await writeFile(config.path, text);
+    }
+    await setEnvVars("application", applicationId, ownerId, [
+        { key: "DB_HOST", value: connection.host, isSecret: false },
+        { key: "DB_PORT", value: String(connection.port), isSecret: false },
+        { key: "DB_NAME", value: connection.database, isSecret: false },
+        { key: "DB_USER", value: connection.username, isSecret: false },
+        { key: "DB_PASSWORD", value: connection.password, isSecret: true },
+        { key: "DATABASE_URL", value: connection.uri, isSecret: true }
+    ]);
+    return true;
 }
 
 /** One service to make: a folder in the home and the domains it serves. */
@@ -209,6 +276,7 @@ export async function importCpanelBackup(
 
         let databases = 0;
         let instanceId: string | undefined;
+        const imported: ImportedDatabase[] = [];
         for (const [index, database] of plan.databases.entries()) {
             await report("databases", index, plan.databases.length);
             try {
@@ -227,6 +295,7 @@ export async function importCpanelBackup(
                 instanceId ??= created.id;
                 await loadDump(created.id, ownerId, actorId, join(root, ...database.dump.split("/")));
                 databases += 1;
+                imported.push({ original: database.name, id: created.id });
             } catch (error) {
                 console.error(`panel-import: database ${database.name} was not carried over:`, error);
                 warnings.push({ code: "databaseFailed", name: database.name });
@@ -254,6 +323,11 @@ export async function importCpanelBackup(
                 safeHeaders: true
             });
             made.applications.push(application.id);
+            const linked = await connectSite(folder, application.id, ownerId, imported).catch((error: unknown) => {
+                console.error(`panel-import: ${name} was not pointed at its database:`, error);
+                return false;
+            });
+            if (!linked) warnings.push({ code: "databaseUnlinked", name });
             await storeSourceFolder(application.id, ownerId, folder, name, await countFolder(folder));
             services += 1;
             for (const domain of site.domains) {

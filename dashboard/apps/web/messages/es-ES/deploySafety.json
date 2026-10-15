@@ -81,7 +81,8 @@
             "folderMissing": "La carpeta de {name} no está en la copia, así que no se importó.",
             "domainTaken": "No se pudo asociar {name}; puede que ya esté en uso.",
             "notDeploying": "{name} se importó pero no empezó a desplegarse; despliégalo desde su página.",
-            "unknown": "Algo de la copia no se pudo traer."
+            "unknown": "Algo de la copia no se pudo traer.",
+            "databaseUnlinked": "{name} no se conectó a ninguna base de datos; indica la conexión en sus variables."
         }
     }
 }

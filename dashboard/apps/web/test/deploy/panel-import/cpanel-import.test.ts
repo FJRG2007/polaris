@@ -9,7 +9,7 @@
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { CpanelPlan } from "@/lib/deploy/panel-import/cpanel";
-import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWNER = "00000000-0000-7000-8000-0000000000aa";
@@ -63,7 +63,18 @@ vi.mock("@/lib/deploy-service", () => ({
     deleteProject,
     deleteApplication
 }));
-vi.mock("@/lib/database-service", () => ({ createDatabase, deployDatabaseAndWait, deleteDatabase }));
+const databaseConnection = vi.fn(async (id: string) => ({
+    host: `mysql-${id}`,
+    port: 3306,
+    database: id.replace("db-", "") + "_new",
+    username: "polaris_user",
+    password: "pa'ss",
+    uri: `mysql://polaris_user:x@mysql-${id}:3306/db`
+}));
+const setEnvVars = vi.fn(async (_scope: string, _id: string, _owner: string, vars: Array<{ key: string }>) => vars.length);
+
+vi.mock("@/lib/database-service", () => ({ createDatabase, deployDatabaseAndWait, deleteDatabase, databaseConnection }));
+vi.mock("@/lib/env-var-service", () => ({ setEnvVars }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         environment: { count: async () => present?.environments ?? 1 },
@@ -83,7 +94,7 @@ vi.mock("@/lib/deploy/panel-import/cpanel", () => ({
     inspectCpanelBackup: async () => ({ dir: scratch, root: join(scratch, "backup"), plan })
 }));
 
-const { importCpanelBackup, rollbackScope } = await import("@/lib/deploy/panel-import/import");
+const { importCpanelBackup, pickDatabase, rollbackScope } = await import("@/lib/deploy/panel-import/import");
 
 const input = (orgId: string | null = null) => ({ archive: "backup.tar.gz", ownerId: OWNER, orgId, actorId: OWNER });
 
@@ -207,5 +218,55 @@ describe("rollbackScope", () => {
     it("keeps it when anything else is in it", () => {
         expect(rollbackScope(made, { environments: 1, applications: ["a"], databases: ["d", "x"] })).toBe("own");
         expect(rollbackScope(made, { environments: 2, applications: ["a"], databases: ["d"] })).toBe("own");
+    });
+});
+
+describe("pointing a site at its database", () => {
+    const WP = [
+        "<?php",
+        "// define( 'DB_NAME', 'commented' );",
+        "define( 'DB_NAME', 'acct_wp' );",
+        "define( 'DB_USER', 'acct_u' );",
+        "define( 'DB_PASSWORD', 'old' );",
+        "define( 'DB_HOST', 'localhost' );",
+        "$table_prefix = 'wp_';",
+        ""
+    ].join("\n");
+
+    it("rewrites wp-config.php for the database it names and sets the variables", async () => {
+        const config = join(scratch, "backup", "homedir", "public_html", "wp-config.php");
+        await writeFile(config, WP);
+        // Read before the scratch folder goes: the copy is stored before then.
+        let stored = "";
+        storeSourceFolder.mockImplementationOnce(async () => {
+            stored = await readFile(config, "utf8");
+            return {};
+        });
+        const result = await importCpanelBackup(input());
+        expect(stored).toContain("define( 'DB_NAME', 'acct_wp_new' );");
+        expect(stored).toContain("define( 'DB_HOST', 'mysql-db-acct_wp' );");
+        expect(stored).toContain("define( 'DB_PASSWORD', 'pa\\'ss' );");
+        expect(stored).toContain("// define( 'DB_NAME', 'commented' );");
+        expect(stored).toContain("$table_prefix = 'wp_';");
+        const call = setEnvVars.mock.calls.find((args) => args[1] === "app-main.test");
+        expect(call?.[3].map((entry) => entry.key)).toEqual(["DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DATABASE_URL"]);
+        // The addon site has no config and two databases to choose from: left alone, quietly.
+        expect(setEnvVars.mock.calls.some((args) => args[1] === "app-addon.test")).toBe(false);
+        expect(result.warnings.some((warning) => warning.code === "databaseUnlinked")).toBe(false);
+    });
+
+    it("warns when the config names a database that did not come over", async () => {
+        await writeFile(join(scratch, "backup", "homedir", "public_html", "wp-config.php"), WP.replace("acct_wp", "other"));
+        const result = await importCpanelBackup(input());
+        expect(result.warnings).toContainEqual({ code: "databaseUnlinked", name: "main.test" });
+    });
+
+    it("picks the named database, else the only one", () => {
+        const one = [{ original: "a", id: "1" }];
+        const two = [...one, { original: "b", id: "2" }];
+        expect(pickDatabase("b", two)?.id).toBe("2");
+        expect(pickDatabase("c", two)).toBeUndefined();
+        expect(pickDatabase(null, one)?.id).toBe("1");
+        expect(pickDatabase("c", one)?.id).toBe("1");
     });
 });

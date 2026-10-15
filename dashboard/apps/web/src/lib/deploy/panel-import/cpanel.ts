@@ -37,7 +37,7 @@ const MARKERS = ["cp", "userdata", "homedir", "homedir.tar", "mysql"];
 
 /** Something an import could not carry over, as a code the screen words in the
  *  reader's language and the value it names. */
-export const IMPORT_WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying"] as const;
+export const IMPORT_WARNING_CODES = ["noDomains", "noHome", "databaseFailed", "folderMissing", "domainTaken", "notDeploying", "databaseUnlinked"] as const;
 export type ImportWarningCode = (typeof IMPORT_WARNING_CODES)[number];
 export interface ImportWarning {
     readonly code: ImportWarningCode;
