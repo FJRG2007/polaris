@@ -324,6 +324,9 @@
             "noImage": "has no image",
             "otherRepository": "built from another repository",
             "notDeployed": "not deployed in the source"
+        },
+        "notes": {
+            "tagOnly": "its image tag was pulled again: the exact build the source runs could not be read, so it may differ"
         }
     }
 }

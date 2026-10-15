@@ -324,6 +324,9 @@
             "noImage": "no tiene imagen",
             "otherRepository": "se construye desde otro repositorio",
             "notDeployed": "no está desplegado en el origen"
+        },
+        "notes": {
+            "tagOnly": "se volvió a descargar la etiqueta de su imagen: no se pudo leer la versión exacta que ejecuta el origen, así que puede ser distinta"
         }
     }
 }

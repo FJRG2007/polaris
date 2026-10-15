@@ -203,3 +203,44 @@ export function wordpressAddressCommand(
     ]);
     return sqlCommand(client, statements.join(" "), `Pointing WordPress at ${to}`);
 }
+
+/** An image reference without its tag or digest: `ghcr.io/acme/web`. */
+function imageRepository(ref: string): string {
+    const bare = ref.split("@")[0] ?? "";
+    const slash = bare.lastIndexOf("/");
+    const colon = bare.lastIndexOf(":");
+    return colon > slash ? bare.slice(0, colon) : bare;
+}
+
+/** Docker Hub's names compare equal however they are spelled. */
+function canonicalRepository(repository: string): string {
+    return repository
+        .toLowerCase()
+        .replace(/^(?:index\.)?docker\.io\//, "")
+        .replace(/^library\//, "");
+}
+
+const DIGEST = /^sha256:[0-9a-f]{64}$/;
+
+/**
+ * The image a service runs, pinned to the exact build: `repo@sha256:...`, from
+ * the registry digests the running image was pulled by. A tag can move between
+ * the source pulling it and the target pulling it; a digest cannot. Null when
+ * no digest of the same repository is known - the caller falls back to the tag
+ * and says so. A reference that is already pinned is returned as it is.
+ */
+export function pinnedImageRef(imageRef: string, repoDigests: readonly string[]): string | null {
+    const ref = imageRef.trim();
+    if (!ref) return null;
+    const pinned = ref.split("@")[1];
+    if (pinned && DIGEST.test(pinned)) return ref;
+    const repository = imageRepository(ref);
+    const wanted = canonicalRepository(repository);
+    for (const entry of repoDigests) {
+        const at = entry.lastIndexOf("@");
+        if (at <= 0) continue;
+        const digest = entry.slice(at + 1);
+        if (DIGEST.test(digest) && canonicalRepository(entry.slice(0, at)) === wanted) return `${repository}@${digest}`;
+    }
+    return null;
+}

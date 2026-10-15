@@ -17,8 +17,10 @@
  */
 
 import { prisma } from "@polaris/db";
+import type { TargetRow } from "./runtime";
 import {
     parseWordpressPrefixes,
+    pinnedImageRef,
     planPromotion,
     wordpressAddressCommand,
     wordpressPrefixesCommand,
@@ -32,6 +34,9 @@ export interface PromotionStep {
     readonly outcome: "deployed" | "copied" | "skipped" | "failed";
     /** Why it was skipped, said on screen in the reader's words. */
     readonly reason?: PromotionSkipReason;
+    /** Said beside a deploy: "tagOnly" when no digest of the running image
+     *  was known, so the target pulled the tag, which may have moved. */
+    readonly note?: "tagOnly";
     /** What went wrong, for a failure. */
     readonly detail?: string;
 }
@@ -218,7 +223,7 @@ async function runPromotion(
         const into = targets.get(pair.targetId);
         if (!from || !into) continue;
         try {
-            const release = await releaseOf(from, into);
+            const release = await releaseOf(from, into, input.ownerId);
             if ("skip" in release) {
                 steps.push({ kind: "service", name: pair.name, outcome: "skipped", reason: release.skip });
             } else {
@@ -230,7 +235,12 @@ async function runPromotion(
                 if (release.commitSha)
                     // The poller would otherwise see its branch head and deploy that over it.
                     await prisma.application.update({ where: { id: into.id }, data: { lastDeployedSha: release.commitSha } });
-                steps.push({ kind: "service", name: pair.name, outcome: "deployed" });
+                steps.push({
+                    kind: "service",
+                    name: pair.name,
+                    outcome: "deployed",
+                    ...(release.tagOnly ? { note: "tagOnly" as const } : {})
+                });
             }
         } catch (error) {
             steps.push({ kind: "service", name: pair.name, outcome: "failed", detail: readable(error) });
@@ -258,14 +268,17 @@ function parseSource(raw: string): Record<string, unknown> {
  */
 async function releaseOf(
     from: ServiceRow,
-    into: ServiceRow
-): Promise<{ imageRef?: string; commitSha?: string } | { skip: PromotionSkipReason }> {
+    into: ServiceRow,
+    ownerId: string
+): Promise<{ imageRef?: string; commitSha?: string; tagOnly?: boolean } | { skip: PromotionSkipReason }> {
     if (from.sourceType !== into.sourceType) return { skip: "builtDifferently" };
     const fromSource = parseSource(from.sourceConfig);
     const intoSource = parseSource(into.sourceConfig);
     if (from.sourceType === "image") {
         const imageRef = typeof fromSource.imageRef === "string" ? fromSource.imageRef : "";
-        return imageRef ? { imageRef } : { skip: "noImage" };
+        if (!imageRef) return { skip: "noImage" };
+        const pinned = await runningImageRef(from.id, ownerId, imageRef);
+        return pinned ? { imageRef: pinned } : { imageRef, tagOnly: true };
     }
     if (typeof fromSource.repoUrl === "string" && fromSource.repoUrl !== intoSource.repoUrl)
         return { skip: "otherRepository" };
@@ -275,6 +288,43 @@ async function releaseOf(
         select: { commitSha: true }
     });
     return live?.commitSha ? { commitSha: live.commitSha } : {};
+}
+
+/**
+ * The exact image the source serves, as `repo@sha256:...`: the running
+ * container's image, looked up by the registry digest it was pulled by. Null
+ * when any of that cannot be read - not deployed, a container that does not
+ * answer, an image built rather than pulled.
+ */
+async function runningImageRef(serviceId: string, ownerId: string, imageRef: string): Promise<string | null> {
+    const app = await prisma.application.findUnique({
+        where: { id: serviceId },
+        select: {
+            id: true,
+            slug: true,
+            currentDeploymentId: true,
+            target: true,
+            environment: { select: { project: { select: { slug: true } } } }
+        }
+    });
+    if (!app?.currentDeploymentId) return null;
+    const { currentReleaseRef } = await import("./releases");
+    const { getPorts } = await import("./runtime");
+    const ports = await getPorts(app.target as TargetRow, ownerId).catch(() => null);
+    if (!ports) return null;
+    try {
+        const serving = await currentReleaseRef(app);
+        const inspected = (await ports.inspect(serving.name)) as { Image?: unknown } | null;
+        if (typeof inspected?.Image !== "string") return null;
+        const reader = ports as { imageRepoDigests?: (imageId: string) => Promise<string[]> };
+        const digests = reader.imageRepoDigests ? await reader.imageRepoDigests(inspected.Image) : [];
+        return pinnedImageRef(imageRef, digests);
+    } catch (error) {
+        console.error("polaris: the image a promoted service runs could not be read:", error);
+        return null;
+    } finally {
+        await ports.dispose().catch(() => undefined);
+    }
 }
 
 async function setImage(into: ServiceRow, imageRef: string): Promise<void> {

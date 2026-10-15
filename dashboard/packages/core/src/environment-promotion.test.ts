@@ -4,6 +4,7 @@ import {
     environmentPromotionSchema,
     nextStage,
     parseWordpressPrefixes,
+    pinnedImageRef,
     planPromotion,
     wordpressAddressCommand
 } from "./environment-promotion.js";
@@ -103,5 +104,29 @@ describe("WordPress address rewrite", () => {
         ).toBeNull();
         expect(wordpressAddressCommand(CLIENT, { prefixes: ["wp_"], from: "a.test", to: "a.test" })).toBeNull();
         expect(wordpressAddressCommand(CLIENT, { prefixes: ["x`y_"], from: "a.test", to: "b.test" })).toBeNull();
+    });
+});
+
+describe("pinnedImageRef", () => {
+    const digest = `sha256:${"a".repeat(64)}`;
+
+    it("pins a Docker Hub tag however the digest spells the repository", () => {
+        expect(pinnedImageRef("wordpress:7.1-apache", [`docker.io/library/wordpress@${digest}`])).toBe(
+            `wordpress@${digest}`
+        );
+        expect(pinnedImageRef("library/nginx", [`nginx@${digest}`])).toBe(`library/nginx@${digest}`);
+    });
+
+    it("keeps a registry with a port and ignores other repositories", () => {
+        expect(
+            pinnedImageRef("registry.test:5000/acme/web:1.2", [`other/web@${digest}`, `registry.test:5000/acme/web@${digest}`])
+        ).toBe(`registry.test:5000/acme/web@${digest}`);
+        expect(pinnedImageRef("acme/web:1.2", [`other/web@${digest}`])).toBeNull();
+    });
+
+    it("returns a pinned reference as it is and refuses a malformed digest", () => {
+        expect(pinnedImageRef(`acme/web@${digest}`, [])).toBe(`acme/web@${digest}`);
+        expect(pinnedImageRef("acme/web:1", ["acme/web@sha256:short"])).toBeNull();
+        expect(pinnedImageRef("", [`acme/web@${digest}`])).toBeNull();
     });
 });

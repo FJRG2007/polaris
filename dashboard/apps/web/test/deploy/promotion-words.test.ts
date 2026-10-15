@@ -20,7 +20,8 @@ describe("promotion words", () => {
                 ...ENVIRONMENT_STAGES.map((stage) => `environments.stages.${stage}`),
                 ...REASONS.map((reason) => `promotion.reasons.${reason}`),
                 ...STATUSES.map((status) => `promotion.status.${status}`),
-                ...OUTCOMES.map((outcome) => `promotion.outcome.${outcome}`)
+                ...OUTCOMES.map((outcome) => `promotion.outcome.${outcome}`),
+                "promotion.notes.tagOnly"
             ];
             for (const key of keys) {
                 const words = say(key, { name: "fixture" });

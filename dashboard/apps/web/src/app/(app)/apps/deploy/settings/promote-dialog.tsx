@@ -284,6 +284,7 @@ export function PromotionHistory({ projectId, version }: { projectId: string; ve
                                         <li key={`${step.kind}:${step.name}:${index}`} className="truncate" title={step.detail ?? step.name}>
                                             {t(`promotion.outcome.${step.outcome}`, { name: step.name })}
                                             {step.reason ? ` - ${t(`promotion.reasons.${step.reason}`)}` : ""}
+                                            {step.note ? ` - ${t(`promotion.notes.${step.note}`)}` : ""}
                                             {step.detail ? ` - ${step.detail}` : ""}
                                         </li>
                                     ))}
