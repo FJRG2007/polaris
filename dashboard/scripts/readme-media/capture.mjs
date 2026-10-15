@@ -305,9 +305,7 @@ async function run() {
                 await page.waitForTimeout(120);
                 if (check) continue;
                 shots.push(
-                    await (
-                        await picture(page, scene, viewport)
-                    )
+                    await (await picture(page, scene, viewport))
                         .resize(VIEWPORTS[viewport].width)
                         .png()
                         .toBuffer()
