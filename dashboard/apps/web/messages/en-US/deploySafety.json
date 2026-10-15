@@ -37,10 +37,7 @@
         "cancel": "Cancel",
         "binRestoreFailed": "Could not restore it. Its project may be in the bin too - restore that first.",
         "binDeleteFailed": "Could not delete it. Try again in a moment.",
-        "days": "Keep deleted items for",
         "daysUnit": "days",
-        "daysSave": "Save",
-        "daysSaved": "Saved.",
         "daysInvalid": "Use a number of days between 1 and 365.",
         "off": "The recycle bin is off here: deleting removes things for good straight away.",
         "settingsLink": "Recycle bin settings"

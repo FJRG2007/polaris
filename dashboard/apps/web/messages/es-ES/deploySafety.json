@@ -37,10 +37,7 @@
         "cancel": "Cancelar",
         "binRestoreFailed": "No se pudo restaurar. Puede que su proyecto también esté en la papelera: restáuralo primero.",
         "binDeleteFailed": "No se pudo borrar. Inténtalo de nuevo en un momento.",
-        "days": "Guardar lo borrado durante",
         "daysUnit": "días",
-        "daysSave": "Guardar",
-        "daysSaved": "Guardado.",
         "daysInvalid": "Usa un número de días entre 1 y 365.",
         "off": "La papelera está desactivada aquí: al eliminar se borra definitivamente al momento.",
         "settingsLink": "Ajustes de la papelera"
