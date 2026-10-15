@@ -29,9 +29,13 @@ afterEach(() => {
 
 describe("quiet hours", () => {
     it("names the zone and holds Save until something changed", () => {
-        render(<QuietHoursCard initial={OFF} timeZone="Europe/Madrid" />, { wrapper: MessagesWrapper });
+        render(<QuietHoursCard initial={OFF} timeZone="Europe/Madrid" />, {
+            wrapper: MessagesWrapper
+        });
         expect(screen.getByText(/Europe\/Madrid/)).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(
+            true
+        );
     });
 
     it("saves the window once switched on", async () => {

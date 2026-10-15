@@ -6,7 +6,13 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clearsMinLevel, heldByQuietHours, inQuietHours, parseQuietHours, type QuietHours } from "@polaris/core";
+import {
+    clearsMinLevel,
+    heldByQuietHours,
+    inQuietHours,
+    parseQuietHours,
+    type QuietHours
+} from "@polaris/core";
 
 const created = vi.fn(async () => {});
 const sent = vi.fn(async () => ({}));
@@ -17,8 +23,16 @@ let floor: "info" | "warning" | "danger" = "info";
 vi.mock("@polaris/db", () => ({
     prisma: {
         notificationDelivery: {
-            create: async ({ data }: { data: { kind: string; status: string; detail: string | null } }) => {
-                deliveries.push({ kind: data.kind, status: data.status, detail: data.detail ?? null });
+            create: async ({
+                data
+            }: {
+                data: { kind: string; status: string; detail: string | null };
+            }) => {
+                deliveries.push({
+                    kind: data.kind,
+                    status: data.status,
+                    detail: data.detail ?? null
+                });
                 return data;
             }
         },
@@ -26,10 +40,14 @@ vi.mock("@polaris/db", () => ({
         userEmail: { findFirst: async () => null }
     }
 }));
-vi.mock("@/lib/notification-service", () => ({ createNotification: (input: unknown) => created(input as never) }));
+vi.mock("@/lib/notification-service", () => ({
+    createNotification: (input: unknown) => created(input as never)
+}));
 vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.test" }));
 vi.mock("@/lib/auth-mail", () => ({ sendAuthEmail: async () => ({}) }));
-vi.mock("@/lib/display-prefs-service", () => ({ resolveDisplayPreferencesFor: async () => ({ timeZone: "UTC" }) }));
+vi.mock("@/lib/display-prefs-service", () => ({
+    resolveDisplayPreferencesFor: async () => ({ timeZone: "UTC" })
+}));
 vi.mock("../../src/lib/notifications/preferences", () => ({
     getNotificationPreferences: async () => ({
         "deploy.failed": { inapp: true, email: false, destinations: ["d1"] },
@@ -51,11 +69,17 @@ vi.mock("../../src/lib/notifications/destinations", () => ({
         target: "https://discord.com/api/webhooks/1/x"
     })
 }));
-vi.mock("../../src/lib/notifications/webhook-sender", () => ({ sendWebhook: (...args: unknown[]) => sent(...(args as [])) }));
-vi.mock("../../src/lib/notifications/outbound-hooks", () => ({ queueOutboundHooks: async () => {} }));
+vi.mock("../../src/lib/notifications/webhook-sender", () => ({
+    sendWebhook: (...args: unknown[]) => sent(...(args as []))
+}));
+vi.mock("../../src/lib/notifications/outbound-hooks", () => ({
+    queueOutboundHooks: async () => {}
+}));
 vi.mock("../../src/lib/notifications/sms-service", () => ({ sendSms: async () => ({}) }));
 
-const { notify, QUIET_HOURS, QUIET_SEVERITY } = await import("../../src/lib/notifications/dispatch");
+const { notify, QUIET_HOURS, QUIET_SEVERITY } = await import(
+    "../../src/lib/notifications/dispatch"
+);
 
 /** Let the fan-out the caller does not wait for finish. */
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
@@ -81,7 +105,11 @@ describe("severity floor", () => {
         await settle();
         expect(created).toHaveBeenCalledTimes(1);
         expect(sent).not.toHaveBeenCalled();
-        expect(deliveries).toContainEqual({ kind: "webhook", status: "skipped", detail: QUIET_SEVERITY });
+        expect(deliveries).toContainEqual({
+            kind: "webhook",
+            status: "skipped",
+            detail: QUIET_SEVERITY
+        });
     });
 
     it("sends what clears the floor", async () => {
@@ -99,7 +127,9 @@ describe("quiet hours", () => {
         expect(inQuietHours(night, new Date("2026-10-15T23:30:00Z"), "UTC")).toBe(true);
         expect(inQuietHours(night, new Date("2026-10-15T07:59:00Z"), "UTC")).toBe(true);
         expect(inQuietHours(night, new Date("2026-10-15T08:00:00Z"), "UTC")).toBe(false);
-        expect(inQuietHours({ ...night, end: "22:00" }, new Date("2026-10-15T22:30:00Z"), "UTC")).toBe(false);
+        expect(
+            inQuietHours({ ...night, end: "22:00" }, new Date("2026-10-15T22:30:00Z"), "UTC")
+        ).toBe(false);
     });
 
     it("reads the window on the account's own clock", () => {
@@ -118,7 +148,16 @@ describe("quiet hours", () => {
 
     it("falls back to off for a stored value that no longer parses", () => {
         expect(parseQuietHours("{bad").enabled).toBe(false);
-        expect(parseQuietHours(JSON.stringify({ enabled: true, start: "25:00", end: "08:00", criticalBypass: true })).enabled).toBe(false);
+        expect(
+            parseQuietHours(
+                JSON.stringify({
+                    enabled: true,
+                    start: "25:00",
+                    end: "08:00",
+                    criticalBypass: true
+                })
+            ).enabled
+        ).toBe(false);
     });
 
     it("holds the webhook back and still writes the bell", async () => {
@@ -127,6 +166,10 @@ describe("quiet hours", () => {
         await settle();
         expect(created).toHaveBeenCalledTimes(1);
         expect(sent).not.toHaveBeenCalled();
-        expect(deliveries).toContainEqual({ kind: "webhook", status: "skipped", detail: QUIET_HOURS });
+        expect(deliveries).toContainEqual({
+            kind: "webhook",
+            status: "skipped",
+            detail: QUIET_HOURS
+        });
     });
 });

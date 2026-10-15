@@ -49,7 +49,13 @@ type Open =
     | { kind: "log"; hook: OutboundHookView }
     | null;
 
-export function WebhooksView({ hooks, events }: { hooks: OutboundHookView[]; events: EventOption[] }) {
+export function WebhooksView({
+    hooks,
+    events
+}: {
+    hooks: OutboundHookView[];
+    events: EventOption[];
+}) {
     const router = useRouter();
     const t = useTranslations("accountNotifications");
     const [open, setOpen] = useState<Open>(null);
@@ -104,14 +110,21 @@ export function WebhooksView({ hooks, events }: { hooks: OutboundHookView[]; eve
                         </p>
                     ) : null}
                 </div>
-                <Button size="sm" variant="secondary" disabled={atLimit} onClick={() => setOpen({ kind: "add" })}>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={atLimit}
+                    onClick={() => setOpen({ kind: "add" })}
+                >
                     <Plus className="size-4" />
                     {t("webhooks.list.add")}
                 </Button>
             </CardHeader>
             <CardBody className="p-0">
                 {hooks.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-sm text-muted-foreground">{t("webhooks.list.empty")}</p>
+                    <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        {t("webhooks.list.empty")}
+                    </p>
                 ) : (
                     <ul className="divide-y divide-border">
                         {hooks.map((hook) => {
@@ -128,28 +141,59 @@ export function WebhooksView({ hooks, events }: { hooks: OutboundHookView[]; eve
                                             >
                                                 {hook.name}
                                             </button>
-                                            <p className="truncate text-xs text-muted-foreground" title={hook.urlHint}>
-                                                {hook.urlHint} - {t("webhooks.list.eventCount", { count: hook.events.length })}
+                                            <p
+                                                className="truncate text-xs text-muted-foreground"
+                                                title={hook.urlHint}
+                                            >
+                                                {hook.urlHint} -{" "}
+                                                {t("webhooks.list.eventCount", {
+                                                    count: hook.events.length
+                                                })}
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1">
-                                            {!on ? <Badge variant={hook.disabledReason ? "danger" : "neutral"}>{t("webhooks.list.off")}</Badge> : null}
+                                            {!on ? (
+                                                <Badge
+                                                    variant={
+                                                        hook.disabledReason ? "danger" : "neutral"
+                                                    }
+                                                >
+                                                    {t("webhooks.list.off")}
+                                                </Badge>
+                                            ) : null}
                                             <Switch
                                                 checked={on}
                                                 disabled={pending}
                                                 onChange={(next) => toggle(hook, next)}
-                                                aria-label={on ? t("webhooks.list.switchOff") : t("webhooks.list.switchOn")}
+                                                aria-label={
+                                                    on
+                                                        ? t("webhooks.list.switchOff")
+                                                        : t("webhooks.list.switchOn")
+                                                }
                                             />
-                                            <IconAction label={t("webhooks.list.test")} disabled={pending || !on} onClick={() => test(hook)}>
+                                            <IconAction
+                                                label={t("webhooks.list.test")}
+                                                disabled={pending || !on}
+                                                onClick={() => test(hook)}
+                                            >
                                                 <Send className="size-4" />
                                             </IconAction>
-                                            <IconAction label={t("webhooks.list.log")} onClick={() => setOpen({ kind: "log", hook })}>
+                                            <IconAction
+                                                label={t("webhooks.list.log")}
+                                                onClick={() => setOpen({ kind: "log", hook })}
+                                            >
                                                 <ScrollText className="size-4" />
                                             </IconAction>
-                                            <IconAction label={t("webhooks.list.editEvents")} onClick={() => setOpen({ kind: "events", hook })}>
+                                            <IconAction
+                                                label={t("webhooks.list.editEvents")}
+                                                onClick={() => setOpen({ kind: "events", hook })}
+                                            >
                                                 <ListChecks className="size-4" />
                                             </IconAction>
-                                            <IconAction label={t("webhooks.list.rotate")} onClick={() => setOpen({ kind: "rotate", hook })}>
+                                            <IconAction
+                                                label={t("webhooks.list.rotate")}
+                                                onClick={() => setOpen({ kind: "rotate", hook })}
+                                            >
                                                 <KeyRound className="size-4" />
                                             </IconAction>
                                             <IconAction
@@ -162,15 +206,30 @@ export function WebhooksView({ hooks, events }: { hooks: OutboundHookView[]; eve
                                         </div>
                                     </div>
                                     {hook.disabledReason && !on ? (
-                                        <p className="text-xs text-danger">{t("webhooks.list.switchedOff")}</p>
+                                        <p className="text-xs text-danger">
+                                            {t("webhooks.list.switchedOff")}
+                                        </p>
                                     ) : null}
                                     {notice?.id === hook.id ? (
-                                        <p className={notice.ok ? "text-xs text-success" : "text-xs text-danger"}>{notice.text}</p>
+                                        <p
+                                            className={
+                                                notice.ok
+                                                    ? "text-xs text-success"
+                                                    : "text-xs text-danger"
+                                            }
+                                        >
+                                            {notice.text}
+                                        </p>
                                     ) : (
                                         <p className="text-xs text-muted-foreground">
                                             {hook.lastDeliveryAt
                                                 ? t.rich("webhooks.list.lastDelivery", {
-                                                      time: <RelativeTime key="time" iso={hook.lastDeliveryAt} />
+                                                      time: (
+                                                          <RelativeTime
+                                                              key="time"
+                                                              iso={hook.lastDeliveryAt}
+                                                          />
+                                                      )
                                                   })
                                                 : t("webhooks.list.neverDelivered")}
                                         </p>
@@ -193,7 +252,12 @@ export function WebhooksView({ hooks, events }: { hooks: OutboundHookView[]; eve
                 />
             ) : null}
             {open?.kind === "events" ? (
-                <EndpointDialog events={events} hook={open.hook} onClose={close} onCreated={close} />
+                <EndpointDialog
+                    events={events}
+                    hook={open.hook}
+                    onClose={close}
+                    onCreated={close}
+                />
             ) : null}
             {open?.kind === "secret" ? <SecretDialog secret={open.secret} onClose={close} /> : null}
             {open?.kind === "log" ? <DeliveryLogDialog hook={open.hook} onClose={close} /> : null}
@@ -211,7 +275,9 @@ export function WebhooksView({ hooks, events }: { hooks: OutboundHookView[]; eve
                     error={dialogError}
                     onConfirm={() =>
                         startTransition(async () => {
-                            const result = await actions.rotateOutboundHookSecretAction(open.hook.id);
+                            const result = await actions.rotateOutboundHookSecretAction(
+                                open.hook.id
+                            );
                             if (!result.secret) return setDialogError(result.error ?? null);
                             setDialogError(null);
                             setOpen({ kind: "secret", secret: result.secret });
@@ -302,7 +368,8 @@ function EndpointDialog({
         if (checked.success) return null;
         const issue = checked.error.issues.find((entry) => entry.path[0] === field);
         // An empty field is not yet filled, not wrong.
-        const empty = field === "name" ? !name.trim() : field === "url" ? !url.trim() : picked.size === 0;
+        const empty =
+            field === "name" ? !name.trim() : field === "url" ? !url.trim() : picked.size === 0;
         return issue && !empty ? issue.message : null;
     };
     const unchanged =
@@ -324,7 +391,10 @@ function EndpointDialog({
         setError(null);
         startTransition(async () => {
             if (hook) {
-                const result = await actions.setOutboundHookEventsAction(hook.id, checked.data.events);
+                const result = await actions.setOutboundHookEventsAction(
+                    hook.id,
+                    checked.data.events
+                );
                 if (result.error) return setError(result.error);
                 router.refresh();
                 onCreated("");
@@ -340,7 +410,11 @@ function EndpointDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{hook ? t("webhooks.form.editTitle", { name: hook.name }) : t("webhooks.form.title")}</DialogTitle>
+                    <DialogTitle>
+                        {hook
+                            ? t("webhooks.form.editTitle", { name: hook.name })
+                            : t("webhooks.form.title")}
+                    </DialogTitle>
                     <DialogDescription>
                         {hook ? t("webhooks.form.editDescription") : t("webhooks.form.description")}
                     </DialogDescription>
@@ -356,7 +430,11 @@ function EndpointDialog({
                                     onChange={(event) => setName(event.target.value)}
                                     placeholder={t("webhooks.form.namePlaceholder")}
                                 />
-                                {fieldError("name") ? <span className="text-xs text-danger">{fieldError("name")}</span> : null}
+                                {fieldError("name") ? (
+                                    <span className="text-xs text-danger">
+                                        {fieldError("name")}
+                                    </span>
+                                ) : null}
                             </label>
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">{t("webhooks.form.url")} *</span>
@@ -368,7 +446,9 @@ function EndpointDialog({
                                     onChange={(event) => setUrl(event.target.value)}
                                     placeholder="https://example.com/hooks/polaris"
                                 />
-                                {fieldError("url") ? <span className="text-xs text-danger">{fieldError("url")}</span> : null}
+                                {fieldError("url") ? (
+                                    <span className="text-xs text-danger">{fieldError("url")}</span>
+                                ) : null}
                             </label>
                         </>
                     )}
@@ -381,10 +461,18 @@ function EndpointDialog({
                                 </span>
                             </span>
                             <div className="flex shrink-0 gap-1">
-                                <Button size="xs" variant="ghost" onClick={() => setPicked(new Set(events.map((e) => e.id)))}>
+                                <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    onClick={() => setPicked(new Set(events.map((e) => e.id)))}
+                                >
                                     {t("webhooks.form.selectAll")}
                                 </Button>
-                                <Button size="xs" variant="ghost" onClick={() => setPicked(new Set())}>
+                                <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    onClick={() => setPicked(new Set())}
+                                >
                                     {t("webhooks.form.selectNone")}
                                 </Button>
                             </div>
@@ -392,16 +480,26 @@ function EndpointDialog({
                         <div className="max-h-64 overflow-y-auto overscroll-contain rounded-md border border-border p-2">
                             {groups.map((group) => (
                                 <fieldset key={group} className="mb-2 last:mb-0">
-                                    <legend className="text-xs font-medium text-muted-foreground">{group}</legend>
+                                    <legend className="text-xs font-medium text-muted-foreground">
+                                        {group}
+                                    </legend>
                                     {events
                                         .filter((event) => event.group === group)
                                         .map((event) => (
-                                            <label key={event.id} className="flex min-w-0 items-center gap-2 py-0.5">
+                                            <label
+                                                key={event.id}
+                                                className="flex min-w-0 items-center gap-2 py-0.5"
+                                            >
                                                 <Checkbox
                                                     checked={picked.has(event.id)}
-                                                    onChange={(change) => flip(event.id, change.target.checked)}
+                                                    onChange={(change) =>
+                                                        flip(event.id, change.target.checked)
+                                                    }
                                                 />
-                                                <span className="min-w-0 truncate" title={event.label}>
+                                                <span
+                                                    className="min-w-0 truncate"
+                                                    title={event.label}
+                                                >
                                                     {event.label}
                                                 </span>
                                             </label>
@@ -415,7 +513,10 @@ function EndpointDialog({
                         <Button variant="ghost" onClick={onClose} disabled={pending}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button onClick={submit} disabled={pending || !checked.success || unchanged}>
+                        <Button
+                            onClick={submit}
+                            disabled={pending || !checked.success || unchanged}
+                        >
                             {hook ? t("webhooks.form.save") : t("webhooks.list.add")}
                         </Button>
                     </div>

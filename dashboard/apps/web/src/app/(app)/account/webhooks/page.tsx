@@ -34,7 +34,9 @@ export default async function WebhooksPage() {
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("webhooks.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("webhooks.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("webhooks.page.intro")}</p>
             </div>
             <WebhooksView hooks={hooks} events={events} />

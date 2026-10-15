@@ -43,7 +43,9 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div className="min-w-0">
                     <CardTitle>{t("quiet.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{t("quiet.description", { zone: timeZone })}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("quiet.description", { zone: timeZone })}
+                    </p>
                 </div>
                 <Switch
                     checked={draft.enabled}
@@ -81,10 +83,16 @@ export function QuietHoursCard({ initial, timeZone }: { initial: QuietHours; tim
                         aria-label={t("quiet.critical")}
                     />
                 </label>
-                {!checked.success ? <p className="text-xs text-danger">{t("quiet.invalid")}</p> : null}
+                {!checked.success ? (
+                    <p className="text-xs text-danger">{t("quiet.invalid")}</p>
+                ) : null}
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
                 <div className="flex justify-end">
-                    <Button size="sm" onClick={save} disabled={pending || !changed || !checked.success}>
+                    <Button
+                        size="sm"
+                        onClick={save}
+                        disabled={pending || !changed || !checked.success}
+                    >
                         {t("quiet.save")}
                     </Button>
                 </div>

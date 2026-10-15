@@ -72,7 +72,10 @@ export const inboundHeadersSchema = z.object({
         .min(1)
         .max(200)
         .regex(/^[A-Za-z0-9._:-]+$/),
-    timestamp: z.string().regex(/^\d{1,12}$/).transform(Number),
+    timestamp: z
+        .string()
+        .regex(/^\d{1,12}$/)
+        .transform(Number),
     signature: z.string().regex(/^sha256=[0-9a-f]{64}$/i)
 });
 
@@ -95,7 +98,10 @@ async function mayDeploy(userId: string): Promise<boolean> {
 }
 
 /** The project access to redeploy this service, or null when it is not held. */
-async function redeployAccess(applicationId: string, userId: string): Promise<access.ProjectAccess | null> {
+async function redeployAccess(
+    applicationId: string,
+    userId: string
+): Promise<access.ProjectAccess | null> {
     if (!(await mayDeploy(userId))) return null;
     try {
         return await access.requireApplicationAccess(applicationId, userId, "deploy.run");
@@ -109,14 +115,24 @@ export async function redeployableServices(userId: string): Promise<Redeployable
     if (!(await mayDeploy(userId))) return [];
     const projectIds = await access.visibleProjectIds(userId);
     const reachable = (
-        await Promise.all(projectIds.map((id) => access.projectAccess(id, userId).catch(() => null)))
-    ).filter((entry): entry is access.ProjectAccess => entry !== null && access.accessCan(entry, "deploy.run"));
+        await Promise.all(
+            projectIds.map((id) => access.projectAccess(id, userId).catch(() => null))
+        )
+    ).filter(
+        (entry): entry is access.ProjectAccess =>
+            entry !== null && access.accessCan(entry, "deploy.run")
+    );
     if (reachable.length === 0) return [];
     const apps = await prisma.application.findMany({
         where: { environment: { projectId: { in: reachable.map((entry) => entry.projectId) } } },
         orderBy: { name: "asc" },
         take: 500,
-        select: { id: true, name: true, environmentId: true, environment: { select: { projectId: true, project: { select: { name: true } } } } }
+        select: {
+            id: true,
+            name: true,
+            environmentId: true,
+            environment: { select: { projectId: true, project: { select: { name: true } } } }
+        }
     });
     const byProject = new Map(reachable.map((entry) => [entry.projectId, entry]));
     return apps
@@ -158,15 +174,26 @@ export async function listInboundHooks(userId: string): Promise<InboundHookView[
 export async function createInboundHook(
     userId: string,
     input: z.infer<typeof inboundHookInputSchema>
-): Promise<{ hook: InboundHookView; secret: string } | { error: "rateLimited" | "limit" | "forbidden" }> {
+): Promise<
+    { hook: InboundHookView; secret: string } | { error: "rateLimited" | "limit" | "forbidden" }
+> {
     const limited = await rateLimit(`inbound-hook:create:${userId}`, 10, 10 * 60_000);
     if (!limited.ok) return { error: "rateLimited" };
-    if ((await prisma.inboundWebhook.count({ where: { userId } })) >= MAX_INBOUND_HOOKS) return { error: "limit" };
+    if ((await prisma.inboundWebhook.count({ where: { userId } })) >= MAX_INBOUND_HOOKS)
+        return { error: "limit" };
     if (!(await redeployAccess(input.applicationId, userId))) return { error: "forbidden" };
     const secret = newSigningSecret();
     const row = await prisma.inboundWebhook.create({
         data: { userId, applicationId: input.applicationId, name: input.name, ...sealed(secret) },
-        select: { id: true, name: true, applicationId: true, enabled: true, lastUsedAt: true, createdAt: true, application: { select: { name: true } } }
+        select: {
+            id: true,
+            name: true,
+            applicationId: true,
+            enabled: true,
+            lastUsedAt: true,
+            createdAt: true,
+            application: { select: { name: true } }
+        }
     });
     return {
         secret,
@@ -182,8 +209,15 @@ export async function createInboundHook(
     };
 }
 
-export async function setInboundHookEnabled(userId: string, id: string, enabled: boolean): Promise<boolean> {
-    return (await prisma.inboundWebhook.updateMany({ where: { id, userId }, data: { enabled } })).count > 0;
+export async function setInboundHookEnabled(
+    userId: string,
+    id: string,
+    enabled: boolean
+): Promise<boolean> {
+    return (
+        (await prisma.inboundWebhook.updateMany({ where: { id, userId }, data: { enabled } }))
+            .count > 0
+    );
 }
 
 export async function deleteInboundHook(userId: string, id: string): Promise<boolean> {
@@ -216,11 +250,16 @@ export async function receiveInbound(input: {
     now?: Date;
 }): Promise<InboundOutcome> {
     const now = input.now ?? new Date();
-    if (!z.string().uuid().safeParse(input.id).success) return { status: 404, reason: "Not found." };
-    if (Buffer.byteLength(input.body) > MAX_BODY_BYTES) return { status: 413, reason: "Body too large." };
+    if (!z.string().uuid().safeParse(input.id).success)
+        return { status: 404, reason: "Not found." };
+    if (Buffer.byteLength(input.body) > MAX_BODY_BYTES)
+        return { status: 413, reason: "Body too large." };
     const headers = inboundHeadersSchema.safeParse(input.headers);
     if (!headers.success) {
-        return { status: 400, reason: "X-Polaris-Delivery, X-Polaris-Timestamp and X-Polaris-Signature are required." };
+        return {
+            status: 400,
+            reason: "X-Polaris-Delivery, X-Polaris-Timestamp and X-Polaris-Signature are required."
+        };
     }
 
     const [byIp, byHook] = await Promise.all([
@@ -232,7 +271,15 @@ export async function receiveInbound(input: {
     const unsigned: InboundOutcome = { status: 401, reason: "Signature does not match." };
     const hook = await prisma.inboundWebhook.findUnique({
         where: { id: input.id },
-        select: { id: true, userId: true, applicationId: true, enabled: true, encryptedSecret: true, secretNonce: true, secretKeyId: true }
+        select: {
+            id: true,
+            userId: true,
+            applicationId: true,
+            enabled: true,
+            encryptedSecret: true,
+            secretNonce: true,
+            secretKeyId: true
+        }
     });
     if (!hook || !hook.enabled) return unsigned;
 
@@ -243,7 +290,11 @@ export async function receiveInbound(input: {
     let secret: string;
     try {
         secret = decryptSecret(
-            { ciphertext: Buffer.from(hook.encryptedSecret), nonce: Buffer.from(hook.secretNonce), keyId: hook.secretKeyId ?? "" },
+            {
+                ciphertext: Buffer.from(hook.encryptedSecret),
+                nonce: Buffer.from(hook.secretNonce),
+                keyId: hook.secretKeyId ?? ""
+            },
             loadEnv().POLARIS_MASTER_KEY
         );
     } catch {
@@ -256,38 +307,56 @@ export async function receiveInbound(input: {
     let receiptId: string;
     try {
         const receipt = await prisma.inboundWebhookReceipt.create({
-            data: { hookId: hook.id, deliveryId: signature.toLowerCase(), expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS) },
+            data: {
+                hookId: hook.id,
+                deliveryId: signature.toLowerCase(),
+                expiresAt: new Date(now.getTime() + RECEIPT_TTL_MS)
+            },
             select: { id: true }
         });
         receiptId = receipt.id;
     } catch (error) {
-        if (isUniqueViolation(error)) return { status: 409, reason: "This delivery was already received." };
+        if (isUniqueViolation(error))
+            return { status: 409, reason: "This delivery was already received." };
         throw error;
     }
-    const release = () => prisma.inboundWebhookReceipt.deleteMany({ where: { id: receiptId } }).catch(() => null);
+    const release = () =>
+        prisma.inboundWebhookReceipt.deleteMany({ where: { id: receiptId } }).catch(() => null);
 
-    const granted = await redeployAccess(hook.applicationId, hook.userId).catch(async (error: unknown) => {
-        await release();
-        throw error;
-    });
+    const granted = await redeployAccess(hook.applicationId, hook.userId).catch(
+        async (error: unknown) => {
+            await release();
+            throw error;
+        }
+    );
     if (!granted) {
         await release();
-        return { status: 403, reason: "The account that made this hook may no longer deploy this service." };
+        return {
+            status: 403,
+            reason: "The account that made this hook may no longer deploy this service."
+        };
     }
 
     const deployService = await import("@/lib/deploy-service");
     let deploymentId: string;
     try {
-        deploymentId = await deployService.deployApplication(hook.applicationId, granted.ownerId, hook.userId);
+        deploymentId = await deployService.deployApplication(
+            hook.applicationId,
+            granted.ownerId,
+            hook.userId
+        );
     } catch (error) {
         await release();
         throw error;
     }
-    await prisma.inboundWebhook.update({ where: { id: hook.id }, data: { lastUsedAt: now } }).catch(() => null);
+    await prisma.inboundWebhook
+        .update({ where: { id: hook.id }, data: { lastUsedAt: now } })
+        .catch(() => null);
     return { status: 202, deploymentId };
 }
 
 /** Forget signatures that could no longer pass the timestamp check anyway. */
 export async function pruneInboundReceipts(now: Date = new Date()): Promise<number> {
-    return (await prisma.inboundWebhookReceipt.deleteMany({ where: { expiresAt: { lt: now } } })).count;
+    return (await prisma.inboundWebhookReceipt.deleteMany({ where: { expiresAt: { lt: now } } }))
+        .count;
 }

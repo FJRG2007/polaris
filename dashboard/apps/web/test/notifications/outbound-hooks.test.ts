@@ -70,7 +70,8 @@ function matches(row: Record<string, unknown>, where: Record<string, unknown>): 
 function apply<T extends Record<string, unknown>>(row: T, data: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(data)) {
         if (value && typeof value === "object" && "increment" in (value as object)) {
-            (row as Record<string, unknown>)[key] = (row[key] as number) + (value as { increment: number }).increment;
+            (row as Record<string, unknown>)[key] =
+                (row[key] as number) + (value as { increment: number }).increment;
         } else {
             (row as Record<string, unknown>)[key] = value;
         }
@@ -103,12 +104,24 @@ vi.mock("@polaris/db", () => ({
                 hooks.filter((h) => matches(h, where)).map(pick),
             findFirst: async ({ where }: { where: Record<string, unknown> }) =>
                 hooks.find((h) => matches(h, where)) ?? null,
-            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Record<string, unknown>;
+            }) => {
                 const row = hooks.find((h) => h.id === where.id)!;
                 apply(row, data);
                 return pick(row);
             },
-            updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Record<string, unknown>;
+            }) => {
                 const rows = hooks.filter((h) => matches(h, where));
                 rows.forEach((row) => apply(row, data));
                 return { count: rows.length };
@@ -159,12 +172,24 @@ vi.mock("@polaris/db", () => ({
                 if (cursor) rows = rows.slice(rows.findIndex((d) => d.id === cursor.id) + 1);
                 return rows.slice(0, take).map(pick);
             },
-            update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+            update: async ({
+                where,
+                data
+            }: {
+                where: { id: string };
+                data: Record<string, unknown>;
+            }) => {
                 const row = deliveries.find((d) => d.id === where.id)!;
                 apply(row, data);
                 return pick(row);
             },
-            updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Record<string, unknown>;
+            }) => {
                 const rows = deliveries.filter((d) => matches(d, where));
                 rows.forEach((row) => apply(row, data));
                 return { count: rows.length };
@@ -179,7 +204,11 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k" }) }));
 vi.mock("@polaris/storage", () => ({
-    encryptSecret: (value: string) => ({ ciphertext: enc.encode(value), nonce: new Uint8Array([1]), keyId: "k1" }),
+    encryptSecret: (value: string) => ({
+        ciphertext: enc.encode(value),
+        nonce: new Uint8Array([1]),
+        keyId: "k1"
+    }),
     decryptSecret: (blob: { ciphertext: Uint8Array }) => dec.decode(blob.ciphertext)
 }));
 
@@ -188,7 +217,8 @@ vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => ({ ok: allowRate, retryAfterMs: allowRate ? 0 : 1000 })
 }));
 
-const requests: Array<{ url: string; init: { headers: Record<string, string>; body: string } }> = [];
+const requests: Array<{ url: string; init: { headers: Record<string, string>; body: string } }> =
+    [];
 let respond: () => Promise<{ status: number }> = async () => ({ status: 200 });
 vi.mock("@/lib/safe-fetch", () => {
     class RefusedAddressError extends Error {}
@@ -202,7 +232,10 @@ vi.mock("@/lib/safe-fetch", () => {
             }
         },
         reachable: async (host: string) => host !== "10.0.0.1",
-        configuredRequest: async (url: string, init: { headers: Record<string, string>; body: string }) => {
+        configuredRequest: async (
+            url: string,
+            init: { headers: Record<string, string>; body: string }
+        ) => {
             requests.push({ url, init });
             const response = await respond();
             return { status: response.status, body: null };
@@ -211,9 +244,12 @@ vi.mock("@/lib/safe-fetch", () => {
 });
 
 const notified = vi.fn(async () => {});
-vi.mock("../../src/lib/notifications/dispatch", () => ({ notify: (input: unknown) => notified(input as never) }));
+vi.mock("../../src/lib/notifications/dispatch", () => ({
+    notify: (input: unknown) => notified(input as never)
+}));
 vi.mock("../../src/lib/notifications/notice-words", () => ({
-    wordsFor: async () => (key: string, values?: Record<string, string>) => `${key}${values ? JSON.stringify(values) : ""}`
+    wordsFor: async () => (key: string, values?: Record<string, string>) =>
+        `${key}${values ? JSON.stringify(values) : ""}`
 }));
 
 const hooksModule = await import("../../src/lib/notifications/outbound-hooks");
@@ -240,7 +276,11 @@ const PAYLOAD = {
 };
 
 async function addHook(events = ["deploy.failed"]): Promise<{ id: string; secret: string }> {
-    const created = await createOutboundHook("u1", { name: "Ops", url: "https://hooks.example.test/in", events });
+    const created = await createOutboundHook("u1", {
+        name: "Ops",
+        url: "https://hooks.example.test/in",
+        events
+    });
     if ("error" in created) throw new Error(created.error);
     return { id: created.hook.id, secret: created.secret };
 }
@@ -355,13 +395,17 @@ describe("switching off", () => {
         for (let i = 0; i < DISABLE_AFTER_FAILURES; i++) {
             await queueOutboundHooks("u1", PAYLOAD);
             const row = deliveries[deliveries.length - 1]!;
-            while (row.status === "pending") await attemptDelivery(row.id, { now: row.nextAttemptAt! });
+            while (row.status === "pending")
+                await attemptDelivery(row.id, { now: row.nextAttemptAt! });
         }
         const hook = hooks.find((h) => h.id === id)!;
         expect(hook.enabled).toBe(false);
         expect(hook.disabledReason).toBe("failures");
         expect(notified).toHaveBeenCalledTimes(1);
-        expect(notified.mock.calls[0]![0]).toMatchObject({ userId: "u1", event: "webhook.disabled" });
+        expect(notified.mock.calls[0]![0]).toMatchObject({
+            userId: "u1",
+            event: "webhook.disabled"
+        });
     });
 
     it("starts the count over after a success", async () => {
@@ -375,7 +419,12 @@ describe("switching off", () => {
         const { id } = await addHook();
         hooks[0]!.consecutiveFailures = 4;
         respond = async () => ({ status: 500 });
-        const result = await testOutboundHook("u1", id, { level: "info", title: "t", body: null, url: null });
+        const result = await testOutboundHook("u1", id, {
+            level: "info",
+            title: "t",
+            body: null,
+            url: null
+        });
         expect(result).toMatchObject({ status: "failed" });
         expect(hooks[0]!.enabled).toBe(true);
         expect(hooks[0]!.consecutiveFailures).toBe(4);
@@ -440,13 +489,25 @@ describe("the log", () => {
 describe("limits", () => {
     it("keeps at most twenty endpoints per account", async () => {
         for (let i = 0; i < 20; i++) await addHook();
-        expect(await createOutboundHook("u1", { name: "x", url: "https://a.test/", events: ["deploy.failed"] })).toEqual({
+        expect(
+            await createOutboundHook("u1", {
+                name: "x",
+                url: "https://a.test/",
+                events: ["deploy.failed"]
+            })
+        ).toEqual({
             error: "limit"
         });
     });
 
     it("refuses a private address", async () => {
-        expect(await createOutboundHook("u1", { name: "x", url: "http://10.0.0.1/", events: ["deploy.failed"] })).toEqual({
+        expect(
+            await createOutboundHook("u1", {
+                name: "x",
+                url: "http://10.0.0.1/",
+                events: ["deploy.failed"]
+            })
+        ).toEqual({
             error: "unreachable"
         });
     });
@@ -455,7 +516,9 @@ describe("limits", () => {
         const { id } = await addHook();
         allowRate = false;
         expect(await addHook().catch((error: Error) => error.message)).toBe("rateLimited");
-        expect(await testOutboundHook("u1", id, { level: "info", title: "t", body: null, url: null })).toEqual({
+        expect(
+            await testOutboundHook("u1", id, { level: "info", title: "t", body: null, url: null })
+        ).toEqual({
             error: "rateLimited"
         });
         expect(await redeliverOutbound("u1", "x")).toEqual({ error: "rateLimited" });

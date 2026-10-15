@@ -13,7 +13,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
-const create = vi.fn(async (_input: unknown) => ({ secret: "whsec_fixture", hook: undefined as unknown }));
+const create = vi.fn(async (_input: unknown) => ({
+    secret: "whsec_fixture",
+    hook: undefined as unknown
+}));
 const remove = vi.fn(async (_id: unknown) => ({}));
 const list = vi.fn(async (_id: unknown, _cursor: unknown) => ({
     page: {
@@ -107,7 +110,11 @@ describe("the webhooks page", () => {
         expect(submit.disabled).toBe(false);
         fireEvent.click(submit);
         await waitFor(() =>
-            expect(create).toHaveBeenCalledWith({ name: "Ops", url: "https://hooks.example.test/in", events: ["deploy.failed"] })
+            expect(create).toHaveBeenCalledWith({
+                name: "Ops",
+                url: "https://hooks.example.test/in",
+                events: ["deploy.failed"]
+            })
         );
         expect(await screen.findByText("whsec_fixture")).toBeTruthy();
     });
@@ -125,18 +132,25 @@ describe("the webhooks page", () => {
         fireEvent.click(screen.getByRole("button", { name: "Delivery log" }));
         expect(await screen.findByText("It answered 500.")).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Redeliver" }));
-        await waitFor(() => expect(redeliver).toHaveBeenCalledWith("00000000-0000-7000-8000-000000000002"));
+        await waitFor(() =>
+            expect(redeliver).toHaveBeenCalledWith("00000000-0000-7000-8000-000000000002")
+        );
         expect(await screen.findByText("Sent again.")).toBeTruthy();
     });
 });
 
 describe("deploy hooks", () => {
     it("offers nothing to add when no service can be redeployed", () => {
-        render(<InboundHooksCard hooks={[]} services={[]} baseUrl="https://polaris.example.test" />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <InboundHooksCard hooks={[]} services={[]} baseUrl="https://polaris.example.test" />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(screen.getByText(/no services you can redeploy/)).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Add deploy hook" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByRole("button", { name: "Add deploy hook" }) as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 
     it("names the service a hook redeploys", () => {
@@ -153,7 +167,9 @@ describe("deploy hooks", () => {
                         createdAt: "2026-10-01T00:00:00.000Z"
                     }
                 ]}
-                services={[{ id: "00000000-0000-7000-8000-0000000000bb", name: "api", project: "Shop" }]}
+                services={[
+                    { id: "00000000-0000-7000-8000-0000000000bb", name: "api", project: "Shop" }
+                ]}
                 baseUrl="https://polaris.example.test"
             />,
             { wrapper: MessagesWrapper }

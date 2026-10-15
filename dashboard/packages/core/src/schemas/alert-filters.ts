@@ -28,7 +28,11 @@ export function readMinLevel(raw: string | null | undefined): AlertMinLevel {
 }
 
 /** Whether an alert of `level` clears a destination's floor. */
-export function clearsMinLevel(level: NotificationLevel, floor: AlertMinLevel, critical = false): boolean {
+export function clearsMinLevel(
+    level: NotificationLevel,
+    floor: AlertMinLevel,
+    critical = false
+): boolean {
     if (critical) return true;
     return RANK[level] >= RANK[floor];
 }
@@ -97,7 +101,11 @@ export function minutesInZone(now: Date, timeZone: string | null | undefined): n
  * window whose end is earlier than its start runs over midnight; one whose
  * start and end are the same is empty rather than all day.
  */
-export function inQuietHours(quiet: QuietHours, now: Date, timeZone: string | null | undefined): boolean {
+export function inQuietHours(
+    quiet: QuietHours,
+    now: Date,
+    timeZone: string | null | undefined
+): boolean {
     if (!quiet.enabled) return false;
     const start = minutesOf(quiet.start);
     const end = minutesOf(quiet.end);

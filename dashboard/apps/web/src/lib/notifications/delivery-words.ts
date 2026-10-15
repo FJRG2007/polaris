@@ -34,7 +34,8 @@ const EXACT: Readonly<Record<string, Key>> = {
     "The endpoint is gone (404). It was probably deleted.": "delivery.endpointGone",
     "The endpoint refused the message (unauthorized).": "delivery.endpointUnauthorized",
     "The endpoint is rate limiting Polaris (429).": "delivery.endpointRateLimited",
-    "The destination is switched off, deleted, or its target cannot be read.": "delivery.destinationOff",
+    "The destination is switched off, deleted, or its target cannot be read.":
+        "delivery.destinationOff",
     "No confirmed address on the account.": "delivery.noAddress",
     "Marked read: you had the page it points at open.": "delivery.markedRead",
     "Turned off for this event.": "delivery.eventOff",

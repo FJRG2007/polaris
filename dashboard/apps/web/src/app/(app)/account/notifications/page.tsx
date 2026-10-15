@@ -23,28 +23,39 @@ export const dynamic = "force-dynamic";
 export default async function NotificationsPage() {
     const user = await requireUser();
     const t = await getTranslations("accountNotifications");
-    const [rules, destinations, senders, deliveries, inGameOffered, inGameReady, account, quietHours, display] =
-        await Promise.all([
-            describeNotificationRules(user.id),
-            listDestinations(user.id),
-            listSmsSenders(user.id),
-            listDeliveries(user.id),
-            // Offered only where an installed app can show a message in a game.
-            relaysChatToGames().catch(() => false),
-            // And chosen only once a server knows which of its players is them.
-            chatRelayReady(user.id).catch(() => false),
-            prisma.user.findUnique({
-                where: { id: user.id },
-                select: { messagesInGame: true, badgesClearOnVisit: true }
-            }),
-            getQuietHours(user.id),
-            resolveDisplayPreferencesFor(user.id)
-        ]);
+    const [
+        rules,
+        destinations,
+        senders,
+        deliveries,
+        inGameOffered,
+        inGameReady,
+        account,
+        quietHours,
+        display
+    ] = await Promise.all([
+        describeNotificationRules(user.id),
+        listDestinations(user.id),
+        listSmsSenders(user.id),
+        listDeliveries(user.id),
+        // Offered only where an installed app can show a message in a game.
+        relaysChatToGames().catch(() => false),
+        // And chosen only once a server knows which of its players is them.
+        chatRelayReady(user.id).catch(() => false),
+        prisma.user.findUnique({
+            where: { id: user.id },
+            select: { messagesInGame: true, badgesClearOnVisit: true }
+        }),
+        getQuietHours(user.id),
+        resolveDisplayPreferencesFor(user.id)
+    ]);
 
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("settings.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("settings.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("settings.page.intro")}</p>
             </div>
             <NotificationsPageView

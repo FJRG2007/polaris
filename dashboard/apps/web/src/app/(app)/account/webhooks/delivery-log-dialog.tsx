@@ -25,7 +25,13 @@ import {
 
 const STATUS_VARIANT = { sent: "success", pending: "warning", failed: "danger" } as const;
 
-export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; onClose: () => void }) {
+export function DeliveryLogDialog({
+    hook,
+    onClose
+}: {
+    hook: OutboundHookView;
+    onClose: () => void;
+}) {
     const t = useTranslations("accountNotifications");
     const [items, setItems] = useState<OutboundDeliveryView[] | null>(null);
     const [cursor, setCursor] = useState<string | null>(null);
@@ -63,7 +69,11 @@ export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; o
         try {
             const result = await redeliverOutboundAction(delivery.id);
             if (!result.delivery) {
-                setRowNote({ id: delivery.id, ok: false, text: result.error ?? t("webhooks.errors.notSaved") });
+                setRowNote({
+                    id: delivery.id,
+                    ok: false,
+                    text: result.error ?? t("webhooks.errors.notSaved")
+                });
                 return;
             }
             const fresh = result.delivery;
@@ -84,7 +94,9 @@ export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; o
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle className="truncate">{t("webhooks.deliveries.title", { name: hook.name })}</DialogTitle>
+                    <DialogTitle className="truncate">
+                        {t("webhooks.deliveries.title", { name: hook.name })}
+                    </DialogTitle>
                     <DialogDescription>{t("webhooks.deliveries.description")}</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[60vh] min-w-0 overflow-y-auto overscroll-contain">
@@ -95,7 +107,9 @@ export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; o
                             ))}
                         </div>
                     ) : items !== null && items.length === 0 ? (
-                        <p className="py-6 text-center text-sm text-muted-foreground">{t("webhooks.deliveries.empty")}</p>
+                        <p className="py-6 text-center text-sm text-muted-foreground">
+                            {t("webhooks.deliveries.empty")}
+                        </p>
                     ) : (
                         <ul className="divide-y divide-border">
                             {(items ?? []).map((delivery) => (
@@ -105,20 +119,33 @@ export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; o
                                             <Badge variant={STATUS_VARIANT[delivery.status]}>
                                                 {t(`webhooks.deliveries.status.${delivery.status}`)}
                                             </Badge>
-                                            <code className="min-w-0 truncate font-mono text-xs" title={delivery.event}>
+                                            <code
+                                                className="min-w-0 truncate font-mono text-xs"
+                                                title={delivery.event}
+                                            >
                                                 {delivery.event}
                                             </code>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                                             <RelativeTime iso={delivery.createdAt} />
-                                            <span>{t("webhooks.deliveries.attempts", { count: delivery.attempts })}</span>
+                                            <span>
+                                                {t("webhooks.deliveries.attempts", {
+                                                    count: delivery.attempts
+                                                })}
+                                            </span>
                                             {delivery.durationMs !== null ? (
-                                                <span>{t("webhooks.deliveries.took", { ms: delivery.durationMs })}</span>
+                                                <span>
+                                                    {t("webhooks.deliveries.took", {
+                                                        ms: delivery.durationMs
+                                                    })}
+                                                </span>
                                             ) : null}
                                             <Button
                                                 size="xs"
                                                 variant="outline"
-                                                disabled={busy !== null || delivery.status === "pending"}
+                                                disabled={
+                                                    busy !== null || delivery.status === "pending"
+                                                }
                                                 onClick={() => void redeliver(delivery)}
                                             >
                                                 {t("webhooks.deliveries.redeliver")}
@@ -126,17 +153,30 @@ export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; o
                                         </div>
                                     </div>
                                     {delivery.error ? (
-                                        <p className="text-xs text-danger">{deliveryReason(t, delivery)}</p>
+                                        <p className="text-xs text-danger">
+                                            {deliveryReason(t, delivery)}
+                                        </p>
                                     ) : null}
                                     {delivery.status === "pending" && delivery.nextAttemptAt ? (
                                         <p className="text-xs text-muted-foreground">
                                             {t.rich("webhooks.deliveries.nextTry", {
-                                                time: <RelativeTime key="time" iso={delivery.nextAttemptAt} />
+                                                time: (
+                                                    <RelativeTime
+                                                        key="time"
+                                                        iso={delivery.nextAttemptAt}
+                                                    />
+                                                )
                                             })}
                                         </p>
                                     ) : null}
                                     {rowNote?.id === delivery.id ? (
-                                        <p className={rowNote.ok ? "text-xs text-success" : "text-xs text-danger"}>
+                                        <p
+                                            className={
+                                                rowNote.ok
+                                                    ? "text-xs text-success"
+                                                    : "text-xs text-danger"
+                                            }
+                                        >
                                             {rowNote.text}
                                         </p>
                                     ) : null}
@@ -147,14 +187,23 @@ export function DeliveryLogDialog({ hook, onClose }: { hook: OutboundHookView; o
                     {failed ? (
                         <div className="flex items-center justify-center gap-2 py-4 text-sm text-danger">
                             {t("webhooks.deliveries.loadFailed")}
-                            <Button size="xs" variant="outline" onClick={() => void load(items ? cursor : null)}>
+                            <Button
+                                size="xs"
+                                variant="outline"
+                                onClick={() => void load(items ? cursor : null)}
+                            >
                                 {t("webhooks.deliveries.retry")}
                             </Button>
                         </div>
                     ) : null}
                     {cursor && !failed ? (
                         <div className="flex justify-center py-2">
-                            <Button size="sm" variant="ghost" disabled={loading} onClick={() => void load(cursor)}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={loading}
+                                onClick={() => void load(cursor)}
+                            >
                                 {t("webhooks.deliveries.more")}
                             </Button>
                         </div>

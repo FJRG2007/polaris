@@ -727,7 +727,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "webhook.disabled",
         group: "system",
         label: "A webhook was switched off",
-        description: "One of your webhooks failed five deliveries in a row, so Polaris stopped sending to it.",
+        description:
+            "One of your webhooks failed five deliveries in a row, so Polaris stopped sending to it.",
         level: "warning",
         // Mailed by default: whatever reads that endpoint has stopped hearing
         // from Polaris, and nothing else will say so.
@@ -862,12 +863,18 @@ export const outboundWebhookInputSchema = z.object({
         .trim()
         .url("Enter the full URL, starting with https://")
         .max(2048)
-        .refine((value) => /^https?:\/\//i.test(value), "The URL has to start with https:// or http://"),
+        .refine(
+            (value) => /^https?:\/\//i.test(value),
+            "The URL has to start with https:// or http://"
+        ),
     events: z
         .array(z.string().trim().min(1).max(80))
         .min(1, "Pick at least one event")
         .max(NOTIFICATION_EVENTS.length)
-        .refine((ids) => ids.every((id) => EVENT_BY_ID.has(id)), "One of those events does not exist")
+        .refine(
+            (ids) => ids.every((id) => EVENT_BY_ID.has(id)),
+            "One of those events does not exist"
+        )
         .transform((ids) => [...new Set(ids)])
 });
 

@@ -144,7 +144,12 @@ async function deliverEmail(input: NotifyInput, level: NotificationLevel): Promi
     const link = await absoluteHref(input.href);
     const { text, html } = emailBody(input, link);
     const prefix = level === "danger" ? "[Alert] " : "";
-    const result = await sendAuthEmail({ to: address, subject: `${prefix}${input.title}`, text, html });
+    const result = await sendAuthEmail({
+        to: address,
+        subject: `${prefix}${input.title}`,
+        text,
+        html
+    });
     await record({
         userId: input.userId,
         event: input.event,
@@ -195,15 +200,21 @@ async function deliverDestination(
                   destination.target,
                   input.body ? `${input.title}\n${input.body}` : input.title
               )
-            : await sendWebhook(destination.target, (destination.format ?? "generic") as WebhookFormat, {
-                  openLabel: (await wordsFor(input.userId, "notices"))("delivery.openInPolaris"),
-                  event: input.event,
-                  level,
-                  title: input.title,
-                  body: input.body ?? null,
-                  url: await absoluteHref(input.href),
-                  at: new Date().toISOString()
-              });
+            : await sendWebhook(
+                  destination.target,
+                  (destination.format ?? "generic") as WebhookFormat,
+                  {
+                      openLabel: (await wordsFor(input.userId, "notices"))(
+                          "delivery.openInPolaris"
+                      ),
+                      event: input.event,
+                      level,
+                      title: input.title,
+                      body: input.body ?? null,
+                      url: await absoluteHref(input.href),
+                      at: new Date().toISOString()
+                  }
+              );
 
     await recordDestinationResult(destination.id, result.error ?? null);
     await record({
@@ -252,7 +263,15 @@ async function fanOut(
     if ((rule.email || rule.destinations.length > 0) && (await quietNow(input.userId, critical))) {
         const held: Array<Promise<void>> = [];
         if (rule.email) {
-            held.push(record({ userId: input.userId, event: input.event, kind: "email", status: "skipped", detail: QUIET_HOURS }));
+            held.push(
+                record({
+                    userId: input.userId,
+                    event: input.event,
+                    kind: "email",
+                    status: "skipped",
+                    detail: QUIET_HOURS
+                })
+            );
         }
         for (const destinationId of rule.destinations) {
             held.push(
@@ -370,7 +389,10 @@ export async function notify(input: NotifyInput): Promise<void> {
  * number finds out it works before an incident does. Returns the provider's
  * reason on failure, which is the whole point of the button.
  */
-export async function testDestination(userId: string, destinationId: string): Promise<{ error?: string }> {
+export async function testDestination(
+    userId: string,
+    destinationId: string
+): Promise<{ error?: string }> {
     const destination = await resolveDestination(userId, destinationId);
     const t = await wordsFor(userId, "notices");
     if (!destination) return { error: t("test.gone") };
@@ -380,16 +402,22 @@ export async function testDestination(userId: string, destinationId: string): Pr
     const result =
         destination.kind === "sms"
             ? await sendSms(userId, destination.target, `${title}: ${body}`)
-            : await sendWebhook(destination.target, (destination.format ?? "generic") as WebhookFormat, {
-                  openLabel: t("delivery.openInPolaris"),
-                  event: "test",
-                  level: "info",
-                  title,
-                  body,
-                  url: await absoluteHref("/account/notifications"),
-                  at: new Date().toISOString()
-              });
+            : await sendWebhook(
+                  destination.target,
+                  (destination.format ?? "generic") as WebhookFormat,
+                  {
+                      openLabel: t("delivery.openInPolaris"),
+                      event: "test",
+                      level: "info",
+                      title,
+                      body,
+                      url: await absoluteHref("/account/notifications"),
+                      at: new Date().toISOString()
+                  }
+              );
 
     await recordDestinationResult(destination.id, result.error ?? null);
-    return result.error ? { error: deliveryText(await wordsFor(userId, "components"), result.error) } : result;
+    return result.error
+        ? { error: deliveryText(await wordsFor(userId, "components"), result.error) }
+        : result;
 }

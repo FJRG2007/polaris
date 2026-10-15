@@ -11,10 +11,14 @@ import { MAX_BODY_BYTES, receiveInbound } from "@/lib/deploy/inbound-hooks";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }): Promise<Response> {
+export async function POST(
+    request: Request,
+    context: { params: Promise<{ id: string }> }
+): Promise<Response> {
     const { id } = await context.params;
     const declared = Number(request.headers.get("content-length") ?? 0);
-    if (declared > MAX_BODY_BYTES) return Response.json({ error: "Body too large." }, { status: 413 });
+    if (declared > MAX_BODY_BYTES)
+        return Response.json({ error: "Body too large." }, { status: 413 });
     const bytes = await readCappedBody(request, MAX_BODY_BYTES).catch(() => null);
     if (!bytes) return Response.json({ error: "Body too large." }, { status: 413 });
     try {

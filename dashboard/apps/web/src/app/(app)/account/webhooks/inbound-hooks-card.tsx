@@ -70,7 +70,10 @@ export function InboundHooksCard({
     function create() {
         setError(null);
         startTransition(async () => {
-            const result = await actions.createInboundHookAction({ name: name.trim(), applicationId: serviceId });
+            const result = await actions.createInboundHookAction({
+                name: name.trim(),
+                applicationId: serviceId
+            });
             if (!result.hook || !result.secret) return setError(result.error ?? null);
             setAdding(false);
             setName("");
@@ -85,9 +88,16 @@ export function InboundHooksCard({
             <CardHeader className="flex-row items-center justify-between gap-3">
                 <div className="min-w-0">
                     <CardTitle>{t("webhooks.inbound.title")}</CardTitle>
-                    <p className="text-xs text-muted-foreground">{t("webhooks.inbound.description")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("webhooks.inbound.description")}
+                    </p>
                 </div>
-                <Button size="sm" variant="secondary" disabled={services.length === 0} onClick={() => setAdding(true)}>
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={services.length === 0}
+                    onClick={() => setAdding(true)}
+                >
                     <Plus className="size-4" />
                     {t("webhooks.inbound.add")}
                 </Button>
@@ -95,7 +105,9 @@ export function InboundHooksCard({
             <CardBody className="p-0">
                 {hooks.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                        {services.length === 0 ? t("webhooks.inbound.noServices") : t("webhooks.inbound.empty")}
+                        {services.length === 0
+                            ? t("webhooks.inbound.noServices")
+                            : t("webhooks.inbound.empty")}
                     </p>
                 ) : (
                     <ul className="divide-y divide-border">
@@ -105,20 +117,32 @@ export function InboundHooksCard({
                                 <li key={hook.id} className="flex flex-col gap-1 px-4 py-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium" title={hook.name}>
+                                            <p
+                                                className="truncate text-sm font-medium"
+                                                title={hook.name}
+                                            >
                                                 {hook.name}
                                             </p>
                                             <p className="truncate text-xs text-muted-foreground">
-                                                {t("webhooks.inbound.redeploys", { service: hook.serviceName })}
+                                                {t("webhooks.inbound.redeploys", {
+                                                    service: hook.serviceName
+                                                })}
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1">
-                                            <CopyButton value={urlFor(hook.id)} label={t("webhooks.inbound.url")} />
+                                            <CopyButton
+                                                value={urlFor(hook.id)}
+                                                label={t("webhooks.inbound.url")}
+                                            />
                                             <Switch
                                                 checked={on}
                                                 disabled={pending}
                                                 onChange={(next) => toggle(hook, next)}
-                                                aria-label={on ? t("webhooks.inbound.switchOff") : t("webhooks.inbound.switchOn")}
+                                                aria-label={
+                                                    on
+                                                        ? t("webhooks.inbound.switchOff")
+                                                        : t("webhooks.inbound.switchOn")
+                                                }
                                             />
                                             <button
                                                 type="button"
@@ -134,7 +158,12 @@ export function InboundHooksCard({
                                     <p className="text-xs text-muted-foreground">
                                         {hook.lastUsedAt
                                             ? t.rich("webhooks.inbound.lastUsed", {
-                                                  time: <RelativeTime key="time" iso={hook.lastUsedAt} />
+                                                  time: (
+                                                      <RelativeTime
+                                                          key="time"
+                                                          iso={hook.lastUsedAt}
+                                                      />
+                                                  )
                                               })
                                             : t("webhooks.inbound.neverUsed")}
                                     </p>
@@ -143,7 +172,9 @@ export function InboundHooksCard({
                         })}
                     </ul>
                 )}
-                {error && !adding && !removing ? <p className="px-4 pb-3 text-xs text-danger">{error}</p> : null}
+                {error && !adding && !removing ? (
+                    <p className="px-4 pb-3 text-xs text-danger">{error}</p>
+                ) : null}
             </CardBody>
 
             {adding ? (
@@ -151,11 +182,15 @@ export function InboundHooksCard({
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>{t("webhooks.inbound.dialogTitle")}</DialogTitle>
-                            <DialogDescription>{t("webhooks.inbound.dialogDescription")}</DialogDescription>
+                            <DialogDescription>
+                                {t("webhooks.inbound.dialogDescription")}
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="flex min-w-0 flex-col gap-3">
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">{t("webhooks.inbound.service")} *</span>
+                                <span className="font-medium">
+                                    {t("webhooks.inbound.service")} *
+                                </span>
                                 <Select
                                     value={serviceId}
                                     onValueChange={setServiceId}
@@ -177,7 +212,11 @@ export function InboundHooksCard({
                             </label>
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
                             <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => setAdding(false)} disabled={pending}>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setAdding(false)}
+                                    disabled={pending}
+                                >
                                     {tc("actions.cancel")}
                                 </Button>
                                 <Button onClick={create} disabled={pending || !ready}>
@@ -194,23 +233,35 @@ export function InboundHooksCard({
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>{t("webhooks.secret.title")}</DialogTitle>
-                            <DialogDescription>{t("webhooks.secret.description")}</DialogDescription>
+                            <DialogDescription>
+                                {t("webhooks.secret.description")}
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="flex min-w-0 flex-col gap-2">
                             <span className="text-xs font-medium">{t("webhooks.inbound.url")}</span>
                             <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2">
-                                <code className="min-w-0 flex-1 break-all font-mono text-xs">{created.url}</code>
+                                <code className="min-w-0 flex-1 break-all font-mono text-xs">
+                                    {created.url}
+                                </code>
                                 <CopyButton value={created.url} />
                             </div>
-                            <span className="text-xs font-medium">{t("webhooks.secret.title")}</span>
+                            <span className="text-xs font-medium">
+                                {t("webhooks.secret.title")}
+                            </span>
                             <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2">
-                                <code className="min-w-0 flex-1 break-all font-mono text-xs">{created.secret}</code>
+                                <code className="min-w-0 flex-1 break-all font-mono text-xs">
+                                    {created.secret}
+                                </code>
                                 <CopyButton value={created.secret} />
                             </div>
-                            <p className="text-xs text-muted-foreground">{t("webhooks.inbound.secretVerify")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("webhooks.inbound.secretVerify")}
+                            </p>
                         </div>
                         <div className="flex justify-end">
-                            <Button onClick={() => setCreated(null)}>{t("webhooks.secret.done")}</Button>
+                            <Button onClick={() => setCreated(null)}>
+                                {t("webhooks.secret.done")}
+                            </Button>
                         </div>
                     </DialogContent>
                 </Dialog>

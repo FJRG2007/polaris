@@ -118,10 +118,14 @@ export function DestinationsCard({
                                             <Webhook className="size-4 shrink-0 text-muted-foreground" />
                                         )}
                                         <div className="min-w-0">
-                                            <p className="truncate text-sm font-medium">{destination.name}</p>
+                                            <p className="truncate text-sm font-medium">
+                                                {destination.name}
+                                            </p>
                                             <p className="truncate text-xs text-muted-foreground">
                                                 {destination.targetHint}
-                                                {destination.format ? ` - ${destination.format}` : ""}
+                                                {destination.format
+                                                    ? ` - ${destination.format}`
+                                                    : ""}
                                             </p>
                                         </div>
                                     </div>
@@ -140,19 +144,30 @@ export function DestinationsCard({
                                             options={levelOptions}
                                         />
                                         {destination.status === "error" ? (
-                                            <Badge variant="danger">{t("destinations.failing")}</Badge>
+                                            <Badge variant="danger">
+                                                {t("destinations.failing")}
+                                            </Badge>
                                         ) : destination.status === "ok" ? (
-                                            <Badge variant="success">{t("destinations.working")}</Badge>
+                                            <Badge variant="success">
+                                                {t("destinations.working")}
+                                            </Badge>
                                         ) : null}
                                         <Switch
                                             checked={destination.enabled}
                                             onChange={(next) =>
                                                 startTransition(async () => {
-                                                    await setDestinationEnabledAction(destination.id, next);
+                                                    await setDestinationEnabledAction(
+                                                        destination.id,
+                                                        next
+                                                    );
                                                     router.refresh();
                                                 })
                                             }
-                                            aria-label={destination.enabled ? t("destinations.switchOff") : t("destinations.switchOn")}
+                                            aria-label={
+                                                destination.enabled
+                                                    ? t("destinations.switchOff")
+                                                    : t("destinations.switchOn")
+                                            }
                                         />
                                         <button
                                             type="button"
@@ -184,7 +199,11 @@ export function DestinationsCard({
                                     <p className="text-xs text-warning">
                                         {t.rich("destinations.smsNotReady", {
                                             link: (chunks) => (
-                                                <Link key="link" href="/admin/inbox/channels" className="underline">
+                                                <Link
+                                                    key="link"
+                                                    href="/admin/inbox/channels"
+                                                    className="underline"
+                                                >
                                                     {chunks}
                                                 </Link>
                                             )
@@ -195,7 +214,13 @@ export function DestinationsCard({
                                     <p className="text-xs text-danger">{floorError.error}</p>
                                 ) : null}
                                 {testResult?.id === destination.id ? (
-                                    <p className={testResult.error ? "text-xs text-danger" : "text-xs text-success"}>
+                                    <p
+                                        className={
+                                            testResult.error
+                                                ? "text-xs text-danger"
+                                                : "text-xs text-success"
+                                        }
+                                    >
                                         {testResult.error ?? t("destinations.testSent")}
                                     </p>
                                 ) : destination.lastError ? (
@@ -203,7 +228,12 @@ export function DestinationsCard({
                                 ) : destination.lastUsedAt ? (
                                     <p className="text-xs text-muted-foreground">
                                         {t.rich("destinations.lastUsed", {
-                                            time: <RelativeTime key="time" iso={destination.lastUsedAt} />
+                                            time: (
+                                                <RelativeTime
+                                                    key="time"
+                                                    iso={destination.lastUsedAt}
+                                                />
+                                            )
                                         })}
                                     </p>
                                 ) : null}
@@ -302,7 +332,11 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                         <Input
                             value={label}
                             onChange={(event) => setLabel(event.target.value)}
-                            placeholder={kind === "sms" ? t("destinations.dialog.phonePlaceholder") : t("destinations.dialog.webhookPlaceholder")}
+                            placeholder={
+                                kind === "sms"
+                                    ? t("destinations.dialog.phonePlaceholder")
+                                    : t("destinations.dialog.webhookPlaceholder")
+                            }
                         />
                     </label>
                     {kind === "webhook" ? (
@@ -310,7 +344,9 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             {telegram ? (
                                 <>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="font-medium">{t("destinations.dialog.botToken")}</span>
+                                        <span className="font-medium">
+                                            {t("destinations.dialog.botToken")}
+                                        </span>
                                         <Input
                                             type="password"
                                             autoComplete="off"
@@ -319,7 +355,9 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                         />
                                     </label>
                                     <label className="flex flex-col gap-1 text-sm">
-                                        <span className="font-medium">{t("destinations.dialog.chatId")}</span>
+                                        <span className="font-medium">
+                                            {t("destinations.dialog.chatId")}
+                                        </span>
                                         <Input
                                             value={chatId}
                                             onChange={(event) => setChatId(event.target.value)}
@@ -331,22 +369,27 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                     </label>
                                 </>
                             ) : (
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">{t("destinations.dialog.url")}</span>
-                                <Input
-                                    value={url}
-                                    onChange={(event) => setUrl(event.target.value)}
-                                    placeholder="https://discord.com/api/webhooks/..."
-                                />
-                                <span className="text-xs text-muted-foreground">
-                                    {t("destinations.dialog.urlHint", {
-                                        example: "https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>"
-                                    })}
-                                </span>
-                            </label>
+                                <label className="flex flex-col gap-1 text-sm">
+                                    <span className="font-medium">
+                                        {t("destinations.dialog.url")}
+                                    </span>
+                                    <Input
+                                        value={url}
+                                        onChange={(event) => setUrl(event.target.value)}
+                                        placeholder="https://discord.com/api/webhooks/..."
+                                    />
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("destinations.dialog.urlHint", {
+                                            example:
+                                                "https://api.telegram.org/bot<token>/sendMessage?chat_id=<chat id>"
+                                        })}
+                                    </span>
+                                </label>
                             )}
                             <label className="flex flex-col gap-1 text-sm">
-                                <span className="font-medium">{t("destinations.dialog.format")}</span>
+                                <span className="font-medium">
+                                    {t("destinations.dialog.format")}
+                                </span>
                                 <Select
                                     value={format}
                                     onValueChange={setFormat}
@@ -371,7 +414,9 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                                 onChange={(event) => setPhone(event.target.value)}
                                 placeholder="+34600111222"
                             />
-                            <span className="text-xs text-muted-foreground">{t("destinations.dialog.numberHint")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("destinations.dialog.numberHint")}
+                            </span>
                         </label>
                     )}
                     <label className="flex flex-col gap-1 text-sm">

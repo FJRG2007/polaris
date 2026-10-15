@@ -135,7 +135,10 @@ export async function destinationSummary(
 
 /** The target and shape of one destination, for a sender. Returns null when the
  *  row is gone, belongs to somebody else, is switched off, or cannot decrypt. */
-export async function resolveDestination(userId: string, id: string): Promise<ResolvedDestination | null> {
+export async function resolveDestination(
+    userId: string,
+    id: string
+): Promise<ResolvedDestination | null> {
     const row = await prisma.notificationDestination.findFirst({
         where: { id, userId, enabled: true }
     });
@@ -167,7 +170,11 @@ export async function resolveDestination(userId: string, id: string): Promise<Re
 }
 
 /** The target a destination points at, and how it should be displayed. */
-function describeTarget(input: DestinationInput): { target: string; hint: string; format: WebhookFormat | null } {
+function describeTarget(input: DestinationInput): {
+    target: string;
+    hint: string;
+    format: WebhookFormat | null;
+} {
     if (input.kind === "sms") {
         return { target: input.phone, hint: maskPhone(input.phone), format: null };
     }
@@ -199,12 +206,20 @@ export async function createDestination(
 }
 
 /** Turn a destination on or off without losing it, or where it is routed. */
-export async function setDestinationEnabled(userId: string, id: string, enabled: boolean): Promise<void> {
+export async function setDestinationEnabled(
+    userId: string,
+    id: string,
+    enabled: boolean
+): Promise<void> {
     await prisma.notificationDestination.updateMany({ where: { id, userId }, data: { enabled } });
 }
 
 /** Change the lowest severity a destination is sent. */
-export async function setDestinationMinLevel(userId: string, id: string, minLevel: AlertMinLevel): Promise<void> {
+export async function setDestinationMinLevel(
+    userId: string,
+    id: string,
+    minLevel: AlertMinLevel
+): Promise<void> {
     await prisma.notificationDestination.updateMany({ where: { id, userId }, data: { minLevel } });
 }
 

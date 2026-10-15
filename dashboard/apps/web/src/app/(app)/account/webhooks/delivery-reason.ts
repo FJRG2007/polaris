@@ -6,7 +6,15 @@
 
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
-const CODES = ["refused", "redirect", "http", "timeout", "network", "unreadable", "disabled"] as const;
+const CODES = [
+    "refused",
+    "redirect",
+    "http",
+    "timeout",
+    "network",
+    "unreadable",
+    "disabled"
+] as const;
 
 export function deliveryReason(
     t: NamespaceTranslator<"accountNotifications">,

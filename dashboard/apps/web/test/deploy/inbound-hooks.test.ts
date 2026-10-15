@@ -23,12 +23,25 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         inboundWebhook: {
             findUnique: async () =>
-                hook && { ...hook, encryptedSecret: enc.encode(SECRET), secretNonce: new Uint8Array([1]), secretKeyId: "k" },
+                hook && {
+                    ...hook,
+                    encryptedSecret: enc.encode(SECRET),
+                    secretNonce: new Uint8Array([1]),
+                    secretKeyId: "k"
+                },
             update: async () => ({})
         },
         inboundWebhookReceipt: {
-            create: async ({ data }: { data: { hookId: string; deliveryId: string; expiresAt: Date } }) => {
-                if (receipts.some((r) => r.hookId === data.hookId && r.deliveryId === data.deliveryId)) {
+            create: async ({
+                data
+            }: {
+                data: { hookId: string; deliveryId: string; expiresAt: Date };
+            }) => {
+                if (
+                    receipts.some(
+                        (r) => r.hookId === data.hookId && r.deliveryId === data.deliveryId
+                    )
+                ) {
                     throw Object.assign(new Error("unique"), { code: "P2002" });
                 }
                 const row = { ...data, id: `r-${receipts.length + 1}` };
@@ -37,7 +50,9 @@ vi.mock("@polaris/db", () => ({
             },
             deleteMany: async ({ where }: { where: { id?: string; expiresAt?: { lt: Date } } }) => {
                 const before = receipts.length;
-                receipts = receipts.filter((r) => (where.id ? r.id !== where.id : r.expiresAt >= where.expiresAt!.lt));
+                receipts = receipts.filter((r) =>
+                    where.id ? r.id !== where.id : r.expiresAt >= where.expiresAt!.lt
+                );
                 return { count: before - receipts.length };
             }
         },
@@ -50,7 +65,9 @@ vi.mock("@polaris/storage", () => ({
     decryptSecret: (blob: { ciphertext: Uint8Array }) => new TextDecoder().decode(blob.ciphertext)
 }));
 vi.mock("@polaris/auth", () => ({ userHasPermission: async () => hasPermission }));
-vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: rateOk, retryAfterMs: 0 }) }));
+vi.mock("@/lib/rate-limit-service", () => ({
+    rateLimit: async () => ({ ok: rateOk, retryAfterMs: 0 })
+}));
 vi.mock("@/lib/deploy-project-access", () => ({
     requireApplicationAccess: async () => {
         if (!projectAccessOk) throw new Error("Service not found");
@@ -61,7 +78,9 @@ vi.mock("@/lib/deploy-project-access", () => ({
     accessCan: () => true,
     accessInEnvironment: () => true
 }));
-vi.mock("@/lib/deploy-service", () => ({ deployApplication: (...args: unknown[]) => deploy(...args) }));
+vi.mock("@/lib/deploy-service", () => ({
+    deployApplication: (...args: unknown[]) => deploy(...args)
+}));
 vi.mock("@/lib/notifications/outbound-hooks", () => ({
     newSigningSecret: () => SECRET,
     signPayload: (secret: string, ts: number, body: string) =>
@@ -72,7 +91,9 @@ const { receiveInbound, pruneInboundReceipts } = await import("../../src/lib/dep
 
 function signed(body: string, opts: { ts?: number; delivery?: string; secret?: string } = {}) {
     const ts = opts.ts ?? Math.floor(Date.now() / 1000);
-    const signature = `sha256=${createHmac("sha256", opts.secret ?? SECRET).update(`${ts}.${body}`).digest("hex")}`;
+    const signature = `sha256=${createHmac("sha256", opts.secret ?? SECRET)
+        .update(`${ts}.${body}`)
+        .digest("hex")}`;
     return {
         id: HOOK_ID,
         ip: "203.0.113.5",
@@ -92,7 +113,10 @@ beforeEach(() => {
 
 describe("the deploy-hook gateway", () => {
     it("redeploys as the hook's creator, on the project owner's resources", async () => {
-        expect(await receiveInbound(signed('{"ref":"main"}'))).toEqual({ status: 202, deploymentId: "dep-1" });
+        expect(await receiveInbound(signed('{"ref":"main"}'))).toEqual({
+            status: 202,
+            deploymentId: "dep-1"
+        });
         expect(deploy).toHaveBeenCalledWith(APP_ID, "owner-1", "creator-1");
     });
 
@@ -106,8 +130,12 @@ describe("the deploy-hook gateway", () => {
     it("refuses a timestamp more than five minutes off, either way", async () => {
         const now = Math.floor(Date.now() / 1000);
         expect((await receiveInbound(signed("{}", { ts: now - 301 }))).status).toBe(401);
-        expect((await receiveInbound(signed("{}", { ts: now + 301, delivery: "d-2" }))).status).toBe(401);
-        expect((await receiveInbound(signed("{}", { ts: now - 299, delivery: "d-3" }))).status).toBe(202);
+        expect(
+            (await receiveInbound(signed("{}", { ts: now + 301, delivery: "d-2" }))).status
+        ).toBe(401);
+        expect(
+            (await receiveInbound(signed("{}", { ts: now - 299, delivery: "d-3" }))).status
+        ).toBe(202);
     });
 
     it("refuses the same request twice", async () => {
@@ -153,7 +181,14 @@ describe("the deploy-hook gateway", () => {
     });
 
     it("rejects missing headers, a malformed id, an oversized body, and a flood", async () => {
-        expect((await receiveInbound({ ...signed("{}"), headers: { delivery: null, timestamp: null, signature: null } })).status).toBe(400);
+        expect(
+            (
+                await receiveInbound({
+                    ...signed("{}"),
+                    headers: { delivery: null, timestamp: null, signature: null }
+                })
+            ).status
+        ).toBe(400);
         expect((await receiveInbound({ ...signed("{}"), id: "not-a-uuid" })).status).toBe(404);
         expect((await receiveInbound(signed("x".repeat(64 * 1024 + 1)))).status).toBe(413);
         rateOk = false;

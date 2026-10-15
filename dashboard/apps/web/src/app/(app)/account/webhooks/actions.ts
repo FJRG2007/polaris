@@ -18,7 +18,9 @@ const eventsSchema = outboundWebhookInputSchema.shape.events;
 
 async function refusal(code: hooks.HookRefusal | "invalid" | "notSaved"): Promise<string> {
     const t = await getTranslations("accountNotifications");
-    return code === "limit" ? t("webhooks.errors.limit", { max: MAX_OUTBOUND_WEBHOOKS }) : t(`webhooks.errors.${code}`);
+    return code === "limit"
+        ? t("webhooks.errors.limit", { max: MAX_OUTBOUND_WEBHOOKS })
+        : t(`webhooks.errors.${code}`);
 }
 
 export async function createOutboundHookAction(
@@ -33,7 +35,10 @@ export async function createOutboundHookAction(
     return result;
 }
 
-export async function setOutboundHookEventsAction(id: unknown, events: unknown): Promise<{ error?: string }> {
+export async function setOutboundHookEventsAction(
+    id: unknown,
+    events: unknown
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsedId = idSchema.safeParse(id);
     const parsedEvents = eventsSchema.safeParse(events);
@@ -45,7 +50,10 @@ export async function setOutboundHookEventsAction(id: unknown, events: unknown):
     return {};
 }
 
-export async function setOutboundHookEnabledAction(id: unknown, enabled: unknown): Promise<{ error?: string }> {
+export async function setOutboundHookEnabledAction(
+    id: unknown,
+    enabled: unknown
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsedId = idSchema.safeParse(id);
     const parsedEnabled = z.boolean().safeParse(enabled);
@@ -57,7 +65,9 @@ export async function setOutboundHookEnabledAction(id: unknown, enabled: unknown
     return {};
 }
 
-export async function rotateOutboundHookSecretAction(id: unknown): Promise<{ secret?: string; error?: string }> {
+export async function rotateOutboundHookSecretAction(
+    id: unknown
+): Promise<{ secret?: string; error?: string }> {
     const user = await requireUser();
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) return { error: await refusal("notFound") };
@@ -114,7 +124,11 @@ export async function listOutboundDeliveriesAction(
     return { page: await hooks.listOutboundDeliveries(user.id, parsedId.data, parsedCursor.data) };
 }
 
-const inboundErrors = { rateLimited: "rateLimited", limit: "limit", forbidden: "forbidden" } as const;
+const inboundErrors = {
+    rateLimited: "rateLimited",
+    limit: "limit",
+    forbidden: "forbidden"
+} as const;
 
 export async function createInboundHookAction(
     input: unknown
@@ -132,7 +146,10 @@ export async function createInboundHookAction(
     return result;
 }
 
-export async function setInboundHookEnabledAction(id: unknown, enabled: unknown): Promise<{ error?: string }> {
+export async function setInboundHookEnabledAction(
+    id: unknown,
+    enabled: unknown
+): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsedId = idSchema.safeParse(id);
     const parsedEnabled = z.boolean().safeParse(enabled);

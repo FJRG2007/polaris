@@ -35,7 +35,13 @@ import { configuredRequest, reachable, RefusedAddressError, safeUrl } from "@/li
 const MINUTE = 60_000;
 
 /** When each retry is due, counted from the attempt before it. */
-export const RETRY_DELAYS_MS = [MINUTE, 5 * MINUTE, 30 * MINUTE, 2 * 60 * MINUTE, 6 * 60 * MINUTE] as const;
+export const RETRY_DELAYS_MS = [
+    MINUTE,
+    5 * MINUTE,
+    30 * MINUTE,
+    2 * 60 * MINUTE,
+    6 * 60 * MINUTE
+] as const;
 
 /** Deliveries in a row that ran out of attempts before an endpoint is switched off. */
 export const DISABLE_AFTER_FAILURES = 5;
@@ -177,7 +183,9 @@ function toDeliveryView(row: {
     createdAt: Date;
 }): OutboundDeliveryView {
     const status = row.status === "sent" || row.status === "failed" ? row.status : "pending";
-    const error = ERROR_CODES.includes(row.error as DeliveryErrorCode) ? (row.error as DeliveryErrorCode) : null;
+    const error = ERROR_CODES.includes(row.error as DeliveryErrorCode)
+        ? (row.error as DeliveryErrorCode)
+        : null;
     return {
         id: row.id,
         event: row.event,
@@ -216,7 +224,11 @@ function open(ciphertext: Uint8Array, nonce: Uint8Array, keyId: string | null): 
 /** Count one create, test or redelivery against the account. */
 async function allowed(userId: string, action: "create" | "test" | "redeliver"): Promise<boolean> {
     const limits = { create: 10, test: 20, redeliver: 30 } as const;
-    const result = await rateLimit(`outbound-hook:${action}:${userId}`, limits[action], 10 * MINUTE);
+    const result = await rateLimit(
+        `outbound-hook:${action}:${userId}`,
+        limits[action],
+        10 * MINUTE
+    );
     return result.ok;
 }
 
@@ -268,13 +280,24 @@ export async function createOutboundHook(
 }
 
 /** Change which events an endpoint is sent. */
-export async function setOutboundHookEvents(userId: string, id: string, events: string[]): Promise<boolean> {
-    const result = await prisma.outboundWebhook.updateMany({ where: { id, userId }, data: { events } });
+export async function setOutboundHookEvents(
+    userId: string,
+    id: string,
+    events: string[]
+): Promise<boolean> {
+    const result = await prisma.outboundWebhook.updateMany({
+        where: { id, userId },
+        data: { events }
+    });
     return result.count > 0;
 }
 
 /** Switch an endpoint on or off. Switching it on starts its failure count over. */
-export async function setOutboundHookEnabled(userId: string, id: string, enabled: boolean): Promise<boolean> {
+export async function setOutboundHookEnabled(
+    userId: string,
+    id: string,
+    enabled: boolean
+): Promise<boolean> {
     const result = await prisma.outboundWebhook.updateMany({
         where: { id, userId },
         data: enabled ? { enabled, consecutiveFailures: 0, disabledReason: null } : { enabled }
@@ -288,7 +311,11 @@ export async function rotateOutboundHookSecret(userId: string, id: string): Prom
     const sealed = seal(secret);
     const result = await prisma.outboundWebhook.updateMany({
         where: { id, userId },
-        data: { encryptedSecret: sealed.ciphertext, secretNonce: sealed.nonce, secretKeyId: sealed.keyId }
+        data: {
+            encryptedSecret: sealed.ciphertext,
+            secretNonce: sealed.nonce,
+            secretKeyId: sealed.keyId
+        }
     });
     return result.count > 0 ? secret : null;
 }
@@ -335,7 +362,12 @@ export async function queueOutboundHooks(userId: string, payload: OutboundPayloa
     const rows = await Promise.all(
         hooks.map((hook) =>
             prisma.outboundWebhookDelivery.create({
-                data: { webhookId: hook.id, event: payload.event, payload: body, nextAttemptAt: now },
+                data: {
+                    webhookId: hook.id,
+                    event: payload.event,
+                    payload: body,
+                    nextAttemptAt: now
+                },
                 select: { id: true }
             })
         )
@@ -350,7 +382,9 @@ async function post(
     deliveryId: string,
     event: string,
     body: string
-): Promise<{ ok: true; status: number } | { ok: false; status: number | null; error: DeliveryErrorCode }> {
+): Promise<
+    { ok: true; status: number } | { ok: false; status: number | null; error: DeliveryErrorCode }
+> {
     const timestamp = Math.floor(Date.now() / 1000);
     try {
         const response = await configuredRequest(
@@ -373,15 +407,18 @@ async function post(
         // The body is never read: it is somebody else's text and nothing here
         // shows it. Released so the socket goes back to the pool.
         await response.body?.cancel().catch(() => {});
-        if (response.status >= 200 && response.status < 300) return { ok: true, status: response.status };
+        if (response.status >= 200 && response.status < 300)
+            return { ok: true, status: response.status };
         if (response.status >= 300 && response.status < 400) {
             return { ok: false, status: response.status, error: "redirect" };
         }
         return { ok: false, status: response.status, error: "http" };
     } catch (error) {
-        if (error instanceof RefusedAddressError) return { ok: false, status: null, error: "refused" };
+        if (error instanceof RefusedAddressError)
+            return { ok: false, status: null, error: "refused" };
         const name = (error as { name?: string } | null)?.name;
-        if (name === "TimeoutError" || name === "AbortError") return { ok: false, status: null, error: "timeout" };
+        if (name === "TimeoutError" || name === "AbortError")
+            return { ok: false, status: null, error: "timeout" };
         return { ok: false, status: null, error: "network" };
     }
 }
@@ -424,11 +461,17 @@ export async function attemptDelivery(
             }
         }
     });
-    if (!row || row.status !== "pending" || !row.nextAttemptAt || row.nextAttemptAt > now) return null;
+    if (!row || row.status !== "pending" || !row.nextAttemptAt || row.nextAttemptAt > now)
+        return null;
 
     // The claim: only the runner whose update matched sends it.
     const claimed = await prisma.outboundWebhookDelivery.updateMany({
-        where: { id: row.id, status: "pending", attempts: row.attempts, nextAttemptAt: { lte: now } },
+        where: {
+            id: row.id,
+            status: "pending",
+            attempts: row.attempts,
+            nextAttemptAt: { lte: now }
+        },
         data: { attempts: { increment: 1 }, nextAttemptAt: new Date(later() + CLAIM_MS) }
     });
     if (claimed.count !== 1) return null;
@@ -498,7 +541,13 @@ export async function attemptDelivery(
 
     await prisma.outboundWebhookDelivery.update({
         where: { id: row.id },
-        data: { status: "failed", nextAttemptAt: null, responseStatus: result.status, error: result.error, durationMs }
+        data: {
+            status: "failed",
+            nextAttemptAt: null,
+            responseStatus: result.status,
+            error: result.error,
+            durationMs
+        }
     });
     if (!options.final) await countFailure(hook.id, hook.userId, hook.name);
     return "failed";
@@ -520,7 +569,10 @@ async function countFailure(hookId: string, userId: string, name: string): Promi
     if (switched.count !== 1) return;
     try {
         // Loaded here: dispatch queues these hooks, so a static import is a cycle.
-        const [{ notify }, { wordsFor }] = await Promise.all([import("./dispatch"), import("./notice-words")]);
+        const [{ notify }, { wordsFor }] = await Promise.all([
+            import("./dispatch"),
+            import("./notice-words")
+        ]);
         const t = await wordsFor(userId, "notices");
         await notify({
             userId,
@@ -541,7 +593,10 @@ export async function testOutboundHook(
     sample: Omit<OutboundPayload, "event" | "at">
 ): Promise<{ status: "sent" | "failed"; delivery: OutboundDeliveryView } | { error: HookRefusal }> {
     if (!(await allowed(userId, "test"))) return { error: "rateLimited" };
-    const hook = await prisma.outboundWebhook.findFirst({ where: { id, userId }, select: { id: true } });
+    const hook = await prisma.outboundWebhook.findFirst({
+        where: { id, userId },
+        select: { id: true }
+    });
     if (!hook) return { error: "notFound" };
     const body = JSON.stringify({ event: "test", ...sample, at: new Date().toISOString() });
     return sendOnce(hook.id, "test", body);
@@ -583,7 +638,9 @@ async function sendOnce(
  * The background pass: send what is due, then drop log rows past retention.
  * Run under a lease, but safe without one - every row is claimed on its own.
  */
-export async function runOutboundHooks(now: Date = new Date()): Promise<{ attempted: number; pruned: number }> {
+export async function runOutboundHooks(
+    now: Date = new Date()
+): Promise<{ attempted: number; pruned: number }> {
     const due = await prisma.outboundWebhookDelivery.findMany({
         where: { status: "pending", nextAttemptAt: { lte: now } },
         orderBy: { nextAttemptAt: "asc" },
