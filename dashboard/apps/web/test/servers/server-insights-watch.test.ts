@@ -68,7 +68,8 @@ function insight(subject: string, starts: number[], diskWarning = false): Server
         forecast: diskWarning
             ? { kind: "filling", usedBytes: 90, totalBytes: 100, bytesPerDay: 5, spanDays: 5, days: 2 }
             : steady,
-        diskWarning
+        diskWarning,
+        historyHours: 200
     };
 }
 

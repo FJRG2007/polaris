@@ -719,10 +719,7 @@
             "heading": "Unusual activity",
             "hint": "Each hour is compared with the day before it, and listed when it sits at least 3.5 times the usual spread from the median.",
             "none": "Nothing unusual in the last 7 days.",
-            "when": "When",
-            "metric": "Metric",
-            "reading": "Reading",
-            "distance": "How far",
+            "tooNew": "Not enough history yet. Unusual activity is spotted after {hours} hours of readings.",
             "high": "Unusually high",
             "low": "Unusually low",
             "value": "{value}, usually {usual}",
@@ -731,8 +728,7 @@
             "warning": "Notable",
             "danger": "Severe",
             "allServers": "All servers",
-            "filter": "Show anomalies for",
-            "server": "Server"
+            "filter": "Show anomalies for"
         }
     }
 }

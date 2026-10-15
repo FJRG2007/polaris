@@ -121,7 +121,8 @@ describe("ServerInsightsPanel", () => {
                             subject: "local",
                             anomalies: [],
                             forecast: { kind: "insufficient", spanDays: 0.5, usedBytes: null, totalBytes: null },
-                            diskWarning: false
+                            diskWarning: false,
+                            historyHours: 12
                         },
                         {
                             id: SERVERS[1]!.id,
@@ -147,7 +148,8 @@ describe("ServerInsightsPanel", () => {
                                 spanDays: 9,
                                 days: 5
                             },
-                            diskWarning: true
+                            diskWarning: true,
+                            historyHours: 216
                         }
                     ]
                 })
@@ -162,5 +164,30 @@ describe("ServerInsightsPanel", () => {
         expect(screen.getByText("Severe")).toBeTruthy();
         expect(screen.getByText(/96%, usually 21%/)).toBeTruthy();
         expect(screen.getByText(/9\.3x the usual spread/)).toBeTruthy();
+    });
+
+    it("tells a server too new to judge from one that was calm", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () =>
+                Response.json({
+                    servers: [
+                        {
+                            id: "local",
+                            subject: "local",
+                            anomalies: [],
+                            forecast: { kind: "insufficient", spanDays: 0.2, usedBytes: null, totalBytes: null },
+                            diskWarning: false,
+                            historyHours: 5
+                        }
+                    ]
+                })
+            )
+        );
+        render(<ServerInsightsPanel servers={SERVERS.slice(0, 1)} />, { wrapper: MessagesWrapper });
+        expect(
+            await screen.findByText("Not enough history yet. Unusual activity is spotted after 13 hours of readings.")
+        ).toBeTruthy();
+        expect(screen.queryByText("Nothing unusual in the last 7 days.")).toBeNull();
     });
 });

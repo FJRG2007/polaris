@@ -39,7 +39,8 @@ vi.mock("@/lib/server-insights/insights", () => ({
             subject,
             anomalies: [],
             forecast: { kind: "insufficient", spanDays: 0, usedBytes: null, totalBytes: null },
-            diskWarning: false
+            diskWarning: false,
+            historyHours: 0
         }));
     }
 }));

@@ -28,7 +28,7 @@ import { formatMetric, formatScore } from "./insight-format";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { FORECAST_DEFAULTS, type DiskForecast } from "@/lib/server-insights/stats";
+import { ANOMALY_MIN_HISTORY, FORECAST_DEFAULTS, type DiskForecast } from "@/lib/server-insights/stats";
 import type { InsightAnomaly, ServerInsight } from "@/lib/server-insights/insights";
 
 /** The rollups behind this change once an hour; five minutes is plenty. */
@@ -182,8 +182,12 @@ export function ServerInsightsPanel({
 
     const byId = useMemo(() => new Map(servers.map((server) => [server.id, server])), [servers]);
     const answered = (data ?? []).filter((insight) => byId.has(insight.id));
-    const anomalies = answered
-        .filter((insight) => filter === null || insight.id === filter)
+    const inScope = answered.filter((insight) => filter === null || insight.id === filter);
+    // An answer cached before the field existed counts as enough history.
+    const tooNew =
+        inScope.length > 0 &&
+        inScope.every((insight) => (insight.historyHours ?? Number.POSITIVE_INFINITY) <= ANOMALY_MIN_HISTORY);
+    const anomalies = inScope
         .flatMap((insight) => insight.anomalies.map((anomaly) => ({ anomaly, server: byId.get(insight.id)! })))
         .sort((a, b) => b.anomaly.start - a.anomaly.start);
     const failure = error ?? (data === null ? stale : null);
@@ -265,7 +269,11 @@ export function ServerInsightsPanel({
                         <Skeleton className="h-12 w-full" />
                     </div>
                 ) : anomalies.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("insights.anomalies.none")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {tooNew
+                            ? t("insights.anomalies.tooNew", { hours: ANOMALY_MIN_HISTORY + 1 })
+                            : t("insights.anomalies.none")}
+                    </p>
                 ) : (
                     <ul className="max-h-[32rem] divide-y divide-border overflow-y-auto overscroll-y-contain">
                         {anomalies.map(({ anomaly, server }) => (

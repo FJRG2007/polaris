@@ -55,6 +55,9 @@ export function median(values: readonly number[]): number {
 /** Scales a median absolute deviation to a standard deviation for normal data. */
 const MAD_SCALE = 1.4826;
 
+/** Hours of readings a server needs before its first hour can be judged unusual. */
+export const ANOMALY_MIN_HISTORY = 12;
+
 export interface AnomalyOptions {
     /** How many earlier points make up "normal". */
     window: number;

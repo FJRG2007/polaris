@@ -719,10 +719,7 @@
             "heading": "Actividad inusual",
             "hint": "Cada hora se compara con el día anterior, y aparece si se aleja de la mediana al menos 3,5 veces la variación habitual.",
             "none": "Nada inusual en los últimos 7 días.",
-            "when": "Cuándo",
-            "metric": "Métrica",
-            "reading": "Lectura",
-            "distance": "Distancia",
+            "tooNew": "Aún no hay historial suficiente. La actividad inusual se detecta tras {hours} horas de lecturas.",
             "high": "Inusualmente alto",
             "low": "Inusualmente bajo",
             "value": "{value}, lo normal es {usual}",
@@ -731,8 +728,7 @@
             "warning": "Notable",
             "danger": "Grave",
             "allServers": "Todos",
-            "filter": "Ver anomalías de",
-            "server": "Servidor"
+            "filter": "Ver anomalías de"
         }
     }
 }

@@ -11,6 +11,7 @@
 
 import { prisma } from "@polaris/db";
 import {
+    ANOMALY_MIN_HISTORY,
     bucketize,
     detectAnomalies,
     forecastDisk,
@@ -50,7 +51,7 @@ const MIN_DELTA: Record<InsightMetric, number> = {
 
 /** The day before a point is its normal; a modified z-score of 3.5 is the usual
  *  cut-off for "an outlier" with this measure. */
-const DETECTION: Omit<AnomalyOptions, "minDelta"> = { window: 24, minHistory: 12, threshold: 3.5 };
+const DETECTION: Omit<AnomalyOptions, "minDelta"> = { window: 24, minHistory: ANOMALY_MIN_HISTORY, threshold: 3.5 };
 
 /** Twice the threshold is no longer a wobble. */
 const DANGER_SCORE = DETECTION.threshold * 2;
@@ -67,6 +68,8 @@ export interface ServerInsight {
     forecast: DiskForecast;
     /** Whether the forecast is close enough to warn about. */
     diskWarning: boolean;
+    /** Hours of readings read, so an empty list can tell "calm" from "too new to judge". */
+    historyHours: number;
 }
 
 /** One hourly rollup row, as read. */
@@ -125,7 +128,13 @@ export function insightFromRows(subject: string, rows: readonly RollupRow[], now
         disk.push({ t: row.bucket.getTime(), used: Number(row.diskUsedBytesAvg), total: Number(row.diskTotalBytesAvg) });
     }
     const forecast = forecastDisk(disk);
-    return { subject, anomalies: anomalies.slice(0, MAX_ANOMALIES), forecast, diskWarning: forecastWarns(forecast) };
+    return {
+        subject,
+        anomalies: anomalies.slice(0, MAX_ANOMALIES),
+        forecast,
+        diskWarning: forecastWarns(forecast),
+        historyHours: rows.length
+    };
 }
 
 /** Insights for the given server subjects, in one read of their rollups. The
