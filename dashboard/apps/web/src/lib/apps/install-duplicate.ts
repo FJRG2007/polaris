@@ -24,7 +24,7 @@
 import { prisma } from "@polaris/db";
 import { revealEnvVar, setEnvVars } from "@/lib/env-var-service";
 import { publishAccessChange } from "@/lib/access-live";
-import { createVolume } from "@/lib/deploy-volume-service";
+import { createVolume, volumeMountSource } from "@/lib/deploy-volume-service";
 import { holdWhileCopying } from "@/lib/apps/install-copy-hold";
 import { getPorts, type TargetRow } from "@/lib/deploy/runtime";
 import type { ComposeSpec, ComposeSpecVolume } from "@polaris/deploy";
@@ -652,8 +652,7 @@ function mountedSource(volume: VolumeRow, inspect: unknown): ComposeSpecVolume {
 }
 
 function nasSource(volume: VolumeRow): string {
-    const stored = volume.source ?? volume.name;
-    return volume.connectionId ? `${volume.connectionId}/${stored}` : stored;
+    return volumeMountSource(volume).source;
 }
 
 /** The volume mounted at `path` in an inspected container, by its Docker name. */

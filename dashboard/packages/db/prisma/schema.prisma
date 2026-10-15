@@ -4848,6 +4848,8 @@ model Application {
     volumes     Volume[]
     crons       ServiceCron[]
     runtimeLogs RuntimeLogLine[]
+    fileAccessAccounts FileAccessAccount[]
+    fileAccessServer   FileAccessServer?
 
     @@unique([environmentId, slug])
     @@index([targetId])
@@ -13745,4 +13747,41 @@ model CloudPrice {
     fetchedAt    DateTime @default(now())
 
     @@unique([provider, region, size])
+}
+
+// SFTP accounts that reach one service's volumes, each chrooted to them. The
+// server that answers them runs only while at least one account exists
+// (lib/deploy/file-access.ts); with none, nothing runs.
+model FileAccessAccount {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    applicationId  String   @db.Uuid
+    username       String
+    readOnly       Boolean  @default(false)
+    // The password, sealed with the master key; null for a key-only account.
+    passwordCipher Bytes?
+    passwordNonce  Bytes?
+    passwordKeyId  String?
+    // One OpenSSH public key line; null for a password-only account.
+    publicKey      String?
+    createdById    String?  @db.Uuid
+    createdAt      DateTime @default(now())
+
+    application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@unique([applicationId, username])
+}
+
+// The running SFTP server of one service: the host port it was given and how
+// its last start went. The row exists only while the server should run.
+model FileAccessServer {
+    applicationId String    @id @db.Uuid
+    targetId      String    @db.Uuid
+    port          Int
+    lastError     String?
+    startedAt     DateTime?
+    updatedAt     DateTime  @updatedAt
+
+    application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@unique([targetId, port])
 }

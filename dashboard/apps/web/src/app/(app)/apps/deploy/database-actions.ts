@@ -19,8 +19,12 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { firstIssue, reply } from "./reply";
 import * as pitr from "@/lib/database-ops/pitr";
+import * as accounts from "@/lib/database-ops/accounts";
+import * as tuning from "@/lib/database-ops/tuning";
 import { requirePermission } from "@/lib/session";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import { getTranslations } from "@/lib/i18n/request";
+import { DatabaseOperationError } from "@/lib/database-ops/ops";
 import { copyInto } from "@/lib/database-ops/copy";
 import * as store from "@/lib/object-storage/store";
 import * as upgrade from "@/lib/database-ops/upgrade";
@@ -44,8 +48,8 @@ async function invalid(error: z.ZodError): Promise<{ error: string }> {
     return { error: await firstIssue(error, "common.invalidRequestShort") };
 }
 
-/** An error's words for the screen. Refusals are written for it; anything else
- *  is logged and replaced, since it may name internals. */
+/** An error's words for the screen. Refusals are written for it, or give a key
+ *  of this catalog; anything else is logged and replaced, since it may name internals. */
 async function failure(
     caught: unknown,
     fallback: NamespaceKey<"deployServer">
@@ -55,7 +59,10 @@ async function failure(
         !(caught instanceof TypeError) &&
         !caught.name.startsWith("Prisma")
     ) {
-        return { error: caught.message };
+        const t = await getTranslations("deployServer");
+        if (!t.has(caught.message)) return { error: caught.message };
+        const params = caught instanceof DatabaseOperationError ? caught.params : undefined;
+        return { error: t(caught.message as NamespaceKey<"deployServer">, params) };
     }
     console.error(`deploy: ${fallback}:`, caught);
     return { error: await reply(fallback) };
@@ -599,5 +606,169 @@ export async function purgeDomainCacheAction(
         return {};
     } catch (caught) {
         return failure(caught, "cdn.purgeFailed");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Users and connections
+// ---------------------------------------------------------------------------
+
+export async function listDatabaseAccountsAction(
+    databaseId: string
+): Promise<Result<accounts.AccountListing>> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { ownerId } = await manage(parsed.data);
+        return await accounts.listAccounts(parsed.data, ownerId);
+    } catch (caught) {
+        return failure(caught, "databases.accountsFailed");
+    }
+}
+
+const accountCreateSchema = core.dbAccountCreateSchema.extend({ databaseId: z.string().uuid() });
+
+/** The generated password is in this answer and nowhere else; it is never stored. */
+export async function createDatabaseAccountAction(
+    input: z.input<typeof accountCreateSchema>
+): Promise<Result<{ username: string; password: string }>> {
+    const parsed = accountCreateSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data.databaseId);
+        const created = await accounts.createAccount(
+            parsed.data.databaseId,
+            ownerId,
+            parsed.data.username
+        );
+        await audit(userId, "deploy.db.account.create", parsed.data.databaseId, {
+            username: created.username
+        });
+        return created;
+    } catch (caught) {
+        return failure(caught, "databases.accountFailed");
+    }
+}
+
+const accountDropSchema = z.object({
+    databaseId: z.string().uuid(),
+    username: core.dbAccountGrantSchema.shape.username
+});
+
+export async function dropDatabaseAccountAction(
+    input: z.input<typeof accountDropSchema>
+): Promise<Result> {
+    const parsed = accountDropSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data.databaseId);
+        await accounts.dropAccount(parsed.data.databaseId, ownerId, parsed.data.username);
+        await audit(userId, "deploy.db.account.drop", parsed.data.databaseId, {
+            username: parsed.data.username
+        });
+        return {};
+    } catch (caught) {
+        return failure(caught, "databases.accountFailed");
+    }
+}
+
+const accountGrantSchema = core.dbAccountGrantSchema.extend({ databaseId: z.string().uuid() });
+
+export async function grantDatabaseAccountAction(
+    input: z.input<typeof accountGrantSchema>
+): Promise<Result> {
+    const parsed = accountGrantSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data.databaseId);
+        const { databaseId, ...grant } = parsed.data;
+        await accounts.grantAccount(databaseId, ownerId, grant);
+        await audit(userId, "deploy.db.account.grant", databaseId, grant);
+        return {};
+    } catch (caught) {
+        return failure(caught, "databases.accountFailed");
+    }
+}
+
+const accountRevokeSchema = core.dbAccountRevokeSchema.extend({ databaseId: z.string().uuid() });
+
+export async function revokeDatabaseAccountAction(
+    input: z.input<typeof accountRevokeSchema>
+): Promise<Result> {
+    const parsed = accountRevokeSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data.databaseId);
+        const { databaseId, ...revoke } = parsed.data;
+        await accounts.revokeAccount(databaseId, ownerId, revoke);
+        await audit(userId, "deploy.db.account.revoke", databaseId, revoke);
+        return {};
+    } catch (caught) {
+        return failure(caught, "databases.accountFailed");
+    }
+}
+
+export async function listDatabaseProcessesAction(
+    databaseId: string
+): Promise<Result<{ processes: Awaited<ReturnType<typeof accounts.listProcesses>> }>> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { ownerId } = await manage(parsed.data);
+        return { processes: await accounts.listProcesses(parsed.data, ownerId) };
+    } catch (caught) {
+        return failure(caught, "databases.processesFailed");
+    }
+}
+
+const processKillSchema = core.dbProcessKillSchema.extend({ databaseId: z.string().uuid() });
+
+export async function killDatabaseProcessAction(
+    input: z.input<typeof processKillSchema>
+): Promise<Result> {
+    const parsed = processKillSchema.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data.databaseId);
+        await accounts.killProcess(parsed.data.databaseId, ownerId, parsed.data.processId);
+        await audit(userId, "deploy.db.process.kill", parsed.data.databaseId, {
+            processId: parsed.data.processId
+        });
+        return {};
+    } catch (caught) {
+        return failure(caught, "databases.killFailed");
+    }
+}
+// ---------------------------------------------------------------------------
+// Tuning
+// ---------------------------------------------------------------------------
+
+export async function databaseTuningAction(
+    databaseId: string
+): Promise<Result<{ tuning: tuning.TuningView }>> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { ownerId } = await manage(parsed.data);
+        return { tuning: await tuning.tuningView(parsed.data, ownerId) };
+    } catch (caught) {
+        return failure(caught, "databases.readFailed");
+    }
+}
+
+/** Saves the settings suggested for the database's memory and restarts it. */
+export async function applyDatabaseTuningAction(databaseId: string): Promise<Result> {
+    const parsed = z.string().uuid().safeParse(databaseId);
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+        const { userId, ownerId } = await manage(parsed.data);
+        const applied = await tuning.applyTuning(parsed.data, ownerId);
+        await audit(userId, "deploy.db.tuning", parsed.data, {
+            settings: Object.fromEntries(applied.map((entry) => [entry.name, entry.value]))
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "databases.tuningFailed");
     }
 }
