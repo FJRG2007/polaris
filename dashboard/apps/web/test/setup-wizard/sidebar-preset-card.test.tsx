@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { withMessages } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "@polaris/ui";
 import { cleanup, render, screen } from "@testing-library/react";
 import { SIDEBAR_PRESETS } from "@/lib/setup/sidebar-presets";
 import { SidebarPresetCard } from "@/components/setup/sidebar-preset-card";
@@ -29,7 +30,9 @@ function draw(favorites: readonly string[], order: readonly string[] = []) {
         openLauncher: () => undefined
     } satisfies FavoriteApps;
     const wrap = (node: ReactNode) => (
-        <FavoriteAppsContext.Provider value={value}>{node}</FavoriteAppsContext.Provider>
+        <ToastProvider>
+            <FavoriteAppsContext.Provider value={value}>{node}</FavoriteAppsContext.Provider>
+        </ToastProvider>
     );
     render(withMessages(wrap(<SidebarPresetCard />)));
     return replacePrefs;
@@ -84,5 +87,27 @@ describe("the sidebar preset card", () => {
                 .getAllByRole("radio")
                 .some((radio) => radio.getAttribute("aria-checked") === "true")
         ).toBe(false);
+    });
+
+    it("offers a list arranged by hand back after a preset replaced it", async () => {
+        const user = userEvent.setup();
+        const replacePrefs = draw(["chat", "vault"], ["vault", "chat"]);
+        await user.click(screen.getByRole("radio", { name: /Team workspace/ }));
+        expect(replacePrefs).toHaveBeenLastCalledWith({
+            favorites: [...SIDEBAR_PRESETS.team],
+            order: []
+        });
+        await user.click(await screen.findByRole("button", { name: "Restore" }));
+        expect(replacePrefs).toHaveBeenLastCalledWith({
+            favorites: ["chat", "vault"],
+            order: ["vault", "chat"]
+        });
+    });
+
+    it("leaves no note when the list replaced was a preset", async () => {
+        const user = userEvent.setup();
+        draw([]);
+        await user.click(screen.getByRole("radio", { name: /Team workspace/ }));
+        expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
     });
 });

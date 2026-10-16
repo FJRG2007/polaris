@@ -17,6 +17,7 @@ let mark: string | null;
 let users: { id: string }[];
 let anyApp: { id: string } | null;
 let present: Set<string>;
+let reads: string[];
 const installApp = vi.fn(async () => ({ installedAppId: "row-1", applicationId: null }));
 const upsert = vi.fn(async () => ({}));
 
@@ -26,7 +27,7 @@ vi.mock("@polaris/db", () => ({
             findUnique: async () => (mark === null ? null : { value: mark }),
             upsert: (...args: unknown[]) => upsert(...(args as []))
         },
-        user: { findMany: async () => users },
+        user: { findMany: async () => (reads.push("users"), users) },
         installedApp: { findFirst: async () => anyApp }
     }
 }));
@@ -47,10 +48,11 @@ vi.mock("@/lib/apps/install-service", () => ({
     installApp: (...args: unknown[]) => installApp(...(args as []))
 }));
 vi.mock("@/lib/apps/install-presence", () => ({
-    isAppInstalled: async (id: string) => present.has(id)
+    isAppInstalled: async (id: string) => (reads.push(id), present.has(id))
 }));
 
-const { finishSetupAction, installSetupAppAction, setupStateAction } = await import(
+const { finishSetupAction, installSetupAppAction, setupInstalledAction, setupStateAction } =
+    await import(
     "@/app/(app)/setup-actions"
 );
 
@@ -60,6 +62,7 @@ beforeEach(() => {
     users = [{ id: "admin-1" }];
     anyApp = null;
     present = new Set();
+    reads = [];
     installApp.mockClear();
     upsert.mockClear();
 });
@@ -111,9 +114,10 @@ describe("whether the setup opens by itself", () => {
         expect((await setupStateAction()).offer).toBe(true);
     });
 
-    it("stays shut once finished or skipped", async () => {
+    it("stays shut once finished or skipped, reading nothing but the mark", async () => {
         mark = "skipped";
-        expect((await setupStateAction()).offer).toBe(false);
+        expect(await setupStateAction()).toEqual({ offer: false, installed: [] });
+        expect(reads).toEqual([]);
     });
 
     it("stays shut on a Polaris already in use", async () => {
@@ -132,6 +136,26 @@ describe("whether the setup opens by itself", () => {
     it("reports which of its apps are already here", async () => {
         present = new Set(["home", "calendar"]);
         expect((await setupStateAction()).installed).toEqual(["calendar", "home"]);
+    });
+
+    it("asks no app whether it is installed on a Polaris already in use", async () => {
+        users = [{ id: "admin-1" }, { id: "member-1" }];
+        await setupStateAction();
+        expect(reads).toEqual(["users"]);
+    });
+});
+
+describe("the setup opened again from Management", () => {
+    it("reports which of its apps are already here, whatever the mark says", async () => {
+        mark = "done";
+        present = new Set(["tools", "crm"]);
+        expect(await setupInstalledAction()).toEqual(["crm", "tools"]);
+    });
+
+    it("says nothing to somebody who may not install", async () => {
+        viewer = { id: "member-1", isAdmin: false };
+        present = new Set(["tools"]);
+        expect(await setupInstalledAction()).toEqual([]);
     });
 });
 

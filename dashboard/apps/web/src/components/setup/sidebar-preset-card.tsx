@@ -8,11 +8,12 @@
  * that puts the old list back, with the reason, if the server refuses it. So a
  * preset is only a starting point - pinning or arranging afterwards turns it into
  * "Custom", and picking "Default" again is the sidebar every account had before.
+ * Replacing a Custom list can be undone from the note it leaves.
  */
 
 import { Check } from "lucide-react";
 import type { KeyboardEvent } from "react";
-import { Card, CardBody, cn } from "@polaris/ui";
+import { Card, CardBody, cn, useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import {
@@ -24,12 +25,30 @@ import {
 
 export function SidebarPresetCard() {
     const t = useTranslations("setup");
+    const toast = useToast();
     const { favorites, order, replacePrefs } = useFavoriteApps();
     const current = matchPreset({ favorites, order });
 
+    // A list arranged by hand cannot be rebuilt from a preset, so replacing one
+    // offers it back.
     function pick(id: SidebarPresetId) {
         if (id === current) return;
         replacePrefs(presetPrefs(id));
+        if (current !== "custom") return;
+        const previous = { favorites: [...favorites], order: [...order] };
+        toast.show({
+            key: "sidebar-preset",
+            title: t("presets.replaced"),
+            actions: [
+                {
+                    label: t("presets.undo"),
+                    run: async () => {
+                        replacePrefs(previous);
+                        return null;
+                    }
+                }
+            ]
+        });
     }
 
     // A radio group is one stop for Tab; the arrows move between its options and

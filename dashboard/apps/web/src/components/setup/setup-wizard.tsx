@@ -14,7 +14,7 @@
  * only the app list waits on it, as a skeleton.
  */
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { findApp } from "@/lib/apps/catalog";
 import { AppMark } from "@/components/app-mark";
 import { localizeApp } from "@/lib/apps/app-words";
@@ -43,12 +43,15 @@ interface Progress {
 export function SetupWizard({
     installed,
     onFinish,
+    onInstalling,
     install = installSetupAppAction
 }: {
     /** The setup's apps already installed; null while that is being asked. */
     installed: readonly SetupApp[] | null;
     /** Called with "done" or "skipped" when the reader leaves the setup. */
     onFinish: (outcome: "done" | "skipped") => void;
+    /** Told when installs start and when the last one settles. */
+    onInstalling?: (busy: boolean) => void;
     /** The install, injectable so the screen can be exercised without a server. */
     install?: (app: SetupApp) => Promise<{ error?: string }>;
 }) {
@@ -120,6 +123,7 @@ export function SetupWizard({
         const status = progress.get(app)?.status;
         return status === "waiting" || status === "installing";
     });
+    useEffect(() => onInstalling?.(busy), [busy, onInstalling]);
     const failed = queue.some((app) => progress.get(app)?.status === "failed");
     const current = STEPS.indexOf(step) + 1;
 

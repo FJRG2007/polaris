@@ -73,19 +73,26 @@ async function establishment(): Promise<{ accounts: number; appsInstalled: boole
 }
 
 /** Whether to open the setup, and what it would find installed. Silent for
- *  anybody who may not install: they are never offered it. */
+ *  anybody who may not install: they are never offered it. Once the setup was
+ *  finished or skipped - every Polaris after its first day - the mark is all
+ *  this reads. */
 export async function setupStateAction(): Promise<SetupState> {
     const user = await backgroundUser();
     if (!user || !user.isAdmin || user.viewingAs) return NOTHING;
-    const [mark, installed, established] = await Promise.all([
-        readMark().catch(() => "unknown"),
-        installedSetupApps(),
-        establishment()
-    ]);
-    return {
-        offer: shouldOfferSetup({ isAdmin: user.isAdmin, viewingAs: false, mark, ...established }),
-        installed
-    };
+    const mark = await readMark().catch(() => "unknown");
+    if (mark !== null) return NOTHING;
+    const established = await establishment();
+    if (!shouldOfferSetup({ isAdmin: user.isAdmin, viewingAs: false, mark, ...established }))
+        return NOTHING;
+    return { offer: true, installed: await installedSetupApps() };
+}
+
+/** The setup's apps this Polaris already has, for the setup opened again on
+ *  purpose. Nothing for anybody who may not install. */
+export async function setupInstalledAction(): Promise<readonly SetupApp[]> {
+    const user = await backgroundUser();
+    if (!user || !user.isAdmin || user.viewingAs) return [];
+    return installedSetupApps();
 }
 
 /** Install one of the setup's apps with the marketplace's one-click defaults. */

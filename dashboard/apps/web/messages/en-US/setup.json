@@ -58,12 +58,13 @@
     "presets": {
         "title": "Sidebar apps",
         "hint": "Choose the apps the Overview lists in its sidebar. You can still pin and arrange apps afterwards.",
-        "custom": "Custom",
         "customHint": "You arranged your own list. Picking a preset replaces it.",
+        "replaced": "Sidebar apps replaced.",
+        "undo": "Restore",
         "items": {
             "default": {
                 "title": "Default",
-                "body": "Your favorites, or the apps you open most."
+                "body": "The apps Polaris lists first."
             },
             "hosting": {
                 "title": "Hosting and deploys",

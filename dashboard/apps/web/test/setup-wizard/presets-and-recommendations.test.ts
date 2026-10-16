@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { findApp } from "@/lib/apps/catalog";
-import { NO_LAUNCHER_PREFS } from "@/lib/app-launcher";
+import { NO_LAUNCHER_PREFS, railApps } from "@/lib/app-launcher";
 import {
     recommendApps,
     SETUP_APPS,
@@ -17,7 +17,6 @@ import {
     matchPreset,
     presetAppsListed,
     presetPrefs,
-    presetRail,
     SIDEBAR_PRESET_IDS,
     SIDEBAR_PRESETS
 } from "@/lib/setup/sidebar-presets";
@@ -26,7 +25,11 @@ describe("sidebar presets", () => {
     it("leaves today's sidebar alone for Default", () => {
         expect(presetPrefs("default")).toEqual(NO_LAUNCHER_PREFS);
         expect(matchPreset(NO_LAUNCHER_PREFS)).toBe("default");
-        expect(presetRail("default", ["chat", "tasks"])).toEqual([]);
+        const { favorites, order } = presetPrefs("default");
+        expect(railApps({ available: ["chat", "tasks"], favorites, arranged: order })).toEqual([
+            "chat",
+            "tasks"
+        ]);
     });
 
     it("round-trips every preset through the stored favorites", () => {
@@ -48,7 +51,8 @@ describe("sidebar presets", () => {
     });
 
     it("draws only the preset apps the reader can open, in the preset's order", () => {
-        expect(presetRail("homelab", ["drive", "home", "overview", "tools"])).toEqual([
+        const { favorites } = presetPrefs("homelab");
+        expect(railApps({ available: ["drive", "home", "overview", "tools"], favorites })).toEqual([
             "home",
             "drive",
             "tools"

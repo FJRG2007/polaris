@@ -58,12 +58,13 @@
     "presets": {
         "title": "Apps laterales",
         "hint": "Elige las apps que el Resumen muestra en su barra lateral. Después puedes fijar y ordenar apps igual.",
-        "custom": "A medida",
         "customHint": "Ordenaste tu propia lista. Elegir un preajuste la sustituye.",
+        "replaced": "Apps laterales sustituidas.",
+        "undo": "Recuperar",
         "items": {
             "default": {
                 "title": "Estándar",
-                "body": "Tus favoritas, o las apps que más abres."
+                "body": "Las apps que Polaris muestra primero."
             },
             "hosting": {
                 "title": "Hosting y despliegues",

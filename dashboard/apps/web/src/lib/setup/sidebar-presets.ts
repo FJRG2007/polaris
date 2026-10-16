@@ -15,7 +15,7 @@
  * Pure and safe in the browser.
  */
 
-import { OVERVIEW_APP_ID, POLARIS_APPS } from "@/lib/apps";
+import { POLARIS_APPS } from "@/lib/apps";
 import { NO_LAUNCHER_PREFS, type LauncherPrefs } from "@/lib/app-launcher";
 
 export const SIDEBAR_PRESET_IDS = ["default", "hosting", "team", "games", "homelab"] as const;
@@ -53,13 +53,6 @@ export function matchPreset(prefs: LauncherPrefs): SidebarPresetId | "custom" {
         );
     });
     return found ?? "custom";
-}
-
-/** The rail a preset draws for somebody who can open `available`: its apps they
- *  can open, in its order. Empty for "default", which is today's rail. */
-export function presetRail(id: SidebarPresetId, available: readonly string[]): string[] {
-    const open = new Set(available.filter((app) => app !== OVERVIEW_APP_ID));
-    return SIDEBAR_PRESETS[id].filter((app) => open.has(app));
 }
 
 /** Whether every app a preset names is one the switcher lists - asserted in a
