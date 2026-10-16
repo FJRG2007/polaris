@@ -622,7 +622,7 @@
         "closeAll": "Close all",
         "confirmTitle": "Close {count, plural, one {this port} other {these # ports}}?",
         "confirmBody": "Each service starts again without the port and keeps serving on its domains while it changes over. One that cannot run two copies at once restarts and is offline for a few seconds. Whatever reached it on the address and port stops reaching it.",
-        "confirm": "Close",
+        "confirm": "Close port",
         "closing": "Closing. Each service changes over in the background.",
         "closeFailed": "Could not close the port. The service keeps running as it was.",
         "noPermission": "Only whoever runs this instance can close these."
