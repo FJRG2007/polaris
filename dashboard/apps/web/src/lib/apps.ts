@@ -803,6 +803,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["github actions", "ci"]
         },
         {
+            label: "Tunnels", // i18n-ignore
+            href: "/apps/tunnels",
+            needs: "deploy.manage",
+            icon: Network,
+            group: MACHINES_GROUP,
+            keywords: ["wireguard", "nat", "cgnat", "expose", "public address", "vpn"]
+        },
+        {
             label: "Agents", // i18n-ignore
             href: "/apps/agents",
             needs: "agents.read",

@@ -1,0 +1,84 @@
+{
+    "page": {
+        "title": "Tunnels",
+        "description": "Publish a service that runs behind NAT through one of your servers with a public address.",
+        "create": "New tunnel"
+    },
+    "empty": {
+        "title": "No tunnels yet",
+        "description": "A tunnel lets a service at home or behind a router answer on a hostname, through a server the internet can reach."
+    },
+    "list": {
+        "via": "Through {server}, UDP port {port}",
+        "service": "{service} in {project}, on {server}",
+        "handshake": "Last handshake",
+        "never": "Never",
+        "received": "Received",
+        "sent": "Sent",
+        "statusFailed": "The tunnel's state could not be read."
+    },
+    "health": {
+        "up": "Connected",
+        "waiting": "Waiting",
+        "down": "Down",
+        "paused": "Paused",
+        "unknown": "Unknown"
+    },
+    "actions": {
+        "pause": "Pause",
+        "resume": "Resume",
+        "remove": "Remove",
+        "refresh": "Refresh",
+        "open": "Open {hostname}"
+    },
+    "setup": {
+        "title": "Open UDP port {port} on {server}",
+        "body": "Polaris cannot open ports at your hosting provider. Add an inbound rule to this server's firewall or security group with these values. This notice goes away at the first handshake.",
+        "down": "No handshake for a while. Check that UDP port {port} is still open on {server} and that the server running {service} is on.",
+        "protocol": "Protocol",
+        "port": "Port",
+        "source": "Source",
+        "address": "Server address",
+        "addressUnknown": "Not known yet",
+        "dns": "Point {hostname} at {address} with an A record so visitors reach it."
+    },
+    "dialog": {
+        "title": "New tunnel",
+        "description": "Visitors reach the hostname on the public server, which passes them through an encrypted tunnel to the service.",
+        "publicServer": "Public server",
+        "publicHint": "A server with a public address. It receives visitors and listens on one UDP port.",
+        "service": "Service",
+        "serviceHint": "Runs on a different server, usually behind NAT. Nothing is opened there.",
+        "hostname": "Hostname",
+        "pickServer": "Choose a server",
+        "pickService": "Choose a service",
+        "searchServices": "Search services",
+        "noServices": "No services found",
+        "thisMachine": "{name} (this machine)",
+        "serviceOption": "{service} - {project}",
+        "noOtherServer": "Every service runs on this server. A tunnel needs a service on another one.",
+        "hostnameInvalid": "Enter a hostname such as app.example.com.",
+        "create": "Create tunnel",
+        "creating": "Creating",
+        "cancel": "Cancel"
+    },
+    "remove": {
+        "kind": "tunnel",
+        "title": "Remove this tunnel?",
+        "question": "{hostname} stops answering and both ends are removed. The service itself is not touched.",
+        "confirm": "Remove tunnel"
+    },
+    "refusals": {
+        "notFound": "This tunnel no longer exists.",
+        "noServer": "That server is not one of yours.",
+        "noService": "That service is not one of yours.",
+        "sameServer": "The service already runs on that server. Pick a service on another server.",
+        "hostname": "Enter a hostname such as app.example.com.",
+        "hostnameTaken": "That hostname is already in use.",
+        "full": "No free tunnel port is left on that server.",
+        "noAddress": "The public address of that server is not known yet.",
+        "unreachable": "That server cannot be reached right now.",
+        "edge": "That server's edge does not take routes from Polaris yet. Set it up again from Servers.",
+        "generic": "The tunnel could not be changed. Try again in a moment."
+    }
+}

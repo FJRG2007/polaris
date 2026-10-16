@@ -15,6 +15,9 @@
 
 import { generateKeyPairSync } from "node:crypto";
 import type { ComposeSpec } from "@polaris/deploy";
+import { isRouteHostname } from "./tunnel-hostname";
+
+export { isRouteHostname };
 
 /**
  * Userspace WireGuard, pinned to the commit tagged v1.1.3 (2026-07-16). The
@@ -339,14 +342,6 @@ export function tunnelHealth(lastHandshake: number, nowSeconds: number): TunnelH
 export interface TunnelRoute {
     readonly id: string;
     readonly hostname: string;
-}
-
-/** A hostname safe to put in a rule. */
-export function isRouteHostname(value: string): boolean {
-    return (
-        value.length <= 253 &&
-        /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(value)
-    );
 }
 
 /**

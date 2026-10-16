@@ -15,6 +15,7 @@
 
 import { prisma } from "@polaris/db";
 import * as wg from "./tunnel-config";
+import { normalizeHostname } from "./tunnel-hostname";
 import { loadEnv } from "@polaris/config";
 import { serviceName } from "@polaris/deploy";
 import { getPorts } from "@/lib/deploy/runtime";
@@ -83,15 +84,6 @@ export function sealKey(privateKey: string, masterKey = loadEnv().POLARIS_MASTER
 export function openKey(sealed: string, masterKey = loadEnv().POLARIS_MASTER_KEY): string {
     const { c, n, k } = JSON.parse(sealed) as { c: string; n: string; k: string };
     return decryptSecret({ ciphertext: Buffer.from(c, "base64"), nonce: Buffer.from(n, "base64"), keyId: k }, masterKey);
-}
-
-/** Lowercase, no scheme, no trailing dot or slash. */
-export function normalizeHostname(value: string): string {
-    return value
-        .trim()
-        .toLowerCase()
-        .replace(/^https?:\/\//, "")
-        .replace(/[/.]+$/, "");
 }
 
 /** What the create form can offer: the owner's servers and services. */
