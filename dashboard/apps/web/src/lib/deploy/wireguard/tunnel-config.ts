@@ -92,11 +92,15 @@ export function keyToHex(key: string): string {
 
 /** The two addresses of a slot: the public end's and the NAT end's. */
 export function slotAddresses(slot: number): { publicAddress: string; peerAddress: string } {
-    if (!Number.isInteger(slot) || slot < 0 || slot >= SLOT_COUNT) throw new RangeError(`No tunnel slot ${slot}`);
+    if (!Number.isInteger(slot) || slot < 0 || slot >= SLOT_COUNT)
+        throw new RangeError(`No tunnel slot ${slot}`);
     const base = slot * 4;
     const third = Math.floor(base / 256);
     const fourth = base % 256;
-    return { publicAddress: `10.213.${third}.${fourth + 1}`, peerAddress: `10.213.${third}.${fourth + 2}` };
+    return {
+        publicAddress: `10.213.${third}.${fourth + 1}`,
+        peerAddress: `10.213.${third}.${fourth + 2}`
+    };
 }
 
 /** The lowest slot nobody holds, or null when all are taken. */
@@ -109,7 +113,8 @@ export function allocateSlot(used: Iterable<number>): number | null {
 /** The lowest listening port free on a public server, or null when all are taken. */
 export function allocateListenPort(used: Iterable<number>): number | null {
     const taken = new Set(used);
-    for (let port = FIRST_LISTEN_PORT; port <= LAST_LISTEN_PORT; port += 1) if (!taken.has(port)) return port;
+    for (let port = FIRST_LISTEN_PORT; port <= LAST_LISTEN_PORT; port += 1)
+        if (!taken.has(port)) return port;
     return null;
 }
 
@@ -175,7 +180,8 @@ export function renderNatConfig(input: NatEndInput): string {
     const { publicAddress, peerAddress } = slotAddresses(input.slot);
     assertKey(input.privateKey);
     assertKey(input.peerPublicKey);
-    if (!isHostPort(input.endpoint)) throw new Error("The public server's address is not a host and port");
+    if (!isHostPort(input.endpoint))
+        throw new Error("The public server's address is not a host and port");
     if (!isHostPort(input.origin)) throw new Error("The service's address is not a host and port");
     return [
         "[Interface]",
@@ -201,10 +207,20 @@ function assertKey(key: string): void {
 
 /** Compose names for one end of one tunnel. Container names are global on a host,
  *  so the tunnel id is in every one of them. */
-export function endNames(tunnelId: string, end: "public" | "nat"): { project: string; helper: string; wireguard: string } {
-    const id = tunnelId.replace(/[^a-f0-9]/gi, "").slice(-12).toLowerCase();
+export function endNames(
+    tunnelId: string,
+    end: "public" | "nat"
+): { project: string; helper: string; wireguard: string } {
+    const id = tunnelId
+        .replace(/[^a-f0-9]/gi, "")
+        .slice(-12)
+        .toLowerCase();
     const tag = end === "public" ? "pub" : "nat";
-    return { project: `polaris-wg-${tag}-${id}`, helper: `wg-${tag}-${id}`, wireguard: `wg-${tag}-${id}-wg` };
+    return {
+        project: `polaris-wg-${tag}-${id}`,
+        helper: `wg-${tag}-${id}`,
+        wireguard: `wg-${tag}-${id}-wg`
+    };
 }
 
 /** The address the edge dials: the public end's helper, which owns the namespace. */
@@ -249,7 +265,9 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
                 image: HELPER_IMAGE,
                 pullPolicy: "missing",
                 env: { WG_CONFIG: Buffer.from(input.config, "utf8").toString("base64") },
-                ports: input.listenPort ? [{ host: input.listenPort, container: input.listenPort, protocol: "udp" }] : [],
+                ports: input.listenPort
+                    ? [{ host: input.listenPort, container: input.listenPort, protocol: "udp" }]
+                    : [],
                 volumes: [{ kind: "volume", source: volume, target: "/etc/wireproxy" }],
                 labels: {},
                 command: ["sh", "-c", script],
@@ -299,7 +317,13 @@ export interface PeerReading {
  */
 export function parseDeviceState(text: string): PeerReading[] {
     const peers: PeerReading[] = [];
-    let current: { publicKeyHex: string; endpoint: string | null; sec: number; rx: number; tx: number } | null = null;
+    let current: {
+        publicKeyHex: string;
+        endpoint: string | null;
+        sec: number;
+        rx: number;
+        tx: number;
+    } | null = null;
     const close = (): void => {
         if (current) {
             peers.push({
@@ -353,7 +377,13 @@ export interface TunnelRoute {
  */
 export function renderTunnelRoutes(routes: readonly TunnelRoute[]): string {
     const usable = routes.filter((route) => isRouteHostname(route.hostname));
-    const lines = ["http:", "  middlewares:", "    polaris-wg-https:", "      redirectScheme:", "        scheme: https"];
+    const lines = [
+        "http:",
+        "  middlewares:",
+        "    polaris-wg-https:",
+        "      redirectScheme:",
+        "        scheme: https"
+    ];
     if (usable.length === 0) return `${lines.join("\n")}\n`;
     lines.push("  routers:");
     for (const route of usable) {

@@ -45,9 +45,17 @@ vi.mock("@/lib/deploy/server-edge", () => ({
     }),
     withSetupLock: vi.fn(async (_host: string, run: () => Promise<void>) => run())
 }));
-vi.mock("@/lib/deploy/service-networks", () => ({ connectorNetworks: vi.fn(async () => ["polaris-proxy"]) }));
+vi.mock("@/lib/deploy/service-networks", () => ({
+    connectorNetworks: vi.fn(async () => ["polaris-proxy"])
+}));
 vi.mock("@/lib/host-service", () => ({
-    getHostConnection: vi.fn(async () => ({ address: "198.51.100.1", port: 22, username: "x", auth: {}, hostKey: null }))
+    getHostConnection: vi.fn(async () => ({
+        address: "198.51.100.1",
+        port: 22,
+        username: "x",
+        auth: {},
+        hostKey: null
+    }))
 }));
 vi.mock("@/lib/deploy/router-remote", () => ({
     RemoteRouter: class {
@@ -80,9 +88,13 @@ function rowById(id: unknown): Record<string, unknown> | undefined {
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        deployTarget: { findFirst: vi.fn(async () => (state.owned.target ? { id: "t-public" } : null)) },
+        deployTarget: {
+            findFirst: vi.fn(async () => (state.owned.target ? { id: "t-public" } : null))
+        },
         application: {
-            findFirst: vi.fn(async () => (state.owned.app ? { id: "app-1", targetId: "t-home" } : null))
+            findFirst: vi.fn(async () =>
+                state.owned.app ? { id: "app-1", targetId: "t-home" } : null
+            )
         },
         wireguardTunnel: {
             findFirst: vi.fn(async ({ where }: FindArgs) => {
@@ -98,7 +110,8 @@ vi.mock("@polaris/db", () => ({
                         .map((row) => ({ ...row }));
                 }
                 if (select?.slot) return rowsOf().map((row) => ({ slot: row.slot }));
-                if (select?.listenPort) return rowsOf().map((row) => ({ listenPort: row.listenPort }));
+                if (select?.listenPort)
+                    return rowsOf().map((row) => ({ listenPort: row.listenPort }));
                 return rowsOf()
                     .filter((row) => !row.paused)
                     .map((row) => ({ id: row.id, hostname: row.hostname }));
@@ -118,16 +131,32 @@ vi.mock("@polaris/db", () => ({
                 };
                 return { id: ID };
             }),
-            update: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
-                const row = rowById(where.id);
-                if (row) Object.assign(row, data);
-                return row;
-            }),
-            updateMany: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
-                const row = rowById(where.id);
-                if (row) Object.assign(row, data);
-                return { count: row ? 1 : 0 };
-            }),
+            update: vi.fn(
+                async ({
+                    where,
+                    data
+                }: {
+                    where: { id: string };
+                    data: Record<string, unknown>;
+                }) => {
+                    const row = rowById(where.id);
+                    if (row) Object.assign(row, data);
+                    return row;
+                }
+            ),
+            updateMany: vi.fn(
+                async ({
+                    where,
+                    data
+                }: {
+                    where: { id: string };
+                    data: Record<string, unknown>;
+                }) => {
+                    const row = rowById(where.id);
+                    if (row) Object.assign(row, data);
+                    return { count: row ? 1 : 0 };
+                }
+            ),
             deleteMany: vi.fn(async ({ where }: { where: { id: string } }) => {
                 state.deleted += 1;
                 if (state.row?.id === where.id) state.row = null;
@@ -141,8 +170,22 @@ vi.mock("@polaris/db", () => ({
 const service = await import("@/lib/deploy/wireguard/tunnel-service");
 const wg = await import("@/lib/deploy/wireguard/tunnel-config");
 
-const PUBLIC = { id: "t-public", name: "edge-1", kind: "ssh", hostId: "h-1", runtime: "compose", proxyNetwork: "polaris-proxy" };
-const HOME = { id: "t-home", name: "home-box", kind: "ssh", hostId: "h-2", runtime: "compose", proxyNetwork: "polaris-proxy" };
+const PUBLIC = {
+    id: "t-public",
+    name: "edge-1",
+    kind: "ssh",
+    hostId: "h-1",
+    runtime: "compose",
+    proxyNetwork: "polaris-proxy"
+};
+const HOME = {
+    id: "t-home",
+    name: "home-box",
+    kind: "ssh",
+    hostId: "h-2",
+    runtime: "compose",
+    proxyNetwork: "polaris-proxy"
+};
 const APPLICATION = {
     id: "app-1",
     slug: "web",
@@ -198,7 +241,9 @@ beforeEach(() => {
     state.owned = { target: true, app: true };
 });
 
-async function refusalOf(run: Promise<unknown>): Promise<InstanceType<typeof service.TunnelRefusal>> {
+async function refusalOf(
+    run: Promise<unknown>
+): Promise<InstanceType<typeof service.TunnelRefusal>> {
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const caught = await run.then(
         () => null,
@@ -218,7 +263,11 @@ describe("creating a tunnel", () => {
 
     it("stores both keys sealed, starts both ends and puts the hostname on the public edge", async () => {
         expect(await service.createTunnel("owner", INPUT)).toEqual({ id: ID });
-        const data = state.created[0] as { hostname: string; privateKeySealed: string; peerPrivateKeySealed: string; };
+        const data = state.created[0] as {
+            hostname: string;
+            privateKeySealed: string;
+            peerPrivateKeySealed: string;
+        };
         expect(data.hostname).toBe("app.example.com");
         const publicKey = service.openKey(data.privateKeySealed);
         const natKey = service.openKey(data.peerPrivateKeySealed);
@@ -251,7 +300,9 @@ describe("creating a tunnel", () => {
         expect((await refusalOf(service.createTunnel("owner", INPUT))).code).toBe("noServer");
         state.owned = { target: true, app: false };
         expect((await refusalOf(service.createTunnel("owner", INPUT))).code).toBe("noService");
-        expect((await refusalOf(service.createTunnel("owner", { ...INPUT, hostname: "nope" }))).code).toBe("hostname");
+        expect(
+            (await refusalOf(service.createTunnel("owner", { ...INPUT, hostname: "nope" }))).code
+        ).toBe("hostname");
         expect(state.created).toHaveLength(0);
         expect(state.ports.get(PUBLIC.id)?.composeUp).not.toHaveBeenCalled();
     });
@@ -265,8 +316,12 @@ describe("creating a tunnel", () => {
     it("takes back both ends and the row when an end does not start", async () => {
         state.ports.get(HOME.id)?.composeUp.mockRejectedValue(new Error("daemon said no"));
         await expect(service.createTunnel("owner", INPUT)).rejects.toThrow("daemon said no");
-        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
-        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "public").project
+        );
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "nat").project
+        );
         expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
         expect(state.deleted).toBe(1);
     });
@@ -281,7 +336,7 @@ describe("creating a tunnel", () => {
 
 describe("resuming a tunnel", () => {
     it("starts both ends from the stored keys and routes the hostname again", async () => {
-        (state.row as { paused: boolean; }).paused = true;
+        (state.row as { paused: boolean }).paused = true;
         await service.setTunnelPaused("owner", ID, false);
         expect(state.ports.get(PUBLIC.id)?.composeUp).toHaveBeenCalled();
         expect(state.ports.get(HOME.id)?.composeUp).toHaveBeenCalled();
@@ -290,11 +345,13 @@ describe("resuming a tunnel", () => {
     });
 
     it("stays paused, with what started taken down again, when an end does not start", async () => {
-        (state.row as { paused: boolean; }).paused = true;
+        (state.row as { paused: boolean }).paused = true;
         state.ports.get(HOME.id)?.composeUp.mockRejectedValue(new Error("daemon said no"));
         await expect(service.setTunnelPaused("owner", ID, false)).rejects.toThrow("daemon said no");
         expect(state.row?.paused).toBe(true);
-        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "public").project
+        );
         expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
     });
 });
@@ -304,8 +361,12 @@ describe("a tunnel whose service or server is deleted", () => {
         const rows = await service.tunnelsWithin("owner", { applicationId: "app-1" });
         expect(rows.map((row) => row.id)).toEqual([ID]);
         expect(await service.retireTunnels("owner", rows)).toEqual([]);
-        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
-        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "public").project
+        );
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "nat").project
+        );
         expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
         expect(state.deleted).toBe(1);
     });
@@ -329,25 +390,33 @@ describe("a tunnel whose service or server is deleted", () => {
         await service.tunnelsWithin("owner", { applicationId: "app-9" });
         expect(findMany.mock.calls[0][0]?.where).toEqual({
             ownerId: "owner",
-            OR: [{ publicTarget: { hostId: "h-9" } }, { application: { target: { hostId: "h-9" } } }]
+            OR: [
+                { publicTarget: { hostId: "h-9" } },
+                { application: { target: { hostId: "h-9" } } }
+            ]
         });
-        expect(findMany.mock.calls[1][0]?.where).toEqual({ ownerId: "owner", applicationId: "app-9" });
+        expect(findMany.mock.calls[1][0]?.where).toEqual({
+            ownerId: "owner",
+            applicationId: "app-9"
+        });
     });
 
     it("starts again where its service moved, taking down the end on the old server", async () => {
         const before = (await service.tunnelsWithin("owner", { hostId: HOME.hostId }))[0];
         const moved = { ...HOME, id: "t-new", name: "new-box", hostId: "h-3" };
         state.ports.set(moved.id, fakePorts());
-        (state.row as { application: unknown; }).application = { ...APPLICATION, target: moved };
+        (state.row as { application: unknown }).application = { ...APPLICATION, target: moved };
         expect(await service.moveTunnel("owner", before)).toEqual([]);
-        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "nat").project
+        );
         expect(state.ports.get(moved.id)?.composeUp).toHaveBeenCalled();
         expect(state.ports.get(HOME.id)?.composeUp).not.toHaveBeenCalled();
         expect(state.row?.paused).toBe(false);
     });
 
     it("keeps a paused tunnel paused when its service moves", async () => {
-        (state.row as { paused: boolean; }).paused = true;
+        (state.row as { paused: boolean }).paused = true;
         const before = (await service.tunnelsWithin("owner", { hostId: HOME.hostId }))[0];
         await service.moveTunnel("owner", before);
         expect(state.ports.get(PUBLIC.id)?.composeUp).not.toHaveBeenCalled();
@@ -358,8 +427,12 @@ describe("a tunnel whose service or server is deleted", () => {
 describe("removing a tunnel", () => {
     it("stops both ends, takes the hostname off the edge and deletes the row", async () => {
         await service.removeTunnel("owner", ID);
-        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
-        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "public").project
+        );
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "nat").project
+        );
         expect(state.pushed).toHaveLength(1);
         expect(state.pushed[0].file).toBe(wg.TUNNEL_ROUTE_FILE);
         expect(state.pushed[0].yaml).not.toContain("app.example.com");
@@ -373,7 +446,9 @@ describe("removing a tunnel", () => {
         quiet.mockRestore();
         expect(refusal).toBeInstanceOf(service.TunnelRefusal);
         expect((refusal as InstanceType<typeof service.TunnelRefusal>).code).toBe("leftover");
-        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({ servers: "home-box" });
+        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({
+            servers: "home-box"
+        });
         expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalled();
         expect(state.pushed[0].yaml).not.toContain("app.example.com");
         expect(state.deleted).toBe(0);
@@ -390,12 +465,16 @@ describe("removing a tunnel", () => {
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const refusal = await service.removeTunnel("owner", ID).catch((error: unknown) => error);
         quiet.mockRestore();
-        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({ servers: "edge-1" });
+        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({
+            servers: "edge-1"
+        });
         expect(state.deleted).toBe(0);
     });
 
     it("does not hold on to an end that never started", async () => {
-        state.ports.get(HOME.id)?.composeDown.mockRejectedValue(new Error("remote command exited with code 1"));
+        state.ports
+            .get(HOME.id)
+            ?.composeDown.mockRejectedValue(new Error("remote command exited with code 1"));
         await service.removeTunnel("owner", ID);
         expect(state.deleted).toBe(1);
     });
@@ -407,7 +486,9 @@ describe("removing a tunnel", () => {
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const refusal = await service.removeTunnel("owner", ID).catch((error: unknown) => error);
         quiet.mockRestore();
-        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({ servers: "home-box" });
+        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({
+            servers: "home-box"
+        });
         expect(state.deleted).toBe(0);
     });
 
@@ -415,7 +496,9 @@ describe("removing a tunnel", () => {
         state.unreachable.add(HOME.id);
         state.pushFails = true;
         const logged: unknown[] = [];
-        const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => void logged.push(...args));
+        const spy = vi
+            .spyOn(console, "error")
+            .mockImplementation((...args: unknown[]) => void logged.push(...args));
         await service.removeTunnel("owner", ID).catch(() => undefined);
         spy.mockRestore();
         const text = logged.map((one) => String(one)).join("\n");
@@ -429,12 +512,18 @@ describe("pausing a tunnel", () => {
     it("records the pause and says which server still runs its end", async () => {
         state.unreachable.add(PUBLIC.id);
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
-        const refusal = await service.setTunnelPaused("owner", ID, true).catch((error: unknown) => error);
+        const refusal = await service
+            .setTunnelPaused("owner", ID, true)
+            .catch((error: unknown) => error);
         quiet.mockRestore();
         expect((refusal as InstanceType<typeof service.TunnelRefusal>).code).toBe("leftoverPaused");
-        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({ servers: "edge-1" });
+        expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({
+            servers: "edge-1"
+        });
         expect(state.row?.paused).toBe(true);
-        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(
+            wg.endNames(ID, "nat").project
+        );
     });
 
     it("does nothing when the tunnel is already in that state", async () => {
@@ -444,7 +533,9 @@ describe("pausing a tunnel", () => {
 
     it("refuses a tunnel that is not the caller's", async () => {
         state.row = null;
-        await expect(service.setTunnelPaused("owner", ID, true)).rejects.toMatchObject({ code: "notFound" });
+        await expect(service.setTunnelPaused("owner", ID, true)).rejects.toMatchObject({
+            code: "notFound"
+        });
         await expect(service.removeTunnel("owner", ID)).rejects.toMatchObject({ code: "notFound" });
     });
 });
@@ -466,13 +557,25 @@ describe("reading a tunnel's state", () => {
             ].join("\n")
         });
         const status = await service.readTunnelStatus("owner", ID, 1760000030 * 1000);
-        expect(status).toEqual({ health: "up", lastHandshake: 1760000000, rxBytes: 10, txBytes: 20 });
-        expect(state.ports.get(PUBLIC.id)?.runIn).toHaveBeenCalledWith(wg.endNames(ID, "public").helper, wg.statusCommand());
+        expect(status).toEqual({
+            health: "up",
+            lastHandshake: 1760000000,
+            rxBytes: 10,
+            txBytes: 20
+        });
+        expect(state.ports.get(PUBLIC.id)?.runIn).toHaveBeenCalledWith(
+            wg.endNames(ID, "public").helper,
+            wg.statusCommand()
+        );
     });
 
     it("reaches each server once for every tunnel it carries", async () => {
         const row = state.row as Record<string, unknown>;
-        const second = { ...row, id: "0190a8c4-0000-7000-8000-000000000002", hostname: "two.example.com" };
+        const second = {
+            ...row,
+            id: "0190a8c4-0000-7000-8000-000000000002",
+            hostname: "two.example.com"
+        };
         state.others = [second];
         const publicEnd = state.ports.get(PUBLIC.id);
         publicEnd?.runIn.mockImplementation(async (helper: string) => ({
@@ -487,7 +590,11 @@ describe("reading a tunnel's state", () => {
         }));
         const { getPorts } = await import("@/lib/deploy/runtime");
         vi.mocked(getPorts).mockClear();
-        const statuses = await service.readTunnelStatuses("owner", [ID, second.id as string], 1760000030 * 1000);
+        const statuses = await service.readTunnelStatuses(
+            "owner",
+            [ID, second.id as string],
+            1760000030 * 1000
+        );
         expect(statuses[ID].health).toBe("up");
         expect(statuses[second.id as string].health).toBe("waiting");
         expect(vi.mocked(getPorts)).toHaveBeenCalledTimes(1);
@@ -496,9 +603,14 @@ describe("reading a tunnel's state", () => {
     });
 
     it("reports a paused tunnel without asking any server, and leaves out ids that are not the owner's", async () => {
-        (state.row as { paused: boolean; }).paused = true;
-        const statuses = await service.readTunnelStatuses("owner", [ID, "0190a8c4-0000-7000-8000-0000000000ee"]);
-        expect(statuses).toEqual({ [ID]: { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 } });
+        (state.row as { paused: boolean }).paused = true;
+        const statuses = await service.readTunnelStatuses("owner", [
+            ID,
+            "0190a8c4-0000-7000-8000-0000000000ee"
+        ]);
+        expect(statuses).toEqual({
+            [ID]: { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 }
+        });
         expect(state.ports.get(PUBLIC.id)?.runIn).not.toHaveBeenCalled();
     });
 

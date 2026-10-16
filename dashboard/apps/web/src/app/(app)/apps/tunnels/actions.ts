@@ -44,7 +44,11 @@ export async function createTunnelAction(input: unknown): Promise<Reply & { id?:
     const parsed = createSchema.safeParse(input);
     if (!parsed.success) {
         const hostnameIssue = parsed.error.issues.some((issue) => issue.path[0] === "hostname");
-        return { error: (await getTranslations("tunnels"))(hostnameIssue ? "refusals.hostname" : "refusals.generic") };
+        return {
+            error: (await getTranslations("tunnels"))(
+                hostnameIssue ? "refusals.hostname" : "refusals.generic"
+            )
+        };
     }
     try {
         const created = await tunnels.createTunnel(user.id, parsed.data);

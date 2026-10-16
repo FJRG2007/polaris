@@ -42,7 +42,9 @@ vi.mock("@/lib/deploy/wireguard/tunnel-service", async () => {
             if (fake.failWith) throw fake.failWith;
         }),
         readTunnelStatuses: vi.fn(async (_owner: string, ids: string[]) =>
-            Object.fromEntries(ids.map((id) => [id, { health: "up", lastHandshake: 1, rxBytes: 2, txBytes: 3 }]))
+            Object.fromEntries(
+                ids.map((id) => [id, { health: "up", lastHandshake: 1, rxBytes: 2, txBytes: 3 }])
+            )
         )
     };
 });
@@ -66,16 +68,26 @@ describe("tunnel actions", () => {
     it("asks for the deploy management permission and does nothing without it", async () => {
         fake.allowed = false;
         await expect(
-            actions.createTunnelAction({ publicServerId: SERVER, serviceId: SERVICE, hostname: "app.example.com" })
+            actions.createTunnelAction({
+                publicServerId: SERVER,
+                serviceId: SERVICE,
+                hostname: "app.example.com"
+            })
         ).rejects.toThrow("denied deploy.manage");
-        await expect(actions.removeTunnelAction({ id: SERVER })).rejects.toThrow("denied deploy.manage");
+        await expect(actions.removeTunnelAction({ id: SERVER })).rejects.toThrow(
+            "denied deploy.manage"
+        );
         await expect(actions.setTunnelPausedAction({ id: SERVER, paused: true })).rejects.toThrow(
             "denied deploy.manage"
         );
-        await expect(actions.tunnelStatusesAction({ ids: [SERVER] })).rejects.toThrow("denied deploy.manage");
+        await expect(actions.tunnelStatusesAction({ ids: [SERVER] })).rejects.toThrow(
+            "denied deploy.manage"
+        );
         expect(service.createTunnel).not.toHaveBeenCalled();
         expect(service.removeTunnel).not.toHaveBeenCalled();
-        expect(vi.mocked(session.requirePermission).mock.calls.every(([p]) => p === "deploy.manage")).toBe(true);
+        expect(
+            vi.mocked(session.requirePermission).mock.calls.every(([p]) => p === "deploy.manage")
+        ).toBe(true);
     });
 
     it("normalizes the hostname before handing it on", async () => {
@@ -85,11 +97,17 @@ describe("tunnel actions", () => {
             hostname: "  HTTPS://App.Example.com/ "
         });
         expect(reply.error).toBeUndefined();
-        expect(fake.created).toEqual([{ publicServerId: SERVER, serviceId: SERVICE, hostname: "app.example.com" }]);
+        expect(fake.created).toEqual([
+            { publicServerId: SERVER, serviceId: SERVICE, hostname: "app.example.com" }
+        ]);
     });
 
     it("refuses a malformed body without calling the service", async () => {
-        const reply = await actions.createTunnelAction({ publicServerId: "x", serviceId: SERVICE, hostname: "a.b" });
+        const reply = await actions.createTunnelAction({
+            publicServerId: "x",
+            serviceId: SERVICE,
+            hostname: "a.b"
+        });
         expect(reply.error).toBeTruthy();
         expect(service.createTunnel).not.toHaveBeenCalled();
         expect((await actions.removeTunnelAction({ id: "../etc" })).error).toBeTruthy();
@@ -99,10 +117,16 @@ describe("tunnel actions", () => {
     it("reads every tunnel on screen in one call, and refuses a list it should not take", async () => {
         const reply = await actions.tunnelStatusesAction({ ids: [SERVER, SERVICE] });
         expect(Object.keys(reply.statuses ?? {})).toEqual([SERVER, SERVICE]);
-        expect(service.readTunnelStatuses).toHaveBeenCalledWith("0190a8c4-0000-7000-8000-00000000000a", [SERVER, SERVICE]);
+        expect(service.readTunnelStatuses).toHaveBeenCalledWith(
+            "0190a8c4-0000-7000-8000-00000000000a",
+            [SERVER, SERVICE]
+        );
         expect((await actions.tunnelStatusesAction({ ids: [] })).error).toBeTruthy();
         expect((await actions.tunnelStatusesAction({ ids: ["../etc"] })).error).toBeTruthy();
-        expect((await actions.tunnelStatusesAction({ ids: Array.from({ length: 201 }, () => SERVER) })).error).toBeTruthy();
+        expect(
+            (await actions.tunnelStatusesAction({ ids: Array.from({ length: 201 }, () => SERVER) }))
+                .error
+        ).toBeTruthy();
         expect(service.readTunnelStatuses).toHaveBeenCalledTimes(1);
     });
 
@@ -123,7 +147,9 @@ describe("tunnel actions", () => {
             serviceId: SERVICE,
             hostname: "app.example.com"
         });
-        expect(refused.error).toBe("The service already runs on that server. Pick a service on another server.");
+        expect(refused.error).toBe(
+            "The service already runs on that server. Pick a service on another server."
+        );
 
         fake.failWith = new service.TunnelRefusal("leftover", { servers: "home-box" });
         const left = await actions.removeTunnelAction({ id: SERVER });

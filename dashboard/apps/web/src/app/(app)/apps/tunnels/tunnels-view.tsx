@@ -16,8 +16,21 @@ import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Network, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
 import { removeTunnelAction, setTunnelPausedAction, tunnelStatusesAction } from "./actions";
-import type { TunnelOptions, TunnelStatus, TunnelView } from "@/lib/deploy/wireguard/tunnel-service";
-import { Badge, Button, Card, ConfirmDeleteDialog, CopyButton, EmptyState, Skeleton, useToast } from "@polaris/ui";
+import type {
+    TunnelOptions,
+    TunnelStatus,
+    TunnelView
+} from "@/lib/deploy/wireguard/tunnel-service";
+import {
+    Badge,
+    Button,
+    Card,
+    ConfirmDeleteDialog,
+    CopyButton,
+    EmptyState,
+    Skeleton,
+    useToast
+} from "@polaris/ui";
 
 /** How often the running cards re-read their state while the page is open. */
 const POLL_MS = 15_000;
@@ -46,7 +59,9 @@ function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
         if (ids.length === 0) return;
         reading.current = true;
         try {
-            const reply = await tunnelStatusesAction({ ids }).catch(() => ({ statuses: undefined }));
+            const reply = await tunnelStatusesAction({ ids }).catch(() => ({
+                statuses: undefined
+            }));
             for (const id of ids) listeners.current.get(id)?.(reply.statuses?.[id] ?? null);
         } finally {
             reading.current = false;
@@ -89,7 +104,13 @@ function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
     return { watch, refresh };
 }
 
-export function TunnelsView({ tunnels, options }: { tunnels: TunnelView[]; options: TunnelOptions }) {
+export function TunnelsView({
+    tunnels,
+    options
+}: {
+    tunnels: TunnelView[];
+    options: TunnelOptions;
+}) {
     const t = useTranslations("tunnels");
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
     const shown = tunnels.filter((tunnel) => !hidden.has(tunnel.id));
@@ -217,7 +238,10 @@ function TunnelCard({
                         {tunnel.hostname}
                     </a>
                     <span className="truncate text-xs text-muted-foreground">
-                        {t("list.via", { server: tunnel.publicServer.name, port: tunnel.listenPort })}
+                        {t("list.via", {
+                            server: tunnel.publicServer.name,
+                            port: tunnel.listenPort
+                        })}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
                         {t("list.service", {
@@ -245,7 +269,11 @@ function TunnelCard({
                     >
                         {paused ? <Play /> : <Pause />}
                     </IconButton>
-                    <IconButton label={t("actions.remove")} disabled={busy} onClick={() => setConfirming(true)}>
+                    <IconButton
+                        label={t("actions.remove")}
+                        disabled={busy}
+                        onClick={() => setConfirming(true)}
+                    >
                         <Trash2 />
                     </IconButton>
                 </div>
@@ -255,7 +283,9 @@ function TunnelCard({
                 <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
                     <Reading label={t("list.handshake")}>
                         {status.lastHandshake > 0 ? (
-                            <RelativeTime iso={new Date(status.lastHandshake * 1000).toISOString()} />
+                            <RelativeTime
+                                iso={new Date(status.lastHandshake * 1000).toISOString()}
+                            />
                         ) : (
                             t("list.never")
                         )}
@@ -368,7 +398,14 @@ function IconButton({
     children: React.ReactNode;
 }) {
     return (
-        <Button variant="ghost" size="icon-sm" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
+        <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={label}
+            title={label}
+            disabled={disabled}
+            onClick={onClick}
+        >
             {children}
         </Button>
     );

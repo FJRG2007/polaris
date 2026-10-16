@@ -22,7 +22,9 @@ vi.mock("../../../src/app/(app)/apps/tunnels/actions", () => ({
         status.calls += 1;
         status.ids.push(ids);
         const reply = status.reply as { status?: unknown; error?: string };
-        return reply.status ? { statuses: Object.fromEntries(ids.map((id) => [id, reply.status])) } : reply;
+        return reply.status
+            ? { statuses: Object.fromEntries(ids.map((id) => [id, reply.status])) }
+            : reply;
     })
 }));
 
@@ -34,7 +36,12 @@ const TUNNEL: TunnelView = {
     listenPort: 51821,
     paused: false,
     publicServer: { id: "0190a8c4-0000-7000-8000-0000000000aa", name: "edge-1" },
-    service: { id: "0190a8c4-0000-7000-8000-0000000000bb", name: "web", project: "Shop", server: "home-box" },
+    service: {
+        id: "0190a8c4-0000-7000-8000-0000000000bb",
+        name: "web",
+        project: "Shop",
+        server: "home-box"
+    },
     endpointHost: "203.0.113.7",
     createdAt: "2026-10-01T00:00:00.000Z"
 };
@@ -51,7 +58,12 @@ afterEach(cleanup);
 describe("a live tunnel card", () => {
     it("shows connected with the bytes moved, and no firewall step", async () => {
         status.reply = {
-            status: { health: "up", lastHandshake: Math.floor(Date.now() / 1000) - 30, rxBytes: 2048, txBytes: 1024 }
+            status: {
+                health: "up",
+                lastHandshake: Math.floor(Date.now() / 1000) - 30,
+                rxBytes: 2048,
+                txBytes: 1024
+            }
         };
         render(<TunnelsView tunnels={[TUNNEL]} options={OPTIONS} />, { wrapper: MessagesWrapper });
         expect(await screen.findByText("Connected")).toBeTruthy();
@@ -68,7 +80,11 @@ describe("a live tunnel card", () => {
         expect(screen.getByText("Never")).toBeTruthy();
         expect(screen.getByText("UDP")).toBeTruthy();
         expect(screen.getByText("0.0.0.0/0")).toBeTruthy();
-        expect(screen.getByText("Point app.example.com at 203.0.113.7 with an A record so visitors reach it.")).toBeTruthy();
+        expect(
+            screen.getByText(
+                "Point app.example.com at 203.0.113.7 with an A record so visitors reach it."
+            )
+        ).toBeTruthy();
     });
 
     it("does not send the operator to their firewall when neither server answered", async () => {
@@ -79,10 +95,28 @@ describe("a live tunnel card", () => {
     });
 
     it("reads every running card in one request", async () => {
-        status.reply = { status: { health: "up", lastHandshake: Math.floor(Date.now() / 1000), rxBytes: 0, txBytes: 0 } };
-        const second = { ...TUNNEL, id: "0190a8c4-0000-7000-8000-000000000002", hostname: "two.example.com" };
-        const paused = { ...TUNNEL, id: "0190a8c4-0000-7000-8000-000000000003", hostname: "three.example.com", paused: true };
-        render(<TunnelsView tunnels={[TUNNEL, second, paused]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        status.reply = {
+            status: {
+                health: "up",
+                lastHandshake: Math.floor(Date.now() / 1000),
+                rxBytes: 0,
+                txBytes: 0
+            }
+        };
+        const second = {
+            ...TUNNEL,
+            id: "0190a8c4-0000-7000-8000-000000000002",
+            hostname: "two.example.com"
+        };
+        const paused = {
+            ...TUNNEL,
+            id: "0190a8c4-0000-7000-8000-000000000003",
+            hostname: "three.example.com",
+            paused: true
+        };
+        render(<TunnelsView tunnels={[TUNNEL, second, paused]} options={OPTIONS} />, {
+            wrapper: MessagesWrapper
+        });
         await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(2));
         expect(status.calls).toBe(1);
         expect(status.ids[0]).toEqual([TUNNEL.id, second.id]);
@@ -95,7 +129,9 @@ describe("a live tunnel card", () => {
     });
 
     it("reads nothing for a paused tunnel", async () => {
-        render(<TunnelsView tunnels={[{ ...TUNNEL, paused: true }]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        render(<TunnelsView tunnels={[{ ...TUNNEL, paused: true }]} options={OPTIONS} />, {
+            wrapper: MessagesWrapper
+        });
         await waitFor(() => expect(screen.getByText("Paused")).toBeTruthy());
         expect(status.calls).toBe(0);
     });

@@ -79,18 +79,32 @@ export interface TunnelOptions {
     readonly services: { id: string; name: string; project: string; serverId: string }[];
 }
 
-const TARGET_SELECT = { id: true, name: true, kind: true, hostId: true, runtime: true, proxyNetwork: true } as const;
+const TARGET_SELECT = {
+    id: true,
+    name: true,
+    kind: true,
+    hostId: true,
+    runtime: true,
+    proxyNetwork: true
+} as const;
 
 /** Encrypt a private key for storage. */
 export function sealKey(privateKey: string, masterKey = loadEnv().POLARIS_MASTER_KEY): string {
     const blob = encryptSecret(privateKey, masterKey);
-    return JSON.stringify({ c: blob.ciphertext.toString("base64"), n: blob.nonce.toString("base64"), k: blob.keyId });
+    return JSON.stringify({
+        c: blob.ciphertext.toString("base64"),
+        n: blob.nonce.toString("base64"),
+        k: blob.keyId
+    });
 }
 
 /** Decrypt a stored private key. */
 export function openKey(sealed: string, masterKey = loadEnv().POLARIS_MASTER_KEY): string {
     const { c, n, k } = JSON.parse(sealed) as { c: string; n: string; k: string };
-    return decryptSecret({ ciphertext: Buffer.from(c, "base64"), nonce: Buffer.from(n, "base64"), keyId: k }, masterKey);
+    return decryptSecret(
+        { ciphertext: Buffer.from(c, "base64"), nonce: Buffer.from(n, "base64"), keyId: k },
+        masterKey
+    );
 }
 
 /** What the create form can offer: the owner's servers and services. */
@@ -104,13 +118,22 @@ export async function tunnelOptions(ownerId: string): Promise<TunnelOptions> {
         }),
         prisma.application.findMany({
             where: { environment: { project: { ownerId } } },
-            select: { id: true, name: true, targetId: true, environment: { select: { project: { select: { name: true } } } } },
+            select: {
+                id: true,
+                name: true,
+                targetId: true,
+                environment: { select: { project: { select: { name: true } } } }
+            },
             orderBy: { name: "asc" },
             take: 500
         })
     ]);
     return {
-        servers: targets.map((target) => ({ id: target.id, name: target.name, local: target.kind === "local" })),
+        servers: targets.map((target) => ({
+            id: target.id,
+            name: target.name,
+            local: target.kind === "local"
+        })),
         services: apps.map((app) => ({
             id: app.id,
             name: app.name,
@@ -132,7 +155,9 @@ export async function listTunnels(ownerId: string): Promise<TunnelView[]> {
             listenPort: true,
             paused: true,
             createdAt: true,
-            publicTarget: { select: { id: true, name: true, kind: true, host: { select: { address: true } } } },
+            publicTarget: {
+                select: { id: true, name: true, kind: true, host: { select: { address: true } } }
+            },
             application: {
                 select: {
                     id: true,
@@ -143,7 +168,9 @@ export async function listTunnels(ownerId: string): Promise<TunnelView[]> {
             }
         }
     });
-    const localIp = rows.some((row) => row.publicTarget.kind === "local") ? await getPublicIp() : null;
+    const localIp = rows.some((row) => row.publicTarget.kind === "local")
+        ? await getPublicIp()
+        : null;
     return rows.map((row) => ({
         id: row.id,
         hostname: row.hostname,
@@ -156,7 +183,8 @@ export async function listTunnels(ownerId: string): Promise<TunnelView[]> {
             project: row.application.environment.project.name,
             server: row.application.target.name
         },
-        endpointHost: row.publicTarget.kind === "local" ? localIp : (row.publicTarget.host?.address ?? null),
+        endpointHost:
+            row.publicTarget.kind === "local" ? localIp : (row.publicTarget.host?.address ?? null),
         createdAt: row.createdAt.toISOString()
     }));
 }
@@ -169,7 +197,10 @@ export async function createTunnel(
     const hostname = normalizeHostname(input.hostname);
     if (!wg.isRouteHostname(hostname)) throw new TunnelRefusal("hostname");
     const [target, app] = await Promise.all([
-        prisma.deployTarget.findFirst({ where: { id: input.publicServerId, ownerId }, select: { id: true } }),
+        prisma.deployTarget.findFirst({
+            where: { id: input.publicServerId, ownerId },
+            select: { id: true }
+        }),
         prisma.application.findFirst({
             where: { id: input.serviceId, environment: { project: { ownerId } } },
             select: { id: true, targetId: true }
@@ -188,7 +219,10 @@ export async function createTunnel(
     for (let attempt = 0; attempt < 3 && !created; attempt += 1) {
         const [slots, ports] = await Promise.all([
             prisma.wireguardTunnel.findMany({ where: { ownerId }, select: { slot: true } }),
-            prisma.wireguardTunnel.findMany({ where: { publicTargetId: target.id }, select: { listenPort: true } })
+            prisma.wireguardTunnel.findMany({
+                where: { publicTargetId: target.id },
+                select: { listenPort: true }
+            })
         ]);
         const slot = wg.allocateSlot(slots.map((row) => row.slot));
         const listenPort = wg.allocateListenPort(ports.map((row) => row.listenPort));
@@ -211,7 +245,10 @@ export async function createTunnel(
             });
         } catch (error) {
             if ((error as { code?: string }).code !== "P2002") throw error;
-            const again = await prisma.wireguardTunnel.findUnique({ where: { hostname }, select: { id: true } });
+            const again = await prisma.wireguardTunnel.findUnique({
+                where: { hostname },
+                select: { id: true }
+            });
             if (again) throw new TunnelRefusal("hostnameTaken");
         }
     }
@@ -263,7 +300,10 @@ export async function removeTunnel(ownerId: string, id: string): Promise<void> {
     await prisma.wireguardTunnel.deleteMany({ where: { id, ownerId } });
 }
 
-function refuseLeftovers(left: readonly string[], code: "leftover" | "leftoverPaused" = "leftover"): void {
+function refuseLeftovers(
+    left: readonly string[],
+    code: "leftover" | "leftoverPaused" = "leftover"
+): void {
     if (left.length > 0) throw new TunnelRefusal(code, { servers: [...new Set(left)].join(", ") });
 }
 
@@ -281,7 +321,10 @@ export async function tunnelsWithin(ownerId: string, scope: TunnelScope): Promis
             ? { ownerId, applicationId: scope.applicationId }
             : {
                   ownerId,
-                  OR: [{ publicTarget: { hostId: scope.hostId } }, { application: { target: { hostId: scope.hostId } } }]
+                  OR: [
+                      { publicTarget: { hostId: scope.hostId } },
+                      { application: { target: { hostId: scope.hostId } } }
+                  ]
               };
     return prisma.wireguardTunnel.findMany({ where, select: TUNNEL_SELECT, take: 500 });
 }
@@ -299,9 +342,13 @@ export async function retireTunnels(
 ): Promise<{ hostname: string; servers: string }[]> {
     const left: { hostname: string; servers: string }[] = [];
     for (const row of rows) {
-        await prisma.wireguardTunnel.updateMany({ where: { id: row.id, ownerId }, data: { paused: true } });
+        await prisma.wireguardTunnel.updateMany({
+            where: { id: row.id, ownerId },
+            data: { paused: true }
+        });
         const servers = await takeDown(ownerId, row.id, row);
-        if (servers.length > 0) left.push({ hostname: row.hostname, servers: [...new Set(servers)].join(", ") });
+        if (servers.length > 0)
+            left.push({ hostname: row.hostname, servers: [...new Set(servers)].join(", ") });
         else await prisma.wireguardTunnel.deleteMany({ where: { id: row.id, ownerId } });
     }
     return left;
@@ -315,14 +362,21 @@ export async function retireTunnels(
  * the servers where the old ends could not be cleaned up.
  */
 export async function moveTunnel(ownerId: string, before: TunnelRow): Promise<string[]> {
-    await prisma.wireguardTunnel.updateMany({ where: { id: before.id, ownerId }, data: { paused: true } });
+    await prisma.wireguardTunnel.updateMany({
+        where: { id: before.id, ownerId },
+        data: { paused: true }
+    });
     const left = await takeDown(ownerId, before.id, before);
     if (!before.paused) await setTunnelPaused(ownerId, before.id, false);
     return left;
 }
 
 /** Read the live state from whichever end answers, the public one first. */
-export async function readTunnelStatus(ownerId: string, id: string, now = Date.now()): Promise<TunnelStatus> {
+export async function readTunnelStatus(
+    ownerId: string,
+    id: string,
+    now = Date.now()
+): Promise<TunnelStatus> {
     const status = (await readTunnelStatuses(ownerId, [id], now))[id];
     if (!status) throw new TunnelRefusal("notFound");
     return status;
@@ -346,7 +400,8 @@ export async function readTunnelStatuses(
     });
     const statuses: Record<string, TunnelStatus> = {};
     for (const row of rows) {
-        if (row.paused) statuses[row.id] = { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
+        if (row.paused)
+            statuses[row.id] = { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
     }
     const live = rows.filter((row) => !row.paused);
     await readEnds(
@@ -373,7 +428,8 @@ export async function readTunnelStatuses(
         now,
         statuses
     );
-    for (const row of live) statuses[row.id] ??= { health: "unknown", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
+    for (const row of live)
+        statuses[row.id] ??= { health: "unknown", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
     return statuses;
 }
 
@@ -454,7 +510,10 @@ const TUNNEL_SELECT = {
 type TunnelRow = Awaited<ReturnType<typeof loadTunnel>>;
 
 async function loadTunnel(ownerId: string, id: string) {
-    const row = await prisma.wireguardTunnel.findFirst({ where: { id, ownerId }, select: TUNNEL_SELECT });
+    const row = await prisma.wireguardTunnel.findFirst({
+        where: { id, ownerId },
+        select: TUNNEL_SELECT
+    });
     if (!row) throw new TunnelRefusal("notFound");
     return row;
 }
@@ -462,7 +521,10 @@ async function loadTunnel(ownerId: string, id: string) {
 /** Start both ends from the stored keys and put the hostname on the public edge. */
 async function bringUp(ownerId: string, id: string): Promise<void> {
     const row = await loadTunnel(ownerId, id);
-    const host = row.publicTarget.kind === "local" ? await getPublicIp() : (row.publicTarget.host?.address ?? null);
+    const host =
+        row.publicTarget.kind === "local"
+            ? await getPublicIp()
+            : (row.publicTarget.host?.address ?? null);
     if (!host) throw new TunnelRefusal("noAddress");
     const endpoint = `${host.includes(":") ? `[${host}]` : host}:${row.listenPort}`;
     // Before the public end starts: it joins the edge's network, which a server
@@ -503,7 +565,11 @@ async function bringUp(ownerId: string, id: string): Promise<void> {
     await publishRoutes(ownerId, row.publicTarget);
 }
 
-async function up(target: TunnelRow["application"]["target"], ownerId: string, input: wg.EndSpecInput): Promise<void> {
+async function up(
+    target: TunnelRow["application"]["target"],
+    ownerId: string,
+    input: wg.EndSpecInput
+): Promise<void> {
     const ports = await getPorts(target, ownerId);
     try {
         await ports.composeUp(wg.endSpec(input));
@@ -552,7 +618,11 @@ async function takeDown(ownerId: string, id: string, row: TunnelRow): Promise<st
 }
 
 /** Whether neither container of one end exists on its server any more. */
-async function endGone(ports: Awaited<ReturnType<typeof getPorts>>, id: string, end: "public" | "nat"): Promise<boolean> {
+async function endGone(
+    ports: Awaited<ReturnType<typeof getPorts>>,
+    id: string,
+    end: "public" | "nat"
+): Promise<boolean> {
     const names = wg.endNames(id, end);
     for (const name of [names.helper, names.wireguard]) {
         // Only the engine's "no such container" counts as gone - a 404 from the
@@ -560,7 +630,8 @@ async function endGone(ports: Awaited<ReturnType<typeof getPorts>>, id: string, 
         // means it may well still be there.
         const missing = await ports.inspect(name).then(
             () => false,
-            (error: unknown) => /\(404\)|exited with code 1$|no such (object|container)/i.test(String(error))
+            (error: unknown) =>
+                /\(404\)|exited with code 1$|no such (object|container)/i.test(String(error))
         );
         if (!missing) return false;
     }
@@ -598,7 +669,9 @@ async function publishRoutes(ownerId: string, target: TunnelRow["publicTarget"])
  * serves for a moment), so that is refused with the reason instead.
  */
 async function ensureEdge(hostId: string, ownerId: string, proxyNetwork: string): Promise<void> {
-    const { readServerEdge, prepareServerEdge, withSetupLock } = await import("@/lib/deploy/server-edge");
+    const { readServerEdge, prepareServerEdge, withSetupLock } = await import(
+        "@/lib/deploy/server-edge"
+    );
     const edge = await readServerEdge(hostId, ownerId);
     if (edge.error) throw new TunnelRefusal("unreachable");
     if (!edge.traefik) {

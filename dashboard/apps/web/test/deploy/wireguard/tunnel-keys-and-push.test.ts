@@ -37,12 +37,19 @@ describe("the tunnel route file on a remote edge", () => {
         const script = remoteWriteScript(wg.renderTunnelRoutes([]), "n1", wg.TUNNEL_ROUTE_FILE);
         expect(script).toContain(`/.${wg.TUNNEL_ROUTE_FILE}.n1`);
         const temporary = `${wg.TUNNEL_ROUTE_FILE}\\.n1`;
-        expect(script).toMatch(new RegExp(`^mv -f '?\\S*/\\.${temporary}'? '?\\S*/${wg.TUNNEL_ROUTE_FILE}'?$`, "m"));
+        expect(script).toMatch(
+            new RegExp(`^mv -f '?\\S*/\\.${temporary}'? '?\\S*/${wg.TUNNEL_ROUTE_FILE}'?$`, "m")
+        );
         expect(script).not.toContain("polaris-apps.yml");
     });
 
     it("refuses any file but one of Polaris's own, and never the app routes", async () => {
-        const router = new RemoteRouter({ address: "192.0.2.1", port: 22, username: "x", auth: { kind: "password", password: "x" } as never });
+        const router = new RemoteRouter({
+            address: "192.0.2.1",
+            port: 22,
+            username: "x",
+            auth: { kind: "password", password: "x" } as never
+        });
         await expect(router.pushFile("../etc/passwd", "a")).rejects.toThrow(/Not a file/);
         await expect(router.pushFile("polaris-apps.yml", "a")).rejects.toThrow(/Not a file/);
         await expect(router.pushFile("other.yml", "a")).rejects.toThrow(/Not a file/);

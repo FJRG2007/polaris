@@ -43,7 +43,8 @@ export function TunnelDialog({ options }: { options: TunnelOptions }) {
     const normalized = normalizeHostname(hostname);
     // Empty is unfinished, not wrong: the field only complains once there is
     // something in it to complain about.
-    const hostnameError = normalized && !isRouteHostname(normalized) ? t("dialog.hostnameInvalid") : null;
+    const hostnameError =
+        normalized && !isRouteHostname(normalized) ? t("dialog.hostnameInvalid") : null;
     const ready =
         Boolean(serverId) &&
         services.some((service) => service.id === serviceId) &&
@@ -62,7 +63,11 @@ export function TunnelDialog({ options }: { options: TunnelOptions }) {
         if (!ready || pending) return;
         setPending(true);
         setError(null);
-        const reply = await createTunnelAction({ publicServerId: serverId, serviceId, hostname: normalized });
+        const reply = await createTunnelAction({
+            publicServerId: serverId,
+            serviceId,
+            hostname: normalized
+        });
         setPending(false);
         if (reply.error) {
             setError(reply.error);
@@ -99,14 +104,19 @@ export function TunnelDialog({ options }: { options: TunnelOptions }) {
                             value={serverId}
                             onValueChange={(value) => {
                                 setServerId(value);
-                                if (options.services.find((service) => service.id === serviceId)?.serverId === value)
+                                if (
+                                    options.services.find((service) => service.id === serviceId)
+                                        ?.serverId === value
+                                )
                                     setServiceId("");
                             }}
                             placeholder={t("dialog.pickServer")}
                             aria-label={t("dialog.publicServer")}
                             options={options.servers.map((server) => ({
                                 value: server.id,
-                                label: server.local ? t("dialog.thisMachine", { name: server.name }) : server.name
+                                label: server.local
+                                    ? t("dialog.thisMachine", { name: server.name })
+                                    : server.name
                             }))}
                         />
                     </Field>
@@ -121,12 +131,17 @@ export function TunnelDialog({ options }: { options: TunnelOptions }) {
                             aria-label={t("dialog.service")}
                             options={services.map((service) => ({
                                 value: service.id,
-                                label: t("dialog.serviceOption", { service: service.name, project: service.project }),
+                                label: t("dialog.serviceOption", {
+                                    service: service.name,
+                                    project: service.project
+                                }),
                                 keywords: `${service.name} ${service.project}`
                             }))}
                         />
                         {serverId && services.length === 0 ? (
-                            <span className="text-xs text-muted-foreground">{t("dialog.noOtherServer")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("dialog.noOtherServer")}
+                            </span>
                         ) : null}
                     </Field>
                     <Field label={t("dialog.hostname")} error={hostnameError}>
@@ -147,7 +162,12 @@ export function TunnelDialog({ options }: { options: TunnelOptions }) {
                         </p>
                     ) : null}
                     <div className="flex flex-wrap justify-end gap-2">
-                        <Button type="button" variant="ghost" disabled={pending} onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => setOpen(false)}
+                        >
                             {t("dialog.cancel")}
                         </Button>
                         <Button type="submit" aria-disabled={!ready || pending} disabled={pending}>

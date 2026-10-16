@@ -28,8 +28,14 @@ describe("addresses", () => {
             seen.add(publicAddress);
             seen.add(peerAddress);
         }
-        expect(wg.slotAddresses(0)).toEqual({ publicAddress: "10.213.0.1", peerAddress: "10.213.0.2" });
-        expect(wg.slotAddresses(64)).toEqual({ publicAddress: "10.213.1.1", peerAddress: "10.213.1.2" });
+        expect(wg.slotAddresses(0)).toEqual({
+            publicAddress: "10.213.0.1",
+            peerAddress: "10.213.0.2"
+        });
+        expect(wg.slotAddresses(64)).toEqual({
+            publicAddress: "10.213.1.1",
+            peerAddress: "10.213.1.2"
+        });
         expect(() => wg.slotAddresses(16384)).toThrow();
     });
 
@@ -47,7 +53,12 @@ describe("config files", () => {
     const nat = wg.generateKeyPair();
 
     it("lets the public end accept only the NAT end, on its tunnel address", () => {
-        const text = wg.renderPublicConfig({ privateKey: pub.privateKey, peerPublicKey: nat.publicKey, slot: 3, listenPort: 51821 });
+        const text = wg.renderPublicConfig({
+            privateKey: pub.privateKey,
+            peerPublicKey: nat.publicKey,
+            slot: 3,
+            listenPort: 51821
+        });
         expect(text).toContain(`PrivateKey = ${pub.privateKey}`);
         expect(text).toContain("ListenPort = 51821");
         expect(text).toContain(`PublicKey = ${nat.publicKey}`);
@@ -74,15 +85,28 @@ describe("config files", () => {
     });
 
     it("refuses an endpoint or origin that could add a line", () => {
-        const base = { privateKey: nat.privateKey, peerPublicKey: pub.publicKey, slot: 0, origin: "a:1" };
+        const base = {
+            privateKey: nat.privateKey,
+            peerPublicKey: pub.publicKey,
+            slot: 0,
+            origin: "a:1"
+        };
         expect(() => wg.renderNatConfig({ ...base, endpoint: "1.2.3.4:5\n[Peer]" })).toThrow();
-        expect(() => wg.renderNatConfig({ ...base, endpoint: "1.2.3.4:5", origin: "a:1\nx" })).toThrow();
+        expect(() =>
+            wg.renderNatConfig({ ...base, endpoint: "1.2.3.4:5", origin: "a:1\nx" })
+        ).toThrow();
     });
 });
 
 describe("containers", () => {
     it("publishes the UDP port on the helper and keeps every value on one line", () => {
-        const spec = wg.endSpec({ tunnelId: ID, end: "public", config: "[Interface]\nA = 1\n", networks: ["polaris-proxy"], listenPort: 51820 });
+        const spec = wg.endSpec({
+            tunnelId: ID,
+            end: "public",
+            config: "[Interface]\nA = 1\n",
+            networks: ["polaris-proxy"],
+            listenPort: 51820
+        });
         const [helper, wireguard] = spec.services;
         expect(helper.ports).toEqual([{ host: 51820, container: 51820, protocol: "udp" }]);
         expect(wireguard.networkMode).toBe(`service:${helper.name}`);
@@ -93,18 +117,29 @@ describe("containers", () => {
                 expect(value).not.toMatch(/[\u0000-\u001f]/);
             }
         }
-        expect(Buffer.from(helper.env.WG_CONFIG, "base64").toString("utf8")).toBe("[Interface]\nA = 1\n");
+        expect(Buffer.from(helper.env.WG_CONFIG, "base64").toString("utf8")).toBe(
+            "[Interface]\nA = 1\n"
+        );
         // The config file holds a private key, so it goes when the container stops.
-        expect(helper.command?.join(" ")).toContain("trap 'rm -f /etc/wireproxy/config; exit 0' TERM INT");
+        expect(helper.command?.join(" ")).toContain(
+            "trap 'rm -f /etc/wireproxy/config; exit 0' TERM INT"
+        );
         expect(helper.image).toBe(wg.HELPER_IMAGE);
         expect(helper.pullPolicy).toBe("missing");
         expect(wireguard.pullPolicy).toBe("missing");
     });
 
     it("opens no port on the end behind NAT", () => {
-        const spec = wg.endSpec({ tunnelId: ID, end: "nat", config: "x", networks: ["polaris-proxy"] });
+        const spec = wg.endSpec({
+            tunnelId: ID,
+            end: "nat",
+            config: "x",
+            networks: ["polaris-proxy"]
+        });
         expect(spec.services.every((service) => service.ports.length === 0)).toBe(true);
-        expect(spec.project).not.toBe(wg.endSpec({ tunnelId: ID, end: "public", config: "x", networks: [] }).project);
+        expect(spec.project).not.toBe(
+            wg.endSpec({ tunnelId: ID, end: "public", config: "x", networks: [] }).project
+        );
     });
 });
 
@@ -114,7 +149,9 @@ describe("edge routes", () => {
         const routers = yaml.match(/^ {4}polaris-wg-[a-z0-9-]+:$/gm) ?? [];
         // Two routers, their service and the redirect middleware.
         expect(routers.length).toBe(4);
-        expect(yaml.match(new RegExp(`priority: ${wg.TUNNEL_ROUTE_PRIORITY}`, "g"))).toHaveLength(2);
+        expect(yaml.match(new RegExp(`priority: ${wg.TUNNEL_ROUTE_PRIORITY}`, "g"))).toHaveLength(
+            2
+        );
         expect(yaml).toContain("Host(`app.example.com`)");
         expect(yaml).toContain('url: "http://wg-pub-0123456789ab:8080"');
         expect(yaml).toContain("certResolver: letsencrypt");
@@ -122,7 +159,9 @@ describe("edge routes", () => {
 
     it("is never empty and drops a hostname that could break the rule", () => {
         expect(wg.renderTunnelRoutes([]).trim().length).toBeGreaterThan(0);
-        expect(wg.renderTunnelRoutes([{ id: ID, hostname: "x`) || Host(`evil.com" }])).not.toContain("routers");
+        expect(
+            wg.renderTunnelRoutes([{ id: ID, hostname: "x`) || Host(`evil.com" }])
+        ).not.toContain("routers");
     });
 });
 
