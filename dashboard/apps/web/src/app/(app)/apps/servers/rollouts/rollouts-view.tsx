@@ -51,10 +51,32 @@ const REFRESH_MS = 30_000;
 /** Servers drawn at first, and added per "Show more". */
 const SERVER_PAGE = 50;
 const OPEN = new Set(["running", "halted"]);
-const STATES: readonly plan.TargetState[] = ["pending", "updating", "verifying", "healthy", "failed", "skipped"];
-const REASONS = ["no-agent", "pinned", "current", "timeout", "heartbeat", "version", "refused"] as const;
+const STATES: readonly plan.TargetState[] = [
+    "pending",
+    "updating",
+    "verifying",
+    "healthy",
+    "failed",
+    "skipped"
+];
+const REASONS = [
+    "no-agent",
+    "pinned",
+    "current",
+    "timeout",
+    "heartbeat",
+    "version",
+    "refused"
+] as const;
 const ROLLOUT_STATUSES = ["running", "halted", "done", "rolled-back", "cancelled"] as const;
-const COMMAND_STATUSES = ["queued", "delivering", "done", "failed", "cancelled", "expired"] as const;
+const COMMAND_STATUSES = [
+    "queued",
+    "delivering",
+    "done",
+    "failed",
+    "cancelled",
+    "expired"
+] as const;
 const RESULTS = [
     "offline",
     "noAgent",
@@ -134,7 +156,10 @@ export function RolloutsView() {
         <div className="flex min-w-0 flex-col gap-6">
             {confirmDialog}
             {notice ? (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {notice}
                 </p>
             ) : null}
@@ -187,7 +212,12 @@ export function RolloutsView() {
                             ...before,
                             servers: before.servers.map((row) =>
                                 row.id === server.id
-                                    ? { ...row, waiting: row.waiting.filter((one) => one.id !== command.id) }
+                                    ? {
+                                          ...row,
+                                          waiting: row.waiting.filter(
+                                              (one) => one.id !== command.id
+                                          )
+                                      }
                                     : row
                             )
                         });
@@ -273,7 +303,10 @@ function RolloutCard({
     onControl: (action: "resume" | "halt" | "rollback") => void;
 }) {
     const t = useTranslations("agentRollouts");
-    const names = useMemo(() => new Map(servers.map((server) => [server.id, server.name])), [servers]);
+    const names = useMemo(
+        () => new Map(servers.map((server) => [server.id, server.name])),
+        [servers]
+    );
     const status = oneOf(rollout.status, ROLLOUT_STATUSES);
     const counted = rollout.targets.filter((target) => target.wave >= 0);
     const done = counted.filter((target) => target.state === "healthy").length;
@@ -294,7 +327,15 @@ function RolloutCard({
                     })}
                 </span>
                 {status ? (
-                    <Badge variant={status === "halted" ? "danger" : status === "done" ? "success" : "neutral"}>
+                    <Badge
+                        variant={
+                            status === "halted"
+                                ? "danger"
+                                : status === "done"
+                                  ? "success"
+                                  : "neutral"
+                        }
+                    >
                         {t(`rollout.status.${status}`)}
                     </Badge>
                 ) : null}
@@ -325,7 +366,12 @@ function RolloutCard({
                     />
                 ))}
                 {skipped.length > 0 ? (
-                    <WaveRow label={t("rollout.skippedWave")} current={false} targets={skipped} names={names} />
+                    <WaveRow
+                        label={t("rollout.skippedWave")}
+                        current={false}
+                        targets={skipped}
+                        names={names}
+                    />
                 ) : null}
             </ol>
             {OPEN.has(rollout.status) ? (
@@ -335,11 +381,21 @@ function RolloutCard({
                             {t("rollout.resume")}
                         </Button>
                     ) : (
-                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => onControl("halt")}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() => onControl("halt")}
+                        >
                             {t("rollout.halt")}
                         </Button>
                     )}
-                    <Button size="sm" variant="danger" disabled={busy} onClick={() => onControl("rollback")}>
+                    <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={busy}
+                        onClick={() => onControl("rollback")}
+                    >
                         {t("rollout.rollback")}
                     </Button>
                 </div>
@@ -362,13 +418,18 @@ function WaveRow({
     const t = useTranslations("agentRollouts");
     return (
         <li className="flex min-w-0 flex-col gap-1">
-            <span className={cn("text-xs", current ? "font-semibold" : "text-muted-foreground")}>{label}</span>
+            <span className={cn("text-xs", current ? "font-semibold" : "text-muted-foreground")}>
+                {label}
+            </span>
             <ul className="flex min-w-0 flex-wrap gap-1.5">
                 {targets.map((target) => {
                     const state = oneOf(target.state, STATES);
                     const reason = oneOf(target.error, REASONS);
                     const name = names.get(target.serverId) ?? target.serverId;
-                    const words = [state ? t(`rollout.state.${state}`) : "", reason ? t(`rollout.reason.${reason}`) : ""]
+                    const words = [
+                        state ? t(`rollout.state.${state}`) : "",
+                        reason ? t(`rollout.reason.${reason}`) : ""
+                    ]
                         .filter(Boolean)
                         .join(" - ");
                     return (
@@ -423,21 +484,32 @@ function StartDialog({
                     className="flex flex-col gap-3"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (ready) onStart({ version: trimmed, waves: parsedWaves, healthMinutes: minutes });
+                        if (ready)
+                            onStart({
+                                version: trimmed,
+                                waves: parsedWaves,
+                                healthMinutes: minutes
+                            });
                     }}
                 >
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("rollout.version")} *</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("rollout.version")} *
+                        </span>
                         <Input
                             value={version}
                             onChange={(event) => setVersion(event.target.value)}
                             maxLength={64}
                             autoFocus
                         />
-                        <span className="text-xs text-muted-foreground">{t("rollout.versionHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("rollout.versionHint")}
+                        </span>
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("rollout.waves")} *</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("rollout.waves")} *
+                        </span>
                         <Input
                             value={waves}
                             onChange={(event) => setWaves(event.target.value)}
@@ -451,11 +523,15 @@ function StartDialog({
                                     : "text-muted-foreground"
                             )}
                         >
-                            {waves.trim() !== "" && parsedWaves === null ? t("errors.badWaves") : t("rollout.wavesHint")}
+                            {waves.trim() !== "" && parsedWaves === null
+                                ? t("errors.badWaves")
+                                : t("rollout.wavesHint")}
                         </span>
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("rollout.health")} *</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("rollout.health")} *
+                        </span>
                         <Input
                             value={health}
                             inputMode="numeric"
@@ -481,7 +557,12 @@ function StartDialog({
 // Servers and their queues
 // ---------------------------------------------------------------------------
 
-type QueueInput = { id: string; serverId: string; expiry: queue.ExpiryChoice; command: queue.CommandSpec };
+type QueueInput = {
+    id: string;
+    serverId: string;
+    expiry: queue.ExpiryChoice;
+    command: queue.CommandSpec;
+};
 
 function ServersSection({
     data,
@@ -520,7 +601,9 @@ function ServersSection({
                                 key={server.id}
                                 server={server}
                                 busy={busy}
-                                onPin={() => (server.pinnedVersion ? onPin(server, null) : setPinning(server))}
+                                onPin={() =>
+                                    server.pinnedVersion ? onPin(server, null) : setPinning(server)
+                                }
                                 onQueue={() => setQueueing(server)}
                                 onCancel={(command) => onCancel(server, command)}
                             />
@@ -598,18 +681,25 @@ function ServerRow({
             <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
                 <div className="flex min-w-0 gap-1">
                     <dt className="shrink-0 text-muted-foreground">{t("servers.columns.agent")}</dt>
-                    <dd className="min-w-0 truncate" title={server.version ? server.version : t("servers.noAgentHint")}>
+                    <dd
+                        className="min-w-0 truncate"
+                        title={server.version ? server.version : t("servers.noAgentHint")}
+                    >
                         {server.version ?? t("servers.noAgent")}
                     </dd>
                 </div>
                 <div className="flex min-w-0 gap-1">
                     <dt className="shrink-0 text-muted-foreground">{t("servers.columns.seen")}</dt>
                     <dd className="min-w-0 truncate">
-                        {server.heartbeatAt ? format.dateTime(server.heartbeatAt) : t("servers.never")}
+                        {server.heartbeatAt
+                            ? format.dateTime(server.heartbeatAt)
+                            : t("servers.never")}
                     </dd>
                 </div>
                 <div className="flex min-w-0 gap-1">
-                    <dt className="shrink-0 text-muted-foreground">{t("servers.columns.waiting")}</dt>
+                    <dt className="shrink-0 text-muted-foreground">
+                        {t("servers.columns.waiting")}
+                    </dt>
                     <dd>{server.waiting.length}</dd>
                 </div>
             </dl>
@@ -622,7 +712,10 @@ function ServerRow({
                     onClick={() => setExpanded((open) => !open)}
                 >
                     <ChevronDown
-                        className={cn("size-4 shrink-0 transition-transform", expanded && "rotate-180")}
+                        className={cn(
+                            "size-4 shrink-0 transition-transform",
+                            expanded && "rotate-180"
+                        )}
                         aria-hidden
                     />
                     {t("servers.commands")}
@@ -693,7 +786,10 @@ function CommandHistory({ serverId, busy }: { serverId: string; busy: boolean })
                 aria-controls={listId}
                 onClick={toggle}
             >
-                <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />
+                <ChevronDown
+                    className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")}
+                    aria-hidden
+                />
                 {t("queue.history")}
             </Button>
             {open ? (
@@ -732,13 +828,18 @@ function CommandRow({
     const format = useDisplayFormat();
     const kind = oneOf(command.kind, queue.COMMAND_KINDS);
     const status = oneOf(command.status, COMMAND_STATUSES);
-    const result = command.status === "failed" || command.status === "expired" ? oneOf(command.result, RESULTS) : null;
+    const result =
+        command.status === "failed" || command.status === "expired"
+            ? oneOf(command.result, RESULTS)
+            : null;
     const cancel = t("queue.cancel");
     return (
         <li className="flex min-w-0 items-center gap-2 rounded-md bg-background px-2 py-1 text-xs">
             <div className="flex min-w-0 flex-1 flex-col">
                 <span className="min-w-0 truncate" title={command.target}>
-                    <span className="font-medium">{kind ? t(`queue.kinds.${kind}`) : command.kind}</span>
+                    <span className="font-medium">
+                        {kind ? t(`queue.kinds.${kind}`) : command.kind}
+                    </span>
                     {command.target ? ` ${command.target}` : ""}
                 </span>
                 <span className="min-w-0 truncate text-muted-foreground">
@@ -794,8 +895,15 @@ function PinDialog({
                     }}
                 >
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("servers.pinVersion")} *</span>
-                        <Input value={version} maxLength={64} onChange={(event) => setVersion(event.target.value)} autoFocus />
+                        <span className="text-xs text-muted-foreground">
+                            {t("servers.pinVersion")} *
+                        </span>
+                        <Input
+                            value={version}
+                            maxLength={64}
+                            onChange={(event) => setVersion(event.target.value)}
+                            autoFocus
+                        />
                     </label>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>
@@ -833,9 +941,17 @@ function QueueDialog({
     const [value, setValue] = useState("");
     const [expiry, setExpiry] = useState<queue.ExpiryChoice>("1d");
     const field =
-        kind === "template.apply" ? "assignmentId" : kind === "agent.update" ? "version" : "container";
+        kind === "template.apply"
+            ? "assignmentId"
+            : kind === "agent.update"
+              ? "version"
+              : "container";
     const fieldLabel =
-        kind === "template.apply" ? t("queue.assignment") : kind === "agent.update" ? t("queue.version") : t("queue.container");
+        kind === "template.apply"
+            ? t("queue.assignment")
+            : kind === "agent.update"
+              ? t("queue.version")
+              : t("queue.container");
     const parsed = queue.commandSchema.safeParse({ kind, [field]: value });
     const invalid = value.trim() !== "" && !parsed.success;
     return (
@@ -849,7 +965,8 @@ function QueueDialog({
                     className="flex flex-col gap-3"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        if (parsed.success) onQueue({ id, serverId: server.id, expiry, command: parsed.data });
+                        if (parsed.success)
+                            onQueue({ id, serverId: server.id, expiry, command: parsed.data });
                     }}
                 >
                     <label className="flex flex-col gap-1">
@@ -858,9 +975,16 @@ function QueueDialog({
                             value={kind}
                             onValueChange={(next) => {
                                 setKind(next as queue.CommandKind);
-                                setValue(next === "template.apply" ? (server.assignments[0]?.id ?? "") : "");
+                                setValue(
+                                    next === "template.apply"
+                                        ? (server.assignments[0]?.id ?? "")
+                                        : ""
+                                );
                             }}
-                            options={kinds.map((one) => ({ value: one, label: t(`queue.kinds.${one}`) }))}
+                            options={kinds.map((one) => ({
+                                value: one,
+                                label: t(`queue.kinds.${one}`)
+                            }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1">
@@ -869,7 +993,10 @@ function QueueDialog({
                             <Select
                                 value={value}
                                 onValueChange={setValue}
-                                options={server.assignments.map((one) => ({ value: one.id, label: one.name }))}
+                                options={server.assignments.map((one) => ({
+                                    value: one.id,
+                                    label: one.name
+                                }))}
                             />
                         ) : (
                             <Input
@@ -879,14 +1006,18 @@ function QueueDialog({
                                 aria-invalid={invalid}
                             />
                         )}
-                        {invalid ? <span className="text-xs text-danger">{t("errors.invalid")}</span> : null}
+                        {invalid ? (
+                            <span className="text-xs text-danger">{t("errors.invalid")}</span>
+                        ) : null}
                     </label>
                     <label className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">{t("queue.expiry")}</span>
                         <Select
                             value={expiry}
                             onValueChange={(next) => setExpiry(next as queue.ExpiryChoice)}
-                            options={(Object.keys(queue.EXPIRY_CHOICES) as queue.ExpiryChoice[]).map((one) => ({
+                            options={(
+                                Object.keys(queue.EXPIRY_CHOICES) as queue.ExpiryChoice[]
+                            ).map((one) => ({
                                 value: one,
                                 label: t(`queue.expiries.${one}`)
                             }))}
@@ -896,7 +1027,11 @@ function QueueDialog({
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}
                         </Button>
-                        <Button type="submit" aria-disabled={!parsed.success} disabled={!parsed.success}>
+                        <Button
+                            type="submit"
+                            aria-disabled={!parsed.success}
+                            disabled={!parsed.success}
+                        >
                             {t("queue.add")}
                         </Button>
                     </DialogFooter>

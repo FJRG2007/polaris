@@ -66,7 +66,8 @@ vi.mock("@/lib/agent-rollouts/service", () => {
         setPin: record("setPin"),
         enqueueCommand: record("enqueueCommand"),
         cancelCommand: record("cancelCommand"),
-        serverOfConnection: (id: string) => (id === "local" ? "local" : id.startsWith("host:") ? id.slice(5) : null),
+        serverOfConnection: (id: string) =>
+            id === "local" ? "local" : id.startsWith("host:") ? id.slice(5) : null,
         queueIfOffline: async (serverId: string, command: { kind: string; container: string }) => {
             called.push(`queueIfOffline ${serverId} ${command.kind} ${command.container}`);
             return offline;
@@ -104,10 +105,20 @@ describe("rollout actions", () => {
 
     it("validates input and turns a refusal into its code", async () => {
         expect(
-            await actions.startRolloutAction({ version: "2.0.0", waves: [50, 10], healthMinutes: 10 })
+            await actions.startRolloutAction({
+                version: "2.0.0",
+                waves: [50, 10],
+                healthMinutes: 10
+            })
         ).toEqual({ ok: false, error: "invalid" });
-        expect(await actions.cancelCommandAction("not-an-id")).toEqual({ ok: false, error: "invalid" });
-        expect(await actions.rolloutControlAction("rollback")).toEqual({ ok: false, error: "noRollout" });
+        expect(await actions.cancelCommandAction("not-an-id")).toEqual({
+            ok: false,
+            error: "invalid"
+        });
+        expect(await actions.rolloutControlAction("rollback")).toEqual({
+            ok: false,
+            error: "noRollout"
+        });
         expect(called).not.toContain("audit agent.rollout.rollback");
         expect(await actions.rolloutControlAction("halt")).toEqual({ ok: true, value: undefined });
         expect(called).toContain("audit agent.rollout.halt");
@@ -116,7 +127,9 @@ describe("rollout actions", () => {
 
 describe("a container action on a server that is not answering", () => {
     it("is queued for when the server is back", async () => {
-        expect(await containers.containerAction(`host:${ID}`, "api", "restart")).toEqual({ queued: true });
+        expect(await containers.containerAction(`host:${ID}`, "api", "restart")).toEqual({
+            queued: true
+        });
         expect(called).toContain(`queueIfOffline ${ID} container.restart api`);
         expect(called).toContain("audit server.command.queue");
     });

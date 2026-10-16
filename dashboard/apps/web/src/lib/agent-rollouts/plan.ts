@@ -228,9 +228,7 @@ export function stepTarget(
  *  rollout halts the moment any one of them fails. */
 export function waveVerdict(states: readonly TargetState[]): "advance" | "halt" | "wait" {
     if (states.includes("failed")) return "halt";
-    return states.every((state) => state === "healthy" || state === "skipped")
-        ? "advance"
-        : "wait";
+    return states.every((state) => state === "healthy" || state === "skipped") ? "advance" : "wait";
 }
 
 /** Servers a rollback leaves pinned to the previous version: the ones it reached. */

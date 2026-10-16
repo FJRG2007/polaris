@@ -25,7 +25,11 @@ const row = (id: string, over: Partial<queue.QueuedRow> = {}): queue.QueuedRow =
 describe("drainOrder", () => {
     it("delivers oldest first, ties broken by id", () => {
         const { deliver } = queue.drainOrder(
-            [row("c", { createdAt: ago(5) }), row("b", { createdAt: ago(10) }), row("a", { createdAt: ago(10) })],
+            [
+                row("c", { createdAt: ago(5) }),
+                row("b", { createdAt: ago(10) }),
+                row("a", { createdAt: ago(10) })
+            ],
             now
         );
         expect(deliver.map((entry) => entry.id)).toEqual(["a", "b", "c"]);
@@ -45,7 +49,11 @@ describe("drainOrder", () => {
             [
                 row("busy", { status: "delivering", startedAt: ago(1), attempts: 1 }),
                 row("cut", { status: "delivering", startedAt: ago(15), attempts: 1 }),
-                row("spent", { status: "delivering", startedAt: ago(15), attempts: queue.MAX_ATTEMPTS })
+                row("spent", {
+                    status: "delivering",
+                    startedAt: ago(15),
+                    attempts: queue.MAX_ATTEMPTS
+                })
             ],
             now
         );
@@ -79,7 +87,7 @@ describe("commands", () => {
     it("round-trips a payload and refuses one that no longer parses", () => {
         const spec = { kind: "container.restart" as const, container: "web-1" };
         expect(queue.readCommand(spec.kind, queue.payloadOf(spec))).toEqual(spec);
-        expect(queue.readCommand("container.restart", "{\"container\":\"; rm -rf /\"}")).toBeNull();
+        expect(queue.readCommand("container.restart", '{"container":"; rm -rf /"}')).toBeNull();
         expect(queue.readCommand("container.restart", "not json")).toBeNull();
         expect(queue.readCommand("shell.run", "{}")).toBeNull();
     });

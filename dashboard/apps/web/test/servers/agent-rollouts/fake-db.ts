@@ -57,7 +57,13 @@ export function createFakeDb() {
         hostTemplateAssignment: []
     };
 
-    function compare(value: unknown, condition: unknown, row: Row, table: string, key: string): boolean {
+    function compare(
+        value: unknown,
+        condition: unknown,
+        row: Row,
+        table: string,
+        key: string
+    ): boolean {
         if (table === "agentRolloutTarget" && key === "rollout") {
             const parent = tables.agentRollout!.find((one) => one.id === row.rolloutId);
             return parent !== undefined && matches(parent, condition as Row, "agentRollout");
@@ -67,9 +73,15 @@ export function createFakeDb() {
             if ("in" in ops && !(ops.in as unknown[]).includes(value)) return false;
             if ("notIn" in ops && (ops.notIn as unknown[]).includes(value)) return false;
             if ("not" in ops && value === ops.not) return false;
-            if ("lt" in ops && !(value != null && (value as Date | number) < (ops.lt as Date | number))) return false;
-            if ("lte" in ops && !((value as Date | number) <= (ops.lte as Date | number))) return false;
-            if ("gt" in ops && !((value as Date | number) > (ops.gt as Date | number))) return false;
+            if (
+                "lt" in ops &&
+                !(value != null && (value as Date | number) < (ops.lt as Date | number))
+            )
+                return false;
+            if ("lte" in ops && !((value as Date | number) <= (ops.lte as Date | number)))
+                return false;
+            if ("gt" in ops && !((value as Date | number) > (ops.gt as Date | number)))
+                return false;
             return true;
         }
         return value === condition;
@@ -84,13 +96,16 @@ export function createFakeDb() {
     function apply(row: Row, data: Row): void {
         for (const [key, value] of Object.entries(data)) {
             if (value && typeof value === "object" && "increment" in (value as Row)) {
-                row[key] = (row[key] as number) + ((value as { increment: number }).increment);
+                row[key] = (row[key] as number) + (value as { increment: number }).increment;
             } else row[key] = value;
         }
     }
 
     function order(rows: Row[], orderBy: unknown): Row[] {
-        const keys = (Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []) as Record<string, "asc" | "desc">[];
+        const keys = (Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []) as Record<
+            string,
+            "asc" | "desc"
+        >[];
         return [...rows].sort((a, b) => {
             for (const entry of keys) {
                 const [key, direction] = Object.entries(entry)[0]!;
@@ -108,7 +123,9 @@ export function createFakeDb() {
         const row: Row = { id: randomUUID(), ...DEFAULTS[table]?.(), ...rest };
         for (const key of UNIQUE[table] ?? []) {
             if (row[key] != null && tables[table]!.some((one) => one[key] === row[key])) {
-                throw Object.assign(new Error(`Unique constraint failed on ${table}.${key}`), { code: "P2002" });
+                throw Object.assign(new Error(`Unique constraint failed on ${table}.${key}`), {
+                    code: "P2002"
+                });
             }
         }
         tables[table]!.push(row);
@@ -126,7 +143,10 @@ export function createFakeDb() {
                 return found ? { ...found } : null;
             },
             findFirst: async (args: { where?: Row; orderBy?: unknown; include?: Row } = {}) => {
-                const found = order(rows().filter((row) => matches(row, args.where, table)), args.orderBy)[0];
+                const found = order(
+                    rows().filter((row) => matches(row, args.where, table)),
+                    args.orderBy
+                )[0];
                 if (!found) return null;
                 if (args.include?.targets) {
                     return {
@@ -140,7 +160,10 @@ export function createFakeDb() {
                 return { ...found };
             },
             findMany: async (args: { where?: Row; orderBy?: unknown; take?: number } = {}) =>
-                order(rows().filter((row) => matches(row, args.where, table)), args.orderBy)
+                order(
+                    rows().filter((row) => matches(row, args.where, table)),
+                    args.orderBy
+                )
                     .slice(0, args.take ?? Infinity)
                     .map((row) => ({ ...row })),
             count: async ({ where }: { where?: Row } = {}) =>
@@ -157,8 +180,14 @@ export function createFakeDb() {
                 tables[table]!.splice(0, rows().length, ...keep);
                 if (table === "agentRollout") {
                     const live = new Set(keep.map((row) => row.id));
-                    const targets = tables.agentRolloutTarget!.filter((row) => live.has(row.rolloutId));
-                    tables.agentRolloutTarget!.splice(0, tables.agentRolloutTarget!.length, ...targets);
+                    const targets = tables.agentRolloutTarget!.filter((row) =>
+                        live.has(row.rolloutId)
+                    );
+                    tables.agentRolloutTarget!.splice(
+                        0,
+                        tables.agentRolloutTarget!.length,
+                        ...targets
+                    );
                 }
                 return { count };
             },
@@ -174,7 +203,8 @@ export function createFakeDb() {
                 const seen = new Map<string, Row>();
                 for (const row of rows().filter((one) => matches(one, where, table))) {
                     const key = by.map((field) => String(row[field])).join("|");
-                    if (!seen.has(key)) seen.set(key, Object.fromEntries(by.map((field) => [field, row[field]])));
+                    if (!seen.has(key))
+                        seen.set(key, Object.fromEntries(by.map((field) => [field, row[field]])));
                 }
                 return [...seen.values()];
             }

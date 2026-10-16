@@ -67,7 +67,12 @@ let ids = 0;
 const uuid = () => `0192d3a4-5b6c-7d8e-9f00-${String(++ids).padStart(12, "0")}`;
 
 function restart(container: string, serverId = HOST, expiry: "1h" | "1d" = "1d") {
-    return { id: uuid(), serverId, expiry, command: { kind: "container.restart" as const, container } };
+    return {
+        id: uuid(),
+        serverId,
+        expiry,
+        command: { kind: "container.restart" as const, container }
+    };
 }
 
 const commands = () => fakeDb.tables.serverCommand!;
@@ -101,7 +106,9 @@ describe("the command queue", () => {
         await service.tick(minutes(3));
         expect(state.calls).toEqual(["restart api", "restart worker"]);
         expect(commands().map((row) => row.status)).toEqual(["done", "done"]);
-        expect(fakeDb.tables.serverAgent!.find((row) => row.serverId === HOST)?.heartbeatAt).toEqual(minutes(3));
+        expect(
+            fakeDb.tables.serverAgent!.find((row) => row.serverId === HOST)?.heartbeatAt
+        ).toEqual(minutes(3));
     });
 
     it("puts a command back, without letting the next one overtake it, when the server drops mid-way", async () => {
@@ -111,8 +118,8 @@ describe("the command queue", () => {
         state.hostOnline = true;
         // Answers the heartbeat, then goes away before the command.
         const docker = await import("@/lib/docker-service");
-        vi.spyOn(docker, "hostDockerDriver").mockImplementation(async () =>
-            driver(() => ++pings === 1) as never
+        vi.spyOn(docker, "hostDockerDriver").mockImplementation(
+            async () => driver(() => ++pings === 1) as never
         );
         await service.tick(minutes(2));
         vi.mocked(docker.hostDockerDriver).mockRestore();
@@ -135,13 +142,16 @@ describe("the command queue", () => {
         const again = await service.enqueueCommand(input, OWNER);
         expect(again.id).toBe(first.id);
         expect(commands()).toHaveLength(1);
-        await expect(service.enqueueCommand({ ...input, serverId: "local" }, OWNER)).rejects.toMatchObject({
+        await expect(
+            service.enqueueCommand({ ...input, serverId: "local" }, OWNER)
+        ).rejects.toMatchObject({
             code: "unknownServer"
         });
     });
 
     it("refuses a command past the per-server bound", async () => {
-        for (let index = 0; index < 50; index++) await service.enqueueCommand(restart(`c${index}`), OWNER);
+        for (let index = 0; index < 50; index++)
+            await service.enqueueCommand(restart(`c${index}`), OWNER);
         await expect(service.enqueueCommand(restart("one-more"), OWNER)).rejects.toMatchObject({
             code: "queueFull"
         });
@@ -154,7 +164,9 @@ describe("the command queue", () => {
         state.hostOnline = true;
         await service.tick(minutes(1));
         expect(state.calls).toEqual([]);
-        await expect(service.cancelCommand(waiting.id)).rejects.toMatchObject({ code: "notCancellable" });
+        await expect(service.cancelCommand(waiting.id)).rejects.toMatchObject({
+            code: "notCancellable"
+        });
     });
 
     it("refuses a server Polaris does not know", async () => {
@@ -188,14 +200,24 @@ describe("the command queue", () => {
 
     it("keeps the commands of a server that exists but is past the probe list, and expires a removed one's", async () => {
         const late = "0192d3a4-5b6c-7d8e-9f00-aaaaaaaaaaaa";
-        fakeDb.tables.host!.push({ id: late, name: "late", ownerId: OWNER, createdAt: minutes(-1) });
+        fakeDb.tables.host!.push({
+            id: late,
+            name: "late",
+            ownerId: OWNER,
+            createdAt: minutes(-1)
+        });
         await service.enqueueCommand(restart("api", late), OWNER, minutes(0));
         const spy = vi.spyOn(fakeDb.prisma.host, "findMany");
-        spy.mockImplementationOnce((async () => [{ id: HOST, name: "web-1", ownerId: OWNER }]) as never);
+        spy.mockImplementationOnce((async () => [
+            { id: HOST, name: "web-1", ownerId: OWNER }
+        ]) as never);
         await service.tick(minutes(1));
         spy.mockRestore();
         expect(commands()[0]!.status).toBe("queued");
-        fakeDb.tables.host!.splice(fakeDb.tables.host!.findIndex((row) => row.id === late), 1);
+        fakeDb.tables.host!.splice(
+            fakeDb.tables.host!.findIndex((row) => row.id === late),
+            1
+        );
         await service.tick(minutes(2));
         expect(commands()[0]).toMatchObject({ status: "expired", result: "unknownServer" });
     });
@@ -204,14 +226,24 @@ describe("the command queue", () => {
         const mine = "0192d3a4-5b6c-7d8e-9f00-bbbbbbbbbbbb";
         const theirs = "0192d3a4-5b6c-7d8e-9f00-cccccccccccc";
         const other = "0192d3a4-5b6c-7d8e-9f00-dddddddddddd";
-        fakeDb.tables.host!.push({ id: other, name: "db-1", ownerId: OWNER, createdAt: minutes(-50) });
+        fakeDb.tables.host!.push({
+            id: other,
+            name: "db-1",
+            ownerId: OWNER,
+            createdAt: minutes(-50)
+        });
         fakeDb.tables.hostTemplateAssignment!.push(
             { id: mine, hostId: HOST, template: { name: "Base" }, createdAt: minutes(0) },
             { id: theirs, hostId: other, template: { name: "Other" }, createdAt: minutes(0) }
         );
         const apply = (assignmentId: string) =>
             service.enqueueCommand(
-                { id: uuid(), serverId: HOST, expiry: "1d", command: { kind: "template.apply", assignmentId } },
+                {
+                    id: uuid(),
+                    serverId: HOST,
+                    expiry: "1d",
+                    command: { kind: "template.apply", assignmentId }
+                },
                 OWNER
             );
         await expect(apply(theirs)).rejects.toMatchObject({ code: "unknownAssignment" });
@@ -230,7 +262,10 @@ describe("the command queue", () => {
         fakeDb.tables.serverCommand!.find((row) => row.id === second.id)!.createdAt = minutes(1);
         await service.cancelCommand(first.id);
         await service.cancelCommand(second.id);
-        expect((await service.commandHistory(HOST)).map((row) => row.target)).toEqual(["worker", "api"]);
+        expect((await service.commandHistory(HOST)).map((row) => row.target)).toEqual([
+            "worker",
+            "api"
+        ]);
         expect(await service.commandHistory("local")).toEqual([]);
     });
 
@@ -239,12 +274,34 @@ describe("the command queue", () => {
         await service.enqueueCommand(restart("worker"), OWNER, minutes(0));
         await service.cancelCommand(old.id);
         fakeDb.tables.serverCommand!.find((row) => row.id === old.id)!.finishedAt = minutes(0);
-        fakeDb.tables.agentRollout!.push({ id: "r-old", openKey: null, status: "done", finishedAt: minutes(0) });
-        fakeDb.tables.agentRolloutTarget!.push({ id: "t-old", rolloutId: "r-old", serverId: "local", wave: 0 });
+        fakeDb.tables.agentRollout!.push({
+            id: "r-old",
+            openKey: null,
+            status: "done",
+            finishedAt: minutes(0)
+        });
+        fakeDb.tables.agentRolloutTarget!.push({
+            id: "t-old",
+            rolloutId: "r-old",
+            serverId: "local",
+            wave: 0
+        });
         const removed = "0192d3a4-5b6c-7d8e-9f00-eeeeeeeeeeee";
         fakeDb.tables.serverAgent!.push(
-            { serverId: removed, version: null, heartbeatAt: minutes(0), pinnedVersion: null, updatedAt: minutes(0) },
-            { serverId: HOST, version: null, heartbeatAt: minutes(0), pinnedVersion: "1.0.0", updatedAt: minutes(0) }
+            {
+                serverId: removed,
+                version: null,
+                heartbeatAt: minutes(0),
+                pinnedVersion: null,
+                updatedAt: minutes(0)
+            },
+            {
+                serverId: HOST,
+                version: null,
+                heartbeatAt: minutes(0),
+                pinnedVersion: "1.0.0",
+                updatedAt: minutes(0)
+            }
         );
         await service.pruneFinished(minutes(29 * 24 * 60));
         expect(commands()).toHaveLength(2);
@@ -361,12 +418,16 @@ describe("a rollout", () => {
         await service.tick(minutes(0));
         await start();
         await service.tick(minutes(1));
-        expect(commands().filter((row) => row.kind === "agent.update" && row.status === "queued")).toHaveLength(1);
+        expect(
+            commands().filter((row) => row.kind === "agent.update" && row.status === "queued")
+        ).toHaveLength(1);
         const result = await service.rollbackRollout();
         expect(result.pinned).toBe(1);
         expect(rollout()).toMatchObject({ status: "rolled-back", openKey: null });
         expect(commands().find((row) => row.kind === "agent.update")?.status).toBe("cancelled");
-        expect(fakeDb.tables.serverAgent!.find((row) => row.serverId === "local")?.pinnedVersion).toBe("1.0.0");
+        expect(
+            fakeDb.tables.serverAgent!.find((row) => row.serverId === "local")?.pinnedVersion
+        ).toBe("1.0.0");
         await expect(service.rollbackRollout()).rejects.toMatchObject({ code: "noRollout" });
     });
 
@@ -396,9 +457,13 @@ describe("a rollout", () => {
             ["local", "1.0.0", true],
             [HOST, null, false]
         ]);
-        expect(screen.servers[1]!.waiting.map((row) => [row.kind, row.target, row.status])).toEqual([
-            ["container.restart", "api", "queued"]
-        ]);
-        expect(screen.rollout).toMatchObject({ version: "2.0.0", status: "running", waves: [1, 100] });
+        expect(screen.servers[1]!.waiting.map((row) => [row.kind, row.target, row.status])).toEqual(
+            [["container.restart", "api", "queued"]]
+        );
+        expect(screen.rollout).toMatchObject({
+            version: "2.0.0",
+            status: "running",
+            waves: [1, 100]
+        });
     });
 });

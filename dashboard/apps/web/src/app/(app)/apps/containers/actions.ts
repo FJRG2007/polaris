@@ -41,7 +41,10 @@ const CONTAINERS_PATH = "/apps/containers";
 export async function createDockerConnectionAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createDockerConnectionSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await say("errors.invalidConnection")) };
+    if (!parsed.success)
+        return {
+            error: parsed.error.issues[0]?.message ?? (await say("errors.invalidConnection"))
+        };
 
     // Validate connectivity before persisting.
     try {
@@ -78,9 +81,15 @@ export async function deleteDockerConnectionAction(connectionId: string): Promis
     const user = await requirePermission("system.manage");
     // The local host and global Hosts are not stored Docker rows here (Hosts are
     // managed in the Servers app), so there is nothing to remove.
-    if (connectionId === LOCAL_DOCKER_CONNECTION_ID || connectionId.startsWith(HOST_DOCKER_PREFIX)) return;
+    if (connectionId === LOCAL_DOCKER_CONNECTION_ID || connectionId.startsWith(HOST_DOCKER_PREFIX))
+        return;
     await deleteDockerConnection(user.id, connectionId);
-    await recordAudit({ actorId: user.id, action: "docker.connection.delete", targetType: "docker", targetId: connectionId });
+    await recordAudit({
+        actorId: user.id,
+        action: "docker.connection.delete",
+        targetType: "docker",
+        targetId: connectionId
+    });
     revalidatePath(CONTAINERS_PATH);
 }
 
@@ -121,13 +130,17 @@ async function queueForLater(
     actorId: string
 ): Promise<boolean> {
     const serverId = rollouts.serverOfConnection(connectionId);
-    const command = queue.commandSchema.safeParse({ kind: `container.${action}`, container: containerId });
+    const command = queue.commandSchema.safeParse({
+        kind: `container.${action}`,
+        container: containerId
+    });
     if (!serverId || !command.success) return false;
     try {
         if (!(await rollouts.queueIfOffline(serverId, command.data, actorId))) return false;
     } catch (error) {
         // A full queue or a vanished server: the original failure is the answer.
-        if (!(error instanceof rollouts.RolloutRefusal)) console.error("polaris: queueing a container action failed:", error);
+        if (!(error instanceof rollouts.RolloutRefusal))
+            console.error("polaris: queueing a container action failed:", error);
         return false;
     }
     await recordAudit({
@@ -153,7 +166,9 @@ export async function removeContainerAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     try {
-        await withDockerDriver(connectionId, user.id, (driver) => driver.remove(containerId, options));
+        await withDockerDriver(connectionId, user.id, (driver) =>
+            driver.remove(containerId, options)
+        );
     } catch (caught) {
         return { error: await failure(caught, "errors.removeFailed") };
     }

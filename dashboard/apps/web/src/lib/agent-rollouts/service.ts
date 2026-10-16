@@ -83,7 +83,9 @@ async function loadServers(): Promise<{ servers: ServerRef[]; localHostIds: stri
     const remote = hosts
         .filter((host) => !isLocalMachine(host, identity))
         .map((host) => ({ id: host.id, name: host.name, ownerId: host.ownerId }));
-    const localHostIds = hosts.filter((host) => isLocalMachine(host, identity)).map((host) => host.id);
+    const localHostIds = hosts
+        .filter((host) => isLocalMachine(host, identity))
+        .map((host) => host.id);
     return { servers: [local, ...remote], localHostIds };
 }
 
@@ -175,7 +177,11 @@ export interface EnqueueInput {
  * Queue a command, or return the one already queued under this id: the client
  * mints the id, so a submit sent twice is still one command.
  */
-export async function enqueueCommand(input: EnqueueInput, actorId: string | null, now = new Date()) {
+export async function enqueueCommand(
+    input: EnqueueInput,
+    actorId: string | null,
+    now = new Date()
+) {
     const server = await findServer(input.serverId);
     const existing = await prisma.serverCommand.findUnique({ where: { id: input.id } });
     if (existing) {
@@ -306,7 +312,10 @@ export async function drainServer(server: ServerRef, now = new Date()): Promise<
     const { deliver, expire, abandon } = queue.drainOrder(rows, now);
     if (expire.length) {
         await prisma.serverCommand.updateMany({
-            where: { id: { in: expire.map((row) => row.id) }, status: { in: ["queued", "delivering"] } },
+            where: {
+                id: { in: expire.map((row) => row.id) },
+                status: { in: ["queued", "delivering"] }
+            },
             data: { status: "expired", finishedAt: now }
         });
     }
@@ -326,7 +335,9 @@ export async function drainServer(server: ServerRef, now = new Date()): Promise<
         const command = queue.readCommand(row.kind, row.payload);
         let outcome: Outcome;
         try {
-            outcome = command ? await execute(server, command) : { ok: false, result: "unreadable" };
+            outcome = command
+                ? await execute(server, command)
+                : { ok: false, result: "unreadable" };
         } catch (error) {
             console.error(`polaris: command ${row.id} on ${server.id} failed:`, error);
             outcome = { ok: false, result: "failed" };
@@ -428,7 +439,13 @@ export async function resumeRollout(): Promise<void> {
     await prisma.$transaction([
         prisma.agentRolloutTarget.updateMany({
             where: { rolloutId: rollout.id, state: "failed" },
-            data: { state: "pending", error: null, startedAt: null, healthySince: null, finishedAt: null }
+            data: {
+                state: "pending",
+                error: null,
+                startedAt: null,
+                healthySince: null,
+                finishedAt: null
+            }
         }),
         prisma.agentRollout.updateMany({
             where: { id: rollout.id, status: "halted" },
@@ -460,7 +477,10 @@ export async function rollbackRollout(): Promise<{ pinned: number }> {
         select: { serverId: true, state: true }
     });
     const pins = plan.rollbackPins(
-        targets.map((target) => ({ serverId: target.serverId, state: target.state as plan.TargetState }))
+        targets.map((target) => ({
+            serverId: target.serverId,
+            state: target.state as plan.TargetState
+        }))
     );
     const now = new Date();
     const ended = await prisma.agentRollout.updateMany({
@@ -500,7 +520,10 @@ export async function setPin(serverId: string, version: string | null): Promise<
 }
 
 /** One step of the open rollout: start the current wave, gate it, move on. */
-export async function advanceRollout(servers: readonly ServerRef[], now = new Date()): Promise<void> {
+export async function advanceRollout(
+    servers: readonly ServerRef[],
+    now = new Date()
+): Promise<void> {
     const rollout = await openRollout();
     if (!rollout || rollout.status !== "running") return;
     const wave = await prisma.agentRolloutTarget.findMany({
@@ -522,7 +545,11 @@ export async function advanceRollout(servers: readonly ServerRef[], now = new Da
                 state = "skipped";
                 await prisma.agentRolloutTarget.updateMany({
                     where: { id: target.id, state: "pending" },
-                    data: { state, error: known.has(target.serverId) ? "pinned" : "no-agent", finishedAt: now }
+                    data: {
+                        state,
+                        error: known.has(target.serverId) ? "pinned" : "no-agent",
+                        finishedAt: now
+                    }
                 });
             } else {
                 state = "updating";
@@ -530,24 +557,29 @@ export async function advanceRollout(servers: readonly ServerRef[], now = new Da
                     where: { id: target.id, state: "pending" },
                     data: { state, startedAt: now }
                 });
-                const queued = claimed.count === 0 || await enqueueCommand(
-                    {
-                        id: randomUUID(),
-                        serverId: target.serverId,
-                        expiry: "1h",
-                        command: { kind: "agent.update", version: rollout.version }
-                    },
-                    rollout.actorId,
-                    now
-                ).then(
-                    () => true,
-                    (error: unknown) => {
-                        if (!(error instanceof RolloutRefusal)) {
-                            console.error(`polaris: rollout update for ${target.serverId} not queued:`, error);
+                const queued =
+                    claimed.count === 0 ||
+                    (await enqueueCommand(
+                        {
+                            id: randomUUID(),
+                            serverId: target.serverId,
+                            expiry: "1h",
+                            command: { kind: "agent.update", version: rollout.version }
+                        },
+                        rollout.actorId,
+                        now
+                    ).then(
+                        () => true,
+                        (error: unknown) => {
+                            if (!(error instanceof RolloutRefusal)) {
+                                console.error(
+                                    `polaris: rollout update for ${target.serverId} not queued:`,
+                                    error
+                                );
+                            }
+                            return false;
                         }
-                        return false;
-                    }
-                );
+                    ));
                 if (!queued) {
                     state = "failed";
                     await prisma.agentRolloutTarget.updateMany({
@@ -653,7 +685,10 @@ async function removedServers(serverIds: readonly string[]): Promise<Set<string>
 export async function pruneFinished(now = new Date()): Promise<void> {
     const cutoff = new Date(now.getTime() - RETENTION_MS);
     await prisma.serverCommand.deleteMany({
-        where: { status: { in: ["done", "failed", "expired", "cancelled"] }, finishedAt: { lt: cutoff } }
+        where: {
+            status: { in: ["done", "failed", "expired", "cancelled"] },
+            finishedAt: { lt: cutoff }
+        }
     });
     await prisma.agentRollout.deleteMany({ where: { openKey: null, finishedAt: { lt: cutoff } } });
     const agents = await prisma.serverAgent.findMany({
@@ -662,7 +697,8 @@ export async function pruneFinished(now = new Date()): Promise<void> {
         take: PROBE_CAP
     });
     const gone = await removedServers(agents.map((agent) => agent.serverId));
-    if (gone.size > 0) await prisma.serverAgent.deleteMany({ where: { serverId: { in: [...gone] } } });
+    if (gone.size > 0)
+        await prisma.serverAgent.deleteMany({ where: { serverId: { in: [...gone] } } });
 }
 
 let started = false;
@@ -747,14 +783,13 @@ function commandView(
     templates: ReadonlyMap<string, string> = new Map()
 ): CommandView {
     const spec = queue.readCommand(row.kind, row.payload);
-    const target =
-        !spec
-            ? ""
-            : "container" in spec
-              ? spec.container
-              : "version" in spec
-                ? spec.version
-                : (templates.get(spec.assignmentId) ?? spec.assignmentId);
+    const target = !spec
+        ? ""
+        : "container" in spec
+          ? spec.container
+          : "version" in spec
+            ? spec.version
+            : (templates.get(spec.assignmentId) ?? spec.assignmentId);
     return {
         id: row.id,
         kind: row.kind,
@@ -771,7 +806,10 @@ async function assignmentsByServer(
     servers: readonly ServerRef[],
     localHostIds: readonly string[]
 ): Promise<Map<string, { id: string; name: string }[]>> {
-    const hostIds = [...servers.filter((server) => server.id !== LOCAL_SERVER).map((server) => server.id), ...localHostIds];
+    const hostIds = [
+        ...servers.filter((server) => server.id !== LOCAL_SERVER).map((server) => server.id),
+        ...localHostIds
+    ];
     const local = new Set(localHostIds);
     const rows = hostIds.length
         ? await prisma.hostTemplateAssignment.findMany({
@@ -784,7 +822,10 @@ async function assignmentsByServer(
     const byServer = new Map<string, { id: string; name: string }[]>();
     for (const row of rows) {
         const serverId = local.has(row.hostId) ? LOCAL_SERVER : row.hostId;
-        byServer.set(serverId, [...(byServer.get(serverId) ?? []), { id: row.id, name: row.template.name }]);
+        byServer.set(serverId, [
+            ...(byServer.get(serverId) ?? []),
+            { id: row.id, name: row.template.name }
+        ]);
     }
     return byServer;
 }

@@ -89,7 +89,13 @@ const data: RolloutScreen = {
         haltReason: "failed",
         createdAt: "2026-10-16T12:00:00.000Z",
         targets: [
-            { serverId: "local", wave: 0, state: "failed", fromVersion: "1.0.0", error: "heartbeat" },
+            {
+                serverId: "local",
+                wave: 0,
+                state: "failed",
+                fromVersion: "1.0.0",
+                error: "heartbeat"
+            },
             {
                 serverId: "0192d3a4-5b6c-7d8e-9f00-112233445566",
                 wave: -1,
@@ -115,18 +121,24 @@ describe("the Rollouts screen", () => {
         render(<RolloutsView />, { wrapper: MessagesWrapper });
         expect(screen.getByRole("heading", { name: "Rollout" })).toBeTruthy();
         expect(screen.getByRole("heading", { name: "Servers" })).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Start rollout" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByRole("button", { name: "Start rollout" }) as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 
     it("says why a rollout halted, per server, and offers resume and roll back", async () => {
         answer = Promise.resolve({ ok: true, value: data });
         render(<RolloutsView />, { wrapper: MessagesWrapper });
         expect(
-            await screen.findByText("Halted because a server failed its health check. Retry it, or roll back.")
+            await screen.findByText(
+                "Halted because a server failed its health check. Retry it, or roll back."
+            )
         ).toBeTruthy();
         expect(screen.getByTitle("this-box: Failed - Stopped answering")).toBeTruthy();
         expect(screen.getByTitle("web-1: Skipped - Managed over SSH")).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Start rollout" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByRole("button", { name: "Start rollout" }) as HTMLButtonElement).disabled
+        ).toBe(true);
         fireEvent.click(screen.getByRole("button", { name: "Resume" }));
         await waitFor(() => expect(control).toHaveBeenCalledWith("resume"));
     });

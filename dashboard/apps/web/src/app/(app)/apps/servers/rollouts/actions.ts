@@ -59,9 +59,7 @@ export async function startRolloutAction(input: z.input<typeof startSchema>): Pr
     }
 }
 
-export async function rolloutControlAction(
-    input: "resume" | "halt" | "rollback"
-): Promise<Result> {
+export async function rolloutControlAction(input: "resume" | "halt" | "rollback"): Promise<Result> {
     const user = await requirePermission("system.manage");
     try {
         const action = z.enum(["resume", "halt", "rollback"]).parse(input);
@@ -117,10 +115,15 @@ export async function enqueueCommandAction(
     }
 }
 
-export async function commandHistoryAction(serverId: string): Promise<Result<rollouts.CommandView[]>> {
+export async function commandHistoryAction(
+    serverId: string
+): Promise<Result<rollouts.CommandView[]>> {
     await requirePermission("system.manage");
     try {
-        return { ok: true, value: await rollouts.commandHistory(queue.serverIdSchema.parse(serverId)) };
+        return {
+            ok: true,
+            value: await rollouts.commandHistory(queue.serverIdSchema.parse(serverId))
+        };
     } catch (error) {
         return refused(error);
     }

@@ -7,7 +7,11 @@
 import { describe, expect, it } from "vitest";
 import * as plan from "@/lib/agent-rollouts/plan";
 
-const server = (id: string, version: string | null = "1.0.0", pinnedVersion: string | null = null) => ({
+const server = (
+    id: string,
+    version: string | null = "1.0.0",
+    pinnedVersion: string | null = null
+) => ({
     id,
     version,
     pinnedVersion
@@ -75,7 +79,11 @@ describe("planRollout", () => {
 
     it("assigns the same waves however the servers arrive", () => {
         const ids = Array.from({ length: 10 }, (_, index) => `s${index}`);
-        const one = plan.planRollout(ids.map((id) => server(id)), "2.0.0", [1, 50, 100]);
+        const one = plan.planRollout(
+            ids.map((id) => server(id)),
+            "2.0.0",
+            [1, 50, 100]
+        );
         const two = plan.planRollout(
             [...ids].reverse().map((id) => server(id)),
             "2.0.0",
@@ -94,7 +102,12 @@ describe("previousVersion", () => {
     it("is the version most servers run, ignoring the target and agentless ones", () => {
         expect(
             plan.previousVersion(
-                [server("a", "1.0.0"), server("b", "1.0.0"), server("c", "0.9.0"), server("d", null)],
+                [
+                    server("a", "1.0.0"),
+                    server("b", "1.0.0"),
+                    server("c", "0.9.0"),
+                    server("d", null)
+                ],
                 "2.0.0"
             )
         ).toBe("1.0.0");
@@ -119,35 +132,40 @@ describe("stepTarget", () => {
 
     it("keeps waiting for an update in progress, and fails one that never reports", () => {
         const target = { state: "updating" as const, startedAt: start, healthySince: null };
-        expect(plan.stepTarget(target, { version: "1.0.0", heartbeatAt: at(5) }, at(5), config).state).toBe(
-            "updating"
-        );
+        expect(
+            plan.stepTarget(target, { version: "1.0.0", heartbeatAt: at(5) }, at(5), config).state
+        ).toBe("updating");
         expect(
             plan.stepTarget(target, { version: "1.0.0", heartbeatAt: at(31) }, at(31), config)
         ).toMatchObject({ state: "failed", reason: "timeout" });
     });
 
     it("fails at once a server that installed a version other than the rollout's", () => {
-        const target = { state: "updating" as const, startedAt: start, healthySince: null, fromVersion: "1.0.0" };
+        const target = {
+            state: "updating" as const,
+            startedAt: start,
+            healthySince: null,
+            fromVersion: "1.0.0"
+        };
         expect(
             plan.stepTarget(target, { version: "1.5.0", heartbeatAt: at(3) }, at(3), config)
         ).toMatchObject({ state: "failed", reason: "version" });
-        expect(plan.stepTarget(target, { version: "1.0.0", heartbeatAt: at(3) }, at(3), config).state).toBe(
-            "updating"
-        );
-        expect(plan.stepTarget(target, { version: "1.5.0", heartbeatAt: at(-10) }, at(3), config).state).toBe(
-            "updating"
-        );
+        expect(
+            plan.stepTarget(target, { version: "1.0.0", heartbeatAt: at(3) }, at(3), config).state
+        ).toBe("updating");
+        expect(
+            plan.stepTarget(target, { version: "1.5.0", heartbeatAt: at(-10) }, at(3), config).state
+        ).toBe("updating");
     });
 
     it("is healthy only after the whole health window", () => {
         const target = { state: "verifying" as const, startedAt: start, healthySince: at(2) };
-        expect(plan.stepTarget(target, { version: "2.0.0", heartbeatAt: at(9) }, at(9), config).state).toBe(
-            "verifying"
-        );
-        expect(plan.stepTarget(target, { version: "2.0.0", heartbeatAt: at(12) }, at(12), config).state).toBe(
-            "healthy"
-        );
+        expect(
+            plan.stepTarget(target, { version: "2.0.0", heartbeatAt: at(9) }, at(9), config).state
+        ).toBe("verifying");
+        expect(
+            plan.stepTarget(target, { version: "2.0.0", heartbeatAt: at(12) }, at(12), config).state
+        ).toBe("healthy");
     });
 
     it("fails a server that stops answering or goes back to another version", () => {
