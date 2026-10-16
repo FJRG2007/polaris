@@ -52,9 +52,7 @@ vi.mock("@/lib/apps/install-presence", () => ({
 }));
 
 const { finishSetupAction, installSetupAppAction, setupInstalledAction, setupStateAction } =
-    await import(
-    "@/app/(app)/setup-actions"
-);
+    await import("@/app/(app)/setup-actions");
 
 beforeEach(() => {
     viewer = { id: "admin-1", isAdmin: true };
