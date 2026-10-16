@@ -14,6 +14,7 @@ const OWNER = "0192d3a4-0000-7000-8000-000000000001";
 const state = {
     hostOnline: false,
     localOnline: true,
+    hostd: true,
     localVersion: "1.0.0" as string | null,
     update: "started" as "started" | "unreachable" | "failed",
     calls: [] as string[]
@@ -26,7 +27,7 @@ vi.mock("@/lib/cron/lease", () => ({
 vi.mock("@polaris/hostd-client", () => ({
     HostdClient: class {
         async health() {
-            return state.localOnline ? { version: state.localVersion } : null;
+            return state.localOnline && state.hostd ? { version: state.localVersion } : null;
         }
     }
 }));
@@ -79,6 +80,7 @@ beforeEach(() => {
     Object.assign(state, {
         hostOnline: false,
         localOnline: true,
+        hostd: true,
         localVersion: "1.0.0",
         update: "started",
         calls: []
@@ -237,6 +239,14 @@ describe("a rollout", () => {
         expect(commands().find((row) => row.kind === "agent.update")?.status).toBe("cancelled");
         expect(fakeDb.tables.serverAgent!.find((row) => row.serverId === "local")?.pinnedVersion).toBe("1.0.0");
         await expect(service.rollbackRollout()).rejects.toMatchObject({ code: "noRollout" });
+    });
+
+    it("counts this box as online with no agent when only its engine answers", async () => {
+        state.hostd = false;
+        await service.tick(minutes(0));
+        const screen = await service.rolloutScreen(minutes(1));
+        expect(screen.servers[0]).toMatchObject({ id: "local", online: true, version: null });
+        await expect(start()).rejects.toMatchObject({ code: "noTargets" });
     });
 
     it("leaves a pinned server out, and refuses a rollout that would reach nobody", async () => {

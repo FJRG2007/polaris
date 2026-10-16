@@ -95,8 +95,16 @@ async function findServer(serverId: string): Promise<ServerRef> {
 async function probe(server: ServerRef): Promise<{ online: boolean; version: string | null }> {
     try {
         if (server.id === LOCAL_SERVER) {
-            const health = await new HostdClient().health();
-            return { online: health !== null, version: health?.version ?? null };
+            const health = await new HostdClient().health().catch(() => null);
+            if (health) return { online: true, version: health.version ?? null };
+            // No agent answering (the limited edition has none): the box is still
+            // there while its engine answers, it just has nothing to update.
+            const driver = localDockerDriver();
+            try {
+                return { online: await driver.ping(), version: null };
+            } finally {
+                await driver.dispose();
+            }
         }
         const driver = await hostDockerDriver(server.id, server.ownerId ?? "");
         try {
