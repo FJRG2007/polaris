@@ -133,6 +133,9 @@ const CONTEXT_PARTS: MenuParts = {
     SubContent: ContextMenuSubContent
 };
 
+/** How long a stored move is drawn ahead of a list that carries it. */
+const PENDING_ORDER_SETTLE_MS = 5_000;
+
 /** What an administrator's right-click on a channel asks the rail to open. */
 type ChannelManage = "edit" | "duplicate" | "create" | "delete";
 
@@ -167,38 +170,43 @@ function MoveToOptions({ move: place }: { move: RowMove }) {
                 {t("channelMenu.moveTo")}
             </ContextMenuSubTrigger>
             <ContextMenuSubContent>
-                <ContextMenuSub>
-                    <ContextMenuSubTrigger>
-                        <FolderTree className="size-3.5" />
-                        {t("channelMenu.moveCategory")}
-                    </ContextMenuSubTrigger>
-                    {/* Capped well short of the window, so a space with forty
+                {place.categories.length > 0 && (
+                    <ContextMenuSub>
+                        <ContextMenuSubTrigger>
+                            <FolderTree className="size-3.5" />
+                            {t("channelMenu.moveCategory")}
+                        </ContextMenuSubTrigger>
+                        {/* Capped well short of the window, so a space with forty
                         headings scrolls inside the list instead of filling the
                         screen with it. */}
-                    <ContextMenuSubContent className="max-h-[min(20rem,var(--radix-context-menu-content-available-height))]">
-                        {headings.map((heading) => {
-                            const here = heading.id === place.categoryId;
-                            return (
-                                <ContextMenuItem
-                                    key={heading.id ?? ""}
-                                    disabled={here}
-                                    onSelect={() =>
-                                        place.onMove({ to: "category", categoryId: heading.id })
-                                    }
-                                >
-                                    {here ? (
-                                        <Check className="size-3.5" />
-                                    ) : (
-                                        <span aria-hidden="true" className="size-3.5 shrink-0" />
-                                    )}
-                                    <span className="min-w-0 truncate" title={heading.name}>
-                                        {heading.name}
-                                    </span>
-                                </ContextMenuItem>
-                            );
-                        })}
-                    </ContextMenuSubContent>
-                </ContextMenuSub>
+                        <ContextMenuSubContent className="max-h-[min(20rem,var(--radix-context-menu-content-available-height))]">
+                            {headings.map((heading) => {
+                                const here = heading.id === place.categoryId;
+                                return (
+                                    <ContextMenuItem
+                                        key={heading.id ?? ""}
+                                        disabled={here}
+                                        onSelect={() =>
+                                            place.onMove({ to: "category", categoryId: heading.id })
+                                        }
+                                    >
+                                        {here ? (
+                                            <Check className="size-3.5" />
+                                        ) : (
+                                            <span
+                                                aria-hidden="true"
+                                                className="size-3.5 shrink-0"
+                                            />
+                                        )}
+                                        <span className="min-w-0 truncate" title={heading.name}>
+                                            {heading.name}
+                                        </span>
+                                    </ContextMenuItem>
+                                );
+                            })}
+                        </ContextMenuSubContent>
+                    </ContextMenuSub>
+                )}
                 <ContextMenuItem
                     disabled={place.first}
                     onSelect={() => place.onMove({ to: "first" })}
@@ -242,8 +250,9 @@ export function ChatSidebar() {
     const [deleteError, setDeleteError] = useState("");
     const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
     // A move that has been asked for and is drawn already, ahead of the answer.
-    // `stored` once the server has taken it: it is dropped when the next list
-    // arrives, which is the one that carries it, and at once on a refusal.
+    // `stored` once the server has taken it: it is dropped when a list arrives
+    // that carries it (or after a short wait, should another change mean none
+    // ever does), and at once on a refusal.
     const [pendingOrder, setPendingOrder] = useState<{
         order: move.ChannelOrder;
         stored: boolean;
@@ -299,8 +308,21 @@ export function ChatSidebar() {
     }, [channels, activeSpaceId, pendingOrder]);
 
     useEffect(() => {
-        setPendingOrder((current) => (current?.stored ? null : current));
-    }, [channels]);
+        if (!pendingOrder?.stored || !activeSpaceId) return;
+        const listed = channels.filter(
+            (channel) => channel.spaceId === activeSpaceId && !channel.archived
+        );
+        if (move.reflectsChannelOrder(listed, pendingOrder.order)) {
+            setPendingOrder(null);
+            return;
+        }
+        const order = pendingOrder.order;
+        const timer = setTimeout(
+            () => setPendingOrder((current) => (current?.order === order ? null : current)),
+            PENDING_ORDER_SETTLE_MS
+        );
+        return () => clearTimeout(timer);
+    }, [channels, activeSpaceId, pendingOrder]);
 
     const voiceIds = useMemo(
         () => inSpace.filter((channel) => channel.kind === "voice").map((channel) => channel.id),
@@ -1575,6 +1597,12 @@ function RowMenu({
                                 >
                                     <Link2 className="size-3.5" />
                                     {t("sidebar.copyLink")}
+                                </ContextMenuItem>,
+                                // What a bot, an integration or an API call
+                                // names it by.
+                                <ContextMenuItem onSelect={() => void copyText(channel.id)}>
+                                    <Fingerprint className="size-3.5" />
+                                    {t("channelMenu.copyId")}
                                 </ContextMenuItem>
                             ],
                             // How loud it is.
@@ -1652,7 +1680,7 @@ function RowMenu({
                             // arrange it.
                             [moveTo && channel.spaceId && <MoveToOptions move={moveTo} />],
                             // The channel itself, for somebody who administers
-                            // the space. Deleting last, and asked first.
+                            // the space. Deleting is below, and asked first.
                             onManage && channel.spaceId
                                 ? [
                                       <ContextMenuItem onSelect={() => onManage(channel, "edit")}>
@@ -1671,20 +1699,23 @@ function RowMenu({
                                       <ContextMenuItem onSelect={() => onManage(channel, "create")}>
                                           <Plus className="size-3.5" />
                                           {t("channelMenu.create")}
-                                      </ContextMenuItem>,
-                                      <ContextMenuItem
-                                          variant="danger"
-                                          onSelect={() => onManage(channel, "delete")}
-                                      >
-                                          <Trash2 className="size-3.5" />
-                                          {t("channelMenu.delete")}
                                       </ContextMenuItem>
                                   ]
                                 : [],
-                            // Leaving a group is a decision about the
-                            // conversation, made from the list where somebody
-                            // is when they decide they are done with it.
+                            // The way out, on its own at the bottom. Leaving a
+                            // group is a decision about the conversation, made
+                            // from the list where somebody is when they decide
+                            // they are done with it.
                             [
+                                onManage && channel.spaceId && (
+                                    <ContextMenuItem
+                                        variant="danger"
+                                        onSelect={() => onManage(channel, "delete")}
+                                    >
+                                        <Trash2 className="size-3.5" />
+                                        {t("channelMenu.delete")}
+                                    </ContextMenuItem>
+                                ),
                                 group && (
                                     <ContextMenuItem
                                         variant="danger"
@@ -1694,14 +1725,6 @@ function RowMenu({
                                         {t("sidebar.leaveThisGroup")}
                                     </ContextMenuItem>
                                 )
-                            ],
-                            // What a bot, an integration or an API call names
-                            // it by.
-                            [
-                                <ContextMenuItem onSelect={() => void copyText(channel.id)}>
-                                    <Fingerprint className="size-3.5" />
-                                    {t("channelMenu.copyId")}
-                                </ContextMenuItem>
                             ]
                         ],
                         ContextMenuSeparator

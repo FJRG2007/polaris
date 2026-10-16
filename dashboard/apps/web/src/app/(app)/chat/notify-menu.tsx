@@ -58,17 +58,7 @@ export function NotifyOptions({
         <Sub>
             <SubTrigger>
                 <Bell className="size-3.5" />
-                {/* What it is set to now, under the name, so the answer to
-                    "why did this not ping me" is on the row without opening it. */}
-                <span className="flex min-w-0 flex-col leading-tight">
-                    <span className="truncate">{t("notifyMenu.notifications")}</span>
-                    <span
-                        className="truncate text-[0.6875rem] text-foreground-subtle"
-                        title={t(LEVEL_KEYS[current])}
-                    >
-                        {t(LEVEL_KEYS[current])}
-                    </span>
-                </span>
+                {t("notifyMenu.notifications")}
             </SubTrigger>
             <SubContent>
                 {offered.map((option) => (

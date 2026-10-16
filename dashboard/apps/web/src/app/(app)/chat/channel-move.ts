@@ -56,7 +56,9 @@ export function channelMoveOrder(
     const place = channelPlace(channels, id);
     if ((move.to === "first" && place.first) || (move.to === "last" && place.last)) return null;
 
-    const ids = channels.filter((entry) => entry.categoryId === categoryId).map((entry) => entry.id);
+    const ids = channels
+        .filter((entry) => entry.categoryId === categoryId)
+        .map((entry) => entry.id);
     const first = ids.find((entry) => entry !== id);
     const channelIds =
         move.to === "first" && first
@@ -83,4 +85,15 @@ export function withChannelOrder<T extends Placed>(
         return channel ? [{ ...channel, categoryId: order.categoryId }] : [];
     });
     return [...channels.filter((entry) => !moved.has(entry.id)), ...placed];
+}
+
+/** Whether `channels` already draw `order`'s heading in `order`'s order. */
+export function reflectsChannelOrder(channels: readonly Placed[], order: ChannelOrder): boolean {
+    const ids = channels
+        .filter((entry) => entry.categoryId === order.categoryId)
+        .map((entry) => entry.id);
+    return (
+        ids.length === order.channelIds.length &&
+        ids.every((id, index) => id === order.channelIds[index])
+    );
 }

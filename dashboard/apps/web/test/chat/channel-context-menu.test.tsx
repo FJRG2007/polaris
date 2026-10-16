@@ -212,18 +212,18 @@ describe("the groups on a channel's menu", () => {
             "Invite people",
             "Pin to the top",
             "Copy link",
+            "Copy ID",
             "|",
             "Mute",
-            "NotificationsFollow the server",
+            "Notifications",
             "|",
             "Move to",
             "|",
             "Edit channel",
             "Duplicate channel",
             "Create channel",
-            "Delete channel",
             "|",
-            "Copy ID"
+            "Delete channel"
         ]);
     });
 
@@ -241,11 +241,10 @@ describe("the groups on a channel's menu", () => {
             "|",
             "Pin to the top",
             "Copy link",
+            "Copy ID",
             "|",
             "Mute",
-            "NotificationsFollow the server",
-            "|",
-            "Copy ID"
+            "Notifications"
         ]);
     });
 });

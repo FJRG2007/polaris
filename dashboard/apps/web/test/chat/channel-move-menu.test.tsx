@@ -15,6 +15,7 @@ let access: "member" | "admin" = "admin";
 let visibility: "private" | "public" = "private";
 const called: string[] = [];
 let refuse = "";
+let refreshes = 0;
 
 vi.mock("next/navigation", () => ({
     useParams: () => ({}),
@@ -104,7 +105,9 @@ function buildChat(): Record<string, unknown> {
         categories: [{ id: "category-1", spaceId: "space-1", name: "Talk" }],
         activeSpaceId: "space-1",
         setActiveSpaceId: () => undefined,
-        refresh: () => undefined,
+        refresh: () => {
+            refreshes += 1;
+        },
         loaded: true,
         blocked: new Set<string>(),
         friends: new Set<string>()
@@ -124,6 +127,7 @@ beforeEach(() => {
     visibility = "private";
     called.length = 0;
     refuse = "";
+    refreshes = 0;
     chatState = buildChat();
 });
 
@@ -174,15 +178,21 @@ describe("where a channel goes, worked out", () => {
         expect(move.channelMoveOrder(rail, "c", { to: "category", categoryId: "talk" })).toBeNull();
     });
 
+    it("knows when a list already carries the order", () => {
+        const order = move.channelMoveOrder(rail, "b", { to: "last" })!;
+        expect(move.reflectsChannelOrder(rail, order)).toBe(false);
+        expect(move.reflectsChannelOrder(move.withChannelOrder(rail, order), order)).toBe(true);
+    });
+
     it("draws the new order before it is stored", () => {
         const order = move.channelMoveOrder(rail, "c", { to: "category", categoryId: "games" })!;
         const drawn = move.withChannelOrder(rail, order);
-        expect(drawn.filter((entry) => entry.categoryId === "games").map((entry) => entry.id)).toEqual(
-            ["e", "c"]
-        );
-        expect(drawn.filter((entry) => entry.categoryId === "talk").map((entry) => entry.id)).toEqual(
-            ["b", "d"]
-        );
+        expect(
+            drawn.filter((entry) => entry.categoryId === "games").map((entry) => entry.id)
+        ).toEqual(["e", "c"]);
+        expect(
+            drawn.filter((entry) => entry.categoryId === "talk").map((entry) => entry.id)
+        ).toEqual(["b", "d"]);
     });
 });
 
@@ -214,6 +224,47 @@ describe("Move to on a channel's menu", () => {
         expect(rows.findIndex((text) => text.includes("random"))).toBeLessThan(
             rows.findIndex((text) => text.includes("general"))
         );
+    });
+
+    it("keeps the new order drawn through a list that does not carry it yet", async () => {
+        const { rerender } = render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        openMove("general");
+        fireEvent.click(option("Last in category"));
+        await vi.waitFor(() => expect(refreshes).toBe(1));
+        const order = () => {
+            const rows = screen.getAllByRole("link").map((link) => link.textContent ?? "");
+            return rows.findIndex((text) => text.includes("random")) <
+                rows.findIndex((text) => text.includes("general"))
+                ? "moved"
+                : "old";
+        };
+        chatState = {
+            ...chatState,
+            channels: [channel("c1", "general", 0), channel("c2", "random", 0)]
+        };
+        rerender(<ChatSidebar />);
+        expect(order()).toBe("moved");
+        chatState = {
+            ...chatState,
+            channels: [channel("c2", "random", 0), channel("c1", "general", 0)]
+        };
+        rerender(<ChatSidebar />);
+        expect(order()).toBe("moved");
+    });
+
+    it("offers no Category list in a space with no headings", () => {
+        chatState = {
+            ...buildChat(),
+            categories: [],
+            channels: [channel("c1", "general", 3), channel("c2", "random", 0)].map((entry) => ({
+                ...entry,
+                categoryId: null
+            }))
+        };
+        render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        openMove("general");
+        expect(screen.queryByRole("menuitem", { name: "Category" })).toBeNull();
+        expect(option("Last in category")).toBeTruthy();
     });
 
     it("moves it under no heading", () => {
