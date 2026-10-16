@@ -13,6 +13,7 @@ import { OverviewGrid } from "./overview-grid";
 import { Messages } from "@/components/i18n/messages";
 import { resolveOverviewLayout } from "@polaris/core";
 import { accessFor, requireUser } from "@/lib/session";
+import { SetupWizardOffer } from "@/components/setup/setup-wizard-entry";
 import { overviewFeatures } from "@/lib/overview/features";
 import { availableOverviewWidgets } from "@/lib/overview/catalog";
 import { availableAppWidgetKinds } from "@/lib/overview/app-widgets";
@@ -53,6 +54,13 @@ export default async function OverviewPage() {
                 gate={{ held, installed }}
                 appKinds={appKinds}
             />
+            {/* Only an administrator is ever offered the first-run setup; it asks
+                the server after the Overview is drawn. */}
+            {user.isAdmin && !user.viewingAs ? (
+                <Messages namespaces={["setup", "catalog"]}>
+                    <SetupWizardOffer />
+                </Messages>
+            ) : null}
         </Messages>
     );
 }

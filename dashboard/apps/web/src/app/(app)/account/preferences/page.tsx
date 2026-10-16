@@ -25,6 +25,7 @@ import { getSeasonalChoice, seasonsAllowed } from "@/lib/seasonal-service";
 import { AccessibilityForm } from "@/components/accessibility-form";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { LanguageCard } from "./language-card";
+import { SidebarPresetCard } from "@/components/setup/sidebar-preset-card";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { saveDisplayPreferencesAction, saveTextSizeAction, setLocaleAction } from "./actions";
@@ -55,10 +56,12 @@ export default async function PreferencesPage() {
     const fallback = resolveDisplayPreferences(platform, undefined, locale);
 
     return (
-        <Messages namespaces={["account"]}>
+        <Messages namespaces={["account", "setup"]}>
             <div className="mx-auto flex max-w-2xl flex-col gap-4">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("preferences.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("preferences.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">{t("preferences.intro")}</p>
                 </div>
                 <LanguageCard current={locale} save={setLocaleAction} />
@@ -78,6 +81,7 @@ export default async function PreferencesPage() {
                     standard={fallback.textSize}
                     save={saveTextSizeAction}
                 />
+                <SidebarPresetCard />
                 <SeasonalCard allowed={seasonsOn} initial={seasonal} />
                 <SpoilersCard />
                 <DeviceCacheCard />

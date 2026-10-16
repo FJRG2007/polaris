@@ -20,6 +20,11 @@ export interface FavoriteApps {
     readonly arrangeApps: (visible: readonly string[]) => void;
     /** Forget the arrangement: favorites first and the rest by use again. */
     readonly resetOrder: () => void;
+    /** Replace both lists at once - what picking a sidebar preset does. */
+    readonly replacePrefs: (prefs: {
+        favorites: readonly string[];
+        order: readonly string[];
+    }) => void;
     readonly launcherOpen: boolean;
     readonly setLauncherOpen: (open: boolean) => void;
     /** Open the app menu from elsewhere - after any drawer it was asked from has
@@ -32,6 +37,7 @@ const NONE: FavoriteApps = {
     order: [],
     arrangeApps: () => undefined,
     resetOrder: () => undefined,
+    replacePrefs: () => undefined,
     launcherOpen: false,
     setLauncherOpen: () => undefined,
     openLauncher: () => undefined
