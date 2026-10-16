@@ -14206,7 +14206,14 @@ describe("impostor", () => {
         expect((await stateNow()).done[impostor] ?? []).toEqual([]);
         // Somebody else's station counts nothing either.
         const crew = names.filter((name) => name !== impostor) as [string, string, string];
-        const theirs = first.tasks[crew[1]]!.find((id) => !first.tasks[crew[0]]!.includes(id))!;
+        // Tasks are drawn from the run's random id, so two players can share
+        // every station; any station that is not crew[0]'s will do then.
+        const theirs = [
+            ...first.tasks[crew[1]]!,
+            ...first.tasks[crew[2]]!,
+            ...layout.stations.map((one) => one.id)
+        ].find((id) => !first.tasks[crew[0]]!.includes(id))!;
+        expect(theirs).toBeDefined();
         await work(crew[0], theirs);
         expect((await stateNow()).done[crew[0]] ?? []).toEqual([]);
         // A press from across the station counts nothing: nobody was there.
