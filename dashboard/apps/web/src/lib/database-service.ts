@@ -16,6 +16,7 @@
  * queue as applications.
  */
 
+import { assertEnvironmentRoom } from "@/lib/orgs/quota-service";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
@@ -279,6 +280,7 @@ export async function createDatabase(ownerId: string, input: CreateDatabaseInput
     const spec = engineSpec(parsed.engine);
     const slug = slugify(parsed.name);
     if (!slug) throw new Error("Database name must contain letters or digits");
+    await assertEnvironmentRoom(parsed.environmentId, "databases");
     // The slug identifies the service in its environment. Saying so beats the
     // constraint violation the insert would otherwise answer with.
     const clash = await prisma.managedDatabase.findFirst({

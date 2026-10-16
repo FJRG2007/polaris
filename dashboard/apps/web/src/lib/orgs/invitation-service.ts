@@ -23,6 +23,8 @@ import { OrgError } from "./errors";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { organizationPolicy } from "./policy";
+import { roomForOne } from "./quotas";
+import { getOrgQuota, quotaRefusal, seatsTaken } from "./quota-service";
 import { contactLines } from "@/lib/privacy-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
@@ -223,7 +225,9 @@ async function inviteByEmail(
 ): Promise<SentInvitation> {
     const policy = await organizationPolicy();
     if (policy.newPeople === "off") {
-        throw new OrgError("No account matches that email, and this Polaris only lets organizations invite people who already have one");
+        throw new OrgError(
+            "No account matches that email, and this Polaris only lets organizations invite people who already have one"
+        );
     }
     if (policy.newPeople === "admins" && !invitedBy.isAdmin) {
         throw new OrgError(
@@ -231,7 +235,10 @@ async function inviteByEmail(
         );
     }
 
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
+    const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true }
+    });
     if (!org) throw new OrgError("That organization no longer exists");
     await assertRoom(orgId, null);
 
@@ -307,8 +314,12 @@ export async function listOrgEmailInvites(
             email: options.canManage ? row.email : maskEmail(row.email),
             role,
             roleName:
-                roles.find((entry) => entry.slug === role)?.name ?? core.ORG_SYSTEM_ROLES[role]?.name ?? role,
-            invitedBy: row.invitedBy.name || (row.invitedBy.username ? `@${row.invitedBy.username}` : "Somebody"),
+                roles.find((entry) => entry.slug === role)?.name ??
+                core.ORG_SYSTEM_ROLES[role]?.name ??
+                role,
+            invitedBy:
+                row.invitedBy.name ||
+                (row.invitedBy.username ? `@${row.invitedBy.username}` : "Somebody"),
             sentAt: row.sentAt?.toISOString() ?? null,
             expiresAt: row.expiresAt.toISOString()
         };
@@ -328,7 +339,10 @@ export async function resendOrgEmailInvite(
         select: { orgRole: true }
     });
     if (!invite) throw new OrgError("That invitation is no longer waiting");
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } });
+    const org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true }
+    });
     if (!org) throw new OrgError("That organization no longer exists");
 
     const { resendInvite } = await import("@/lib/invite-service");
@@ -348,7 +362,9 @@ export async function resendOrgEmailInvite(
 /** Withdraw one of this organization's emailed invitations. The link stops
  *  working at once; nobody is told. */
 export async function revokeOrgEmailInvite(orgId: string, inviteId: string): Promise<void> {
-    const gone = await prisma.invite.deleteMany({ where: { id: inviteId, orgId, acceptedAt: null } });
+    const gone = await prisma.invite.deleteMany({
+        where: { id: inviteId, orgId, acceptedAt: null }
+    });
     if (gone.count === 0) throw new OrgError("That invitation is no longer waiting");
 }
 
@@ -418,7 +434,8 @@ export async function joinOrgFromInvite(input: {
             userId: input.invitedById,
             event: "account.orgInvite",
             title: t("orgs.joined", {
-                who: joined?.name || (joined?.username ? `@${joined.username}` : t("orgs.somebody")),
+                who:
+                    joined?.name || (joined?.username ? `@${joined.username}` : t("orgs.somebody")),
                 org: org.name
             }),
             href: `/account/organizations/${org.slug}/people`
@@ -445,8 +462,10 @@ export async function joinOrgFromInvite(input: {
 
 async function roleExists(orgId: string, slug: string): Promise<boolean> {
     return (
-        (await prisma.orgRole.findUnique({ where: { orgId_slug: { orgId, slug } }, select: { id: true } })) !==
-        null
+        (await prisma.orgRole.findUnique({
+            where: { orgId_slug: { orgId, slug } },
+            select: { id: true }
+        })) !== null
     );
 }
 
@@ -470,26 +489,21 @@ async function assertRoom(
     forUserId: string | null,
     exceptInviteId?: string
 ): Promise<void> {
-    const policy = await organizationPolicy();
-    const [members, invited, emailed] = await Promise.all([
-        prisma.organizationMember.count({ where: { orgId } }),
-        prisma.organizationInvitation.count({
-            where: { orgId, ...live(), ...(forUserId ? { userId: { not: forUserId } } : {}) }
-        }),
-        // Invitations emailed to people with no account hold a place too.
-        prisma.invite.count({
-            where: {
-                orgId,
-                acceptedAt: null,
-                expiresAt: { gt: new Date() },
-                ...(exceptInviteId ? { id: { not: exceptInviteId } } : {})
-            }
-        })
+    const [policy, orgQuota, seats] = await Promise.all([
+        organizationPolicy(),
+        getOrgQuota(orgId),
+        seatsTaken(orgId, { userId: forUserId, inviteId: exceptInviteId })
     ]);
-    if (!core.withinLimit(policy.maxMembers, members + invited + emailed + 1)) {
+    if (!core.withinLimit(policy.maxMembers, seats)) {
         throw new OrgError(
             `This organization is at the ${policy.maxMembers}-member limit for this Polaris, counting invitations nobody has answered`
         );
+    }
+    // The organization's own cap, counted the same way: the owner, the roster and
+    // every invitation still open.
+    const memberCap = orgQuota?.members ?? null;
+    if (memberCap !== null && !roomForOne(memberCap, seats)) {
+        throw await quotaRefusal("members", memberCap);
     }
 }
 

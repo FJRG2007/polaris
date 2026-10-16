@@ -29,6 +29,8 @@ import { copyWafRule } from "../waf-service";
 import { setSetting } from "../setting-store";
 import { copyScopeValues } from "./env-values";
 import { copyGroupLinks } from "./variable-groups";
+import * as quotas from "@/lib/orgs/quotas";
+import * as quota from "@/lib/orgs/quota-service";
 import * as activity from "../activity/activity";
 import { parseGithubRepo } from "../repo-reference";
 import { githubTokenForOwner } from "../github-access";
@@ -217,6 +219,17 @@ export async function cloneEnvironment(
                 publishPort: application.publishPort
             });
             ids.set(application.id, created.id);
+            // The copy takes on its original's limits, so it is held to the
+            // organization's caps on what those reserve.
+            await quota.assertOrgReservation(
+                () => quota.orgIdOfEnvironment(environment.id),
+                { cpus: 0, memoryMb: 0 },
+                {
+                    cpus: quotas.reservationOf(application.cpuLimit, application.replicas),
+                    memoryMb: quotas.reservationOf(application.memoryLimitMb, application.replicas)
+                },
+                { applicationId: created.id }
+            );
             await prisma.application.update({
                 where: { id: created.id },
                 data: {

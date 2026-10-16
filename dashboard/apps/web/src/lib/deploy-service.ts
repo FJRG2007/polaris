@@ -107,6 +107,8 @@ import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { refuseWhileCopying } from "./apps/install-copy-hold";
 import { notifyVolumeHealth } from "./notifications/volume-events";
 import { nasBinding } from "./deploy/nas-binding";
+import * as quotas from "@/lib/orgs/quotas";
+import * as quota from "@/lib/orgs/quota-service";
 import { refreshFileAccess, takeDownFileAccess } from "./deploy/file-access";
 import {
     appEdgeConfigSchema,
@@ -587,6 +589,7 @@ export async function createProject(
 ) {
     const slug = slugify(name);
     if (!slug) throw new Error("Project name must contain letters or digits");
+    await quota.assertOrgRoom(orgId, "projects");
     return prisma.project.create({
         data: {
             ownerId,
@@ -661,6 +664,7 @@ export async function createApplication(ownerId: string, input: CreateApplicatio
     if (!target) throw new Error("Deploy target not found");
     const slug = slugify(input.name);
     if (!slug) throw new Error("Application name must contain letters or digits");
+    await quota.assertEnvironmentRoom(input.environmentId, "services");
     const application = await prisma.application.create({
         data: {
             environmentId: input.environmentId,
@@ -2704,6 +2708,17 @@ export async function duplicateApplication(
         where: { id: applicationId, environment: { project: { ownerId } } }
     });
     if (!app) throw new Error("Application not found");
+    // A copy is one more service, and reserves what its original does.
+    const orgId = await quota.orgIdOfEnvironment(app.environmentId);
+    await quota.assertOrgRoom(orgId, "services");
+    await quota.assertOrgReservation(
+        orgId,
+        { cpus: 0, memoryMb: 0 },
+        {
+            cpus: quotas.reservationOf(app.cpuLimit, app.replicas),
+            memoryMb: quotas.reservationOf(app.memoryLimitMb, app.replicas)
+        }
+    );
     const base = slugify(`${app.name}-copy`) || `${app.slug}-copy`;
     let slug = base;
     let suffix = 1;
