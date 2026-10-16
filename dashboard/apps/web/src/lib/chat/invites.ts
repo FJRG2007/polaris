@@ -32,6 +32,7 @@ import { postSpaceNotice } from "./notices";
 import * as messages from "./messages";
 import { openDirect } from "./chat-service";
 import { friendIds } from "@/lib/friends-service";
+import { SHORTEST_SEARCH } from "@/lib/people-search";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import {
@@ -382,15 +383,27 @@ export async function inviteCandidates(
         throw new ChatAccessError({ key: "errors.notInSpace" });
     }
 
+    // A search needs two characters before it reaches past friends; one typed
+    // letter narrows the friends list instead of emptying it.
     const ids =
-        query.length > 0
+        query.length >= SHORTEST_SEARCH
             ? (await searchForConversation(actor, query, 25)).people.map((person) => person.id)
             : [...(await friendIds(actor.id))].filter((id) => id !== actor.id);
     if (ids.length === 0) return [];
 
     const [people, members, space] = await Promise.all([
         prisma.user.findMany({
-            where: { id: { in: ids } },
+            where: {
+                id: { in: ids },
+                ...(query && query.length < SHORTEST_SEARCH
+                    ? {
+                          OR: [
+                              { name: { contains: query, mode: "insensitive" as const } },
+                              { username: { startsWith: query, mode: "insensitive" as const } }
+                          ]
+                      }
+                    : {})
+            },
             orderBy: { name: "asc" },
             take: 100,
             select: { id: true, name: true, username: true }
