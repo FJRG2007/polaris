@@ -226,6 +226,9 @@ export const ContextMenuSubTrigger = forwardRef<
             onPointerLeave={(event) => {
                 onPointerLeave?.(event);
                 settled.onPointerLeave();
+                // Before the menu's own handler, which runs straight after
+                // this one and reads the box this answers for.
+                unmeasureKeptSubmenu(event.currentTarget);
             }}
         >
             {children}
@@ -234,6 +237,40 @@ export const ContextMenuSubTrigger = forwardRef<
     );
 });
 ContextMenuSubTrigger.displayName = "ContextMenuSubTrigger";
+
+/**
+ * A shut submenu that is only being kept, made to look as absent as it is.
+ *
+ * When the pointer leaves a submenu trigger, Radix asks that submenu's content
+ * for its box, and a box means "the pointer may be heading into it": it draws the
+ * corner-cutting grace area towards it, replacing whatever grace area was there.
+ * No content means the opposite - it respects the grace of the submenu that IS
+ * open and leaves it alone. Radix only expects content to exist while it is
+ * open, but a kept one exists all the time, hidden, and answers with a 0x0 box
+ * at the corner of the window.
+ *
+ * So stepping across a kept, shut submenu's trigger on the way into the open one
+ * threw the open one's grace away for a useless one, handed focus back to the
+ * menu, and closed the submenu under the pointer - and from there every hover
+ * near it seemed to do nothing. Reported as "after pointing at one option the
+ * menu stops working" on a chat row, where Mute and Notifications sit together.
+ *
+ * The answer is to report no box for the length of this one event: the shadow
+ * is set before Radix's handler runs and taken off in the microtask after it,
+ * which is before anything else - positioning included - can measure the node.
+ * An open submenu, or one that is not kept, is left alone.
+ */
+function unmeasureKeptSubmenu(trigger: HTMLElement): void {
+    if (trigger.dataset.state === "open") return;
+    const id = trigger.getAttribute("aria-controls");
+    const content = id ? trigger.ownerDocument.getElementById(id) : null;
+    if (!content) return;
+    Object.defineProperty(content, "getBoundingClientRect", {
+        configurable: true,
+        value: () => undefined
+    });
+    queueMicrotask(() => Reflect.deleteProperty(content, "getBoundingClientRect"));
+}
 
 export const ContextMenuSubContent = forwardRef<
     ElementRef<typeof RadixMenu.SubContent>,
