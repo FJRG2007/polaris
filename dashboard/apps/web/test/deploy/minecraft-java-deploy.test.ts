@@ -58,6 +58,11 @@ const { app, refs, updateApp, findUniqueDeployment, deployed } = vi.hoisted(() =
     deployed: [] as Array<{ build: Record<string, unknown>; env: Record<string, string> }>
 }));
 
+// Whether a deploy closes a host port is its own suite (direct-port.test.ts).
+vi.mock("@/lib/deploy/direct-port", () => ({
+    closingInFlight: async () => false,
+    mustCloseDirectPort: async () => false
+}));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_DATA_DIR: dataDir }) }));
 vi.mock("@polaris/db", () => ({
     prisma: {
