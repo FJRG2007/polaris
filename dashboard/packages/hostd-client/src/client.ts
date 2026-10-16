@@ -11,7 +11,7 @@
  */
 
 import { loadEnv } from "@polaris/config";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import type { HostdHealth } from "@polaris/config";
 import { connect as netConnect, type Socket } from "node:net";
 import { request as httpRequest, type IncomingMessage, type RequestOptions } from "node:http";
@@ -95,6 +95,19 @@ export class HostdClient {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * Whether this Polaris has a daemon at all: a TCP address, or the token file
+     * the daemon writes when it starts. False is the limited edition; true with a
+     * null `health()` is a daemon that is down for now.
+     */
+    public async configured(): Promise<boolean> {
+        if (this.tcpUrl) return true;
+        return access(this.tokenFile).then(
+            () => true,
+            () => false
+        );
     }
 
     /** Request a native mount. Throws if the daemon rejects or is unreachable. */

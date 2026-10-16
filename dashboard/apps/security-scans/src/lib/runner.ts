@@ -95,13 +95,13 @@ export async function runOneShot(
 
 /**
  * The local daemon, or a failure the screen can put in words when this Polaris
- * runs without one (the limited edition) - rather than a connection error that
- * reads as the scan having broken.
+ * runs without one (the limited edition) or when it is down for now - rather
+ * than a connection error that reads as the scan having broken.
  */
 async function localDaemon(): Promise<HostdClient> {
     const client = new HostdClient();
-    if (!(await client.health())) throw new ScanFailure("noDaemon");
-    return client;
+    if (await client.health()) return client;
+    throw new ScanFailure((await client.configured()) ? "lost" : "noDaemon");
 }
 
 /** Run a host action on a server: the local daemon's fixed endpoint, or the
@@ -205,7 +205,10 @@ export async function exportImage(
 
 /** The export volumes on a server; null when it cannot be asked. */
 export async function listExports(target: ScanTarget): Promise<string[] | null> {
-    if (target.kind === "local" || !target.hostId) return new HostdClient().hostImageExports();
+    if (target.kind === "local" || !target.hostId) {
+        const client = new HostdClient();
+        return (await client.configured()) ? client.hostImageExports() : null;
+    }
     return withSsh(target, async (client) => {
         const result = await sshRun(client, quoteArgv(LIST_EXPORTS_ARGV));
         return result.code === 0 ? result.output.split("\n") : null;
