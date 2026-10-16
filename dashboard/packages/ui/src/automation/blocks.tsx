@@ -461,7 +461,9 @@ export function BlockPanel({
                     className="absolute inset-y-0 left-0 z-10"
                 />
                 {heading}
-                <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+                    {children}
+                </div>
             </aside>
         );
 
