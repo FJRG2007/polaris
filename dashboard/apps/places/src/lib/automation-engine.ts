@@ -101,9 +101,83 @@ export interface Observation {
     /** A purifier's figures by measure - the dust, the humidity, the filter
      *  life - each with when it last changed. Absent for anything else. */
     readonly figures?: Readonly<Record<string, Figure>>;
+    /** What each attribute was before its last change, so a change held for a
+     *  while can still be told apart by where it came from. Absent until the
+     *  first change is seen. */
+    readonly before?: Readonly<Partial<Record<auto.AutomationAttribute, string>>>;
+    /** Since when a reading has passed each line a "for" waits on, by reading
+     *  (`READING_KEY` for the device's one reading, else the measure) and then
+     *  by line (`lineKey`) - what tells how long a figure has been past a line
+     *  when it moves on every sync. Only the lines an enabled automation
+     *  watches, and only while the reading passes them. */
+    readonly held?: Readonly<Record<string, Readonly<Record<string, Held>>>>;
     /** Counts every change, so each one has a name of its own even when two
      *  land in the same millisecond - and so the swap has one field to compare. */
     readonly version: number;
+}
+
+/** The key of a device's one reading among `held`, beside the measures' own. */
+export const READING_KEY = "reading";
+
+/** Since when a reading has passed a line, and - when it was seen to cross it -
+ *  the value it came from. */
+export interface Held {
+    readonly since: Date;
+    readonly from?: string;
+}
+
+/** A test on a figure that a "for" waits on: a threshold's side of its line or
+ *  a reading condition's comparison, in the comparison's terms. */
+export interface Line {
+    readonly op: auto.Comparison;
+    readonly value: number;
+    readonly upper?: number;
+}
+
+/** One name for each line, so two automations waiting on the same one share it. */
+export function lineKey(line: Line): string {
+    const ranged = line.op === "between" || line.op === "outside";
+    return `${line.op}:${line.value}${ranged ? `:${line.upper ?? ""}` : ""}`;
+}
+
+/** A threshold's line as a comparison: past it is above or below its value, or
+ *  inside or outside its range. */
+function thresholdLine(threshold: {
+    direction: auto.ThresholdDirection;
+    value: number;
+    upper?: number;
+}): Line {
+    const { direction, value, upper } = threshold;
+    const op = direction === "above" ? "gt" : direction === "below" ? "lt" : direction;
+    return { op, value, upper };
+}
+
+function passesLine(line: Line, value: string): boolean {
+    const figure = numberOf(value);
+    return figure !== null && compare(figure, line.op, line.value, line.upper);
+}
+
+/**
+ * The lines a reading passes after it changed from `before` to `after`, each
+ * with since when: from now when `before` did not pass it - a crossing - and
+ * otherwise from when the run it is part of began.
+ */
+export function heldAfter(
+    previous: Readonly<Record<string, Held>> | undefined,
+    before: Figure,
+    after: string,
+    now: Date,
+    lines: readonly Line[]
+): Record<string, Held> {
+    const next: Record<string, Held> = {};
+    for (const line of lines) {
+        const key = lineKey(line);
+        if (!passesLine(line, after)) continue;
+        next[key] = passesLine(line, before.value)
+            ? (previous?.[key] ?? { since: before.since })
+            : { since: now, from: before.value };
+    }
+    return next;
 }
 
 /** One figure as last seen, and since when. */
@@ -234,7 +308,14 @@ function numberOf(text: string): number | null {
     return Number.isFinite(value) ? value : null;
 }
 
-function compare(value: number, op: auto.Comparison, against: number): boolean {
+/** Whether a figure passes a reading condition's test. Both ends of a range
+ *  are inside it, and a range with no top above its bottom passes nothing. */
+function compare(
+    value: number,
+    op: auto.Comparison,
+    against: number,
+    upper: number | undefined
+): boolean {
     switch (op) {
         case "gt":
             return value > against;
@@ -248,6 +329,12 @@ function compare(value: number, op: auto.Comparison, against: number): boolean {
             return value === against;
         case "ne":
             return value !== against;
+        case "between":
+        case "outside": {
+            if (upper === undefined || !(upper > against)) return false;
+            const inside = value >= against && value <= upper;
+            return op === "between" ? inside : !inside;
+        }
     }
 }
 
@@ -379,6 +466,7 @@ export function createEngine(ports: EnginePorts) {
             return [];
         }
         const changed: Transition[] = [];
+        const moved: { key: string; before: Figure; after: string }[] = [];
         const next = {
             state: previous.state,
             stateSince: previous.stateSince,
@@ -391,6 +479,10 @@ export function createEngine(ports: EnginePorts) {
             filter: previous.filter,
             filterSince: previous.filterSince,
             figures: previous.figures ? { ...previous.figures } : undefined,
+            before: { ...(previous.before ?? {}) } as Partial<
+                Record<auto.AutomationAttribute, string>
+            >,
+            held: { ...(previous.held ?? {}) } as Record<string, Readonly<Record<string, Held>>>,
             version: previous.version + 1
         };
         const version = next.version;
@@ -403,6 +495,7 @@ export function createEngine(ports: EnginePorts) {
                 at: now,
                 version
             });
+            next.before.state = previous.state;
             next.state = state;
             next.stateSince = now;
         }
@@ -415,6 +508,7 @@ export function createEngine(ports: EnginePorts) {
                 at: now,
                 version
             });
+            next.before.door = previous.door;
             next.door = device.door;
             next.doorSince = now;
         }
@@ -426,6 +520,12 @@ export function createEngine(ports: EnginePorts) {
                 to: device.reading,
                 at: now,
                 version
+            });
+            next.before.reading = previous.reading;
+            moved.push({
+                key: READING_KEY,
+                before: { value: previous.reading, since: previous.readingSince },
+                after: device.reading
             });
             next.reading = device.reading;
             next.readingSince = now;
@@ -441,6 +541,7 @@ export function createEngine(ports: EnginePorts) {
                 at: now,
                 version
             });
+            next.before.mode = previous.mode;
             next.mode = device.mode;
             next.modeSince = now;
         }
@@ -452,6 +553,7 @@ export function createEngine(ports: EnginePorts) {
             if (before && before.value === value) continue;
             next.figures = { ...(next.figures ?? {}), [measure]: { value, since: now } };
             if (!before) continue;
+            moved.push({ key: measure, before, after: value });
             changed.push({
                 deviceId: device.id,
                 attribute: "reading",
@@ -473,6 +575,7 @@ export function createEngine(ports: EnginePorts) {
                     version
                 });
             }
+            if (previous.filter) next.before.filter = previous.filter;
             next.filter = device.filter;
             next.filterSince = now;
         }
@@ -485,10 +588,16 @@ export function createEngine(ports: EnginePorts) {
             if (learned) await store.swapObservation(device.id, previous, next);
             return [];
         }
+        const automations = await store.enabledAutomations(installedAppId);
+        const lines = watchedLines(automations, device.id);
+        for (const { key, before, after } of moved) {
+            const held = heldAfter(previous.held?.[key], before, after, now, lines.get(key) ?? []);
+            if (Object.keys(held).length > 0) next.held[key] = held;
+            else delete next.held[key];
+        }
         if (!(await store.swapObservation(device.id, previous, next))) return [];
 
         const depth = (causeContext.getStore()?.depth ?? -1) + 1;
-        const automations = await store.enabledAutomations(installedAppId);
         for (const change of changed) {
             for (const automation of automations) {
                 for (const trigger of automation.definition.triggers) {
@@ -520,6 +629,9 @@ export function createEngine(ports: EnginePorts) {
     }
 
     function matchesChange(trigger: auto.Trigger, change: Transition): boolean {
+        // One that has to last is looked at on the clock, once it has.
+        if ((trigger.kind === "change" || trigger.kind === "threshold") && trigger.forMinutes)
+            return false;
         if (trigger.kind === "change") {
             if (trigger.deviceId !== change.deviceId || trigger.attribute !== change.attribute)
                 return false;
@@ -594,6 +706,60 @@ export function createEngine(ports: EnginePorts) {
                 automation,
                 `interval:${trigger.id}:${trigger.minutes}:${slot}`,
                 { kind: "interval", triggerId: trigger.id, minutes: trigger.minutes, at: iso(at) },
+                0
+            );
+            return;
+        }
+        if (trigger.kind === "change" && trigger.forMinutes) {
+            const seen = await store.observation(trigger.deviceId);
+            // No change seen yet is nothing to have lasted.
+            const before = seen?.before?.[trigger.attribute];
+            if (!seen || before === undefined) return;
+            const value = attributeOf(seen, trigger.attribute);
+            if (trigger.from && !same(trigger.from, before)) return;
+            if (trigger.to && !same(trigger.to, value)) return;
+            const since = sinceOf(seen, trigger.attribute);
+            // A change from before it was switched on is not one it saw.
+            if (since.getTime() < armed) return;
+            if (now.getTime() - since.getTime() < trigger.forMinutes * 60 * 1000) return;
+            await fire(
+                automation,
+                `held:${trigger.id}:${trigger.attribute}:${iso(since)}`,
+                {
+                    kind: "change",
+                    triggerId: trigger.id,
+                    deviceId: trigger.deviceId,
+                    attribute: trigger.attribute,
+                    from: before,
+                    to: value,
+                    minutes: trigger.forMinutes,
+                    at: iso(now)
+                },
+                0
+            );
+            return;
+        }
+        if (trigger.kind === "threshold" && trigger.forMinutes) {
+            const seen = await store.observation(trigger.deviceId);
+            if (!seen) return;
+            const held = heldOf(seen, trigger.measure, thresholdLine(trigger));
+            // Past the line since before anything was seen is no crossing at all.
+            if (!held || held.from === undefined || held.since.getTime() < armed) return;
+            if (now.getTime() - held.since.getTime() < trigger.forMinutes * 60 * 1000) return;
+            await fire(
+                automation,
+                `held:${trigger.id}:${trigger.measure ?? READING_KEY}:${iso(held.since)}`,
+                {
+                    kind: "threshold",
+                    triggerId: trigger.id,
+                    deviceId: trigger.deviceId,
+                    attribute: "reading",
+                    ...(trigger.measure ? { measure: trigger.measure } : {}),
+                    from: held.from,
+                    to: held.value,
+                    minutes: trigger.forMinutes,
+                    at: iso(now)
+                },
                 0
             );
             return;
@@ -961,7 +1127,18 @@ export function createEngine(ports: EnginePorts) {
             const value = numberOf(
                 condition.measure ? (device.figures?.[condition.measure] ?? "") : device.reading
             );
-            return value !== null && compare(value, condition.op, condition.value);
+            const passes =
+                value !== null && compare(value, condition.op, condition.value, condition.upper);
+            if (!passes || !condition.forMinutes) return passes;
+            // Held for long enough: every value since then passed too. A figure
+            // passing since it was first seen counts from then, never before.
+            const seen = await store.observation(condition.deviceId);
+            if (!seen) return false;
+            const held = heldOf(seen, condition.measure, condition);
+            return (
+                held !== null &&
+                now.getTime() - held.since.getTime() >= condition.forMinutes * 60 * 1000
+            );
         }
         const clock = wallClock(now, timeZone);
         if (condition.kind === "weekday") {
@@ -987,6 +1164,55 @@ function sinceOf(seen: Observation, attribute: auto.AutomationAttribute): Date {
     if (attribute === "mode") return seen.modeSince;
     if (attribute === "filter") return seen.filterSince ?? seen.stateSince;
     return seen.stateSince;
+}
+
+/**
+ * Since when a reading has passed a line, counting back from the value it has
+ * now: null when that one does not. A run no change was seen to start - the
+ * line was not watched when it began - counts from the value it has now, never
+ * before, and is no crossing.
+ */
+function heldOf(
+    seen: Observation,
+    measure: auto.ReadingMeasure | undefined,
+    line: Line
+): (Held & { value: string }) | null {
+    const current = measure
+        ? seen.figures?.[measure]
+        : { value: seen.reading, since: seen.readingSince };
+    if (!current || !passesLine(line, current.value)) return null;
+    const held = seen.held?.[measure ?? READING_KEY]?.[lineKey(line)];
+    return { ...(held ?? { since: current.since }), value: current.value };
+}
+
+/** The lines enabled automations wait on with a "for" on one device, by the
+ *  reading they read. */
+function watchedLines(
+    automations: readonly AutomationRecord[],
+    deviceId: string
+): Map<string, Line[]> {
+    const lines = new Map<string, Line[]>();
+    const add = (measure: auto.ReadingMeasure | undefined, line: Line) => {
+        const key = measure ?? READING_KEY;
+        lines.set(key, [...(lines.get(key) ?? []), line]);
+    };
+    for (const { definition } of automations) {
+        for (const trigger of definition.triggers) {
+            if (trigger.kind === "threshold" && trigger.forMinutes && trigger.deviceId === deviceId)
+                add(trigger.measure, thresholdLine(trigger));
+        }
+        for (const group of definition.conditions.groups) {
+            for (const condition of group.items) {
+                if (
+                    condition.kind === "reading" &&
+                    condition.forMinutes &&
+                    condition.deviceId === deviceId
+                )
+                    add(condition.measure, condition);
+            }
+        }
+    }
+    return lines;
 }
 
 /**

@@ -1845,7 +1845,9 @@
             "lt": "Below",
             "lte": "At most",
             "eq": "Exactly",
-            "ne": "Not"
+            "ne": "Not",
+            "between": "Between",
+            "outside": "Outside"
         },
         "days": "{which, select, every {every day} weekdays {weekdays} weekends {weekends} other {{list}}}",
         "units": {
@@ -1857,11 +1859,11 @@
             "time": "At {time}, {days}",
             "interval": "Every {every}",
             "manual": "Only when run by hand",
-            "threshold": "{device} {direction, select, above {goes above {value}} below {goes below {value}} between {comes into {value} to {upper}} other {leaves {value} to {upper}}}",
-            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}",
+            "threshold": "{device} {direction, select, above {goes above {value}} below {goes below {value}} between {comes into {value} to {upper}} other {leaves {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}",
+            "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}{hasFor, select, yes { for {span}} other {}}",
             "stays": "{device} is {value} for {span}",
             "is": "{device} {negate, select, yes {is not} other {is}} {value}{hasFor, select, yes { for {span}} other {}}",
-            "reading": "{device}: {compare} {value}",
+            "reading": "{device}: {compare} {value}{hasFor, select, yes { for {span}} other {}}",
             "between": "Between {from} and {to}",
             "on": "On {days}",
             "act": "{action}: {device}",
@@ -1871,8 +1873,9 @@
             "run": "Run {name}",
             "set": "Set {device} to {value}",
             "figure": "{measure} of {device}",
-            "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}",
-            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}"
+            "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}{hasFor, select, yes { for {span}} other {}}",
+            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}{hasFor, select, yes { for {span}} other {}}",
+            "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}{hasFor, select, yes { for {span}} other {}}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -1880,7 +1883,8 @@
             "time": "At its time",
             "interval": "On its interval",
             "stays": "{device} was {value} for {span}",
-            "change": "{device} went from {from} to {to}"
+            "change": "{device} went from {from} to {to}",
+            "held": "{device} went from {from} to {to} and stayed so for {span}"
         },
         "status": {
             "queued": "Queued",
@@ -2060,7 +2064,6 @@
             "at": "At",
             "days": "Days",
             "every": "Every",
-            "minutesSuffix": "min",
             "manualHint": "Starts only from Run now, or from another automation.",
             "device": "Device",
             "sensor": "Sensor",
@@ -2100,7 +2103,8 @@
             "units": {
                 "seconds": "Seconds",
                 "minutes": "Minutes",
-                "hours": "Hours"
+                "hours": "Hours",
+                "days": "Days"
             },
             "mode": "Mode",
             "target": "Temperature",
@@ -2161,7 +2165,9 @@
             "lt": "Better than",
             "lte": "This or better",
             "eq": "Exactly",
-            "ne": "Not"
+            "ne": "Not",
+            "between": "Between",
+            "outside": "Outside"
         },
         "blocks": {
             "menu": "More actions",
@@ -2277,6 +2283,42 @@
                     "delay": "Pause before the next step.",
                     "notify": "Send a notification to you.",
                     "run": "Start another automation of this place."
+                }
+            }
+        },
+        "purposes": {
+            "trigger": {
+                "opened": "A door opens",
+                "closed": "A door closes",
+                "locked": "A lock locks",
+                "unlocked": "A lock unlocks",
+                "motion": "Movement is seen",
+                "still": "Movement stops"
+            },
+            "condition": {
+                "open": "A door is open",
+                "shut": "A door is closed",
+                "isLocked": "A lock is locked",
+                "isUnlocked": "A lock is unlocked",
+                "moving": "There is movement",
+                "quiet": "All is still"
+            },
+            "about": {
+                "trigger": {
+                    "opened": "When a door or window sensor reads open.",
+                    "closed": "When a door or window sensor reads closed.",
+                    "locked": "When a lock reports it is locked.",
+                    "unlocked": "When a lock reports it is unlocked.",
+                    "motion": "When a motion sensor sees movement.",
+                    "still": "When a motion sensor stops seeing it."
+                },
+                "condition": {
+                    "open": "Only while a door or window is open.",
+                    "shut": "Only while a door or window is closed.",
+                    "isLocked": "Only while a lock is locked.",
+                    "isUnlocked": "Only while a lock is unlocked.",
+                    "moving": "Only while a motion sensor sees movement.",
+                    "quiet": "Only while a motion sensor sees nothing."
                 }
             }
         }

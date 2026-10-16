@@ -909,6 +909,61 @@ describe("ranges and held conditions", () => {
         ]);
     });
 
+    it("takes a reading condition over a range, and refuses one without its top", () => {
+        const reading = (extra: object) =>
+            messages(
+                input({
+                    conditions: {
+                        match: "all",
+                        groups: [
+                            {
+                                id: "group1",
+                                match: "all",
+                                items: [
+                                    {
+                                        id: "cond01",
+                                        kind: "reading",
+                                        deviceId: "temp",
+                                        value: 18,
+                                        ...extra
+                                    } as auto.Condition
+                                ]
+                            }
+                        ]
+                    }
+                })
+            );
+        expect(reading({ op: "between", upper: 24 })).toEqual([]);
+        expect(reading({ op: "outside" })).toEqual(["automations.errors.upper"]);
+        expect(reading({ op: "between", upper: 18 })).toEqual(["automations.errors.upperBelow"]);
+        // A line keeps whatever top it was once given, and never reads it.
+        expect(reading({ op: "gt", upper: 2 })).toEqual([]);
+    });
+
+    it("takes a change and a crossing that have to last, in whole minutes", () => {
+        const held = (trigger: object) => messages(input({ triggers: [trigger as auto.Trigger] }));
+        const change = {
+            id: "trig01",
+            kind: "change",
+            deviceId: "lock",
+            attribute: "state",
+            from: "",
+            to: "unlocked"
+        };
+        expect(held({ ...change, forMinutes: 10 })).toEqual([]);
+        expect(held({ ...change, forMinutes: 0 }).length).toBeGreaterThan(0);
+        expect(
+            held({
+                id: "trig01",
+                kind: "threshold",
+                deviceId: "temp",
+                direction: "above",
+                value: 25,
+                forMinutes: 5
+            })
+        ).toEqual([]);
+    });
+
     it("takes a held condition in whole minutes", () => {
         const held = (forMinutes: number) =>
             messages(

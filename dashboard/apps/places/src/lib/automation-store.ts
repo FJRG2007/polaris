@@ -18,6 +18,7 @@ import type {
     AutomationRecord,
     AutomationStore,
     Figure,
+    Held,
     Observation,
     RunRecord
 } from "./automation-engine";
@@ -28,16 +29,68 @@ const FILTER_KEY = "@filter";
 
 const storedFigure = z.object({ value: z.string().max(200), since: z.string().datetime() });
 
-/** The figures column, read back: each figure with when it changed, and the
- *  filter's state among them. Anything unreadable is left out. */
+/** Where the values before each attribute's last change are kept, and since
+ *  when each reading has passed the lines a "for" waits on. Not measure names
+ *  either. */
+const BEFORE_KEY = "@before";
+const HELD_KEY = "@held";
+
+const storedHeld = z.object({
+    since: z.string().datetime(),
+    from: z.string().max(200).optional()
+});
+
+/** The entries of a stored object that `schema` reads, each on its own: one
+ *  that does not is left out without taking the rest with it. */
+function entriesOf<T>(
+    value: unknown,
+    schema: z.ZodType<T>,
+    key: z.ZodType<string> = z.string().max(40)
+) {
+    const parsed = z.record(z.string(), z.unknown()).safeParse(value);
+    if (!parsed.success) return [];
+    return Object.entries(parsed.data).flatMap(([name, entry]): [string, T][] => {
+        const read = schema.safeParse(entry);
+        return key.safeParse(name).success && read.success ? [[name, read.data]] : [];
+    });
+}
+
+/** The figures column, read back: each figure with when it changed, the
+ *  filter's state, what each attribute was before, and the readings' held
+ *  lines. Anything unreadable is left out, so a row written before any of these
+ *  reads as one that has none yet. */
 function figuresOf(
     stored: Prisma.JsonValue
-): Pick<Observation, "figures" | "filter" | "filterSince"> {
+): Pick<Observation, "figures" | "filter" | "filterSince" | "before" | "held"> {
     const parsed = z.record(z.string(), z.unknown()).safeParse(stored);
     if (!parsed.success) return {};
     const figures: Record<string, Figure> = {};
     let filter: Figure | undefined;
+    let before: Observation["before"];
+    let held: Record<string, Record<string, Held>> | undefined;
     for (const [key, value] of Object.entries(parsed.data)) {
+        if (key === BEFORE_KEY) {
+            before = Object.fromEntries(
+                entriesOf(value, z.string().max(200), z.enum(auto.AUTOMATION_ATTRIBUTES))
+            );
+            continue;
+        }
+        if (key === HELD_KEY) {
+            held = {};
+            for (const [reading, lines] of entriesOf(value, z.unknown())) {
+                const kept = entriesOf(lines, storedHeld, z.string().max(80)).map(
+                    ([line, mark]): [string, Held] => [
+                        line,
+                        {
+                            since: new Date(mark.since),
+                            ...(mark.from !== undefined ? { from: mark.from } : {})
+                        }
+                    ]
+                );
+                if (kept.length > 0) held[reading] = Object.fromEntries(kept);
+            }
+            continue;
+        }
         const read = storedFigure.safeParse(value);
         if (!read.success) continue;
         const figure = { value: read.data.value, since: new Date(read.data.since) };
@@ -46,19 +99,38 @@ function figuresOf(
     }
     return {
         ...(Object.keys(figures).length > 0 ? { figures } : {}),
-        ...(filter ? { filter: filter.value, filterSince: filter.since } : {})
+        ...(filter ? { filter: filter.value, filterSince: filter.since } : {}),
+        ...(before && Object.keys(before).length > 0 ? { before } : {}),
+        ...(held && Object.keys(held).length > 0 ? { held } : {})
     };
 }
 
 /** An observation as the row takes it: its figures folded into one column. */
 function rowOf(observation: Observation) {
-    const { figures, filter, filterSince, ...rest } = observation;
-    const stored: Record<string, { value: string; since: string }> = {};
+    const { figures, filter, filterSince, before, held, ...rest } = observation;
+    const stored: Record<string, unknown> = {};
     for (const [key, figure] of Object.entries(figures ?? {})) {
         stored[key] = { value: figure.value, since: figure.since.toISOString() };
     }
     if (filter)
         stored[FILTER_KEY] = { value: filter, since: (filterSince ?? new Date()).toISOString() };
+    if (before && Object.keys(before).length > 0) stored[BEFORE_KEY] = before;
+    if (held && Object.keys(held).length > 0) {
+        stored[HELD_KEY] = Object.fromEntries(
+            Object.entries(held).map(([reading, lines]) => [
+                reading,
+                Object.fromEntries(
+                    Object.entries(lines).map(([line, mark]) => [
+                        line,
+                        {
+                            since: mark.since.toISOString(),
+                            ...(mark.from !== undefined ? { from: mark.from } : {})
+                        }
+                    ])
+                )
+            ])
+        );
+    }
     return { ...rest, figures: stored as Prisma.InputJsonValue };
 }
 

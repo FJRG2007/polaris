@@ -38,6 +38,7 @@ import * as actions from "./actions";
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
 import * as auto from "../../lib/automation-kinds";
+import * as purposes from "../../lib/automation-purposes";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
@@ -121,11 +122,31 @@ export function withOwnText<B extends Block>(
 
 /** A block made from the add dialog, pointed at the device chosen on "By target". */
 export function triggerFor(kind: string, target?: DeviceView): auto.Trigger {
+    const purpose = kind.startsWith(purposes.PURPOSE_PREFIX)
+        ? kind.slice(purposes.PURPOSE_PREFIX.length)
+        : null;
+    if (purpose !== null) {
+        const made =
+            target && purposes.isTriggerPurpose(purpose)
+                ? purposes.purposeTrigger(purpose, target)
+                : null;
+        return made ?? auto.blankTrigger("change");
+    }
     const blank = auto.blankTrigger(kind as auto.TriggerKind);
     return target ? auto.triggerOn(blank, target) : blank;
 }
 
 export function conditionFor(kind: string, target?: DeviceView): auto.Condition {
+    const purpose = kind.startsWith(purposes.PURPOSE_PREFIX)
+        ? kind.slice(purposes.PURPOSE_PREFIX.length)
+        : null;
+    if (purpose !== null) {
+        const made =
+            target && purposes.isConditionPurpose(purpose)
+                ? purposes.purposeCondition(purpose, target)
+                : null;
+        return made ?? auto.blankCondition("device");
+    }
     const blank = auto.blankCondition(kind as auto.ConditionKind);
     return target ? auto.conditionOn(blank, target) : blank;
 }
@@ -1341,14 +1362,12 @@ function TriggerCard({
                 </>
             )}
             {trigger.kind === "interval" && (
-                <fields.NumberField
+                <fields.DurationField
                     label={t("automations.fields.every")}
                     path={path}
                     field="minutes"
+                    stored="minutes"
                     value={trigger.minutes}
-                    min={1}
-                    step={1}
-                    suffix={t("automations.fields.minutesSuffix")}
                     disabled={disabled}
                     onChange={(minutes) => onChange({ ...trigger, minutes })}
                 />
@@ -1446,6 +1465,7 @@ function TriggerCard({
                                 })}
                             </p>
                         )}
+                    <HeldFor node={trigger} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
             {trigger.kind === "stays" && (
@@ -1460,14 +1480,12 @@ function TriggerCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...trigger, is })}
                     />
-                    <fields.NumberField
+                    <fields.DurationField
                         label={t("automations.fields.for")}
                         path={path}
                         field="minutes"
+                        stored="minutes"
                         value={trigger.minutes}
-                        min={1}
-                        step={1}
-                        suffix={t("automations.fields.minutesSuffix")}
                         disabled={disabled}
                         onChange={(minutes) => onChange({ ...trigger, minutes })}
                     />
@@ -1569,6 +1587,7 @@ function TriggerCard({
                             onChange={(upper) => onChange({ ...trigger, upper })}
                         />
                     )}
+                    <HeldFor node={trigger} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
         </flow.NodeCard>
@@ -1790,23 +1809,7 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...condition, is })}
                     />
-                    <fields.NumberField
-                        label={t("automations.fields.forMinutes")}
-                        path={path}
-                        field="forMinutes"
-                        value={condition.forMinutes ?? Number.NaN}
-                        min={1}
-                        step={1}
-                        suffix={t("automations.fields.minutesSuffix")}
-                        disabled={disabled}
-                        onChange={(minutes) => {
-                            const { forMinutes: _was, ...rest } = condition;
-                            // Empty is "as soon as it is so", which is no duration at all.
-                            onChange(
-                                Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes }
-                            );
-                        }}
-                    />
+                    <HeldFor node={condition} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
             {condition.kind === "reading" && (
@@ -1856,9 +1859,17 @@ function ConditionCard({
                                     value: op,
                                     label: words.comparisonText(op, t, condition.measure)
                                 }))}
-                                onValueChange={(op) =>
-                                    onChange({ ...condition, op: op as auto.Comparison })
-                                }
+                                onValueChange={(next) => {
+                                    const op = next as auto.Comparison;
+                                    // A line has no top: one left over from a range
+                                    // would be saved and never read.
+                                    const { upper, ...rest } = condition;
+                                    onChange(
+                                        auto.isRangeTest(op)
+                                            ? { ...rest, op, upper: upper ?? Number.NaN }
+                                            : { ...rest, op }
+                                    );
+                                }}
                             />
                         )}
                     </flow.Field>
@@ -1871,6 +1882,19 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(value) => onChange({ ...condition, value })}
                     />
+                    {auto.isRangeTest(condition.op) && (
+                        <fields.FigureField
+                            measure={condition.measure}
+                            label={t("automations.fields.upper")}
+                            path={path}
+                            field="upper"
+                            value={condition.upper ?? Number.NaN}
+                            suffix={fields.measureSuffix(condition.measure, device?.reading?.unit)}
+                            disabled={disabled}
+                            onChange={(upper) => onChange({ ...condition, upper })}
+                        />
+                    )}
+                    <HeldFor node={condition} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
             {condition.kind === "time" && (
@@ -2019,7 +2043,7 @@ function StepCard({
                     label={t("automations.fields.wait")}
                     path={path}
                     field="seconds"
-                    seconds={step.seconds}
+                    value={step.seconds}
                     disabled={disabled}
                     onChange={(seconds) => onChange({ ...step, seconds })}
                 />
@@ -2054,14 +2078,12 @@ function StepCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...step, is })}
                     />
-                    <fields.NumberField
+                    <fields.DurationField
                         label={t("automations.fields.giveUp")}
                         path={path}
                         field="timeoutMinutes"
+                        stored="minutes"
                         value={step.timeoutMinutes}
-                        min={1}
-                        step={1}
-                        suffix={t("automations.fields.minutesSuffix")}
                         disabled={disabled}
                         onChange={(timeoutMinutes) => onChange({ ...step, timeoutMinutes })}
                     />
@@ -2143,5 +2165,36 @@ function StepCard({
                 </flow.Field>
             )}
         </flow.NodeCard>
+    );
+}
+
+/** The optional "for at least" a block can carry: emptied, the block has none
+ *  and happens - or passes - the moment it is so. */
+function HeldFor<T extends { forMinutes?: number }>({
+    node,
+    path,
+    disabled,
+    onChange
+}: {
+    node: T;
+    path: readonly (string | number)[];
+    disabled: boolean;
+    onChange: (node: T) => void;
+}) {
+    const t = usePlacesT();
+    return (
+        <fields.DurationField
+            label={t("automations.fields.forMinutes")}
+            path={path}
+            field="forMinutes"
+            stored="minutes"
+            required={false}
+            value={node.forMinutes ?? Number.NaN}
+            disabled={disabled}
+            onChange={(minutes) => {
+                const { forMinutes: _was, ...rest } = node;
+                onChange((Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes }) as T);
+            }}
+        />
     );
 }

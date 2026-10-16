@@ -252,10 +252,12 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor, conditionFor, stepFor, triggerFor } =
-    await import("@polaris-app/places/src/screens/automations/automation-editor");
-const { AutomationsView } =
-    await import("@polaris-app/places/src/screens/automations/automations-view");
+const { AutomationEditor, conditionFor, stepFor, triggerFor } = await import(
+    "@polaris-app/places/src/screens/automations/automation-editor"
+);
+const { AutomationsView } = await import(
+    "@polaris-app/places/src/screens/automations/automations-view"
+);
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -669,6 +671,66 @@ describe("what a block watches on a device", () => {
             { id: "cond01", kind: "reading", deviceId: "ac", op: "gt", value: 26 }
         ]);
     });
+
+    it("tests a reading over a range, with its top", async () => {
+        render(editor());
+        await painted();
+        openRow("If");
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Its temperature" }));
+        await painted();
+        fireEvent.click(screen.getByRole("combobox", { name: /^Compare/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Between" }));
+        await painted();
+        fireEvent.change(screen.getByLabelText(/^Value/), { target: { value: "20" } });
+        fireEvent.change(screen.getByLabelText(/^Up to/), { target: { value: "24" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as {
+            definition: { conditions: { groups: { items: unknown[] }[] } };
+        };
+        expect(input.definition.conditions.groups[0]!.items).toEqual([
+            {
+                id: "cond01",
+                kind: "reading",
+                deviceId: "ac",
+                op: "between",
+                value: 20,
+                upper: 24
+            }
+        ]);
+    });
+
+    it("makes a change wait until it has lasted, and drops the wait when emptied", async () => {
+        render(editor());
+        await painted();
+        openRow("When");
+        fireEvent.change(screen.getByLabelText(/^For at least/), { target: { value: "15" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const first = saved[0] as { definition: { triggers: { forMinutes?: number }[] } };
+        expect(first.definition.triggers[0]!.forMinutes).toBe(15);
+        fireEvent.change(screen.getByLabelText(/^For at least/), { target: { value: "" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const second = saved[1] as { definition: { triggers: object[] } };
+        expect(second.definition.triggers[0]).not.toHaveProperty("forMinutes");
+    });
+
+    it("keeps a held-for span typed in hours as whole minutes", async () => {
+        render(editor());
+        await painted();
+        openRow("If");
+        fireEvent.click(screen.getByRole("combobox", { name: "Unit" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Hours" }));
+        fireEvent.change(screen.getByLabelText(/^For at least/), { target: { value: "1.5" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as {
+            definition: { conditions: { groups: { items: { forMinutes?: number }[] }[] } };
+        };
+        expect(input.definition.conditions.groups[0]!.items[0]!.forMinutes).toBe(90);
+    });
 });
 
 describe("the block editor", () => {
@@ -1048,6 +1110,31 @@ describe("the add dialog", () => {
         await painted();
         expect(screen.queryByRole("dialog", { name: "Add a trigger" })).toBeNull();
         expect(rowsIn("When")[0]!.textContent).toContain("Fixture plug");
+    });
+
+    it("offers what a lock is for, and adds it already pointed at the lock", async () => {
+        render(editor());
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.change(within(dialog).getByRole("searchbox"), {
+            target: { value: "fixture door" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: /^Fixture door/ }));
+        expect(within(dialog).queryByRole("button", { name: /^Movement is seen/ })).toBeNull();
+        fireEvent.click(within(dialog).getByRole("button", { name: /^A door opens/ }));
+        await painted();
+        expect(rowsIn("When")[0]!.textContent).toContain("Fixture door");
+        expect(
+            triggerFor(
+                "purpose:unlocked",
+                DEVICES.find((each) => each.id === "door")
+            )
+        ).toMatchObject({
+            kind: "change",
+            attribute: "state",
+            to: "unlocked"
+        });
     });
 
     it("searches every kind, whatever the case, and says when nothing matches", async () => {

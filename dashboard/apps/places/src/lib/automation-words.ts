@@ -169,7 +169,9 @@ const COMPARISON_KEYS: Readonly<Record<auto.Comparison, PlacesKey>> = {
     lt: "automations.compare.lt",
     lte: "automations.compare.lte",
     eq: "automations.compare.eq",
-    ne: "automations.compare.ne"
+    ne: "automations.compare.ne",
+    between: "automations.compare.between",
+    outside: "automations.compare.outside"
 };
 
 export function comparisonText(
@@ -180,6 +182,13 @@ export function comparisonText(
     // Air quality is a rank where more is worse, so its comparisons are said in
     // those words: "Worse than Moderate", not "Above 3".
     return measure === "quality" ? t(`automations.qualityCompare.${op}`) : t(COMPARISON_KEYS[op]);
+}
+
+/** The "for" a block may carry, as its sentence takes it. */
+function heldFor(forMinutes: number | undefined, t: PlacesTranslator) {
+    return forMinutes
+        ? { hasFor: "yes", span: durationText(forMinutes * 60, t) }
+        : { hasFor: "no", span: "" };
 }
 
 /** A figure's value as a person reads it: the number, or for air quality the
@@ -233,7 +242,8 @@ export function describeTrigger(
                     upper:
                         trigger.upper === undefined
                             ? ""
-                            : figureValueText(trigger.measure, trigger.upper, t)
+                            : figureValueText(trigger.measure, trigger.upper, t),
+                    ...heldFor(trigger.forMinutes, t)
                 }
             );
         }
@@ -245,7 +255,8 @@ export function describeTrigger(
                 from: valueText(trigger.attribute, device.kind, trigger.from, t),
                 to: valueText(trigger.attribute, device.kind, trigger.to, t),
                 hasFrom: trigger.from ? "yes" : "no",
-                hasTo: trigger.to ? "yes" : "no"
+                hasTo: trigger.to ? "yes" : "no",
+                ...heldFor(trigger.forMinutes, t)
             });
         }
         case "stays": {
@@ -277,17 +288,34 @@ export function describeCondition(
         }
         case "reading": {
             const device = deviceName(lookup, condition.deviceId, t);
+            const figure = figureOf(device.name, condition.measure, t);
+            const value = figureValueText(condition.measure, condition.value, t);
+            const held = heldFor(condition.forMinutes, t);
+            if (auto.isRangeTest(condition.op)) {
+                return t("automations.say.readingRange", {
+                    device: figure,
+                    op: condition.op,
+                    value,
+                    upper:
+                        condition.upper === undefined
+                            ? "?"
+                            : figureValueText(condition.measure, condition.upper, t),
+                    ...held
+                });
+            }
             if (condition.measure === "quality") {
                 return t("automations.say.qualityReading", {
-                    device: figureOf(device.name, condition.measure, t),
+                    device: figure,
                     op: condition.op,
-                    value: figureValueText(condition.measure, condition.value, t)
+                    value,
+                    ...held
                 });
             }
             return t("automations.say.reading", {
-                device: figureOf(device.name, condition.measure, t),
+                device: figure,
                 compare: comparisonText(condition.op, t),
-                value: figureValueText(condition.measure, condition.value, t)
+                value,
+                ...held
             });
         }
         case "time":
@@ -361,11 +389,15 @@ export function describeCause(
         cause.measure === "quality" && value
             ? figureValueText("quality", Number(value), t)
             : valueText(attribute, device.kind, value ?? "", t);
-    return t("automations.cause.change", {
+    const said = {
         device: figureOf(device.name, cause.measure, t),
         from: figure(cause.from),
         to: figure(cause.to)
-    });
+    };
+    // A change or a crossing that had to last says for how long it did.
+    return cause.minutes
+        ? t("automations.cause.held", { ...said, span: durationText(cause.minutes * 60, t) })
+        : t("automations.cause.change", said);
 }
 
 export function runStatusText(status: auto.RunStatus, t: PlacesTranslator): string {

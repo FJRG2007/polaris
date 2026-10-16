@@ -556,6 +556,293 @@ describe("a reading crossing a line", () => {
     });
 });
 
+describe("a change or a crossing that has to last", () => {
+    const sensor = (reading: string) => readout("temp", "sensor", "unknown", { reading });
+
+    it("fires a change only once it has lasted, and only for the change it names", async () => {
+        automation("held", {
+            triggers: [
+                {
+                    id: "trigheld",
+                    kind: "change",
+                    deviceId: "door",
+                    attribute: "state",
+                    from: "locked",
+                    to: "unlocked",
+                    forMinutes: 10
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "left open" }]
+        });
+        await reads(readout("door", "lock", "locked"));
+        later(MINUTE);
+        await reads(readout("door", "lock", "unlocked"));
+        // Not the moment it happens.
+        expect(store.runsOf("held")).toHaveLength(0);
+        later(9 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("held")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await engine.drain();
+        expect(notified).toEqual(["left open"]);
+        expect(store.runsOf("held")[0]?.cause).toMatchObject({
+            kind: "change",
+            from: "locked",
+            to: "unlocked",
+            minutes: 10
+        });
+    });
+
+    it("does not fire a change that was undone in time, or that came from elsewhere", async () => {
+        automation("held", {
+            triggers: [
+                {
+                    id: "trigheld",
+                    kind: "change",
+                    deviceId: "door",
+                    attribute: "state",
+                    from: "locked",
+                    to: "unlocked",
+                    forMinutes: 10
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "left open" }]
+        });
+        // Already unlocked when first seen: no change was seen at all.
+        await reads(readout("door", "lock", "unlocked"));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await reads(readout("door", "lock", "locked"));
+        later(MINUTE);
+        await reads(readout("door", "lock", "unlocked"));
+        later(5 * MINUTE);
+        await reads(readout("door", "lock", "locked"));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("held")).toHaveLength(0);
+    });
+
+    it("fires a crossing that stayed over the line while the figure kept moving", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("24"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        for (const next of ["27", "26.5", "28"]) {
+            later(MINUTE);
+            await reads(sensor(next));
+            await engine.evaluateSchedules(INSTALL);
+        }
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(2 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause).toMatchObject({ from: "24", to: "28", minutes: 5 });
+    });
+
+    it("starts the wait again when the figure dips back under", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("24"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        later(4 * MINUTE);
+        await reads(sensor("25"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        later(4 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+    });
+
+    it("never fires for a figure past the line since it was first seen", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("30"));
+        later(MINUTE);
+        await reads(sensor("31"));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+    });
+
+    it("holds a reading condition only once every value for that long passed", async () => {
+        automation("muggy", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp",
+                                op: "gt",
+                                value: 25,
+                                forMinutes: 10
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "went" }]
+        });
+        const press = async (name: string) => {
+            await engine.runNow(store.automations.get("muggy")!, "Fixture person", name);
+            await engine.drain();
+        };
+        await reads(sensor("20"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        later(5 * MINUTE);
+        await reads(sensor("27"));
+        later(4 * MINUTE);
+        await press("press-1");
+        expect(notified).toEqual([]);
+        later(MINUTE);
+        await press("press-2");
+        expect(notified).toEqual(["went"]);
+    });
+
+    it("fires a crossing held for hours while the figure moved every minute", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 120
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("24"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        for (let index = 1; index < 120; index += 1) {
+            later(MINUTE);
+            await reads(sensor(index % 2 ? "27" : "26"));
+            await engine.evaluateSchedules(INSTALL);
+        }
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause).toMatchObject({ from: "24", minutes: 120 });
+    });
+
+    it("holds a reading condition for hours while the figure moved every minute", async () => {
+        automation("muggy", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp",
+                                op: "gt",
+                                value: 25,
+                                forMinutes: 180
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "went" }]
+        });
+        await reads(sensor("20"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        for (let index = 1; index <= 180; index += 1) {
+            later(MINUTE);
+            await reads(sensor(index % 2 ? "27" : "26"));
+        }
+        await engine.runNow(store.automations.get("muggy")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(notified).toEqual(["went"]);
+    });
+
+    it("keeps only the lines an automation waits on, and only while they pass", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("24"));
+        for (let index = 0; index < 150; index += 1) {
+            later(MINUTE);
+            await reads(sensor(String(26 + (index % 3))));
+        }
+        expect(store.observations.get("temp")?.held).toEqual({
+            reading: { "gt:25": { since: expect.any(Date), from: "24" } }
+        });
+        later(MINUTE);
+        await reads(sensor("20"));
+        expect(store.observations.get("temp")?.held).toEqual({});
+        await reads(readout("other", "sensor", "unknown", { reading: "30" }));
+        later(MINUTE);
+        await reads(readout("other", "sensor", "unknown", { reading: "31" }));
+        expect(store.observations.get("other")?.held).toEqual({});
+    });
+});
+
 describe("a reading coming into or leaving a range", () => {
     function ranged(direction: "between" | "outside") {
         automation("range", {
@@ -685,6 +972,56 @@ describe("conditions", () => {
         await engine.runNow(store.automations.get("guarded")!, "Fixture person", "press-1");
         await engine.drain();
         expect(notified).toEqual(["went"]);
+    });
+});
+
+describe("a reading condition over a range", () => {
+    function within(op: "between" | "outside") {
+        automation("ranged", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp",
+                                op,
+                                value: 18,
+                                upper: 24
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "went" }]
+        });
+    }
+
+    async function pressAt(reading: string, press: string) {
+        devices.set("temp", readout("temp", "sensor", "unknown", { reading }));
+        await engine.runNow(store.automations.get("ranged")!, "Fixture person", press);
+        await engine.drain();
+    }
+
+    it("passes inside the range, both ends included", async () => {
+        within("between");
+        await pressAt("18 C", "press-1");
+        await pressAt("24 C", "press-2");
+        await pressAt("17.9 C", "press-3");
+        await pressAt("30 C", "press-4");
+        expect(notified).toEqual(["went", "went"]);
+    });
+
+    it("passes outside the range only", async () => {
+        within("outside");
+        await pressAt("21 C", "press-1");
+        await pressAt("12 C", "press-2");
+        await pressAt("25 C", "press-3");
+        expect(notified).toEqual(["went", "went"]);
     });
 });
 

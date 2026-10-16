@@ -500,54 +500,86 @@ export function ClockField({
     );
 }
 
-type Unit = "seconds" | "minutes" | "hours";
-const UNIT_SECONDS: Readonly<Record<Unit, number>> = { seconds: 1, minutes: 60, hours: 3600 };
+type Unit = "seconds" | "minutes" | "hours" | "days";
+const UNIT_SECONDS: Readonly<Record<Unit, number>> = {
+    seconds: 1,
+    minutes: 60,
+    hours: 3600,
+    days: 86400
+};
 
-function unitOf(seconds: number): Unit {
-    if (Number.isFinite(seconds) && seconds > 0 && seconds % 3600 === 0) return "hours";
-    if (Number.isFinite(seconds) && seconds > 0 && seconds % 60 === 0) return "minutes";
-    return Number.isFinite(seconds) ? "seconds" : "minutes";
+/** The units a span is offered in, by what it is stored as: a span kept in
+ *  whole minutes has no seconds to offer. */
+const UNITS: Readonly<Record<"seconds" | "minutes", readonly Unit[]>> = {
+    seconds: ["seconds", "minutes", "hours"],
+    minutes: ["minutes", "hours", "days"]
+};
+
+function unitOf(seconds: number, offered: readonly Unit[]): Unit {
+    const fits = [...offered]
+        .reverse()
+        .find(
+            (unit) => Number.isFinite(seconds) && seconds > 0 && seconds % UNIT_SECONDS[unit] === 0
+        );
+    return fits ?? offered[0]!;
 }
 
-/** A span of time as an amount and a unit, stored as seconds. The unit is the
- *  field's own: switching it keeps the amount and changes what it means, which
- *  is what somebody switching "5 minutes" to "hours" wants. */
+/**
+ * A span of time as an amount and a unit - every "for", "every", "wait" and
+ * "give up after" in the editor is this one field. `stored` is what the block
+ * keeps it as (seconds for a delay, whole minutes for the rest), and `value` and
+ * `onChange` speak that unit. The unit picked is the field's own: switching it
+ * keeps the amount and changes what it means, which is what somebody switching
+ * "5 minutes" to "hours" wants. An optional span emptied is no span (NaN out),
+ * never zero.
+ */
 export function DurationField({
     label,
     path,
     field,
-    seconds,
+    value,
     onChange,
+    stored = "seconds",
+    required = true,
     disabled
 }: {
     label: string;
     path: readonly (string | number)[];
     field: string;
-    seconds: number;
-    onChange: (seconds: number) => void;
+    value: number;
+    onChange: (value: number) => void;
+    stored?: "seconds" | "minutes";
+    required?: boolean;
     disabled?: boolean;
 }) {
     const t = usePlacesT();
-    const [unit, setUnit] = useState<Unit>(() => unitOf(seconds));
+    const offered = UNITS[stored];
+    const scale = UNIT_SECONDS[stored];
+    const seconds = value * scale;
+    const [unit, setUnit] = useState<Unit>(() => unitOf(seconds, offered));
     const amount = Number.isFinite(seconds) ? seconds / UNIT_SECONDS[unit] : Number.NaN;
+    const emit = (next: number, chosen: Unit) =>
+        onChange(
+            Number.isFinite(next) ? Math.round((next * UNIT_SECONDS[chosen]) / scale) : Number.NaN
+        );
     return (
-        <Field label={label} path={[...path, field]} required>
+        <Field label={label} path={[...path, field]} required={required}>
             {(id, invalid) => (
                 <div className="flex items-center gap-2">
                     <Input
                         id={id}
                         type="number"
-                        inputMode="numeric"
-                        min={1}
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
                         disabled={disabled}
                         className="min-w-0 flex-1"
                         value={Number.isFinite(amount) ? String(amount) : ""}
                         aria-invalid={invalid || undefined}
                         onChange={(event) =>
-                            onChange(
-                                event.target.value === ""
-                                    ? Number.NaN
-                                    : Math.round(Number(event.target.value) * UNIT_SECONDS[unit])
+                            emit(
+                                event.target.value === "" ? Number.NaN : Number(event.target.value),
+                                unit
                             )
                         }
                     />
@@ -556,15 +588,14 @@ export function DurationField({
                         disabled={disabled}
                         className="w-28 shrink-0"
                         aria-label={t("automations.fields.unit")}
-                        options={(["seconds", "minutes", "hours"] as const).map((entry) => ({
+                        options={offered.map((entry) => ({
                             value: entry,
                             label: t(`automations.fields.units.${entry}`)
                         }))}
                         onValueChange={(next) => {
                             const chosen = next as Unit;
                             setUnit(chosen);
-                            if (Number.isFinite(amount))
-                                onChange(Math.round(amount * UNIT_SECONDS[chosen]));
+                            if (Number.isFinite(amount)) emit(amount, chosen);
                         }}
                     />
                 </div>
