@@ -337,7 +337,13 @@
         "expandAll": "Expand all categories",
         "editCategory": "Edit category",
         "categoryName": "Category name",
-        "deleteCategory": "Delete category"
+        "deleteCategory": "Delete category",
+        "moveTo": "Move to",
+        "moveCategory": "Category",
+        "noCategory": "No category",
+        "moveFirst": "First in category",
+        "moveLast": "Last in category",
+        "moveFailed": "Channel not moved"
     },
     "moderation": {
         "notice": {
@@ -1530,7 +1536,13 @@
         "about": "About"
     },
     "notifyMenu": {
-        "notifications": "Notifications"
+        "notifications": "Notifications",
+        "levels": {
+            "inherit": "Follow the server",
+            "all": "Every message",
+            "mentions": "Only mentions",
+            "none": "Nothing"
+        }
     },
     "elsewhereLabel": {
         "somewhereElse": "Somewhere else"

@@ -194,6 +194,61 @@ describe("right-clicking a channel", () => {
     });
 });
 
+/** The open menu top to bottom: each item's text, and "|" for a separator. */
+function layout(): string[] {
+    const menu = screen.getAllByRole("menu")[0]!;
+    return Array.from(menu.children).map((node) =>
+        node.getAttribute("role") === "separator" ? "|" : (node.textContent?.trim() ?? "")
+    );
+}
+
+describe("the groups on a channel's menu", () => {
+    it("come in order for an administrator, a line between each", () => {
+        render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        fireEvent.contextMenu(screen.getByText("general"));
+        expect(layout()).toEqual([
+            "Mark as read",
+            "|",
+            "Invite people",
+            "Pin to the top",
+            "Copy link",
+            "Copy ID",
+            "|",
+            "Mute",
+            "Notifications",
+            "|",
+            "Move to",
+            "|",
+            "Edit channel",
+            "Duplicate channel",
+            "Create channel",
+            "|",
+            "Delete channel"
+        ]);
+    });
+
+    it("leave no line at an edge or two together for a member who manages nothing", () => {
+        access = "member";
+        chatState = buildChat();
+        render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        fireEvent.contextMenu(screen.getByText("random"));
+        const drawn = layout();
+        expect(drawn[0]).not.toBe("|");
+        expect(drawn.at(-1)).not.toBe("|");
+        expect(drawn.join(",")).not.toContain("|,|");
+        expect(drawn).toEqual([
+            "Mark as unread",
+            "|",
+            "Pin to the top",
+            "Copy link",
+            "Copy ID",
+            "|",
+            "Mute",
+            "Notifications"
+        ]);
+    });
+});
+
 describe("right-clicking a heading", () => {
     it("marks what is unread under it as read, and offers an administrator its tools", async () => {
         render(<ChatSidebar />, { wrapper: MessagesWrapper });

@@ -20,6 +20,15 @@ import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Bell, Check } from "lucide-react";
 import type { MenuParts } from "./mute-menu";
+import type { NamespaceKey } from "@/lib/i18n/types";
+
+/** Each level's name, in the reader's language. */
+const LEVEL_KEYS: Readonly<Record<core.ChatChannelNotifyLevel, NamespaceKey<"chat">>> = {
+    [core.CHAT_NOTIFY_INHERIT]: "notifyMenu.levels.inherit",
+    all: "notifyMenu.levels.all",
+    mentions: "notifyMenu.levels.mentions",
+    none: "notifyMenu.levels.none"
+};
 
 export function NotifyOptions({
     level,
@@ -61,7 +70,7 @@ export function NotifyOptions({
                         ) : (
                             <span aria-hidden="true" className="size-3.5" />
                         )}
-                        {core.CHAT_NOTIFY_LABEL[option]}
+                        {t(LEVEL_KEYS[option])}
                     </Item>
                 ))}
             </SubContent>
