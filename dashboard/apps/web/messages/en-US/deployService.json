@@ -728,5 +728,17 @@
         "rollbackBodyManual": "{hostname} goes back to {source}. Change the record back at your DNS provider too; the old values are shown next.",
         "rolledBack": "{hostname} is back on {source}.",
         "rolledBackManual": "Change the record back at your DNS provider:"
+    },
+    "gpu": {
+        "title": "GPU",
+        "hint": "Hand this service every NVIDIA card on its server. Saving starts the running release again with them.",
+        "use": "Use the GPU",
+        "noGpu": "Its server has no NVIDIA card Polaris can see. Only NVIDIA cards are supported.",
+        "swarm": "A service on a swarm cluster cannot be given a card.",
+        "cards": "Cards on its server: {list}",
+        "using": "Using {used} of GPU memory.",
+        "notUsing": "Not holding any GPU memory right now.",
+        "saved": "Saved. The service is starting again with the change.",
+        "noConfigure": "You cannot change how this service runs."
     }
 }

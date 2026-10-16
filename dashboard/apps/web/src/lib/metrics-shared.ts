@@ -61,6 +61,16 @@ export interface MetricPoint {
      */
     netRxBytesPerSecond: number | null;
     netTxBytesPerSecond: number | null;
+    /**
+     * The machine's NVIDIA cards: busy on average, memory added up, the hottest
+     * card's temperature and the power they draw together. For a service, only
+     * the memory it holds on them. Absent or null wherever there is no card.
+     */
+    gpuPercent?: number | null;
+    gpuMemUsedBytes?: number | null;
+    gpuMemTotalBytes?: number | null;
+    gpuTempC?: number | null;
+    gpuPowerW?: number | null;
 }
 
 /**
@@ -95,7 +105,11 @@ export function counterAdvance(values: (bigint | null)[]): bigint | null {
  * means the container restarted and began counting again, so the reading itself
  * is what it has moved since - which is the honest floor, and never negative.
  */
-export function counterRate(previous: bigint | null, current: bigint | null, elapsedMs: number): number | null {
+export function counterRate(
+    previous: bigint | null,
+    current: bigint | null,
+    elapsedMs: number
+): number | null {
     if (current == null || previous == null || elapsedMs <= 0) return null;
     const moved = current >= previous ? current - previous : current;
     return Math.round(Number(moved) / (elapsedMs / 1000));

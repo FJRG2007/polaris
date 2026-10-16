@@ -115,7 +115,12 @@ function downsample(points: MetricPoint[], max: number): MetricPoint[] {
             diskTotalBytes: roundInt(avg(slice.map((point) => point.diskTotalBytes))),
             // Already rates by the time they get here, so averaging them is right.
             netRxBytesPerSecond: roundInt(avg(slice.map((point) => point.netRxBytesPerSecond))),
-            netTxBytesPerSecond: roundInt(avg(slice.map((point) => point.netTxBytesPerSecond)))
+            netTxBytesPerSecond: roundInt(avg(slice.map((point) => point.netTxBytesPerSecond))),
+            gpuPercent: round1(avg(slice.map((point) => point.gpuPercent ?? null))),
+            gpuMemUsedBytes: roundInt(avg(slice.map((point) => point.gpuMemUsedBytes ?? null))),
+            gpuMemTotalBytes: roundInt(avg(slice.map((point) => point.gpuMemTotalBytes ?? null))),
+            gpuTempC: round1(avg(slice.map((point) => point.gpuTempC ?? null))),
+            gpuPowerW: round1(avg(slice.map((point) => point.gpuPowerW ?? null)))
         });
     }
     return out;
@@ -180,7 +185,12 @@ async function rawSeries(input: {
             diskUsedBytes: num(row.diskUsedBytes),
             diskTotalBytes: num(row.diskTotalBytes),
             netRxBytesPerSecond: counterRate(before?.netRxBytes ?? null, row.netRxBytes, elapsed),
-            netTxBytesPerSecond: counterRate(before?.netTxBytes ?? null, row.netTxBytes, elapsed)
+            netTxBytesPerSecond: counterRate(before?.netTxBytes ?? null, row.netTxBytes, elapsed),
+            gpuPercent: row.gpuPercent,
+            gpuMemUsedBytes: num(row.gpuMemUsedBytes),
+            gpuMemTotalBytes: num(row.gpuMemTotalBytes),
+            gpuTempC: row.gpuTempC,
+            gpuPowerW: row.gpuPowerW
         };
     });
     return downsample(points, MAX_POINTS);
@@ -211,7 +221,12 @@ async function rollupSeries(input: {
         diskUsedBytes: num(row.diskUsedBytesAvg),
         diskTotalBytes: num(row.diskTotalBytesAvg),
         netRxBytesPerSecond: perHour(row.netRxBytesSum),
-        netTxBytesPerSecond: perHour(row.netTxBytesSum)
+        netTxBytesPerSecond: perHour(row.netTxBytesSum),
+        gpuPercent: row.gpuPercentAvg,
+        gpuMemUsedBytes: num(row.gpuMemUsedBytesAvg),
+        gpuMemTotalBytes: num(row.gpuMemTotalBytesAvg),
+        gpuTempC: row.gpuTempCAvg,
+        gpuPowerW: row.gpuPowerWAvg
     }));
 }
 

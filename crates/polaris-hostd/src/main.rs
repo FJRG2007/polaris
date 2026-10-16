@@ -15,6 +15,7 @@ mod config;
 mod deploy;
 mod deploy_dirs;
 mod docker;
+mod gpu;
 mod handlers;
 mod host_security;
 mod http;

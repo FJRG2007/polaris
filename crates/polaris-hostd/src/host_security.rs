@@ -114,7 +114,10 @@ const POLL: Duration = Duration::from_millis(250);
 
 /// Wait for every child to exit by `deadline`. Past it, every one still
 /// running is killed and the answer is `None`.
-fn wait_all(children: &mut [&mut Child], deadline: Instant) -> io::Result<Option<Vec<ExitStatus>>> {
+pub(crate) fn wait_all(
+    children: &mut [&mut Child],
+    deadline: Instant,
+) -> io::Result<Option<Vec<ExitStatus>>> {
     let mut statuses: Vec<Option<ExitStatus>> = vec![None; children.len()];
     loop {
         for (child, status) in children.iter_mut().zip(statuses.iter_mut()) {

@@ -329,5 +329,12 @@
             "not-allowed": "That service is not one you can move this domain to.",
             "closed": "This move has already ended."
         }
+    },
+    "gpu": {
+        "loadFailed": "Polaris could not read this service's GPU setting.",
+        "saveFailed": "Polaris could not save the GPU setting.",
+        "restartFailed": "The GPU setting is saved, but the service could not be restarted with it. It takes effect on its next deploy or restart.",
+        "noGpu": "Its server has no NVIDIA card Polaris can see, so it cannot be given one.",
+        "swarm": "A service on a swarm cluster cannot be given a card."
     }
 }

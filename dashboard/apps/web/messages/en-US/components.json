@@ -1231,7 +1231,11 @@
             "disk": "Storage",
             "netOut": "Bandwidth out",
             "netIn": "Bandwidth in",
-            "players": "Players"
+            "players": "Players",
+            "gpu": "GPU",
+            "gpuMem": "GPU memory",
+            "gpuTemp": "GPU temperature",
+            "gpuPower": "GPU power"
         },
         "custom": "Custom",
         "points": "{count} points",

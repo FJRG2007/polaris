@@ -4952,6 +4952,9 @@ model Application {
     // limit. Applied the next time it is started.
     cpuLimit            Float?
     memoryLimitMb       Int?
+    // Hands the container every NVIDIA card on the machine it runs on. Only
+    // offered where the machine has one.
+    useGpu              Boolean  @default(false)
     // Stop the service after this many minutes with no request at the edge, and
     // start it again on the next one. Null keeps it running.
     sleepAfterMinutes   Int?
@@ -6023,6 +6026,14 @@ model MetricSample {
     // which the reader sees as a fall and treats as a gap rather than as traffic.
     netRxBytes     BigInt?
     netTxBytes     BigInt?
+    // The machine's NVIDIA cards (busy on average, memory and power added up,
+    // the hottest card's temperature), or a container's share of their memory.
+    // Null wherever there is no card, which is most machines.
+    gpuPercent       Float?
+    gpuMemUsedBytes  BigInt?
+    gpuMemTotalBytes BigInt?
+    gpuTempC         Float?
+    gpuPowerW        Float?
 
     @@id([subjectType, subjectId, ts])
     @@index([ts])
@@ -6049,6 +6060,12 @@ model MetricRollup {
     // is how far they advanced inside it.
     netRxBytesSum     BigInt?
     netTxBytesSum     BigInt?
+    gpuPercentAvg       Float?
+    gpuPercentMax       Float?
+    gpuMemUsedBytesAvg  BigInt?
+    gpuMemTotalBytesAvg BigInt?
+    gpuTempCAvg         Float?
+    gpuPowerWAvg        Float?
     samples           Int      @default(0)
 
     @@id([subjectType, subjectId, bucket])

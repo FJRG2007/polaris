@@ -735,5 +735,26 @@
             "allServers": "Todos",
             "filter": "Ver anomalías de"
         }
+    },
+    "gpu": {
+        "heading": "GPU",
+        "none": "No hay ninguna tarjeta NVIDIA en esta máquina. Solo se leen tarjetas NVIDIA; AMD e Intel no son compatibles.",
+        "hint": "Solo se leen tarjetas NVIDIA. El historial muestra todas las tarjetas juntas: uso medio, memoria sumada y la temperatura más alta.",
+        "use": "Uso",
+        "memory": "Memoria",
+        "temperature": "Temperatura",
+        "power": "Consumo",
+        "notMeasured": "Sin medir",
+        "celsius": "{value} °C",
+        "watts": "{value} W",
+        "of": "{used} de {total}",
+        "card": "GPU {index}",
+        "containers": "Contenedores en las tarjetas",
+        "noContainers": "Ningún contenedor está usando una tarjeta ahora mismo.",
+        "containersHidden": "Solo un administrador ve los contenedores en las tarjetas de esta máquina.",
+        "onCards": "GPU {list}",
+        "more": "Y {count} más.",
+        "history": "Historial GPU",
+        "unread": "Polaris no ha podido leer las tarjetas ahora mismo."
     }
 }

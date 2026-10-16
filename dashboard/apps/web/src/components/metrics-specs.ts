@@ -20,6 +20,13 @@ export interface ConsumptionPoint {
     diskTotalBytes: number | null;
     netRxBytesPerSecond: number | null;
     netTxBytesPerSecond: number | null;
+    /** A machine's NVIDIA cards, or a service's share of their memory; absent
+     *  or null wherever there is no card. */
+    gpuPercent?: number | null;
+    gpuMemUsedBytes?: number | null;
+    gpuMemTotalBytes?: number | null;
+    gpuTempC?: number | null;
+    gpuPowerW?: number | null;
 }
 
 /** A chart to draw: how to pull a value from a point and how to label it. The
@@ -119,14 +126,23 @@ export const PLAYER_METRICS: MetricSpec<{ t: number; players: number | null }>[]
  */
 export const CONSUMPTION_METRICS: MetricSpec[] = [
     // i18n-ignore every label here is said through components.metrics.labels where drawn
-    { key: "cpu", label: "CPU", value: (point) => point.cpuPercent, format: percent, tone: "primary", max: 100 },
+    {
+        key: "cpu",
+        label: "CPU", // i18n-ignore
+        value: (point) => point.cpuPercent,
+        format: percent,
+        tone: "primary",
+        max: 100
+    },
     {
         key: "mem",
         label: "Memory", // i18n-ignore
         value: (point) => point.memUsedBytes,
         share: (point) => {
             const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
-            return share === null || point.memTotalBytes === null ? null : { share, total: point.memTotalBytes };
+            return share === null || point.memTotalBytes === null
+                ? null
+                : { share, total: point.memTotalBytes };
         },
         describe: (point) => {
             const share = ratioPercent(point.memUsedBytes, point.memTotalBytes);
@@ -143,7 +159,9 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
         value: (point) => point.diskUsedBytes,
         share: (point) => {
             const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
-            return share === null || point.diskTotalBytes === null ? null : { share, total: point.diskTotalBytes };
+            return share === null || point.diskTotalBytes === null
+                ? null
+                : { share, total: point.diskTotalBytes };
         },
         describe: (point) => {
             const share = ratioPercent(point.diskUsedBytes, point.diskTotalBytes);
@@ -173,5 +191,49 @@ export const CONSUMPTION_METRICS: MetricSpec[] = [
         format: formatRate,
         tone: "success",
         summary: "max"
+    }
+];
+
+/**
+ * A machine's NVIDIA cards over time, taken together: how busy on average, the
+ * memory of every card added up, the hottest card, and what they draw. Drawn
+ * only on a machine that has a card.
+ */
+export const GPU_METRICS: MetricSpec[] = [
+    // i18n-ignore every label here is said through components.metrics.labels where drawn
+    {
+        key: "gpu",
+        label: "GPU", // i18n-ignore
+        value: (point) => point.gpuPercent ?? null,
+        format: percent,
+        tone: "primary",
+        max: 100
+    },
+    {
+        key: "gpu-mem",
+        label: "GPU memory", // i18n-ignore
+        value: (point) => point.gpuMemUsedBytes ?? null,
+        share: (point) => {
+            const total = point.gpuMemTotalBytes ?? null;
+            const share = ratioPercent(point.gpuMemUsedBytes ?? null, total);
+            return share === null || total === null ? null : { share, total };
+        },
+        format: formatBytes,
+        tone: "success"
+    },
+    {
+        key: "gpu-temp",
+        label: "GPU temperature", // i18n-ignore
+        value: (point) => point.gpuTempC ?? null,
+        format: (value) => `${Math.round(value)} °C`,
+        tone: "warning",
+        summary: "max"
+    },
+    {
+        key: "gpu-power",
+        label: "GPU power", // i18n-ignore
+        value: (point) => point.gpuPowerW ?? null,
+        format: (value) => `${Math.round(value)} W`,
+        tone: "primary"
     }
 ];

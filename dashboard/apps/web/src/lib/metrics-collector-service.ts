@@ -19,6 +19,8 @@ import { recordMachineCores } from "./machine-cores";
 import { rememberSample } from "./container-stats-cache";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { getServerMetrics } from "./server-metrics-service";
+import { summarizeGpus, type GpuReport } from "./gpu/nvidia";
+import { machineGpus, readLocalGpus, recordMachineGpus } from "./gpu/gpu-live";
 import { recordHostDockerId, recordLocalDockerId } from "./local-machine";
 import { getDriverForConnection, getUnasMetrics } from "./storage-service";
 import { currentReleaseRef, servingContainerNames } from "./deploy/releases";
@@ -92,11 +94,17 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
             // service's own name once a release runs in a project of its own.
             const names = await servingContainerNames(group);
             const samples = await driver.statsMany([...names.values()]);
+            // The machine's cards as the host pass read them this tick, which
+            // runs first. Null on a machine without one, which is most of them.
+            const gpus = machineGpus(
+                key === "local" ? LOCAL_HOST_SUBJECT : key.slice("host:".length)
+            );
             for (const app of group) {
                 const stats = samples.get(names.get(app.id) ?? "");
                 // Not running this tick. That is an absent sample rather than a
                 // zero: a gap in the chart reads as "not running", a zero as idle.
                 if (!stats) continue;
+                const gpu = gpus?.containers.get(names.get(app.id) ?? "") ?? null;
                 rows.push({
                     subjectType: "app",
                     subjectId: app.id,
@@ -108,7 +116,10 @@ async function collectApps(ts: Date): Promise<SampleRow[]> {
                     // into a rate needs two of these and the gap between them,
                     // which is the reader's job - see `metrics-history-service`.
                     netRxBytes: bigBytes(stats.netRx),
-                    netTxBytes: bigBytes(stats.netTx)
+                    netTxBytes: bigBytes(stats.netTx),
+                    // Memory is the one share of a card a container can be held
+                    // to; the card's busy figure belongs to the whole card.
+                    ...(gpu ? { gpuMemUsedBytes: bigBytes(gpu.memoryUsedBytes) } : {})
                 });
             }
         } catch {
@@ -156,6 +167,8 @@ async function localDisk(): Promise<{ used: number; total: number } | null> {
  * probe behind a server's panel treats a missing number.
  */
 interface MachineReading {
+    /** The machine's NVIDIA cards, where it was asked about them. */
+    gpu?: GpuReport | null;
     cpuPercent: number | null;
     memUsedBytes: number | null;
     memTotalBytes: number | null;
@@ -251,6 +264,7 @@ async function probedMachine(hostId: string, ownerId: string): Promise<MachineRe
                     ? { used: metrics.diskUsedBytes, total: metrics.diskTotalBytes }
                     : null,
             cores: metrics.cpuCount,
+            gpu: metrics.gpu ?? null,
             net:
                 metrics.netRxBytes != null && metrics.netTxBytes != null
                     ? { rx: metrics.netRxBytes, tx: metrics.netTxBytes }
@@ -364,6 +378,7 @@ async function containersOn(
     cpuPercent: number;
     memUsedBytes: number;
     net: Map<string, { rx: number; tx: number }>;
+    running: { id: string; name: string }[];
 } | null> {
     let driver: DockerDriver | null = null;
     try {
@@ -408,7 +423,8 @@ async function containersOn(
             // back a set that adds up to a hair over the whole machine.
             cpuPercent: round2(Math.min(100, cpu)),
             memUsedBytes: memory,
-            net
+            net,
+            running: running.map((container) => ({ id: container.id, name: container.name }))
         };
     } catch {
         // Daemon absent or host unreachable this tick.
@@ -434,11 +450,23 @@ async function sampleHost(
     ownerId: string | null,
     ts: Date
 ): Promise<{ row: SampleRow; dockerId: string | null } | null> {
-    const [machine, containers] = await Promise.all([
+    const [machine, containers, localGpu] = await Promise.all([
         ownerId === null ? localMachine() : probedMachine(subjectId, ownerId),
-        containersOn(subjectId, ownerId)
+        containersOn(subjectId, ownerId),
+        // The box Polaris runs on is asked through its daemon, which remembers a
+        // machine without a card and never starts anything for it again.
+        ownerId === null ? readLocalGpus() : Promise.resolve(null)
     ]);
     if (!machine && !containers) return null;
+
+    // Kept for the panel that shows the cards one by one, with which container
+    // is on which; the row below carries them as one machine.
+    const gpus = recordMachineGpus(
+        subjectId,
+        ownerId === null ? localGpu : (machine?.gpu ?? null),
+        containers?.running ?? []
+    );
+    const gpu = gpus ? summarizeGpus(gpus.gpus) : null;
 
     // What turns a service's share of this machine into cores, for billing. A
     // failed write costs the reading nothing.
@@ -466,7 +494,16 @@ async function sampleHost(
             diskUsedBytes: bigBytes(machine?.disk?.used),
             diskTotalBytes: bigBytes(machine?.disk?.total),
             netRxBytes: moved.rx,
-            netTxBytes: moved.tx
+            netTxBytes: moved.tx,
+            ...(gpu
+                ? {
+                      gpuPercent: gpu.utilizationPercent,
+                      gpuMemUsedBytes: bigBytes(gpu.memoryUsedBytes),
+                      gpuMemTotalBytes: bigBytes(gpu.memoryTotalBytes),
+                      gpuTempC: gpu.temperatureC,
+                      gpuPowerW: gpu.powerWatts
+                  }
+                : {})
         }
     };
 }
@@ -613,8 +650,10 @@ async function collectStorage(ts: Date): Promise<SampleRow[]> {
  */
 export async function collectMetricsOnce(opts: { storage: boolean }): Promise<number> {
     const ts = new Date();
-    const rows = await collectApps(ts);
-    rows.push(...(await collectHosts(ts)));
+    // Machines first: what each card is doing, and which container is on it, is
+    // read there, and a service's share of a card is looked up from it.
+    const rows = await collectHosts(ts);
+    rows.push(...(await collectApps(ts)));
     // Volumes ride the slower cadence: measuring one walks its whole tree, which
     // is far too expensive to do every minute beside a container stats read.
     if (opts.storage) rows.push(...(await collectVolumes(ts)), ...(await collectStorage(ts)));
@@ -658,6 +697,11 @@ interface AggregatedSample {
     diskTotalBytes: bigint | null;
     netRxBytes: bigint | null;
     netTxBytes: bigint | null;
+    gpuPercent: number | null;
+    gpuMemUsedBytes: bigint | null;
+    gpuMemTotalBytes: bigint | null;
+    gpuTempC: number | null;
+    gpuPowerW: number | null;
 }
 
 function aggregate(list: AggregatedSample[]) {
@@ -671,6 +715,12 @@ function aggregate(list: AggregatedSample[]) {
         diskTotalBytesAvg: avgBig(list.map((row) => row.diskTotalBytes)),
         netRxBytesSum: counterAdvance(list.map((row) => row.netRxBytes)),
         netTxBytesSum: counterAdvance(list.map((row) => row.netTxBytes)),
+        gpuPercentAvg: avgNum(list.map((row) => row.gpuPercent)),
+        gpuPercentMax: maxNum(list.map((row) => row.gpuPercent)),
+        gpuMemUsedBytesAvg: avgBig(list.map((row) => row.gpuMemUsedBytes)),
+        gpuMemTotalBytesAvg: avgBig(list.map((row) => row.gpuMemTotalBytes)),
+        gpuTempCAvg: avgNum(list.map((row) => row.gpuTempC)),
+        gpuPowerWAvg: avgNum(list.map((row) => row.gpuPowerW)),
         samples: list.length
     };
 }

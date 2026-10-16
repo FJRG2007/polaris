@@ -728,5 +728,17 @@
         "rollbackBodyManual": "{hostname} vuelve a {source}. Devuelve también el registro en tu proveedor DNS; abajo verás los valores viejos.",
         "rolledBack": "{hostname} vuelve a estar en {source}.",
         "rolledBackManual": "Devuelve el registro en tu proveedor DNS:"
+    },
+    "gpu": {
+        "title": "GPU",
+        "hint": "Da a este servicio todas las tarjetas NVIDIA de su servidor. Al guardar se vuelve a iniciar la versión en marcha con ellas.",
+        "use": "Usar la GPU",
+        "noGpu": "Su servidor no tiene ninguna tarjeta NVIDIA que Polaris pueda ver. Solo se admiten tarjetas NVIDIA.",
+        "swarm": "Un servicio en un clúster swarm no puede recibir una tarjeta.",
+        "cards": "Tarjetas de su servidor: {list}",
+        "using": "Usa {used} de memoria de GPU.",
+        "notUsing": "Ahora mismo no ocupa memoria de GPU.",
+        "saved": "Guardado. El servicio se está iniciando de nuevo con el cambio.",
+        "noConfigure": "No puedes cambiar cómo se ejecuta este servicio."
     }
 }
