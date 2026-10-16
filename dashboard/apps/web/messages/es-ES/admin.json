@@ -3303,6 +3303,7 @@
             "sourceUrl": "URL metadatos",
             "sourceXml": "XML metadatos",
             "sourceManual": "A mano",
+            "sourceCurrent": "Mantener",
             "replaceHint": "Al guardar, estos datos sustituyen a los actuales del proveedor.",
             "metadataUrl": "URL metadatos",
             "metadataXml": "XML metadatos",
@@ -3354,7 +3355,7 @@
             "domainTaken": "Otro proveedor ya gestiona uno de estos dominios.",
             "notFound": "Este proveedor ya no existe. Recarga la página.",
             "invalid": "Revisa los campos marcados.",
-            "failed": "No se pudo guardar. Prueba de nuevo en un momento."
+            "failed": "No se ha podido completar. Inténtalo de nuevo en un momento."
         }
     }
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import * as core from "@polaris/core";
 import { Check, Plus, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { validationMessage } from "@/components/i18n/validation-message";
 import type { SamlCheck, SamlProviderView } from "@/lib/saml-providers";
 import { checkSamlProviderAction, deleteSamlProviderAction, saveSamlProviderAction } from "./actions";
 import {
@@ -57,7 +58,7 @@ function draftFor(provider: SamlProviderView | null): Draft {
     return {
         name: provider?.name ?? "",
         domains: provider?.domains.join(", ") ?? "",
-        kind: provider ? "manual" : "metadataUrl",
+        kind: provider ? "current" : "metadataUrl",
         url: "",
         xml: "",
         entityId: provider?.entityId ?? "",
@@ -75,11 +76,13 @@ function draftFor(provider: SamlProviderView | null): Draft {
 /** The form's values in the shape the schema parses, on both sides. */
 function inputFor(draft: Draft): unknown {
     const source =
-        draft.kind === "metadataUrl"
+        draft.kind === "current"
+            ? { kind: draft.kind }
+            : draft.kind === "metadataUrl"
             ? { kind: draft.kind, url: draft.url }
-            : draft.kind === "metadataXml"
-              ? { kind: draft.kind, xml: draft.xml }
-              : { kind: draft.kind, entityId: draft.entityId, ssoUrl: draft.ssoUrl, certificate: draft.certificate };
+              : draft.kind === "metadataXml"
+                ? { kind: draft.kind, xml: draft.xml }
+                : { kind: draft.kind, entityId: draft.entityId, ssoUrl: draft.ssoUrl, certificate: draft.certificate };
     return {
         name: draft.name,
         domains: draft.domains.split(/[\s,]+/).filter(Boolean),
@@ -122,25 +125,33 @@ function ProviderForm({
     onDone: (saved: SamlProviderView | null) => void;
 }) {
     const t = useTranslations("admin");
-    const [draft, setDraft] = useState<Draft>(() => draftFor(provider));
+    const tv = useTranslations("validation");
+    const initial = useMemo(() => draftFor(provider), [provider]);
+    const [draft, setDraft] = useState<Draft>(initial);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const parsed = core.samlProviderInputSchema.safeParse(inputFor(draft));
     const issues = parsed.success ? [] : parsed.error.issues;
+    // Core words its refusals in English; they are shown in the reader's language.
     const issueFor = (path: string) => {
-        const issue = issues.find((entry) => entry.path.join(".") === path || entry.path[0] === path);
-        return issue ? issue.message : null;
+        const issue = issues.find((entry) => {
+            const at = entry.path.join(".");
+            return at === path || at.startsWith(`${path}.`);
+        });
+        return issue ? validationMessage(tv, issue.message) : null;
     };
+    // Saving what is already saved does nothing, so an untouched edit cannot be sent.
+    const changed = provider === null || JSON.stringify(draft) !== JSON.stringify(initial);
     const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((prev) => ({ ...prev, [key]: value }));
 
     async function save() {
-        if (!parsed.success) return;
+        if (!parsed.success || !changed) return;
         setPending(true);
         setError(null);
         const outcome = await saveSamlProviderAction(inputFor(draft), provider?.providerId ?? null);
         setPending(false);
         if (outcome.ok) onDone(outcome.value);
-        else setError(outcome.message ?? t(PROBLEMS[outcome.problem]));
+        else setError(outcome.message ? validationMessage(tv, outcome.message) : t(PROBLEMS[outcome.problem]));
     }
 
     const touched = (value: string) => value.trim().length > 0;
@@ -169,14 +180,19 @@ function ProviderForm({
                         value={draft.kind}
                         onValueChange={(kind) => set("kind", kind)}
                         options={[
+                            ...(provider ? [{ value: "current" as const, label: t("sso.form.sourceCurrent") }] : []),
                             { value: "metadataUrl", label: t("sso.form.sourceUrl") },
                             { value: "metadataXml", label: t("sso.form.sourceXml") },
                             { value: "manual", label: t("sso.form.sourceManual") }
                         ]}
                     />
-                    {provider ? <p className="text-xs text-muted-foreground">{t("sso.form.replaceHint")}</p> : null}
+                    {provider && draft.kind !== "current" ? (
+                        <p className="text-xs text-muted-foreground">{t("sso.form.replaceHint")}</p>
+                    ) : null}
                 </div>
-                {draft.kind === "metadataUrl" ? (
+                {draft.kind === "current" ? (
+                    <p className="min-w-0 break-all text-xs text-muted-foreground">{provider?.entityId}</p>
+                ) : draft.kind === "metadataUrl" ? (
                     <Field label={`${t("sso.form.metadataUrl")} *`} error={touched(draft.url) ? issueFor("source") : null}>
                         <Input
                             value={draft.url}
@@ -190,10 +206,16 @@ function ProviderForm({
                     </Field>
                 ) : (
                     <div className="grid gap-3">
-                        <Field label={`${t("sso.form.entityId")} *`}>
+                        <Field
+                            label={`${t("sso.form.entityId")} *`}
+                            error={touched(draft.entityId) ? issueFor("source.entityId") : null}
+                        >
                             <Input value={draft.entityId} onChange={(event) => set("entityId", event.target.value)} />
                         </Field>
-                        <Field label={`${t("sso.form.ssoUrl")} *`}>
+                        <Field
+                            label={`${t("sso.form.ssoUrl")} *`}
+                            error={touched(draft.ssoUrl) ? issueFor("source.ssoUrl") : null}
+                        >
                             <Input
                                 value={draft.ssoUrl}
                                 placeholder="https://"
@@ -202,7 +224,7 @@ function ProviderForm({
                         </Field>
                         <Field
                             label={`${t("sso.form.certificate")} *`}
-                            error={touched(draft.entityId) && touched(draft.ssoUrl) && touched(draft.certificate) ? issueFor("source") : null}
+                            error={touched(draft.certificate) ? issueFor("source.certificate") : null}
                         >
                             <Textarea
                                 rows={5}
@@ -216,20 +238,25 @@ function ProviderForm({
                 <div className="flex flex-col gap-2">
                     <span className="text-sm font-medium">{t("sso.form.mapping")}</span>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <Field label={`${t("sso.form.mapEmail")} *`}>
+                        <Field
+                            label={`${t("sso.form.mapEmail")} *`}
+                            error={touched(draft.email) ? issueFor("mapping.email") : null}
+                        >
                             <Input value={draft.email} onChange={(event) => set("email", event.target.value)} />
                         </Field>
-                        <Field label={`${t("sso.form.mapName")} *`}>
+                        <Field
+                            label={`${t("sso.form.mapName")} *`}
+                            error={touched(draft.displayName) ? issueFor("mapping.name") : null}
+                        >
                             <Input value={draft.displayName} onChange={(event) => set("displayName", event.target.value)} />
                         </Field>
-                        <Field label={t("sso.form.mapFirstName")}>
+                        <Field label={t("sso.form.mapFirstName")} error={issueFor("mapping.firstName")}>
                             <Input value={draft.firstName} onChange={(event) => set("firstName", event.target.value)} />
                         </Field>
-                        <Field label={t("sso.form.mapLastName")}>
+                        <Field label={t("sso.form.mapLastName")} error={issueFor("mapping.lastName")}>
                             <Input value={draft.lastName} onChange={(event) => set("lastName", event.target.value)} />
                         </Field>
                     </div>
-                    {issueFor("mapping") ? <span className="text-xs text-danger">{issueFor("mapping")}</span> : null}
                 </div>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -260,8 +287,8 @@ function ProviderForm({
                     </Button>
                     <Button
                         type="button"
-                        disabled={pending || !parsed.success}
-                        aria-disabled={!parsed.success}
+                        disabled={pending || !parsed.success || !changed}
+                        aria-disabled={!parsed.success || !changed}
                         onClick={() => void save()}
                     >
                         {pending ? t("sso.form.saving") : t("sso.form.save")}

@@ -21,6 +21,28 @@ export const SAML_REDIRECT_BINDING = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-
 /** The name ID format asked for: the address, which is what accounts are keyed on. */
 export const SAML_EMAIL_NAME_ID = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress";
 
+/**
+ * The words the schemas below refuse a value with. Exported so a screen can
+ * translate them by these exact words rather than show the English source.
+ */
+export const SAML_MESSAGES = {
+    domain: "Enter a domain such as example.com.",
+    attribute: "Enter the attribute name.",
+    metadataUrl: "Enter the full metadata address, starting with https://.",
+    metadataUrlHttps: "The metadata address has to use https://.",
+    metadataXml: "Paste the metadata XML.",
+    metadataTooLarge: "This metadata is too large.",
+    notMetadata: "This is not SAML metadata: it has no EntityDescriptor.",
+    entityId: "Enter the identity provider's entity ID.",
+    ssoUrl: "Enter the full sign-in address, starting with https://.",
+    ssoUrlHttps: "The sign-in address has to use https://.",
+    certificate: "Paste the signing certificate.",
+    certificateTooLarge: "This certificate is too large.",
+    name: "Enter a name.",
+    domainsMin: "Add at least one domain.",
+    domainsMax: `Use at most ${SAML_MAX_DOMAINS} domains.`
+} as const;
+
 const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/;
 
 /** One domain the way it is stored: trimmed, lower case, no leading "@" or trailing dot. */
@@ -50,12 +72,12 @@ export function samlDomainMatches(domain: string, domains: readonly string[]): b
 const domainSchema = z
     .string()
     .transform(normalizeSamlDomain)
-    .refine((value) => DOMAIN_PATTERN.test(value), { message: "Enter a domain such as example.com." });
+    .refine((value) => DOMAIN_PATTERN.test(value), { message: SAML_MESSAGES.domain });
 
 const attributeSchema = z
     .string()
     .trim()
-    .min(1, "Enter the attribute name.")
+    .min(1, SAML_MESSAGES.attribute)
     .max(200, "Use at most 200 characters.");
 
 const optionalAttributeSchema = z
@@ -73,9 +95,9 @@ export const samlSourceSchema = z.discriminatedUnion("kind", [
             .string()
             .trim()
             .max(2048, "Use at most 2048 characters.")
-            .url("Enter the full metadata address, starting with https://.")
+            .url(SAML_MESSAGES.metadataUrl)
             .refine((value) => value.startsWith("https://"), {
-                message: "The metadata address has to use https://."
+                message: SAML_MESSAGES.metadataUrlHttps
             })
     }),
     z.object({
@@ -83,27 +105,29 @@ export const samlSourceSchema = z.discriminatedUnion("kind", [
         xml: z
             .string()
             .trim()
-            .min(1, "Paste the metadata XML.")
-            .max(SAML_MAX_METADATA_LENGTH, "This metadata is too large.")
+            .min(1, SAML_MESSAGES.metadataXml)
+            .max(SAML_MAX_METADATA_LENGTH, SAML_MESSAGES.metadataTooLarge)
             .refine((value) => /<(?:\w+:)?EntityDescriptor[\s>]/.test(value), {
-                message: "This is not SAML metadata: it has no EntityDescriptor."
+                message: SAML_MESSAGES.notMetadata
             })
     }),
     z.object({
         kind: z.literal("manual"),
-        entityId: z.string().trim().min(1, "Enter the identity provider's entity ID.").max(1024, "Use at most 1024 characters."),
+        entityId: z.string().trim().min(1, SAML_MESSAGES.entityId).max(1024, "Use at most 1024 characters."),
         ssoUrl: z
             .string()
             .trim()
             .max(2048, "Use at most 2048 characters.")
-            .url("Enter the full sign-in address, starting with https://.")
-            .refine((value) => value.startsWith("https://"), { message: "The sign-in address has to use https://." }),
+            .url(SAML_MESSAGES.ssoUrl)
+            .refine((value) => value.startsWith("https://"), { message: SAML_MESSAGES.ssoUrlHttps }),
         certificate: z
             .string()
             .trim()
-            .min(1, "Paste the signing certificate.")
-            .max(16 * 1024, "This certificate is too large.")
-    })
+            .min(1, SAML_MESSAGES.certificate)
+            .max(16 * 1024, SAML_MESSAGES.certificateTooLarge)
+    }),
+    /** Keep the details already saved: only meaningful when editing a provider. */
+    z.object({ kind: z.literal("current") })
 ]);
 
 export type SamlSource = z.infer<typeof samlSourceSchema>;
@@ -128,11 +152,11 @@ export const DEFAULT_SAML_MAPPING: SamlMapping = {
 
 /** An identity provider as the admin form submits it. */
 export const samlProviderInputSchema = z.object({
-    name: z.string().trim().min(1, "Enter a name.").max(80, "Use at most 80 characters."),
+    name: z.string().trim().min(1, SAML_MESSAGES.name).max(80, "Use at most 80 characters."),
     domains: z
         .array(domainSchema)
-        .min(1, "Add at least one domain.")
-        .max(SAML_MAX_DOMAINS, `Use at most ${SAML_MAX_DOMAINS} domains.`)
+        .min(1, SAML_MESSAGES.domainsMin)
+        .max(SAML_MAX_DOMAINS, SAML_MESSAGES.domainsMax)
         .transform((domains) => [...new Set(domains)]),
     source: samlSourceSchema,
     mapping: samlMappingSchema,

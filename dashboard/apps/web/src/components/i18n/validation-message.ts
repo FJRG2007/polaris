@@ -40,14 +40,30 @@ const EXACT: ReadonlyMap<string, ValidationKey> = new Map<string, ValidationKey>
     [core.INVITE_REFUSALS.unavailable, "inviteUnavailable"],
     [core.INVITE_REFUSALS.location, "inviteLocation"],
     [core.INVITE_REFUSALS.password, "invitePassword"],
-    [core.INVITE_REFUSALS.throttled, "inviteThrottled"]
+    [core.INVITE_REFUSALS.throttled, "inviteThrottled"],
+    [core.SAML_MESSAGES.domain, "samlDomain"],
+    [core.SAML_MESSAGES.attribute, "samlAttribute"],
+    [core.SAML_MESSAGES.metadataUrl, "samlMetadataUrl"],
+    [core.SAML_MESSAGES.metadataUrlHttps, "samlMetadataUrlHttps"],
+    [core.SAML_MESSAGES.metadataXml, "samlMetadataXml"],
+    [core.SAML_MESSAGES.metadataTooLarge, "samlMetadataTooLarge"],
+    [core.SAML_MESSAGES.notMetadata, "samlNotMetadata"],
+    [core.SAML_MESSAGES.entityId, "samlEntityId"],
+    [core.SAML_MESSAGES.ssoUrl, "samlSsoUrl"],
+    [core.SAML_MESSAGES.ssoUrlHttps, "samlSsoUrlHttps"],
+    [core.SAML_MESSAGES.certificate, "samlCertificate"],
+    [core.SAML_MESSAGES.certificateTooLarge, "samlCertificateTooLarge"],
+    [core.SAML_MESSAGES.name, "samlName"],
+    [core.SAML_MESSAGES.domainsMin, "samlDomainsMin"]
 ]);
 
 /** Messages with a length in them. */
 const COUNTED: readonly (readonly [RegExp, ValidationKey])[] = [
     [/^At least (\d+) characters$/, "atLeast"],
     [/^At most (\d+) characters$/, "atMost"],
-    [/^Use at least (\d+) characters$/, "useAtLeast"]
+    [/^Use at least (\d+) characters$/, "useAtLeast"],
+    [/^Use at most (\d+) characters\.$/, "atMost"],
+    [/^Use at most (\d+) domains\.$/, "samlDomainsMax"]
 ];
 
 /** Every message the table knows, for the test that holds English to core's words. */

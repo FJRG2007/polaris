@@ -22,5 +22,20 @@
     "inviteUnavailable": "This invite is invalid, expired, or already used. Ask an administrator for a new one.",
     "inviteLocation": "This invite cannot be accepted from your network. Ask whoever sent it which addresses it allows.",
     "invitePassword": "That one-time password did not match.",
-    "inviteThrottled": "Too many attempts from your network. Wait a few minutes and try again."
+    "inviteThrottled": "Too many attempts from your network. Wait a few minutes and try again.",
+    "samlDomain": "Enter a domain such as example.com.",
+    "samlAttribute": "Enter the attribute name.",
+    "samlMetadataUrl": "Enter the full metadata address, starting with https://.",
+    "samlMetadataUrlHttps": "The metadata address has to use https://.",
+    "samlMetadataXml": "Paste the metadata XML.",
+    "samlMetadataTooLarge": "This metadata is too large.",
+    "samlNotMetadata": "This is not SAML metadata: it has no EntityDescriptor.",
+    "samlEntityId": "Enter the identity provider's entity ID.",
+    "samlSsoUrl": "Enter the full sign-in address, starting with https://.",
+    "samlSsoUrlHttps": "The sign-in address has to use https://.",
+    "samlCertificate": "Paste the signing certificate.",
+    "samlCertificateTooLarge": "This certificate is too large.",
+    "samlName": "Enter a name.",
+    "samlDomainsMin": "Add at least one domain.",
+    "samlDomainsMax": "Use at most {count} domains."
 }

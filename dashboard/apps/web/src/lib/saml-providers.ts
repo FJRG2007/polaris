@@ -100,8 +100,13 @@ async function fetchMetadata(address: string): Promise<string> {
     return new TextDecoder().decode(bytes);
 }
 
-async function idpDetails(source: core.SamlSource): Promise<auth.IdpDetails> {
+async function idpDetails(source: core.SamlSource, samlConfig: string | null): Promise<auth.IdpDetails> {
     try {
+        if (source.kind === "current") {
+            const stored = auth.storedIdpDetails(samlConfig);
+            if (!stored?.entityId || !stored.ssoUrl || !stored.certificate) throw new SamlProviderError("metadata");
+            return { entityId: stored.entityId, ssoUrl: stored.ssoUrl, certificate: stored.certificate };
+        }
         if (source.kind === "manual") return auth.manualIdpDetails(source);
         const xml = source.kind === "metadataXml" ? source.xml : await fetchMetadata(source.url);
         return auth.readIdpMetadata(xml);
@@ -133,7 +138,9 @@ export async function saveSamlProvider(
         : null;
     if (providerId && !existing) throw new SamlProviderError("notFound");
     await assertDomainsFree(input.domains, providerId);
-    const idp = await idpDetails(input.source);
+    // Keeping the saved details only means something for a provider that has them.
+    if (input.source.kind === "current" && !existing) throw new SamlProviderError("notFound");
+    const idp = await idpDetails(input.source, existing?.samlConfig ?? null);
     const id = providerId ?? `saml-${randomBytes(12).toString("hex").slice(0, 20)}`;
     const domain = input.domains.join(",");
     const samlConfig = auth.samlPluginConfig({ appUrl: appUrl(), providerId: id, idp, mapping: input.mapping });

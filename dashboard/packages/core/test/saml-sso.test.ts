@@ -49,6 +49,10 @@ describe("samlProviderInputSchema", () => {
         expect(samlProviderInputSchema.safeParse({ ...valid, source: { kind: "other" } }).success).toBe(false);
     });
 
+    it("accepts keeping the saved details, which only an edit can use", () => {
+        expect(samlProviderInputSchema.safeParse({ ...valid, source: { kind: "current" } }).success).toBe(true);
+    });
+
     it("needs the email and name attributes", () => {
         expect(samlProviderInputSchema.safeParse({ ...valid, mapping: { ...valid.mapping, email: " " } }).success).toBe(false);
     });
