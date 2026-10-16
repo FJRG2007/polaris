@@ -1985,6 +1985,54 @@ describe("a set of devices", () => {
         expect(store.runsOf("set")[0]?.cause.deviceId).toBe("lamp3");
     });
 
+    it("does not count one gone quiet towards all of them having lasted", async () => {
+        onAny("all", { forMinutes: 5 });
+        await allOff();
+        await reads(readout("lamp1", "light", "on"));
+        await reads(readout("lamp2", "light", "on"));
+        later(MINUTE);
+        await reads(readout("lamp1", "light", "on", { online: false }));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set")).toHaveLength(0);
+    });
+
+    function quietSet(behaviour: auto.Behaviour, extra: Record<string, unknown> = {}) {
+        onAny(behaviour, { attribute: "online", to: "offline", ...extra });
+    }
+
+    it("fires for the first of them to go quiet only", async () => {
+        quietSet("first");
+        await allOff();
+        await reads(readout("lamp1", "light", "off", { online: false }));
+        await reads(readout("lamp2", "light", "off", { online: false }));
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp1"]);
+    });
+
+    it("fires for all of them gone quiet only once the last has", async () => {
+        quietSet("all");
+        await allOff();
+        await reads(readout("lamp1", "light", "off", { online: false }));
+        await reads(readout("lamp2", "light", "off", { online: false }));
+        expect(store.runsOf("set")).toHaveLength(0);
+        await reads(readout("lamp3", "light", "off", { online: false }));
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp3"]);
+    });
+
+    it("waits for all of them to have been quiet for long enough", async () => {
+        quietSet("all", { forMinutes: 5 });
+        await allOff();
+        await reads(readout("lamp1", "light", "off", { online: false }));
+        await reads(readout("lamp2", "light", "off", { online: false }));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set")).toHaveLength(0);
+        await reads(readout("lamp3", "light", "off", { online: false }));
+        later(5 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp3"]);
+    });
+
     it("keeps a single device's firing named as it always was", async () => {
         automation("one", {
             triggers: [

@@ -407,6 +407,15 @@ export function pickHeld(
     return byStart;
 }
 
+/**
+ * Whether a set's device counts towards its trigger: one that is answering, or
+ * any of them where whether it is answering is the very question.
+ */
+function answers(trigger: auto.Trigger, seen: Observation): boolean {
+    if (seen.online !== "offline") return true;
+    return (trigger.kind === "change" || trigger.kind === "stays") && trigger.attribute === "online";
+}
+
 export function createEngine(ports: EnginePorts) {
     const { store } = ports;
     let draining: Promise<void> | null = null;
@@ -820,7 +829,7 @@ export function createEngine(ports: EnginePorts) {
         for (const deviceId of members) {
             if (deviceId === change.deviceId) continue;
             const seen = await store.observation(deviceId);
-            if (seen && seen.online !== "offline") others.push(seen);
+            if (seen && answers(trigger, seen)) others.push(seen);
         }
         return behaviour === "first" ? !others.some(there) : others.every(there);
     }
@@ -888,8 +897,8 @@ export function createEngine(ports: EnginePorts) {
             let present = 0;
             for (const deviceId of members) {
                 const seen = await store.observation(deviceId);
-                if (!seen) continue;
-                if (seen.online !== "offline") present += 1;
+                if (!seen || !answers(trigger, seen)) continue;
+                present += 1;
                 const candidate = heldOn(trigger, deviceId, seen, armed, now);
                 if (candidate) candidates.push(candidate);
             }
