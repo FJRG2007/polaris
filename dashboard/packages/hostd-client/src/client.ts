@@ -254,6 +254,24 @@ export class HostdClient {
     }
 
     /**
+     * What the host's NVIDIA cards are doing, as the reading script's own lines.
+     * `present: false` on a host without the NVIDIA driver; null from a daemon
+     * that predates the call or is busy with the previous reading.
+     */
+    public async hostGpu(): Promise<{ present: boolean; output: string } | null> {
+        const response = await this.call("GET", "/v1/host/gpu");
+        if (response.status === 404 || response.status === 409) return null;
+        if (response.status !== 200) {
+            throw new Error(`hostd gpu reading failed (${response.status})`);
+        }
+        const parsed = JSON.parse(response.body) as { present?: unknown; output?: unknown };
+        return {
+            present: parsed.present === true,
+            output: typeof parsed.output === "string" ? parsed.output : ""
+        };
+    }
+
+    /**
      * Save an image on this host into a short-lived `polaris-secscan-image-*`
      * volume as `/in/image.tar`, for a scan to read. Null from a daemon that
      * predates the call; otherwise the archive's size or why it was not made.

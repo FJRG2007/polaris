@@ -12,6 +12,8 @@
  * says "unknown" for one value beats one that says nothing for all of them.
  */
 
+import { GPU_SCRIPT, parseGpuReport, type GpuReport } from "./gpu/nvidia";
+
 /** Consumers are ranked and cut here rather than in the UI, so the session carries
  *  a screenful instead of every process on a busy machine. */
 const CONSUMER_LIMIT = 8;
@@ -52,6 +54,9 @@ export interface ServerMetrics {
     /** Heaviest first. Containers and processes ranked together, because the
      *  question is what is eating the machine, not what kind of thing it is. */
     readonly consumers: readonly ServerConsumer[];
+    /** The machine's NVIDIA cards and the processes on them. Absent from a
+     *  reading taken before cards were read, empty on a machine without one. */
+    readonly gpu?: GpuReport;
     readonly probedAt: string;
 }
 
@@ -125,7 +130,8 @@ fi
 # Two spellings: GNU ps takes --sort, BSD ps (macOS) takes -r for the same thing.
 { ps -eo pcpu,rss,comm --sort=-pcpu 2>/dev/null || ps -A -o pcpu,rss,comm -r 2>/dev/null; } \\
     | awk 'NR > 1 && NR <= ${CONSUMER_LIMIT} + 1 { printf "process=%s\\t%s\\t%s\\n", \$1, \$2, \$3 }'
-`;
+
+${GPU_SCRIPT}`;
 
 /** Turn the probe's lines into the report, ignoring anything it did not recognize. */
 export function parseProbe(output: string): ServerMetrics {
@@ -138,6 +144,7 @@ export function parseProbe(output: string): ServerMetrics {
         const key = line.slice(0, separator).trim();
         const value = line.slice(separator + 1).trim();
         if (!value) continue;
+        if (key === "gpu" || key === "gpuproc") continue;
         if (key === "container" || key === "process") {
             const consumer = key === "container" ? containerConsumer(value) : processConsumer(value);
             if (consumer) consumers.push(consumer);
@@ -160,6 +167,7 @@ export function parseProbe(output: string): ServerMetrics {
         netRxBytes: numberOf(fields.get("net_rx")),
         netTxBytes: numberOf(fields.get("net_tx")),
         consumers: rank(consumers),
+        gpu: parseGpuReport(output),
         probedAt: new Date().toISOString()
     };
 }
