@@ -318,5 +318,16 @@
         "nameRequired": "Give the group a name of up to 60 characters.",
         "tagsInvalid": "Use up to 12 tags of up to 32 characters.",
         "tagsFailed": "The tags were not saved. Try again."
+    },
+    "cutover": {
+        "notAllowed": "You cannot change this project's domains.",
+        "failed": "The move could not be carried out. Try again in a moment.",
+        "chooseTarget": "Choose the service to move the domain to.",
+        "refused": {
+            "not-found": "That domain or service no longer exists.",
+            "same-service": "That is the service serving it already. Choose another one.",
+            "not-allowed": "That service is not one you can move this domain to.",
+            "closed": "This move has already ended."
+        }
     }
 }

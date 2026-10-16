@@ -305,3 +305,131 @@ export function readPhase(value: string): CutoverPhase {
 export function readMode(value: string): CutoverMode {
     return value === "edge" || value === "cloudflare" ? value : "manual";
 }
+
+const FAILURES: readonly CutoverFailure[] = [
+    "same-service",
+    "target-not-deployed",
+    "target-not-running",
+    "target-not-routed",
+    "target-down",
+    "no-address",
+    "record-write-failed",
+    "propagation-timeout"
+];
+
+export function readFailure(value: string | null): CutoverFailure | null {
+    return value !== null && (FAILURES as readonly string[]).includes(value) ? (value as CutoverFailure) : null;
+}
+
+/** One public resolver's answer, as the screen lists it. */
+export interface ResolverView {
+    readonly label: string;
+    readonly status: string;
+    readonly values: string[];
+    readonly agrees: boolean | null;
+}
+
+/** A cutover as the screen draws it: dates as ISO strings, every stored JSON read total. */
+export interface CutoverView {
+    readonly id: string;
+    readonly hostname: string;
+    readonly phase: CutoverPhase;
+    readonly mode: CutoverMode;
+    readonly failure: CutoverFailure | null;
+    readonly sourceName: string;
+    readonly targetName: string;
+    readonly targetApplicationId: string;
+    readonly newValue: string | null;
+    readonly oldValues: string[];
+    readonly oldTtl: number | null;
+    readonly lowerUntil: string | null;
+    readonly switchedAt: string | null;
+    readonly finishedAt: string | null;
+    readonly checkedAt: string | null;
+    readonly preflight: PreflightChecks | null;
+    readonly resolvers: ResolverView[];
+    readonly targetStatus: { readonly status: "up" | "down"; readonly code: number | null } | null;
+    readonly canSwitch: boolean;
+    readonly canRollback: boolean;
+}
+
+const resolverSchema = z.object({
+    label: z.string(),
+    status: z.string(),
+    values: z.array(z.string()),
+    agrees: z.boolean().nullable()
+});
+
+const storedChecksSchema = z.object({
+    preflight: preflightChecksSchema.optional().catch(undefined),
+    propagation: z.object({ resolvers: z.array(resolverSchema) }).optional().catch(undefined),
+    target: z
+        .object({ status: z.enum(["up", "down"]), code: z.number().int().nullable() })
+        .optional()
+        .catch(undefined),
+    checkedAt: z.string().optional().catch(undefined)
+});
+
+function readStoredChecks(value: string): z.infer<typeof storedChecksSchema> {
+    try {
+        const parsed = storedChecksSchema.safeParse(JSON.parse(value));
+        return parsed.success ? parsed.data : {};
+    } catch {
+        return {};
+    }
+}
+
+/** The screen's view of a stored cutover. */
+export function cutoverView(
+    row: {
+        readonly id: string;
+        readonly hostname: string;
+        readonly phase: string;
+        readonly mode: string;
+        readonly failure: string | null;
+        readonly targetApplicationId: string;
+        readonly newValue: string | null;
+        readonly oldValues: string;
+        readonly oldTtl: number | null;
+        readonly checks: string;
+        readonly lowerUntil: Date | null;
+        readonly switchedAt: Date | null;
+        readonly finishedAt: Date | null;
+    },
+    names: { readonly source: string; readonly target: string }
+): CutoverView {
+    const phase = readPhase(row.phase);
+    const checks = readStoredChecks(row.checks);
+    return {
+        id: row.id,
+        hostname: row.hostname,
+        phase,
+        mode: readMode(row.mode),
+        failure: readFailure(row.failure),
+        sourceName: names.source,
+        targetName: names.target,
+        targetApplicationId: row.targetApplicationId,
+        newValue: row.newValue,
+        oldValues: readList(row.oldValues),
+        oldTtl: row.oldTtl,
+        lowerUntil: row.lowerUntil?.toISOString() ?? null,
+        switchedAt: row.switchedAt?.toISOString() ?? null,
+        finishedAt: row.finishedAt?.toISOString() ?? null,
+        checkedAt: checks.checkedAt ?? null,
+        preflight: checks.preflight ?? null,
+        resolvers: checks.propagation?.resolvers ?? [],
+        targetStatus: checks.target ?? null,
+        canSwitch: canSwitch(phase),
+        canRollback: canRollback(phase)
+    };
+}
+
+/** How long a screen waits between asking an open cutover to look again. */
+export const SCREEN_CHECK_GAP_MS = 15_000;
+
+/** Whether a screen's visit should run a check now rather than wait for the pass:
+ *  only while something is being waited on, and not more often than the gap. */
+export function screenShouldCheck(phase: CutoverPhase, checkedAt: Date | null, now: Date): boolean {
+    if (phase !== "lowering" && phase !== "propagating" && phase !== "finishing") return false;
+    return checkedAt === null || now.getTime() - checkedAt.getTime() >= SCREEN_CHECK_GAP_MS;
+}

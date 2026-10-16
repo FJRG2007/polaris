@@ -318,5 +318,16 @@
         "nameRequired": "Pon al grupo un nombre de hasta 60 caracteres.",
         "tagsInvalid": "Usa hasta 12 etiquetas de hasta 32 caracteres.",
         "tagsFailed": "No se guardaron las etiquetas. Reinténtalo."
+    },
+    "cutover": {
+        "notAllowed": "No puedes cambiar los dominios de este proyecto.",
+        "failed": "No se pudo hacer el cambio. Vuelve a intentarlo en un momento.",
+        "chooseTarget": "Elige el servicio al que mover el dominio.",
+        "refused": {
+            "not-found": "Ese dominio o servicio ya no existe.",
+            "same-service": "Ese servicio ya es el que lo sirve. Elige otro.",
+            "not-allowed": "No puedes mover este dominio a ese servicio.",
+            "closed": "Este cambio ya terminó."
+        }
     }
 }

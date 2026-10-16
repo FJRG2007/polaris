@@ -418,9 +418,57 @@ async function moveRoute(domainId: string, applicationId: string, route?: Cutove
     });
 }
 
-/** The cutover a domain has, the open one first, for the screen. */
-export async function domainCutover(domainId: string) {
-    return prisma.dnsCutover.findFirst({ where: { domainId }, orderBy: { createdAt: "desc" } });
+/**
+ * What the screen shows for a domain: its latest cutover, freshly checked when the
+ * screen has been waiting on it longer than the gap, and the services it may move to.
+ */
+export async function cutoverPanel(
+    domainId: string,
+    environmentIds: readonly string[] | null
+): Promise<{
+    cutover: machine.CutoverView | null;
+    targets: { id: string; name: string; environment: string }[];
+}> {
+    const latest = () =>
+        prisma.dnsCutover.findFirst({ where: { domainId }, orderBy: { createdAt: "desc" } });
+    let row = await latest();
+    if (row?.openKey) {
+        const checkedAt = readChecks(row.checks).checkedAt;
+        const at = checkedAt ? new Date(checkedAt) : null;
+        if (machine.screenShouldCheck(machine.readPhase(row.phase), at && !Number.isNaN(at.getTime()) ? at : null, new Date())) {
+            await advanceCutover(row.id).catch((error) => {
+                console.error(`polaris: DNS cutover ${row?.id} could not be checked:`, error);
+            });
+            row = await latest();
+        }
+    }
+    const targets = await cutoverTargets(domainId, environmentIds);
+    if (!row) return { cutover: null, targets };
+    const names = new Map(
+        (
+            await prisma.application.findMany({
+                where: { id: { in: [row.sourceApplicationId, row.targetApplicationId] } },
+                select: { id: true, name: true }
+            })
+        ).map((app) => [app.id, app.name])
+    );
+    return {
+        cutover: machine.cutoverView(row, {
+            source: names.get(row.sourceApplicationId) ?? "",
+            target: names.get(row.targetApplicationId) ?? ""
+        }),
+        targets
+    };
+}
+
+/** The open cutover of a domain, or a refusal saying there is none. */
+export async function openCutoverId(domainId: string): Promise<string> {
+    const open = await prisma.dnsCutover.findUnique({
+        where: { openKey: domainId },
+        select: { id: true }
+    });
+    if (!open) throw new CutoverRefusedError("closed");
+    return open.id;
 }
 
 /**
