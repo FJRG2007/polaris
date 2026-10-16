@@ -738,6 +738,7 @@
         "cards": "Tarjetas de su servidor: {list}",
         "using": "Usa {used} de memoria de GPU.",
         "notUsing": "Ahora mismo no ocupa memoria de GPU.",
-        "saved": "Guardado. El servicio se está iniciando de nuevo con el cambio."
+        "saved": "Guardado. El servicio se está iniciando de nuevo con el cambio.",
+        "noConfigure": "No puedes cambiar cómo se ejecuta este servicio."
     }
 }

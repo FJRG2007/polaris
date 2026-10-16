@@ -16,6 +16,7 @@ import { DomainPrivateButton } from "./domain-private";
 import { EdgeSettings } from "./edge-settings";
 import * as publicNet from "./public-networking";
 import { useProjectCan } from "./access-context";
+import { GpuCard } from "./gpu-card";
 import { ScalingSection } from "./scaling-section";
 import type { ProjectApp } from "./deploy-view";
 import { ownDomains } from "./domain-rank";
@@ -771,6 +772,7 @@ export function SettingsTab({
             {section(2).shown && (
                 <SettingsSection {...head(2)}>
                     <ScalingSection applicationId={app.id} onChanged={onChanged} />
+                    <GpuCard applicationId={app.id} canConfigure={configure} onChanged={onChanged} />
                 </SettingsSection>
             )}
 
