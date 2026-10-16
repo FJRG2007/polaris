@@ -1872,6 +1872,7 @@
             "hours": "{count, plural, one {# hour} other {# hours}}"
         },
         "say": {
+            "inPlace": "anything in {place}",
             "time": "At {time}, {days}",
             "interval": "Every {every}",
             "manual": "Only when run by hand",
@@ -1946,6 +1947,8 @@
             "toggleUnknown": "Its state was not known, so there was nothing to switch over."
         },
         "errors": {
+            "placeGone": "That room or floor is no longer here.",
+            "placeEmpty": "Nothing there can do this yet.",
             "broken": "Something in this card is not right. Remove it and add it again.",
             "time": "Write a time as 07:30.",
             "days": "Choose at least one day.",
@@ -2078,6 +2081,11 @@
             "edgeHelp": "Connection between two nodes."
         },
         "fields": {
+            "where": "Which devices",
+            "whereChosen": "The ones chosen here",
+            "wholeFloor": "All on {floor}",
+            "wholeRoom": "All in {room}",
+            "placeGone": "A room no longer here",
             "at": "At",
             "days": "Days",
             "every": "Every",

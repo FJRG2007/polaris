@@ -1872,6 +1872,7 @@
             "hours": "{count, plural, one {# hora} other {# horas}}"
         },
         "say": {
+            "inPlace": "cualquiera en {place}",
             "time": "A las {time}, {days}",
             "interval": "Cada {every}",
             "manual": "Solo cuando se lanza a mano",
@@ -1946,6 +1947,8 @@
             "toggleUnknown": "No se sabía su estado, así que no había nada que cambiar."
         },
         "errors": {
+            "placeGone": "Esa sala o planta ya no está.",
+            "placeEmpty": "Nada de ahí puede hacer esto.",
             "broken": "Algo en esta tarjeta no está bien. Quítala y vuelve a añadirla.",
             "time": "Escribe la hora como 07:30.",
             "days": "Elige al menos un día.",
@@ -2078,6 +2081,11 @@
             "edgeHelp": "Conexión entre dos nodos."
         },
         "fields": {
+            "where": "Qué dispositivos",
+            "whereChosen": "Los elegidos aquí",
+            "wholeFloor": "Todo en {floor}",
+            "wholeRoom": "Todo en {room}",
+            "placeGone": "Una sala que ya no está",
             "at": "A las",
             "days": "Días",
             "every": "Cada",

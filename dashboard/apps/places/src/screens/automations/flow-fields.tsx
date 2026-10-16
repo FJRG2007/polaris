@@ -16,7 +16,8 @@ import type { DeviceView } from "../../lib/device-kinds";
 import { Field, useIssue } from "@polaris/ui/automation";
 import { Button, Input, Select, cn, type SelectOption } from "@polaris/ui";
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
+import type { RoomView } from "../../lib/room-kinds";
 
 /** Which device. A device that is no longer at this place stays named as gone
  *  rather than the picker going blank, so the reader sees what to replace. */
@@ -117,16 +118,6 @@ export function TargetSetField({
     const free = candidates.filter((device) => !ids.includes(device.id));
     const label = (device: DeviceView) =>
         device.zone ? `${device.name} - ${device.zone}` : device.name;
-    const counts: SelectOption[] =
-        role === "trigger"
-            ? (["each", "first", "all"] as const).map((value) => ({
-                  value,
-                  label: t(`automations.fields.behaviours.${value}`)
-              }))
-            : (["any", "all"] as const).map((value) => ({
-                  value,
-                  label: t(`automations.fields.quantifiers.${value}`)
-              }));
     return (
         <>
             {rest.map((id, index) => {
@@ -184,26 +175,13 @@ export function TargetSetField({
                 );
             })}
             {ids.length > 1 && (
-                <Field
-                    label={t(
-                        role === "trigger"
-                            ? "automations.fields.behaviour"
-                            : "automations.fields.quantifier"
-                    )}
-                    path={[...path, role === "trigger" ? "behaviour" : "quantifier"]}
-                >
-                    {(fieldId) => (
-                        <Select
-                            id={fieldId}
-                            value={count ?? (role === "trigger" ? "each" : "any")}
-                            disabled={disabled}
-                            options={counts}
-                            onValueChange={(next) =>
-                                onChange([...ids], next as auto.Behaviour | auto.Quantifier)
-                            }
-                        />
-                    )}
-                </Field>
+                <SetCountField
+                    role={role}
+                    count={count}
+                    path={path}
+                    disabled={disabled}
+                    onChange={(next) => onChange([...ids], next)}
+                />
             )}
             {free.length > 0 && ids.length < auto.LIMITS.targets && (
                 <div className="flex items-end sm:col-span-2">
@@ -217,6 +195,174 @@ export function TargetSetField({
                         {t("automations.fields.addDevice")}
                     </Button>
                 </div>
+            )}
+        </>
+    );
+}
+
+/** How a set counts: each, the first or all of its devices for a trigger, any
+ *  or all of them for a condition. */
+export function SetCountField({
+    role,
+    count,
+    onChange,
+    path,
+    disabled
+}: {
+    role: "trigger" | "condition";
+    count: auto.Behaviour | auto.Quantifier | undefined;
+    onChange: (count: auto.Behaviour | auto.Quantifier) => void;
+    path: readonly (string | number)[];
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    const counts: SelectOption[] =
+        role === "trigger"
+            ? (["each", "first", "all"] as const).map((value) => ({
+                  value,
+                  label: t(`automations.fields.behaviours.${value}`)
+              }))
+            : (["any", "all"] as const).map((value) => ({
+                  value,
+                  label: t(`automations.fields.quantifiers.${value}`)
+              }));
+    return (
+        <Field
+            label={t(
+                role === "trigger" ? "automations.fields.behaviour" : "automations.fields.quantifier"
+            )}
+            path={[...path, role === "trigger" ? "behaviour" : "quantifier"]}
+        >
+            {(fieldId) => (
+                <Select
+                    id={fieldId}
+                    value={count ?? (role === "trigger" ? "each" : "any")}
+                    disabled={disabled}
+                    options={counts}
+                    onValueChange={(next) => onChange(next as auto.Behaviour | auto.Quantifier)}
+                />
+            )}
+        </Field>
+    );
+}
+
+const RoomsContext = createContext<readonly RoomView[]>([]);
+
+/** The place's rooms, for every picker that can name one. */
+export const RoomsProvider = RoomsContext.Provider;
+
+export function useRooms(): readonly RoomView[] {
+    return useContext(RoomsContext);
+}
+
+/** A room's name as a picker shows it: on its floor, where it has one. */
+export function roomLabel(room: RoomView, t: ReturnType<typeof usePlacesT>): string {
+    return room.floor
+        ? t("automations.add.roomOnFloor", { floor: room.floor, room: room.name })
+        : room.name;
+}
+
+/** The floors the rooms are on, each once, by name. */
+export function floorsOf(rooms: readonly RoomView[]): { id: string; name: string }[] {
+    const found = new Map<string, string>();
+    for (const room of rooms) if (room.floorId && room.floor) found.set(room.floorId, room.floor);
+    return [...found.entries()]
+        .map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+}
+
+/** The picker value of a block's room or floor: "room:<id>", "floor:<id>", or
+ *  empty for the devices it names. */
+export function placeValue(block: {
+    readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+}): string {
+    const [first] = auto.placeTargets(block);
+    return first ? `${first.kind}:${first.id}` : "";
+}
+
+/**
+ * Which devices a block is about: the ones picked, or every device in a room or
+ * on a floor that answers it - read again each time, so a lamp moved into the
+ * kitchen counts for the kitchen from then on. Drawn only where the place has
+ * rooms. Picking a room keeps the device as the one its choices are drawn from,
+ * and how the set counts.
+ */
+export function PlaceTargetField<
+    T extends {
+        readonly deviceId: string;
+        readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+        readonly behaviour?: auto.Behaviour;
+        readonly quantifier?: auto.Quantifier;
+    }
+>({
+    block,
+    role,
+    onChange,
+    path,
+    disabled
+}: {
+    block: T;
+    /** Absent for a step, which has no way to count. */
+    role?: "trigger" | "condition";
+    onChange: (block: T) => void;
+    path: readonly (string | number)[];
+    disabled?: boolean;
+}) {
+    const t = usePlacesT();
+    const rooms = useRooms();
+    if (rooms.length === 0) return null;
+    const value = placeValue(block);
+    const options: SelectOption[] = [
+        { value: "", label: t("automations.fields.whereChosen") },
+        ...floorsOf(rooms).map((floor) => ({
+            value: `floor:${floor.id}`,
+            label: t("automations.fields.wholeFloor", { floor: floor.name })
+        })),
+        ...rooms.map((room) => ({
+            value: `room:${room.id}`,
+            label: t("automations.fields.wholeRoom", { room: roomLabel(room, t) })
+        }))
+    ];
+    if (value && !options.some((option) => option.value === value)) {
+        options.push({ value, label: t("automations.fields.placeGone"), disabled: true });
+    }
+    const field = role === "trigger" ? "behaviour" : "quantifier";
+    const pick = (next: string) => {
+        const { targets: _was, behaviour: _b, quantifier: _q, ...rest } = block;
+        if (!next) {
+            onChange(rest as unknown as T);
+            return;
+        }
+        const [kind, id] = next.split(":") as ["room" | "floor", string];
+        const counted = role === "trigger" ? block.behaviour : block.quantifier;
+        onChange({
+            ...rest,
+            targets: [{ kind, id }],
+            ...(counted && role ? { [field]: counted } : {})
+        } as unknown as T);
+    };
+    return (
+        <>
+            <Field label={t("automations.fields.where")} path={[...path, "targets", 0, "id"]}>
+                {(fieldId, invalid) => (
+                    <Select
+                        id={fieldId}
+                        value={value}
+                        disabled={disabled}
+                        options={options}
+                        className={invalid ? "border-danger-edge" : undefined}
+                        onValueChange={pick}
+                    />
+                )}
+            </Field>
+            {value && role && (
+                <SetCountField
+                    role={role}
+                    count={role === "trigger" ? block.behaviour : block.quantifier}
+                    path={path}
+                    disabled={disabled}
+                    onChange={(count) => onChange({ ...block, [field]: count } as T)}
+                />
             )}
         </>
     );

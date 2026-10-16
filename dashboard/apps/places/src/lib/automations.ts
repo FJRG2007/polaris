@@ -13,6 +13,7 @@
 import { z } from "zod";
 import { getPlace } from "./places";
 import { prisma } from "@polaris/db";
+import { listRooms } from "./rooms";
 import { listDevices } from "./devices";
 import { HomeError } from "./home-error";
 import * as auto from "./automation-kinds";
@@ -121,16 +122,18 @@ export async function checkAutomation(
 ): Promise<auto.AutomationIssue[]> {
     const place = await getPlace(installedAppId, input.placeId);
     if (!place) return [{ path: ["placeId"], message: "automations.errors.place" }];
-    const [devices, others] = await Promise.all([
+    const [devices, others, roomList] = await Promise.all([
         listDevices(installedAppId, input.placeId),
         prisma.placeAutomation.findMany({
             where: { installedAppId, placeId: input.placeId },
             select: { id: true }
-        })
+        }),
+        listRooms(installedAppId, input.placeId)
     ]);
     return auto.deviceIssues(input.definition, devices, {
         automationIds: others.map((other) => other.id),
-        selfId
+        selfId,
+        rooms: roomList
     });
 }
 

@@ -277,6 +277,11 @@ export interface EnginePorts {
         message: string,
         runId: string
     ) => Promise<void>;
+    /** The place's devices by room and its rooms by floor, which a block naming
+     *  a room or a floor is read against each time it is looked at - so a
+     *  device moved into the kitchen counts for "the kitchen" from then on.
+     *  Absent, a room or a floor holds nothing. */
+    readonly places?: (installedAppId: string, placeId: string) => Promise<auto.TargetScope>;
     /** Come back and drain in this many milliseconds. */
     readonly wake?: (ms: number) => void;
     /** Where a fault that is not a refusal is written. */
@@ -420,6 +425,46 @@ function answers(trigger: auto.Trigger, seen: Observation): boolean {
 
 export function createEngine(ports: EnginePorts) {
     const { store } = ports;
+
+    const NOWHERE: auto.TargetScope = { devices: [], rooms: [] };
+
+    /** An automation as it runs: its rooms and floors read into devices. */
+    async function placed(automation: AutomationRecord): Promise<AutomationRecord> {
+        if (!auto.namesPlaces(automation.definition)) return automation;
+        const scope = ports.places
+            ? await ports.places(automation.installedAppId, automation.placeId)
+            : NOWHERE;
+        return { ...automation, definition: auto.resolveDefinition(automation.definition, scope) };
+    }
+
+    /** The enabled automations of an install, their rooms and floors read once
+     *  per place. */
+    async function enabled(installedAppId: string): Promise<AutomationRecord[]> {
+        const list = await store.enabledAutomations(installedAppId);
+        if (!list.some((each) => auto.namesPlaces(each.definition))) return list;
+        const scopes = new Map<string, Promise<auto.TargetScope>>();
+        return Promise.all(
+            list.map(async (automation) => {
+                if (!auto.namesPlaces(automation.definition)) return automation;
+                let scope = scopes.get(automation.placeId);
+                if (!scope) {
+                    scope = ports.places
+                        ? ports.places(installedAppId, automation.placeId)
+                        : Promise.resolve(NOWHERE);
+                    scopes.set(automation.placeId, scope);
+                }
+                return {
+                    ...automation,
+                    definition: auto.resolveDefinition(automation.definition, await scope)
+                };
+            })
+        );
+    }
+
+    async function one(id: string): Promise<AutomationRecord | null> {
+        const found = await store.automation(id);
+        return found ? placed(found) : null;
+    }
     let draining: Promise<void> | null = null;
     let again = false;
 
@@ -728,7 +773,7 @@ export function createEngine(ports: EnginePorts) {
         moved: readonly { key: string; before: Figure; after: string }[],
         now: Date
     ): Promise<boolean> {
-        const automations = await store.enabledAutomations(installedAppId);
+        const automations = await enabled(installedAppId);
         const lines = watchedLines(automations, deviceId);
         const held: Record<string, Readonly<Record<string, Held>>> = { ...(next.held ?? {}) };
         for (const { key, before, after } of moved) {
@@ -844,7 +889,7 @@ export function createEngine(ports: EnginePorts) {
      */
     async function evaluateSchedules(installedAppId: string): Promise<void> {
         const now = ports.now();
-        const automations = await store.enabledAutomations(installedAppId);
+        const automations = await enabled(installedAppId);
         for (const automation of automations) {
             for (const trigger of automation.definition.triggers) {
                 try {
@@ -1074,7 +1119,7 @@ export function createEngine(ports: EnginePorts) {
     }
 
     async function execute(run: RunRecord): Promise<void> {
-        const automation = await store.automation(run.automationId);
+        const automation = await one(run.automationId);
         const steps: auto.StepLog[] = [...run.steps];
         if (!automation) {
             await finish(run, "failed", steps, "unreadable");
@@ -1200,7 +1245,7 @@ export function createEngine(ports: EnginePorts) {
             }
 
             if (step.kind === "run") {
-                const target = await store.automation(step.automationId);
+                const target = await one(step.automationId);
                 if (!target || target.installedAppId !== automation.installedAppId) {
                     log("failed", { code: "automationGone" });
                     await finish(run, "failed", steps, "step");

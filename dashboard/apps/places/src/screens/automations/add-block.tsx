@@ -10,7 +10,7 @@
 import { Button } from "@polaris/ui";
 import * as fields from "./flow-fields";
 import { usePlacesT } from "../use-places-t";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { roomsByFloor, type RoomView } from "../../lib/room-kinds";
 import * as kinds from "../../lib/device-kinds";
 import * as auto from "../../lib/automation-kinds";
@@ -48,8 +48,7 @@ export type AddRole = "trigger" | "condition" | "step";
 
 /** The place's rooms, which "By target" groups devices by. The editor provides
  *  them once rather than through every list a block can be added to. */
-const RoomsContext = createContext<readonly RoomView[]>([]);
-export const RoomsProvider = RoomsContext.Provider;
+export const RoomsProvider = fields.RoomsProvider;
 
 /**
  * "By target" groups: a room's devices under the room, floor by floor, then
@@ -234,7 +233,7 @@ export function AddBlockButton({
     onPaste?: () => void;
 }) {
     const t = usePlacesT();
-    const rooms = useContext(RoomsContext);
+    const rooms = fields.useRooms();
     const [open, setOpen] = useState(false);
     const vocabulary = VOCABULARY[role];
     const blockItem = (kind: string) => ({

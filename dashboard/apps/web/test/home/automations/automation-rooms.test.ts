@@ -4,6 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import * as auto from "@polaris-app/places/src/lib/automation-kinds";
 import * as schemas from "@polaris-app/places/src/lib/schemas";
 import { floorNames, roomsByFloor, type RoomView } from "@polaris-app/places/src/lib/room-kinds";
 import { targetGroups } from "@polaris-app/places/src/screens/automations/add-block";
@@ -92,5 +93,72 @@ describe("a room's name and floor", () => {
         });
         expect(parsed).not.toHaveProperty("roomId");
         expect(schemas.deviceEditSchema.parse({ name: "Lamp", roomId: null }).roomId).toBeNull();
+    });
+});
+
+describe("a block naming a room or a floor", () => {
+    const rooms = [
+        { id: "kitchen", floorId: "ground" },
+        { id: "bedroom", floorId: "upstairs" }
+    ];
+    const devices = [
+        { id: "lamp1", kind: "light", name: "Lamp", controllable: true, roomId: "kitchen" },
+        { id: "lamp2", kind: "light", name: "Lamp 2", controllable: true, roomId: null }
+    ];
+    const trigger = (target: { kind: "room" | "floor"; id: string }): auto.Trigger => ({
+        id: "trigroom",
+        kind: "change",
+        deviceId: "lamp2",
+        targets: [target],
+        attribute: "state",
+        from: "",
+        to: "on"
+    });
+    const definition = (block: auto.Trigger): auto.AutomationDefinition => ({
+        timeZone: "UTC",
+        triggers: [block],
+        conditions: { match: "all", groups: [] },
+        actions: [{ id: "stepnote", kind: "notify", message: "hi" }]
+    });
+    const context = { automationIds: [], selfId: null, rooms };
+
+    it("is accepted by the schema", () => {
+        expect(auto.triggerSchema.safeParse(trigger({ kind: "floor", id: "ground" })).success).toBe(
+            true
+        );
+    });
+
+    it("resolves to what is in it, not to the device it was saved with", () => {
+        const scope = { devices, rooms };
+        expect(auto.resolvedTargets(trigger({ kind: "room", id: "kitchen" }), scope)).toEqual([
+            "lamp1"
+        ]);
+        expect(auto.resolvedTargets(trigger({ kind: "floor", id: "upstairs" }), scope)).toEqual([]);
+    });
+
+    it("is refused where the room is gone, or holds nothing that can answer", () => {
+        expect(
+            auto
+                .deviceIssues(definition(trigger({ kind: "room", id: "gone" })), devices, context)
+                .map((issue) => issue.message)
+        ).toEqual(["automations.errors.placeGone"]);
+        expect(
+            auto
+                .deviceIssues(definition(trigger({ kind: "floor", id: "upstairs" })), devices, context)
+                .map((issue) => issue.message)
+        ).toEqual(["automations.errors.placeEmpty"]);
+        expect(
+            auto.deviceIssues(definition(trigger({ kind: "room", id: "kitchen" })), devices, context)
+        ).toEqual([]);
+    });
+
+    it("keeps its room when its device is changed, and is read on every device", () => {
+        const kept = auto.triggerOn(trigger({ kind: "room", id: "kitchen" }), {
+            ...devices[0]!
+        } as unknown as Parameters<typeof auto.triggerOn>[1]);
+        expect(auto.placeTargets(kept)).toEqual([{ kind: "room", id: "kitchen" }]);
+        expect(auto.devicesReadBy(definition(trigger({ kind: "room", id: "kitchen" })))).toBe(
+            "all"
+        );
     });
 });
