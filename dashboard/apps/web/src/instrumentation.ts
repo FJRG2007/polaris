@@ -70,7 +70,13 @@ export async function register(): Promise<void> {
     // Close out deploys this process cannot possibly be running: the deploy queue is
     // in memory, so anything left mid-flight by the previous process is abandoned, and
     // a row that still reads DEPLOYING is one an operator waits on instead of retrying.
-    void recoverAbandonedDeployments().catch((error) =>
+    //
+    // Only once that previous process is gone. An update starts this one while the
+    // old dashboard is still serving, and a deploy it is running then is live, not
+    // abandoned: closing it out here failed it on screen and on GitHub while it went
+    // on to finish (see lib/deploy/dashboard-peers.ts).
+    const { whenAlone } = await import("./lib/deploy/dashboard-peers");
+    void whenAlone(recoverAbandonedDeployments).catch((error) =>
         console.error("polaris: could not close out interrupted deploys:", error)
     );
 
