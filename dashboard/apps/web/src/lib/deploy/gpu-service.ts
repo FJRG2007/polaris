@@ -90,22 +90,31 @@ export async function getServiceGpu(applicationId: string, ownerId: string): Pro
  * Turn the cards on or off for a service, and start its running release again
  * so the container is created with (or without) them. Turning it off is always
  * allowed, so a service moved to a machine without a card can be repaired.
- * Returns the refusal instead of saving when it cannot be turned on.
+ * Returns the refusal instead of saving when it cannot be turned on. A restart
+ * that fails leaves the setting saved and says so with `restartFailed`, so the
+ * screen keeps showing what is stored.
  */
 export async function setServiceGpu(
     applicationId: string,
     ownerId: string,
     userId: string,
     enabled: boolean
-): Promise<{ refusal: GpuRefusal | null; redeployed: boolean }> {
+): Promise<{ refusal: GpuRefusal | null; saved: boolean; redeployed: boolean; restartFailed: boolean }> {
     const app = await loadApp(applicationId, ownerId);
-    if (app.useGpu === enabled) return { refusal: null, redeployed: false };
+    const unchanged = { refusal: null, saved: false, redeployed: false, restartFailed: false };
+    if (app.useGpu === enabled) return unchanged;
     if (enabled) {
         const refusal = gpuRefusal(app.target, machineGpus(machineSubjectOf(app.target)) !== null);
-        if (refusal) return { refusal, redeployed: false };
+        if (refusal) return { ...unchanged, refusal };
     }
     await prisma.application.update({ where: { id: applicationId }, data: { useGpu: enabled } });
-    if (!app.currentDeploymentId) return { refusal: null, redeployed: false };
-    await restartFromKeptImage(applicationId, ownerId, userId, "settings");
-    return { refusal: null, redeployed: true };
+    const saved = { ...unchanged, saved: true };
+    if (!app.currentDeploymentId) return saved;
+    try {
+        await restartFromKeptImage(applicationId, ownerId, userId, "settings");
+    } catch (error) {
+        console.error("polaris: a service could not be restarted after its GPU setting changed:", error);
+        return { ...saved, restartFailed: true };
+    }
+    return { ...saved, redeployed: true };
 }

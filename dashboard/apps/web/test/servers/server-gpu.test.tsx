@@ -113,6 +113,19 @@ describe("the GPU section", () => {
         expect(markup).toContain("No container is using a card right now.");
     });
 
+    it("keeps the cards and leaves out the containers for a reader who may not see them", () => {
+        const view = machineGpuView(ENTRY, false);
+        expect(view.gpus).toBe(ENTRY.gpus);
+        expect(view.containers).toEqual([]);
+        expect(view.moreContainers).toBe(0);
+        expect(view.containersHidden).toBe(true);
+        const markup = html(view);
+        expect(markup).toContain("NVIDIA GeForce RTX 4090");
+        expect(markup).not.toContain("big");
+        expect(markup).toContain("Only an administrator sees the containers on this machine&#x27;s cards.");
+        expect(html(view, { locale: "es-ES" })).toContain("Solo un administrador ve los contenedores");
+    });
+
     it("waits on a skeleton, and says when the reading failed", () => {
         expect(html(null)).not.toContain("NVIDIA");
         expect(html(null, { error: true })).toContain("Polaris could not read the cards just now.");

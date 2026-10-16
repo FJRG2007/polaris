@@ -27,12 +27,17 @@ export interface MachineGpuView {
     readonly containers: readonly GpuContainerRow[];
     /** Containers on a card beyond the ones listed. */
     readonly moreContainers: number;
+    /** The containers were left out because the reader may not see them. */
+    readonly containersHidden: boolean;
 }
 
-export const NO_GPUS: MachineGpuView = { at: null, gpus: [], containers: [], moreContainers: 0 };
+export const NO_GPUS: MachineGpuView = { at: null, gpus: [], containers: [], moreContainers: 0, containersHidden: false };
 
-export function machineGpuView(entry: MachineGpus | null): MachineGpuView {
+/** `showContainers` false keeps the cards and leaves out what runs on them: the
+ *  machine Polaris runs on carries every user's containers. */
+export function machineGpuView(entry: MachineGpus | null, showContainers = true): MachineGpuView {
     if (!entry || entry.gpus.length === 0) return NO_GPUS;
+    if (!showContainers) return { at: entry.at, gpus: entry.gpus, containers: [], moreContainers: 0, containersHidden: true };
     const indexOf = new Map(entry.gpus.map((gpu) => [gpu.uuid, gpu.index]));
     const rows = [...entry.containers]
         .map(([name, usage]) => ({
@@ -47,6 +52,7 @@ export function machineGpuView(entry: MachineGpus | null): MachineGpuView {
         at: entry.at,
         gpus: entry.gpus,
         containers: rows.slice(0, MAX_GPU_CONTAINERS),
-        moreContainers: Math.max(0, rows.length - MAX_GPU_CONTAINERS)
+        moreContainers: Math.max(0, rows.length - MAX_GPU_CONTAINERS),
+        containersHidden: false
     };
 }

@@ -751,6 +751,7 @@
         "card": "GPU {index}",
         "containers": "Contenedores en las tarjetas",
         "noContainers": "Ningún contenedor está usando una tarjeta ahora mismo.",
+        "containersHidden": "Solo un administrador ve los contenedores en las tarjetas de esta máquina.",
         "onCards": "GPU {list}",
         "more": "Y {count} más.",
         "history": "Historial GPU",

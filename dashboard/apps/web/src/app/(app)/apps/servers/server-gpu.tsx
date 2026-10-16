@@ -79,7 +79,9 @@ export function GpuBody({
             </div>
             <div className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">{t("gpu.containers")}</span>
-                {view.containers.length === 0 ? (
+                {view.containersHidden ? (
+                    <span className="text-xs text-muted-foreground">{t("gpu.containersHidden")}</span>
+                ) : view.containers.length === 0 ? (
                     <span className="text-xs text-muted-foreground">{t("gpu.noContainers")}</span>
                 ) : (
                     view.containers.map((row) => (

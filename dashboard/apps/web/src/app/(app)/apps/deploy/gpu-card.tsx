@@ -62,7 +62,8 @@ export function GpuCard({
                 setNote(result.error);
                 return;
             }
-            if (result.redeployed) setNote(t("gpu.saved"));
+            if (result.restartError) setNote(result.restartError);
+            else if (result.redeployed) setNote(t("gpu.saved"));
             onChanged();
         });
     }

@@ -751,6 +751,7 @@
         "card": "GPU {index}",
         "containers": "Containers on the cards",
         "noContainers": "No container is using a card right now.",
+        "containersHidden": "Only an administrator sees the containers on this machine's cards.",
         "onCards": "GPU {list}",
         "more": "And {count} more.",
         "history": "GPU history",
