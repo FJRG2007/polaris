@@ -460,7 +460,10 @@ async function readAutomationAccounts(
         for (const id of read) deviceIds.add(id);
     }
     const waiting = await prisma.placeAutomationRun.count({
-        where: { status: { in: ["queued", "waiting", "running"] } }
+        where: {
+            status: { in: ["queued", "waiting", "running"] },
+            automation: { installedAppId }
+        }
     });
     if (waiting > 0) return "all";
     if (deviceIds.size === 0) return new Set();

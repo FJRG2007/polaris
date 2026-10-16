@@ -311,4 +311,13 @@ describe("an automation is somebody waiting", () => {
         await advance(31_000);
         expect(mocks.syncDevices).toHaveBeenCalledTimes(2);
     });
+
+    it("counts only this install's runs as waiting", async () => {
+        mocks.enabledAutomations.mockResolvedValue([]);
+        watch.startDeviceCoordinator();
+        await advance(0);
+        expect(mocks.runCount).toHaveBeenCalledWith({
+            where: expect.objectContaining({ automation: { installedAppId: INSTALL } })
+        });
+    });
 });

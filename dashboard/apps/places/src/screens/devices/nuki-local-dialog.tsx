@@ -43,17 +43,18 @@ export function NukiLocalDialog({
         setError(null);
         if (!accountId) return;
         let stopped = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
         const look = async () => {
-            const result = await actions.nukiLocalStateAction(accountId);
+            const result = await actions.nukiLocalStateAction(accountId).catch(() => null);
             if (stopped) return;
-            if (result.error) setError(result.error);
-            else if (result.state) setState(result.state);
+            if (result?.error) setError(result.error);
+            else if (result?.state) setState(result.state);
+            timer = setTimeout(() => void look(), WATCH_MS);
         };
         void look();
-        const timer = setInterval(() => void look(), WATCH_MS);
         return () => {
             stopped = true;
-            clearInterval(timer);
+            if (timer) clearTimeout(timer);
         };
     }, [accountId]);
 
@@ -89,7 +90,10 @@ export function NukiLocalDialog({
                     {!state?.linked ? (
                         <div className="flex flex-col gap-3">
                             <p className="text-foreground-subtle">{t("nukiLocal.startHint")}</p>
-                            <Button onClick={() => void start()} disabled={starting || !state}>
+                            <Button
+                                onClick={() => void start()}
+                                disabled={starting || (!state && !error)}
+                            >
                                 {starting && <Loader2 className="size-4 shrink-0 animate-spin" />}
                                 {starting ? t("nukiLocal.starting") : t("nukiLocal.start")}
                             </Button>

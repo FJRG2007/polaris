@@ -10,6 +10,7 @@ let contents = new Map<string, Record<string, string>>();
 let sent: { deviceId: string; action: number }[] = [];
 let cloudActions: { id: string; action: number }[] = [];
 let brokerDown = false;
+let brokerHangs = false;
 
 vi.mock("@polaris-app/places/src/lib/integrations/nuki-mqtt", () => ({
     NukiMqttError: class extends Error {
@@ -17,6 +18,7 @@ vi.mock("@polaris-app/places/src/lib/integrations/nuki-mqtt", () => ({
     },
     readBroker: async () => {
         if (brokerDown) throw new Error("down");
+        if (brokerHangs) return new Promise(() => undefined);
         return contents;
     },
     watchBroker: async (_broker: unknown, changed: (deviceId: string) => void) => {
@@ -68,6 +70,7 @@ beforeEach(() => {
     sent = [];
     cloudActions = [];
     brokerDown = false;
+    brokerHangs = false;
 });
 
 describe("the Nuki ID behind a Web smartlockId", () => {
@@ -123,5 +126,23 @@ describe("acting", () => {
         await web.nukiWebDriver.act(LINKED, { externalId: "17988169541", kind: "lock" }, "lock");
         expect(sent).toEqual([]);
         expect(cloudActions).toEqual([{ id: "17988169541", action: 2 }]);
+    });
+
+    it("does not wait on a broker that does not answer before going through the cloud", async () => {
+        vi.useFakeTimers();
+        try {
+            brokerHangs = true;
+            const acting = web.nukiWebDriver.act(
+                LINKED,
+                { externalId: "17988169541", kind: "lock" },
+                "lock"
+            );
+            await vi.advanceTimersByTimeAsync(1500);
+            await acting;
+            expect(sent).toEqual([]);
+            expect(cloudActions).toEqual([{ id: "17988169541", action: 2 }]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

@@ -117,6 +117,27 @@ async function brokerContents(
     return byId;
 }
 
+/** How long a press waits to see whether the lock is on the broker before it
+ *  goes through the account instead. A broker on this network answers well
+ *  inside it; one that is not there must not hold the door up. */
+const ACT_READ_MS = 1500;
+
+/** The broker's contents, or nothing if they take longer than `ms`. */
+async function brokerContentsWithin(
+    broker: mqtt.NukiBroker,
+    ms: number
+): Promise<Awaited<ReturnType<typeof brokerContents>>> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<Awaited<ReturnType<typeof brokerContents>>>((resolve) => {
+        timer = setTimeout(() => resolve(new Map()), ms);
+    });
+    try {
+        return await Promise.race([brokerContents(broker), late]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 /**
  * The cloud's reading of a lock with the broker's laid over it.
  *
@@ -330,7 +351,9 @@ export const nukiWebDriver: DeviceDriver = {
         if (code === undefined) throw new HomeError("A Nuki device cannot be told to do that");
         const broker = localBrokerOf(credentials);
         if (broker) {
-            const held = (await brokerContents(broker)).get(nukiIdOf(device.externalId));
+            const held = (await brokerContentsWithin(broker, ACT_READ_MS)).get(
+                nukiIdOf(device.externalId)
+            );
             if (held && fromTopics(held.id, held.topics)?.online) {
                 try {
                     // Under the id the lock itself publishes, in its own case.

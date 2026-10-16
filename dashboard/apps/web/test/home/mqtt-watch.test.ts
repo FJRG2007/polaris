@@ -79,6 +79,40 @@ describe("watching a broker", () => {
     });
 });
 
+describe("reading what a broker holds", () => {
+    it("ends at the first quiet moment after the grant, even when nothing is held", async () => {
+        vi.useFakeTimers();
+        try {
+            const reading = broker.readRetained(ADDRESS, ["nuki/+/#"]);
+            await vi.advanceTimersByTimeAsync(400);
+            await expect(reading).resolves.toEqual(new Map());
+            expect(client.ended).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("keeps what arrives right behind the grant", async () => {
+        vi.useFakeTimers();
+        try {
+            const reading = broker.readRetained(ADDRESS, ["nuki/+/#"]);
+            await vi.advanceTimersByTimeAsync(0);
+            client.emit("message", "nuki/2BB28570/state", Buffer.from("1"));
+            await vi.advanceTimersByTimeAsync(300);
+            client.emit("message", "nuki/2BB28570/connected", Buffer.from("true"));
+            await vi.advanceTimersByTimeAsync(400);
+            expect(await reading).toEqual(
+                new Map([
+                    ["nuki/2BB28570/state", "1"],
+                    ["nuki/2BB28570/connected", "true"]
+                ])
+            );
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
 describe("watching the Nuki locks", () => {
     it("subscribes under the prefix and names the device of each topic", async () => {
         const changed: string[] = [];
