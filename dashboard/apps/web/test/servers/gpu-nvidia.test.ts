@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as nvidia from "@/lib/gpu/nvidia";
+import { parseProbe } from "@/lib/server-probe";
 
 const CONTAINER = "a".repeat(64);
 const OTHER = "b".repeat(64);
@@ -119,5 +120,19 @@ describe("the script", () => {
     it("does nothing on a machine without nvidia-smi", () => {
         expect(nvidia.GPU_SCRIPT.startsWith("if command -v nvidia-smi >/dev/null 2>&1; then\n")).toBe(true);
         expect(nvidia.GPU_SCRIPT.trimEnd().endsWith("fi")).toBe(true);
+    });
+});
+
+describe("a server's probe", () => {
+    it("carries the cards, and keeps their lines out of the machine's own figures", () => {
+        const metrics = parseProbe(OUTPUT);
+        expect(metrics.os).toBe("Ubuntu 24.04 LTS");
+        expect(metrics.gpu?.gpus.map((gpu) => gpu.index)).toEqual([0, 1]);
+        expect(metrics.gpu?.processes).toHaveLength(4);
+        expect(metrics.consumers).toEqual([]);
+    });
+
+    it("has no card on a machine without nvidia-smi", () => {
+        expect(parseProbe(["os=Debian 12", "load=0.1"].join("\n")).gpu).toEqual({ gpus: [], processes: [] });
     });
 });
