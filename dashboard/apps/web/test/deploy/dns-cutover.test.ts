@@ -140,14 +140,15 @@ describe("switching", () => {
         expect(cutover.switchEffects(row({ mode: "manual" }))).toEqual([]);
     });
 
-    it("does nothing a second time", () => {
-        for (const phase of ["propagating", "finishing", "done", "rolled-back"] as const) {
+    it("does nothing a second time, nor before the pre-flight has finished", () => {
+        for (const phase of ["checking", "propagating", "finishing", "done", "rolled-back"] as const) {
             expect(cutover.canSwitch(phase)).toBe(false);
             expect(cutover.switchEffects(row({ phase }))).toEqual([]);
         }
     });
 
     it("keeps the target's route staged until the cutover closes", () => {
+        expect(cutover.stagesRoute("cloudflare", "checking")).toBe(true);
         expect(cutover.stagesRoute("cloudflare", "ready")).toBe(true);
         expect(cutover.stagesRoute("manual", "propagating")).toBe(true);
         expect(cutover.stagesRoute("cloudflare", "finishing")).toBe(true);
@@ -187,6 +188,23 @@ describe("rolling back", () => {
             "republish"
         ]);
         expect(cutover.rollbackEffects(row({ phase: "ready", oldTtl: 60 }))).toEqual(["republish"]);
+    });
+
+    it("undoes a switch that began and did not finish", () => {
+        expect(cutover.rollbackEffects({ ...row({ phase: "ready", oldTtl: 1 }), touched: true })).toEqual([
+            "restore-record",
+            "republish"
+        ]);
+        expect(cutover.rollbackEffects({ ...row({ mode: "edge", phase: "ready" }), touched: true })).toEqual([
+            "move-route-back",
+            "republish"
+        ]);
+    });
+
+    it("can close a cutover whose pre-flight never finished", () => {
+        expect(cutover.canRollback("checking")).toBe(true);
+        expect(cutover.isOpen("checking")).toBe(true);
+        expect(cutover.rollbackEffects(row({ phase: "checking", oldTtl: 1 }))).toEqual(["republish"]);
     });
 
     it("moves the route back behind a shared edge", () => {

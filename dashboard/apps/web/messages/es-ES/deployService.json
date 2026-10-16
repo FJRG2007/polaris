@@ -676,6 +676,7 @@
             "tlsOnSwitch": "El certificado se emite cuando el registro apunte allí; HTTPS puede avisar un minuto tras el cambio."
         },
         "phase": {
+            "checking": "Comprobando",
             "preflightFailed": "Sin empezar",
             "lowering": "Bajando el TTL",
             "ready": "Listo para cambiar",
@@ -693,9 +694,12 @@
             "down": "{target} respondió a {hostname} con un error (HTTP {code}). Corrígelo y vuelve a intentarlo.",
             "noAddress": "El servidor de {target} no tiene dirección pública. Ponle una en sus ajustes y vuelve a intentarlo.",
             "recordWrite": "Cloudflare rechazó el cambio del registro. Comprueba que la conexión DNS aún puede editar esta zona y vuelve a cambiar.",
+            "routeMove": "No se pudo mover la ruta a {target}. Vuelve a cambiar; si se repite, vuelve a desplegar {target}.",
             "rollbackWrite": "Cloudflare rechazó restaurar el registro, así que el cambio sigue abierto. Comprueba que la conexión DNS aún puede editar esta zona y vuelve a revertir.",
+            "rollbackRoute": "No se pudo devolver la ruta, así que el cambio sigue abierto. Vuelve a revertir en un minuto.",
             "timeout": "Tras 48 horas, no todos los resolutores públicos ven la nueva dirección. Revierte, o revisa el registro en tu proveedor DNS."
         },
+        "checking": "Comprobando {target} antes de cambiar nada. Si no avanza, revierte y empieza de nuevo.",
         "lowering": "El TTL pasó de {old} a {ttl} segundos. Las cachés olvidan la respuesta vieja hacia las {time}. Cambiar ya también sirve; solo tarda más en asentarse.",
         "manualIntro": "El DNS de este dominio no se gestiona aquí. En tu proveedor DNS:",
         "manualLower": "Baja el TTL del registro a {ttl} segundos y espera {old} segundos para que las cachés olviden la respuesta vieja.",

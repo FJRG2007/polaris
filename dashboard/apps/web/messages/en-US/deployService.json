@@ -676,6 +676,7 @@
             "tlsOnSwitch": "The certificate is issued once the record points there, so HTTPS may warn for a minute after the switch."
         },
         "phase": {
+            "checking": "Checking",
             "preflightFailed": "Not started",
             "lowering": "Lowering TTL",
             "ready": "Ready to switch",
@@ -693,9 +694,12 @@
             "down": "{target} answered {hostname} with an error (HTTP {code}). Fix it, then try again.",
             "noAddress": "The server {target} runs on has no public address. Give it one in its server settings, then try again.",
             "recordWrite": "Cloudflare refused the record change. Check that the DNS connection can still edit this zone, then switch again.",
+            "routeMove": "The route could not be moved to {target}. Switch again; if it repeats, redeploy {target}.",
             "rollbackWrite": "Cloudflare refused to put the record back, so the move is still open. Check that the DNS connection can still edit this zone, then roll back again.",
+            "rollbackRoute": "The route could not be moved back, so the move is still open. Roll back again in a minute.",
             "timeout": "After 48 hours the public resolvers still do not all see the new address. Roll back, or check the record at your DNS provider."
         },
+        "checking": "Checking {target} before anything changes. If this does not move on, roll back and start again.",
         "lowering": "The TTL went from {old} to {ttl} seconds. Caches let go of the old answer by {time}. Switching now works too; it only settles more slowly.",
         "manualIntro": "This domain's DNS is not managed here. At your DNS provider:",
         "manualLower": "Lower the record's TTL to {ttl} seconds and wait {old} seconds, so caches let go of the old answer.",

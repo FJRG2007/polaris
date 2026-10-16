@@ -53,6 +53,9 @@ interface Written {
     readonly records: KeptRecord[];
     /** The record the switch created when there was none to rewrite. */
     readonly created: string | null;
+    /** The switch began changing things, so a rollback has something to undo even
+     *  when it did not finish. */
+    readonly touched: boolean;
 }
 
 /** What the screen reads off one check, stored on the row as JSON. */
@@ -111,10 +114,11 @@ function readWritten(value: string): Written {
         const parsed = JSON.parse(value) as Partial<Written>;
         return {
             records: Array.isArray(parsed.records) ? parsed.records : [],
-            created: typeof parsed.created === "string" ? parsed.created : null
+            created: typeof parsed.created === "string" ? parsed.created : null,
+            touched: parsed.touched === true
         };
     } catch {
-        return { records: [], created: null };
+        return { records: [], created: null, touched: false };
     }
 }
 
@@ -317,13 +321,13 @@ export async function startCutover(input: {
                 targetApplicationId: target.id,
                 actorId: input.actorId,
                 openKey: domain.id,
-                phase: "ready",
+                phase: "checking",
                 mode,
                 oldValues: JSON.stringify(oldValues),
                 newValue,
                 oldTtl,
                 zoneId: zone?.zoneId ?? null,
-                recordIds: JSON.stringify({ records, created: null } satisfies Written)
+                recordIds: JSON.stringify({ records, created: null, touched: false } satisfies Written)
             },
             select: { id: true }
         });
@@ -400,6 +404,45 @@ async function zoneOf(row: { hostname: string; zoneId: string | null; domainId: 
     const zone = await zoneFor(row.hostname, domain.application.environment.project);
     if (!zone || zone.zoneId !== row.zoneId) throw new Error("zone-unreachable");
     return zone;
+}
+
+/** Put the name's A records back the way the cutover found them, from what the zone
+ *  holds now, so a rollback cut short and tried again converges instead of
+ *  repeating what already happened. */
+async function restoreRecords(
+    zone: { token: string; zoneId: string },
+    row: { hostname: string; newValue: string | null },
+    written: Written
+): Promise<void> {
+    const current = await cf.findDnsRecords(zone.token, zone.zoneId, "A", row.hostname);
+    const kept = new Set(written.records.map((record) => record.id));
+    const spare = current.filter((entry) => !kept.has(entry.id));
+    for (const record of written.records) {
+        if (current.some((entry) => entry.id === record.id)) {
+            await rewrite(zone, row.hostname, record, {});
+            continue;
+        }
+        const again = spare.find(
+            (entry) => entry.id !== written.created && entry.content === record.content
+        );
+        if (again) {
+            spare.splice(spare.indexOf(again), 1);
+            await rewrite(zone, row.hostname, { ...record, id: again.id }, {});
+            continue;
+        }
+        await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
+            type: "A",
+            name: row.hostname,
+            content: record.content,
+            ttl: record.ttl,
+            proxied: record.proxied
+        });
+    }
+    for (const entry of spare) {
+        if (entry.id === written.created || (row.newValue !== null && entry.content === row.newValue)) {
+            await cf.deleteDnsRecord(zone.token, zone.zoneId, entry.id);
+        }
+    }
 }
 
 async function moveRoute(domainId: string, applicationId: string, route?: CutoverChecks["route"]) {
@@ -487,19 +530,25 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
         data: { phase: "propagating", switchedAt: new Date(), failure: null }
     });
     if (claimed.count === 0) return;
+    let written = readWritten(row.recordIds);
+    const save = async (next: Written) => {
+        written = next;
+        await prisma.dnsCutover.update({ where: { id }, data: { recordIds: JSON.stringify(next) } });
+    };
     try {
+        await save({ ...written, touched: true });
         for (const effect of effects) {
             if (effect === "write-record") {
                 const zone = await zoneOf(row);
-                const written = readWritten(row.recordIds);
+                const present = new Set(
+                    (await cf.findDnsRecords(zone.token, zone.zoneId, "A", row.hostname)).map((entry) => entry.id)
+                );
                 const ttl = machine.lowersTtl(mode, row.oldTtl) ? machine.LOWERED_TTL : undefined;
                 const [first, ...rest] = written.records;
-                let created: string | null = null;
-                if (first) {
+                if (first && present.has(first.id)) {
                     await rewrite(zone, row.hostname, first, { content: row.newValue ?? "", ttl });
-                    for (const other of rest) await cf.deleteDnsRecord(zone.token, zone.zoneId, other.id);
-                } else {
-                    created = (
+                } else if (!written.created || !present.has(written.created)) {
+                    const created = (
                         await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
                             type: "A",
                             name: row.hostname,
@@ -508,11 +557,11 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
                             proxied: false
                         })
                     ).id;
+                    await save({ ...written, created });
                 }
-                await prisma.dnsCutover.update({
-                    where: { id },
-                    data: { recordIds: JSON.stringify({ records: written.records, created }) }
-                });
+                for (const other of rest) {
+                    if (present.has(other.id)) await cf.deleteDnsRecord(zone.token, zone.zoneId, other.id);
+                }
             } else if (effect === "move-route") {
                 await moveRoute(row.domainId, row.targetApplicationId);
             } else if (effect === "republish") {
@@ -522,7 +571,11 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
     } catch {
         await prisma.dnsCutover.update({
             where: { id },
-            data: { phase: row.phase, switchedAt: null, failure: "record-write-failed" }
+            data: {
+                phase: row.phase,
+                switchedAt: null,
+                failure: mode === "edge" ? "route-move-failed" : "record-write-failed"
+            }
         });
         return;
     }
@@ -549,7 +602,8 @@ export async function rollbackCutover(id: string, actorId: string): Promise<void
         phase,
         mode,
         switchedAt: row.switchedAt,
-        oldTtl: row.oldTtl
+        oldTtl: row.oldTtl,
+        touched: readWritten(row.recordIds).touched
     });
     if (effects.length === 0) return;
     const claimed = await prisma.dnsCutover.updateMany({
@@ -561,26 +615,7 @@ export async function rollbackCutover(id: string, actorId: string): Promise<void
     try {
         for (const effect of effects) {
             if (effect === "restore-record") {
-                const zone = await zoneOf(row);
-                const written = readWritten(row.recordIds);
-                if (written.created) await cf.deleteDnsRecord(zone.token, zone.zoneId, written.created);
-                const [first, ...rest] = written.records;
-                if (first) await rewrite(zone, row.hostname, first, {});
-                for (const other of rest) {
-                    if (row.switchedAt) {
-                        // Deleted by the switch, and they come back as they were.
-                        await cf.saveDnsRecord(zone.token, zone.zoneId, null, {
-                            type: "A",
-                            name: row.hostname,
-                            content: other.content,
-                            ttl: other.ttl,
-                            proxied: other.proxied
-                        });
-                    } else {
-                        // Only their TTL was lowered.
-                        await rewrite(zone, row.hostname, other, {});
-                    }
-                }
+                await restoreRecords(await zoneOf(row), row, readWritten(row.recordIds));
             } else if (effect === "move-route-back") {
                 await moveRoute(row.domainId, row.sourceApplicationId, checks.route);
             }
@@ -594,7 +629,7 @@ export async function rollbackCutover(id: string, actorId: string): Promise<void
                     phase: row.phase,
                     openKey: row.openKey,
                     finishedAt: null,
-                    failure: "rollback-write-failed"
+                    failure: mode === "edge" ? "rollback-route-failed" : "rollback-write-failed"
                 }
             })
             .catch(() => undefined);

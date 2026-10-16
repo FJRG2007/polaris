@@ -9,6 +9,7 @@
  *
  * The phases, in order:
  *
+ * - `checking` - the pre-flight is running; nothing can be switched yet.
  * - `preflight-failed` - the target cannot take the name yet; nothing was changed.
  * - `lowering` - the record's TTL was lowered and the old, longer one is still
  *   running out in caches; switching now is allowed, only slower to settle.
@@ -21,6 +22,7 @@
 import { z } from "zod";
 
 export const CUTOVER_PHASES = [
+    "checking",
     "preflight-failed",
     "lowering",
     "ready",
@@ -72,7 +74,9 @@ export type CutoverFailure =
     | "target-down"
     | "no-address"
     | "record-write-failed"
+    | "route-move-failed"
     | "rollback-write-failed"
+    | "rollback-route-failed"
     | "propagation-timeout";
 
 /** What the pre-flight found about the target. */
@@ -144,13 +148,16 @@ export function canSwitch(phase: CutoverPhase): boolean {
 }
 
 export function canRollback(phase: CutoverPhase): boolean {
-    return phase === "lowering" || phase === "ready" || phase === "propagating" || phase === "failed";
+    return phase === "checking" || phase === "lowering" || phase === "ready" || phase === "propagating" || phase === "failed";
 }
 
 /** Whether the target's edge carries a route for the hostname while the old one still
  *  serves it: from the start, so the pre-flight can ask it, until the cutover closes. */
 export function stagesRoute(mode: CutoverMode, phase: CutoverPhase): boolean {
-    return mode !== "edge" && (canSwitch(phase) || phase === "propagating" || phase === "finishing");
+    return (
+        mode !== "edge" &&
+        (phase === "checking" || canSwitch(phase) || phase === "propagating" || phase === "finishing")
+    );
 }
 
 /** An open cutover, as the edge reads it. */
@@ -253,13 +260,18 @@ export function switchEffects(row: Pick<CutoverRow, "phase" | "mode">): CutoverE
     return [];
 }
 
-/** What a rollback undoes, from where the cutover got to. Empty once closed. */
-export function rollbackEffects(row: Pick<CutoverRow, "phase" | "mode" | "switchedAt" | "oldTtl">): CutoverEffect[] {
+/** What a rollback undoes, from where the cutover got to. Empty once closed.
+ *  `touched` is a switch that began changing things and did not finish, which leaves
+ *  `switchedAt` empty but still has to be undone. */
+export function rollbackEffects(
+    row: Pick<CutoverRow, "phase" | "mode" | "switchedAt" | "oldTtl"> & { readonly touched?: boolean }
+): CutoverEffect[] {
     if (!canRollback(row.phase)) return [];
     const effects: CutoverEffect[] = [];
+    const switched = row.switchedAt !== null || row.touched === true;
     if (row.mode === "edge") {
-        if (row.switchedAt) effects.push("move-route-back");
-    } else if (row.mode === "cloudflare" && (row.switchedAt || lowersTtl(row.mode, row.oldTtl))) {
+        if (switched) effects.push("move-route-back");
+    } else if (row.mode === "cloudflare" && (switched || lowersTtl(row.mode, row.oldTtl))) {
         effects.push("restore-record");
     }
     // The staged route on the target's edge goes with the next publish either way.
@@ -315,7 +327,9 @@ const FAILURES: readonly CutoverFailure[] = [
     "target-down",
     "no-address",
     "record-write-failed",
+    "route-move-failed",
     "rollback-write-failed",
+    "rollback-route-failed",
     "propagation-timeout"
 ];
 

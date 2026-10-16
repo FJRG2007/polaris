@@ -2,11 +2,19 @@
  * Carrying out a DNS cutover against a store held in memory: the background pass
  * looks at a bounded number of cutovers and does each step once however often it
  * runs, Switch and Rollback pressed twice do the work once, a record Cloudflare
- * refused can be switched again, and the screen only asks for a fresh check when
+ * refused can be switched again, a switch or a rollback cut short is undone or
+ * finished from where it got to, and the screen only asks for a fresh check when
  * the last one is old.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+interface ZoneRecord {
+    id: string;
+    content: string;
+    ttl: number;
+    proxied: boolean;
+}
 
 interface Row {
     id: string;
@@ -40,7 +48,12 @@ const state = vi.hoisted(() => ({
     audits: [] as string[],
     saved: [] as { id: string | null; content: string; ttl: number }[],
     deleted: [] as string[],
+    zone: new Map<string, ZoneRecord>(),
+    created: 0,
     saveFails: 0,
+    deleteFails: 0,
+    publishFails: 0,
+    certificateFails: false,
     probes: 0,
     published: 0,
     settled: true,
@@ -89,6 +102,29 @@ vi.mock("@polaris/db", () => {
             apply(row, data);
             return row;
         },
+        create: async ({ data }: { data: Partial<Row> }) => {
+            const row = {
+                id: "started",
+                actorId: null,
+                openKey: null,
+                oldValues: "[]",
+                newValue: null,
+                oldTtl: null,
+                zoneId: null,
+                recordIds: "[]",
+                checks: "{}",
+                failure: null,
+                passes: 0,
+                lowerUntil: null,
+                switchedAt: null,
+                finishedAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...data
+            } as Row;
+            state.rows.set(row.id, row);
+            return { id: row.id };
+        },
         updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
             const hit = [...state.rows.values()].filter((row) => matches(row, where));
             for (const row of hit) apply(row, data);
@@ -131,13 +167,24 @@ vi.mock("@polaris/db", () => {
                 findUnique: async ({ where }: { where: { id: string } }) => app(where.id),
                 findMany: async () => [app("app-old"), app("app-new")]
             },
-            ownerDomain: { findUnique: async () => null }
+            ownerDomain: { findUnique: async () => null },
+            deployment: { findUnique: async () => ({ status: "running" }) },
+            managedCertificate: {
+                findFirst: async () => {
+                    if (state.certificateFails) throw new Error("database gone");
+                    return null;
+                }
+            }
         }
     };
 });
 vi.mock("@/lib/deploy-service", () => ({
     containerPortOf: () => 3000,
     syncAppRoutes: async () => {
+        if (state.publishFails > 0) {
+            state.publishFails -= 1;
+            throw new Error("edge unreachable");
+        }
         state.published += 1;
         return { unreachedHosts: new Set() };
     }
@@ -168,16 +215,30 @@ vi.mock("@/lib/tls/managed-certificates", () => ({ openText: () => null }));
 vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: async () => "token" }));
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     resolveZoneForHostname: async () => ({ id: "zone-1" }),
-    findDnsRecords: async () => [],
-    saveDnsRecord: async (_token: string, _zone: string, id: string | null, record: { content: string; ttl: number }) => {
+    findDnsRecords: async () => [...state.zone.values()].map((record) => ({ ...record })),
+    saveDnsRecord: async (
+        _token: string,
+        _zone: string,
+        id: string | null,
+        record: { content: string; ttl: number; proxied: boolean }
+    ) => {
         if (state.saveFails > 0) {
             state.saveFails -= 1;
             throw new Error("refused");
         }
+        if (id !== null && !state.zone.has(id)) throw new Error("not found");
         state.saved.push({ id, content: record.content, ttl: record.ttl });
-        return { id: id ?? "record-new" };
+        const saved = id ?? `record-new-${(state.created += 1)}`;
+        state.zone.set(saved, { id: saved, content: record.content, ttl: record.ttl, proxied: record.proxied });
+        return { id: saved };
     },
     deleteDnsRecord: async (_token: string, _zone: string, id: string) => {
+        if (state.deleteFails > 0) {
+            state.deleteFails -= 1;
+            throw new Error("refused");
+        }
+        if (!state.zone.has(id)) throw new Error("not found");
+        state.zone.delete(id);
         state.deleted.push(id);
     }
 }));
@@ -203,7 +264,8 @@ function seed(id: string, overrides: Partial<Row> = {}): Row {
         zoneId: "zone-1",
         recordIds: JSON.stringify({
             records: [{ id: "record-1", content: "198.51.100.4", ttl: 60, proxied: false }],
-            created: null
+            created: null,
+            touched: false
         }),
         checks: "{}",
         failure: null,
@@ -226,7 +288,12 @@ beforeEach(() => {
     state.audits = [];
     state.saved = [];
     state.deleted = [];
+    state.zone = new Map([["record-1", { id: "record-1", content: "198.51.100.4", ttl: 60, proxied: false }]]);
+    state.created = 0;
     state.saveFails = 0;
+    state.deleteFails = 0;
+    state.publishFails = 0;
+    state.certificateFails = false;
     state.probes = 0;
     state.published = 0;
     state.settled = true;
@@ -303,6 +370,126 @@ describe("switching", () => {
         });
         await service.switchCutover("c1", "user-1");
         expect(state.rows.get("c1")).toMatchObject({ phase: "propagating", failure: null });
+    });
+});
+
+const TWO_RECORDS = [
+    { id: "record-1", content: "198.51.100.4", ttl: 1, proxied: false },
+    { id: "record-2", content: "198.51.100.5", ttl: 1, proxied: false }
+];
+
+function seedTwo(id: string, overrides: Partial<Row> = {}): Row {
+    state.zone = new Map(TWO_RECORDS.map((record) => [record.id, { ...record }]));
+    return seed(id, {
+        oldTtl: 1,
+        oldValues: JSON.stringify(TWO_RECORDS.map((record) => record.content)),
+        recordIds: JSON.stringify({ records: TWO_RECORDS, created: null, touched: false }),
+        ...overrides
+    });
+}
+
+function zoneContents(): string[] {
+    return [...state.zone.values()].map((record) => `${record.id}=${record.content}`).sort();
+}
+
+describe("a switch cut short", () => {
+    it("is undone by a rollback, though nothing was recorded as switched", async () => {
+        seedTwo("c1");
+        state.deleteFails = 1;
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({ phase: "ready", failure: "record-write-failed", switchedAt: null });
+        expect(zoneContents()).toEqual(["record-1=203.0.113.7", "record-2=198.51.100.5"]);
+        await service.rollbackCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({ phase: "rolled-back", openKey: null });
+        expect(zoneContents()).toEqual(["record-1=198.51.100.4", "record-2=198.51.100.5"]);
+    });
+
+    it("finishes when switched again, without deleting a record twice", async () => {
+        seedTwo("c1");
+        state.deleteFails = 1;
+        await service.switchCutover("c1", "user-1");
+        state.zone.delete("record-2");
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({ phase: "propagating", failure: null });
+        expect(zoneContents()).toEqual(["record-1=203.0.113.7"]);
+    });
+
+    it("behind a shared edge, says the route did not move and moves it back on rollback", async () => {
+        seed("c1", { mode: "edge", newValue: null, zoneId: null });
+        state.publishFails = 1;
+        await service.switchCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({ phase: "ready", failure: "route-move-failed" });
+        expect(state.domainApp).toBe("app-new");
+        await service.rollbackCutover("c1", "user-1");
+        expect(state.rows.get("c1")?.phase).toBe("rolled-back");
+        expect(state.domainApp).toBe("app-old");
+    });
+});
+
+describe("a rollback tried again", () => {
+    it("puts deleted records back once", async () => {
+        seedTwo("c1");
+        await service.switchCutover("c1", "user-1");
+        expect(zoneContents()).toEqual(["record-1=203.0.113.7"]);
+        // A first attempt brought record-2 back under a new id and then stopped.
+        state.zone.set("record-x", { id: "record-x", content: "198.51.100.5", ttl: 1, proxied: false });
+        await service.rollbackCutover("c1", "user-1");
+        expect(state.rows.get("c1")?.phase).toBe("rolled-back");
+        expect(zoneContents()).toEqual(["record-1=198.51.100.4", "record-x=198.51.100.5"]);
+    });
+
+    it("converges when the record the switch created is already gone", async () => {
+        state.zone = new Map();
+        seed("c1", { oldTtl: null, recordIds: JSON.stringify({ records: [], created: null, touched: false }) });
+        await service.switchCutover("c1", "user-1");
+        expect(zoneContents()).toEqual(["record-new-1=203.0.113.7"]);
+        state.zone.clear();
+        await service.rollbackCutover("c1", "user-1");
+        expect(state.rows.get("c1")).toMatchObject({ phase: "rolled-back", openKey: null });
+        expect(zoneContents()).toEqual([]);
+    });
+
+    it("deletes the record a switch created when its id was never stored", async () => {
+        state.zone = new Map();
+        seed("c1", {
+            phase: "propagating",
+            switchedAt: new Date(NOW),
+            oldTtl: null,
+            recordIds: JSON.stringify({ records: [], created: null, touched: true })
+        });
+        state.zone.set("record-lost", { id: "record-lost", content: "203.0.113.7", ttl: 60, proxied: false });
+        await service.rollbackCutover("c1", "user-1");
+        expect(zoneContents()).toEqual([]);
+    });
+});
+
+describe("starting", () => {
+    it("cannot be switched while its pre-flight has not finished, and can be rolled back", async () => {
+        state.certificateFails = true;
+        await expect(
+            service.startCutover({
+                domainId: "domain-1",
+                targetApplicationId: "app-new",
+                actorId: "user-1",
+                environmentIds: null
+            })
+        ).rejects.toThrow("database gone");
+        expect(state.rows.get("started")).toMatchObject({ phase: "checking", openKey: "domain-1" });
+        await service.switchCutover("started", "user-1");
+        expect(state.rows.get("started")?.phase).toBe("checking");
+        expect(state.saved).toEqual([]);
+        await service.rollbackCutover("started", "user-1");
+        expect(state.rows.get("started")).toMatchObject({ phase: "rolled-back", openKey: null });
+    });
+
+    it("leaves the pre-flight's phase once it has run", async () => {
+        await service.startCutover({
+            domainId: "domain-1",
+            targetApplicationId: "app-new",
+            actorId: "user-1",
+            environmentIds: null
+        });
+        expect(state.rows.get("started")?.phase).toBe("ready");
     });
 });
 

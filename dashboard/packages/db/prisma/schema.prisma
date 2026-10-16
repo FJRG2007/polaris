@@ -5579,7 +5579,7 @@ model DnsCutover {
     // Set to the domain id while the cutover is open and cleared when it ends, so
     // two cutovers of one hostname cannot be open at once.
     openKey             String?   @unique
-    // preflight-failed | lowering | ready | propagating | finishing | done |
+    // checking | preflight-failed | lowering | ready | propagating | finishing | done |
     // failed | rolled-back (see lib/deploy/dns-cutover.ts)
     phase               String
     // edge: both services answer behind the same edge, so only the route moves.

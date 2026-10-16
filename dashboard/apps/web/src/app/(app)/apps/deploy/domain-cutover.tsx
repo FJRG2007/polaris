@@ -48,6 +48,7 @@ const WAITING: readonly CutoverPhase[] = ["lowering", "propagating", "finishing"
 type CutoverT = NamespaceTranslator<"deployService">;
 
 const PHASE_KEYS = {
+    checking: "cutover.phase.checking",
     "preflight-failed": "cutover.phase.preflightFailed",
     lowering: "cutover.phase.lowering",
     ready: "cutover.phase.ready",
@@ -66,7 +67,9 @@ const FAILURE_KEYS = {
     "target-down": "cutover.failure.down",
     "no-address": "cutover.failure.noAddress",
     "record-write-failed": "cutover.failure.recordWrite",
+    "route-move-failed": "cutover.failure.routeMove",
     "rollback-write-failed": "cutover.failure.rollbackWrite",
+    "rollback-route-failed": "cutover.failure.rollbackRoute",
     "propagation-timeout": "cutover.failure.timeout"
 } as const satisfies Record<CutoverFailure, string>;
 
@@ -496,6 +499,13 @@ function CutoverState({
                 <p className="flex min-w-0 items-start gap-2 text-sm text-danger" role="alert">
                     <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0 break-words">{failure}</span>
+                </p>
+            ) : null}
+
+            {phase === "checking" ? (
+                <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+                    <span className="min-w-0 break-words">{t("cutover.checking", { target })}</span>
                 </p>
             ) : null}
 
