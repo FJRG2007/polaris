@@ -1,6 +1,6 @@
 {
     "page": {
-        "heading": "Despliegue del agente",
+        "heading": "Despliegues",
         "description": "Actualiza el agente por oleadas de servidores y envía órdenes a servidores desconectados.",
         "back": "Servidores"
     },
@@ -9,13 +9,13 @@
         "columns": {
             "server": "Servidor",
             "agent": "Agente",
-            "seen": "Última respuesta",
+            "seen": "Última señal",
             "waiting": "En cola"
         },
         "noAgent": "Gestionado por SSH",
         "noAgentHint": "Polaris maneja este servidor con su usuario SSH, así que aquí no hay agente que actualizar.",
         "online": "En línea",
-        "offline": "Sin conexión",
+        "offline": "Sin señal",
         "never": "Nunca",
         "pinned": "Fijado en {version}",
         "pin": "Fijar",
@@ -29,8 +29,8 @@
     "rollout": {
         "heading": "Despliegue",
         "none": "Aún no hay despliegues. Empieza uno cuando salga una versión nueva del agente.",
-        "start": "Iniciar despliegue",
-        "startTitle": "Iniciar un despliegue",
+        "start": "Desplegar",
+        "startTitle": "Nuevo despliegue",
         "startBody": "La primera oleada es un canario de pocos servidores; cada oleada siguiente es la parte de servidores alcanzada al terminarla. Una oleada empieza solo cuando todos los servidores de la anterior siguen sanos durante toda la comprobación.",
         "version": "Versión",
         "versionHint": "La versión que debe indicar cada agente tras actualizarse",
@@ -61,7 +61,7 @@
         "skippedWave": "Excluidos",
         "state": {
             "pending": "En espera",
-            "updating": "Actualizando",
+            "updating": "Instalando",
             "verifying": "Comprobando",
             "healthy": "Sano",
             "failed": "Falló",
@@ -96,7 +96,7 @@
             "container.start": "Iniciar contenedor",
             "container.stop": "Parar contenedor",
             "template.apply": "Aplicar plantilla",
-            "agent.update": "Actualizar agente"
+            "agent.update": "Instalar agente"
         },
         "status": {
             "queued": "Esperando al servidor",
