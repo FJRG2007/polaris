@@ -21,6 +21,9 @@ export const NATIVE_APPS: Readonly<Record<string, string>> = {
     "cloud-servers": "/apps/servers/cloud"
 };
 
+/** The catalog ids of every native app. */
+export const NATIVE_APP_IDS: readonly string[] = Object.keys(NATIVE_APPS);
+
 /** Whether an app is part of every Polaris and never installed. */
 export function isNativeApp(catalogId: string): boolean {
     return Object.hasOwn(NATIVE_APPS, catalogId);

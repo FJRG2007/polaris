@@ -33,6 +33,7 @@ import { clearResourceGrants } from "@polaris/auth";
 import { resourceRef } from "@polaris/core";
 import { reconcilePrivateNetworks } from "@/lib/deploy/service-networks";
 import { invalidateInstallPresence } from "@/lib/apps/install-presence";
+import { NATIVE_APP_IDS } from "@/lib/apps/native-apps";
 import {
     appUninstallRefusal,
     pauseOwnedServices,
@@ -430,12 +431,13 @@ export async function listInstalledApps(
     ownerId: string,
     alsoIds: readonly string[] = []
 ): Promise<InstalledAppView[]> {
-    const mine = { ownerId, status: { not: "removed" } };
+    // A row left from when a part of Servers was installable is not an app
+    // anybody manages (see `native-apps`), so no list of installs shows it.
+    const kept = { status: { not: "removed" }, catalogId: { notIn: [...NATIVE_APP_IDS] } };
+    const mine = { ownerId, ...kept };
     const rows = await prisma.installedApp.findMany({
         where:
-            alsoIds.length > 0
-                ? { OR: [mine, { id: { in: [...alsoIds] }, status: { not: "removed" } }] }
-                : mine,
+            alsoIds.length > 0 ? { OR: [mine, { id: { in: [...alsoIds] }, ...kept }] } : mine,
         orderBy: { createdAt: "desc" }
     });
     return rows.map((row) => ({
