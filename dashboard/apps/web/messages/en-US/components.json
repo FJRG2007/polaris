@@ -261,7 +261,7 @@
         "calculationCopyFailed": "The result could not be copied. Try again.",
         "calculationLabel": "Copy {value}",
         "calculationUse": "Use {value}",
-        "calculationCopy": "Copy result",
+        "calculationCopy": "Copy the result",
         "clock": {
             "timer": "Start a {length} timer",
             "alarm": "Set an alarm for {time}",
