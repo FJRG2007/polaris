@@ -121,6 +121,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
     const [editingNote, setEditingNote] = useState<string | null>(null);
     const [overview, setOverview] = useState(graph.nodes.length >= 8);
     const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+    const [resizing, setResizing] = useState<{ id: string; width: number; height: number } | null>(null);
     const shift = useRef(false);
     const help = useId();
 
@@ -214,6 +215,33 @@ export function CanvasBoard(props: CanvasBoardProps) {
         window.addEventListener("pointercancel", up);
     }
 
+    // ---- resizing a note --------------------------------------------------------
+    function pressResize(event: ReactPointerEvent, note: core.GraphNote): void {
+        if (event.button !== 0 || readOnly) return;
+        event.stopPropagation();
+        event.preventDefault();
+        const start = { x: event.clientX, y: event.clientY };
+        let size: { width: number; height: number } | null = null;
+        const move = (next: PointerEvent) => {
+            const zoom = viewRef.current.zoom;
+            size = core.clampNoteSize({ width: note.size.width + (next.clientX - start.x) / zoom, height: note.size.height + (next.clientY - start.y) / zoom });
+            setResizing({ id: note.id, ...size });
+        };
+        const up = () => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+            window.removeEventListener("pointercancel", up);
+            setResizing(null);
+            if (size) {
+                const done = size;
+                onChange((current) => core.resizeNote(current, note.id, done), { group: false });
+            }
+        };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        window.addEventListener("pointercancel", up);
+    }
+
     // ---- connecting -----------------------------------------------------------
     function pressPort(event: ReactPointerEvent, from: { node: string; port: string }): void {
         if (event.button !== 0 || readOnly) return;
@@ -275,7 +303,14 @@ export function CanvasBoard(props: CanvasBoardProps) {
         else if (key === "-") zoomCentre(1 / STEP);
         else if (key === "1" && !event.ctrlKey && !event.metaKey) fit();
         else if (key === "0" && !event.ctrlKey && !event.metaKey) setView((current) => zoomViewAt(current, 1 / current.zoom, { x: 0, y: 0 }, LIMITS));
-        else if (key.startsWith("Arrow") && !readOnly && (selection.nodes.size > 0 || selection.notes.size > 0)) {
+        else if (key.startsWith("Arrow") && event.altKey && !readOnly && selection.notes.size === 1 && selection.nodes.size === 0) {
+            const note = graph.notes.find((entry) => selection.notes.has(entry.id));
+            if (!note) return;
+            const by = event.shiftKey ? 60 : 20;
+            const width = note.size.width + (key === "ArrowLeft" ? -by : key === "ArrowRight" ? by : 0);
+            const height = note.size.height + (key === "ArrowUp" ? -by : key === "ArrowDown" ? by : 0);
+            onChange((current) => core.resizeNote(current, note.id, { width, height }));
+        } else if (key.startsWith("Arrow") && !readOnly && (selection.nodes.size > 0 || selection.notes.size > 0)) {
             const by = event.shiftKey ? 60 : 12;
             const dx = key === "ArrowLeft" ? -by : key === "ArrowRight" ? by : 0;
             const dy = key === "ArrowUp" ? -by : key === "ArrowDown" ? by : 0;
@@ -417,6 +452,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                 {graph.notes.map((note) => {
                     const at = drag && selection.notes.has(note.id) ? { x: note.position.x + drag.x, y: note.position.y + drag.y } : note.position;
                     const selected = selection.notes.has(note.id);
+                    const size = resizing?.id === note.id ? resizing : note.size;
                     return (
                         <div
                             key={note.id}
@@ -425,7 +461,7 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                 "absolute overflow-hidden rounded-md border bg-warning-soft p-2 text-xs text-foreground",
                                 selected ? "border-primary ring-1 ring-primary" : "border-warning-edge"
                             )}
-                            style={{ left: at.x, top: at.y, width: note.size.width, height: note.size.height }}
+                            style={{ left: at.x, top: at.y, width: size.width, height: size.height }}
                             onPointerDown={(event) => editingNote !== note.id && pressItem(event, "note", note.id)}
                             onDoubleClick={() => !readOnly && setEditingNote(note.id)}
                         >
@@ -449,6 +485,15 @@ export function CanvasBoard(props: CanvasBoardProps) {
                             ) : (
                                 <p className="whitespace-pre-wrap break-words">{note.text || <span className="text-foreground-subtle">{t("canvas.notePlaceholder")}</span>}</p>
                             )}
+                            {selected && !readOnly && editingNote !== note.id ? (
+                                <span
+                                    data-port
+                                    role="presentation"
+                                    title={t("canvas.resizeNote")}
+                                    className="absolute bottom-0 right-0 size-3 cursor-nwse-resize rounded-tl-sm border-l border-t border-warning-edge bg-warning-edge/60"
+                                    onPointerDown={(event) => pressResize(event, note)}
+                                />
+                            ) : null}
                         </div>
                     );
                 })}

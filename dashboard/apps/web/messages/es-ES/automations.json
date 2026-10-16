@@ -400,7 +400,8 @@
         "insertGone": "Esa conexión ya no existe.",
         "tidy": "Ordenar",
         "tidied": "Ordenado. Ctrl+Z lo deshace.",
-        "runFromStarted": "Probando desde {name}"
+        "runFromStarted": "Probando desde {name}",
+        "resizeNote": "Arrastra o Alt+flechas para el tamaño"
     },
     "stepStatus": {
         "ready": "Listo",

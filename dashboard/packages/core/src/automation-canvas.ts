@@ -283,6 +283,24 @@ export function insertOnEdge(graph: graphs.AutomationGraph, key: string, node: g
     };
 }
 
+/** The smallest and largest a sticky note may be, the bounds `graphNoteSchema` holds it to. */
+export const NOTE_SIZE = { min: { width: 120, height: 60 }, max: { width: 1200, height: 1200 } } as const;
+
+/** A note's size kept inside `NOTE_SIZE`, whole units. */
+export function clampNoteSize(size: { width: number; height: number }): { width: number; height: number } {
+    const clamp = (value: number, min: number, max: number) => Math.round(Math.min(max, Math.max(min, Number.isFinite(value) ? value : min)));
+    return { width: clamp(size.width, NOTE_SIZE.min.width, NOTE_SIZE.max.width), height: clamp(size.height, NOTE_SIZE.min.height, NOTE_SIZE.max.height) };
+}
+
+/** The graph with one note resized; the same graph when the note is gone or the size did not change. */
+export function resizeNote(graph: graphs.AutomationGraph, noteId: string, size: { width: number; height: number }): graphs.AutomationGraph {
+    const note = graph.notes.find((entry) => entry.id === noteId);
+    if (!note) return graph;
+    const next = clampNoteSize(size);
+    if (next.width === note.size.width && next.height === note.size.height) return graph;
+    return { ...graph, notes: graph.notes.map((entry) => (entry.id === noteId ? { ...entry, size: next } : entry)) };
+}
+
 /** Move nodes and notes by the same distance, as a drag of a selection does. */
 export function moveInGraph(graph: graphs.AutomationGraph, nodeIds: ReadonlySet<string>, noteIds: ReadonlySet<string>, dx: number, dy: number): graphs.AutomationGraph {
     const snap = (value: number) => Math.round(value);

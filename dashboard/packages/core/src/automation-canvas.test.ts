@@ -297,3 +297,20 @@ describe("run from here", () => {
         expect((run as Extract<canvas.PartialRun, { graph: unknown }>).graph.nodes.map((entry) => entry.id).sort()).toEqual(["a", "if1", "t1"]);
     });
 });
+
+describe("resizing a note", () => {
+    const withNote = (): graph.AutomationGraph => ({ ...sample(), notes: [{ id: "note", text: "", position: { x: 0, y: 0 }, size: { width: 220, height: 120 } }] });
+
+    it("keeps the size inside the bounds the schema accepts", () => {
+        expect(canvas.resizeNote(withNote(), "note", { width: 300.4, height: 90 }).notes[0]!.size).toEqual({ width: 300, height: 90 });
+        expect(canvas.resizeNote(withNote(), "note", { width: 10, height: 5000 }).notes[0]!.size).toEqual({ width: 120, height: 1200 });
+        const resized = canvas.resizeNote(withNote(), "note", { width: 10, height: 5000 });
+        expect(graph.automationGraphSchema.safeParse(resized).success).toBe(true);
+    });
+
+    it("returns the same graph when nothing changes or the note is gone", () => {
+        const g = withNote();
+        expect(canvas.resizeNote(g, "note", { width: 220, height: 120 })).toBe(g);
+        expect(canvas.resizeNote(g, "gone", { width: 400, height: 400 })).toBe(g);
+    });
+});
