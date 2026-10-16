@@ -302,10 +302,12 @@ function ProviderForm({
 function ProviderCard({
     provider,
     onEdit,
+    onChecked,
     onDeleted
 }: {
     provider: SamlProviderView;
     onEdit: () => void;
+    onChecked: (provider: SamlProviderView) => void;
     onDeleted: () => void;
 }) {
     const t = useTranslations("admin");
@@ -319,8 +321,10 @@ function ProviderCard({
         setError(null);
         const outcome = await checkSamlProviderAction(provider.providerId);
         setPending(false);
-        if (outcome.ok) setChecks(outcome.value);
-        else setError(t(PROBLEMS[outcome.problem]));
+        if (outcome.ok) {
+            setChecks(outcome.value.checks);
+            onChecked(outcome.value.provider);
+        } else setError(t(PROBLEMS[outcome.problem]));
     }
 
     return (
@@ -409,7 +413,10 @@ export function SsoAdmin({ providers: initial }: { providers: SamlProviderView[]
 
     function saved(provider: SamlProviderView | null) {
         setEditing(null);
-        if (!provider) return;
+        if (provider) replace(provider);
+    }
+
+    function replace(provider: SamlProviderView) {
         setProviders((list) =>
             list.some((entry) => entry.providerId === provider.providerId)
                 ? list.map((entry) => (entry.providerId === provider.providerId ? provider : entry))
@@ -430,6 +437,7 @@ export function SsoAdmin({ providers: initial }: { providers: SamlProviderView[]
                         key={provider.providerId}
                         provider={provider}
                         onEdit={() => setEditing(provider.providerId)}
+                        onChecked={replace}
                         onDeleted={() => setProviders((list) => list.filter((entry) => entry.providerId !== provider.providerId))}
                     />
                 )

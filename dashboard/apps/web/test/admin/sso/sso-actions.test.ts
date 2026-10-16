@@ -10,7 +10,7 @@ const ADMIN = { id: "admin-1", isAdmin: true };
 const requireAdmin = vi.fn(async (): Promise<unknown> => ADMIN);
 const recordAudit = vi.fn(async () => undefined);
 const saveSamlProvider = vi.fn(async () => VIEW);
-const checkSamlProvider = vi.fn(async () => [{ key: "certificate", ok: true }]);
+const checkSamlProvider = vi.fn(async () => ({ checks: [{ key: "certificate", ok: true }], provider: VIEW }));
 const deleteSamlProvider = vi.fn(async () => undefined);
 
 class SamlProviderError extends Error {

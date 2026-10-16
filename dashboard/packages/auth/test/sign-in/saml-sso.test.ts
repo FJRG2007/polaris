@@ -42,12 +42,18 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         ssoProvider: { findMany: async () => state.policies },
         user: {
-            findUnique: async ({ where }: { where: { email: string } }) => ({ isAdmin: state.admins.has(where.email) })
+            findUnique: async ({ where }: { where: { email?: string; id?: string } }) => {
+                const email = where.email ?? (db.user.find((user) => user.id === where.id)?.email as string | undefined);
+                return email === undefined ? null : { email, isAdmin: state.admins.has(email) };
+            }
         }
     }
 }));
 
-const { samlSignUpAllowed, samlSsoPlugin, SSO_ERROR_PATH, SSO_REQUIRED_CODE } = await import("../../src/saml-sso.js");
+const { refuseSessionForEnforcedDomain, samlSignUpAllowed, samlSsoPlugin, SSO_ERROR_PATH, SSO_REQUIRED_CODE } = await import(
+    "../../src/saml-sso.js"
+);
+const { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } = await import("../../src/connection-sign-in.js");
 
 type Db = Record<string, Record<string, unknown>[]>;
 let db: Db;
@@ -59,8 +65,17 @@ function createTestAuth() {
         secret: "fixture-secret-value-0123456789abcdef",
         database: memoryAdapter(db),
         emailAndPassword: { enabled: true },
-        databaseHooks: { user: { create: { before: async (user, context) => samlSignUpAllowed(user.email, context) } } },
-        plugins: [samlSsoPlugin()]
+        databaseHooks: {
+            user: { create: { before: async (user, context) => samlSignUpAllowed(user.email, context) } },
+            session: {
+                create: {
+                    before: async (session, context) => {
+                        if (context?.path === CONNECTION_SIGN_IN_PATH) await refuseSessionForEnforcedDomain(session.userId);
+                    }
+                }
+            }
+        },
+        plugins: [samlSsoPlugin(), connectionSignInPlugin()]
     });
 }
 
@@ -304,5 +319,28 @@ describe("enforced domains", () => {
         expect((await passwordSignIn("outside@other.test")).status).toBe(200);
         setProvider({ enforced: true, domainVerified: false });
         expect((await passwordSignIn("root@acme.test")).status).toBe(200);
+    });
+
+    async function connectionSignIn(email: string): Promise<unknown> {
+        const userId = db.user.find((user) => user.email === email)?.id as string;
+        const api = auth.api as unknown as {
+            polarisConnectionSignIn(input: { body: { userId: string; provider: string; challenge: boolean }; headers: Headers }): Promise<unknown>;
+        };
+        return api.polarisConnectionSignIn({ body: { userId, provider: "github", challenge: false }, headers: new Headers() }).then(
+            () => null,
+            (error: { body?: { code?: string } }) => error.body?.code ?? "failed"
+        );
+    }
+
+    it("refuses every other way in for an address in an enforced domain", async () => {
+        const sessions = db.session.length;
+        expect(await connectionSignIn("root@acme.test")).toBe(SSO_REQUIRED_CODE);
+        expect(db.session).toHaveLength(sessions);
+    });
+
+    it("keeps the other ways in for an administrator and for other domains", async () => {
+        state.admins.add("root@acme.test");
+        expect(await connectionSignIn("root@acme.test")).toBeNull();
+        expect(await connectionSignIn("outside@other.test")).toBeNull();
     });
 });

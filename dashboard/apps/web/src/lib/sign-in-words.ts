@@ -17,7 +17,8 @@ const OWN_METHODS: Readonly<Record<string, NamespaceKey<"components">>> = {
     password: "signIn.methods.password",
     passkey: "signIn.methods.passkey",
     "email-link": "signIn.methods.emailLink",
-    "qr-code": "signIn.methods.qrCode"
+    "qr-code": "signIn.methods.qrCode",
+    sso: "signIn.methods.sso"
 };
 
 const SECOND_FACTORS: Readonly<Record<SecondFactor, NamespaceKey<"components">>> = {

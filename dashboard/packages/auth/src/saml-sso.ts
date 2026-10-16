@@ -13,7 +13,7 @@
  *   provider that would then vouch for somebody else's address.
  * - A first sign-in creates an account only when that provider allows it, and
  *   only for an address in one of that provider's own domains.
- * - Where a provider is enforced, a password sign-in for its domains is refused,
+ * - Where a provider is enforced, every other way in for its domains is refused,
  *   except for a platform administrator, whose password is the way back in when
  *   the provider is broken.
  * - The address a sign-in returns to is a path on this deployment, never a URL.
@@ -39,7 +39,7 @@ export const SSO_ERROR_PATH = "/oauth/login?error=sso";
 const AUTHN_REQUEST_PREFIX = "saml-authn-request:";
 
 /** The two routes a SAML response is posted to. */
-const ASSERTION_PATHS: ReadonlySet<string> = new Set([
+export const ASSERTION_PATHS: ReadonlySet<string> = new Set([
     "/sso/saml2/sp/acs/:providerId",
     "/sso/saml2/callback/:providerId"
 ]);
@@ -97,6 +97,25 @@ async function refusePasswordForEnforcedDomain(email: string): Promise<void> {
         select: { isAdmin: true }
     });
     if (core.passwordSignInRefused({ email, isAdmin: user?.isAdmin ?? false }, providers)) {
+        throw new APIError("FORBIDDEN", {
+            code: SSO_REQUIRED_CODE,
+            message: "This account signs in with single sign-on."
+        });
+    }
+}
+
+/**
+ * Refuses a session for an account whose domain must use its identity provider,
+ * when it comes through a way in that never asks that provider - a passkey, a
+ * scanned code, an emailed link, a connected account. Without this, someone
+ * offboarded at the provider keeps every other door. A platform administrator
+ * passes, as with a password.
+ */
+export async function refuseSessionForEnforcedDomain(userId: string): Promise<void> {
+    const providers = await samlDomainPolicies();
+    if (!providers.some((provider) => provider.enforced && provider.domainVerified)) return;
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, isAdmin: true } });
+    if (user && core.passwordSignInRefused(user, providers)) {
         throw new APIError("FORBIDDEN", {
             code: SSO_REQUIRED_CODE,
             message: "This account signs in with single sign-on."

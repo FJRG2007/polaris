@@ -727,7 +727,8 @@
             "password": "Password",
             "passkey": "Passkey",
             "emailLink": "Email link",
-            "qrCode": "QR code"
+            "qrCode": "QR code",
+            "sso": "Single sign-on"
         },
         "secondFactors": {
             "totp": "Authenticator app",

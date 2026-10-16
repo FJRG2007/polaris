@@ -54,7 +54,7 @@ export async function saveSamlProviderAction(
     return outcome;
 }
 
-export async function checkSamlProviderAction(providerId: string): Promise<Outcome<saml.SamlCheck[]>> {
+export async function checkSamlProviderAction(providerId: string): Promise<Outcome<saml.SamlCheckResult>> {
     await requireAdmin();
     const id = providerIdSchema.safeParse(providerId);
     if (!id.success) return { ok: false, problem: "notFound" };

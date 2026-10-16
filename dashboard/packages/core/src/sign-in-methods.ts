@@ -22,7 +22,7 @@
 import { CONNECTION_PROVIDERS, type ConnectionProviderSlug } from "./connection-providers.js";
 
 /** The ways in that Polaris itself proves. */
-const OWN_SIGN_IN_METHODS = ["password", "passkey", "email-link", "qr-code"] as const;
+const OWN_SIGN_IN_METHODS = ["password", "passkey", "email-link", "qr-code", "sso"] as const;
 
 /**
  * How the account was identified. A linked outside account is one of these too,
@@ -66,6 +66,7 @@ export const SIGN_IN_METHOD_LABELS: Record<SignInMethod, string> = {
     passkey: "Passkey",
     "email-link": "Email link",
     "qr-code": "QR code",
+    sso: "Single sign-on",
     ...(Object.fromEntries(
         CONNECTION_PROVIDERS.map((provider) => [provider.slug, provider.name])
     ) as Record<ConnectionProviderSlug, string>)

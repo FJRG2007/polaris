@@ -174,6 +174,19 @@ export interface SamlCheck {
     detail?: string;
 }
 
+/** A check's lines, and the provider as the check left it. */
+export interface SamlCheckResult {
+    checks: SamlCheck[];
+    provider: SamlProviderView;
+}
+
+/** Whether the identity provider's sign-in address still answers: anything short
+ *  of a server error or an address that is gone. A bare GET carries no request,
+ *  so a working provider may well refuse it with a 400 or a 401. */
+function signInAddressAnswers(response: { status: number } | null): boolean {
+    return response !== null && response.status < 500 && response.status !== 404 && response.status !== 410;
+}
+
 async function hasRecord(record: { name: string; value: string }): Promise<boolean> {
     try {
         const answers = await resolveTxt(record.name);
@@ -185,11 +198,11 @@ async function hasRecord(record: { name: string; value: string }): Promise<boole
 
 /**
  * Checks a saved provider the way sign-in will meet it: the certificate is still
- * valid, the metadata address (when it has one) still answers, and every domain
+ * valid, the sign-in address (when it has one) still answers, and every domain
  * carries its record. A provider whose domains all pass is marked verified; one
  * that no longer passes is not, so it stops signing people in.
  */
-export async function checkSamlProvider(providerId: string): Promise<SamlCheck[]> {
+export async function checkSamlProvider(providerId: string): Promise<SamlCheckResult> {
     const row = await prisma.ssoProvider.findUnique({ where: { providerId }, select: SELECT });
     if (!row) throw new SamlProviderError("notFound");
     const current = view(row);
@@ -203,7 +216,7 @@ export async function checkSamlProvider(providerId: string): Promise<SamlCheck[]
     }
     if (stored?.ssoUrl) {
         const url = safeUrl(stored.ssoUrl);
-        const answered = url ? await follow(url).then((response) => response !== null, () => false) : false;
+        const answered = url ? await follow(url).then(signInAddressAnswers, () => false) : false;
         checks.push({ key: "metadata", ok: answered });
     }
     let allDomains = true;
@@ -215,7 +228,7 @@ export async function checkSamlProvider(providerId: string): Promise<SamlCheck[]
     if (allDomains !== row.domainVerified) {
         await prisma.ssoProvider.update({ where: { providerId }, data: { domainVerified: allDomains } });
     }
-    return checks;
+    return { checks, provider: { ...current, domainVerified: allDomains } };
 }
 
 /** Whether an address's domain signs in through a working provider, for the sign-in screen. */

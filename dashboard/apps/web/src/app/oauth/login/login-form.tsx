@@ -216,6 +216,11 @@ export function LoginForm({
         const result = await authClient.signIn.passkey();
         setPending(false);
         if (result?.error) {
+            if ((result.error as { code?: string }).code === "SSO_REQUIRED") {
+                setCanSso(true);
+                setError(t("login.ssoRequired"));
+                return;
+            }
             setError(t("login.passkeyFailed"));
             return;
         }

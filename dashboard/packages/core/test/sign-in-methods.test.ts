@@ -52,6 +52,7 @@ describe("describing a sign-in", () => {
     it("carries a method that needs no second step on its own", () => {
         expect(signInSummary({ method: "qr-code", secondFactor: null })).toBe("QR code");
         expect(signInSummary({ method: "passkey", secondFactor: null })).toBe("Passkey");
+        expect(signInSummary({ method: parseSignInMethod("sso"), secondFactor: null })).toBe("Single sign-on");
     });
 
     // The one that matters: silence here would read as "signed in with a password

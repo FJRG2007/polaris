@@ -136,6 +136,10 @@ function boundHere(rpId: string): { rpId: string | null }[] {
  * provider, so the sign-in screen can offer it.
  */
 export async function ssoOffered(identifier: string): Promise<boolean> {
-    const email = await resolveIdentifier(identifier);
+    const value = identifier.trim().toLowerCase();
+    if (!value) return false;
+    const throttle = await rateLimit(`sso-hint:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
+    if (!throttle.ok) return false;
+    const email = await resolveIdentifier(value);
     return email ? ssoOfferedFor(email) : false;
 }

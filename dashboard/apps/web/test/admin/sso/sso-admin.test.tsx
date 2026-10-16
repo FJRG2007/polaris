@@ -105,14 +105,30 @@ describe("single sign-on screen", () => {
     it("checks a provider and lists what passed and what did not", async () => {
         checkSamlProviderAction.mockResolvedValue({
             ok: true,
-            value: [
-                { key: "certificate", ok: true },
-                { key: "domain", ok: false, detail: "_polaris-sso.example.com" }
-            ]
+            value: {
+                checks: [
+                    { key: "certificate", ok: true },
+                    { key: "domain", ok: false, detail: "_polaris-sso.example.com" }
+                ],
+                provider: PROVIDER
+            }
         });
         render(<SsoAdmin providers={[PROVIDER]} />);
         fireEvent.click(screen.getByRole("button", { name: "Check now" }));
         await waitFor(() => expect(screen.getByText("Signing certificate is valid")).toBeTruthy());
         expect(screen.getByText(/DNS record found - _polaris-sso.example.com/)).toBeTruthy();
+    });
+
+    it("shows the provider as the check left it, without a reload", async () => {
+        checkSamlProviderAction.mockResolvedValue({
+            ok: true,
+            value: { checks: [{ key: "domain", ok: true }], provider: { ...PROVIDER, domainVerified: true } }
+        });
+        render(<SsoAdmin providers={[PROVIDER]} />);
+        expect(screen.getByText("Waiting for DNS")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Check now" }));
+        await waitFor(() => expect(screen.getByText("Active")).toBeTruthy());
+        expect(screen.queryByText("Waiting for DNS")).toBeNull();
+        expect(screen.queryByText(/Add these TXT records/)).toBeNull();
     });
 });
