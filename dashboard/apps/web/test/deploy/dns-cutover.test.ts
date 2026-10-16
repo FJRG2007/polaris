@@ -40,11 +40,15 @@ describe("the pre-flight", () => {
         expect(cutover.preflightProblem("manual", { ...HEALTHY, running: false })).toBe(
             "target-not-running"
         );
-        expect(cutover.preflightProblem("manual", { ...HEALTHY, newValue: null })).toBe("no-address");
+        expect(cutover.preflightProblem("manual", { ...HEALTHY, newValue: null })).toBe(
+            "no-address"
+        );
         expect(cutover.preflightProblem("manual", { ...HEALTHY, answers: "not-routed" })).toBe(
             "target-not-routed"
         );
-        expect(cutover.preflightProblem("manual", { ...HEALTHY, answers: "down" })).toBe("target-down");
+        expect(cutover.preflightProblem("manual", { ...HEALTHY, answers: "down" })).toBe(
+            "target-down"
+        );
     });
 
     it("needs no address when only the route moves", () => {
@@ -56,7 +60,9 @@ describe("the pre-flight", () => {
 
 describe("where a cutover starts", () => {
     it("stops before anything changes when the pre-flight fails", () => {
-        expect(cutover.initialState("cloudflare", { ...HEALTHY, running: false }, 3600, NOW)).toEqual({
+        expect(
+            cutover.initialState("cloudflare", { ...HEALTHY, running: false }, 3600, NOW)
+        ).toEqual({
             phase: "preflight-failed",
             failure: "target-not-running",
             lowerUntil: null
@@ -75,12 +81,14 @@ describe("where a cutover starts", () => {
     });
 
     it("is ready at once with a short TTL, a record by hand, or only a route to move", () => {
-        expect(cutover.initialState("cloudflare", HEALTHY, cutover.LOWERED_TTL, NOW).phase).toBe("ready");
-        expect(cutover.initialState("cloudflare", HEALTHY, 1, NOW).phase).toBe("ready");
-        expect(cutover.initialState("manual", HEALTHY, 3600, NOW).phase).toBe("ready");
-        expect(cutover.initialState("edge", { ...HEALTHY, answers: "skipped" }, null, NOW).phase).toBe(
+        expect(cutover.initialState("cloudflare", HEALTHY, cutover.LOWERED_TTL, NOW).phase).toBe(
             "ready"
         );
+        expect(cutover.initialState("cloudflare", HEALTHY, 1, NOW).phase).toBe("ready");
+        expect(cutover.initialState("manual", HEALTHY, 3600, NOW).phase).toBe("ready");
+        expect(
+            cutover.initialState("edge", { ...HEALTHY, answers: "skipped" }, null, NOW).phase
+        ).toBe("ready");
     });
 });
 
@@ -117,7 +125,9 @@ describe("a background pass", () => {
     it("is idempotent: the same row and observation give the same phase", () => {
         const propagating = row({ phase: "propagating", switchedAt: NOW });
         const observation = { dnsSettled: true, targetUp: true };
-        expect(cutover.tick(propagating, observation, NOW)).toEqual(cutover.tick(propagating, observation, NOW));
+        expect(cutover.tick(propagating, observation, NOW)).toEqual(
+            cutover.tick(propagating, observation, NOW)
+        );
         for (const phase of ["ready", "done", "rolled-back", "failed"] as const) {
             expect(cutover.tick(row({ phase }), observation, NOW).phase).toBe(phase);
         }
@@ -141,7 +151,13 @@ describe("switching", () => {
     });
 
     it("does nothing a second time, nor before the pre-flight has finished", () => {
-        for (const phase of ["checking", "propagating", "finishing", "done", "rolled-back"] as const) {
+        for (const phase of [
+            "checking",
+            "propagating",
+            "finishing",
+            "done",
+            "rolled-back"
+        ] as const) {
             expect(cutover.canSwitch(phase)).toBe(false);
             expect(cutover.switchEffects(row({ phase }))).toEqual([]);
         }
@@ -191,20 +207,20 @@ describe("rolling back", () => {
     });
 
     it("undoes a switch that began and did not finish", () => {
-        expect(cutover.rollbackEffects({ ...row({ phase: "ready", oldTtl: 1 }), touched: true })).toEqual([
-            "restore-record",
-            "republish"
-        ]);
-        expect(cutover.rollbackEffects({ ...row({ mode: "edge", phase: "ready" }), touched: true })).toEqual([
-            "move-route-back",
-            "republish"
-        ]);
+        expect(
+            cutover.rollbackEffects({ ...row({ phase: "ready", oldTtl: 1 }), touched: true })
+        ).toEqual(["restore-record", "republish"]);
+        expect(
+            cutover.rollbackEffects({ ...row({ mode: "edge", phase: "ready" }), touched: true })
+        ).toEqual(["move-route-back", "republish"]);
     });
 
     it("can close a cutover whose pre-flight never finished", () => {
         expect(cutover.canRollback("checking")).toBe(true);
         expect(cutover.isOpen("checking")).toBe(true);
-        expect(cutover.rollbackEffects(row({ phase: "checking", oldTtl: 1 }))).toEqual(["republish"]);
+        expect(cutover.rollbackEffects(row({ phase: "checking", oldTtl: 1 }))).toEqual([
+            "republish"
+        ]);
     });
 
     it("moves the route back behind a shared edge", () => {
@@ -214,9 +230,9 @@ describe("rolling back", () => {
     });
 
     it("only drops the staged route for a record changed by hand", () => {
-        expect(cutover.rollbackEffects(row({ mode: "manual", phase: "failed", switchedAt: NOW }))).toEqual(
-            ["republish"]
-        );
+        expect(
+            cutover.rollbackEffects(row({ mode: "manual", phase: "failed", switchedAt: NOW }))
+        ).toEqual(["republish"]);
     });
 
     it("does nothing once closed, so a second press is harmless", () => {
@@ -262,7 +278,14 @@ describe("the routes a cutover stages on the edge", () => {
     it("routes a moving name on the target's edge while it is open", () => {
         const staged = cutover.stagedRoutes(
             rows,
-            [{ domainId: "d1", targetApplicationId: "far", phase: "propagating", mode: "cloudflare" }],
+            [
+                {
+                    domainId: "d1",
+                    targetApplicationId: "far",
+                    phase: "propagating",
+                    mode: "cloudflare"
+                }
+            ],
             targets
         );
         expect(staged.map(({ row, target }) => [row.id, target.id])).toEqual([["d1", "far"]]);
@@ -275,8 +298,18 @@ describe("the routes a cutover stages on the edge", () => {
                 [
                     { domainId: "d1", targetApplicationId: "near", phase: "ready", mode: "manual" },
                     { domainId: "d2", targetApplicationId: "far", phase: "done", mode: "manual" },
-                    { domainId: "gone", targetApplicationId: "far", phase: "ready", mode: "manual" },
-                    { domainId: "d2", targetApplicationId: "missing", phase: "ready", mode: "manual" },
+                    {
+                        domainId: "gone",
+                        targetApplicationId: "far",
+                        phase: "ready",
+                        mode: "manual"
+                    },
+                    {
+                        domainId: "d2",
+                        targetApplicationId: "missing",
+                        phase: "ready",
+                        mode: "manual"
+                    },
                     { domainId: "d2", targetApplicationId: "far", phase: "ready", mode: "edge" }
                 ],
                 targets

@@ -226,11 +226,7 @@ export async function findDnsRecords(
 ): Promise<CfDnsRecord[]> {
     const existing = await cf<
         Array<{ id?: unknown; content?: unknown; ttl?: unknown; proxied?: unknown }>
-    >(
-        token,
-        "GET",
-        `/zones/${zoneId}/dns_records?type=${type}&name=${encodeURIComponent(name)}`
-    );
+    >(token, "GET", `/zones/${zoneId}/dns_records?type=${type}&name=${encodeURIComponent(name)}`);
     if (!Array.isArray(existing)) return [];
     return existing
         .filter(

@@ -107,7 +107,10 @@ export const preflightChecksSchema = z.object({
 });
 
 /** The first problem that stops the cutover, or null when the target can take it. */
-export function preflightProblem(mode: CutoverMode, checks: PreflightChecks): CutoverFailure | null {
+export function preflightProblem(
+    mode: CutoverMode,
+    checks: PreflightChecks
+): CutoverFailure | null {
     if (!checks.deployed) return "target-not-deployed";
     if (!checks.running) return "target-not-running";
     if (mode !== "edge" && checks.newValue === null) return "no-address";
@@ -148,7 +151,13 @@ export function canSwitch(phase: CutoverPhase): boolean {
 }
 
 export function canRollback(phase: CutoverPhase): boolean {
-    return phase === "checking" || phase === "lowering" || phase === "ready" || phase === "propagating" || phase === "failed";
+    return (
+        phase === "checking" ||
+        phase === "lowering" ||
+        phase === "ready" ||
+        phase === "propagating" ||
+        phase === "failed"
+    );
 }
 
 /** Whether the target's edge carries a route for the hostname while the old one still
@@ -156,7 +165,10 @@ export function canRollback(phase: CutoverPhase): boolean {
 export function stagesRoute(mode: CutoverMode, phase: CutoverPhase): boolean {
     return (
         mode !== "edge" &&
-        (phase === "checking" || canSwitch(phase) || phase === "propagating" || phase === "finishing")
+        (phase === "checking" ||
+            canSwitch(phase) ||
+            phase === "propagating" ||
+            phase === "finishing")
     );
 }
 
@@ -178,16 +190,25 @@ type EdgeTarget = { readonly kind: string; readonly hostId: string | null };
  * route itself instead. The edge's route file is rendered from what this returns.
  */
 export function stagedRoutes<
-    R extends { readonly id: string; readonly servedBy: string; readonly application: { readonly target: EdgeTarget } },
+    R extends {
+        readonly id: string;
+        readonly servedBy: string;
+        readonly application: { readonly target: EdgeTarget };
+    },
     T extends { readonly target: EdgeTarget }
->(rows: readonly R[], staged: readonly StagedCutover[], targets: ReadonlyMap<string, T>): { row: R; target: T }[] {
+>(
+    rows: readonly R[],
+    staged: readonly StagedCutover[],
+    targets: ReadonlyMap<string, T>
+): { row: R; target: T }[] {
     const routed: { row: R; target: T }[] = [];
     for (const entry of staged) {
         if (!stagesRoute(readMode(entry.mode), readPhase(entry.phase))) continue;
         const row = rows.find((candidate) => candidate.id === entry.domainId);
         const target = targets.get(entry.targetApplicationId);
         if (!row || !target) continue;
-        if (edgeKey(row.application.target, row.servedBy) === edgeKey(target.target, row.servedBy)) continue;
+        if (edgeKey(row.application.target, row.servedBy) === edgeKey(target.target, row.servedBy))
+            continue;
         routed.push({ row, target });
     }
     return routed;
@@ -219,7 +240,10 @@ export function tick(
     switch (row.phase) {
         case "lowering":
             return {
-                phase: row.lowerUntil && now.getTime() >= row.lowerUntil.getTime() ? "ready" : "lowering",
+                phase:
+                    row.lowerUntil && now.getTime() >= row.lowerUntil.getTime()
+                        ? "ready"
+                        : "lowering",
                 failure: null
             };
         case "propagating": {
@@ -264,7 +288,9 @@ export function switchEffects(row: Pick<CutoverRow, "phase" | "mode">): CutoverE
  *  `touched` is a switch that began changing things and did not finish, which leaves
  *  `switchedAt` empty but still has to be undone. */
 export function rollbackEffects(
-    row: Pick<CutoverRow, "phase" | "mode" | "switchedAt" | "oldTtl"> & { readonly touched?: boolean }
+    row: Pick<CutoverRow, "phase" | "mode" | "switchedAt" | "oldTtl"> & {
+        readonly touched?: boolean;
+    }
 ): CutoverEffect[] {
     if (!canRollback(row.phase)) return [];
     const effects: CutoverEffect[] = [];
@@ -297,7 +323,11 @@ export interface ManualRecord {
     readonly ttl: number;
 }
 
-export function manualRecord(hostname: string, value: string, ttl: number = LOWERED_TTL): ManualRecord {
+export function manualRecord(
+    hostname: string,
+    value: string,
+    ttl: number = LOWERED_TTL
+): ManualRecord {
     return { type: "A", name: hostname, value, ttl };
 }
 
@@ -305,14 +335,18 @@ export function manualRecord(hostname: string, value: string, ttl: number = LOWE
 export function readList(value: string | null | undefined): string[] {
     try {
         const parsed: unknown = JSON.parse(value ?? "[]");
-        return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+        return Array.isArray(parsed)
+            ? parsed.filter((entry): entry is string => typeof entry === "string")
+            : [];
     } catch {
         return [];
     }
 }
 
 export function readPhase(value: string): CutoverPhase {
-    return (CUTOVER_PHASES as readonly string[]).includes(value) ? (value as CutoverPhase) : "failed";
+    return (CUTOVER_PHASES as readonly string[]).includes(value)
+        ? (value as CutoverPhase)
+        : "failed";
 }
 
 export function readMode(value: string): CutoverMode {
@@ -334,7 +368,9 @@ const FAILURES: readonly CutoverFailure[] = [
 ];
 
 export function readFailure(value: string | null): CutoverFailure | null {
-    return value !== null && (FAILURES as readonly string[]).includes(value) ? (value as CutoverFailure) : null;
+    return value !== null && (FAILURES as readonly string[]).includes(value)
+        ? (value as CutoverFailure)
+        : null;
 }
 
 /** One public resolver's answer, as the screen lists it. */
@@ -378,7 +414,10 @@ const resolverSchema = z.object({
 
 const storedChecksSchema = z.object({
     preflight: preflightChecksSchema.optional().catch(undefined),
-    propagation: z.object({ resolvers: z.array(resolverSchema) }).optional().catch(undefined),
+    propagation: z
+        .object({ resolvers: z.array(resolverSchema) })
+        .optional()
+        .catch(undefined),
     target: z
         .object({ status: z.enum(["up", "down"]), code: z.number().int().nullable() })
         .optional()

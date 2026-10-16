@@ -79,8 +79,12 @@ const APP_SELECT = {
     sourceType: true,
     sourceConfig: true,
     domains: { select: { targetPort: true } },
-    environment: { select: { projectId: true, name: true, project: { select: { ownerId: true, orgId: true } } } },
-    target: { select: { kind: true, hostId: true, host: { select: { name: true, address: true } } } }
+    environment: {
+        select: { projectId: true, name: true, project: { select: { ownerId: true, orgId: true } } }
+    },
+    target: {
+        select: { kind: true, hostId: true, host: { select: { name: true, address: true } } }
+    }
 } as const;
 
 async function loadDomain(domainId: string) {
@@ -327,7 +331,11 @@ export async function startCutover(input: {
                 newValue,
                 oldTtl,
                 zoneId: zone?.zoneId ?? null,
-                recordIds: JSON.stringify({ records, created: null, touched: false } satisfies Written)
+                recordIds: JSON.stringify({
+                    records,
+                    created: null,
+                    touched: false
+                } satisfies Written)
             },
             select: { id: true }
         });
@@ -439,7 +447,10 @@ async function restoreRecords(
         });
     }
     for (const entry of spare) {
-        if (entry.id === written.created || (row.newValue !== null && entry.content === row.newValue)) {
+        if (
+            entry.id === written.created ||
+            (row.newValue !== null && entry.content === row.newValue)
+        ) {
             await cf.deleteDnsRecord(zone.token, zone.zoneId, entry.id);
         }
     }
@@ -478,7 +489,13 @@ export async function cutoverPanel(
     if (row?.openKey) {
         const checkedAt = readChecks(row.checks).checkedAt;
         const at = checkedAt ? new Date(checkedAt) : null;
-        if (machine.screenShouldCheck(machine.readPhase(row.phase), at && !Number.isNaN(at.getTime()) ? at : null, new Date())) {
+        if (
+            machine.screenShouldCheck(
+                machine.readPhase(row.phase),
+                at && !Number.isNaN(at.getTime()) ? at : null,
+                new Date()
+            )
+        ) {
             await advanceCutover(row.id).catch((error) => {
                 console.error(`polaris: DNS cutover ${row?.id} could not be checked:`, error);
             });
@@ -533,7 +550,10 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
     let written = readWritten(row.recordIds);
     const save = async (next: Written) => {
         written = next;
-        await prisma.dnsCutover.update({ where: { id }, data: { recordIds: JSON.stringify(next) } });
+        await prisma.dnsCutover.update({
+            where: { id },
+            data: { recordIds: JSON.stringify(next) }
+        });
     };
     try {
         await save({ ...written, touched: true });
@@ -541,7 +561,9 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
             if (effect === "write-record") {
                 const zone = await zoneOf(row);
                 const present = new Set(
-                    (await cf.findDnsRecords(zone.token, zone.zoneId, "A", row.hostname)).map((entry) => entry.id)
+                    (await cf.findDnsRecords(zone.token, zone.zoneId, "A", row.hostname)).map(
+                        (entry) => entry.id
+                    )
                 );
                 const ttl = machine.lowersTtl(mode, row.oldTtl) ? machine.LOWERED_TTL : undefined;
                 const [first, ...rest] = written.records;
@@ -560,7 +582,8 @@ export async function switchCutover(id: string, actorId: string): Promise<void> 
                     await save({ ...written, created });
                 }
                 for (const other of rest) {
-                    if (present.has(other.id)) await cf.deleteDnsRecord(zone.token, zone.zoneId, other.id);
+                    if (present.has(other.id))
+                        await cf.deleteDnsRecord(zone.token, zone.zoneId, other.id);
                 }
             } else if (effect === "move-route") {
                 await moveRoute(row.domainId, row.targetApplicationId);
@@ -663,7 +686,10 @@ async function finish(row: Awaited<ReturnType<typeof loadCutover>>): Promise<voi
                 const zone = await zoneOf(row);
                 const first = readWritten(row.recordIds).records[0];
                 if (first && row.newValue && row.oldTtl !== null) {
-                    await rewrite(zone, row.hostname, first, { content: row.newValue, ttl: row.oldTtl });
+                    await rewrite(zone, row.hostname, first, {
+                        content: row.newValue,
+                        ttl: row.oldTtl
+                    });
                 }
             } catch {
                 // The cutover is done either way; a short TTL is harmless and the
@@ -711,7 +737,11 @@ export async function advanceCutover(id: string): Promise<void> {
         const [report, health] = await Promise.all([
             mode === "edge"
                 ? null
-                : checkPropagation(row.hostname, "A", proxied || !row.newValue ? null : [row.newValue]),
+                : checkPropagation(
+                      row.hostname,
+                      "A",
+                      proxied || !row.newValue ? null : [row.newValue]
+                  ),
             checkDomain({ hostname: row.hostname, https: domain?.https ?? true })
         ]);
         checks.propagation = report
@@ -726,7 +756,10 @@ export async function advanceCutover(id: string): Promise<void> {
               }
             : undefined;
         checks.target = { status: health.status, code: health.code };
-        observation = { dnsSettled: report ? report.settled : true, targetUp: health.status === "up" };
+        observation = {
+            dnsSettled: report ? report.settled : true,
+            targetUp: health.status === "up"
+        };
     }
     checks.checkedAt = now.toISOString();
     const next = machine.tick(

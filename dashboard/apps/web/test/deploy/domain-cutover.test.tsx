@@ -74,7 +74,12 @@ async function open(cutover: CutoverView | null, canManage = true) {
     actions.cutoverPanelAction.mockResolvedValue({ panel: { cutover, targets: TARGETS } });
     const domainId = `${DOMAIN.slice(0, -2)}${String(opened++).padStart(2, "0")}`;
     render(
-        <DomainCutoverButton domainId={domainId} hostname={HOST} canManage={canManage} onChanged={() => undefined} />,
+        <DomainCutoverButton
+            domainId={domainId}
+            hostname={HOST}
+            canManage={canManage}
+            onChanged={() => undefined}
+        />,
         { wrapper: MessagesWrapper }
     );
     const button = screen.getByRole("button", { name: `Move ${HOST} to another service` });
@@ -98,7 +103,12 @@ describe("moving a domain to another service", () => {
             () => new Promise<CutoverReply>((resolve) => (answer = resolve))
         );
         render(
-            <DomainCutoverButton domainId={DOMAIN} hostname={HOST} canManage onChanged={() => undefined} />,
+            <DomainCutoverButton
+                domainId={DOMAIN}
+                hostname={HOST}
+                canManage
+                onChanged={() => undefined}
+            />,
             { wrapper: MessagesWrapper }
         );
         fireEvent.click(screen.getByRole("button", { name: `Move ${HOST} to another service` }));
@@ -113,8 +123,12 @@ describe("moving a domain to another service", () => {
     it("offers the services it may move to and waits for one to be chosen", async () => {
         await open(null);
         const dialog = await screen.findByRole("dialog");
-        await waitFor(() => expect(within(dialog).getByRole("combobox", { name: "Move to" })).toBeTruthy());
-        expect(within(dialog).getByRole("button", { name: "Check and start" }).hasAttribute("disabled")).toBe(true);
+        await waitFor(() =>
+            expect(within(dialog).getByRole("combobox", { name: "Move to" })).toBeTruthy()
+        );
+        expect(
+            within(dialog).getByRole("button", { name: "Check and start" }).hasAttribute("disabled")
+        ).toBe(true);
     });
 
     it("says what failed the pre-flight and what to do about it", async () => {
@@ -124,13 +138,22 @@ describe("moving a domain to another service", () => {
                 failure: "target-not-running",
                 canSwitch: false,
                 canRollback: false,
-                preflight: { deployed: true, running: false, answers: "unknown", code: null, newValue: "203.0.113.7", tls: "on-switch" }
+                preflight: {
+                    deployed: true,
+                    running: false,
+                    answers: "unknown",
+                    code: null,
+                    newValue: "203.0.113.7",
+                    tls: "on-switch"
+                }
             })
         );
         const dialog = await screen.findByRole("dialog");
         await waitFor(() =>
             expect(
-                within(dialog).getByText("shop-v2 is not running. Start or redeploy it, then try again.")
+                within(dialog).getByText(
+                    "shop-v2 is not running. Start or redeploy it, then try again."
+                )
             ).toBeTruthy()
         );
         expect(within(dialog).getByText("Not started")).toBeTruthy();
@@ -141,8 +164,12 @@ describe("moving a domain to another service", () => {
     it("names the exact record to change by hand, and switches once it is changed", async () => {
         const { domainId } = await open(view({ mode: "manual" }));
         const dialog = await screen.findByRole("dialog");
-        await waitFor(() => expect(within(dialog).getByText("203.0.113.7", { selector: "td *, td" })).toBeTruthy());
-        expect(within(dialog).getByText(/Lower the record's TTL to 60 seconds and wait 3600 seconds/)).toBeTruthy();
+        await waitFor(() =>
+            expect(within(dialog).getByText("203.0.113.7", { selector: "td *, td" })).toBeTruthy()
+        );
+        expect(
+            within(dialog).getByText(/Lower the record's TTL to 60 seconds and wait 3600 seconds/)
+        ).toBeTruthy();
         fireEvent.click(within(dialog).getByRole("button", { name: "I changed the record" }));
         await waitFor(() => expect(actions.switchCutoverAction).toHaveBeenCalledWith(domainId));
     });
@@ -154,7 +181,12 @@ describe("moving a domain to another service", () => {
                 canSwitch: false,
                 switchedAt: "2026-10-16T12:00:00.000Z",
                 resolvers: [
-                    { label: "Cloudflare", status: "answered", values: ["203.0.113.7"], agrees: true },
+                    {
+                        label: "Cloudflare",
+                        status: "answered",
+                        values: ["203.0.113.7"],
+                        agrees: true
+                    },
                     { label: "Google", status: "answered", values: ["203.0.113.7"], agrees: true },
                     { label: "Quad9", status: "answered", values: ["198.51.100.4"], agrees: false }
                 ],
@@ -163,7 +195,9 @@ describe("moving a domain to another service", () => {
         );
         const dialog = await screen.findByRole("dialog");
         await waitFor(() =>
-            expect(within(dialog).getByText("2 of 3 public resolvers see the new address")).toBeTruthy()
+            expect(
+                within(dialog).getByText("2 of 3 public resolvers see the new address")
+            ).toBeTruthy()
         );
         expect(within(dialog).getByRole("progressbar").getAttribute("aria-valuenow")).toBe("67");
         expect(within(dialog).getByText(`shop-v2 answers for ${HOST}.`)).toBeTruthy();
@@ -178,7 +212,9 @@ describe("moving a domain to another service", () => {
     it("says the move is done, and that the TTL is back", async () => {
         await open(view({ phase: "done", canSwitch: false, canRollback: false }));
         const dialog = await screen.findByRole("dialog");
-        await waitFor(() => expect(within(dialog).getByText(`${HOST} now points at shop-v2.`)).toBeTruthy());
+        await waitFor(() =>
+            expect(within(dialog).getByText(`${HOST} now points at shop-v2.`)).toBeTruthy()
+        );
         expect(within(dialog).getByText("The TTL is back to 3600 seconds.")).toBeTruthy();
     });
 
@@ -193,7 +229,9 @@ describe("moving a domain to another service", () => {
             })
         );
         const dialog = await screen.findByRole("dialog");
-        await waitFor(() => expect(within(dialog).getByText(`${HOST} is back on shop.`)).toBeTruthy());
+        await waitFor(() =>
+            expect(within(dialog).getByText(`${HOST} is back on shop.`)).toBeTruthy()
+        );
         expect(within(dialog).getByText("198.51.100.4", { selector: "td *, td" })).toBeTruthy();
     });
 
@@ -205,12 +243,21 @@ describe("moving a domain to another service", () => {
     });
 
     it("shows a refusal from the server in words", async () => {
-        actions.cutoverPanelAction.mockResolvedValueOnce({ error: "You cannot change this project's domains." });
+        actions.cutoverPanelAction.mockResolvedValueOnce({
+            error: "You cannot change this project's domains."
+        });
         render(
-            <DomainCutoverButton domainId={DOMAIN} hostname={HOST} canManage onChanged={() => undefined} />,
+            <DomainCutoverButton
+                domainId={DOMAIN}
+                hostname={HOST}
+                canManage
+                onChanged={() => undefined}
+            />,
             { wrapper: MessagesWrapper }
         );
         fireEvent.click(screen.getByRole("button", { name: `Move ${HOST} to another service` }));
-        expect((await screen.findByRole("alert")).textContent).toContain("You cannot change this project's domains.");
+        expect((await screen.findByRole("alert")).textContent).toContain(
+            "You cannot change this project's domains."
+        );
     });
 });

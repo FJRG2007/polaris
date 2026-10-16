@@ -482,10 +482,7 @@ export async function serviceDnsTarget(
     // An address is used as it is; a name is looked up, the way a visitor would.
     const addresses = isIP(address) !== 0 ? [address] : await resolveOrEmpty(address);
     return {
-        ip: dnsAddressFor(
-            { remote: true, servedBy, serverAddresses: addresses },
-            null
-        ),
+        ip: dnsAddressFor({ remote: true, servedBy, serverAddresses: addresses }, null),
         server: host.name
     };
 }

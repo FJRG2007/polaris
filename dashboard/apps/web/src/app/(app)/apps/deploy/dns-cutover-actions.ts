@@ -38,7 +38,10 @@ async function access(domainId: string) {
 /** Run one step and answer with the panel as it stands after it. */
 async function step(
     domainId: unknown,
-    run: (caller: { userId: string; environmentIds: readonly string[] | null }, id: string) => Promise<unknown>
+    run: (
+        caller: { userId: string; environmentIds: readonly string[] | null },
+        id: string
+    ) => Promise<unknown>
 ): Promise<CutoverReply> {
     const parsed = domainIdSchema.safeParse(domainId);
     if (!parsed.success) return { error: await reply("cutover.notAllowed") };

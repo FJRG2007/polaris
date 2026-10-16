@@ -72,22 +72,30 @@ describe("the domain move actions", () => {
     });
 
     it("let a domain manager switch and roll back, answering with the panel", async () => {
-        expect(await actions.switchCutoverAction(DOMAIN)).toEqual({ panel: { cutover: null, targets: [] } });
+        expect(await actions.switchCutoverAction(DOMAIN)).toEqual({
+            panel: { cutover: null, targets: [] }
+        });
         await actions.rollbackCutoverAction(DOMAIN);
         expect(state.calls).toEqual(["switch", "panel", "rollback", "panel"]);
     });
 
     it("turn a refusal of the service into its sentence", async () => {
-        expect(await actions.startCutoverAction({ domainId: DOMAIN, targetApplicationId: TARGET })).toEqual({
+        expect(
+            await actions.startCutoverAction({ domainId: DOMAIN, targetApplicationId: TARGET })
+        ).toEqual({
             error: "cutover.refused.same-service"
         });
     });
 
     it("refuse an input that is not a domain and a service", async () => {
-        expect(await actions.startCutoverAction({ domainId: "nope", targetApplicationId: TARGET })).toEqual({
+        expect(
+            await actions.startCutoverAction({ domainId: "nope", targetApplicationId: TARGET })
+        ).toEqual({
             error: "cutover.chooseTarget"
         });
-        expect(await actions.switchCutoverAction("../etc")).toEqual({ error: "cutover.notAllowed" });
+        expect(await actions.switchCutoverAction("../etc")).toEqual({
+            error: "cutover.notAllowed"
+        });
         expect(state.asked).toEqual([]);
     });
 });

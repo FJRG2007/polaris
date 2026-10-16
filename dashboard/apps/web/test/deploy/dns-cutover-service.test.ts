@@ -75,7 +75,9 @@ function matches(row: Row, where: Record<string, unknown>): boolean {
 function apply(row: Row, data: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(data)) {
         if (value && typeof value === "object" && "increment" in (value as object)) {
-            (row as unknown as Record<string, number>)[key] += (value as { increment: number }).increment;
+            (row as unknown as Record<string, number>)[key] += (
+                value as { increment: number }
+            ).increment;
         } else (row as unknown as Record<string, unknown>)[key] = value;
     }
     row.updatedAt = new Date();
@@ -85,7 +87,9 @@ vi.mock("@polaris/db", () => {
     const dnsCutover = {
         findMany: async (args: { where: Record<string, unknown>; take?: number }) => {
             state.passQueries.push(args);
-            return [...state.rows.values()].filter((row) => matches(row, args.where)).slice(0, args.take);
+            return [...state.rows.values()]
+                .filter((row) => matches(row, args.where))
+                .slice(0, args.take);
         },
         // Copies, as a database hands back: a later write never reaches a row already read.
         findUnique: async ({ where }: { where: Record<string, unknown> }) => {
@@ -93,10 +97,18 @@ vi.mock("@polaris/db", () => {
             return row ? { ...row } : null;
         },
         findFirst: async ({ where }: { where: Record<string, unknown> }) => {
-            const row = [...state.rows.values()].filter((candidate) => matches(candidate, where)).at(-1);
+            const row = [...state.rows.values()]
+                .filter((candidate) => matches(candidate, where))
+                .at(-1);
             return row ? { ...row } : null;
         },
-        update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        update: async ({
+            where,
+            data
+        }: {
+            where: { id: string };
+            data: Record<string, unknown>;
+        }) => {
             const row = state.rows.get(where.id);
             if (!row) throw new Error("missing");
             apply(row, data);
@@ -125,13 +137,23 @@ vi.mock("@polaris/db", () => {
             state.rows.set(row.id, row);
             return { id: row.id };
         },
-        updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        updateMany: async ({
+            where,
+            data
+        }: {
+            where: Record<string, unknown>;
+            data: Record<string, unknown>;
+        }) => {
             const hit = [...state.rows.values()].filter((row) => matches(row, where));
             for (const row of hit) apply(row, data);
             return { count: hit.length };
         }
     };
-    const owner = { project: { ownerId: "user-1", orgId: null }, projectId: "project-1", name: "production" };
+    const owner = {
+        project: { ownerId: "user-1", orgId: null },
+        projectId: "project-1",
+        name: "production"
+    };
     const app = (id: string) => ({
         id,
         name: id,
@@ -141,7 +163,11 @@ vi.mock("@polaris/db", () => {
         sourceConfig: "{}",
         domains: [],
         environment: owner,
-        target: { kind: "host", hostId: id === "app-old" ? "host-1" : "host-2", host: { name: id, address: "203.0.113.7" } }
+        target: {
+            kind: "host",
+            hostId: id === "app-old" ? "host-1" : "host-2",
+            host: { name: id, address: "203.0.113.7" }
+        }
     });
     return {
         prisma: {
@@ -205,14 +231,25 @@ vi.mock("@/lib/watch/health-probe", () => ({
 vi.mock("@/lib/dns/propagation", () => ({
     checkPropagation: async () => ({
         settled: state.settled,
-        resolvers: [{ label: "Cloudflare", status: "answered", values: ["203.0.113.7"], agrees: state.settled }]
+        resolvers: [
+            {
+                label: "Cloudflare",
+                status: "answered",
+                values: ["203.0.113.7"],
+                agrees: state.settled
+            }
+        ]
     })
 }));
-vi.mock("@/lib/dns/public-resolver", () => ({ publicResolver: () => ({ resolve4: async () => [] }) }));
+vi.mock("@/lib/dns/public-resolver", () => ({
+    publicResolver: () => ({ resolve4: async () => [] })
+}));
 vi.mock("@/lib/domain-dns", () => ({ serviceDnsTarget: async () => ({ ip: "203.0.113.7" }) }));
 vi.mock("@/lib/dns/zone-records", () => ({ provenDomainOf: async () => null }));
 vi.mock("@/lib/tls/managed-certificates", () => ({ openText: () => null }));
-vi.mock("@/lib/integrations/cloudflare-account-service", () => ({ loadCloudflareToken: async () => "token" }));
+vi.mock("@/lib/integrations/cloudflare-account-service", () => ({
+    loadCloudflareToken: async () => "token"
+}));
 vi.mock("@/lib/integrations/cloudflare-api", () => ({
     resolveZoneForHostname: async () => ({ id: "zone-1" }),
     findDnsRecords: async () => [...state.zone.values()].map((record) => ({ ...record })),
@@ -229,7 +266,12 @@ vi.mock("@/lib/integrations/cloudflare-api", () => ({
         if (id !== null && !state.zone.has(id)) throw new Error("not found");
         state.saved.push({ id, content: record.content, ttl: record.ttl });
         const saved = id ?? `record-new-${(state.created += 1)}`;
-        state.zone.set(saved, { id: saved, content: record.content, ttl: record.ttl, proxied: record.proxied });
+        state.zone.set(saved, {
+            id: saved,
+            content: record.content,
+            ttl: record.ttl,
+            proxied: record.proxied
+        });
         return { id: saved };
     },
     deleteDnsRecord: async (_token: string, _zone: string, id: string) => {
@@ -288,7 +330,9 @@ beforeEach(() => {
     state.audits = [];
     state.saved = [];
     state.deleted = [];
-    state.zone = new Map([["record-1", { id: "record-1", content: "198.51.100.4", ttl: 60, proxied: false }]]);
+    state.zone = new Map([
+        ["record-1", { id: "record-1", content: "198.51.100.4", ttl: 60, proxied: false }]
+    ]);
     state.created = 0;
     state.saveFails = 0;
     state.deleteFails = 0;
@@ -304,7 +348,10 @@ describe("the background pass", () => {
     it("looks only at open cutovers waiting on time or DNS, and at most twenty of them", async () => {
         await service.runCutoverPass();
         expect(state.passQueries[0]).toMatchObject({
-            where: { openKey: { not: null }, phase: { in: ["lowering", "propagating", "finishing"] } },
+            where: {
+                openKey: { not: null },
+                phase: { in: ["lowering", "propagating", "finishing"] }
+            },
             take: 20
         });
     });
@@ -321,7 +368,9 @@ describe("the background pass", () => {
         await Promise.all([service.runCutoverPass(), service.runCutoverPass()]);
         await service.runCutoverPass();
         expect(state.rows.get("c1")).toMatchObject({ phase: "done", openKey: null });
-        expect(state.audits.filter((action) => action === "deploy.domain.cutover.finish")).toHaveLength(1);
+        expect(
+            state.audits.filter((action) => action === "deploy.domain.cutover.finish")
+        ).toHaveLength(1);
         expect(state.domainApp).toBe("app-new");
         // The TTL went back to what it was before the cutover lowered it. Two passes
         // that both reach the hand-over may each write it, and write the same thing.
@@ -397,7 +446,11 @@ describe("a switch cut short", () => {
         seedTwo("c1");
         state.deleteFails = 1;
         await service.switchCutover("c1", "user-1");
-        expect(state.rows.get("c1")).toMatchObject({ phase: "ready", failure: "record-write-failed", switchedAt: null });
+        expect(state.rows.get("c1")).toMatchObject({
+            phase: "ready",
+            failure: "record-write-failed",
+            switchedAt: null
+        });
         expect(zoneContents()).toEqual(["record-1=203.0.113.7", "record-2=198.51.100.5"]);
         await service.rollbackCutover("c1", "user-1");
         expect(state.rows.get("c1")).toMatchObject({ phase: "rolled-back", openKey: null });
@@ -418,7 +471,10 @@ describe("a switch cut short", () => {
         seed("c1", { mode: "edge", newValue: null, zoneId: null });
         state.publishFails = 1;
         await service.switchCutover("c1", "user-1");
-        expect(state.rows.get("c1")).toMatchObject({ phase: "ready", failure: "route-move-failed" });
+        expect(state.rows.get("c1")).toMatchObject({
+            phase: "ready",
+            failure: "route-move-failed"
+        });
         expect(state.domainApp).toBe("app-new");
         await service.rollbackCutover("c1", "user-1");
         expect(state.rows.get("c1")?.phase).toBe("rolled-back");
@@ -432,7 +488,12 @@ describe("a rollback tried again", () => {
         await service.switchCutover("c1", "user-1");
         expect(zoneContents()).toEqual(["record-1=203.0.113.7"]);
         // A first attempt brought record-2 back under a new id and then stopped.
-        state.zone.set("record-x", { id: "record-x", content: "198.51.100.5", ttl: 1, proxied: false });
+        state.zone.set("record-x", {
+            id: "record-x",
+            content: "198.51.100.5",
+            ttl: 1,
+            proxied: false
+        });
         await service.rollbackCutover("c1", "user-1");
         expect(state.rows.get("c1")?.phase).toBe("rolled-back");
         expect(zoneContents()).toEqual(["record-1=198.51.100.4", "record-x=198.51.100.5"]);
@@ -440,7 +501,10 @@ describe("a rollback tried again", () => {
 
     it("converges when the record the switch created is already gone", async () => {
         state.zone = new Map();
-        seed("c1", { oldTtl: null, recordIds: JSON.stringify({ records: [], created: null, touched: false }) });
+        seed("c1", {
+            oldTtl: null,
+            recordIds: JSON.stringify({ records: [], created: null, touched: false })
+        });
         await service.switchCutover("c1", "user-1");
         expect(zoneContents()).toEqual(["record-new-1=203.0.113.7"]);
         state.zone.clear();
@@ -457,7 +521,12 @@ describe("a rollback tried again", () => {
             oldTtl: null,
             recordIds: JSON.stringify({ records: [], created: null, touched: true })
         });
-        state.zone.set("record-lost", { id: "record-lost", content: "203.0.113.7", ttl: 60, proxied: false });
+        state.zone.set("record-lost", {
+            id: "record-lost",
+            content: "203.0.113.7",
+            ttl: 60,
+            proxied: false
+        });
         await service.rollbackCutover("c1", "user-1");
         expect(zoneContents()).toEqual([]);
     });
@@ -501,7 +570,9 @@ describe("rolling back", () => {
         await service.rollbackCutover("c1", "user-1");
         expect(state.rows.get("c1")).toMatchObject({ phase: "rolled-back", openKey: null });
         expect(state.saved.at(-1)).toEqual({ id: "record-1", content: "198.51.100.4", ttl: 60 });
-        expect(state.audits.filter((action) => action === "deploy.domain.cutover.rollback")).toHaveLength(1);
+        expect(
+            state.audits.filter((action) => action === "deploy.domain.cutover.rollback")
+        ).toHaveLength(1);
         expect(state.domainApp).toBe("app-old");
     });
 
@@ -518,7 +589,9 @@ describe("rolling back", () => {
         expect(state.audits).not.toContain("deploy.domain.cutover.rollback");
         await service.rollbackCutover("c1", "user-1");
         expect(state.rows.get("c1")).toMatchObject({ phase: "rolled-back", openKey: null });
-        expect(state.audits.filter((action) => action === "deploy.domain.cutover.rollback")).toHaveLength(1);
+        expect(
+            state.audits.filter((action) => action === "deploy.domain.cutover.rollback")
+        ).toHaveLength(1);
     });
 
     it("is refused once there is nothing open to roll back", async () => {
@@ -537,7 +610,9 @@ describe("the screen's view", () => {
         expect(state.probes).toBe(0);
         expect(fresh.cutover?.phase).toBe("propagating");
 
-        state.rows.get("c1")!.checks = JSON.stringify({ checkedAt: new Date(NOW - 60_000).toISOString() });
+        state.rows.get("c1")!.checks = JSON.stringify({
+            checkedAt: new Date(NOW - 60_000).toISOString()
+        });
         const checked = await service.cutoverPanel("domain-1", null);
         expect(state.probes).toBe(1);
         expect(checked.cutover?.phase).toBe("done");

@@ -12,7 +12,15 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { CutoverFailure, CutoverPhase, CutoverView } from "@/lib/deploy/dns-cutover";
-import { ArrowRightLeft, CheckCircle2, Circle, Loader2, RotateCcw, TriangleAlert, XCircle } from "lucide-react";
+import {
+    ArrowRightLeft,
+    CheckCircle2,
+    Circle,
+    Loader2,
+    RotateCcw,
+    TriangleAlert,
+    XCircle
+} from "lucide-react";
 import {
     cutoverPanelAction,
     rollbackCutoverAction,
@@ -169,7 +177,9 @@ export function DomainCutoverButton({
             <Dialog open={open} onOpenChange={show}>
                 <DialogContent className="max-w-xl">
                     <DialogHeader>
-                        <DialogTitle className="break-words">{t("cutover.title", { hostname })}</DialogTitle>
+                        <DialogTitle className="break-words">
+                            {t("cutover.title", { hostname })}
+                        </DialogTitle>
                         <DialogDescription>{t("cutover.description")}</DialogDescription>
                     </DialogHeader>
                     <div className="flex min-w-0 flex-col gap-4">
@@ -194,11 +204,19 @@ export function DomainCutoverButton({
                             </div>
                         ) : null}
                         {error ? (
-                            <div className="flex min-w-0 items-start gap-2 text-sm text-danger" role="alert">
+                            <div
+                                className="flex min-w-0 items-start gap-2 text-sm text-danger"
+                                role="alert"
+                            >
                                 <TriangleAlert className="mt-0.5 size-4 shrink-0" />
                                 <span className="min-w-0 break-words">{error}</span>
                                 {!panel ? (
-                                    <Button size="sm" variant="secondary" className="ml-auto" onClick={() => show(true)}>
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        className="ml-auto"
+                                        onClick={() => show(true)}
+                                    >
                                         {t("cutover.retry")}
                                     </Button>
                                 ) : null}
@@ -231,7 +249,11 @@ function CutoverBody({
     onCheck: () => void;
 }) {
     const cutover = panel.cutover;
-    const closed = !cutover || cutover.phase === "done" || cutover.phase === "rolled-back" || cutover.phase === "preflight-failed";
+    const closed =
+        !cutover ||
+        cutover.phase === "done" ||
+        cutover.phase === "rolled-back" ||
+        cutover.phase === "preflight-failed";
     return (
         <>
             {cutover ? (
@@ -251,7 +273,11 @@ function CutoverBody({
                     targets={panel.targets}
                     pending={pending}
                     again={cutover !== null}
-                    preselect={cutover?.phase === "preflight-failed" ? cutover.targetApplicationId : undefined}
+                    preselect={
+                        cutover?.phase === "preflight-failed"
+                            ? cutover.targetApplicationId
+                            : undefined
+                    }
                     onStart={onStart}
                 />
             ) : null}
@@ -280,7 +306,9 @@ function StartForm({
     }
     return (
         <div className="flex min-w-0 flex-col gap-2">
-            <span className="text-sm font-medium">{again ? t("cutover.moveAgain") : t("cutover.target")}</span>
+            <span className="text-sm font-medium">
+                {again ? t("cutover.moveAgain") : t("cutover.target")}
+            </span>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
                 <div className="min-w-0 flex-1">
                     <Select
@@ -294,7 +322,11 @@ function StartForm({
                         aria-label={t("cutover.target")}
                     />
                 </div>
-                <Button disabled={pending || !target} aria-disabled={pending || !target} onClick={() => onStart(target)}>
+                <Button
+                    disabled={pending || !target}
+                    aria-disabled={pending || !target}
+                    onClick={() => onStart(target)}
+                >
                     {pending ? <Loader2 className="size-4 animate-spin" /> : null}
                     {pending ? t("cutover.starting") : t("cutover.start")}
                 </Button>
@@ -303,7 +335,15 @@ function StartForm({
     );
 }
 
-function CheckLine({ ok, warn, children }: { ok: boolean; warn?: boolean; children: React.ReactNode }) {
+function CheckLine({
+    ok,
+    warn,
+    children
+}: {
+    ok: boolean;
+    warn?: boolean;
+    children: React.ReactNode;
+}) {
     return (
         <li className="flex min-w-0 items-start gap-2 text-sm">
             {ok ? (
@@ -318,17 +358,31 @@ function CheckLine({ ok, warn, children }: { ok: boolean; warn?: boolean; childr
     );
 }
 
-function Preflight({ t, cutover, hostname }: { t: CutoverT; cutover: CutoverView; hostname: string }) {
+function Preflight({
+    t,
+    cutover,
+    hostname
+}: {
+    t: CutoverT;
+    cutover: CutoverView;
+    hostname: string;
+}) {
     const checks = cutover.preflight;
     if (!checks) return null;
     const answers = checks.answers;
     return (
         <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">{t("cutover.checks.title")}</span>
+            <span className="text-xs font-medium text-muted-foreground">
+                {t("cutover.checks.title")}
+            </span>
             <ul className="flex min-w-0 flex-col gap-1">
-                <CheckLine ok={checks.deployed}>{t("cutover.checks.deployed", { target: cutover.targetName })}</CheckLine>
+                <CheckLine ok={checks.deployed}>
+                    {t("cutover.checks.deployed", { target: cutover.targetName })}
+                </CheckLine>
                 {checks.deployed ? (
-                    <CheckLine ok={checks.running}>{t("cutover.checks.running", { target: cutover.targetName })}</CheckLine>
+                    <CheckLine ok={checks.running}>
+                        {t("cutover.checks.running", { target: cutover.targetName })}
+                    </CheckLine>
                 ) : null}
                 {cutover.mode !== "edge" ? (
                     <CheckLine ok={checks.newValue !== null}>
@@ -347,12 +401,17 @@ function Preflight({ t, cutover, hostname }: { t: CutoverT; cutover: CutoverView
                               ? t("cutover.checks.noAnswer")
                               : answers === "not-routed"
                                 ? t("cutover.checks.notRouted", { hostname })
-                                : t("cutover.checks.answersBadly", { hostname, code: checks.code ?? 0 })}
+                                : t("cutover.checks.answersBadly", {
+                                      hostname,
+                                      code: checks.code ?? 0
+                                  })}
                     </CheckLine>
                 )}
                 {cutover.mode !== "edge" ? (
                     <CheckLine ok={checks.tls === "ready"} warn={checks.tls !== "ready"}>
-                        {checks.tls === "ready" ? t("cutover.checks.tlsReady") : t("cutover.checks.tlsOnSwitch")}
+                        {checks.tls === "ready"
+                            ? t("cutover.checks.tlsReady")
+                            : t("cutover.checks.tlsOnSwitch")}
                     </CheckLine>
                 ) : null}
             </ul>
@@ -363,12 +422,29 @@ function Preflight({ t, cutover, hostname }: { t: CutoverT; cutover: CutoverView
 function RecordToSet({ hostname, values }: { hostname: string; values: readonly string[] }) {
     return (
         <DnsRecordTable
-            records={values.map((value) => ({ type: "A", name: hostname, value, status: "waiting" as const }))}
+            records={values.map((value) => ({
+                type: "A",
+                name: hostname,
+                value,
+                status: "waiting" as const
+            }))}
         />
     );
 }
 
-function Propagation({ t, cutover, hostname, pending, onCheck }: { t: CutoverT; cutover: CutoverView; hostname: string; pending: boolean; onCheck: () => void }) {
+function Propagation({
+    t,
+    cutover,
+    hostname,
+    pending,
+    onCheck
+}: {
+    t: CutoverT;
+    cutover: CutoverView;
+    hostname: string;
+    pending: boolean;
+    onCheck: () => void;
+}) {
     const asked = cutover.resolvers.filter((resolver) => resolver.status !== "unreachable");
     const agreeing = asked.filter((resolver) => resolver.agrees === true).length;
     const share = asked.length === 0 ? 0 : Math.round((agreeing / asked.length) * 100);
@@ -380,7 +456,9 @@ function Propagation({ t, cutover, hostname, pending, onCheck }: { t: CutoverT; 
                         <span className="min-w-0">
                             {t("cutover.progress", { agree: agreeing, total: asked.length })}
                         </span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">{share}%</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                            {share}%
+                        </span>
                     </div>
                     <div
                         className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
@@ -390,12 +468,18 @@ function Propagation({ t, cutover, hostname, pending, onCheck }: { t: CutoverT; 
                         aria-valuenow={share}
                         aria-label={t("cutover.progressLabel")}
                     >
-                        <div className="h-full bg-primary transition-all" style={{ width: `${share}%` }} />
+                        <div
+                            className="h-full bg-primary transition-all"
+                            style={{ width: `${share}%` }}
+                        />
                     </div>
                     {cutover.resolvers.length > 0 ? (
                         <ul className="flex min-w-0 flex-col gap-1">
                             {cutover.resolvers.map((resolver) => (
-                                <li key={resolver.label} className="flex min-w-0 items-center gap-2 text-xs">
+                                <li
+                                    key={resolver.label}
+                                    className="flex min-w-0 items-center gap-2 text-xs"
+                                >
                                     {resolver.agrees === true ? (
                                         <CheckCircle2 className="size-3.5 shrink-0 text-success" />
                                     ) : (
@@ -421,14 +505,19 @@ function Propagation({ t, cutover, hostname, pending, onCheck }: { t: CutoverT; 
                 </>
             ) : null}
             {cutover.targetStatus ? (
-                <CheckLine ok={cutover.targetStatus.status === "up"} warn={cutover.targetStatus.status !== "up"}>
+                <CheckLine
+                    ok={cutover.targetStatus.status === "up"}
+                    warn={cutover.targetStatus.status !== "up"}
+                >
                     {cutover.targetStatus.status === "up"
                         ? t("cutover.targetUp", { target: cutover.targetName, hostname })
                         : t("cutover.targetWaiting", { target: cutover.targetName })}
                 </CheckLine>
             ) : null}
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                {cutover.checkedAt ? <span>{t("cutover.checkedAt", { time: clock(cutover.checkedAt) })}</span> : null}
+                {cutover.checkedAt ? (
+                    <span>{t("cutover.checkedAt", { time: clock(cutover.checkedAt) })}</span>
+                ) : null}
                 <Button size="sm" variant="ghost" disabled={pending} onClick={onCheck}>
                     {pending ? <Loader2 className="size-3.5 animate-spin" /> : null}
                     {t("cutover.checkNow")}
@@ -486,7 +575,10 @@ function CutoverState({
             {confirmDialog}
             <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
                 <Badge variant={phaseVariant(phase)}>{t(PHASE_KEYS[phase])}</Badge>
-                <span className="min-w-0 truncate text-muted-foreground" title={`${source} -> ${target}`}>
+                <span
+                    className="min-w-0 truncate text-muted-foreground"
+                    title={`${source} -> ${target}`}
+                >
                     {t("cutover.route", { source, target })}
                 </span>
             </div>
@@ -526,26 +618,42 @@ function CutoverState({
                         <ol className="flex list-decimal flex-col gap-2 pl-5">
                             <li>
                                 {cutover.oldTtl !== null && cutover.oldTtl > LOWERED_TTL
-                                    ? t("cutover.manualLower", { ttl: LOWERED_TTL, old: cutover.oldTtl })
+                                    ? t("cutover.manualLower", {
+                                          ttl: LOWERED_TTL,
+                                          old: cutover.oldTtl
+                                      })
                                     : t("cutover.manualTtlShort")}
                             </li>
                             <li className="min-w-0">
                                 <span>{t("cutover.manualChange", { ttl: LOWERED_TTL })}</span>
-                                <RecordToSet hostname={hostname} values={cutover.newValue ? [cutover.newValue] : []} />
+                                <RecordToSet
+                                    hostname={hostname}
+                                    values={cutover.newValue ? [cutover.newValue] : []}
+                                />
                             </li>
                         </ol>
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground">
-                        {mode === "edge" ? t("cutover.readyEdge") : t("cutover.readyCloudflare", { address: cutover.newValue ?? "" })}
+                        {mode === "edge"
+                            ? t("cutover.readyEdge")
+                            : t("cutover.readyCloudflare", { address: cutover.newValue ?? "" })}
                     </p>
                 )
             ) : null}
 
             {phase === "propagating" ? (
                 <>
-                    <p className="text-sm text-muted-foreground">{t("cutover.propagating", { source })}</p>
-                    <Propagation t={t} cutover={cutover} hostname={hostname} pending={pending} onCheck={onCheck} />
+                    <p className="text-sm text-muted-foreground">
+                        {t("cutover.propagating", { source })}
+                    </p>
+                    <Propagation
+                        t={t}
+                        cutover={cutover}
+                        hostname={hostname}
+                        pending={pending}
+                        onCheck={onCheck}
+                    />
                 </>
             ) : null}
 
@@ -557,20 +665,36 @@ function CutoverState({
             ) : null}
 
             {phase === "failed" ? (
-                <Propagation t={t} cutover={cutover} hostname={hostname} pending={pending} onCheck={onCheck} />
+                <Propagation
+                    t={t}
+                    cutover={cutover}
+                    hostname={hostname}
+                    pending={pending}
+                    onCheck={onCheck}
+                />
             ) : null}
 
             {phase === "done" ? (
                 <div className="flex min-w-0 flex-col gap-1 text-sm">
                     <p className="flex items-start gap-2">
                         <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" />
-                        <span className="min-w-0 break-words">{t("cutover.done", { hostname, target })}</span>
+                        <span className="min-w-0 break-words">
+                            {t("cutover.done", { hostname, target })}
+                        </span>
                     </p>
-                    {mode === "cloudflare" && cutover.oldTtl !== null && cutover.oldTtl > LOWERED_TTL ? (
-                        <p className="text-muted-foreground">{t("cutover.doneTtl", { ttl: cutover.oldTtl })}</p>
+                    {mode === "cloudflare" &&
+                    cutover.oldTtl !== null &&
+                    cutover.oldTtl > LOWERED_TTL ? (
+                        <p className="text-muted-foreground">
+                            {t("cutover.doneTtl", { ttl: cutover.oldTtl })}
+                        </p>
                     ) : null}
-                    {mode === "manual" && cutover.oldTtl !== null && cutover.oldTtl > LOWERED_TTL ? (
-                        <p className="text-muted-foreground">{t("cutover.doneManualTtl", { ttl: cutover.oldTtl })}</p>
+                    {mode === "manual" &&
+                    cutover.oldTtl !== null &&
+                    cutover.oldTtl > LOWERED_TTL ? (
+                        <p className="text-muted-foreground">
+                            {t("cutover.doneManualTtl", { ttl: cutover.oldTtl })}
+                        </p>
                     ) : null}
                 </div>
             ) : null}
@@ -579,7 +703,9 @@ function CutoverState({
                 <div className="flex min-w-0 flex-col gap-2 text-sm">
                     <p className="flex items-start gap-2">
                         <RotateCcw className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 break-words">{t("cutover.rolledBack", { hostname, source })}</span>
+                        <span className="min-w-0 break-words">
+                            {t("cutover.rolledBack", { hostname, source })}
+                        </span>
                     </p>
                     {mode === "manual" && cutover.switchedAt && cutover.oldValues.length > 0 ? (
                         <>
