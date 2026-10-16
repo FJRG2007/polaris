@@ -13,7 +13,8 @@ import {
     type PrivateAccess
 } from "@/lib/deploy/private-domain";
 import * as restorePoints from "@/lib/restore-points/service";
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
+import * as dnsCutover from "./deploy/dns-cutover";
 import { copyGroupLinks, groupLayers } from "@/lib/deploy/variable-groups";
 import * as follow from "./follow/follow";
 import { createWriteStream } from "node:fs";
@@ -1291,39 +1292,88 @@ export async function syncAppRoutes(): Promise<{ readonly unreachedHosts: Readon
     return result;
 }
 
+/** What the edge reads of a service to route one of its hostnames. */
+const ROUTE_APP_SELECT = {
+    slug: true,
+    keepReleases: true,
+    currentDeploymentId: true,
+    publishPort: true,
+    edgeConfig: true,
+    sourceType: true,
+    sourceConfig: true,
+    replicas: true,
+    asleepSince: true,
+    target: { select: { kind: true, hostId: true, runtime: true } },
+    environment: {
+        select: { project: { select: { slug: true, ownerId: true } } }
+    }
+} as const satisfies Prisma.ApplicationSelect;
+
+/** What the edge reads of a hostname to route it. */
+const ROUTE_DOMAIN_SELECT = {
+    id: true,
+    hostname: true,
+    pathPrefix: true,
+    privateAccess: true,
+    certResolver: true,
+    targetPort: true,
+    portPinned: true,
+    servedBy: true,
+    applicationId: true,
+    deploymentId: true,
+    application: { select: ROUTE_APP_SELECT }
+} as const satisfies Prisma.DomainSelect;
+
+type RouteDomain = Prisma.DomainGetPayload<{ select: typeof ROUTE_DOMAIN_SELECT }>;
+
+/**
+ * The routes a DNS cutover stages: each open cutover's hostname, routed to the
+ * service it is moving to, on that service's edge. Only where the two services sit
+ * behind different edges - behind one, two routers for one name would collide, and
+ * the cutover moves the route itself instead (see lib/deploy/dns-cutover.ts).
+ */
+async function stagedCutoverRoutes(rows: readonly RouteDomain[]): Promise<RouteDomain[]> {
+    const staged = (
+        await prisma.dnsCutover.findMany({
+            where: { openKey: { not: null } },
+            select: { domainId: true, targetApplicationId: true, phase: true, mode: true }
+        })
+    ).filter((entry) =>
+        dnsCutover.stagesRoute(dnsCutover.readMode(entry.mode), dnsCutover.readPhase(entry.phase))
+    );
+    if (staged.length === 0) return [];
+    const targets = new Map(
+        (
+            await prisma.application.findMany({
+                where: { id: { in: staged.map((entry) => entry.targetApplicationId) } },
+                select: { id: true, domains: { select: { targetPort: true } }, ...ROUTE_APP_SELECT }
+            })
+        ).map((app) => [app.id, app])
+    );
+    return dnsCutover.stagedRoutes(rows, staged, targets).map(({ row, target }) => ({
+        ...row,
+        applicationId: target.id,
+        deploymentId: null,
+        portPinned: false,
+        targetPort: containerPortOf(target),
+        application: target
+    }));
+}
+
 async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
-    const domains = await prisma.domain.findMany({
+    const rows = await prisma.domain.findMany({
         where: { enabled: true },
-        select: {
-            id: true,
-            hostname: true,
-            pathPrefix: true,
-            privateAccess: true,
-            certResolver: true,
-            targetPort: true,
-            portPinned: true,
-            servedBy: true,
-            applicationId: true,
-            deploymentId: true,
-            application: {
-                select: {
-                    slug: true,
-                    keepReleases: true,
-                    currentDeploymentId: true,
-                    publishPort: true,
-                    edgeConfig: true,
-                    sourceType: true,
-                    sourceConfig: true,
-                    replicas: true,
-                    asleepSince: true,
-                    target: { select: { kind: true, hostId: true, runtime: true } },
-                    environment: {
-                        select: { project: { select: { slug: true, ownerId: true } } }
-                    }
-                }
-            }
-        }
+        select: ROUTE_DOMAIN_SELECT
     });
+    // A hostname in the middle of a DNS cutover is also routed on the edge of the
+    // service it is moving to, so that service answers whoever the new record has
+    // reached while the old one keeps serving the rest.
+    // A failure to read them never costs the rest of the edge its routes.
+    const staged = await stagedCutoverRoutes(rows).catch((error: unknown) => {
+        console.error("polaris: the routes of domains being moved could not be read:", error);
+        return [];
+    });
+    const domains = [...rows, ...staged];
     // What each service asks of the edge, read once per service rather than per
     // hostname, and which services are under the flood check's challenge right now.
     const flooded = await floodedServices();

@@ -65,6 +65,7 @@ import { backfillCategories, sweepExpiredCodes } from "@/lib/mailbox/categories"
 import { sweepHostSpace, sweepServerSpace } from "@/lib/deploy/host-housekeeping";
 import { sweepReleaseImages } from "@/lib/deploy/release-retention";
 import { watchDisks } from "@/lib/deploy/disk-watch";
+import { runCutoverPass } from "@/lib/deploy/dns-cutover-service";
 import { sweepExpired as sweepExpiredSignins } from "@/lib/agents/signin-runtime";
 
 const MINUTE = 60 * 1000;
@@ -177,6 +178,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // once count every outage exactly once.
         leaseMs: null,
         run: compactOutages
+    },
+    {
+        key: "dns-cutovers",
+        // Every minute: a cutover's lowered TTL is a minute, so a minute is the
+        // finest step at which a resolver's answer can have changed. Free when
+        // nothing is moving.
+        everyMs: MINUTE,
+        // Leased. Each step claims its phase before it acts, so a second runner
+        // does nothing, but there is no reason to ask the resolvers twice.
+        leaseMs: 5 * MINUTE,
+        run: runCutoverPass
     },
     {
         key: "audit-seal",

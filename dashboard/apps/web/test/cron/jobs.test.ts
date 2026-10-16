@@ -119,6 +119,9 @@ describe("the work Polaris runs on a schedule", () => {
             "deploy-recycle-bin",
             // Two passes would each sweep the same low disk at once.
             "disk-watch",
+            // A cutover's steps each claim their phase first, so a second pass does
+            // nothing; it would only ask the public resolvers twice.
+            "dns-cutovers",
             // One Polaris has no reason to dial the same deployment twice a
             // minute, and this is the pass the alarm above reads.
             "domain-health",

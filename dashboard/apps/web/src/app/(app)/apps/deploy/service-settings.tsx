@@ -11,6 +11,7 @@ import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import * as deployActions from "./actions";
 import { DomainCdnButton } from "./domain-cdn";
+import { DomainCutoverButton } from "./domain-cutover";
 import { DomainPrivateButton } from "./domain-private";
 import { EdgeSettings } from "./edge-settings";
 import * as publicNet from "./public-networking";
@@ -1715,6 +1716,14 @@ function PublicNetworking({ app, onChanged }: { app: ProjectApp; onChanged: () =
                                                 domainId={domain.id}
                                                 hostname={domain.hostname}
                                                 enabled={domain.cdn}
+                                                onChanged={onChanged}
+                                            />
+                                        )}
+                                        {domain.targetPort !== undefined && !local && (
+                                            <DomainCutoverButton
+                                                domainId={domain.id}
+                                                hostname={domain.hostname}
+                                                canManage={can("domains.manage")}
                                                 onChanged={onChanged}
                                             />
                                         )}

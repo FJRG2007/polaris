@@ -11,7 +11,10 @@
  * page it is on is the one you open only after you already know something is wrong.
  */
 
+import { isIP } from "node:net";
+import { lookup } from "node:dns";
 import { prisma } from "@polaris/db";
+import { Agent, fetch as pinnedFetch } from "undici";
 import { HEALTH_PROBE_USER_AGENT, VACANT_HEADER, VACANT_HEADER_VALUE } from "@polaris/core";
 import {
     notifyDomainHealthChanged,
@@ -110,20 +113,52 @@ async function edgeSaysNotRouted(response: Response): Promise<boolean> {
     return (await response.text().catch(() => "")).trim() === EDGE_NO_ROUTE;
 }
 
-/** Probe one domain and return its health without persisting. */
-export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
+/**
+ * A connection that opens to one address whatever the hostname resolves to, so a
+ * server can be asked about a name before DNS sends anybody there. The hostname
+ * still goes in the Host header and the TLS name, exactly as a visitor's would.
+ */
+function pinnedTo(address: string): Agent {
+    return new Agent({
+        connect: {
+            lookup(_hostname, options, callback) {
+                const family = isIP(address);
+                if (family === 0) return lookup(address, options, callback);
+                if (options.all) return callback(null, [{ address, family }]);
+                callback(null, address, family);
+            }
+        }
+    });
+}
+
+/**
+ * Probe one domain and return its health without persisting. `address` sends the
+ * request to that server instead of wherever the name resolves today - how a DNS
+ * cutover checks that the service it is moving to answers for the name before the
+ * record is changed.
+ */
+export async function checkDomain(
+    target: ProbeTarget,
+    options: { address?: string } = {}
+): Promise<DomainHealth> {
     const url = `${target.https ? "https" : "http"}://${target.hostname}${target.pathPrefix ?? ""}`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
     const started = Date.now();
+    const dispatcher = options.address ? pinnedTo(options.address) : null;
     try {
-        const response = await fetch(url, {
+        const init = {
             method: "GET",
-            redirect: "manual",
+            redirect: "manual" as const,
             // Named, so sleep mode never counts this as somebody visiting.
             headers: { "user-agent": HEALTH_PROBE_USER_AGENT },
             signal: controller.signal
-        });
+        };
+        // undici's Response is the platform's in every way this reads it; the cast
+        // only reconciles the two packages' declarations of it.
+        const response = dispatcher
+            ? ((await pinnedFetch(url, { ...init, dispatcher })) as unknown as Response)
+            : await fetch(url, init);
         if (await edgeSaysNotRouted(response)) {
             return {
                 status: "down",
@@ -169,6 +204,7 @@ export async function checkDomain(target: ProbeTarget): Promise<DomainHealth> {
         };
     } finally {
         clearTimeout(timer);
+        void dispatcher?.close().catch(() => undefined);
     }
 }
 
