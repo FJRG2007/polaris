@@ -96,6 +96,65 @@ export interface CanvasBox {
     readonly height: number;
 }
 
+function overlaps(a: CanvasBox, b: CanvasBox): boolean {
+    return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+/**
+ * Positions for the nodes that have none (a step added in the list view)
+ * without moving the ones that do: next to the node it follows, else before
+ * the node it leads to, else under everything, then down until it lands on a
+ * free spot. A graph with no positions at all is laid out whole.
+ */
+export function placeNew(graph: graphs.AutomationGraph): graphs.AutomationGraph {
+    if (graph.nodes.every((node) => node.position)) return graph;
+    if (graph.nodes.every((node) => !node.position)) return layoutGraph(graph);
+    const placed = new Map<string, { x: number; y: number }>();
+    for (const node of graph.nodes) if (node.position) placed.set(node.id, node.position);
+    const boxes: CanvasBox[] = [...[...placed.values()].map((at) => ({ ...at, ...CANVAS_NODE })), ...graph.notes.map((note) => ({ ...note.position, ...note.size }))];
+    const settle = (at: { x: number; y: number }) => {
+        const box = { ...at, ...CANVAS_NODE };
+        while (boxes.some((other) => overlaps(box, other))) box.y += CANVAS_NODE.height + CANVAS_GAP.y;
+        boxes.push(box);
+        return { x: Math.round(box.x), y: Math.round(box.y) };
+    };
+    const near = (id: string): { x: number; y: number } | null => {
+        const before = graph.edges.find((edge) => edge.to.node === id && placed.has(edge.from.node));
+        if (before) {
+            const at = placed.get(before.from.node)!;
+            return { x: at.x + CANVAS_NODE.width + CANVAS_GAP.x, y: at.y };
+        }
+        const after = graph.edges.find((edge) => edge.from.node === id && placed.has(edge.to.node));
+        if (after) {
+            const at = placed.get(after.to.node)!;
+            return { x: at.x - CANVAS_NODE.width - CANVAS_GAP.x, y: at.y };
+        }
+        if (graph.finally.entry === id) {
+            const band = finallyBand(graph);
+            return { x: 0, y: band.top + 36 };
+        }
+        return null;
+    };
+    let progress = true;
+    while (progress) {
+        progress = false;
+        for (const node of graph.nodes) {
+            if (placed.has(node.id)) continue;
+            const at = near(node.id);
+            if (!at) continue;
+            placed.set(node.id, settle(at));
+            progress = true;
+        }
+    }
+    for (const node of graph.nodes) {
+        if (placed.has(node.id)) continue;
+        const bottom = Math.max(0, ...boxes.map((box) => box.y + box.height));
+        const left = Math.min(...boxes.map((box) => box.x));
+        placed.set(node.id, settle({ x: Number.isFinite(left) ? left : 0, y: bottom + CANVAS_GAP.y }));
+    }
+    return { ...graph, nodes: graph.nodes.map((node) => (node.position ? node : { ...node, position: placed.get(node.id)! })) };
+}
+
 /** The box around every node and note, or null for an empty canvas. */
 export function graphBounds(graph: graphs.AutomationGraph): CanvasBox | null {
     const boxes: CanvasBox[] = [

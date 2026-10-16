@@ -93,9 +93,9 @@ function readView(): View | null {
     }
 }
 
-/** The list view's edits, back onto the graph: notes stay, and positions travel on the nodes. */
+/** The list view's edits, back onto the graph: notes stay, positions travel on the nodes, and a new step gets a free spot. */
 function withList(graph: core.AutomationGraph, flow: core.ListFlow): core.AutomationGraph {
-    return { ...core.graphFromList(flow), notes: graph.notes };
+    return core.placeNew({ ...core.graphFromList(flow), notes: graph.notes });
 }
 
 /** The newest test run, refetched while it is still going. */

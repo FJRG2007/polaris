@@ -392,6 +392,8 @@ function NodePanel({
                 })}
             </section>
 
+            {!readOnly && role !== "trigger" ? <AlwaysLane node={node} graph={graph} change={change} /> : null}
+
             {core.canPin(node.type) ? (
                 <section className="space-y-2">
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">{node.pinned !== undefined ? t("canvas.pinnedSample") : t("canvas.lastOutput")}</h3>
@@ -451,5 +453,32 @@ function NodePanel({
                 </Button>
             ) : null}
         </>
+    );
+}
+
+/** Start the Always lane at this node, or take it out: the panel's way to do what dragging from the lane's dot does. */
+function AlwaysLane({ node, graph, change }: { node: core.GraphNode; graph: core.AutomationGraph; change: Change }) {
+    const t = useTranslations("automations");
+    const starts = graph.finally.entry === node.id;
+    const refusal = starts ? null : core.connectRefusal(graph, { node: core.FINALLY_SOURCE, port: "next" }, node.id);
+    if (!starts && refusal !== null) return null;
+    return (
+        <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-foreground-subtle">{t("editor.always")}</h3>
+            {starts ? <p className="text-xs text-muted-foreground">{t("canvas.alwaysStarts")}</p> : null}
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                    change(
+                        (current) =>
+                            starts ? core.disconnect(current, `${core.FINALLY_SOURCE}>${node.id}`) : core.connect(current, { node: core.FINALLY_SOURCE, port: "next" }, node.id),
+                        { group: false }
+                    )
+                }
+            >
+                {starts ? t("canvas.alwaysLeave") : t("canvas.alwaysStartHere")}
+            </Button>
+        </section>
     );
 }

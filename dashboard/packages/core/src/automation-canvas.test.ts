@@ -189,3 +189,25 @@ describe("data mapping", () => {
         expect(canvas.samplePaths({ __proto__x: 1, "bad key": 2 }, "t").map((option) => option.path)).toEqual(["t.__proto__x"]);
     });
 });
+
+describe("placing nodes added in the list view", () => {
+    it("puts a new step next to the one it follows, on a free spot, and keeps every stored position", () => {
+        const laid = canvas.layoutGraph(sample());
+        const added = { ...laid, nodes: [...laid.nodes, node("c", "core.notify")], edges: [...laid.edges, edge("a", "c")] };
+        const placed = canvas.placeNew(added);
+        for (const before of laid.nodes) expect(placed.nodes.find((entry) => entry.id === before.id)!.position).toEqual(before.position);
+        const a = placed.nodes.find((entry) => entry.id === "a")!.position!;
+        const c = placed.nodes.find((entry) => entry.id === "c")!.position!;
+        expect(c.x).toBe(a.x + canvas.CANVAS_NODE.width + canvas.CANVAS_GAP.x);
+        const boxes = placed.nodes.map((entry) => entry.position!);
+        for (const box of boxes) if (box !== c) expect(Math.abs(box.x - c.x) >= canvas.CANVAS_NODE.width || Math.abs(box.y - c.y) >= canvas.CANVAS_NODE.height).toBe(true);
+    });
+
+    it("puts a step with no neighbour under everything, and lays out a graph with no positions at all", () => {
+        const laid = canvas.layoutGraph(sample());
+        const placed = canvas.placeNew({ ...laid, nodes: [...laid.nodes, node("lonely", "core.notify")] });
+        const bottom = Math.max(...laid.nodes.map((entry) => entry.position!.y + canvas.CANVAS_NODE.height));
+        expect(placed.nodes.find((entry) => entry.id === "lonely")!.position!.y).toBeGreaterThan(bottom);
+        expect(canvas.placeNew(sample())).toEqual(canvas.layoutGraph(sample()));
+    });
+});

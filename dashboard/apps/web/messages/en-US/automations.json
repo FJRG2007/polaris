@@ -367,7 +367,10 @@
             "crossesLane": "The main flow and the Always lane stay apart.",
             "intoLaneStart": "The Always lane starts on its own.",
             "laneTaken": "The Always lane already has a start."
-        }
+        },
+        "alwaysStarts": "The Always lane starts here.",
+        "alwaysLeave": "Take out of the Always lane",
+        "alwaysStartHere": "Start the Always lane here"
     },
     "stepStatus": {
         "ready": "Ready",

@@ -367,7 +367,10 @@
             "crossesLane": "El flujo y el carril Siempre van aparte.",
             "intoLaneStart": "El carril Siempre empieza solo.",
             "laneTaken": "El carril Siempre ya tiene inicio."
-        }
+        },
+        "alwaysStarts": "El carril Siempre empieza aquí.",
+        "alwaysLeave": "Sacar del carril Siempre",
+        "alwaysStartHere": "Empezar aquí el carril Siempre"
     },
     "stepStatus": {
         "ready": "Listo",

@@ -438,7 +438,10 @@ export function CanvasBoard(props: CanvasBoardProps) {
                                     props.onOpen(node.id);
                                 }
                             }}
-                            onFocus={() => !selected && !drag && onSelect({ nodes: new Set([node.id]), notes: new Set(), edge: null })}
+                            onFocus={(event) => {
+                                // Only a keyboard arrival selects: a press already chose (and Shift+click added to) the selection.
+                                if (!selected && !drag && focusedByKey(event.currentTarget)) onSelect({ nodes: new Set([node.id]), notes: new Set(), edge: null });
+                            }}
                         >
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-medium" title={props.title(node)}>
@@ -538,6 +541,14 @@ export function CanvasBoard(props: CanvasBoardProps) {
             </div>
         </div>
     );
+}
+
+function focusedByKey(element: Element): boolean {
+    try {
+        return element.matches(":focus-visible");
+    } catch {
+        return true;
+    }
 }
 
 const STEP_KEYS = ["ready", "running", "waiting", "ok", "failed", "skipped", "refused", "timedOut", "interrupted"] as const;
