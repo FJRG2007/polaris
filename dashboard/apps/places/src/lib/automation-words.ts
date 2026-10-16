@@ -387,7 +387,7 @@ export function describeStep(
 ): string {
     switch (step.kind) {
         case "device": {
-            const device = deviceName(lookup, step.deviceId, t);
+            const device = setName(lookup, step, t);
             if (step.setting) {
                 return t("automations.say.set", {
                     device: device.name,
@@ -402,7 +402,7 @@ export function describeStep(
         case "delay":
             return t("automations.say.delay", { span: durationText(step.seconds, t) });
         case "wait": {
-            const device = deviceName(lookup, step.deviceId, t);
+            const device = setName(lookup, step, t);
             return t("automations.say.wait", {
                 device: device.name,
                 value: valueText(step.attribute, device.kind, step.is, t),

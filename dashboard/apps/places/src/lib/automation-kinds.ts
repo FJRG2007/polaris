@@ -643,6 +643,8 @@ export const actionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
+        /** More devices, a room or a floor, each told the same. */
+        targets: targetsSchema,
         do: z.enum(STEP_DEVICE_ACTIONS, {
             errorMap: () => ({ message: "automations.errors.action" })
         }),
@@ -660,6 +662,9 @@ export const actionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("wait"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        /** For a set: until any of its devices is that way, or all of them. */
+        quantifier: quantifierSchema.optional(),
         attribute,
         is: needed,
         timeoutMinutes: count(1, LIMITS.waitMinutes),
@@ -1143,16 +1148,16 @@ export function deviceIssues(
     );
     definition.actions.forEach((step, index) => {
         const at = ["definition", "actions", index];
-        if (step.kind === "wait") watchedOne(step, step.deviceId, step.attribute, at);
-        if (step.kind === "device") {
-            const device = byId.get(step.deviceId);
+        if (step.kind === "wait") watched(step, step.attribute, at);
+        if (step.kind === "device") places(step, at);
+        for (const deviceId of step.kind === "device" ? named(step) : []) {
+            if (step.kind !== "device") break;
+            const device = byId.get(deviceId);
+            const field = fieldOf(step, deviceId, at);
             if (!device) {
-                issues.push({
-                    path: [...at, "deviceId"],
-                    message: "automations.errors.deviceGone"
-                });
+                issues.push({ path: field, message: "automations.errors.deviceGone" });
             } else if (!device.controllable) {
-                issues.push({ path: [...at, "deviceId"], message: "automations.errors.watchOnly" });
+                issues.push({ path: field, message: "automations.errors.watchOnly" });
             } else if (!stepActionsFor(device.kind).includes(step.do)) {
                 issues.push({ path: [...at, "do"], message: "automations.errors.cannotDo" });
             } else if (step.setting) {
@@ -1382,7 +1387,8 @@ export function conditionOn(given: Condition, device: DeviceView): Condition {
 }
 
 /** The same for a step: an action the device does not offer becomes its first one. */
-export function stepOn(step: Step, device: DeviceView): Step {
+export function stepOn(given: Step, device: DeviceView): Step {
+    const step = single(given);
     if (step.kind === "device") {
         const offered = stepActionsFor(device.kind);
         const action = offered.includes(step.do) ? step.do : (offered[0] ?? step.do);

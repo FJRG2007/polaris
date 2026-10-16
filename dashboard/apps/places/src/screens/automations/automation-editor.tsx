@@ -192,14 +192,19 @@ const NO_ROOMS: readonly RoomView[] = [];
 
 /** A block with its set changed: its devices, and how they count - which goes
  *  with the set when it is down to one device again. */
-function setOf<T extends auto.Trigger | auto.Condition>(
+function setOf<T extends auto.Trigger | auto.Condition | auto.Step>(
     block: T,
     ids: readonly string[],
     count: auto.Behaviour | auto.Quantifier | undefined
 ): T {
     if (!("deviceId" in block)) return block;
-    const field = block.kind === "device" || block.kind === "reading" ? "quantifier" : "behaviour";
     const next = { ...auto.withTargets(block, ids) } as Record<string, unknown>;
+    // A device step tells every device, so it has nothing to count by.
+    if ("do" in block) return next as T;
+    const field =
+        block.kind === "device" || block.kind === "reading" || block.kind === "wait"
+            ? "quantifier"
+            : "behaviour";
     delete next[field];
     if (ids.length > 1 && count) next[field] = count;
     return next as T;
@@ -2109,6 +2114,24 @@ function StepCard({
                         }
                         onChange={(next) => onChange(auto.stepOn(step, next))}
                     />
+                    <fields.PlaceTargetField
+                        block={step}
+                        path={path}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
+                    {!fields.placeValue(step) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(step)}
+                            devices={operableDevices}
+                            first={device}
+                            role="step"
+                            count={undefined}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids) => onChange(setOf(step, ids, undefined))}
+                        />
+                    )}
                     <flow.Field label={t("automations.fields.do")} path={[...path, "do"]}>
                         {(id, invalid) => (
                             <Select
@@ -2169,6 +2192,25 @@ function StepCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) => onChange(auto.stepOn(step, next))}
                     />
+                    <fields.PlaceTargetField
+                        block={step}
+                        role="condition"
+                        path={path}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
+                    {!fields.placeValue(step) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(step)}
+                            devices={watched}
+                            first={device}
+                            role="condition"
+                            count={step.quantifier}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids, count) => onChange(setOf(step, ids, count))}
+                        />
+                    )}
                     {device && (
                         <fields.AttributePicker
                             kind={device.kind}

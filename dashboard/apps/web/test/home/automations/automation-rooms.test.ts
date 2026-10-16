@@ -162,3 +162,64 @@ describe("a block naming a room or a floor", () => {
         );
     });
 });
+
+describe("a step on a set", () => {
+    const devices = [
+        { id: "lamp1", kind: "light", name: "Lamp", controllable: true, roomId: "kitchen" },
+        { id: "lock1", kind: "lock", name: "Lock", controllable: false, roomId: "kitchen" }
+    ];
+    const withStep = (step: auto.Step): auto.AutomationDefinition => ({
+        timeZone: "UTC",
+        triggers: [{ id: "trigmanual", kind: "manual" }],
+        conditions: { match: "all", groups: [] },
+        actions: [step]
+    });
+
+    it("is accepted on a device step and a wait, and refused for a member that cannot", () => {
+        const step: auto.Step = {
+            id: "stepon",
+            kind: "device",
+            deviceId: "lamp1",
+            targets: [
+                { kind: "device", id: "lamp1" },
+                { kind: "device", id: "lock1" }
+            ],
+            do: "turn-on"
+        };
+        expect(auto.actionSchema.safeParse(step).success).toBe(true);
+        expect(
+            auto.deviceIssues(withStep(step), devices, { automationIds: [], selfId: null })
+        ).toEqual([
+            {
+                path: ["definition", "actions", 0, "targets", 1, "id"],
+                message: "automations.errors.watchOnly"
+            }
+        ]);
+        expect(
+            auto.actionSchema.safeParse({
+                id: "stepwait",
+                kind: "wait",
+                deviceId: "lamp1",
+                targets: [{ kind: "room", id: "kitchen" }],
+                quantifier: "all",
+                attribute: "state",
+                is: "on",
+                timeoutMinutes: 5,
+                onTimeout: "stop"
+            }).success
+        ).toBe(true);
+    });
+
+    it("reads a room as only the devices in it that can be told", () => {
+        const step = {
+            id: "stepon",
+            kind: "device",
+            deviceId: "lamp1",
+            targets: [{ kind: "room" as const, id: "kitchen" }],
+            do: "turn-on" as const
+        };
+        expect(
+            auto.resolvedTargets(step, { devices, rooms: [{ id: "kitchen", floorId: "" }] })
+        ).toEqual(["lamp1"]);
+    });
+});

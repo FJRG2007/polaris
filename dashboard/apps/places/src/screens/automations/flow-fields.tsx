@@ -104,7 +104,8 @@ export function TargetSetField({
     ids: readonly string[];
     devices: readonly DeviceView[];
     first: DeviceView | undefined;
-    role: "trigger" | "condition";
+    /** A step's set has no way to count: every device of it is told. */
+    role: "trigger" | "condition" | "step";
     /** How the set counts, as stored; absent is each, or any. */
     count: auto.Behaviour | auto.Quantifier | undefined;
     onChange: (ids: string[], count: auto.Behaviour | auto.Quantifier | undefined) => void;
@@ -174,7 +175,7 @@ export function TargetSetField({
                     </Field>
                 );
             })}
-            {ids.length > 1 && (
+            {ids.length > 1 && role !== "step" && (
                 <SetCountField
                     role={role}
                     count={count}

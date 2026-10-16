@@ -1179,16 +1179,28 @@ export function createEngine(ports: EnginePorts) {
             }
 
             if (step.kind === "wait") {
-                const device = await ports.devices.read(automation.installedAppId, step.deviceId);
-                if (!device) {
+                const members = auto.deviceTargets(step);
+                const read = await Promise.all(
+                    members.map((id) => ports.devices.read(automation.installedAppId, id))
+                );
+                // One device that is gone ends the run, as it always has; a set
+                // waits on what is left of it, and ends only once none is.
+                if (read.every((device) => !device)) {
                     log("failed", { code: "deviceGone" });
                     await finish(run, "failed", steps, "step");
                     return;
                 }
-                if (
-                    (device.online || step.attribute === "online") &&
-                    same(attributeOf(device, step.attribute), step.is)
-                ) {
+                const there = read.flatMap((device) =>
+                    device && (device.online || step.attribute === "online")
+                        ? [same(attributeOf(device, step.attribute), step.is)]
+                        : members.length > 1
+                          ? []
+                          : [false]
+                );
+                const reached =
+                    there.length > 0 &&
+                    (step.quantifier === "all" ? there.every(Boolean) : there.some(Boolean));
+                if (reached) {
                     log("ok");
                     waitUntil = null;
                 } else {
@@ -1302,9 +1314,27 @@ export function createEngine(ports: EnginePorts) {
         // hour may have outlived its owner's right to open the door.
         if (!(await ports.mayOperate(automation.ownerId, "control")))
             return { outcome: "refused", code: "owner" };
+        // Every device of a set is told, one failing or not; the step fails with
+        // the first that did, so nobody reads "done" over a lamp still on.
+        const members = auto.deviceTargets(step);
+        if (members.length === 0) return { outcome: "failed", code: "deviceGone" };
+        let first: { outcome: auto.StepOutcome; code?: string; said?: string } | null = null;
+        for (const deviceId of members) {
+            const outcome = await deviceAct(automation, run, step, deviceId);
+            if (outcome.outcome !== "ok" && !first) first = outcome;
+        }
+        return first ?? { outcome: "ok" };
+    }
+
+    async function deviceAct(
+        automation: AutomationRecord,
+        run: RunRecord,
+        step: Extract<auto.Step, { kind: "device" }>,
+        deviceId: string
+    ): Promise<{ outcome: auto.StepOutcome; code?: string; said?: string }> {
         let action: DeviceAction;
         if (step.do === auto.TOGGLE) {
-            const device = await ports.devices.read(automation.installedAppId, step.deviceId);
+            const device = await ports.devices.read(automation.installedAppId, deviceId);
             if (!device) return { outcome: "failed", code: "deviceGone" };
             if (device.state !== "on" && device.state !== "off")
                 return { outcome: "failed", code: "toggleUnknown" };
@@ -1316,7 +1346,7 @@ export function createEngine(ports: EnginePorts) {
             await causeContext.run({ depth: run.depth }, () =>
                 ports.devices.act(
                     automation.installedAppId,
-                    step.deviceId,
+                    deviceId,
                     action,
                     {
                         ownerId: automation.ownerId,
