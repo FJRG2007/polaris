@@ -28,7 +28,7 @@ import { PlainNames } from "@/components/person-name";
 import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
-import { calculate, calculationText } from "@/lib/search/calculate";
+import { calculate, calculationDigits, calculationText } from "@/lib/search/calculate";
 import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
 import {
     Dialog,
@@ -456,9 +456,9 @@ export function CommandPalette({
         () =>
             calculation === null
                 ? null
-                : new Intl.NumberFormat(locale, { maximumSignificantDigits: 10 }).format(
-                      calculation
-                  ),
+                : new Intl.NumberFormat(locale, {
+                      maximumSignificantDigits: calculationDigits(calculation)
+                  }).format(calculation),
         [calculation, locale]
     );
 

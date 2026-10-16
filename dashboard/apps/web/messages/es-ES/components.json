@@ -260,7 +260,7 @@
         "calculationCopied": "{value} copiado al portapapeles",
         "calculationCopyFailed": "No se pudo copiar el resultado. Prueba otra vez.",
         "calculationLabel": "Copiar {value}",
-        "calculationUse": "Usar {value}",
+        "calculationUse": "Usar {value}. Ctrl+C o Cmd+C lo copia.",
         "calculationCopy": "Copiar resultado",
         "clock": {
             "timer": "Iniciar un temporizador de {length}",

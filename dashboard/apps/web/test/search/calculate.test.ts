@@ -60,7 +60,10 @@ describe("calculate", () => {
         ["3,1416 * 2", 6.2832],
         ["1,5+2,25", 3.75],
         ["1,2345 * 1", 1.2345],
-        ["1,00 + 1", 2]
+        ["1,00 + 1", 2],
+        ["12345678901 + 1", 12345678902],
+        ["99999999999 * 10", 999999999990],
+        ["12345678.5 * 2", 24691357]
     ])("%s = %d", (input, expected) => {
         expect(calculate(input)).toBe(expected);
     });
@@ -124,10 +127,11 @@ describe("calculate", () => {
         expect(calculationText(calculate("1 / 4")!)).toBe("0.25");
         expect(calculationText(calculate("12345 * 1000")!)).toBe("12345000");
         expect(calculationText(calculate("-5 * 2")!)).toBe("-10");
+        expect(calculationText(calculate("12345678901 + 1")!)).toBe("12345678902");
     });
 
     it("copies text that reads back as the same number, never an exponent", () => {
-        for (const input of ["10 ^ 21 * 3", "10 ^ -7 * 4", "2 / 3", "123456789 * 987654321"]) {
+        for (const input of ["12345678901 + 1", "10 ^ 21 * 3", "10 ^ -7 * 4", "2 / 3", "123456789 * 987654321"]) {
             const value = calculate(input)!;
             const text = calculationText(value);
             expect(text).not.toMatch(/e/i);

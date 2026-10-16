@@ -82,7 +82,7 @@ describe("the search panel's calculator", () => {
         expect(field.value).toBe("12*3+4");
 
         const options = screen.getAllByRole("option");
-        expect(options[0]?.getAttribute("aria-label")).toBe("Use 40");
+        expect(options[0]?.getAttribute("aria-label")).toBe("Use 40. Ctrl+C or Cmd+C copies it.");
         expect(screen.getByText("Enter or Tab to use the result")).toBeTruthy();
     });
 
@@ -118,7 +118,7 @@ describe("the search panel's calculator", () => {
         expect(screen.getByRole("combobox")).toBe(field);
 
         fireEvent.change(field, { target: { value: "10/4" } });
-        fireEvent.click(screen.getByRole("option", { name: "Use 2.5" }));
+        fireEvent.click(screen.getByRole("option", { name: "Use 2.5. Ctrl+C or Cmd+C copies it." }));
         expect(field.value).toBe("2.5");
         expect(document.activeElement).toBe(field);
         expect(writeText).not.toHaveBeenCalled();

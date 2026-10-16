@@ -46,6 +46,8 @@ const MAX_LENGTH = 200;
 /** As many digits as an answer keeps: enough for any sum, few enough that the
  *  noise of binary fractions never shows. */
 const SIGNIFICANT_DIGITS = 10;
+/** The most digits a number format will write. */
+const MAX_DIGITS = 21;
 /** Brackets and signs nested deeper than this are not arithmetic anybody typed. */
 const MAX_DEPTH = 64;
 
@@ -240,7 +242,7 @@ export function calculate(input: string): number | null {
         const { value, worked } = evaluate(tokenize(text));
         if (!worked || !Number.isFinite(value)) return null;
         // Floating point noise off the end: 0.1 + 0.2 is 0.3.
-        const tidy = Number(value.toPrecision(SIGNIFICANT_DIGITS));
+        const tidy = Number(value.toPrecision(calculationDigits(value)));
         return Object.is(tidy, -0) ? 0 : tidy;
     } catch (error) {
         if (error instanceof NotArithmetic) return null;
@@ -248,14 +250,18 @@ export function calculate(input: string): number | null {
     }
 }
 
-/** Plain digits, never "1e+21": what is copied or put back in the field has to
- *  read back as the same number, here and in a sheet. */
-const PLAIN = new Intl.NumberFormat("en-US", {
-    useGrouping: false,
-    maximumSignificantDigits: SIGNIFICANT_DIGITS
-});
+/** The digits an answer is shown and kept with: the fraction is cut to fit,
+ *  never a digit of the whole part, so "12345678901 + 1" is 12345678902. */
+export function calculationDigits(value: number): number {
+    const whole = Math.abs(value) < 1 ? 0 : Math.floor(Math.log10(Math.abs(value))) + 1;
+    return Math.min(MAX_DIGITS, Math.max(SIGNIFICANT_DIGITS, whole));
+}
 
-/** The answer as it is copied: plain digits a calculator or a sheet reads back. */
+/** The answer as it is copied: plain digits a calculator or a sheet reads back,
+ *  never "1e+21", so it reads back as the same number here and in a sheet. */
 export function calculationText(value: number): string {
-    return PLAIN.format(value);
+    return new Intl.NumberFormat("en-US", {
+        useGrouping: false,
+        maximumSignificantDigits: calculationDigits(value)
+    }).format(value);
 }
