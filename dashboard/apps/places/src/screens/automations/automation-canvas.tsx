@@ -100,12 +100,7 @@ export function AutomationCanvas({ lookup, automationName, ...props }: Automatio
                 kindText: (kind) => words.conditionKindText(kind, t),
                 blank: auto.blankCondition,
                 describe: (condition) =>
-                    words.describeCondition(
-                        condition,
-                        lookup,
-                        t,
-                        triggerIds.current
-                    ),
+                    words.describeCondition(condition, lookup, t, triggerIds.current),
                 icon: (condition) => conditionIcon(condition)
             },
             steps: {

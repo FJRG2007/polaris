@@ -2502,7 +2502,11 @@ describe("the sun", () => {
         const runs = store.runsOf("dusk");
         expect(runs).toHaveLength(1);
         expect(runs[0]?.firingKey).toBe("sun:trigsun:sunset:2024-06-21");
-        expect(runs[0]?.cause).toMatchObject({ kind: "sun", triggerId: "trigsun", event: "sunset" });
+        expect(runs[0]?.cause).toMatchObject({
+            kind: "sun",
+            triggerId: "trigsun",
+            event: "sunset"
+        });
 
         // Down past the catch-up window: that one is missed, never fired late.
         at("2024-06-22T21:00:00.000Z");
@@ -2515,10 +2519,17 @@ describe("the sun", () => {
         automation("nowhere", { timeZone: "Europe/London", triggers: [sunset] });
         automation(
             "arctic",
-            { timeZone: "Europe/Oslo", triggers: [{ id: "trigsun", kind: "sun", event: "sunset" }] },
+            {
+                timeZone: "Europe/Oslo",
+                triggers: [{ id: "trigsun", kind: "sun", event: "sunset" }]
+            },
             { location: { latitude: 69.65, longitude: 18.96 } }
         );
-        for (const iso of ["2024-06-21T20:07:00.000Z", "2024-06-21T22:00:00.000Z", "2024-06-21T23:30:00.000Z"]) {
+        for (const iso of [
+            "2024-06-21T20:07:00.000Z",
+            "2024-06-21T22:00:00.000Z",
+            "2024-06-21T23:30:00.000Z"
+        ]) {
             at(iso);
             await engine.evaluateSchedules(INSTALL);
         }

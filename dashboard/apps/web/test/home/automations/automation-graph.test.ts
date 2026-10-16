@@ -167,9 +167,9 @@ describe("the fixture", () => {
         );
         expect(
             new Set(
-                EVERYTHING.conditions.groups.flatMap((group) =>
-                    group.items.map((node) => node.kind)
-                ).concat(NEWER)
+                EVERYTHING.conditions.groups
+                    .flatMap((group) => group.items.map((node) => node.kind))
+                    .concat(NEWER)
             )
         ).toEqual(new Set(auto.CONDITION_KINDS));
         const added = {

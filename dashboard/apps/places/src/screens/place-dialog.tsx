@@ -105,15 +105,14 @@ export function PlaceDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{place ? place.name : t("placeDialog.addTitle")}</DialogTitle>
-                    <DialogDescription>
-                        {t("placeDialog.description")}
-                    </DialogDescription>
+                    <DialogDescription>{t("placeDialog.description")}</DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-[0.75rem] font-medium text-muted-foreground">
-                            {t("placeDialog.name")}<span className="text-danger"> *</span>
+                            {t("placeDialog.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             value={name}
@@ -158,7 +157,9 @@ export function PlaceDialog({
                                 value={latitude}
                                 onChange={setLatitude}
                                 placeholder="40.42"
-                                error={location.latitude ? t(location.latitude as never) : undefined}
+                                error={
+                                    location.latitude ? t(location.latitude as never) : undefined
+                                }
                             />
                             <CoordinateField
                                 label={t("placeDialog.longitude")}

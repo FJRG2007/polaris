@@ -230,7 +230,12 @@ export async function updatePlace(
     const kind = (PLACE_KINDS as readonly string[]).includes(input.kind) ? input.kind : "other";
     const row = await prisma.place.update({
         where: { id },
-        data: { name, kind, address: input.address.trim() || null, ...locationData(input.location) },
+        data: {
+            name,
+            kind,
+            address: input.address.trim() || null,
+            ...locationData(input.location)
+        },
         select: {
             id: true,
             name: true,

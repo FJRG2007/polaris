@@ -289,7 +289,10 @@ export function describeTrigger(
         case "manual":
             return t("automations.say.manual");
         case "sun":
-            return t("automations.say.sun", { event: trigger.event, ...offsetWords(trigger.offset, t) });
+            return t("automations.say.sun", {
+                event: trigger.event,
+                ...offsetWords(trigger.offset, t)
+            });
         case "threshold": {
             const device = setName(lookup, trigger, t);
             return t(
@@ -347,7 +350,8 @@ export function describeCondition(
                     after: edge(condition.after),
                     before: edge(condition.before)
                 });
-            if (condition.before) return t("automations.say.sunBefore", { edge: edge(condition.before) });
+            if (condition.before)
+                return t("automations.say.sunBefore", { edge: edge(condition.before) });
             return condition.after
                 ? t("automations.say.sunAfter", { edge: edge(condition.after) })
                 : t("automations.conditions.sun");

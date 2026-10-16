@@ -95,7 +95,11 @@ function SunToday({ event, offset }: { event: SunEvent; offset?: Offset }) {
         return (
             <div className="flex min-w-0 flex-col gap-2 rounded-md bg-muted px-3 py-2 sm:col-span-2">
                 <p className="text-xs text-muted-foreground">
-                    {t(scope.setLocation ? "automations.fields.noLocation" : "automations.fields.noLocationAsk")}
+                    {t(
+                        scope.setLocation
+                            ? "automations.fields.noLocation"
+                            : "automations.fields.noLocationAsk"
+                    )}
                 </p>
                 {scope.setLocation ? <UseLocationButton onLocated={scope.setLocation} /> : null}
             </div>
@@ -283,7 +287,11 @@ export function SunConditionFields({
         return (
             <>
                 <EventField
-                    label={t(which === "after" ? "automations.fields.sunAfter" : "automations.fields.sunBefore")}
+                    label={t(
+                        which === "after"
+                            ? "automations.fields.sunAfter"
+                            : "automations.fields.sunBefore"
+                    )}
                     path={[...path, which]}
                     field="event"
                     value={value.event}
@@ -364,7 +372,9 @@ export function TriggeredByFields({
         onChange({
             ...condition,
             triggerIds: on
-                ? scope.triggers.map((each) => each.id).filter((each) => each === id || picked.has(each))
+                ? scope.triggers
+                      .map((each) => each.id)
+                      .filter((each) => each === id || picked.has(each))
                 : condition.triggerIds.filter((each) => each !== id)
         });
     return (
@@ -373,7 +383,9 @@ export function TriggeredByFields({
                 {t("automations.fields.triggeredBy")}
             </legend>
             {scope.triggers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("automations.fields.noTriggers")}</p>
+                <p className="text-xs text-muted-foreground">
+                    {t("automations.fields.noTriggers")}
+                </p>
             ) : (
                 scope.triggers.map((trigger, index) => (
                     <label key={trigger.id} className="flex min-w-0 items-center gap-2 text-sm">
@@ -384,11 +396,16 @@ export function TriggeredByFields({
                         />
                         <span
                             className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[0.6875rem] font-medium tabular-nums text-muted-foreground"
-                            aria-label={t("automations.fields.triggerNumber", { number: index + 1 })}
+                            aria-label={t("automations.fields.triggerNumber", {
+                                number: index + 1
+                            })}
                         >
                             {index + 1}
                         </span>
-                        <span className="min-w-0 truncate" title={words.describeTrigger(trigger, scope.lookup, t)}>
+                        <span
+                            className="min-w-0 truncate"
+                            title={words.describeTrigger(trigger, scope.lookup, t)}
+                        >
                             {blockTitle(trigger, words.describeTrigger(trigger, scope.lookup, t))}
                         </span>
                     </label>
@@ -396,11 +413,7 @@ export function TriggeredByFields({
             )}
             {missing.map((id) => (
                 <label key={id} className="flex min-w-0 items-center gap-2 text-sm text-danger-ink">
-                    <Checkbox
-                        checked
-                        disabled={disabled}
-                        onChange={() => toggle(id, false)}
-                    />
+                    <Checkbox checked disabled={disabled} onChange={() => toggle(id, false)} />
                     <AlertTriangle className="size-4 shrink-0" />
                     <span className="min-w-0">{t("automations.fields.triggerMissing")}</span>
                 </label>
