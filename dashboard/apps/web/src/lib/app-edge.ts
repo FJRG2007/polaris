@@ -47,12 +47,13 @@ export async function appEdgeOrigin(): Promise<string> {
 }
 
 /** Whether another router already answers for this hostname: the dashboard's
- *  own public names, or a deployed service's domain. */
+ *  own public names, a deployed service's domain, or a WireGuard tunnel. */
 export async function edgeHostnameTaken(hostname: string): Promise<boolean> {
     const host = hostname.trim().toLowerCase();
-    const [dashboard, domain] = await Promise.all([
+    const [dashboard, domain, tunnel] = await Promise.all([
         dashboardHosts(),
-        prisma.domain.findUnique({ where: { hostname: host }, select: { id: true } })
+        prisma.domain.findUnique({ where: { hostname: host }, select: { id: true } }),
+        prisma.wireguardTunnel.findUnique({ where: { hostname: host }, select: { id: true } })
     ]);
-    return dashboard.includes(host) || domain !== null;
+    return dashboard.includes(host) || domain !== null || tunnel !== null;
 }

@@ -21,6 +21,7 @@ import * as tunnels from "@/lib/deploy/wireguard/tunnel-service";
 const TUNNELS_PATH = "/apps/tunnels";
 
 const idSchema = z.object({ id: z.string().uuid() });
+const idsSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
 const pausedSchema = z.object({ id: z.string().uuid(), paused: z.boolean() });
 const createSchema = z.object({
     publicServerId: z.string().uuid(),
@@ -99,15 +100,15 @@ export async function removeTunnelAction(input: unknown): Promise<Reply> {
     return {};
 }
 
-/** The live state of one tunnel, read from whichever end answers. */
-export async function tunnelStatusAction(
+/** The live state of the tunnels on screen, each read from whichever end answers. */
+export async function tunnelStatusesAction(
     input: unknown
-): Promise<{ status?: tunnels.TunnelStatus; error?: string }> {
+): Promise<{ statuses?: Record<string, tunnels.TunnelStatus>; error?: string }> {
     const user = await requirePermission("deploy.manage");
-    const parsed = idSchema.safeParse(input);
+    const parsed = idsSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("tunnels"))("refusals.notFound") };
     try {
-        return { status: await tunnels.readTunnelStatus(user.id, parsed.data.id) };
+        return { statuses: await tunnels.readTunnelStatuses(user.id, parsed.data.ids) };
     } catch (caught) {
         return { error: await failure(caught, "status") };
     }

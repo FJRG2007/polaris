@@ -41,7 +41,9 @@ vi.mock("@/lib/deploy/wireguard/tunnel-service", async () => {
         removeTunnel: vi.fn(async () => {
             if (fake.failWith) throw fake.failWith;
         }),
-        readTunnelStatus: vi.fn(async () => ({ health: "up", lastHandshake: 1, rxBytes: 2, txBytes: 3 }))
+        readTunnelStatuses: vi.fn(async (_owner: string, ids: string[]) =>
+            Object.fromEntries(ids.map((id) => [id, { health: "up", lastHandshake: 1, rxBytes: 2, txBytes: 3 }]))
+        )
     };
 });
 
@@ -70,7 +72,7 @@ describe("tunnel actions", () => {
         await expect(actions.setTunnelPausedAction({ id: SERVER, paused: true })).rejects.toThrow(
             "denied deploy.manage"
         );
-        await expect(actions.tunnelStatusAction({ id: SERVER })).rejects.toThrow("denied deploy.manage");
+        await expect(actions.tunnelStatusesAction({ ids: [SERVER] })).rejects.toThrow("denied deploy.manage");
         expect(service.createTunnel).not.toHaveBeenCalled();
         expect(service.removeTunnel).not.toHaveBeenCalled();
         expect(vi.mocked(session.requirePermission).mock.calls.every(([p]) => p === "deploy.manage")).toBe(true);
@@ -92,6 +94,26 @@ describe("tunnel actions", () => {
         expect(service.createTunnel).not.toHaveBeenCalled();
         expect((await actions.removeTunnelAction({ id: "../etc" })).error).toBeTruthy();
         expect(service.removeTunnel).not.toHaveBeenCalled();
+    });
+
+    it("reads every tunnel on screen in one call, and refuses a list it should not take", async () => {
+        const reply = await actions.tunnelStatusesAction({ ids: [SERVER, SERVICE] });
+        expect(Object.keys(reply.statuses ?? {})).toEqual([SERVER, SERVICE]);
+        expect(service.readTunnelStatuses).toHaveBeenCalledWith("0190a8c4-0000-7000-8000-00000000000a", [SERVER, SERVICE]);
+        expect((await actions.tunnelStatusesAction({ ids: [] })).error).toBeTruthy();
+        expect((await actions.tunnelStatusesAction({ ids: ["../etc"] })).error).toBeTruthy();
+        expect((await actions.tunnelStatusesAction({ ids: Array.from({ length: 201 }, () => SERVER) })).error).toBeTruthy();
+        expect(service.readTunnelStatuses).toHaveBeenCalledTimes(1);
+    });
+
+    it("says a pause that left an end running should be paused again, not removed", async () => {
+        vi.mocked(service.setTunnelPaused).mockRejectedValueOnce(
+            new service.TunnelRefusal("leftoverPaused", { servers: "edge-1" })
+        );
+        const reply = await actions.setTunnelPausedAction({ id: SERVER, paused: true });
+        expect(reply.error).toBe(
+            "The tunnel is paused, but its end on edge-1 is still running. Pause it again once it is back."
+        );
     });
 
     it("shows a refusal in its own words and hides anything else", async () => {

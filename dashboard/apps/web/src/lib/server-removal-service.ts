@@ -30,6 +30,7 @@ import { deleteHost, getHostConnection } from "@/lib/host-service";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { deployAndWait, stopApplicationOnTarget, syncAppRoutes } from "@/lib/deploy-service";
 import { readerWords } from "@/lib/i18n/reader-words";
+import type { tunnelsWithin } from "@/lib/deploy/wireguard/tunnel-service";
 
 /** How a server is taken out. Each one includes everything the one before it does. */
 export type ServerRemovalMode = "disconnect" | "clean" | "move";
@@ -137,6 +138,9 @@ export async function removeServer(
 
     const warnings: string[] = [];
     let moved: string[] = [];
+    // Read before a move rewrites where a service's tunnel end is recorded to run:
+    // the end to take down is the one on this server.
+    const tunnels = await (await import("@/lib/deploy/wireguard/tunnel-service")).tunnelsWithin(ownerId, { hostId });
 
     if (input.mode === "move") {
         if (!input.destinationId) return { error: (await readerWords("servers"))("errors.schema.chooseDestination") };
@@ -150,6 +154,8 @@ export async function removeServer(
         warnings.push(...(await tearDown(ownerId, hostId)));
         warnings.push(...(await revokeLogin(ownerId, hostId)));
     }
+
+    warnings.push(...(await settleTunnels(ownerId, hostId, tunnels)));
 
     await deleteHost(ownerId, hostId);
     // Deployed-app routes are generated from what is left, so a removed server's
@@ -223,6 +229,37 @@ async function moveServices(
         moved.push(app.name);
     }
     return { moved };
+}
+
+/**
+ * The tunnels with an end on this server, before its row goes and cascades them
+ * away. One whose service moved to another server starts again there; the rest -
+ * the public end here, or a service that stays and goes with the server - are
+ * taken down on both ends and removed. What could not be done is a warning.
+ */
+async function settleTunnels(
+    ownerId: string,
+    hostId: string,
+    before: Awaited<ReturnType<typeof tunnelsWithin>>
+): Promise<string[]> {
+    const { moveTunnel, retireTunnels, tunnelsWithin } = await import("@/lib/deploy/wireguard/tunnel-service");
+    const t = await readerWords("tunnels");
+    const staying = new Set((await tunnelsWithin(ownerId, { hostId })).map((row) => row.id));
+    const warnings: string[] = [];
+    for (const row of before.filter((one) => !staying.has(one.id))) {
+        try {
+            const left = await moveTunnel(ownerId, row);
+            if (left.length > 0) {
+                warnings.push(t("retired.leftover", { hostname: row.hostname, servers: [...new Set(left)].join(", ") }));
+            }
+        } catch {
+            warnings.push(t("retired.notMoved", { hostname: row.hostname }));
+        }
+    }
+    for (const left of await retireTunnels(ownerId, before.filter((one) => staying.has(one.id)))) {
+        warnings.push(t("retired.leftover", left));
+    }
+    return warnings;
 }
 
 /** The destination as a deploy target, or null when that server is not one of the

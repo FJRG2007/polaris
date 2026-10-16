@@ -14,7 +14,7 @@ vi.mock("../../../src/app/(app)/apps/tunnels/actions", () => ({
     createTunnelAction: vi.fn(),
     removeTunnelAction: vi.fn(),
     setTunnelPausedAction: vi.fn(),
-    tunnelStatusAction: vi.fn()
+    tunnelStatusesAction: vi.fn()
 }));
 
 const { FirewallStep, TunnelsView } = await import("../../../src/app/(app)/apps/tunnels/tunnels-view");
@@ -68,7 +68,14 @@ describe("the firewall step", () => {
         expect(markup).toContain("51821");
         expect(markup).toContain("0.0.0.0/0");
         expect(markup).toContain("203.0.113.7");
-        expect(markup).toContain("Point app.example.com at 203.0.113.7");
+        expect(markup).toContain("Point app.example.com at 203.0.113.7 with an A record");
+    });
+
+    it("asks for an AAAA record when the server's address is IPv6", () => {
+        const markup = renderToStaticMarkup(
+            withMessages(<FirewallStep tunnel={{ ...TUNNEL, endpointHost: "2001:db8::7" }} />)
+        );
+        expect(markup).toContain("Point app.example.com at 2001:db8::7 with an AAAA record");
     });
 
     it("says the address is not known rather than leaving a blank", () => {

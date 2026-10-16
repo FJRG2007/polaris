@@ -20,6 +20,7 @@ import { loadEnv } from "@polaris/config";
 import { serviceName } from "@polaris/deploy";
 import { getPorts } from "@/lib/deploy/runtime";
 import { getPublicIp } from "@/lib/domain-service";
+import { edgeHostnameTaken } from "@/lib/app-edge";
 import { getHostConnection } from "@/lib/host-service";
 import { containerPortOf } from "@/lib/deploy-service";
 import { writeDynamicFile } from "@/lib/traefik-dynamic";
@@ -39,7 +40,8 @@ export type TunnelRefusalCode =
     | "noAddress"
     | "unreachable"
     | "edge"
-    | "leftover";
+    | "leftover"
+    | "leftoverPaused";
 
 export class TunnelRefusal extends Error {
     public constructor(
@@ -176,11 +178,7 @@ export async function createTunnel(
     if (!target) throw new TunnelRefusal("noServer");
     if (!app) throw new TunnelRefusal("noService");
     if (app.targetId === target.id) throw new TunnelRefusal("sameServer");
-    const [taken, domain] = await Promise.all([
-        prisma.wireguardTunnel.findUnique({ where: { hostname }, select: { id: true } }),
-        prisma.domain.findFirst({ where: { hostname }, select: { id: true } }).catch(() => null)
-    ]);
-    if (taken || domain) throw new TunnelRefusal("hostnameTaken");
+    if (await edgeHostnameTaken(hostname)) throw new TunnelRefusal("hostnameTaken");
 
     const publicPair = wg.generateKeyPair();
     const natPair = wg.generateKeyPair();
@@ -240,7 +238,7 @@ export async function setTunnelPaused(ownerId: string, id: string, paused: boole
     if (row.paused === paused) return;
     await prisma.wireguardTunnel.update({ where: { id }, data: { paused } });
     if (paused) {
-        refuseLeftovers(await takeDown(ownerId, id, row));
+        refuseLeftovers(await takeDown(ownerId, id, row), "leftoverPaused");
         return;
     }
     try {
@@ -265,70 +263,198 @@ export async function removeTunnel(ownerId: string, id: string): Promise<void> {
     await prisma.wireguardTunnel.deleteMany({ where: { id, ownerId } });
 }
 
-function refuseLeftovers(left: readonly string[]): void {
-    if (left.length > 0) throw new TunnelRefusal("leftover", { servers: [...new Set(left)].join(", ") });
+function refuseLeftovers(left: readonly string[], code: "leftover" | "leftoverPaused" = "leftover"): void {
+    if (left.length > 0) throw new TunnelRefusal(code, { servers: [...new Set(left)].join(", ") });
+}
+
+/** What is about to be deleted under a tunnel: a service, or a whole server. */
+export type TunnelScope = { readonly applicationId: string } | { readonly hostId: string };
+
+/**
+ * The tunnels a delete would cascade away: those reaching the service, or with
+ * either end on the server. Read before anything changes, since moving a service
+ * off the server rewrites where its end is recorded to run.
+ */
+export async function tunnelsWithin(ownerId: string, scope: TunnelScope): Promise<TunnelRow[]> {
+    const where =
+        "applicationId" in scope
+            ? { ownerId, applicationId: scope.applicationId }
+            : {
+                  ownerId,
+                  OR: [{ publicTarget: { hostId: scope.hostId } }, { application: { target: { hostId: scope.hostId } } }]
+              };
+    return prisma.wireguardTunnel.findMany({ where, select: TUNNEL_SELECT, take: 500 });
+}
+
+/**
+ * Stop both ends of tunnels whose service or server is being deleted and take
+ * their hostnames off the edge, before that delete cascades the rows away: with
+ * no row left to remove it from, an end that stays running keeps its key and its
+ * port for good. A tunnel cleaned up everywhere is deleted; one that is not stays,
+ * paused, and is returned with the servers it is still left on.
+ */
+export async function retireTunnels(
+    ownerId: string,
+    rows: readonly TunnelRow[]
+): Promise<{ hostname: string; servers: string }[]> {
+    const left: { hostname: string; servers: string }[] = [];
+    for (const row of rows) {
+        await prisma.wireguardTunnel.updateMany({ where: { id: row.id, ownerId }, data: { paused: true } });
+        const servers = await takeDown(ownerId, row.id, row);
+        if (servers.length > 0) left.push({ hostname: row.hostname, servers: [...new Set(servers)].join(", ") });
+        else await prisma.wireguardTunnel.deleteMany({ where: { id: row.id, ownerId } });
+    }
+    return left;
+}
+
+/**
+ * Start a tunnel again where its service now runs, after the service moved to
+ * another server. `before` is the tunnel as it was read before the move, so the
+ * end that comes down is the one on the old server. A tunnel that was paused stays
+ * paused; one that does not come up is left paused by `setTunnelPaused`. Returns
+ * the servers where the old ends could not be cleaned up.
+ */
+export async function moveTunnel(ownerId: string, before: TunnelRow): Promise<string[]> {
+    await prisma.wireguardTunnel.updateMany({ where: { id: before.id, ownerId }, data: { paused: true } });
+    const left = await takeDown(ownerId, before.id, before);
+    if (!before.paused) await setTunnelPaused(ownerId, before.id, false);
+    return left;
 }
 
 /** Read the live state from whichever end answers, the public one first. */
 export async function readTunnelStatus(ownerId: string, id: string, now = Date.now()): Promise<TunnelStatus> {
-    const row = await loadTunnel(ownerId, id);
-    if (row.paused) return { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
-    const ends = [
-        { target: row.publicTarget, helper: wg.endNames(id, "public").helper, peer: row.peerPublicKey },
-        { target: row.application.target, helper: wg.endNames(id, "nat").helper, peer: row.publicKey }
-    ];
+    const status = (await readTunnelStatuses(ownerId, [id], now))[id];
+    if (!status) throw new TunnelRefusal("notFound");
+    return status;
+}
+
+/**
+ * The live state of several tunnels at once. Each server is reached once for all
+ * the ends it runs, every server at the same time; a tunnel its public server
+ * could not report is asked of the server behind NAT. Ids that are not the
+ * owner's are left out.
+ */
+export async function readTunnelStatuses(
+    ownerId: string,
+    ids: readonly string[],
+    now = Date.now()
+): Promise<Record<string, TunnelStatus>> {
+    const rows = await prisma.wireguardTunnel.findMany({
+        where: { id: { in: [...ids] }, ownerId },
+        select: TUNNEL_SELECT,
+        take: 500
+    });
+    const statuses: Record<string, TunnelStatus> = {};
+    for (const row of rows) {
+        if (row.paused) statuses[row.id] = { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
+    }
+    const live = rows.filter((row) => !row.paused);
+    await readEnds(
+        ownerId,
+        live.map((row) => ({
+            id: row.id,
+            target: row.publicTarget,
+            helper: wg.endNames(row.id, "public").helper,
+            peer: row.peerPublicKey
+        })),
+        now,
+        statuses
+    );
+    await readEnds(
+        ownerId,
+        live
+            .filter((row) => !statuses[row.id])
+            .map((row) => ({
+                id: row.id,
+                target: row.application.target,
+                helper: wg.endNames(row.id, "nat").helper,
+                peer: row.publicKey
+            })),
+        now,
+        statuses
+    );
+    for (const row of live) statuses[row.id] ??= { health: "unknown", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
+    return statuses;
+}
+
+interface EndToRead {
+    readonly id: string;
+    readonly target: TunnelRow["application"]["target"];
+    readonly helper: string;
+    readonly peer: string;
+}
+
+/** Read each end over one connection per server, filling in the ends that answered. */
+async function readEnds(
+    ownerId: string,
+    ends: readonly EndToRead[],
+    now: number,
+    into: Record<string, TunnelStatus>
+): Promise<void> {
+    const byServer = new Map<string, { target: EndToRead["target"]; ends: EndToRead[] }>();
     for (const end of ends) {
-        const ports = await getPorts(end.target, ownerId).catch(() => null);
-        if (!ports) continue;
-        try {
-            const result = await ports.runIn(end.helper, wg.statusCommand());
-            if (result.code !== 0) continue;
-            const peer = wg.parseDeviceState(result.output).find((one) => one.publicKeyHex === wg.keyToHex(end.peer));
-            if (!peer) continue;
-            return {
-                health: wg.tunnelHealth(peer.lastHandshake, Math.floor(now / 1000)),
-                lastHandshake: peer.lastHandshake,
-                rxBytes: peer.rxBytes,
-                txBytes: peer.txBytes
-            };
-        } catch {
-            // The other end may still answer.
-        } finally {
-            await ports.dispose();
+        const server = byServer.get(end.target.id);
+        if (server) server.ends.push(end);
+        else byServer.set(end.target.id, { target: end.target, ends: [end] });
+    }
+    await Promise.all(
+        [...byServer.values()].map(async (server) => {
+            const ports = await getPorts(server.target, ownerId).catch(() => null);
+            if (!ports) return;
+            try {
+                for (const end of server.ends) {
+                    try {
+                        const result = await ports.runIn(end.helper, wg.statusCommand());
+                        if (result.code !== 0) continue;
+                        const peer = wg
+                            .parseDeviceState(result.output)
+                            .find((one) => one.publicKeyHex === wg.keyToHex(end.peer));
+                        if (!peer) continue;
+                        into[end.id] = {
+                            health: wg.tunnelHealth(peer.lastHandshake, Math.floor(now / 1000)),
+                            lastHandshake: peer.lastHandshake,
+                            rxBytes: peer.rxBytes,
+                            txBytes: peer.txBytes
+                        };
+                    } catch {
+                        // The other end may still answer.
+                    }
+                }
+            } finally {
+                await ports.dispose();
+            }
+        })
+    );
+}
+
+const TUNNEL_SELECT = {
+    id: true,
+    hostname: true,
+    listenPort: true,
+    slot: true,
+    paused: true,
+    publicKey: true,
+    privateKeySealed: true,
+    peerPublicKey: true,
+    peerPrivateKeySealed: true,
+    publicTarget: { select: { ...TARGET_SELECT, host: { select: { address: true } } } },
+    application: {
+        select: {
+            id: true,
+            slug: true,
+            sourceType: true,
+            sourceConfig: true,
+            domains: { select: { targetPort: true }, take: 1 },
+            environment: { select: { project: { select: { slug: true } } } },
+            target: { select: TARGET_SELECT }
         }
     }
-    return { health: "unknown", lastHandshake: 0, rxBytes: 0, txBytes: 0 };
-}
+} as const;
 
 type TunnelRow = Awaited<ReturnType<typeof loadTunnel>>;
 
 async function loadTunnel(ownerId: string, id: string) {
-    const row = await prisma.wireguardTunnel.findFirst({
-        where: { id, ownerId },
-        select: {
-            id: true,
-            hostname: true,
-            listenPort: true,
-            slot: true,
-            paused: true,
-            publicKey: true,
-            privateKeySealed: true,
-            peerPublicKey: true,
-            peerPrivateKeySealed: true,
-            publicTarget: { select: { ...TARGET_SELECT, host: { select: { address: true } } } },
-            application: {
-                select: {
-                    id: true,
-                    slug: true,
-                    sourceType: true,
-                    sourceConfig: true,
-                    domains: { select: { targetPort: true }, take: 1 },
-                    environment: { select: { project: { select: { slug: true } } } },
-                    target: { select: TARGET_SELECT }
-                }
-            }
-        }
-    });
+    const row = await prisma.wireguardTunnel.findFirst({ where: { id, ownerId }, select: TUNNEL_SELECT });
     if (!row) throw new TunnelRefusal("notFound");
     return row;
 }

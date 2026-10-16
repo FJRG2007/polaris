@@ -1,11 +1,11 @@
 "use client";
 
 /**
- * The owner's tunnels. Each card reads its live state on its own - from the
- * servers, so it is slow and can fail - and until the first handshake it carries
- * the firewall rule the operator has to add at their provider, with the values to
- * type. That rule is the one step Polaris cannot take, and the handshake is how
- * this screen knows it was taken.
+ * The owner's tunnels. The live state of every running card is read in one
+ * request - from the servers, so it is slow and can fail - and until the first
+ * handshake a card carries the firewall rule the operator has to add at their
+ * provider, with the values to type. That rule is the one step Polaris cannot
+ * take, and the handshake is how this screen knows it was taken.
  */
 
 import { formatBytes } from "@polaris/core";
@@ -15,17 +15,85 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Network, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
-import { removeTunnelAction, setTunnelPausedAction, tunnelStatusAction } from "./actions";
+import { removeTunnelAction, setTunnelPausedAction, tunnelStatusesAction } from "./actions";
 import type { TunnelOptions, TunnelStatus, TunnelView } from "@/lib/deploy/wireguard/tunnel-service";
 import { Badge, Button, Card, ConfirmDeleteDialog, CopyButton, EmptyState, Skeleton, useToast } from "@polaris/ui";
 
-/** How often a card re-reads its state while the page is open. */
+/** How often the running cards re-read their state while the page is open. */
 const POLL_MS = 15_000;
+
+/** Called with a card's state, or null when it could not be read. */
+type StatusListener = (status: TunnelStatus | null) => void;
+type WatchStatus = (id: string, listener: StatusListener) => () => void;
+
+/**
+ * One read for every card that is watching: each server is reached once per
+ * round however many tunnels it carries. Cards that start watching together
+ * share the first read; one read at a time, so a slow server never piles them up.
+ */
+function useTunnelStatuses(): { watch: WatchStatus; refresh: () => void } {
+    const listeners = useRef(new Map<string, StatusListener>());
+    const reading = useRef(false);
+    const again = useRef(false);
+    const queued = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const read = useCallback(async (): Promise<void> => {
+        if (reading.current) {
+            again.current = true;
+            return;
+        }
+        const ids = [...listeners.current.keys()];
+        if (ids.length === 0) return;
+        reading.current = true;
+        try {
+            const reply = await tunnelStatusesAction({ ids }).catch(() => ({ statuses: undefined }));
+            for (const id of ids) listeners.current.get(id)?.(reply.statuses?.[id] ?? null);
+        } finally {
+            reading.current = false;
+        }
+        if (again.current) {
+            again.current = false;
+            void read();
+        }
+    }, []);
+
+    const refresh = useCallback(() => {
+        if (queued.current) return;
+        queued.current = setTimeout(() => {
+            queued.current = null;
+            void read();
+        }, 0);
+    }, [read]);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            if (document.visibilityState === "visible") void read();
+        }, POLL_MS);
+        return () => {
+            clearInterval(timer);
+            if (queued.current) clearTimeout(queued.current);
+        };
+    }, [read]);
+
+    const watch = useCallback<WatchStatus>(
+        (id, listener) => {
+            listeners.current.set(id, listener);
+            refresh();
+            return () => {
+                if (listeners.current.get(id) === listener) listeners.current.delete(id);
+            };
+        },
+        [refresh]
+    );
+
+    return { watch, refresh };
+}
 
 export function TunnelsView({ tunnels, options }: { tunnels: TunnelView[]; options: TunnelOptions }) {
     const t = useTranslations("tunnels");
     const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
     const shown = tunnels.filter((tunnel) => !hidden.has(tunnel.id));
+    const statuses = useTunnelStatuses();
 
     return (
         <div className="flex min-w-0 flex-col gap-3">
@@ -43,6 +111,8 @@ export function TunnelsView({ tunnels, options }: { tunnels: TunnelView[]; optio
                     <TunnelCard
                         key={tunnel.id}
                         tunnel={tunnel}
+                        watch={statuses.watch}
+                        refresh={statuses.refresh}
                         onHide={(gone) =>
                             setHidden((current) => {
                                 const next = new Set(current);
@@ -66,7 +136,17 @@ const HEALTH_VARIANT = {
     unknown: "neutral"
 } as const;
 
-function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boolean) => void }) {
+function TunnelCard({
+    tunnel,
+    watch,
+    refresh,
+    onHide
+}: {
+    tunnel: TunnelView;
+    watch: WatchStatus;
+    refresh: () => void;
+    onHide: (gone: boolean) => void;
+}) {
     const t = useTranslations("tunnels");
     const toast = useToast();
     const router = useRouter();
@@ -78,37 +158,15 @@ function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boo
 
     useEffect(() => setPaused(tunnel.paused), [tunnel.paused]);
 
-    // One read at a time: a server that is slow to answer must not pile up reads.
-    const reading = useRef(false);
-    const load = useCallback(async () => {
-        if (reading.current) return;
-        reading.current = true;
-        try {
-            const reply = await tunnelStatusAction({ id: tunnel.id });
-            if (reply.status) {
-                setStatus(reply.status);
-                setStatusError(false);
-            } else setStatusError(true);
-        } catch {
-            setStatusError(true);
-        } finally {
-            reading.current = false;
-        }
-    }, [tunnel.id]);
-
     useEffect(() => {
         if (paused) return;
-        let alive = true;
-        const tick = () => {
-            if (alive && document.visibilityState === "visible") void load();
-        };
-        tick();
-        const timer = setInterval(tick, POLL_MS);
-        return () => {
-            alive = false;
-            clearInterval(timer);
-        };
-    }, [paused, load]);
+        return watch(tunnel.id, (next) => {
+            if (next) {
+                setStatus(next);
+                setStatusError(false);
+            } else setStatusError(true);
+        });
+    }, [paused, tunnel.id, watch]);
 
     async function togglePause(): Promise<void> {
         const next = !paused;
@@ -142,7 +200,7 @@ function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boo
     }
 
     const health = paused ? "paused" : (status?.health ?? null);
-    const waiting = !paused && status !== null && status.lastHandshake === 0;
+    const waiting = !paused && status?.health === "waiting";
     const down = !paused && status?.health === "down";
 
     return (
@@ -176,7 +234,7 @@ function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boo
                         <Skeleton className="h-5 w-16" />
                     )}
                     {paused ? null : (
-                        <IconButton label={t("actions.refresh")} onClick={() => void load()}>
+                        <IconButton label={t("actions.refresh")} onClick={refresh}>
                             <RefreshCw />
                         </IconButton>
                     )}
@@ -252,6 +310,7 @@ export function FirewallStep({ tunnel }: { tunnel: TunnelView }) {
             </p>
             <p>{t("setup.body")}</p>
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {/* i18n-ignore: a protocol name, typed as is */}
                 <Reading label={t("setup.protocol")}>UDP</Reading>
                 <Reading label={t("setup.port")}>
                     <span className="flex items-center gap-1">
@@ -275,7 +334,15 @@ export function FirewallStep({ tunnel }: { tunnel: TunnelView }) {
                     )}
                 </Reading>
             </dl>
-            {address ? <p>{t("setup.dns", { hostname: tunnel.hostname, address })}</p> : null}
+            {address ? (
+                <p>
+                    {t("setup.dns", {
+                        hostname: tunnel.hostname,
+                        address,
+                        record: address.includes(":") ? "AAAA" : "A"
+                    })}
+                </p>
+            ) : null}
         </div>
     );
 }

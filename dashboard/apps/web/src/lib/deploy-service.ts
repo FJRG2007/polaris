@@ -762,7 +762,11 @@ async function findAutoDomain(
 /** Whether a hostname is already routed somewhere - including to this same service,
  *  which holds it just as firmly. A zone subdomain is first come, first served. */
 async function hostnameTaken(hostname: string): Promise<boolean> {
-    return (await prisma.domain.count({ where: { hostname } })) > 0;
+    const [domains, tunnels] = await Promise.all([
+        prisma.domain.count({ where: { hostname } }),
+        prisma.wireguardTunnel.count({ where: { hostname } })
+    ]);
+    return domains + tunnels > 0;
 }
 
 export interface ZoneSubdomainCheck {
@@ -1029,6 +1033,9 @@ export async function addApplicationDomain(
         }
         await syncAppRoutes().catch(() => undefined);
         return hostname;
+    }
+    if (await prisma.wireguardTunnel.findUnique({ where: { hostname }, select: { id: true } })) {
+        throw new Error(`${hostname} is already in use by another service.`);
     }
     try {
         await prisma.domain.create({
@@ -2614,6 +2621,28 @@ export async function deleteApplication(
     // Before its rows go: what its volumes were, so a data volume left on the
     // machine still says whose it was - see `host-resources`.
     await noteAppDeleted(applicationId).catch(() => undefined);
+    // Its WireGuard tunnels cascade with the row, and their ends run on two
+    // servers the row was the only record of, so they come down first.
+    const tunnels = await import("@/lib/deploy/wireguard/tunnel-service");
+    const retiring = tunnels
+        .tunnelsWithin(ownerId, { applicationId })
+        .then((rows) => tunnels.retireTunnels(ownerId, rows));
+    const tunnelsLeft = options?.strict
+        ? await retiring
+        : await retiring.catch((error: unknown) => {
+              console.error(
+                  `polaris: the tunnels of service ${applicationId} were not taken down:`,
+                  error
+              );
+              return [];
+          });
+    if (tunnelsLeft.length > 0) {
+        const servers = tunnelsLeft.map((one) => one.servers).join(", ");
+        if (options?.strict) throw new tunnels.TunnelRefusal("leftover", { servers });
+        console.error(
+            `polaris: the tunnels of service ${applicationId} are still running on ${servers}`
+        );
+    }
     // Off the edge before it comes down, so its names never answer for a
     // container that is going: a visitor sees it gone, not broken. Only its own
     // domains - every other app's routes are rendered again exactly as they were.

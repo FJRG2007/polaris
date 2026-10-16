@@ -11,6 +11,24 @@ const APP = "00000000-0000-7000-8000-0000000000bb";
 const OWNER = "00000000-0000-7000-8000-0000000000aa";
 const TARGET = "00000000-0000-7000-8000-0000000000cc";
 
+const TUNNEL = {
+    id: "00000000-0000-7000-8000-0000000000dd",
+    hostname: "app.example.com",
+    paused: false,
+    publicTarget: {
+        id: "t-edge",
+        name: "edge-1",
+        kind: "local",
+        hostId: null,
+        runtime: "compose",
+        proxyNetwork: "p"
+    },
+    application: {
+        id: APP,
+        target: { id: TARGET, name: "home-box", kind: "local", hostId: null, runtime: "compose" }
+    }
+};
+
 /** Every database call, in order, as `model.method` with its arguments. */
 const calls: { readonly name: string; readonly args: unknown }[] = [];
 
@@ -135,6 +153,40 @@ describe("deleting an app", () => {
         expect(release?.args).toMatchObject({
             where: { applicationId: APP, id: { notIn: ["install-1"] } }
         });
+    });
+
+    it("takes its tunnels down before the row that would cascade them goes", async () => {
+        named.wireguardTunnel = { findMany: async () => [TUNNEL] };
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            await deleteApplication(APP, OWNER);
+        } finally {
+            delete named.wireguardTunnel;
+            quiet.mockRestore();
+        }
+        const within = calls.find((call) => call.name === "wireguardTunnel.findMany");
+        expect(within?.args).toMatchObject({ where: { ownerId: OWNER, applicationId: APP } });
+        expect(at("wireguardTunnel.updateMany")).toBeGreaterThanOrEqual(0);
+        expect(at("wireguardTunnel.updateMany")).toBeLessThan(at("application.delete"));
+        expect(getPorts).toHaveBeenCalledWith(expect.objectContaining({ id: "t-edge" }), OWNER);
+        expect(at("application.delete")).toBeGreaterThanOrEqual(0);
+    });
+
+    it("strictly, stops before any row goes when a tunnel end cannot be taken down", async () => {
+        named.wireguardTunnel = { findMany: async () => [TUNNEL] };
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        try {
+            await expect(deleteApplication(APP, OWNER, { strict: true })).rejects.toMatchObject({
+                code: "leftover",
+                params: { servers: "edge-1, home-box" }
+            });
+        } finally {
+            delete named.wireguardTunnel;
+            quiet.mockRestore();
+        }
+        expect(at("wireguardTunnel.deleteMany")).toBe(-1);
+        expect(at("domain.updateMany")).toBe(-1);
+        expect(at("application.delete")).toBe(-1);
     });
 
     it("strictly, asks for the same thing again on a retry", async () => {

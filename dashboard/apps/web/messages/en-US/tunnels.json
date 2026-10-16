@@ -40,7 +40,7 @@
         "source": "Source",
         "address": "Server address",
         "addressUnknown": "Not known yet",
-        "dns": "Point {hostname} at {address} with an A record so visitors reach it."
+        "dns": "Point {hostname} at {address} with an {record} record so visitors reach it."
     },
     "dialog": {
         "title": "New tunnel",
@@ -80,6 +80,11 @@
         "unreachable": "That server cannot be reached right now.",
         "edge": "That server's edge does not take routes from Polaris yet. Set it up again from Servers.",
         "leftover": "The tunnel is paused, but {servers} could not be cleaned up. Remove it again once it is back.",
+        "leftoverPaused": "The tunnel is paused, but its end on {servers} is still running. Pause it again once it is back.",
         "generic": "The tunnel could not be changed. Try again in a moment."
+    },
+    "retired": {
+        "leftover": "The tunnel for {hostname} could not be cleaned up on {servers}.",
+        "notMoved": "The tunnel for {hostname} did not start where its service now runs. It is paused; resume it from Tunnels."
     }
 }

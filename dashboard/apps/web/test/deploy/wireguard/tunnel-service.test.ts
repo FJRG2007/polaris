@@ -10,6 +10,7 @@ const MASTER = Buffer.alloc(32, 7).toString("base64");
 const ID = "0190a8c4-0000-7000-8000-000000000001";
 
 interface FakePorts {
+    composeUp: ReturnType<typeof vi.fn>;
     composeDown: ReturnType<typeof vi.fn>;
     inspect: ReturnType<typeof vi.fn>;
     runIn: ReturnType<typeof vi.fn>;
@@ -22,13 +23,28 @@ const state = vi.hoisted(() => ({
     ports: new Map<string, FakePorts>(),
     pushed: [] as { file: string; yaml: string }[],
     pushFails: false,
-    deleted: 0
+    deleted: 0,
+    others: [] as Record<string, unknown>[],
+    hostnameTaken: false,
+    conflicts: 0,
+    created: [] as Record<string, unknown>[],
+    edge: { traefik: true, pushable: true, error: null as string | null },
+    prepared: 0,
+    owned: { target: true as boolean, app: true as boolean }
 }));
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: MASTER }) }));
 vi.mock("@/lib/domain-service", () => ({ getPublicIp: vi.fn(async () => "203.0.113.7") }));
 vi.mock("@/lib/deploy-service", () => ({ containerPortOf: () => 3000 }));
 vi.mock("@/lib/traefik-dynamic", () => ({ writeDynamicFile: vi.fn(async () => undefined) }));
+vi.mock("@/lib/app-edge", () => ({ edgeHostnameTaken: vi.fn(async () => state.hostnameTaken) }));
+vi.mock("@/lib/deploy/server-edge", () => ({
+    readServerEdge: vi.fn(async () => state.edge),
+    prepareServerEdge: vi.fn(async () => {
+        state.prepared += 1;
+    }),
+    withSetupLock: vi.fn(async (_host: string, run: () => Promise<void>) => run())
+}));
 vi.mock("@/lib/deploy/service-networks", () => ({ connectorNetworks: vi.fn(async () => ["polaris-proxy"]) }));
 vi.mock("@/lib/host-service", () => ({
     getHostConnection: vi.fn(async () => ({ address: "198.51.100.1", port: 22, username: "x", auth: {}, hostKey: null }))
@@ -49,20 +65,73 @@ vi.mock("@/lib/deploy/runtime", () => ({
         return ports;
     })
 }));
+interface FindArgs {
+    where?: { id?: string | { in: string[] } };
+    select?: Record<string, unknown>;
+}
+
+function rowsOf(): Record<string, unknown>[] {
+    return [...(state.row ? [state.row] : []), ...state.others];
+}
+
+function rowById(id: unknown): Record<string, unknown> | undefined {
+    return rowsOf().find((row) => row.id === id);
+}
+
 vi.mock("@polaris/db", () => ({
     prisma: {
+        deployTarget: { findFirst: vi.fn(async () => (state.owned.target ? { id: "t-public" } : null)) },
+        application: {
+            findFirst: vi.fn(async () => (state.owned.app ? { id: "app-1", targetId: "t-home" } : null))
+        },
         wireguardTunnel: {
-            findFirst: vi.fn(async () => (state.row ? { ...state.row } : null)),
-            findMany: vi.fn(async () =>
-                state.row && !state.row.paused ? [{ id: state.row.id, hostname: state.row.hostname }] : []
-            ),
-            update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-                if (state.row) Object.assign(state.row, data);
-                return state.row;
+            findFirst: vi.fn(async ({ where }: FindArgs) => {
+                const row = rowById(where?.id);
+                return row ? { ...row } : null;
             }),
-            deleteMany: vi.fn(async () => {
+            findUnique: vi.fn(async () => null),
+            findMany: vi.fn(async ({ where, select }: FindArgs) => {
+                if (select?.privateKeySealed) {
+                    const ids = typeof where?.id === "object" ? where.id.in : null;
+                    return rowsOf()
+                        .filter((row) => !ids || ids.includes(row.id as string))
+                        .map((row) => ({ ...row }));
+                }
+                if (select?.slot) return rowsOf().map((row) => ({ slot: row.slot }));
+                if (select?.listenPort) return rowsOf().map((row) => ({ listenPort: row.listenPort }));
+                return rowsOf()
+                    .filter((row) => !row.paused)
+                    .map((row) => ({ id: row.id, hostname: row.hostname }));
+            }),
+            create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+                if (state.conflicts > 0) {
+                    state.conflicts -= 1;
+                    throw Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
+                }
+                state.created.push(data);
+                state.row = {
+                    ...data,
+                    id: ID,
+                    paused: false,
+                    publicTarget: { ...PUBLIC, host: { address: "203.0.113.7" } },
+                    application: APPLICATION
+                };
+                return { id: ID };
+            }),
+            update: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                const row = rowById(where.id);
+                if (row) Object.assign(row, data);
+                return row;
+            }),
+            updateMany: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+                const row = rowById(where.id);
+                if (row) Object.assign(row, data);
+                return { count: row ? 1 : 0 };
+            }),
+            deleteMany: vi.fn(async ({ where }: { where: { id: string } }) => {
                 state.deleted += 1;
-                state.row = null;
+                if (state.row?.id === where.id) state.row = null;
+                state.others = state.others.filter((row) => row.id !== where.id);
                 return { count: 1 };
             })
         }
@@ -74,9 +143,19 @@ const wg = await import("@/lib/deploy/wireguard/tunnel-config");
 
 const PUBLIC = { id: "t-public", name: "edge-1", kind: "ssh", hostId: "h-1", runtime: "compose", proxyNetwork: "polaris-proxy" };
 const HOME = { id: "t-home", name: "home-box", kind: "ssh", hostId: "h-2", runtime: "compose", proxyNetwork: "polaris-proxy" };
+const APPLICATION = {
+    id: "app-1",
+    slug: "web",
+    sourceType: "image",
+    sourceConfig: {},
+    domains: [],
+    environment: { project: { slug: "shop" } },
+    target: HOME
+};
 
 function fakePorts(): FakePorts {
     return {
+        composeUp: vi.fn(async () => undefined),
         composeDown: vi.fn(async () => undefined),
         inspect: vi.fn(async () => {
             throw new Error("inspect x failed (404)");
@@ -100,15 +179,7 @@ beforeEach(() => {
         peerPublicKey: nat.publicKey,
         peerPrivateKeySealed: service.sealKey(nat.privateKey),
         publicTarget: { ...PUBLIC, host: { address: "203.0.113.7" } },
-        application: {
-            id: "app-1",
-            slug: "web",
-            sourceType: "image",
-            sourceConfig: {},
-            domains: [],
-            environment: { project: { slug: "shop" } },
-            target: HOME
-        }
+        application: APPLICATION
     };
     state.unreachable = new Set();
     state.ports = new Map([
@@ -118,6 +189,170 @@ beforeEach(() => {
     state.pushed = [];
     state.pushFails = false;
     state.deleted = 0;
+    state.others = [];
+    state.hostnameTaken = false;
+    state.conflicts = 0;
+    state.created = [];
+    state.edge = { traefik: true, pushable: true, error: null };
+    state.prepared = 0;
+    state.owned = { target: true, app: true };
+});
+
+async function refusalOf(run: Promise<unknown>): Promise<InstanceType<typeof service.TunnelRefusal>> {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const caught = await run.then(
+        () => null,
+        (error: unknown) => error
+    );
+    quiet.mockRestore();
+    expect(caught).toBeInstanceOf(service.TunnelRefusal);
+    return caught as InstanceType<typeof service.TunnelRefusal>;
+}
+
+describe("creating a tunnel", () => {
+    const INPUT = { publicServerId: PUBLIC.id, serviceId: "app-1", hostname: " App.Example.com " };
+
+    beforeEach(() => {
+        state.row = null;
+    });
+
+    it("stores both keys sealed, starts both ends and puts the hostname on the public edge", async () => {
+        expect(await service.createTunnel("owner", INPUT)).toEqual({ id: ID });
+        const data = state.created[0] as { hostname: string; privateKeySealed: string; peerPrivateKeySealed: string; };
+        expect(data.hostname).toBe("app.example.com");
+        const publicKey = service.openKey(data.privateKeySealed);
+        const natKey = service.openKey(data.peerPrivateKeySealed);
+        expect(data.privateKeySealed).not.toContain(publicKey);
+
+        const configOf = (spec: { services: { env: Record<string, string> }[] }): string =>
+            Buffer.from(spec.services[0].env.WG_CONFIG, "base64").toString("utf8");
+        const publicUp = configOf(state.ports.get(PUBLIC.id)?.composeUp.mock.calls[0][0]);
+        const natUp = configOf(state.ports.get(HOME.id)?.composeUp.mock.calls[0][0]);
+        expect(publicUp).toContain(publicKey);
+        expect(publicUp).not.toContain(natKey);
+        expect(natUp).toContain(natKey);
+        expect(natUp).not.toContain(publicKey);
+        expect(natUp).toContain("203.0.113.7:");
+        expect(state.pushed.at(-1)?.yaml).toContain("app.example.com");
+        expect(state.row?.paused).toBe(false);
+    });
+
+    it("sets up the edge on a public server that has none yet", async () => {
+        state.edge = { traefik: false, pushable: false, error: null };
+        await service.createTunnel("owner", INPUT);
+        expect(state.prepared).toBe(1);
+    });
+
+    it("refuses before anything starts when the hostname is taken or the servers are not the caller's", async () => {
+        state.hostnameTaken = true;
+        expect((await refusalOf(service.createTunnel("owner", INPUT))).code).toBe("hostnameTaken");
+        state.hostnameTaken = false;
+        state.owned.target = false;
+        expect((await refusalOf(service.createTunnel("owner", INPUT))).code).toBe("noServer");
+        state.owned = { target: true, app: false };
+        expect((await refusalOf(service.createTunnel("owner", INPUT))).code).toBe("noService");
+        expect((await refusalOf(service.createTunnel("owner", { ...INPUT, hostname: "nope" }))).code).toBe("hostname");
+        expect(state.created).toHaveLength(0);
+        expect(state.ports.get(PUBLIC.id)?.composeUp).not.toHaveBeenCalled();
+    });
+
+    it("picks again when another create took the same slot or port", async () => {
+        state.conflicts = 1;
+        expect(await service.createTunnel("owner", INPUT)).toEqual({ id: ID });
+        expect(state.created).toHaveLength(1);
+    });
+
+    it("takes back both ends and the row when an end does not start", async () => {
+        state.ports.get(HOME.id)?.composeUp.mockRejectedValue(new Error("daemon said no"));
+        await expect(service.createTunnel("owner", INPUT)).rejects.toThrow("daemon said no");
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
+        expect(state.deleted).toBe(1);
+    });
+
+    it("refuses an edge that does not take Polaris routes, and leaves nothing behind", async () => {
+        state.edge = { traefik: true, pushable: false, error: null };
+        expect((await refusalOf(service.createTunnel("owner", INPUT))).code).toBe("edge");
+        expect(state.ports.get(PUBLIC.id)?.composeUp).not.toHaveBeenCalled();
+        expect(state.deleted).toBe(1);
+    });
+});
+
+describe("resuming a tunnel", () => {
+    it("starts both ends from the stored keys and routes the hostname again", async () => {
+        (state.row as { paused: boolean; }).paused = true;
+        await service.setTunnelPaused("owner", ID, false);
+        expect(state.ports.get(PUBLIC.id)?.composeUp).toHaveBeenCalled();
+        expect(state.ports.get(HOME.id)?.composeUp).toHaveBeenCalled();
+        expect(state.pushed.at(-1)?.yaml).toContain("app.example.com");
+        expect(state.row?.paused).toBe(false);
+    });
+
+    it("stays paused, with what started taken down again, when an end does not start", async () => {
+        (state.row as { paused: boolean; }).paused = true;
+        state.ports.get(HOME.id)?.composeUp.mockRejectedValue(new Error("daemon said no"));
+        await expect(service.setTunnelPaused("owner", ID, false)).rejects.toThrow("daemon said no");
+        expect(state.row?.paused).toBe(true);
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
+        expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
+    });
+});
+
+describe("a tunnel whose service or server is deleted", () => {
+    it("is taken down on both ends and removed before the delete cascades it", async () => {
+        const rows = await service.tunnelsWithin("owner", { applicationId: "app-1" });
+        expect(rows.map((row) => row.id)).toEqual([ID]);
+        expect(await service.retireTunnels("owner", rows)).toEqual([]);
+        expect(state.ports.get(PUBLIC.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "public").project);
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.pushed.at(-1)?.yaml).not.toContain("app.example.com");
+        expect(state.deleted).toBe(1);
+    });
+
+    it("stays, paused, and names the server it is left on when one does not answer", async () => {
+        const rows = await service.tunnelsWithin("owner", { hostId: HOME.hostId });
+        state.unreachable.add(HOME.id);
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const left = await service.retireTunnels("owner", rows);
+        quiet.mockRestore();
+        expect(left).toEqual([{ hostname: "app.example.com", servers: "home-box" }]);
+        expect(state.row?.paused).toBe(true);
+        expect(state.deleted).toBe(0);
+    });
+
+    it("asks for the tunnels reaching the service, or with an end on the server", async () => {
+        const { prisma } = await import("@polaris/db");
+        const findMany = vi.mocked(prisma.wireguardTunnel.findMany);
+        findMany.mockClear();
+        await service.tunnelsWithin("owner", { hostId: "h-9" });
+        await service.tunnelsWithin("owner", { applicationId: "app-9" });
+        expect(findMany.mock.calls[0][0]?.where).toEqual({
+            ownerId: "owner",
+            OR: [{ publicTarget: { hostId: "h-9" } }, { application: { target: { hostId: "h-9" } } }]
+        });
+        expect(findMany.mock.calls[1][0]?.where).toEqual({ ownerId: "owner", applicationId: "app-9" });
+    });
+
+    it("starts again where its service moved, taking down the end on the old server", async () => {
+        const before = (await service.tunnelsWithin("owner", { hostId: HOME.hostId }))[0];
+        const moved = { ...HOME, id: "t-new", name: "new-box", hostId: "h-3" };
+        state.ports.set(moved.id, fakePorts());
+        (state.row as { application: unknown; }).application = { ...APPLICATION, target: moved };
+        expect(await service.moveTunnel("owner", before)).toEqual([]);
+        expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
+        expect(state.ports.get(moved.id)?.composeUp).toHaveBeenCalled();
+        expect(state.ports.get(HOME.id)?.composeUp).not.toHaveBeenCalled();
+        expect(state.row?.paused).toBe(false);
+    });
+
+    it("keeps a paused tunnel paused when its service moves", async () => {
+        (state.row as { paused: boolean; }).paused = true;
+        const before = (await service.tunnelsWithin("owner", { hostId: HOME.hostId }))[0];
+        await service.moveTunnel("owner", before);
+        expect(state.ports.get(PUBLIC.id)?.composeUp).not.toHaveBeenCalled();
+        expect(state.row?.paused).toBe(true);
+    });
 });
 
 describe("removing a tunnel", () => {
@@ -196,6 +431,7 @@ describe("pausing a tunnel", () => {
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const refusal = await service.setTunnelPaused("owner", ID, true).catch((error: unknown) => error);
         quiet.mockRestore();
+        expect((refusal as InstanceType<typeof service.TunnelRefusal>).code).toBe("leftoverPaused");
         expect((refusal as InstanceType<typeof service.TunnelRefusal>).params).toEqual({ servers: "edge-1" });
         expect(state.row?.paused).toBe(true);
         expect(state.ports.get(HOME.id)?.composeDown).toHaveBeenCalledWith(wg.endNames(ID, "nat").project);
@@ -232,6 +468,38 @@ describe("reading a tunnel's state", () => {
         const status = await service.readTunnelStatus("owner", ID, 1760000030 * 1000);
         expect(status).toEqual({ health: "up", lastHandshake: 1760000000, rxBytes: 10, txBytes: 20 });
         expect(state.ports.get(PUBLIC.id)?.runIn).toHaveBeenCalledWith(wg.endNames(ID, "public").helper, wg.statusCommand());
+    });
+
+    it("reaches each server once for every tunnel it carries", async () => {
+        const row = state.row as Record<string, unknown>;
+        const second = { ...row, id: "0190a8c4-0000-7000-8000-000000000002", hostname: "two.example.com" };
+        state.others = [second];
+        const publicEnd = state.ports.get(PUBLIC.id);
+        publicEnd?.runIn.mockImplementation(async (helper: string) => ({
+            code: 0,
+            output: [
+                `public_key=${wg.keyToHex(row.peerPublicKey as string)}`,
+                `last_handshake_time_sec=${helper === wg.endNames(ID, "public").helper ? 1760000000 : 0}`,
+                "rx_bytes=1",
+                "tx_bytes=2",
+                ""
+            ].join("\n")
+        }));
+        const { getPorts } = await import("@/lib/deploy/runtime");
+        vi.mocked(getPorts).mockClear();
+        const statuses = await service.readTunnelStatuses("owner", [ID, second.id as string], 1760000030 * 1000);
+        expect(statuses[ID].health).toBe("up");
+        expect(statuses[second.id as string].health).toBe("waiting");
+        expect(vi.mocked(getPorts)).toHaveBeenCalledTimes(1);
+        expect(publicEnd?.runIn).toHaveBeenCalledTimes(2);
+        expect(publicEnd?.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a paused tunnel without asking any server, and leaves out ids that are not the owner's", async () => {
+        (state.row as { paused: boolean; }).paused = true;
+        const statuses = await service.readTunnelStatuses("owner", [ID, "0190a8c4-0000-7000-8000-0000000000ee"]);
+        expect(statuses).toEqual({ [ID]: { health: "paused", lastHandshake: 0, rxBytes: 0, txBytes: 0 } });
+        expect(state.ports.get(PUBLIC.id)?.runIn).not.toHaveBeenCalled();
     });
 
     it("falls back to the end at home, and says unknown when neither answers", async () => {

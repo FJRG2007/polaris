@@ -11,16 +11,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TunnelView } from "@/lib/deploy/wireguard/tunnel-service";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-const status = vi.hoisted(() => ({ reply: {} as unknown, calls: 0 }));
+const status = vi.hoisted(() => ({ reply: {} as unknown, calls: 0, ids: [] as string[][] }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("../../../src/app/(app)/apps/tunnels/actions", () => ({
     createTunnelAction: vi.fn(),
     removeTunnelAction: vi.fn(),
     setTunnelPausedAction: vi.fn(),
-    tunnelStatusAction: vi.fn(async () => {
+    tunnelStatusesAction: vi.fn(async ({ ids }: { ids: string[] }) => {
         status.calls += 1;
-        return status.reply;
+        status.ids.push(ids);
+        const reply = status.reply as { status?: unknown; error?: string };
+        return reply.status ? { statuses: Object.fromEntries(ids.map((id) => [id, reply.status])) } : reply;
     })
 }));
 
@@ -41,6 +43,7 @@ const OPTIONS = { servers: [], services: [] };
 
 beforeEach(() => {
     status.calls = 0;
+    status.ids = [];
 });
 
 afterEach(cleanup);
@@ -66,6 +69,23 @@ describe("a live tunnel card", () => {
         expect(screen.getByText("UDP")).toBeTruthy();
         expect(screen.getByText("0.0.0.0/0")).toBeTruthy();
         expect(screen.getByText("Point app.example.com at 203.0.113.7 with an A record so visitors reach it.")).toBeTruthy();
+    });
+
+    it("does not send the operator to their firewall when neither server answered", async () => {
+        status.reply = { status: { health: "unknown", lastHandshake: 0, rxBytes: 0, txBytes: 0 } };
+        render(<TunnelsView tunnels={[TUNNEL]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Unknown")).toBeTruthy();
+        expect(screen.queryByText(/Open UDP port/)).toBeNull();
+    });
+
+    it("reads every running card in one request", async () => {
+        status.reply = { status: { health: "up", lastHandshake: Math.floor(Date.now() / 1000), rxBytes: 0, txBytes: 0 } };
+        const second = { ...TUNNEL, id: "0190a8c4-0000-7000-8000-000000000002", hostname: "two.example.com" };
+        const paused = { ...TUNNEL, id: "0190a8c4-0000-7000-8000-000000000003", hostname: "three.example.com", paused: true };
+        render(<TunnelsView tunnels={[TUNNEL, second, paused]} options={OPTIONS} />, { wrapper: MessagesWrapper });
+        await waitFor(() => expect(screen.getAllByText("Connected")).toHaveLength(2));
+        expect(status.calls).toBe(1);
+        expect(status.ids[0]).toEqual([TUNNEL.id, second.id]);
     });
 
     it("says the state could not be read instead of spinning forever", async () => {

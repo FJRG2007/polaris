@@ -10,12 +10,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const findUnique = vi.fn();
 const findFirst = vi.fn();
 const count = vi.fn();
+const tunnelCount = vi.fn(async () => 0);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         setting: { findUnique, upsert: vi.fn(), deleteMany: vi.fn() },
         application: { findFirst },
-        domain: { count, findFirst: vi.fn(), findMany: vi.fn() }
+        domain: { count, findFirst: vi.fn(), findMany: vi.fn() },
+        wireguardTunnel: { count: tunnelCount }
     }
 }));
 
@@ -81,6 +83,19 @@ describe("checkZoneSubdomain", () => {
             subdomain: "billing",
             hostname: "billing.plr.example.com",
             available: false
+        });
+    });
+
+    it("counts a name a WireGuard tunnel answers on as taken", async () => {
+        count.mockResolvedValue(0);
+        tunnelCount.mockResolvedValueOnce(1);
+        expect(
+            await checkZoneSubdomain("app-1", "owner-1", { subdomain: "billing" })
+        ).toMatchObject({
+            available: false
+        });
+        expect(tunnelCount).toHaveBeenCalledWith({
+            where: { hostname: "billing.plr.example.com" }
         });
     });
 

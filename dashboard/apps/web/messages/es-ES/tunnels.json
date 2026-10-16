@@ -40,7 +40,7 @@
         "source": "Origen",
         "address": "Dirección",
         "addressUnknown": "Aún desconocida",
-        "dns": "Apunta {hostname} a {address} con un registro A para que lleguen las visitas."
+        "dns": "Apunta {hostname} a {address} con un registro {record} para que lleguen las visitas."
     },
     "dialog": {
         "title": "Nuevo túnel",
@@ -80,6 +80,11 @@
         "unreachable": "Ahora mismo no se puede llegar a ese servidor.",
         "edge": "El borde de ese servidor aún no acepta rutas de Polaris. Vuelve a prepararlo desde Servidores.",
         "leftover": "El túnel está en pausa, pero no se pudo limpiar {servers}. Quítalo otra vez cuando vuelva.",
+        "leftoverPaused": "El túnel está en pausa, pero su extremo en {servers} sigue en marcha. Vuelve a pausarlo cuando vuelva.",
         "generic": "No se pudo cambiar el túnel. Inténtalo de nuevo en un momento."
+    },
+    "retired": {
+        "leftover": "No se pudo limpiar el túnel de {hostname} en {servers}.",
+        "notMoved": "El túnel de {hostname} no arrancó donde ahora funciona su servicio. Está en pausa; reanúdalo desde Túneles."
     }
 }
