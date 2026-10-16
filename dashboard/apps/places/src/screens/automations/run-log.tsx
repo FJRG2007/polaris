@@ -133,7 +133,17 @@ export function RunLog({
                                     text: words.runStatusText(run.status, t),
                                     tone: words.RUN_TONES[run.status]
                                 }}
-                                cause={words.describeCause(run.cause, lookup, t)}
+                                cause={[
+                                    words.causeTrigger(
+                                        run.cause,
+                                        automation.definition.triggers,
+                                        lookup,
+                                        t
+                                    ),
+                                    words.describeCause(run.cause, lookup, t)
+                                ]
+                                    .filter(Boolean)
+                                    .join(" - ")}
                                 at={<RelativeTime iso={run.startedAt} />}
                                 atTitle={format.dateTime(run.startedAt)}
                             >

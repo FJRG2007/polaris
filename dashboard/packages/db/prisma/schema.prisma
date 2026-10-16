@@ -10588,10 +10588,17 @@ model Place {
     /// an icon. Nothing behaves differently; it is there because "Warehouse" and
     /// "Mum's" read better with the right symbol beside them.
     kind           String @default("house")
-    /// Where it is, in the words somebody would use. Never geocoded - a house is
-    /// not a map pin here, and a stored coordinate for somebody's home is a
-    /// liability with no use.
+    /// Where it is, in the words somebody would use. Never geocoded: the words
+    /// are never turned into a coordinate.
     address        String?
+    /// Where it is on the Earth, for sunrise and sunset - the one use a
+    /// coordinate has here. Stored only when somebody sets it (from their
+    /// browser or typed), and rounded to 2 decimals, about a kilometre, on the
+    /// server as well as in the browser: close enough for the sun, which moves
+    /// seconds over that distance, and too coarse to find a front door by.
+    /// Both null until then, and sun automations wait for it.
+    latitude       Float?
+    longitude      Float?
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

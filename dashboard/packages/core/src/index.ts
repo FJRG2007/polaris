@@ -73,6 +73,7 @@ export * from "./mailbox-unsubscribe.js";
 export * from "./mailbox.js";
 export * from "./automation-nodes.js";
 export * from "./automation-schema.js";
+export * from "./solar.js";
 export * from "./sign-in-methods.js";
 export * from "./request-origin.js";
 export * from "./user-agent.js";

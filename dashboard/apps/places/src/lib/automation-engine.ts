@@ -31,7 +31,15 @@
 import * as auto from "./automation-kinds";
 import type { DeviceAction, DeviceCommand } from "./device-kinds";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { wallClock, zonedInstant } from "@polaris/core";
+import {
+    durationSeconds,
+    sunEventOn,
+    wallClock,
+    zonedInstant,
+    type CalendarDay,
+    type Coordinate,
+    type Offset
+} from "@polaris/core";
 
 /** How far into a chain of automations starting one another a run may be. */
 export const MAX_DEPTH = 4;
@@ -61,6 +69,9 @@ export interface AutomationRecord {
     readonly enabled: boolean;
     readonly definition: auto.AutomationDefinition;
     readonly armedAt: Date;
+    /** Where its place is, for the sun. Absent or null, a sun trigger never
+     *  fires and a sun condition never passes. */
+    readonly location?: Coordinate | null;
 }
 
 export interface RunRecord {
@@ -920,6 +931,26 @@ export function createEngine(ports: EnginePorts) {
             );
             return;
         }
+        if (trigger.kind === "sun") {
+            const found = lastSunOccurrence(
+                trigger,
+                automation.location ?? null,
+                automation.definition.timeZone,
+                now
+            );
+            if (!found) return;
+            const late = now.getTime() - found.at.getTime();
+            if (late < 0 || late > CATCH_UP_MS || found.at.getTime() < armed) return;
+            // Keyed by the day the event belongs to, not by the instant: a
+            // location or an offset edited after it fired is still today's.
+            await fire(
+                automation,
+                `sun:${trigger.id}:${trigger.event}:${found.day}`,
+                { kind: "sun", triggerId: trigger.id, event: trigger.event, at: iso(found.at) },
+                0
+            );
+            return;
+        }
         if (trigger.kind === "interval") {
             const period = trigger.minutes * 60 * 1000;
             const slot = Math.floor((now.getTime() - armed) / period);
@@ -1047,10 +1078,13 @@ export function createEngine(ports: EnginePorts) {
         key: string
     ): Promise<boolean> {
         const now = ports.now();
+        // Run now is what its "Run by hand" trigger stands for, so a condition
+        // asking which trigger started it gets that one.
+        const manual = automation.definition.triggers.find((trigger) => trigger.kind === "manual");
         const queued = await fire(
             automation,
             `manual:${key}`,
-            { kind: "manual", byUser, at: iso(now) },
+            { kind: "manual", ...(manual ? { triggerId: manual.id } : {}), byUser, at: iso(now) },
             0
         );
         if (queued) ports.wake?.(0);
@@ -1138,7 +1172,7 @@ export function createEngine(ports: EnginePorts) {
                 await finish(run, "refused", steps, "owner");
                 return;
             }
-            const held = await conditionsHold(automation, ports.now());
+            const held = await conditionsHold(automation, ports.now(), run.cause);
             if (!held) {
                 await finish(run, "skipped", steps, "conditions");
                 return;
@@ -1364,13 +1398,27 @@ export function createEngine(ports: EnginePorts) {
         }
     }
 
-    async function conditionsHold(automation: AutomationRecord, now: Date): Promise<boolean> {
+    /** Whether the conditions hold now. `cause` is what started the run, which
+     *  a "Triggered by" condition reads. */
+    async function conditionsHold(
+        automation: AutomationRecord,
+        now: Date,
+        cause?: auto.RunCause
+    ): Promise<boolean> {
         const { conditions, timeZone } = automation.definition;
         if (conditions.groups.length === 0) return true;
         const results: boolean[] = [];
         for (const group of conditions.groups) {
             const items: boolean[] = [];
             for (const condition of group.items) {
+                if (condition.kind === "triggeredBy") {
+                    items.push(triggeredBy(condition, cause));
+                    continue;
+                }
+                if (condition.kind === "sun") {
+                    items.push(sunHolds(condition, automation.location ?? null, timeZone, now));
+                    continue;
+                }
                 items.push(await conditionHolds(automation, condition, now, timeZone));
             }
             results.push(group.match === "all" ? items.every(Boolean) : items.some(Boolean));
@@ -1466,6 +1514,7 @@ export function createEngine(ports: EnginePorts) {
                 now.getTime() - held.since.getTime() >= condition.forMinutes * 60 * 1000
             );
         }
+        if (condition.kind === "sun" || condition.kind === "triggeredBy") return false;
         const clock = wallClock(now, timeZone);
         if (condition.kind === "weekday") {
             const day = new Date(Date.UTC(clock.year, clock.month - 1, clock.day)).getUTCDay();
@@ -1599,4 +1648,101 @@ export function lastOccurrence(
         cursor.setUTCDate(cursor.getUTCDate() - 1);
     }
     return null;
+}
+
+// --- the sun ------------------------------------------------------------------
+
+/** An offset as signed milliseconds: before is earlier. */
+function offsetMs(offset: Offset | undefined): number {
+    if (!offset) return 0;
+    const ms = durationSeconds(offset) * 1000;
+    return offset.direction === "before" ? -ms : ms;
+}
+
+function dayKey(day: CalendarDay): string {
+    return `${day.year}-${String(day.month).padStart(2, "0")}-${String(day.day).padStart(2, "0")}`;
+}
+
+/** The place's calendar day `shift` days from the one `now` falls on. */
+function dayAt(now: Date, timeZone: string, shift: number): CalendarDay {
+    const today = wallClock(now, timeZone);
+    const cursor = new Date(Date.UTC(today.year, today.month - 1, today.day + shift));
+    return {
+        year: cursor.getUTCFullYear(),
+        month: cursor.getUTCMonth() + 1,
+        day: cursor.getUTCDate()
+    };
+}
+
+/**
+ * The latest moment at or before `now` a sun trigger was due, with the day its
+ * event belongs to - or null with no location, or when the event has not
+ * happened lately (a polar summer has no sunset to fire on). Tomorrow is looked
+ * at too, since "12 hours before sunrise" can fall this evening.
+ */
+export function lastSunOccurrence(
+    trigger: Extract<auto.Trigger, { kind: "sun" }>,
+    location: Coordinate | null,
+    timeZone: string,
+    now: Date
+): { at: Date; day: string } | null {
+    if (!location) return null;
+    let found: { at: Date; day: string } | null = null;
+    for (const shift of [1, 0, -1, -2]) {
+        const day = dayAt(now, timeZone, shift);
+        const event = sunEventOn(trigger.event, day, location);
+        if (!event) continue;
+        const at = new Date(event.getTime() + offsetMs(trigger.offset));
+        if (at.getTime() > now.getTime()) continue;
+        if (!found || at.getTime() > found.at.getTime()) found = { at, day: dayKey(day) };
+    }
+    return found;
+}
+
+/**
+ * A sun condition, read against today's sunrise and sunset at the place.
+ *
+ * After sunset and before sunrise is the night - the one pair read across
+ * midnight, as "before today's sunrise or after today's sunset". Any other
+ * pair has to hold together on the same day. An event that does not happen
+ * today (no sunset in a polar summer) fails the condition rather than guessing
+ * which side of it the day is on.
+ */
+export function sunHolds(
+    condition: Extract<auto.Condition, { kind: "sun" }>,
+    location: Coordinate | null,
+    timeZone: string,
+    now: Date
+): boolean {
+    if (!location || (!condition.after && !condition.before)) return false;
+    const today = dayAt(now, timeZone, 0);
+    const edge = (side: { event: auto.SunEdgeEvent; offset?: Offset }): number | null => {
+        const event = sunEventOn(side.event, today, location);
+        return event ? event.getTime() + offsetMs(side.offset) : null;
+    };
+    const after = condition.after ? edge(condition.after) : undefined;
+    const before = condition.before ? edge(condition.before) : undefined;
+    if (after === null || before === null) return false;
+    const at = now.getTime();
+    if (
+        after !== undefined &&
+        before !== undefined &&
+        condition.after?.event === "sunset" &&
+        condition.before?.event === "sunrise"
+    ) {
+        return at < before || at > after;
+    }
+    if (before !== undefined && !(at < before)) return false;
+    if (after !== undefined && !(at > after)) return false;
+    return true;
+}
+
+/** Whether the run was started by one of the triggers a condition names. A
+ *  run with no trigger behind it - started by another automation - is not. */
+export function triggeredBy(
+    condition: Extract<auto.Condition, { kind: "triggeredBy" }>,
+    cause: auto.RunCause | undefined
+): boolean {
+    const id = cause?.triggerId;
+    return id !== undefined && condition.triggerIds.includes(id);
 }

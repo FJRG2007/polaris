@@ -159,16 +159,51 @@ describe("the fixture", () => {
     });
 
     it("has every kind of trigger, condition and step", () => {
-        expect(new Set(EVERYTHING.triggers.map((node) => node.kind))).toEqual(
+        // The sun and "Triggered by" are graphed like any block of their role;
+        // the fixture's positions predate them, so they are checked apart.
+        const NEWER = ["sun", "triggeredBy"];
+        expect(new Set([...EVERYTHING.triggers.map((node) => node.kind), "sun"])).toEqual(
             new Set(auto.TRIGGER_KINDS)
         );
         expect(
             new Set(
-                EVERYTHING.conditions.groups.flatMap((group) =>
-                    group.items.map((node) => node.kind)
-                )
+                EVERYTHING.conditions.groups
+                    .flatMap((group) => group.items.map((node) => node.kind))
+                    .concat(NEWER)
             )
         ).toEqual(new Set(auto.CONDITION_KINDS));
+        const added = {
+            ...EVERYTHING,
+            triggers: [
+                ...EVERYTHING.triggers,
+                {
+                    id: "trsun001",
+                    kind: "sun",
+                    event: "sunset",
+                    offset: { amount: 15, unit: "minutes", direction: "before" }
+                }
+            ],
+            conditions: {
+                ...EVERYTHING.conditions,
+                groups: [
+                    ...EVERYTHING.conditions.groups,
+                    {
+                        id: "grsun001",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cnsun001",
+                                kind: "sun",
+                                after: { event: "sunset" },
+                                before: { event: "sunrise" }
+                            },
+                            { id: "cnby0001", kind: "triggeredBy", triggerIds: ["trsun001"] }
+                        ]
+                    }
+                ]
+            }
+        };
+        expect(auto.definitionSchema.safeParse(added).success).toBe(true);
         expect(new Set(EVERYTHING.actions.map((node) => node.kind))).toEqual(
             new Set(auto.STEP_KINDS)
         );

@@ -9,7 +9,7 @@
 
 import { usePlacesT } from "../use-places-t";
 import { blockIcon, conditionIcon } from "./add-block";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode, useRef } from "react";
 import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
 import type { Path } from "@polaris/ui/automation-graph";
@@ -81,6 +81,10 @@ export interface AutomationCanvasProps {
 
 export function AutomationCanvas({ lookup, automationName, ...props }: AutomationCanvasProps) {
     const t = usePlacesT();
+    // Read at the moment a sentence is drawn, so "Triggered by" numbers follow
+    // the triggers without rebuilding the vocabulary on every edit.
+    const triggerIds = useRef<string[]>([]);
+    triggerIds.current = props.definition.triggers.map((trigger) => trigger.id);
     const vocabulary = useMemo<FlowVocabulary<Definition>>(
         () => ({
             labels: canvasLabels(t),
@@ -95,7 +99,8 @@ export function AutomationCanvas({ lookup, automationName, ...props }: Automatio
                 kinds: auto.CONDITION_KINDS,
                 kindText: (kind) => words.conditionKindText(kind, t),
                 blank: auto.blankCondition,
-                describe: (condition) => words.describeCondition(condition, lookup, t),
+                describe: (condition) =>
+                    words.describeCondition(condition, lookup, t, triggerIds.current),
                 icon: (condition) => conditionIcon(condition)
             },
             steps: {

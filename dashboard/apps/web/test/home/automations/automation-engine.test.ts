@@ -21,7 +21,8 @@ import {
     type AutomationStore,
     type DeviceReadout,
     type Observation,
-    type RunRecord
+    type RunRecord,
+    lastSunOccurrence
 } from "@polaris-app/places/src/lib/automation-engine";
 
 const INSTALL = "install-1";
@@ -2473,5 +2474,113 @@ describe("a step on a set of devices", () => {
                 expect(notified).toEqual(["all"]);
             }
         }
+    });
+});
+describe("the sun", () => {
+    const LONDON = { latitude: 51.51, longitude: -0.13 };
+    const sunset = {
+        id: "trigsun",
+        kind: "sun" as const,
+        event: "sunset" as const,
+        offset: { amount: 15, unit: "minutes" as const, direction: "before" as const }
+    };
+
+    it("fires once on the day at its offset, and once across a restart", async () => {
+        at("2024-06-21T12:00:00.000Z");
+        automation("dusk", { timeZone: "Europe/London", triggers: [sunset] }, { location: LONDON });
+        // Sunset in London that day is 20:21 UTC; 15 minutes before is 20:06.
+        at("2024-06-21T20:05:00.000Z");
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("dusk")).toHaveLength(0);
+
+        at("2024-06-21T20:06:40.000Z");
+        await engine.evaluateSchedules(INSTALL);
+        at("2024-06-21T20:08:00.000Z");
+        await engine.evaluateSchedules(INSTALL);
+        // A restarted process looking at the same minutes.
+        await boot().evaluateSchedules(INSTALL);
+        const runs = store.runsOf("dusk");
+        expect(runs).toHaveLength(1);
+        expect(runs[0]?.firingKey).toBe("sun:trigsun:sunset:2024-06-21");
+        expect(runs[0]?.cause).toMatchObject({
+            kind: "sun",
+            triggerId: "trigsun",
+            event: "sunset"
+        });
+
+        // Down past the catch-up window: that one is missed, never fired late.
+        at("2024-06-22T21:00:00.000Z");
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("dusk")).toHaveLength(1);
+    });
+
+    it("never fires with no location, nor where the event does not happen", async () => {
+        at("2024-06-21T12:00:00.000Z");
+        automation("nowhere", { timeZone: "Europe/London", triggers: [sunset] });
+        automation(
+            "arctic",
+            {
+                timeZone: "Europe/Oslo",
+                triggers: [{ id: "trigsun", kind: "sun", event: "sunset" }]
+            },
+            { location: { latitude: 69.65, longitude: 18.96 } }
+        );
+        for (const iso of [
+            "2024-06-21T20:07:00.000Z",
+            "2024-06-21T22:00:00.000Z",
+            "2024-06-21T23:30:00.000Z"
+        ]) {
+            at(iso);
+            await engine.evaluateSchedules(INSTALL);
+        }
+        expect(store.runsOf("nowhere")).toHaveLength(0);
+        expect(store.runsOf("arctic")).toHaveLength(0);
+        expect(
+            lastSunOccurrence(
+                { id: "x1x1", kind: "sun", event: "sunset" },
+                { latitude: 69.65, longitude: 18.96 },
+                "Europe/Oslo",
+                new Date("2024-06-21T23:00:00.000Z")
+            )
+        ).toBeNull();
+    });
+});
+
+describe("triggered by", () => {
+    it("passes only for the trigger that started the run", async () => {
+        devices.set("plug", readout("plug", "outlet", "off"));
+        const record = automation("which", {
+            triggers: [
+                { id: "trigtime", kind: "time", at: "07:00", days: [0, 1, 2, 3, 4, 5, 6] },
+                { id: "trigmanual", kind: "manual" }
+            ],
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "groupone",
+                        match: "all",
+                        items: [{ id: "condby", kind: "triggeredBy", triggerIds: ["trigtime"] }]
+                    }
+                ]
+            },
+            actions: [{ id: "stepon", kind: "device", deviceId: "plug", do: "turn-on" }]
+        });
+        const time = { kind: "time" as const, triggerId: "trigtime", at: "" };
+        const hand = { kind: "manual" as const, triggerId: "trigmanual", at: "" };
+        expect(await engine.conditionsHold(record, now, time)).toBe(true);
+        expect(await engine.conditionsHold(record, now, hand)).toBe(false);
+        expect(await engine.conditionsHold(record, now)).toBe(false);
+
+        // Run now counts as its "Run by hand" trigger, which is not picked.
+        await engine.runNow(record, "Ana", "press-1");
+        await engine.drain();
+        expect(store.runsOf("which")[0]?.cause.triggerId).toBe("trigmanual");
+        expect(store.runsOf("which")[0]?.status).toBe("skipped");
+
+        at("2026-09-30T07:00:30.000Z");
+        await engine.evaluateSchedules(INSTALL);
+        await engine.drain();
+        expect(acted).toEqual([{ deviceId: "plug", action: "turn-on" }]);
     });
 });

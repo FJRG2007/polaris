@@ -94,6 +94,7 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["The recognizer would not take that photograph", "refusals.photoRefused"],
     ["The recognizer would not forget them, so nothing was removed", "refusals.forgetRefused"],
     ["Place not found", "refusals.placeGone"],
+    ["That is not a place on the Earth", "refusals.notOnEarth"],
     ["Room not found", "refusals.roomGone"],
     ["That room is at another place", "refusals.roomElsewhere"],
     ["Floor not found", "refusals.floorGone"],

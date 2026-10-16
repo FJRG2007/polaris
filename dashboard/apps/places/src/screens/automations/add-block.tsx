@@ -39,9 +39,11 @@ import {
     Plus,
     Power,
     Repeat,
+    Sun,
     Timer,
     Unplug,
-    Workflow
+    Workflow,
+    Zap
 } from "lucide-react";
 
 export type AddRole = "trigger" | "condition" | "step";
@@ -91,14 +93,20 @@ export function targetGroups<T extends { id: string; kind: string; roomId?: stri
 }
 
 type GroupId = "devices" | "time" | "other";
+type Vocable = { group: GroupId; icon: ReactNode };
 
 /** Which group each kind is listed under, and the icon it is drawn with. */
-const VOCABULARY: Record<AddRole, Record<string, { group: GroupId; icon: ReactNode }>> = {
+const VOCABULARY: {
+    trigger: Record<auto.TriggerKind, Vocable>;
+    condition: Record<auto.ConditionKind, Vocable>;
+    step: Record<auto.StepKind, Vocable>;
+} = {
     trigger: {
         change: { group: "devices", icon: <Power /> },
         stays: { group: "devices", icon: <Hourglass /> },
         threshold: { group: "devices", icon: <Gauge /> },
         time: { group: "time", icon: <Clock /> },
+        sun: { group: "time", icon: <Sun /> },
         interval: { group: "time", icon: <Repeat /> },
         manual: { group: "other", icon: <Hand /> }
     },
@@ -106,7 +114,9 @@ const VOCABULARY: Record<AddRole, Record<string, { group: GroupId; icon: ReactNo
         device: { group: "devices", icon: <Power /> },
         reading: { group: "devices", icon: <Gauge /> },
         time: { group: "time", icon: <Clock /> },
-        weekday: { group: "time", icon: <Clock /> }
+        weekday: { group: "time", icon: <Clock /> },
+        sun: { group: "time", icon: <Sun /> },
+        triggeredBy: { group: "other", icon: <Zap /> }
     },
     step: {
         device: { group: "devices", icon: <Power /> },
@@ -242,7 +252,7 @@ export function AddBlockButton({
     const t = usePlacesT();
     const rooms = fields.useRooms();
     const [open, setOpen] = useState(false);
-    const vocabulary = VOCABULARY[role];
+    const vocabulary: Record<string, Vocable | undefined> = VOCABULARY[role];
     const blockItem = (kind: string) => ({
         value: kind,
         label: t(`automations.${LABELS[role]}.${kind}` as PlacesKey),

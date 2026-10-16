@@ -79,6 +79,7 @@ export function Field({
 export function NodeCard({
     handle,
     number,
+    numberLabel,
     kind,
     onRemove,
     onUp,
@@ -91,6 +92,8 @@ export function NodeCard({
     children
 }: {
     number?: number;
+    /** What the number means, as its tooltip and its name for a screen reader. */
+    numberLabel?: string;
     kind: ReactNode;
     /** Drawn without its own border, inside a panel that already is one. */
     plain?: boolean;
@@ -115,7 +118,11 @@ export function NodeCard({
             <div className="flex items-center gap-2">
                 {!disabled && handle}
                 {number !== undefined && (
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[0.6875rem] font-medium tabular-nums text-muted-foreground">
+                    <span
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[0.6875rem] font-medium tabular-nums text-muted-foreground"
+                        title={numberLabel}
+                        aria-label={numberLabel}
+                    >
                         {number}
                     </span>
                 )}
