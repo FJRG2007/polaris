@@ -35,17 +35,28 @@ vi.mock("@/lib/domain-edge", () => ({ syncDashboardRoute: async () => undefined 
 vi.mock("@/lib/domain-service", () => ({ getPublicIp: async () => "203.0.113.7" }));
 vi.mock("@/lib/address-accounts", () => ({ accountsAtAddress: async () => [] }));
 vi.mock("@/lib/waf-ssh-service", () => ({ liftHostBlocks: async () => undefined }));
-vi.mock("@/lib/waf-ban-service", () => ({ getWafJails: async () => [], setWafJails: async () => undefined }));
+vi.mock("@/lib/waf-ban-service", () => ({
+    getWafJails: async () => [],
+    setWafJails: async () => undefined
+}));
 vi.mock("@/lib/waf-analytics-service", () => ({}));
 vi.mock("@/lib/waf-anomaly-service", () => ({}));
-vi.mock("@/lib/people-search", () => ({ findPeople: vi.fn(), findAccountsAsAdmin: vi.fn(), SHORTEST_SEARCH: 2 }));
+vi.mock("@/lib/people-search", () => ({
+    findPeople: vi.fn(),
+    findAccountsAsAdmin: vi.fn(),
+    SHORTEST_SEARCH: 2
+}));
 vi.mock("@/lib/rich-text/mention-service", () => ({ like: () => ({}) }));
 vi.mock("@/lib/privacy-service", () => ({ discoverableBy: async () => new Set() }));
 vi.mock("@/lib/blocks", () => ({ blockedBetween: async () => new Set() }));
 const assertScopeOwner = vi.fn(async () => {
     if (!owns) throw new Error("Project not found");
 });
-vi.mock("@/lib/waf-service", () => ({ assertScopeOwner, getWafRule: vi.fn(), setWafRule: vi.fn() }));
+vi.mock("@/lib/waf-service", () => ({
+    assertScopeOwner,
+    getWafRule: vi.fn(),
+    setWafRule: vi.fn()
+}));
 const directAccessIn = vi.fn(async () => [
     { applicationId: SERVICE, name: "web", address: "203.0.113.7:21234", held: null }
 ]);
@@ -77,7 +88,12 @@ describe("reading what answers round a scope", () => {
         expect(result.reachable).toHaveLength(1);
         expect(assertScopeOwner).toHaveBeenCalledWith(CUSTOMER.id, "project", PROJECT);
         expect(directAccessIn).toHaveBeenCalledWith(
-            { AND: [{ environment: { project: { ownerId: CUSTOMER.id } } }, { environment: { projectId: PROJECT } }] },
+            {
+                AND: [
+                    { environment: { project: { ownerId: CUSTOMER.id } } },
+                    { environment: { projectId: PROJECT } }
+                ]
+            },
             "203.0.113.7"
         );
     });
@@ -89,7 +105,9 @@ describe("reading what answers round a scope", () => {
     });
 
     it("refuses the instance-wide scope without system.manage", async () => {
-        const result = await getDirectAccessAction({ scopeType: "global", scopeId: "" }).catch((error) => error);
+        const result = await getDirectAccessAction({ scopeType: "global", scopeId: "" }).catch(
+            (error) => error
+        );
         expect(result).toBeInstanceOf(Error);
         expect(directAccessIn).not.toHaveBeenCalled();
     });
@@ -103,7 +121,9 @@ describe("reading what answers round a scope", () => {
 
     it("has nothing to say for Polaris's own scope", async () => {
         holds = ["deploy.manage", "system.manage"];
-        expect(await getDirectAccessAction({ scopeType: "polaris", scopeId: "" })).toEqual({ reachable: [] });
+        expect(await getDirectAccessAction({ scopeType: "polaris", scopeId: "" })).toEqual({
+            reachable: []
+        });
     });
 });
 
@@ -112,7 +132,12 @@ describe("closing them", () => {
         const result = await closeDirectAccessAction(SCOPE);
         expect(result).toEqual({ closed: 1, failed: 0, failedIds: [] });
         expect(closeDirectPorts).toHaveBeenCalledWith(
-            { AND: [{ environment: { project: { ownerId: CUSTOMER.id } } }, { environment: { projectId: PROJECT } }] },
+            {
+                AND: [
+                    { environment: { project: { ownerId: CUSTOMER.id } } },
+                    { environment: { projectId: PROJECT } }
+                ]
+            },
             { mode: "operator", actorId: CUSTOMER.id }
         );
         expect(recordAudit).toHaveBeenCalledWith(
@@ -140,7 +165,9 @@ describe("closing them", () => {
     });
 
     it("refuses the instance-wide scope without system.manage", async () => {
-        await expect(closeDirectAccessAction({ scopeType: "global", scopeId: "" })).rejects.toBeInstanceOf(Error);
+        await expect(
+            closeDirectAccessAction({ scopeType: "global", scopeId: "" })
+        ).rejects.toBeInstanceOf(Error);
         expect(closeDirectPorts).not.toHaveBeenCalled();
     });
 

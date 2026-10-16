@@ -84,9 +84,27 @@ describe("directAccessOf", () => {
             "203.0.113.7"
         );
         expect(found).toEqual([
-            { applicationId: "a", name: "api", address: `203.0.113.7:${hostPortForApp("a")}`, held: null, closing: false },
-            { applicationId: "c", name: "game", address: "203.0.113.7:25565", held: "installed", closing: false },
-            { applicationId: "b", name: "web", address: `203.0.113.7:${hostPortForApp("b")}`, held: null, closing: false }
+            {
+                applicationId: "a",
+                name: "api",
+                address: `203.0.113.7:${hostPortForApp("a")}`,
+                held: null,
+                closing: false
+            },
+            {
+                applicationId: "c",
+                name: "game",
+                address: "203.0.113.7:25565",
+                held: "installed",
+                closing: false
+            },
+            {
+                applicationId: "b",
+                name: "web",
+                address: `203.0.113.7:${hostPortForApp("b")}`,
+                held: null,
+                closing: false
+            }
         ]);
     });
 
@@ -145,7 +163,10 @@ describe("servicesOfScope", () => {
 
     it("narrows an owned scope to the reader's own services", async () => {
         expect(await directPort.servicesOfScope("server", "host-a", "owner-1")).toEqual({
-            AND: [{ environment: { project: { ownerId: "owner-1" } } }, { target: { hostId: "host-a" } }]
+            AND: [
+                { environment: { project: { ownerId: "owner-1" } } },
+                { target: { hostId: "host-a" } }
+            ]
         });
         expect(await directPort.servicesOfScope("server-group", "group-1", "owner-1")).toEqual({
             AND: [

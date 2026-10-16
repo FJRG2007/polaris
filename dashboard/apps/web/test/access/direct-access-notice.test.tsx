@@ -24,7 +24,9 @@ let reachable: {
 }[] = [];
 const getDirectAccessAction = vi.fn(async () => ({ reachable }));
 const closeDirectAccessAction = vi.fn(
-    async (_input: Record<string, unknown>): Promise<{ closed?: number; failed?: number; failedIds?: string[]; error?: string }> => ({
+    async (
+        _input: Record<string, unknown>
+    ): Promise<{ closed?: number; failed?: number; failedIds?: string[]; error?: string }> => ({
         closed: 1,
         failed: 0
     })
@@ -34,7 +36,9 @@ vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
     closeDirectAccessAction
 }));
 
-const { DirectAccessNotice } = await import("../../src/app/(app)/apps/firewall/direct-access-notice");
+const { DirectAccessNotice } = await import(
+    "../../src/app/(app)/apps/firewall/direct-access-notice"
+);
 
 function show(canClose = true) {
     render(
@@ -46,8 +50,20 @@ function show(canClose = true) {
 
 beforeEach(() => {
     reachable = [
-        { applicationId: WEB, name: "web", address: "203.0.113.7:21234", held: null, closing: false },
-        { applicationId: KEPT, name: "docs", address: "203.0.113.7:31234", held: "keptRelease", closing: false }
+        {
+            applicationId: WEB,
+            name: "web",
+            address: "203.0.113.7:21234",
+            held: null,
+            closing: false
+        },
+        {
+            applicationId: KEPT,
+            name: "docs",
+            address: "203.0.113.7:31234",
+            held: "keptRelease",
+            closing: false
+        }
     ];
     getDirectAccessAction.mockClear();
     closeDirectAccessAction.mockClear();
@@ -92,7 +108,9 @@ describe("the direct access warning", () => {
         closeDirectAccessAction.mockResolvedValueOnce({ error: "Could not close the port." });
         show();
         fireEvent.click(await screen.findByRole("button", { name: "Close the port of web" }));
-        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Close port" }));
+        fireEvent.click(
+            within(await screen.findByRole("dialog")).getByRole("button", { name: "Close port" })
+        );
         await waitFor(() => expect(closeDirectAccessAction).toHaveBeenCalled());
         expect(await screen.findByRole("button", { name: "Close the port of web" })).toBeTruthy();
         expect(screen.queryByText("Closing")).toBeNull();
@@ -101,13 +119,21 @@ describe("the direct access warning", () => {
     it("puts back only the rows that failed when some of Close all closed", async () => {
         const API = "00000000-0000-7000-8000-0000000000a3";
         reachable = [
-            { applicationId: API, name: "api", address: "203.0.113.7:21235", held: null, closing: false },
+            {
+                applicationId: API,
+                name: "api",
+                address: "203.0.113.7:21235",
+                held: null,
+                closing: false
+            },
             ...reachable
         ];
         closeDirectAccessAction.mockResolvedValueOnce({ closed: 1, failed: 1, failedIds: [WEB] });
         show();
         fireEvent.click(await screen.findByRole("button", { name: "Close all" }));
-        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Close port" }));
+        fireEvent.click(
+            within(await screen.findByRole("dialog")).getByRole("button", { name: "Close port" })
+        );
         await waitFor(() => expect(closeDirectAccessAction).toHaveBeenCalled());
         expect(await screen.findByRole("button", { name: "Close the port of web" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Close the port of api" })).toBeNull();
@@ -125,12 +151,19 @@ describe("the direct access warning", () => {
         show(false);
         const button = await screen.findByRole("button", { name: "Close the port of web" });
         expect(button.hasAttribute("disabled")).toBe(true);
-        expect(screen.getAllByText("Only whoever runs this instance can close these.").length).toBeGreaterThan(0);
+        expect(
+            screen.getAllByText("Only whoever runs this instance can close these.").length
+        ).toBeGreaterThan(0);
     });
 
     it("reads in Spanish from the catalog", async () => {
         const { withMessages } = await import("../setup/i18n");
-        render(withMessages(<DirectAccessNotice scopeType="project" scopeId="project-1" canClose />, "es-ES"));
+        render(
+            withMessages(
+                <DirectAccessNotice scopeType="project" scopeId="project-1" canClose />,
+                "es-ES"
+            )
+        );
         expect(await screen.findByText("Accesibles sin el cortafuegos")).toBeTruthy();
         expect(screen.getByText("web en 203.0.113.7:21234")).toBeTruthy();
     });

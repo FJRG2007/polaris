@@ -97,7 +97,11 @@ vi.mock("@polaris/db", () => ({
         mailServer: { findMany: async () => [] },
         deployment: {
             findMany: async (args: {
-                where: { id?: { in: string[] }; deployableId?: { in: string[] }; status?: { in: string[] } };
+                where: {
+                    id?: { in: string[] };
+                    deployableId?: { in: string[] };
+                    status?: { in: string[] };
+                };
             }) => {
                 if (args.where.status) {
                     return deployments.filter(
@@ -110,7 +114,9 @@ vi.mock("@polaris/db", () => ({
             },
             findUnique: async (args: { where: { id: string } }) => {
                 const row = deployments.find((entry) => entry.id === args.where.id);
-                return row ? { status: row.status, startedAt: new Date(0), createdAt: new Date(0) } : null;
+                return row
+                    ? { status: row.status, startedAt: new Date(0), createdAt: new Date(0) }
+                    : null;
             }
         }
     }
@@ -244,10 +250,17 @@ describe("closeDirectPorts at boot", () => {
 
 describe("closeDirectPorts for the operator", () => {
     it("closes a chosen port too, and still not an installed app's or an unrouted one", async () => {
-        apps = [app("chosen", { publishPortChosen: true }), app("installed"), app("internal", { domains: [] })];
+        apps = [
+            app("chosen", { publishPortChosen: true }),
+            app("installed"),
+            app("internal", { domains: [] })
+        ];
         installed = ["installed"];
         deployments = apps.map((row) => live(row.id));
-        const outcome = await closeDirectPorts({ id: "x" }, { mode: "operator", actorId: "user-1" });
+        const outcome = await closeDirectPorts(
+            { id: "x" },
+            { mode: "operator", actorId: "user-1" }
+        );
         expect(outcome).toEqual({ closed: ["chosen"], failed: [], deferred: [] });
         expect(setApplicationPublishPort).toHaveBeenCalledWith("chosen", "owner", false, "user-1");
     });

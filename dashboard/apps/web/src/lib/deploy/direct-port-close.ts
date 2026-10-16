@@ -149,7 +149,10 @@ export async function closeDirectPorts(
             await setApplicationPublishPort(service.id, service.ownerId, false, options.actorId);
             closed.push(service.id);
         } catch (error) {
-            console.error(`polaris: could not close the host port of service ${service.id}:`, error);
+            console.error(
+                `polaris: could not close the host port of service ${service.id}:`,
+                error
+            );
             failed.push(service.id);
         }
     }

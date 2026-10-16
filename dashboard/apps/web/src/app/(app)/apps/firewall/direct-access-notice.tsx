@@ -84,7 +84,9 @@ export function DirectAccessNotice({
     const confirm = async () => {
         if (!asking) return;
         const ids =
-            asking.kind === "one" ? [asking.entry.applicationId] : open.map((entry) => entry.applicationId);
+            asking.kind === "one"
+                ? [asking.entry.applicationId]
+                : open.map((entry) => entry.applicationId);
         const before = closing;
         // Optimistic: the rows read as closing at once, and go back if it fails.
         setClosing(new Set([...before, ...ids]));
@@ -106,7 +108,8 @@ export function DirectAccessNotice({
             setClosing((current) => new Set([...current].filter((id) => !failedIds.includes(id))));
         }
         toast.show({
-            title: "failed" in result && result.failed ? t("direct.closeFailed") : t("direct.closing")
+            title:
+                "failed" in result && result.failed ? t("direct.closeFailed") : t("direct.closing")
         });
         void load();
     };
@@ -119,7 +122,10 @@ export function DirectAccessNotice({
             className="flex flex-col gap-3 rounded-md border border-warning-edge bg-warning-soft p-3 text-sm"
         >
             <div className="flex min-w-0 items-start gap-2">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning-ink" aria-hidden="true" />
+                <AlertTriangle
+                    className="mt-0.5 size-4 shrink-0 text-warning-ink"
+                    aria-hidden="true"
+                />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <h2 id="direct-access-title" className="font-medium text-warning-ink">
                         {t("direct.title")}
@@ -165,7 +171,11 @@ export function DirectAccessNotice({
                                     size="sm"
                                     variant="outline"
                                     disabled={!canClose}
-                                    title={canClose ? t("direct.closeNamed", { name: entry.name }) : t("direct.noPermission")}
+                                    title={
+                                        canClose
+                                            ? t("direct.closeNamed", { name: entry.name })
+                                            : t("direct.noPermission")
+                                    }
                                     aria-label={t("direct.closeNamed", { name: entry.name })}
                                     onClick={() => setAsking({ kind: "one", entry })}
                                 >
@@ -176,8 +186,13 @@ export function DirectAccessNotice({
                     );
                 })}
             </ul>
-            {!canClose ? <p className="text-xs text-muted-foreground">{t("direct.noPermission")}</p> : null}
-            <Dialog open={asking !== null} onOpenChange={(next) => (!next && !sending ? setAsking(null) : undefined)}>
+            {!canClose ? (
+                <p className="text-xs text-muted-foreground">{t("direct.noPermission")}</p>
+            ) : null}
+            <Dialog
+                open={asking !== null}
+                onOpenChange={(next) => (!next && !sending ? setAsking(null) : undefined)}
+            >
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>{t("direct.confirmTitle", { count })}</DialogTitle>

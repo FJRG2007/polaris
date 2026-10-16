@@ -182,7 +182,8 @@ export async function setWafRuleAction(
     if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
         const { scopeType, scopeId, ...rule } = input;
-        if (!(await withinReach(user, scopeType, scopeId, rule))) return { error: await say("errors.outOfReach") };
+        if (!(await withinReach(user, scopeType, scopeId, rule)))
+            return { error: await say("errors.outOfReach") };
         await setWafRule(user.id, scopeType, scopeId, rule);
         await recordAudit({
             actorId: user.id,
@@ -224,20 +225,28 @@ async function withinReach(
     rule: Partial<Pick<WafScopeRule, "loginAllowPrincipals" | "loginDenyPrincipals">>
 ): Promise<boolean> {
     if (user.isAdmin) return true;
-    const sent = [...(rule.loginAllowPrincipals ?? []), ...(rule.loginDenyPrincipals ?? [])].map((grant) => grant.ref);
+    const sent = [...(rule.loginAllowPrincipals ?? []), ...(rule.loginDenyPrincipals ?? [])].map(
+        (grant) => grant.ref
+    );
     if (sent.length === 0) return true;
     const stored = await getWafRule(user.id, scopeType, scopeId);
-    const kept = new Set([...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref));
+    const kept = new Set(
+        [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref)
+    );
     const added = [...new Set(sent.filter((ref) => !kept.has(ref)))];
     if (added.length === 0) return true;
     const roleIds = idsOf(added, "role");
     const groupIds = idsOf(added, "group");
     const userIds = idsOf(added, "user").filter((id) => id !== user.id);
     // An entry that is not a well-formed id of a known kind is nothing the picker offered.
-    if (roleIds.length + groupIds.length + idsOf(added, "user").length !== added.length) return false;
+    if (roleIds.length + groupIds.length + idsOf(added, "user").length !== added.length)
+        return false;
     const [roles, groups, findable, blocked] = await Promise.all([
         roleIds.length
-            ? prisma.userRole.findMany({ where: { userId: user.id, roleId: { in: roleIds } }, select: { roleId: true } })
+            ? prisma.userRole.findMany({
+                  where: { userId: user.id, roleId: { in: roleIds } },
+                  select: { roleId: true }
+              })
             : [],
         groupIds.length
             ? prisma.groupMember.findMany({
@@ -245,7 +254,9 @@ async function withinReach(
                   select: { groupId: true }
               })
             : [],
-        userIds.length ? discoverableBy({ id: user.id, isAdmin: false }, userIds) : new Set<string>(),
+        userIds.length
+            ? discoverableBy({ id: user.id, isAdmin: false }, userIds)
+            : new Set<string>(),
         userIds.length ? blockedBetween(user.id, userIds) : new Set<string>()
     ]);
     const heldRoles = new Set(roles.map((row) => row.roleId));
@@ -385,11 +396,18 @@ export async function listWafPrincipalsAction(scope?: {
     const user = await requirePermission("deploy.manage");
     const where = scopeSchema.optional().safeParse(scope);
     if (!where.success) return { error: await say("errors.directory") };
-    if (where.data && OPERATOR_SCOPES.has(where.data.scopeType)) await requirePermission("system.manage");
+    if (where.data && OPERATOR_SCOPES.has(where.data.scopeType))
+        await requirePermission("system.manage");
     try {
-        const stored = where.data ? await getWafRule(user.id, where.data.scopeType, where.data.scopeId) : null;
+        const stored = where.data
+            ? await getWafRule(user.id, where.data.scopeType, where.data.scopeId)
+            : null;
         const refs = namedRefsSchema.safeParse(
-            stored ? [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref) : []
+            stored
+                ? [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map(
+                      (grant) => grant.ref
+                  )
+                : []
         );
         if (!refs.success) return { error: await say("errors.directory") };
         const mine = user.isAdmin ? {} : { members: { some: { userId: user.id } } };
@@ -423,10 +441,18 @@ export async function listWafPrincipalsAction(scope?: {
         // Roles and groups first: naming one is how an operator writes a rule that
         // keeps meaning what they meant after the next person joins.
         for (const role of [...roles, ...namedRoles]) {
-            offered.set(`role:${role.id}`, { ref: `role:${role.id}`, type: "role", label: role.name });
+            offered.set(`role:${role.id}`, {
+                ref: `role:${role.id}`,
+                type: "role",
+                label: role.name
+            });
         }
         for (const group of [...groups, ...namedGroups]) {
-            offered.set(`group:${group.id}`, { ref: `group:${group.id}`, type: "group", label: group.name });
+            offered.set(`group:${group.id}`, {
+                ref: `group:${group.id}`,
+                type: "group",
+                label: group.name
+            });
         }
         for (const person of namedUsers) {
             offered.set(`user:${person.id}`, {
@@ -466,7 +492,10 @@ export async function findWafPeopleAction(query: string): Promise<{
         const [found, self] = await Promise.all([
             findPeople({ id: user.id }, term, { reachableOnly: false, limit: PEOPLE_FOUND }),
             prisma.user.findFirst({
-                where: { id: user.id, OR: [{ name: contains }, { email: contains }, { username: contains }] },
+                where: {
+                    id: user.id,
+                    OR: [{ name: contains }, { email: contains }, { username: contains }]
+                },
                 select: { id: true, name: true }
             })
         ]);
@@ -855,7 +884,11 @@ export async function closeDirectAccessAction(
         if (outcome.failed.length > 0 && outcome.closed.length === 0) {
             return { error: await say("direct.closeFailed") };
         }
-        return { closed: outcome.closed.length, failed: outcome.failed.length, failedIds: [...outcome.failed] };
+        return {
+            closed: outcome.closed.length,
+            failed: outcome.failed.length,
+            failedIds: [...outcome.failed]
+        };
     } catch (caught) {
         return { error: await failure(caught, "errors.save") };
     }
