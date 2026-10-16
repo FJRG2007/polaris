@@ -1942,8 +1942,8 @@
             "deviceSet": "{count, plural, one {{first} y uno más} other {{first} y # más}}",
             "sun": "{hasOffset, select, yes {{offset} {direction, select, before {antes} other {después}} del } other {Al }}{event, select, dawn {alba} sunrise {amanecer} sunset {atardecer} other {anochecer}}",
             "sunEdge": "{hasOffset, select, yes {{offset} {direction, select, before {antes} other {después}} del } other {el }}{event, select, sunrise {amanecer} other {atardecer}}",
-            "sunAfter": "Tras {edge}",
-            "sunBefore": "Hasta {edge}",
+            "sunAfter": "Tras {edge}, hasta medianoche",
+            "sunBefore": "Hasta {edge}, desde medianoche",
             "sunBetween": "Tras {after} y hasta {before}",
             "triggeredBy": "Lanzada por {count, plural, one {el disparador} other {los disparadores}} {numbers}"
         },
@@ -2233,7 +2233,7 @@
             "sunModes": {
                 "after": "Tras",
                 "before": "Hasta",
-                "between": "Tras uno, hasta otro"
+                "between": "Entre"
             },
             "sunAfter": "Tras",
             "sunBefore": "Hasta",
@@ -2244,7 +2244,7 @@
             "triggeredBy": "Disparadores",
             "noTriggers": "Aún no hay disparadores. Añade uno antes.",
             "triggerNumber": "Disparador {number}",
-            "triggerPosition": "Disparador {number}, como lo nombra Lanzada por",
+            "triggerPosition": "Disparador {number}",
             "triggerMissing": "Disparador que falta. Desmárcalo para quitarlo."
         },
         "log": {

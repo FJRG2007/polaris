@@ -1942,8 +1942,8 @@
             "deviceSet": "{count, plural, one {{first} and one more} other {{first} and # more}}",
             "sun": "{hasOffset, select, yes {{offset} {direction, select, before {before} other {after}} } other {At }}{event, select, dawn {dawn} sunrise {sunrise} sunset {sunset} other {dusk}}",
             "sunEdge": "{hasOffset, select, yes {{offset} {direction, select, before {before} other {after}} } other {}}{event, select, sunrise {sunrise} other {sunset}}",
-            "sunAfter": "After {edge}",
-            "sunBefore": "Before {edge}",
+            "sunAfter": "After {edge}, until midnight",
+            "sunBefore": "Before {edge}, from midnight",
             "sunBetween": "After {after} and before {before}",
             "triggeredBy": "Triggered by {count, plural, one {trigger} other {triggers}} {numbers}"
         },
@@ -2218,7 +2218,7 @@
             },
             "sunEvent": "Event",
             "sunEvents": {
-                "dawn": "Dawn",
+                "dawn": "Civil dawn",
                 "sunrise": "Sunrise",
                 "sunset": "Sunset",
                 "dusk": "Civil dusk"
@@ -2233,7 +2233,7 @@
             "sunModes": {
                 "after": "After",
                 "before": "Before",
-                "between": "After one, before other"
+                "between": "Between"
             },
             "sunAfter": "After",
             "sunBefore": "Before",
@@ -2244,7 +2244,7 @@
             "triggeredBy": "Which triggers",
             "noTriggers": "No triggers yet. Add a trigger first.",
             "triggerNumber": "Trigger {number}",
-            "triggerPosition": "Trigger {number}, as Triggered by names it",
+            "triggerPosition": "Trigger {number}",
             "triggerMissing": "Missing trigger. Uncheck it to clear it."
         },
         "log": {
