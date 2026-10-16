@@ -3,6 +3,7 @@ import { ChevronLeft } from "lucide-react";
 import { RolloutsView } from "./rollouts-view";
 import { Button, PageHeader } from "@polaris/ui";
 import { requirePermission } from "@/lib/session";
+import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,9 @@ export default async function AgentRolloutsPage() {
                     </Button>
                 }
             />
-            <RolloutsView />
+            <Messages namespaces={["agentRollouts"]}>
+                <RolloutsView />
+            </Messages>
         </>
     );
 }

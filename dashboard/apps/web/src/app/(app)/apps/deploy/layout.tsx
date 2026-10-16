@@ -6,14 +6,18 @@ export default function DeployLayout({ children }: { children: ReactNode }) {
     return (
         <Messages
             namespaces={[
+                "databases",
                 "deploy",
                 "deployConfig",
                 "deploySafety",
                 "deployData",
                 "deployPrivateNet",
                 "deployProject",
+                "deployRegistries",
                 "deployService",
-                "deploySettings"
+                "deploySettings",
+                "driveViewer",
+                "firewall"
             ]}
         >
             {children}
