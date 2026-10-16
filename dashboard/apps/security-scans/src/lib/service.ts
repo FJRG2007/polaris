@@ -771,7 +771,17 @@ const SWEEP_EVERY_MS = 60 * 60_000;
  * are listed before the running scans are read; see `staleExports`.
  */
 async function sweepExports(now: Date): Promise<void> {
+    // Only a server an image scan ran on can hold an export. Every Polaris has
+    // this job, so a server nobody scanned is never dialled for one.
+    const scanned = await prisma.securityScan.groupBy({
+        by: ["targetId"],
+        where: { kind: "image" },
+        orderBy: { targetId: "asc" },
+        take: 100
+    });
+    if (scanned.length === 0) return;
     const targets = await prisma.deployTarget.findMany({
+        where: { id: { in: scanned.map((scan) => scan.targetId) } },
         select: TARGET_SELECT,
         orderBy: { createdAt: "asc" },
         take: 100

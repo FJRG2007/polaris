@@ -102,6 +102,7 @@
         "noFolder": "Esa carpeta no existe en el volumen.",
         "noTool": "No se pudieron descargar las herramientas de auditoría. Comprueba que el servidor tiene acceso a internet.",
         "daemonOutdated": "Esto necesita un Polaris más reciente. Actualiza desde Ajustes y vuelve a intentarlo.",
+        "noDaemon": "Este Polaris funciona sin su servicio de host y no puede revisar esta máquina. Los servidores añadidos por SSH sí se revisan.",
         "busy": "Hay otra comprobación del sistema en curso en este servidor. Inténtalo cuando termine.",
         "lost": "El análisis se detuvo antes de terminar. Inténtalo de nuevo.",
         "timeout": "El análisis tardó demasiado y se detuvo.",

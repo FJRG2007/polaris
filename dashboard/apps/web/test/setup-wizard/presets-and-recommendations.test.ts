@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { findApp } from "@/lib/apps/catalog";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { NO_LAUNCHER_PREFS, railApps } from "@/lib/app-launcher";
 import {
     recommendApps,
@@ -66,24 +67,14 @@ describe("sidebar presets", () => {
 
 describe("setup recommendations", () => {
     it("maps each use to its apps", () => {
-        expect(recommendApps(["hosting"])).toEqual([
-            "status-pages",
-            "security-scans",
-            "cloud-servers"
-        ]);
+        expect(recommendApps(["hosting"])).toEqual(["status-pages"]);
         expect(recommendApps(["team"])).toEqual(["calendar", "crm"]);
         expect(recommendApps(["games"])).toEqual(["game-servers"]);
-        expect(recommendApps(["homelab"])).toEqual(["security-scans", "home", "tools"]);
+        expect(recommendApps(["homelab"])).toEqual(["home", "tools"]);
     });
 
     it("lists a shared app once, in the setup's order, and nothing for no use", () => {
-        expect(recommendApps(["homelab", "hosting"])).toEqual([
-            "status-pages",
-            "security-scans",
-            "cloud-servers",
-            "home",
-            "tools"
-        ]);
+        expect(recommendApps(["homelab", "hosting"])).toEqual(["status-pages", "home", "tools"]);
         expect(recommendApps([])).toEqual([]);
     });
 
@@ -91,6 +82,8 @@ describe("setup recommendations", () => {
         for (const use of SETUP_USE_CASES)
             for (const app of USE_CASE_APPS[use]) expect(SETUP_APPS).toContain(app);
         for (const id of SETUP_APPS) expect(findApp(id)?.installMethod, id).toBe("builtin");
+        // Parts of Servers on every Polaris are never something to install.
+        for (const id of SETUP_APPS) expect(isNativeApp(id), id).toBe(false);
     });
 });
 

@@ -1,13 +1,13 @@
 /**
- * Cloud servers: one page, `/cloud-servers`. The server hands over the frame
- * and nothing else; the screen reads accounts and servers in the browser,
- * painting what it kept from the last visit first.
+ * Cloud servers: one page, `/apps/servers/cloud`, a section of Servers. The
+ * server hands over the frame and nothing else; the screen reads accounts and
+ * servers in the browser, painting what it kept from the last visit first.
  */
 
 import { PAGE_FILL } from "@polaris/ui";
 import { notFound } from "next/navigation";
-import { requireCloudUser } from "../../../lib/service";
-import { CloudServersScreen } from "../../../screens/cloud-servers-screen";
+import { requireCloudUser } from "../../../../../lib/service";
+import { CloudServersScreen } from "../../../../../screens/cloud-servers-screen";
 
 export const dynamic = "force-dynamic";
 

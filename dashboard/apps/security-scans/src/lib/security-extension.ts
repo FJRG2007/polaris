@@ -1,5 +1,6 @@
 /**
- * Security scans as the dashboard sees it: its screens under `/security`, and
+ * Security scans as the dashboard sees it: its screens under
+ * `/apps/servers/security`, a section of Servers, and
  * one job that starts what is queued or due. Nothing runs between scans; the
  * job only reads a few indexed rows when there is nothing to do.
  */

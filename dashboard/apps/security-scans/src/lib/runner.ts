@@ -93,6 +93,17 @@ export async function runOneShot(
     }
 }
 
+/**
+ * The local daemon, or a failure the screen can put in words when this Polaris
+ * runs without one (the limited edition) - rather than a connection error that
+ * reads as the scan having broken.
+ */
+async function localDaemon(): Promise<HostdClient> {
+    const client = new HostdClient();
+    if (!(await client.health())) throw new ScanFailure("noDaemon");
+    return client;
+}
+
 /** Run a host action on a server: the local daemon's fixed endpoint, or the
  *  same `docker run` over SSH as an argument list quoted word by word. */
 export async function runHostAction(
@@ -100,7 +111,7 @@ export async function runHostAction(
     action: HostAction
 ): Promise<{ exitCode: number; output: string }> {
     if (target.kind === "local" || !target.hostId) {
-        const result = await new HostdClient().hostSecurity(action);
+        const result = await (await localDaemon()).hostSecurity(action);
         if (result === null) throw new ScanFailure("daemonOutdated");
         if (result === "busy" || result === "timeout") throw new ScanFailure(result);
         return result;
@@ -170,7 +181,7 @@ export async function exportImage(
     volume: string
 ): Promise<void> {
     if (target.kind === "local" || !target.hostId) {
-        const result = await new HostdClient().hostImageExport(image, volume);
+        const result = await (await localDaemon()).hostImageExport(image, volume);
         if (result === null) throw new ScanFailure("daemonOutdated");
         if (typeof result === "string") throw new ScanFailure(result);
         return;

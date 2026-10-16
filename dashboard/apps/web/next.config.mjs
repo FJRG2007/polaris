@@ -126,6 +126,20 @@ const nextConfig = {
         { source: "/inbox", destination: "/admin/inbox", permanent: false },
         { source: "/inbox/:path*", destination: "/admin/inbox/:path*", permanent: false },
         { source: "/favorites", destination: "/drive/favorites", permanent: false },
+        // Security scans and Cloud servers were marketplace apps at the top
+        // level; they are sections of Servers now, on every Polaris.
+        { source: "/security", destination: "/apps/servers/security", permanent: false },
+        {
+            source: "/security/:path*",
+            destination: "/apps/servers/security/:path*",
+            permanent: false
+        },
+        { source: "/cloud-servers", destination: "/apps/servers/cloud", permanent: false },
+        {
+            source: "/cloud-servers/:path*",
+            destination: "/apps/servers/cloud/:path*",
+            permanent: false
+        },
         { source: "/trash", destination: "/drive/trash", permanent: false },
         // Screens that moved and used to forward from a page of their own.
         // A page in the signed-in group that only redirects is answered inside

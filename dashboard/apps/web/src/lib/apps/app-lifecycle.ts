@@ -17,6 +17,8 @@
 import { prisma } from "@polaris/db";
 import { POLARIS_APP_CATALOG } from "@/lib/apps/catalog";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
+import { isNativeApp } from "@/lib/apps/native-apps";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { patchInstallConfig, readInstallConfig } from "@/lib/apps/install-config";
 import { deployApplication, removeApplicationDeployment } from "@/lib/deploy-service";
 
@@ -41,6 +43,9 @@ export async function appUninstallRefusal(row: {
     catalogId: string;
     ownerId: string;
 }): Promise<string | null> {
+    // Part of Servers on every Polaris: an install row left from when it was a
+    // marketplace app is not something to remove.
+    if (isNativeApp(row.catalogId)) return (await readerWords("api"))("refusals.apps.native");
     if (row.catalogId !== GAME_SERVERS_APP_ID) return null;
     const servers = await prisma.installedApp.findMany({
         where: {

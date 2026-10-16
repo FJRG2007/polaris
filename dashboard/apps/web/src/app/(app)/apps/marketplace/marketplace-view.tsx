@@ -31,6 +31,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppMark } from "@/components/app-mark";
 import { appProvenance } from "@/lib/apps/provenance";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { Loader2, Search, Trash2 } from "lucide-react";
 import { appInstallInputSchema, NAS_CONNECTION_REQUIRED } from "@/lib/apps/install-schema";
 import { defaultInstallInput } from "@/lib/apps/install-defaults";
@@ -302,6 +303,8 @@ function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
  * manifests have said so all along (`internal`, and `ownedBy` naming the app that
  * creates them); this screen was the one place not reading it.
  *
+ * Nor is a part of every Polaris that used to be installed (`native-apps`).
+ *
  * An install whose manifest is gone entirely is still shown. It is on somebody's
  * server, and hiding it because the catalog no longer describes it is how a
  * container becomes unreachable from the product that started it.
@@ -309,6 +312,9 @@ function sortOffered(apps: readonly AppManifest[]): AppManifest[] {
 function ownInstalls(installed: readonly InstalledAppReaderView[]): InstalledAppReaderView[] {
     return installed.filter((item) => {
         const manifest = findApp(item.catalogId);
+        // A row left from when a part of Servers was installable is not an app
+        // anybody has to manage (see `native-apps`).
+        if (isNativeApp(item.catalogId)) return false;
         return !manifest || !manifest.internal;
     });
 }

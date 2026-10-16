@@ -153,12 +153,6 @@
         },
         "crm": {
             "description": "Empresas, personas y los tratos que llevas"
-        },
-        "security-scans": {
-            "description": "Malware, cambios en archivos, endurecimiento del sistema y vulnerabilidades de imágenes"
-        },
-        "cloud-servers": {
-            "description": "Crea y gestiona servidores en tus proveedores cloud"
         }
     },
     "labels": {

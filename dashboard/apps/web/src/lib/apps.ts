@@ -73,6 +73,7 @@ import {
     Rocket,
     ScanFace,
     ScanLine,
+    ScanSearch,
     Scale,
     ScrollText,
     SendHorizontal,
@@ -414,22 +415,6 @@ export const POLARIS_APPS: AppEntry[] = [
         permission: "office.use"
     },
     {
-        /**
-         * Servers at cloud providers, created, sized, switched and destroyed
-         * from here, each enrolled as a Polaris server as it boots.
-         *
-         * Installable: a Polaris that rents nothing carries no menu entry for it.
-         */
-        id: "cloud-servers",
-        category: "infrastructure",
-        label: "Cloud servers", // i18n-ignore
-        description: "Create and run servers at your cloud providers", // i18n-ignore
-        icon: Cloud,
-        href: "/cloud-servers",
-        permission: "system.manage",
-        requiresApp: "cloud-servers"
-    },
-    {
         id: "watch",
         category: "infrastructure",
         label: "Watch", // i18n-ignore
@@ -437,20 +422,6 @@ export const POLARIS_APPS: AppEntry[] = [
         icon: Activity,
         href: "/watch",
         permission: "deploy.read"
-    },
-    {
-        /**
-         * Malware, file changes, host hardening and image vulnerabilities on
-         * the servers Polaris runs. Installable: no entry until it is.
-         */
-        id: "security-scans",
-        category: "infrastructure",
-        label: "Security scans", // i18n-ignore
-        description: "Malware, file changes, host hardening and image vulnerabilities", // i18n-ignore
-        icon: ShieldCheck,
-        href: "/security",
-        permission: "system.manage",
-        requiresApp: "security-scans"
     },
     {
         id: "admin",
@@ -793,6 +764,46 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Rocket,
             group: MACHINES_GROUP,
             keywords: ["agent", "update", "waves", "canary", "pin", "queue", "offline commands"]
+        },
+        {
+            // Part of Servers on every Polaris (see `native-apps`); the same
+            // permission its screen and every one of its actions asks.
+            label: "Security scans", // i18n-ignore
+            href: "/apps/servers/security",
+            needs: "system.manage",
+            icon: ScanSearch,
+            group: MACHINES_GROUP,
+            keywords: [
+                "security",
+                "malware",
+                "antivirus",
+                "quarantine",
+                "file integrity",
+                "hardening",
+                "vulnerabilities",
+                "cve",
+                "sbom"
+            ]
+        },
+        {
+            label: "Cloud servers", // i18n-ignore
+            href: "/apps/servers/cloud",
+            needs: "system.manage",
+            icon: Cloud,
+            group: MACHINES_GROUP,
+            keywords: [
+                "cloud",
+                "digitalocean",
+                "hetzner",
+                "vultr",
+                "linode",
+                "aws",
+                "azure",
+                "google cloud",
+                "ionos",
+                "vps",
+                "cost"
+            ]
         },
         {
             label: "Runners", // i18n-ignore

@@ -11,7 +11,8 @@
  */
 
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isNativeApp } from "@/lib/apps/native-apps";
 import { findApp } from "@/lib/apps/catalog";
 import { uninstallAccess } from "@/lib/apps/install-access";
 import { requirePermission, sessionCan, type SessionUser } from "@/lib/session";
@@ -34,6 +35,8 @@ export default async function MarketplaceAppPage({
     const app = findApp(appId);
     // A helper another app runs is not offered on its own, here or in the grid.
     if (!app || app.internal) notFound();
+    // Part of Servers on every Polaris: old links to its marketplace page open it.
+    if (isNativeApp(app.id) && app.opensAt) redirect(app.opensAt);
     return (
         <AppDetail appId={app.id}>
             <Suspense fallback={<AppInstallPanelSkeleton />}>

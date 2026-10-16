@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "type": "module",
-    "description": "Security scans: malware, file changes, host hardening and image vulnerabilities on the servers Polaris runs. An installable Polaris app.",
+    "description": "Security scans: malware, file changes, host hardening and image vulnerabilities on the servers Polaris runs. A section of Servers on every Polaris.",
     "polaris": {
         "id": "security-scans",
         "extension": "src/lib/security-extension.ts#securityExtension"
