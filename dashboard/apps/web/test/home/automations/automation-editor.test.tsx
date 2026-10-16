@@ -252,10 +252,12 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor, conditionFor, stepFor, triggerFor } =
-    await import("@polaris-app/places/src/screens/automations/automation-editor");
-const { AutomationsView } =
-    await import("@polaris-app/places/src/screens/automations/automations-view");
+const { AutomationEditor, conditionFor, stepFor, triggerFor } = await import(
+    "@polaris-app/places/src/screens/automations/automation-editor"
+);
+const { AutomationsView } = await import(
+    "@polaris-app/places/src/screens/automations/automations-view"
+);
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -1123,7 +1125,12 @@ describe("the add dialog", () => {
         fireEvent.click(within(dialog).getByRole("button", { name: /^A door opens/ }));
         await painted();
         expect(rowsIn("When")[0]!.textContent).toContain("Fixture door");
-        expect(triggerFor("purpose:unlocked", DEVICES.find((each) => each.id === "door"))).toMatchObject({
+        expect(
+            triggerFor(
+                "purpose:unlocked",
+                DEVICES.find((each) => each.id === "door")
+            )
+        ).toMatchObject({
             kind: "change",
             attribute: "state",
             to: "unlocked"

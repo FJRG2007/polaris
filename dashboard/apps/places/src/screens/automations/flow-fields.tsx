@@ -518,7 +518,9 @@ const UNITS: Readonly<Record<"seconds" | "minutes", readonly Unit[]>> = {
 function unitOf(seconds: number, offered: readonly Unit[]): Unit {
     const fits = [...offered]
         .reverse()
-        .find((unit) => Number.isFinite(seconds) && seconds > 0 && seconds % UNIT_SECONDS[unit] === 0);
+        .find(
+            (unit) => Number.isFinite(seconds) && seconds > 0 && seconds % UNIT_SECONDS[unit] === 0
+        );
     return fits ?? offered[0]!;
 }
 
@@ -558,9 +560,7 @@ export function DurationField({
     const amount = Number.isFinite(seconds) ? seconds / UNIT_SECONDS[unit] : Number.NaN;
     const emit = (next: number, chosen: Unit) =>
         onChange(
-            Number.isFinite(next)
-                ? Math.round((next * UNIT_SECONDS[chosen]) / scale)
-                : Number.NaN
+            Number.isFinite(next) ? Math.round((next * UNIT_SECONDS[chosen]) / scale) : Number.NaN
         );
     return (
         <Field label={label} path={[...path, field]} required={required}>
@@ -578,9 +578,7 @@ export function DurationField({
                         aria-invalid={invalid || undefined}
                         onChange={(event) =>
                             emit(
-                                event.target.value === ""
-                                    ? Number.NaN
-                                    : Number(event.target.value),
+                                event.target.value === "" ? Number.NaN : Number(event.target.value),
                                 unit
                             )
                         }

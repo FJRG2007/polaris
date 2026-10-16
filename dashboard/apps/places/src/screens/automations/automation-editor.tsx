@@ -1809,12 +1809,7 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...condition, is })}
                     />
-                    <HeldFor
-                        node={condition}
-                        path={path}
-                        disabled={disabled}
-                        onChange={onChange}
-                    />
+                    <HeldFor node={condition} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
             {condition.kind === "reading" && (
@@ -1899,12 +1894,7 @@ function ConditionCard({
                             onChange={(upper) => onChange({ ...condition, upper })}
                         />
                     )}
-                    <HeldFor
-                        node={condition}
-                        path={path}
-                        disabled={disabled}
-                        onChange={onChange}
-                    />
+                    <HeldFor node={condition} path={path} disabled={disabled} onChange={onChange} />
                 </>
             )}
             {condition.kind === "time" && (
