@@ -124,7 +124,7 @@ function telegramText(payload: WebhookPayload): string {
     return [payload.title, payload.body, payload.url].filter(Boolean).join("\n\n").slice(0, 4096);
 }
 
-function bodyFor(format: WebhookFormat, payload: WebhookPayload): unknown {
+export function bodyFor(format: WebhookFormat, payload: WebhookPayload): unknown {
     if (format === "discord") return discordBody(payload);
     if (format === "slack") return slackBody(payload);
     if (format === "teams") return teamsBody(payload);

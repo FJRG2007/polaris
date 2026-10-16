@@ -460,6 +460,10 @@
             "label": "Storage moved to a new address",
             "description": "A NAS took a new address on the local network and Polaris found it and follows it. Only reaches administrators."
         },
+        "automationsMessage": {
+            "label": "Message from an automation",
+            "description": "A Notify step in one of your automations sent you a message."
+        },
         "webhookDisabled": {
             "label": "A webhook was switched off",
             "description": "One of your webhooks failed five deliveries in a row, so Polaris stopped sending to it."

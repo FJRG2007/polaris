@@ -14473,6 +14473,8 @@ model Automation {
     maxRuns            Int       @default(10)
     // Runs per ten minutes.
     rateLimit          Int       @default(20)
+    // Whether its HTTP steps may reach private LAN ranges. Off unless an administrator turns it on.
+    allowLocalNetwork  Boolean   @default(false)
     // The app that made it (null for core) and what in that app it belongs to.
     origin             String?
     originRef          String?
