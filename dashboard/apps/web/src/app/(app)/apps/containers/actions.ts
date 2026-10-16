@@ -18,8 +18,10 @@ import {
     HOST_DOCKER_PREFIX,
     LOCAL_DOCKER_CONNECTION_ID
 } from "@/lib/docker-service";
+import * as queue from "@/lib/agent-rollouts/queue";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
+import * as rollouts from "@/lib/agent-rollouts/service";
 
 type ContainersKey = NamespaceKey<"containers">;
 
@@ -39,7 +41,10 @@ const CONTAINERS_PATH = "/apps/containers";
 export async function createDockerConnectionAction(input: unknown): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     const parsed = createDockerConnectionSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await say("errors.invalidConnection")) };
+    if (!parsed.success)
+        return {
+            error: parsed.error.issues[0]?.message ?? (await say("errors.invalidConnection"))
+        };
 
     // Validate connectivity before persisting.
     try {
@@ -76,9 +81,15 @@ export async function deleteDockerConnectionAction(connectionId: string): Promis
     const user = await requirePermission("system.manage");
     // The local host and global Hosts are not stored Docker rows here (Hosts are
     // managed in the Servers app), so there is nothing to remove.
-    if (connectionId === LOCAL_DOCKER_CONNECTION_ID || connectionId.startsWith(HOST_DOCKER_PREFIX)) return;
+    if (connectionId === LOCAL_DOCKER_CONNECTION_ID || connectionId.startsWith(HOST_DOCKER_PREFIX))
+        return;
     await deleteDockerConnection(user.id, connectionId);
-    await recordAudit({ actorId: user.id, action: "docker.connection.delete", targetType: "docker", targetId: connectionId });
+    await recordAudit({
+        actorId: user.id,
+        action: "docker.connection.delete",
+        targetType: "docker",
+        targetId: connectionId
+    });
     revalidatePath(CONTAINERS_PATH);
 }
 
@@ -86,7 +97,7 @@ export async function containerAction(
     connectionId: string,
     containerId: string,
     action: "start" | "stop" | "restart"
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; queued?: boolean }> {
     const user = await requirePermission("system.manage");
     try {
         await withDockerDriver(connectionId, user.id, async (driver) => {
@@ -95,6 +106,10 @@ export async function containerAction(
             else await driver.restart(containerId);
         });
     } catch (caught) {
+        // One of Polaris's own servers that is not answering keeps the command
+        // until it is back, instead of the click being lost.
+        const queued = await queueForLater(connectionId, containerId, action, user.id);
+        if (queued) return { queued: true };
         return { error: await failure(caught, "errors.actionFailed") };
     }
     await recordAudit({
@@ -106,6 +121,36 @@ export async function containerAction(
     });
     revalidatePath(CONTAINERS_PATH);
     return {};
+}
+
+async function queueForLater(
+    connectionId: string,
+    containerId: string,
+    action: "start" | "stop" | "restart",
+    actorId: string
+): Promise<boolean> {
+    const serverId = rollouts.serverOfConnection(connectionId);
+    const command = queue.commandSchema.safeParse({
+        kind: `container.${action}`,
+        container: containerId
+    });
+    if (!serverId || !command.success) return false;
+    try {
+        if (!(await rollouts.queueIfOffline(serverId, command.data, actorId))) return false;
+    } catch (error) {
+        // A full queue or a vanished server: the original failure is the answer.
+        if (!(error instanceof rollouts.RolloutRefusal))
+            console.error("polaris: queueing a container action failed:", error);
+        return false;
+    }
+    await recordAudit({
+        actorId,
+        action: "server.command.queue",
+        targetType: "server",
+        targetId: serverId,
+        metadata: { kind: command.data.kind, container: containerId }
+    });
+    return true;
 }
 
 /**
@@ -121,7 +166,9 @@ export async function removeContainerAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("system.manage");
     try {
-        await withDockerDriver(connectionId, user.id, (driver) => driver.remove(containerId, options));
+        await withDockerDriver(connectionId, user.id, (driver) =>
+            driver.remove(containerId, options)
+        );
     } catch (caught) {
         return { error: await failure(caught, "errors.removeFailed") };
     }

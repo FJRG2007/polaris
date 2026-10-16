@@ -187,5 +187,9 @@
     },
     "page": {
         "description": "Vigila y gestiona Docker en tus hosts: uso, estado y ciclo de vida."
+    },
+    "queued": {
+        "title": "Esperando al servidor",
+        "body": "El servidor no responde. Se enviará en cuanto vuelva; puedes cancelarlo desde Despliegues."
     }
 }

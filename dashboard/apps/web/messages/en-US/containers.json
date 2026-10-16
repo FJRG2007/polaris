@@ -187,5 +187,9 @@
     },
     "page": {
         "description": "Monitor and manage Docker across your hosts - usage, state, and lifecycle."
+    },
+    "queued": {
+        "title": "Waiting for the server",
+        "body": "The server is not answering. This goes out as soon as it is back; you can cancel it from Rollouts."
     }
 }

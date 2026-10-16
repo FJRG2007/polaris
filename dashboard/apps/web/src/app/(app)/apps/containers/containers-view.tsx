@@ -31,7 +31,7 @@ import {
     type SortDirection
 } from "@/lib/watch/card-order";
 import { DockerConnectionDialog } from "./docker-connection-dialog";
-import { Badge, Button, Card, CardBody, Skeleton, cn } from "@polaris/ui";
+import { Badge, Button, Card, CardBody, Skeleton, cn, useToast } from "@polaris/ui";
 import { containerAction, deleteDockerConnectionAction, removeContainerAction } from "./actions";
 import {
     useCallback,
@@ -102,6 +102,7 @@ export function ContainersView({
         (connection) => connection.id === connectionId && connection.local
     );
     const [pending, startTransition] = useTransition();
+    const toast = useToast();
     const [live, setLive] = useState(true);
     const [confirm, confirmDialog] = useConfirm();
     // Containers whose removal is in flight. They are already off the table - the
@@ -193,6 +194,7 @@ export function ContainersView({
         startTransition(async () => {
             const result = await containerAction(connectionId!, containerId, action);
             if (result.error) setActionError(result.error);
+            if (result.queued) toast.show({ title: t("queued.title"), body: t("queued.body") });
             refresh();
         });
     }
@@ -270,7 +272,7 @@ export function ContainersView({
             ? t("live.firstReading")
             : usageAge > STALE_AFTER_MS
               ? t("live.aged", { age: formatAge(usageAge) })
-              : t("live.refreshing")
+              : t("live.refreshing");
 
     /** A container's own page, on the host it was listed from. Named rather than
      *  identified: it is what Docker calls it, what every call here accepts in
@@ -284,7 +286,9 @@ export function ContainersView({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_1fr]">
             <aside className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium text-muted-foreground">{t("hosts.title")}</h2>
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                        {t("hosts.title")}
+                    </h2>
                     <DockerConnectionDialog sshEnabled={sshEnabled} />
                 </div>
                 <nav className="flex flex-col gap-1">
@@ -298,7 +302,9 @@ export function ContainersView({
                                     // would only spend its connect timeout to say so.
                                     <span
                                         aria-disabled="true"
-                                        title={t("hosts.notAnswering", { reason: downReason(connection) ?? "" })}
+                                        title={t("hosts.notAnswering", {
+                                            reason: downReason(connection) ?? ""
+                                        })}
                                         className={cn(
                                             "flex flex-1 cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground",
                                             connection.id === connectionId && "bg-muted font-medium"
@@ -321,7 +327,9 @@ export function ContainersView({
                                             {connection.name}
                                         </span>
                                         <Badge variant="neutral">
-                                            {connection.local ? t("hosts.local") : connection.transport}
+                                            {connection.local
+                                                ? t("hosts.local")
+                                                : connection.transport}
                                         </Badge>
                                     </Link>
                                 )}
@@ -330,7 +338,9 @@ export function ContainersView({
                                         size="icon"
                                         variant="ghost"
                                         onClick={() => onDeleteConnection(connection.id)}
-                                        aria-label={t("hosts.removeNamed", { name: connection.name })}
+                                        aria-label={t("hosts.removeNamed", {
+                                            name: connection.name
+                                        })}
                                         title={t("hosts.removeNamed", { name: connection.name })}
                                         className="md:opacity-0 md:group-hover:opacity-100"
                                     >
@@ -355,13 +365,17 @@ export function ContainersView({
                             <dd className="font-mono">
                                 {localDiagnostic.hostdPresent
                                     ? localDiagnostic.hostdVersion
-                                        ? t("local.presentVersion", { version: localDiagnostic.hostdVersion })
+                                        ? t("local.presentVersion", {
+                                              version: localDiagnostic.hostdVersion
+                                          })
                                         : t("local.present")
                                     : t("local.notDetected")}
                             </dd>
                             <dt>{t("local.socket")}</dt>
                             <dd className="font-mono">
-                                {localDiagnostic.dockerReported ? t("local.reported") : t("local.notReported")}
+                                {localDiagnostic.dockerReported
+                                    ? t("local.reported")
+                                    : t("local.notReported")}
                             </dd>
                         </dl>
                     </div>
@@ -580,7 +594,9 @@ export function ContainersView({
                                                                 {container.state === "running" ? (
                                                                     <>
                                                                         <IconButton
-                                                                            label={t("actions.restart")}
+                                                                            label={t(
+                                                                                "actions.restart"
+                                                                            )}
                                                                             onClick={() =>
                                                                                 onAction(
                                                                                     container.id,
@@ -592,7 +608,9 @@ export function ContainersView({
                                                                             <RotateCw className="size-4" />
                                                                         </IconButton>
                                                                         <IconButton
-                                                                            label={t("actions.stop")}
+                                                                            label={t(
+                                                                                "actions.stop"
+                                                                            )}
                                                                             onClick={() =>
                                                                                 onAction(
                                                                                     container.id,

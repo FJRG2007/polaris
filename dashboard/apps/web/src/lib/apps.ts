@@ -787,6 +787,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["anomalies", "unusual", "forecast", "disk full", "capacity", "trend"]
         },
         {
+            label: "Rollouts", // i18n-ignore
+            href: "/apps/servers/rollouts",
+            needs: "system.manage",
+            icon: Rocket,
+            group: MACHINES_GROUP,
+            keywords: ["agent", "update", "waves", "canary", "pin", "queue", "offline commands"]
+        },
+        {
             label: "Runners", // i18n-ignore
             href: "/apps/runners",
             needs: "system.manage",
