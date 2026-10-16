@@ -1387,7 +1387,12 @@ function TriggerCard({
                                               value: Number.NaN,
                                               ...(choice.figure ? { measure: choice.figure } : {})
                                           }
-                                        : { ...trigger, attribute: choice.attribute, from: "", to: "" }
+                                        : {
+                                              ...trigger,
+                                              attribute: choice.attribute,
+                                              from: "",
+                                              to: ""
+                                          }
                                 )
                             }
                         />
@@ -1499,7 +1504,9 @@ function TriggerCard({
                                     return;
                                 }
                                 const { measure: _was, ...rest } = trigger;
-                                onChange(choice.figure ? { ...rest, measure: choice.figure } : rest);
+                                onChange(
+                                    choice.figure ? { ...rest, measure: choice.figure } : rest
+                                );
                             }}
                         />
                     )}
@@ -1833,7 +1840,9 @@ function ConditionCard({
                                     return;
                                 }
                                 const { measure: _was, ...rest } = condition;
-                                onChange(choice.figure ? { ...rest, measure: choice.figure } : rest);
+                                onChange(
+                                    choice.figure ? { ...rest, measure: choice.figure } : rest
+                                );
                             }}
                         />
                     )}

@@ -223,11 +223,11 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
                 ? CLIMATE_SAVED
                 : id === "auto-mode"
                   ? MODE_SAVED
-                : id === "auto-air"
-                  ? AIR_SAVED
-                  : id
-                    ? SAVED
-                    : undefined,
+                  : id === "auto-air"
+                    ? AIR_SAVED
+                    : id
+                      ? SAVED
+                      : undefined,
         runs: id ? RUNS : [],
         context: {
             placeId: "place-1",
@@ -252,12 +252,10 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
     addAutoOffAction: async () => ({})
 }));
 
-const { AutomationEditor, conditionFor, stepFor, triggerFor } = await import(
-    "@polaris-app/places/src/screens/automations/automation-editor"
-);
-const { AutomationsView } = await import(
-    "@polaris-app/places/src/screens/automations/automations-view"
-);
+const { AutomationEditor, conditionFor, stepFor, triggerFor } =
+    await import("@polaris-app/places/src/screens/automations/automation-editor");
+const { AutomationsView } =
+    await import("@polaris-app/places/src/screens/automations/automations-view");
 
 async function painted(): Promise<void> {
     await act(async () => {
@@ -613,9 +611,7 @@ describe("what a block watches on a device", () => {
         await painted();
         openRow("When");
         expect(
-            screen.getByText(
-                "It is Cool now, so this starts it the next time it changes to Cool."
-            )
+            screen.getByText("It is Cool now, so this starts it the next time it changes to Cool.")
         ).toBeDefined();
     });
 
