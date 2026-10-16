@@ -38,10 +38,15 @@ export type TunnelRefusalCode =
     | "full"
     | "noAddress"
     | "unreachable"
-    | "edge";
+    | "edge"
+    | "leftover";
 
 export class TunnelRefusal extends Error {
-    public constructor(public readonly code: TunnelRefusalCode) {
+    public constructor(
+        public readonly code: TunnelRefusalCode,
+        /** Values for the sentence, such as the servers an end is still left on. */
+        public readonly params: Record<string, string> = {}
+    ) {
         super(code);
         this.name = "TunnelRefusal";
     }
@@ -216,29 +221,52 @@ export async function createTunnel(
     try {
         await bringUp(ownerId, created.id);
     } catch (error) {
-        // Half a tunnel is worse than none: take back what started and the row.
+        // Half a tunnel is worse than none: take back what started and the row. A
+        // server that cannot be reached keeps the row, paused, so it can be removed
+        // once it is back.
         await removeTunnel(ownerId, created.id).catch(() => undefined);
         throw error;
     }
     return created;
 }
 
-/** Stop both ends and take the hostname off the edge, keeping keys and settings. */
+/**
+ * Stop both ends and take the hostname off the edge, keeping keys and settings.
+ * A server that cannot be reached keeps its end running; the tunnel is still
+ * recorded as paused and the refusal names that server.
+ */
 export async function setTunnelPaused(ownerId: string, id: string, paused: boolean): Promise<void> {
-    const row = await prisma.wireguardTunnel.findFirst({ where: { id, ownerId }, select: { id: true, paused: true } });
-    if (!row) throw new TunnelRefusal("notFound");
+    const row = await loadTunnel(ownerId, id);
     if (row.paused === paused) return;
     await prisma.wireguardTunnel.update({ where: { id }, data: { paused } });
-    if (paused) await takeDown(ownerId, id);
-    else await bringUp(ownerId, id);
+    if (paused) {
+        refuseLeftovers(await takeDown(ownerId, id, row));
+        return;
+    }
+    try {
+        await bringUp(ownerId, id);
+    } catch (error) {
+        // A resume that did not finish is a paused tunnel, not a half-running one.
+        await prisma.wireguardTunnel.update({ where: { id }, data: { paused: true } });
+        await takeDown(ownerId, id, row).catch(() => undefined);
+        throw error;
+    }
 }
 
-/** Remove both ends, the route and the row. */
+/**
+ * Remove both ends, the route and the row. The row goes only once nothing is left
+ * anywhere: while a server is unreachable the tunnel stays, paused, and the
+ * refusal names what is still there, so removing it again finishes the job.
+ */
 export async function removeTunnel(ownerId: string, id: string): Promise<void> {
     const row = await loadTunnel(ownerId, id);
-    await takeDown(ownerId, id, row);
+    if (!row.paused) await prisma.wireguardTunnel.update({ where: { id }, data: { paused: true } });
+    refuseLeftovers(await takeDown(ownerId, id, row));
     await prisma.wireguardTunnel.deleteMany({ where: { id, ownerId } });
-    await publishRoutes(ownerId, row.publicTarget);
+}
+
+function refuseLeftovers(left: readonly string[]): void {
+    if (left.length > 0) throw new TunnelRefusal("leftover", { servers: [...new Set(left)].join(", ") });
 }
 
 /** Read the live state from whichever end answers, the public one first. */
@@ -358,23 +386,59 @@ async function up(target: TunnelRow["application"]["target"], ownerId: string, i
     }
 }
 
-/** Stop both ends (best effort each, so one unreachable server never strands the
- *  other) and drop the route. */
-async function takeDown(ownerId: string, id: string, loaded?: TunnelRow): Promise<void> {
-    const row = loaded ?? (await loadTunnel(ownerId, id));
+/**
+ * Stop both ends and rewrite the public edge's routes from the database (the
+ * caller has already marked the tunnel paused, so its hostname drops out). Each
+ * step is tried on its own, so one unreachable server never strands the other.
+ * Returns the names of the servers where something could not be cleaned up.
+ */
+async function takeDown(ownerId: string, id: string, row: TunnelRow): Promise<string[]> {
+    const left: string[] = [];
     for (const [target, end] of [
         [row.publicTarget, "public"],
         [row.application.target, "nat"]
     ] as const) {
         const ports = await getPorts(target, ownerId).catch(() => null);
-        if (!ports) continue;
+        if (!ports) {
+            left.push(target.name);
+            continue;
+        }
         try {
-            await ports.composeDown(wg.endNames(id, end).project).catch(() => undefined);
+            await ports.composeDown(wg.endNames(id, end).project);
+        } catch (error) {
+            // An end that never started has nothing to take down, and the engine
+            // says so as a failure. Only a container that is still there is left.
+            if (!(await endGone(ports, id, end))) {
+                console.error(`[tunnels] stopping the ${end} end failed`, error);
+                left.push(target.name);
+            }
         } finally {
             await ports.dispose();
         }
     }
-    if (!loaded) await publishRoutes(ownerId, row.publicTarget);
+    try {
+        await publishRoutes(ownerId, row.publicTarget);
+    } catch (error) {
+        console.error("[tunnels] rewriting the edge routes failed", error);
+        left.push(row.publicTarget.name);
+    }
+    return left;
+}
+
+/** Whether neither container of one end exists on its server any more. */
+async function endGone(ports: Awaited<ReturnType<typeof getPorts>>, id: string, end: "public" | "nat"): Promise<boolean> {
+    const names = wg.endNames(id, end);
+    for (const name of [names.helper, names.wireguard]) {
+        // Only the engine's "no such container" counts as gone - a 404 from the
+        // daemon, or `docker inspect` exiting 1 over SSH. Any other failure to ask
+        // means it may well still be there.
+        const missing = await ports.inspect(name).then(
+            () => false,
+            (error: unknown) => /\(404\)|exited with code 1$|no such (object|container)/i.test(String(error))
+        );
+        if (!missing) return false;
+    }
+    return true;
 }
 
 /** Rewrite the tunnel routes file on one public server's edge from the database. */

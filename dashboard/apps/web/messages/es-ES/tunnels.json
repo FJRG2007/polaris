@@ -79,6 +79,7 @@
         "noAddress": "Aún no se conoce la dirección pública de ese servidor.",
         "unreachable": "Ahora mismo no se puede llegar a ese servidor.",
         "edge": "El borde de ese servidor aún no acepta rutas de Polaris. Vuelve a prepararlo desde Servidores.",
+        "leftover": "El túnel está en pausa, pero no se pudo limpiar {servers}. Quítalo otra vez cuando vuelva.",
         "generic": "No se pudo cambiar el túnel. Inténtalo de nuevo en un momento."
     }
 }

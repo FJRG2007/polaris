@@ -79,6 +79,7 @@
         "noAddress": "The public address of that server is not known yet.",
         "unreachable": "That server cannot be reached right now.",
         "edge": "That server's edge does not take routes from Polaris yet. Set it up again from Servers.",
+        "leftover": "The tunnel is paused, but {servers} could not be cleaned up. Remove it again once it is back.",
         "generic": "The tunnel could not be changed. Try again in a moment."
     }
 }

@@ -33,7 +33,7 @@ type Reply = { error?: string };
 /** What went wrong, in the reader's words. */
 async function failure(caught: unknown, where: string): Promise<string> {
     const t = await getTranslations("tunnels");
-    if (caught instanceof tunnels.TunnelRefusal) return t(`refusals.${caught.code}`);
+    if (caught instanceof tunnels.TunnelRefusal) return t(`refusals.${caught.code}`, caught.params);
     console.error(`[tunnels] ${where} failed`, caught);
     return t("refusals.generic");
 }

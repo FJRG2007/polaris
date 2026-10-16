@@ -11,7 +11,7 @@
 import { formatBytes } from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { TunnelDialog } from "./tunnel-dialog";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Network, Pause, Play, RefreshCw, Trash2 } from "lucide-react";
@@ -78,12 +78,22 @@ function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boo
 
     useEffect(() => setPaused(tunnel.paused), [tunnel.paused]);
 
+    // One read at a time: a server that is slow to answer must not pile up reads.
+    const reading = useRef(false);
     const load = useCallback(async () => {
-        const reply = await tunnelStatusAction({ id: tunnel.id });
-        if (reply.status) {
-            setStatus(reply.status);
-            setStatusError(false);
-        } else setStatusError(true);
+        if (reading.current) return;
+        reading.current = true;
+        try {
+            const reply = await tunnelStatusAction({ id: tunnel.id });
+            if (reply.status) {
+                setStatus(reply.status);
+                setStatusError(false);
+            } else setStatusError(true);
+        } catch {
+            setStatusError(true);
+        } finally {
+            reading.current = false;
+        }
     }, [tunnel.id]);
 
     useEffect(() => {
@@ -109,6 +119,8 @@ function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boo
         if (reply.error) {
             setPaused(!next);
             toast.show({ title: reply.error });
+            // A pause that stopped one end and not the other is still recorded.
+            router.refresh();
             return;
         }
         setStatus(null);
@@ -122,6 +134,8 @@ function TunnelCard({ tunnel, onHide }: { tunnel: TunnelView; onHide: (gone: boo
         if (reply.error) {
             onHide(false);
             toast.show({ title: reply.error });
+            // A removal that could not reach a server leaves the tunnel, paused.
+            router.refresh();
             return;
         }
         router.refresh();

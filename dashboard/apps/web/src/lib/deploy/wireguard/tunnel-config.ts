@@ -237,7 +237,8 @@ export function endSpec(input: EndSpecInput): ComposeSpec {
         // The WireGuard image runs as the distroless nonroot user.
         "chown 65532:65532 /etc/wireproxy/config",
         "chmod 0400 /etc/wireproxy/config",
-        "trap 'exit 0' TERM INT",
+        // The file holds a private key: it does not outlive the tunnel's containers.
+        "trap 'rm -f /etc/wireproxy/config; exit 0' TERM INT",
         "while :; do sleep 3600 & wait $!; done"
     ].join("; ");
     return {
