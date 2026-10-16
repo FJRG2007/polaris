@@ -1725,3 +1725,544 @@ describe("a condition held for a while", () => {
         expect(await press("press-1")).toBe("skipped");
     });
 });
+
+describe("a device that stops answering", () => {
+    function silence(id: string, extra: Partial<auto.Trigger> = {}) {
+        automation("silent", {
+            triggers: [
+                {
+                    id: "trigsilent",
+                    kind: "change",
+                    deviceId: id,
+                    attribute: "online",
+                    from: "",
+                    to: "offline",
+                    ...extra
+                } as auto.Trigger
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "gone quiet" }]
+        });
+    }
+
+    it("is a change of its own, fired once", async () => {
+        silence("plug");
+        await reads(readout("plug", "outlet", "on"));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        expect(store.runsOf("silent")).toHaveLength(1);
+        expect(store.runsOf("silent")[0]?.cause).toMatchObject({
+            attribute: "online",
+            from: "online",
+            to: "offline"
+        });
+    });
+
+    it("keeps its last state while silent, and fires nothing it says on the way back", async () => {
+        automation("door", {
+            triggers: [
+                {
+                    id: "trigopen",
+                    kind: "change",
+                    deviceId: "lock",
+                    attribute: "door",
+                    from: "",
+                    to: "open"
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "opened" }]
+        });
+        await reads(readout("lock", "lock", "locked", { door: "closed" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "unknown", online: false }));
+        expect((await store.observation("lock"))?.door).toBe("closed");
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "open" }));
+        expect(store.runsOf("door")).toHaveLength(0);
+        expect((await store.observation("lock"))?.door).toBe("open");
+        // From there on, a change is a change again.
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "closed" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { door: "open" }));
+        expect(store.runsOf("door")).toHaveLength(1);
+    });
+
+    it("fires its return to whatever waits for it", async () => {
+        silence("plug", { to: "online" });
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on"));
+        expect(store.runsOf("silent")).toHaveLength(1);
+    });
+
+    it("counts a row kept before this was as answering", async () => {
+        silence("plug");
+        await reads(readout("plug", "outlet", "on"));
+        const seen = await store.observation("plug");
+        const { online: _online, onlineSince: _since, ...older } = seen!;
+        store.observations.set("plug", older);
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        expect(store.runsOf("silent")).toHaveLength(1);
+    });
+
+    it("can be a condition, which silence passes rather than fails", async () => {
+        automation("check", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "device",
+                                deviceId: "plug",
+                                attribute: "online",
+                                is: "offline",
+                                negate: false
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "still quiet" }]
+        });
+        devices.set("plug", readout("plug", "outlet", "on", { online: false }));
+        await engine.runNow(store.automations.get("check")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(notified).toEqual(["still quiet"]);
+        devices.set("plug", readout("plug", "outlet", "on"));
+        await engine.runNow(store.automations.get("check")!, "Fixture person", "press-2");
+        await engine.drain();
+        expect(store.runsOf("check").map((run) => run.status)).toContain("skipped");
+    });
+
+    it("can have to stay silent for a while", async () => {
+        automation("long", {
+            triggers: [
+                {
+                    id: "trigstays",
+                    kind: "stays",
+                    deviceId: "plug",
+                    attribute: "online",
+                    is: "offline",
+                    minutes: 10
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "down a while" }]
+        });
+        await reads(readout("plug", "outlet", "on"));
+        later(MINUTE);
+        await reads(readout("plug", "outlet", "on", { online: false }));
+        later(9 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("long")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("long")).toHaveLength(1);
+    });
+});
+
+describe("a battery running low", () => {
+    beforeEach(() => {
+        automation("battery", {
+            triggers: [
+                {
+                    id: "trigbattery",
+                    kind: "change",
+                    deviceId: "lock",
+                    attribute: "battery",
+                    from: "",
+                    to: "low"
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "battery low" }]
+        });
+    });
+
+    it("fires once when it turns low, and not on the first sight of one already low", async () => {
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        expect(store.runsOf("battery")).toHaveLength(0);
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { battery: "ok" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        expect(store.runsOf("battery")).toHaveLength(1);
+    });
+
+    it("learns a battery first reported later without calling it a change", async () => {
+        await reads(readout("lock", "lock", "locked"));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked", { battery: "low" }));
+        expect(store.runsOf("battery")).toHaveLength(0);
+        expect((await store.observation("lock"))?.battery).toBe("low");
+    });
+
+    it("keeps its last word when the battery stops being reported", async () => {
+        await reads(readout("lock", "lock", "locked", { battery: "ok" }));
+        later(MINUTE);
+        await reads(readout("lock", "lock", "locked"));
+        expect((await store.observation("lock"))?.battery).toBe("ok");
+    });
+});
+
+describe("a set of devices", () => {
+    const LAMPS = ["lamp1", "lamp2", "lamp3"];
+
+    function onAny(behaviour?: auto.Behaviour, extra: Record<string, unknown> = {}) {
+        automation("set", {
+            triggers: [
+                {
+                    id: "trigset",
+                    kind: "change",
+                    deviceId: "lamp1",
+                    targets: LAMPS.map((id) => ({ kind: "device" as const, id })),
+                    ...(behaviour ? { behaviour } : {}),
+                    attribute: "state",
+                    from: "",
+                    to: "on",
+                    ...extra
+                } as auto.Trigger
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "set" }]
+        });
+    }
+
+    async function allOff() {
+        for (const id of LAMPS) await reads(readout(id, "light", "off"));
+        later(MINUTE);
+    }
+
+    it("fires for each of them by default, each change once", async () => {
+        onAny();
+        await allOff();
+        await reads(readout("lamp1", "light", "on"));
+        await reads(readout("lamp2", "light", "on"));
+        await reads(readout("lamp2", "light", "on"));
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp1", "lamp2"]);
+    });
+
+    it("fires for the first of them only, and again once all were off", async () => {
+        onAny("first");
+        await allOff();
+        await reads(readout("lamp2", "light", "on"));
+        await reads(readout("lamp3", "light", "on"));
+        expect(store.runsOf("set")).toHaveLength(1);
+        later(MINUTE);
+        await allOff();
+        await reads(readout("lamp1", "light", "on"));
+        expect(store.runsOf("set")).toHaveLength(2);
+    });
+
+    it("fires for all of them once the last gets there, leaving out one not answering", async () => {
+        onAny("all");
+        await allOff();
+        await reads(readout("lamp3", "light", "off", { online: false }));
+        await reads(readout("lamp1", "light", "on"));
+        expect(store.runsOf("set")).toHaveLength(0);
+        await reads(readout("lamp2", "light", "on"));
+        expect(store.runsOf("set")).toHaveLength(1);
+    });
+
+    it("waits for all of them to have lasted, counted from the last", async () => {
+        onAny("all", { forMinutes: 5 });
+        await allOff();
+        for (const id of LAMPS) {
+            await reads(readout(id, "light", "on"));
+            later(2 * MINUTE);
+        }
+        // The last came on two minutes ago.
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set")).toHaveLength(0);
+        later(3 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set")).toHaveLength(1);
+        expect(store.runsOf("set")[0]?.cause.deviceId).toBe("lamp3");
+    });
+
+    it("does not count one gone quiet towards all of them having lasted", async () => {
+        onAny("all", { forMinutes: 5 });
+        await allOff();
+        await reads(readout("lamp1", "light", "on"));
+        await reads(readout("lamp2", "light", "on"));
+        later(MINUTE);
+        await reads(readout("lamp1", "light", "on", { online: false }));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set")).toHaveLength(0);
+    });
+
+    function quietSet(behaviour: auto.Behaviour, extra: Record<string, unknown> = {}) {
+        onAny(behaviour, { attribute: "online", to: "offline", ...extra });
+    }
+
+    it("fires for the first of them to go quiet only", async () => {
+        quietSet("first");
+        await allOff();
+        await reads(readout("lamp1", "light", "off", { online: false }));
+        await reads(readout("lamp2", "light", "off", { online: false }));
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp1"]);
+    });
+
+    it("fires for all of them gone quiet only once the last has", async () => {
+        quietSet("all");
+        await allOff();
+        await reads(readout("lamp1", "light", "off", { online: false }));
+        await reads(readout("lamp2", "light", "off", { online: false }));
+        expect(store.runsOf("set")).toHaveLength(0);
+        await reads(readout("lamp3", "light", "off", { online: false }));
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp3"]);
+    });
+
+    it("waits for all of them to have been quiet for long enough", async () => {
+        quietSet("all", { forMinutes: 5 });
+        await allOff();
+        await reads(readout("lamp1", "light", "off", { online: false }));
+        await reads(readout("lamp2", "light", "off", { online: false }));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set")).toHaveLength(0);
+        await reads(readout("lamp3", "light", "off", { online: false }));
+        later(5 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("set").map((run) => run.cause.deviceId)).toEqual(["lamp3"]);
+    });
+
+    it("keeps a single device's firing named as it always was", async () => {
+        automation("one", {
+            triggers: [
+                {
+                    id: "trigone",
+                    kind: "change",
+                    deviceId: "lamp1",
+                    attribute: "state",
+                    from: "",
+                    to: "on"
+                }
+            ],
+            actions: []
+        });
+        await allOff();
+        await reads(readout("lamp1", "light", "on"));
+        expect(store.runsOf("one")[0]?.firingKey).toMatch(/^change:trigone:state:\d+$/);
+    });
+
+    function setCondition(quantifier?: auto.Quantifier) {
+        automation("cond", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "device",
+                                deviceId: "lamp1",
+                                targets: LAMPS.map((id) => ({ kind: "device" as const, id })),
+                                ...(quantifier ? { quantifier } : {}),
+                                attribute: "state",
+                                is: "on",
+                                negate: false
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "passed" }]
+        });
+    }
+
+    async function passes(): Promise<boolean> {
+        notified = [];
+        await engine.runNow(
+            store.automations.get("cond")!,
+            "Fixture person",
+            `press-${now.getTime()}`
+        );
+        await engine.drain();
+        later(MINUTE);
+        return notified.length === 1;
+    }
+
+    it("passes a condition when any of them is, or only when all are", async () => {
+        setCondition();
+        devices.set("lamp1", readout("lamp1", "light", "off"));
+        devices.set("lamp2", readout("lamp2", "light", "on"));
+        devices.set("lamp3", readout("lamp3", "light", "off"));
+        expect(await passes()).toBe(true);
+        setCondition("all");
+        expect(await passes()).toBe(false);
+        devices.set("lamp1", readout("lamp1", "light", "on"));
+        devices.set("lamp3", readout("lamp3", "light", "on", { online: false }));
+        expect(await passes()).toBe(true);
+    });
+
+    it("fails any and passes all when none of them answers", async () => {
+        for (const id of LAMPS) devices.set(id, readout(id, "light", "on", { online: false }));
+        setCondition("any");
+        expect(await passes()).toBe(false);
+        setCondition("all");
+        expect(await passes()).toBe(true);
+    });
+
+    const SENSORS = ["temp1", "temp2"];
+    const sensor = (id: string, reading: string) => readout(id, "sensor", "unknown", { reading });
+
+    function hotSet(behaviour: auto.Behaviour) {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp1",
+                    targets: SENSORS.map((id) => ({ kind: "device" as const, id })),
+                    behaviour,
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+    }
+
+    async function allCool() {
+        for (const id of SENSORS) await reads(sensor(id, "20"));
+        later(MINUTE);
+    }
+
+    it("fires a crossing held on any of them, once it lasted, from the device that held it", async () => {
+        hotSet("each");
+        await allCool();
+        await reads(sensor("temp2", "26"));
+        later(MINUTE);
+        await reads(sensor("temp2", "27"));
+        // Every device of the set has its line kept, not only the block's first.
+        expect(store.observations.get("temp2")?.held).toEqual({
+            reading: { "gt:25": { since: expect.any(Date), from: "20" } }
+        });
+        expect(store.observations.get("temp1")?.held ?? {}).toEqual({});
+        later(3 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause).toMatchObject({
+            kind: "threshold",
+            deviceId: "temp2",
+            from: "20",
+            to: "27",
+            minutes: 5
+        });
+    });
+
+    it("fires a crossing held on all of them once the last has lasted", async () => {
+        hotSet("all");
+        await allCool();
+        await reads(sensor("temp1", "26"));
+        later(2 * MINUTE);
+        await reads(sensor("temp2", "26"));
+        for (const id of SENSORS) {
+            expect(store.observations.get(id)?.held).toEqual({
+                reading: { "gt:25": { since: expect.any(Date), from: "20" } }
+            });
+        }
+        // The first has lasted, the last only three minutes.
+        later(3 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(2 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause.deviceId).toBe("temp2");
+    });
+
+    it("does not fire a crossing on all of them while one of them never crossed", async () => {
+        hotSet("all");
+        await allCool();
+        await reads(sensor("temp1", "26"));
+        later(MINUTE);
+        await reads(sensor("temp2", "24"));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+    });
+
+    function warmCondition(quantifier: auto.Quantifier) {
+        automation("warm", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp1",
+                                targets: SENSORS.map((id) => ({ kind: "device" as const, id })),
+                                quantifier,
+                                op: "gt",
+                                value: 25,
+                                forMinutes: 10
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "warm" }]
+        });
+    }
+
+    async function warmPasses(): Promise<boolean> {
+        notified = [];
+        await engine.runNow(
+            store.automations.get("warm")!,
+            "Fixture person",
+            `press-${now.getTime()}`
+        );
+        await engine.drain();
+        return notified.length === 1;
+    }
+
+    it("holds a reading condition on any of them once one has been over for long enough", async () => {
+        warmCondition("any");
+        await allCool();
+        await reads(sensor("temp2", "26"));
+        // Still over, but moved: counted from the crossing, not the last value.
+        later(5 * MINUTE);
+        await reads(sensor("temp2", "27"));
+        later(4 * MINUTE);
+        expect(await warmPasses()).toBe(false);
+        later(MINUTE);
+        expect(await warmPasses()).toBe(true);
+    });
+
+    it("holds a reading condition on all of them only once each has been over for long enough", async () => {
+        warmCondition("all");
+        await allCool();
+        await reads(sensor("temp1", "26"));
+        later(5 * MINUTE);
+        await reads(sensor("temp2", "26"));
+        later(2 * MINUTE);
+        await reads(sensor("temp2", "27"));
+        later(3 * MINUTE);
+        // temp1 has lasted, temp2 only five minutes.
+        expect(await warmPasses()).toBe(false);
+        later(5 * MINUTE);
+        expect(await warmPasses()).toBe(true);
+        await reads(sensor("temp1", "24"));
+        expect(await warmPasses()).toBe(false);
+    });
+});

@@ -651,7 +651,9 @@
         "macNotFound": "Nada en esta red responde como {mac}. Comprueba que el dispositivo está encendido y en la misma red que Polaris, o escribe su IP.",
         "brokerQuiet": "El broker local se instaló, pero aún no tiene dirección en esta red",
         "notNuki": "Solo una cuenta de Nuki se puede vincular en local",
-        "noLocalLink": "Esta cuenta de Nuki no tiene enlace local"
+        "noLocalLink": "Esta cuenta de Nuki no tiene enlace local",
+        "roomGone": "Sala inexistente",
+        "roomElsewhere": "Esa sala es de otro sitio"
     },
     "connections": {
         "nuki-web": {
@@ -1695,7 +1697,16 @@
         "noPlace": "Sin decidir",
         "operate": "Manejar desde Polaris",
         "operateHint": "Desactivado conserva el estado y el historial y quita los botones.",
-        "saving": "Guardando"
+        "saving": "Guardando",
+        "room": "Sala",
+        "noRoom": "Sin sala",
+        "newRoom": "Nueva sala",
+        "loadingRooms": "Cargando salas",
+        "roomHint": "Las automatizaciones pueden elegir dispositivos por su sala.",
+        "roomName": "Nombre",
+        "roomNamePlaceholder": "Cocina",
+        "floor": "Planta",
+        "floorPlaceholder": "Planta baja"
     },
     "connect": {
         "reconnectTitle": "Reconectar {name}",
@@ -1816,7 +1827,9 @@
             "filter": "Sus filtros",
             "temperature": "Su temperatura",
             "figure": "Lectura: {measure}",
-            "number": "Su lectura como número"
+            "number": "Su lectura como número",
+            "online": "Si responde",
+            "battery": "Su batería"
         },
         "triggers": {
             "change": "Un aparato cambia",
@@ -1875,7 +1888,8 @@
             "figure": "{measure} de {device}",
             "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}{hasFor, select, yes { durante {span}} other {}}",
             "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}{hasFor, select, yes { durante {span}} other {}}",
-            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}"
+            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}{hasFor, select, yes { durante {span}} other {}}",
+            "deviceSet": "{count, plural, one {{first} y uno más} other {{first} y # más}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -2120,7 +2134,21 @@
             "outside": "Sale de",
             "upper": "Hasta",
             "forMinutes": "Al menos",
-            "alreadyThere": "Ahora está en {value}: salta la próxima vez que cambie a {value}."
+            "alreadyThere": "Ahora está en {value}: salta la próxima vez que cambie a {value}.",
+            "alsoDevice": "Y",
+            "addDevice": "Añadir otro",
+            "removeDevice": "Quitar este dispositivo",
+            "behaviour": "Salta con",
+            "behaviours": {
+                "each": "Cada uno",
+                "first": "El primero de ellos",
+                "all": "Todos a la vez"
+            },
+            "quantifier": "Se cumple si",
+            "quantifiers": {
+                "any": "Alguno lo está",
+                "all": "Todos lo están"
+            }
         },
         "log": {
             "title": "Qué hizo",
@@ -2284,7 +2312,8 @@
                     "notify": "Enviarte una notificación.",
                     "run": "Iniciar otra automatización de este lugar."
                 }
-            }
+            },
+            "roomOnFloor": "{floor} - {room}"
         },
         "purposes": {
             "trigger": {
@@ -2293,7 +2322,9 @@
                 "locked": "Echan la llave",
                 "unlocked": "Abren la cerradura",
                 "motion": "Se ve movimiento",
-                "still": "Cesa el movimiento"
+                "still": "Cesa el movimiento",
+                "batteryLow": "Batería se agota",
+                "unavailable": "Dispositivo no responde"
             },
             "condition": {
                 "open": "Puerta abierta",
@@ -2301,7 +2332,9 @@
                 "isLocked": "Cerradura echada",
                 "isUnlocked": "Cerradura abierta",
                 "moving": "Hay movimiento",
-                "quiet": "Todo quieto"
+                "quiet": "Todo quieto",
+                "batteryIsLow": "Batería baja",
+                "isUnavailable": "Dispositivo sin respuesta"
             },
             "about": {
                 "trigger": {
@@ -2310,7 +2343,9 @@
                     "locked": "Cuando una cerradura dice que está echada.",
                     "unlocked": "Cuando una cerradura dice que está abierta.",
                     "motion": "Cuando un sensor de movimiento lo detecta.",
-                    "still": "Cuando un sensor de movimiento deja de verlo."
+                    "still": "Cuando un sensor de movimiento deja de verlo.",
+                    "batteryLow": "Cuando un dispositivo avisa de batería baja, o baja al 20% o menos.",
+                    "unavailable": "Cuando ya no se puede llegar a un dispositivo."
                 },
                 "condition": {
                     "open": "Solo con una puerta o ventana abierta.",
@@ -2318,9 +2353,19 @@
                     "isLocked": "Solo con una cerradura echada.",
                     "isUnlocked": "Solo con una cerradura abierta.",
                     "moving": "Solo mientras un sensor ve movimiento.",
-                    "quiet": "Solo mientras un sensor no ve nada."
+                    "quiet": "Solo mientras un sensor no ve nada.",
+                    "batteryIsLow": "Solo mientras la batería de un dispositivo está baja.",
+                    "isUnavailable": "Solo mientras no se puede llegar a un dispositivo."
                 }
             }
+        },
+        "availability": {
+            "online": "Responde",
+            "offline": "No responde"
+        },
+        "battery": {
+            "low": "Baja",
+            "ok": "Bien"
         }
     },
     "overview": {

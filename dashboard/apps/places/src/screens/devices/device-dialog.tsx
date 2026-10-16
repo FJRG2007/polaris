@@ -18,7 +18,8 @@
 
 import * as actions from "../actions";
 import { useEffect, useState } from "react";
-import { deviceEditSchema } from "../../lib/schemas";
+import { deviceEditSchema, normalizeRoomInput, roomInputSchema } from "../../lib/schemas";
+import { floorNames, type RoomView } from "../../lib/room-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceView } from "../../lib/device-kinds";
 import {
@@ -39,6 +40,9 @@ import { placesRefusalText } from "../../lib/refusal-text";
 
 const { runAction } = hostUi.runAction;
 
+/** The room picker's value for a room made here, named in the fields below it. */
+const NEW_ROOM = "new";
+
 export function DeviceDialog({
     device,
     places,
@@ -55,6 +59,10 @@ export function DeviceDialog({
     const [zone, setZone] = useState("");
     const [placeId, setPlaceId] = useState("");
     const [controllable, setControllable] = useState(true);
+    const [roomId, setRoomId] = useState("");
+    const [rooms, setRooms] = useState<RoomView[] | null>(null);
+    const [roomName, setRoomName] = useState("");
+    const [floor, setFloor] = useState("");
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -64,26 +72,90 @@ export function DeviceDialog({
         setZone(device.zone);
         setPlaceId(device.placeId ?? "");
         setControllable(device.controllable);
+        setRoomId(device.roomId ?? "");
+        setRoomName("");
+        setFloor("");
         setError("");
     }, [device]);
+
+    // The rooms of the place it is at, read again when another place is picked.
+    useEffect(() => {
+        if (!device || !placeId) {
+            setRooms([]);
+            return;
+        }
+        let current = true;
+        setRooms(null);
+        void actions.listRoomsAction(placeId).then(
+            (result) => {
+                if (current) setRooms(result.rooms ?? []);
+            },
+            () => {
+                if (current) setRooms([]);
+            }
+        );
+        return () => {
+            current = false;
+        };
+    }, [device, placeId]);
 
     const issue = name.trim()
         ? (deviceEditSchema.shape.name.safeParse(name).error?.issues[0]?.message ?? null)
         : null;
     const nameIssue = issue ? placesRefusalText(t, issue) : null;
-    const canSubmit = name.trim().length > 0 && !nameIssue && !saving;
+    const making = roomId === NEW_ROOM;
+    const roomIssueRaw = roomName.trim()
+        ? (roomInputSchema.shape.name.safeParse(roomName).error?.issues[0]?.message ?? null)
+        : null;
+    const roomIssue = roomIssueRaw ? placesRefusalText(t, roomIssueRaw) : null;
+    const canSubmit =
+        name.trim().length > 0 &&
+        !nameIssue &&
+        !saving &&
+        (!making || (roomName.trim().length > 0 && !roomIssue));
+    // A room picked at the place before it was changed is not one of this one's.
+    const roomOptions = [
+        { value: "", label: t("deviceDialog.noRoom") },
+        ...(rooms ?? []).map((room) => ({
+            value: room.id,
+            label: room.floor ? `${room.name} - ${room.floor}` : room.name
+        })),
+        { value: NEW_ROOM, label: t("deviceDialog.newRoom") }
+    ];
+    const floors = floorNames(rooms ?? []);
 
     const submit = async () => {
         if (!device || !canSubmit) return;
         setSaving(true);
         setError("");
+        let room: string | null =
+            roomId && rooms?.some((each) => each.id === roomId) ? roomId : null;
+        if (making && placeId) {
+            const made = await runAction(
+                () =>
+                    actions.saveRoomAction(
+                        null,
+                        normalizeRoomInput({ placeId, name: roomName, floor })
+                    ),
+                setError
+            );
+            if (!made || made.error || !made.room) {
+                setSaving(false);
+                if (made?.error) setError(made.error);
+                return;
+            }
+            room = made.room.id;
+            setRooms((list) => [...(list ?? []), made.room!]);
+            setRoomId(made.room.id);
+        }
         const result = await runAction(
             () =>
                 actions.saveDeviceAction(device.id, {
                     name,
                     zone,
                     placeId: placeId || null,
-                    controllable
+                    controllable,
+                    roomId: placeId ? room : null
                 }),
             setError
         );
@@ -123,7 +195,10 @@ export function DeviceDialog({
 
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs text-muted-foreground">
-                            {t("cameras.area")} <span className="text-foreground-subtle">{t("deviceDialog.optional")}</span>
+                            {t("cameras.area")}{" "}
+                            <span className="text-foreground-subtle">
+                                {t("deviceDialog.optional")}
+                            </span>
                         </span>
                         <Input
                             value={zone}
@@ -138,10 +213,15 @@ export function DeviceDialog({
                     </label>
 
                     <label className="flex flex-col gap-1.5">
-                        <span className="text-xs text-muted-foreground">{t("deviceDialog.place")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("deviceDialog.place")}
+                        </span>
                         <Select
                             value={placeId}
-                            onValueChange={setPlaceId}
+                            onValueChange={(next) => {
+                                setPlaceId(next);
+                                setRoomId("");
+                            }}
                             aria-label={t("deviceDialog.place")}
                             options={[
                                 { value: "", label: t("deviceDialog.noPlace") },
@@ -149,6 +229,83 @@ export function DeviceDialog({
                             ]}
                         />
                     </label>
+
+                    {placeId && (
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">
+                                {t("deviceDialog.room")}{" "}
+                                <span className="text-foreground-subtle">
+                                    {t("deviceDialog.optional")}
+                                </span>
+                            </span>
+                            <Select
+                                value={rooms === null ? "" : roomId}
+                                onValueChange={setRoomId}
+                                disabled={rooms === null}
+                                aria-label={t("deviceDialog.room")}
+                                placeholder={
+                                    rooms === null ? t("deviceDialog.loadingRooms") : undefined
+                                }
+                                options={roomOptions}
+                            />
+                            <span className="text-xs text-foreground-subtle">
+                                {t("deviceDialog.roomHint")}
+                            </span>
+                        </div>
+                    )}
+
+                    {placeId && making && (
+                        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                            <label className="flex min-w-0 flex-col gap-1.5">
+                                <span className="text-xs text-muted-foreground">
+                                    {t("deviceDialog.roomName")}{" "}
+                                    <span className="text-danger">*</span>
+                                </span>
+                                <Input
+                                    value={roomName}
+                                    maxLength={60}
+                                    aria-label={t("deviceDialog.roomName")}
+                                    placeholder={t("deviceDialog.roomNamePlaceholder")}
+                                    onChange={(event) => setRoomName(event.target.value)}
+                                />
+                                {roomIssue && (
+                                    <span className="text-xs text-danger">{roomIssue}</span>
+                                )}
+                            </label>
+                            <label className="flex min-w-0 flex-col gap-1.5">
+                                <span className="text-xs text-muted-foreground">
+                                    {t("deviceDialog.floor")}{" "}
+                                    <span className="text-foreground-subtle">
+                                        {t("deviceDialog.optional")}
+                                    </span>
+                                </span>
+                                <Input
+                                    value={floor}
+                                    maxLength={40}
+                                    aria-label={t("deviceDialog.floor")}
+                                    placeholder={t("deviceDialog.floorPlaceholder")}
+                                    onChange={(event) => setFloor(event.target.value)}
+                                />
+                            </label>
+                            {floors.length > 0 && (
+                                <div className="flex min-w-0 flex-wrap gap-1 sm:col-span-2">
+                                    {floors.map((name) => (
+                                        <Button
+                                            key={name}
+                                            size="sm"
+                                            variant="ghost"
+                                            className="max-w-full truncate"
+                                            title={name}
+                                            aria-pressed={floor === name}
+                                            onClick={() => setFloor(name)}
+                                        >
+                                            {name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <label className="flex items-center justify-between gap-3">
                         <span className="flex flex-col gap-0.5">

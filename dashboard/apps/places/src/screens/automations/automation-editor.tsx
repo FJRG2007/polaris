@@ -44,7 +44,8 @@ import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
 import { AutomationCanvas } from "./automation-canvas";
-import { AddBlockButton } from "./add-block";
+import { AddBlockButton, RoomsProvider } from "./add-block";
+import type { RoomView } from "../../lib/room-kinds";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
@@ -184,6 +185,24 @@ const UNFINISHED = new Set([
 
 function pathKey(path: readonly (string | number)[]): string {
     return path.join(".");
+}
+
+/** The rooms of a place that has none, one array for every render. */
+const NO_ROOMS: readonly RoomView[] = [];
+
+/** A block with its set changed: its devices, and how they count - which goes
+ *  with the set when it is down to one device again. */
+function setOf<T extends auto.Trigger | auto.Condition>(
+    block: T,
+    ids: readonly string[],
+    count: auto.Behaviour | auto.Quantifier | undefined
+): T {
+    if (!("deviceId" in block)) return block;
+    const field = block.kind === "device" || block.kind === "reading" ? "quantifier" : "behaviour";
+    const next = { ...auto.withTargets(block, ids) } as Record<string, unknown>;
+    delete next[field];
+    if (ids.length > 1 && count) next[field] = count;
+    return next as T;
 }
 
 /** A block's own name, note and switch, kept when the Watch picker turns it into
@@ -1095,199 +1114,214 @@ export function AutomationEditor({
     );
 
     return (
-        <flow.IssueProvider value={issueLookup}>
-            <div className="flex flex-col gap-4">
-                {header}
+        <RoomsProvider value={loaded?.context.rooms ?? NO_ROOMS}>
+            <flow.IssueProvider value={issueLookup}>
+                <div className="flex flex-col gap-4">
+                    {header}
 
-                <div className="flex flex-wrap items-end gap-3">
-                    <flow.Field
-                        label={t("automations.editor.name")}
-                        path={["name"]}
-                        required
-                        className="min-w-[12rem] flex-1"
-                    >
-                        {(id, invalid) => (
-                            <Input
-                                id={id}
-                                value={draft.name}
-                                maxLength={auto.LIMITS.name}
+                    <div className="flex flex-wrap items-end gap-3">
+                        <flow.Field
+                            label={t("automations.editor.name")}
+                            path={["name"]}
+                            required
+                            className="min-w-[12rem] flex-1"
+                        >
+                            {(id, invalid) => (
+                                <Input
+                                    id={id}
+                                    value={draft.name}
+                                    maxLength={auto.LIMITS.name}
+                                    disabled={readOnly}
+                                    placeholder={t("automations.editor.namePlaceholder")}
+                                    aria-invalid={invalid || undefined}
+                                    onChange={(event) =>
+                                        edit((current) => ({
+                                            ...current,
+                                            name: event.target.value
+                                        }))
+                                    }
+                                />
+                            )}
+                        </flow.Field>
+                        <label className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
+                            <Switch
+                                checked={draft.enabled}
                                 disabled={readOnly}
-                                placeholder={t("automations.editor.namePlaceholder")}
-                                aria-invalid={invalid || undefined}
-                                onChange={(event) =>
-                                    edit((current) => ({ ...current, name: event.target.value }))
-                                }
+                                aria-label={t("automations.editor.enabled")}
+                                onChange={(enabled) => edit((current) => ({ ...current, enabled }))}
                             />
-                        )}
-                    </flow.Field>
-                    <label className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
-                        <Switch
-                            checked={draft.enabled}
-                            disabled={readOnly}
-                            aria-label={t("automations.editor.enabled")}
-                            onChange={(enabled) => edit((current) => ({ ...current, enabled }))}
-                        />
-                        {draft.enabled ? t("automations.editor.on") : t("automations.editor.off")}
-                    </label>
-                    {!readOnly && (
-                        <>
-                            {automationId && (
+                            {draft.enabled
+                                ? t("automations.editor.on")
+                                : t("automations.editor.off")}
+                        </label>
+                        {!readOnly && (
+                            <>
+                                {automationId && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={running || dirty || !draft.enabled}
+                                        title={
+                                            dirty ? t("automations.editor.saveFirst") : undefined
+                                        }
+                                        onClick={() => void runNow()}
+                                    >
+                                        {running ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                        ) : (
+                                            <Play className="size-4 shrink-0" />
+                                        )}
+                                        {t("automations.list.run")}
+                                    </Button>
+                                )}
                                 <Button
                                     size="sm"
-                                    variant="outline"
-                                    disabled={running || dirty || !draft.enabled}
-                                    title={dirty ? t("automations.editor.saveFirst") : undefined}
-                                    onClick={() => void runNow()}
+                                    aria-disabled={blocked || saving || undefined}
+                                    className={cn(blocked && "opacity-60")}
+                                    onClick={() => void save()}
                                 >
-                                    {running ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Play className="size-4 shrink-0" />
-                                    )}
-                                    {t("automations.list.run")}
+                                    {saving && <Loader2 className="size-4 animate-spin" />}
+                                    {t("common.save")}
                                 </Button>
-                            )}
-                            <Button
-                                size="sm"
-                                aria-disabled={blocked || saving || undefined}
-                                className={cn(blocked && "opacity-60")}
-                                onClick={() => void save()}
-                            >
-                                {saving && <Loader2 className="size-4 animate-spin" />}
-                                {t("common.save")}
-                            </Button>
-                        </>
+                            </>
+                        )}
+                    </div>
+
+                    {error && (
+                        <p
+                            role="alert"
+                            className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                        >
+                            {error}
+                        </p>
                     )}
-                </div>
+                    {notice && !dirty && (
+                        <p role="status" className="text-xs text-muted-foreground">
+                            {notice}
+                        </p>
+                    )}
+                    {readOnly && (
+                        <p className="text-xs text-muted-foreground">
+                            {t("automations.editor.readOnly")}
+                        </p>
+                    )}
 
-                {error && (
-                    <p
-                        role="alert"
-                        className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
-                    >
-                        {error}
-                    </p>
-                )}
-                {notice && !dirty && (
-                    <p role="status" className="text-xs text-muted-foreground">
-                        {notice}
-                    </p>
-                )}
-                {readOnly && (
-                    <p className="text-xs text-muted-foreground">
-                        {t("automations.editor.readOnly")}
-                    </p>
-                )}
-
-                {tab === "runs" && loaded.automation ? (
-                    <RunLog
-                        automation={loaded.automation}
-                        initial={loaded.runs}
-                        lookup={lookup}
-                        automationName={automationName}
-                        refreshKey={refreshKey}
-                    />
-                ) : layout === "visual" ? (
-                    <div className="flex flex-col gap-2">
-                        <AutomationCanvas
-                            definition={definition}
-                            readOnly={readOnly}
-                            onChange={editDefinition}
-                            stateOf={stateOf}
+                    {tab === "runs" && loaded.automation ? (
+                        <RunLog
+                            automation={loaded.automation}
+                            initial={loaded.runs}
                             lookup={lookup}
                             automationName={automationName}
-                            renderInspector={inspect}
-                            stageIssues={stageIssues}
+                            refreshKey={refreshKey}
                         />
-                        <p className="text-[0.6875rem] text-foreground-subtle">{footnote}</p>
-                    </div>
-                ) : (
-                    <div className="flex min-w-0 items-start gap-4">
-                        <ol className="flex min-w-0 flex-1 flex-col">
-                            <flow.Stage
-                                icon={<Zap className="size-4" />}
-                                title={t("automations.editor.when")}
-                                hint={t("automations.editor.whenHint")}
-                                issue={
-                                    attempted ? issueLookup(["definition", "triggers"]) : undefined
-                                }
-                            >
-                                {rowsOf("trigger", t("automations.editor.when"))}
-                                {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
-                                    <AddBlockButton
-                                        role="trigger"
-                                        label={t("automations.editor.addTrigger")}
-                                        devices={devices}
-                                        onPaste={pasteFor("trigger")}
-                                        onPick={(kind, target) =>
-                                            addBlock("trigger", triggerFor(kind, target))
-                                        }
-                                    />
-                                )}
-                            </flow.Stage>
+                    ) : layout === "visual" ? (
+                        <div className="flex flex-col gap-2">
+                            <AutomationCanvas
+                                definition={definition}
+                                readOnly={readOnly}
+                                onChange={editDefinition}
+                                stateOf={stateOf}
+                                lookup={lookup}
+                                automationName={automationName}
+                                renderInspector={inspect}
+                                stageIssues={stageIssues}
+                            />
+                            <p className="text-[0.6875rem] text-foreground-subtle">{footnote}</p>
+                        </div>
+                    ) : (
+                        <div className="flex min-w-0 items-start gap-4">
+                            <ol className="flex min-w-0 flex-1 flex-col">
+                                <flow.Stage
+                                    icon={<Zap className="size-4" />}
+                                    title={t("automations.editor.when")}
+                                    hint={t("automations.editor.whenHint")}
+                                    issue={
+                                        attempted
+                                            ? issueLookup(["definition", "triggers"])
+                                            : undefined
+                                    }
+                                >
+                                    {rowsOf("trigger", t("automations.editor.when"))}
+                                    {!readOnly &&
+                                        definition.triggers.length < auto.LIMITS.triggers && (
+                                            <AddBlockButton
+                                                role="trigger"
+                                                label={t("automations.editor.addTrigger")}
+                                                devices={devices}
+                                                onPaste={pasteFor("trigger")}
+                                                onPick={(kind, target) =>
+                                                    addBlock("trigger", triggerFor(kind, target))
+                                                }
+                                            />
+                                        )}
+                                </flow.Stage>
 
-                            <flow.Stage
-                                icon={<Filter className="size-4" />}
-                                title={t("automations.editor.if")}
-                                hint={
-                                    definition.conditions.groups.length === 0
-                                        ? t("automations.editor.ifEmpty")
-                                        : t("automations.editor.ifHint")
-                                }
-                            >
-                                {groupsMatch}
-                                {rowsOf("group", t("automations.editor.if"))}
-                                {!readOnly &&
-                                    definition.conditions.groups.length < auto.LIMITS.groups && (
+                                <flow.Stage
+                                    icon={<Filter className="size-4" />}
+                                    title={t("automations.editor.if")}
+                                    hint={
+                                        definition.conditions.groups.length === 0
+                                            ? t("automations.editor.ifEmpty")
+                                            : t("automations.editor.ifHint")
+                                    }
+                                >
+                                    {groupsMatch}
+                                    {rowsOf("group", t("automations.editor.if"))}
+                                    {!readOnly &&
+                                        definition.conditions.groups.length <
+                                            auto.LIMITS.groups && (
+                                            <AddBlockButton
+                                                role="condition"
+                                                label={t("automations.editor.addCondition")}
+                                                devices={devices}
+                                                onPaste={pasteFor("group")}
+                                                onPick={(kind, target) =>
+                                                    addBlock("group", {
+                                                        id: auto.nodeIdOf(),
+                                                        match: "all",
+                                                        items: [conditionFor(kind, target)]
+                                                    })
+                                                }
+                                            />
+                                        )}
+                                </flow.Stage>
+
+                                <flow.Stage
+                                    icon={<Play className="size-4" />}
+                                    title={t("automations.editor.then")}
+                                    hint={t("automations.editor.thenHint")}
+                                    issue={
+                                        attempted
+                                            ? issueLookup(["definition", "actions"])
+                                            : undefined
+                                    }
+                                    last
+                                >
+                                    {rowsOf("step", t("automations.editor.then"))}
+                                    {!readOnly && definition.actions.length < auto.LIMITS.steps && (
                                         <AddBlockButton
-                                            role="condition"
-                                            label={t("automations.editor.addCondition")}
+                                            role="step"
+                                            label={t("automations.editor.addStep")}
                                             devices={devices}
-                                            onPaste={pasteFor("group")}
+                                            canControl={canControl}
+                                            onPaste={pasteFor("step")}
                                             onPick={(kind, target) =>
-                                                addBlock("group", {
-                                                    id: auto.nodeIdOf(),
-                                                    match: "all",
-                                                    items: [conditionFor(kind, target)]
-                                                })
+                                                addBlock("step", stepFor(kind, target))
                                             }
                                         />
                                     )}
-                            </flow.Stage>
-
-                            <flow.Stage
-                                icon={<Play className="size-4" />}
-                                title={t("automations.editor.then")}
-                                hint={t("automations.editor.thenHint")}
-                                issue={
-                                    attempted ? issueLookup(["definition", "actions"]) : undefined
-                                }
-                                last
-                            >
-                                {rowsOf("step", t("automations.editor.then"))}
-                                {!readOnly && definition.actions.length < auto.LIMITS.steps && (
-                                    <AddBlockButton
-                                        role="step"
-                                        label={t("automations.editor.addStep")}
-                                        devices={devices}
-                                        canControl={canControl}
-                                        onPaste={pasteFor("step")}
-                                        onPick={(kind, target) =>
-                                            addBlock("step", stepFor(kind, target))
-                                        }
-                                    />
-                                )}
-                            </flow.Stage>
-                            <li className="pt-2 text-[0.6875rem] text-foreground-subtle">
-                                {footnote}
-                            </li>
-                        </ol>
-                        {panel}
-                    </div>
-                )}
-                {blockDialogs}
-            </div>
-        </flow.IssueProvider>
+                                </flow.Stage>
+                                <li className="pt-2 text-[0.6875rem] text-foreground-subtle">
+                                    {footnote}
+                                </li>
+                            </ol>
+                            {panel}
+                        </div>
+                    )}
+                    {blockDialogs}
+                </div>
+            </flow.IssueProvider>
+        </RoomsProvider>
     );
 }
 
@@ -1388,6 +1422,16 @@ function TriggerCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={pickDevice}
                     />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(trigger)}
+                        devices={devices}
+                        first={device}
+                        role="trigger"
+                        count={trigger.behaviour}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
+                    />
                     {device && trigger.kind === "change" && (
                         <fields.WatchPicker
                             device={device}
@@ -1419,6 +1463,7 @@ function TriggerCard({
                     {device && trigger.kind === "stays" && (
                         <fields.AttributePicker
                             kind={device.kind}
+                            device={device}
                             value={trigger.attribute}
                             path={path}
                             disabled={disabled}
@@ -1501,6 +1546,16 @@ function TriggerCard({
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.triggerOn(trigger, next))}
+                    />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(trigger)}
+                        devices={sensors}
+                        first={device}
+                        role="trigger"
+                        count={trigger.behaviour}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
                     />
                     {device && (
                         <fields.WatchPicker
@@ -1760,6 +1815,16 @@ function ConditionCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(condition)}
+                        devices={devices}
+                        first={device}
+                        role="condition"
+                        count={condition.quantifier}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(condition, ids, count))}
+                    />
                     {device && (
                         <fields.WatchPicker
                             device={device}
@@ -1822,6 +1887,16 @@ function ConditionCard({
                         disabled={disabled}
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
+                    />
+                    <fields.TargetSetField
+                        ids={auto.deviceTargets(condition)}
+                        devices={sensors}
+                        first={device}
+                        role="condition"
+                        count={condition.quantifier}
+                        path={path}
+                        disabled={disabled}
+                        onChange={(ids, count) => onChange(setOf(condition, ids, count))}
                     />
                     {device && (
                         <fields.WatchPicker
@@ -2062,6 +2137,7 @@ function StepCard({
                     {device && (
                         <fields.AttributePicker
                             kind={device.kind}
+                            device={device}
                             value={step.attribute}
                             path={path}
                             disabled={disabled}

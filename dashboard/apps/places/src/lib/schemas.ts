@@ -400,10 +400,33 @@ export const deviceEditSchema = z.object({
     placeId: z.string().trim().max(64).nullable().default(null),
     /** Off is a device somebody wants on the screen and off the controls - a lock
      *  on a door that is not theirs to open. */
-    controllable: z.boolean().default(true)
+    controllable: z.boolean().default(true),
+    /** Which of its place's rooms it is in; null is none. Absent leaves it as it
+     *  is, so a screen from before rooms saves without losing one. */
+    roomId: z.string().trim().max(64).nullable().optional()
 });
 
 export type DeviceEditInput = z.infer<typeof deviceEditSchema>;
+
+/** A room's name and floor, as both sides of the wire check them. */
+export const roomInputSchema = z.object({
+    name: z.string().trim().min(1, "Give it a name").max(60),
+    floor: z.string().trim().max(40).default("")
+});
+
+/** A new room, at the place it is for. */
+export const roomCreateSchema = roomInputSchema.extend({
+    placeId: z.string().trim().min(1).max(64)
+});
+
+/** Every string a room carries, trimmed on both sides of the wire. */
+export function normalizeRoomInput<T extends Record<string, unknown>>(input: T): T {
+    const value = { ...input } as Record<string, unknown>;
+    for (const key of ["name", "floor", "placeId"]) {
+        if (typeof value[key] === "string") value[key] = (value[key] as string).trim();
+    }
+    return value as T;
+}
 
 /** Every string a device edit carries, trimmed on both sides of the wire. */
 export function normalizeDeviceInput<T extends Record<string, unknown>>(input: T): T {
@@ -412,3 +435,5 @@ export function normalizeDeviceInput<T extends Record<string, unknown>>(input: T
     if (typeof value.zone === "string") value.zone = value.zone.trim();
     return value as T;
 }
+
+export type RoomCreateInput = z.infer<typeof roomCreateSchema>;

@@ -82,4 +82,103 @@ describe("purpose blocks", () => {
         });
         expect(parsed.success).toBe(true);
     });
+
+    it("watch a battery only where a device reports one, and silence on any device", () => {
+        const lowLock = device("low", "lock", { batteryPercent: 12 });
+        const fineLock = device("fine", "lock", { batteryPercent: 80 });
+        const critical = device("crit", "sensor", { batteryCritical: true });
+        expect(purposes.triggerFits("batteryLow", plug)).toBe(false);
+        expect(purposes.triggerFits("batteryLow", fineLock)).toBe(true);
+        expect(purposes.conditionFits("batteryIsLow", critical)).toBe(true);
+        expect(purposes.purposeTrigger("batteryLow", lowLock)).toMatchObject({
+            kind: "change",
+            attribute: "battery",
+            from: "",
+            to: "low"
+        });
+        expect(purposes.triggerFits("unavailable", plug)).toBe(true);
+        expect(purposes.purposeCondition("isUnavailable", thermometer)).toMatchObject({
+            kind: "device",
+            attribute: "online",
+            is: "offline",
+            negate: false
+        });
+        const parsed = auto.automationInputSchema.safeParse({
+            placeId: "place-1",
+            name: "Battery",
+            enabled: true,
+            definition: {
+                timeZone: "UTC",
+                triggers: [purposes.purposeTrigger("batteryLow", lowLock)],
+                conditions: {
+                    match: "all",
+                    groups: [
+                        {
+                            id: "group1",
+                            match: "all",
+                            items: [purposes.purposeCondition("isUnavailable", plug)]
+                        }
+                    ]
+                },
+                actions: [{ id: "stepnote", kind: "notify", message: "seen" }]
+            }
+        });
+        expect(parsed.success).toBe(true);
+    });
+
+    it("read a battery at or under the line as low, and none as none", () => {
+        expect(auto.batteryWord({ batteryPercent: auto.BATTERY_LOW_PERCENT })).toBe("low");
+        expect(auto.batteryWord({ batteryPercent: auto.BATTERY_LOW_PERCENT + 1 })).toBe("ok");
+        expect(auto.batteryWord({ batteryPercent: null, batteryCritical: false })).toBe("");
+        expect(auto.attributesFor("outlet", { batteryPercent: null })).toEqual(["state", "online"]);
+        expect(auto.attributesFor("outlet")).toContain("battery");
+    });
+});
+
+describe("a block's set of devices", () => {
+    it("is its device alone when it has no set, as every stored block is read", () => {
+        expect(auto.deviceTargets({ deviceId: "lamp1" })).toEqual(["lamp1"]);
+    });
+
+    it("keeps its first as its device, once each, and drops the set at one", () => {
+        const trigger = auto.withTargets(
+            { id: "t1", kind: "change", deviceId: "", attribute: "state", from: "", to: "on" },
+            ["lamp2", "lamp1", "lamp2"]
+        );
+        expect(trigger.deviceId).toBe("lamp2");
+        expect(auto.deviceTargets(trigger)).toEqual(["lamp2", "lamp1"]);
+        expect("targets" in auto.withTargets(trigger, ["lamp1"])).toBe(false);
+    });
+
+    it("names a device gone from the set where it is", () => {
+        const issues = auto.deviceIssues(
+            {
+                timeZone: "UTC",
+                triggers: [
+                    {
+                        id: "trigset",
+                        kind: "change",
+                        deviceId: "plug",
+                        targets: [
+                            { kind: "device", id: "plug" },
+                            { kind: "device", id: "gone" }
+                        ],
+                        attribute: "state",
+                        from: "",
+                        to: "on"
+                    }
+                ],
+                conditions: { match: "all", groups: [] },
+                actions: []
+            },
+            [plug],
+            { automationIds: [], selfId: null }
+        );
+        expect(issues).toEqual([
+            {
+                path: ["definition", "triggers", 0, "targets", 1, "id"],
+                message: "automations.errors.deviceGone"
+            }
+        ]);
+    });
 });

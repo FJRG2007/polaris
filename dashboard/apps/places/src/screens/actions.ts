@@ -24,6 +24,7 @@ import * as events from "../lib/events";
 import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
 import * as people from "../lib/people";
+import * as rooms from "../lib/rooms";
 import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
@@ -1610,4 +1611,56 @@ export async function nukiLocalStateAction(accountId: string): Promise<{
     const result = await guard(() => localBroker.localLinkState(install.id, String(accountId)));
     if (result.error) return { error: result.error };
     return { state: result.value };
+}
+
+/** A place's rooms, for the device dialog's room picker. */
+export async function listRoomsAction(
+    placeId: string
+): Promise<{ rooms?: rooms.RoomView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => rooms.listRooms(install.id, String(placeId)));
+    if (result.error) return { error: result.error };
+    return { rooms: result.value };
+}
+
+/** A new room at a place (no id), or a room's new name and floor. */
+export async function saveRoomAction(
+    roomId: string | null,
+    input: unknown
+): Promise<{ room?: rooms.RoomView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const normalized = schemas.normalizeRoomInput((input ?? {}) as Record<string, unknown>);
+    const parsed = roomId
+        ? schemas.roomInputSchema.safeParse(normalized)
+        : schemas.roomCreateSchema.safeParse(normalized);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
+    const data = parsed.data;
+    const result = await guard(() =>
+        roomId
+            ? rooms.updateRoom(install.id, String(roomId), data)
+            : rooms.createRoom(install.id, data as schemas.RoomCreateInput)
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: roomId ? "places.room.update" : "places.room.create",
+        targetType: "placeRoom",
+        targetId: result.value?.id ?? String(roomId)
+    });
+    return { room: result.value };
+}
+
+/** Remove a room. Its devices stay at the place, in no room. */
+export async function deleteRoomAction(roomId: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(() => rooms.deleteRoom(install.id, String(roomId)));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.room.delete",
+        targetType: "placeRoom",
+        targetId: String(roomId)
+    });
+    return {};
 }

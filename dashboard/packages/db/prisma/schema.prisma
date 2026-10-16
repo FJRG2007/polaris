@@ -10599,7 +10599,33 @@ model Place {
     cameras     Camera[]
     devices     PlaceDevice[]
     automations PlaceAutomation[]
+    rooms       PlaceRoom[]
 
+    @@index([installedAppId])
+}
+
+// A room at a place, which devices can be put in.
+//
+// The floor is the room's own word ("Ground floor") rather than a table: a
+// house names its floors once, and the screen offers the names already used.
+// Deleting a room leaves its devices at the place, in no room.
+model PlaceRoom {
+    id             String  @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent of not
+    // linking installs by foreign key.
+    installedAppId String  @db.Uuid
+    placeId        String  @db.Uuid
+    name           String
+    /// Which floor it is on, as its owner says it. Null is not said.
+    floor          String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place   Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
+    devices PlaceDevice[]
+
+    @@index([placeId])
     @@index([installedAppId])
 }
 
@@ -10993,6 +11019,8 @@ model PlaceDevice {
     name           String
     /// Where at that place it is ("Front door"). Free text, as a camera's zone.
     zone           String?
+    /// Which of the place's rooms it is in. Null until somebody says.
+    roomId         String? @db.Uuid
     model          String?
     firmware       String?
 
@@ -11040,6 +11068,7 @@ model PlaceDevice {
     updatedAt DateTime @updatedAt
 
     place       Place?                  @relation(fields: [placeId], references: [id], onDelete: SetNull)
+    room        PlaceRoom?              @relation(fields: [roomId], references: [id], onDelete: SetNull)
     account     PlaceDeviceAccount?     @relation(fields: [accountId], references: [id], onDelete: Cascade)
     events      PlaceDeviceEvent[]
     observation PlaceDeviceObservation?
@@ -11053,6 +11082,7 @@ model PlaceDevice {
     @@index([installedAppId])
     @@index([placeId])
     @@index([accountId])
+    @@index([roomId])
 }
 
 // An account, hub or box a place's devices are reached through.

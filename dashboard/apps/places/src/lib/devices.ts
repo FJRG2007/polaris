@@ -19,6 +19,7 @@ import { Prisma, prisma } from "@polaris/db";
 import * as live from "./device-live";
 import * as kinds from "./device-kinds";
 import { HomeError } from "./home-error";
+import * as rooms from "./rooms";
 import * as accounts from "./device-accounts";
 import { DriverError, type DeviceHistoryEntry } from "./drivers/contract";
 import { host } from "@polaris/app-host";
@@ -57,6 +58,7 @@ const DEVICE_FIELDS = {
     name: true,
     zone: true,
     placeId: true,
+    roomId: true,
     model: true,
     firmware: true,
     state: true,
@@ -81,6 +83,7 @@ type DeviceRow = {
     name: string;
     zone: string | null;
     placeId: string | null;
+    roomId: string | null;
     model: string | null;
     firmware: string | null;
     state: string;
@@ -146,6 +149,7 @@ function toView(row: DeviceRow): kinds.DeviceView {
         name: row.name,
         zone: row.zone ?? "",
         placeId: row.placeId,
+        roomId: row.roomId,
         model: row.model ?? "",
         firmware: row.firmware ?? "",
         state: kinds.deviceState(row.state),
@@ -215,6 +219,8 @@ export interface DeviceEdit {
     readonly zone: string;
     readonly placeId: string | null;
     readonly controllable: boolean;
+    /** Its room at that place, or null for none; absent leaves it as it is. */
+    readonly roomId?: string | null;
 }
 
 export async function updateDevice(
@@ -222,14 +228,24 @@ export async function updateDevice(
     id: string,
     edit: DeviceEdit
 ): Promise<kinds.DeviceView> {
-    await requireDevice(installedAppId, id);
+    const current = await requireDevice(installedAppId, id);
+    // A room is one of its place's: one at another is refused, and a device
+    // moved to another place without saying a room leaves the one it was in.
+    let roomId: string | null | undefined = edit.roomId;
+    if (roomId) {
+        const room = await rooms.requireRoom(installedAppId, roomId);
+        if (room.placeId !== edit.placeId) throw new HomeError("That room is at another place");
+    } else if (roomId === undefined && current.placeId !== edit.placeId) {
+        roomId = null;
+    }
     const row = await prisma.placeDevice.update({
         where: { id },
         data: {
             name: edit.name,
             zone: edit.zone || null,
             placeId: edit.placeId,
-            controllable: edit.controllable
+            controllable: edit.controllable,
+            ...(roomId !== undefined ? { roomId } : {})
         },
         select: DEVICE_FIELDS
     });

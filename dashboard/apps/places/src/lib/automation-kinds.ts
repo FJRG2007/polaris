@@ -16,7 +16,16 @@
 
 import { z } from "zod";
 import * as kinds from "./device-kinds";
-import { automationNodeId, blockBaseShape, isTimeZone } from "@polaris/core";
+import {
+    automationNodeId,
+    behaviourSchema,
+    blockBaseShape,
+    isTimeZone,
+    quantifierSchema,
+    targetRefSchema,
+    type Behaviour,
+    type Quantifier
+} from "@polaris/core";
 import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
 
 /** What about a device a trigger, a condition or a wait looks at. A lock has a
@@ -24,8 +33,44 @@ import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
  *  lock opened"; a sensor has neither and is its reading. An air conditioner
  *  is on or off, and separately cooling or heating - its mode. A purifier has a
  *  mode too, and filters that wear: `filter` is the most worn one's state. */
-export const AUTOMATION_ATTRIBUTES = ["state", "door", "reading", "mode", "filter"] as const;
+export const AUTOMATION_ATTRIBUTES = [
+    "state",
+    "door",
+    "reading",
+    "mode",
+    "filter",
+    "online",
+    "battery"
+] as const;
 export type AutomationAttribute = (typeof AUTOMATION_ATTRIBUTES)[number];
+
+/** Whether a device is answering. Every device has this, whatever it does. */
+export const AVAILABILITY_WORDS = ["online", "offline"] as const;
+
+/** A battery as a trigger or a condition reads it: running low, or not. */
+export const BATTERY_WORDS = ["low", "ok"] as const;
+
+/** At or under this share a battery reads as low, unless its own maker says
+ *  so first. */
+export const BATTERY_LOW_PERCENT = 20;
+
+/** What a device says about its battery, where it has one. */
+export interface BatteryReport {
+    readonly batteryPercent?: number | null;
+    readonly batteryCritical?: boolean;
+}
+
+/** A battery's word - low or ok - or empty for a device that reports none. */
+export function batteryWord(device: BatteryReport): string {
+    if (device.batteryCritical) return "low";
+    const percent = device.batteryPercent;
+    if (typeof percent !== "number" || !Number.isFinite(percent)) return "";
+    return percent <= BATTERY_LOW_PERCENT ? "low" : "ok";
+}
+
+export function hasBattery(device: BatteryReport): boolean {
+    return batteryWord(device) !== "";
+}
 
 /** The door sensor's words that can be waited for. `unknown` and `none` are not
  *  something a door does. */
@@ -50,14 +95,28 @@ export function watchedStates(kind: string): readonly kinds.DeviceState[] {
     return WATCHED_STATES[kinds.deviceKind(kind)];
 }
 
-/** Which attributes a kind of device has to watch. */
-export function attributesFor(kind: string): readonly AutomationAttribute[] {
+/** What a kind of device does, before whether it answers and its battery. */
+function ownAttributes(kind: string): readonly AutomationAttribute[] {
     const which = kinds.deviceKind(kind);
     if (which === "sensor") return ["reading"];
     if (which === "lock" || which === "opener") return ["state", "door"];
     if (which === "climate") return ["state", "mode"];
     if (which === "air") return ["state", "mode", "filter"];
     return ["state"];
+}
+
+/**
+ * Which attributes a device has to watch: what its kind does, then whether it
+ * is answering, which every device has, then its battery. Given the device, the
+ * battery is there only when it reports one; without it, the battery is allowed,
+ * so a block saved on one is never refused for a reading the screen lacks.
+ */
+export function attributesFor(
+    kind: string,
+    device?: BatteryReport
+): readonly AutomationAttribute[] {
+    const battery = device === undefined || hasBattery(device);
+    return [...ownAttributes(kind), "online", ...(battery ? (["battery"] as const) : [])];
 }
 
 /**
@@ -160,8 +219,55 @@ export const LIMITS = {
     minutes: 7 * 24 * 60,
     /** How long a step may wait for a device, in minutes: a day. */
     waitMinutes: 24 * 60,
-    word: 60
+    word: 60,
+    /** Devices one trigger or condition can be about. */
+    targets: 20
 } as const;
+
+export type { Behaviour, Quantifier };
+
+/** What a block's set can name. Rooms and floors join devices here. */
+export const TARGET_KINDS = ["device"] as const;
+export type TargetKind = (typeof TARGET_KINDS)[number];
+
+const targetsSchema = z
+    .array(targetRefSchema.extend({ kind: z.enum(TARGET_KINDS) }))
+    .max(LIMITS.targets, "automations.errors.tooMany")
+    .optional();
+
+/**
+ * The devices a trigger or a condition is about. `deviceId` is the one every
+ * block has had, and every one stored before sets existed is read by it alone;
+ * a set lists the rest in `targets`, with `deviceId` kept as its first so an
+ * older build reading the block still finds a device in it. Each device once.
+ */
+export function deviceTargets(block: {
+    readonly deviceId: string;
+    readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+}): string[] {
+    const ids = [
+        block.deviceId,
+        ...(block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id)
+    ].filter((id) => id.length > 0);
+    return [...new Set(ids)];
+}
+
+/** A block pointed at `ids`: the first as its device, all of them as its set
+ *  once there is more than one, and no set at all for one. */
+export function withTargets<T extends { deviceId: string; targets?: unknown }>(
+    block: T,
+    ids: readonly string[]
+): T {
+    const unique = [...new Set(ids.filter((id) => id.length > 0))];
+    const { targets: _was, ...rest } = block;
+    const first = unique[0] ?? block.deviceId;
+    if (unique.length < 2) return { ...rest, deviceId: first } as T;
+    return {
+        ...rest,
+        deviceId: first,
+        targets: unique.map((id) => ({ kind: "device" as const, id }))
+    } as T;
+}
 
 export const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
 /** How a reading condition tests a figure: against one line, or inside or
@@ -321,6 +427,9 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("change"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        /** For a set: each device's change, the first one's, or the last one's. */
+        behaviour: behaviourSchema.optional(),
         attribute,
         from: word,
         to: word,
@@ -332,6 +441,8 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("stays"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        behaviour: behaviourSchema.optional(),
         attribute,
         is: needed,
         // Zero is "the moment it happens", which is what "A device changes"
@@ -343,6 +454,8 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("threshold"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        behaviour: behaviourSchema.optional(),
         /** "between" fires on coming into `value`..`upper`, "outside" on leaving it. */
         direction: z.enum(THRESHOLD_DIRECTIONS),
         value: amount,
@@ -362,6 +475,9 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        /** For a set: any of its devices, or all of them. */
+        quantifier: quantifierSchema.optional(),
         attribute,
         is: needed,
         negate: z.boolean(),
@@ -373,6 +489,8 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("reading"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        quantifier: quantifierSchema.optional(),
         op: z.enum(COMPARISONS),
         value: amount,
         /** The top of the range, for "between" and "outside" only. */
@@ -617,7 +735,11 @@ function checkWord(
                 ? MODE_WORDS.includes(value)
                 : attribute === "filter"
                   ? (kinds.FILTER_STATES as readonly string[]).includes(value)
-                  : true;
+                  : attribute === "online"
+                    ? (AVAILABILITY_WORDS as readonly string[]).includes(value)
+                    : attribute === "battery"
+                      ? (BATTERY_WORDS as readonly string[]).includes(value)
+                      : true;
     if (!known) context.addIssue({ code: "custom", path, message: "automations.errors.state" });
 }
 
@@ -790,45 +912,77 @@ export function deviceIssues(
     const byId = new Map(devices.map((device) => [device.id, device]));
     const issues: AutomationIssue[] = [];
 
-    const watched = (deviceId: string, which: AutomationAttribute, path: (string | number)[]) => {
+    /** Where a complaint about one device of a block goes: its own field for the
+     *  first, its place in the set for the rest. */
+    const fieldOf = (
+        block: { deviceId: string; targets?: readonly { id: string }[] },
+        deviceId: string,
+        path: (string | number)[]
+    ): (string | number)[] => {
+        if (deviceId === block.deviceId) return [...path, "deviceId"];
+        const index = (block.targets ?? []).findIndex((ref) => ref.id === deviceId);
+        return [...path, "targets", Math.max(0, index), "id"];
+    };
+    const watchedOne = (
+        block: { deviceId: string; targets?: readonly { id: string }[] },
+        deviceId: string,
+        which: AutomationAttribute,
+        path: (string | number)[]
+    ) => {
         const device = byId.get(deviceId);
         if (!device) {
-            issues.push({ path: [...path, "deviceId"], message: "automations.errors.deviceGone" });
+            issues.push({
+                path: fieldOf(block, deviceId, path),
+                message: "automations.errors.deviceGone"
+            });
             return;
         }
         if (!attributesFor(device.kind).includes(which)) {
             issues.push({ path: [...path, "attribute"], message: "automations.errors.attribute" });
         }
     };
-    const sensor = (deviceId: string, path: (string | number)[], measure?: ReadingMeasure) => {
-        const device = byId.get(deviceId);
-        if (!device)
-            issues.push({ path: [...path, "deviceId"], message: "automations.errors.deviceGone" });
-        else if (!measures(device.kind)) {
-            issues.push({ path: [...path, "deviceId"], message: "automations.errors.notSensor" });
-        } else if (measure !== undefined && !measuresFor(device.kind).includes(measure)) {
-            // A figure only a purifier has, named on something that is not one.
-            issues.push({ path: [...path, "measure"], message: "automations.errors.measure" });
+    const watched = (
+        block: { deviceId: string; targets?: readonly { kind: string; id: string }[] },
+        which: AutomationAttribute,
+        path: (string | number)[]
+    ) => {
+        for (const deviceId of deviceTargets(block)) watchedOne(block, deviceId, which, path);
+    };
+    const sensor = (
+        block: { deviceId: string; targets?: readonly { kind: string; id: string }[] },
+        path: (string | number)[],
+        measure?: ReadingMeasure
+    ) => {
+        for (const deviceId of deviceTargets(block)) {
+            const device = byId.get(deviceId);
+            const field = fieldOf(block, deviceId, path);
+            if (!device) issues.push({ path: field, message: "automations.errors.deviceGone" });
+            else if (!measures(device.kind)) {
+                issues.push({ path: field, message: "automations.errors.notSensor" });
+            } else if (measure !== undefined && !measuresFor(device.kind).includes(measure)) {
+                // A figure only a purifier has, named on something that is not one.
+                issues.push({ path: [...path, "measure"], message: "automations.errors.measure" });
+            }
         }
     };
 
     definition.triggers.forEach((trigger, index) => {
         const at = ["definition", "triggers", index];
         if (trigger.kind === "change" || trigger.kind === "stays") {
-            watched(trigger.deviceId, trigger.attribute, at);
+            watched(trigger, trigger.attribute, at);
         }
-        if (trigger.kind === "threshold") sensor(trigger.deviceId, at, trigger.measure);
+        if (trigger.kind === "threshold") sensor(trigger, at, trigger.measure);
     });
     definition.conditions.groups.forEach((group, index) =>
         group.items.forEach((condition, item) => {
             const at = ["definition", "conditions", "groups", index, "items", item];
-            if (condition.kind === "device") watched(condition.deviceId, condition.attribute, at);
-            if (condition.kind === "reading") sensor(condition.deviceId, at, condition.measure);
+            if (condition.kind === "device") watched(condition, condition.attribute, at);
+            if (condition.kind === "reading") sensor(condition, at, condition.measure);
         })
     );
     definition.actions.forEach((step, index) => {
         const at = ["definition", "actions", index];
-        if (step.kind === "wait") watched(step.deviceId, step.attribute, at);
+        if (step.kind === "wait") watchedOne(step, step.deviceId, step.attribute, at);
         if (step.kind === "device") {
             const device = byId.get(step.deviceId);
             if (!device) {
@@ -1023,8 +1177,16 @@ export function blankStep(kind: StepKind): Step {
     }
 }
 
+/** A block with its set dropped: pointed at another device, it starts over. */
+function single<T extends object>(block: T): T {
+    if (!("targets" in block)) return block;
+    const { targets: _was, ...rest } = block as T & { targets?: unknown };
+    return rest as T;
+}
+
 /** A trigger pointed at `device`, with what it looks at reset to what that device has. */
-export function triggerOn(trigger: Trigger, device: DeviceView): Trigger {
+export function triggerOn(given: Trigger, device: DeviceView): Trigger {
+    const trigger = single(given);
     if (trigger.kind === "change" || trigger.kind === "stays") {
         const attribute = attributesFor(device.kind)[0] ?? "state";
         return trigger.kind === "change"
@@ -1040,7 +1202,8 @@ export function triggerOn(trigger: Trigger, device: DeviceView): Trigger {
 }
 
 /** The same for a condition. */
-export function conditionOn(condition: Condition, device: DeviceView): Condition {
+export function conditionOn(given: Condition, device: DeviceView): Condition {
+    const condition = single(given);
     if (condition.kind === "device") {
         const attribute = attributesFor(device.kind)[0] ?? "state";
         return { ...condition, deviceId: device.id, attribute, is: "" };
