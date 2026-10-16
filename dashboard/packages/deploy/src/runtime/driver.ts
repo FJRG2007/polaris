@@ -180,6 +180,10 @@ export interface AppDeployPlan {
 export interface ResourceLimits {
     readonly cpus?: number;
     readonly memoryMb?: number;
+    /** NVIDIA cards handed to the container: every one, or a count. Not a
+     *  ceiling like the two above, but carried with them because it is the
+     *  same part of the container's definition. */
+    readonly gpus?: "all" | number;
 }
 
 export interface HealthcheckSpec {

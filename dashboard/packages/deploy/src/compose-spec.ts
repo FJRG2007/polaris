@@ -113,7 +113,13 @@ export interface ComposeSpecService {
      *  no limit. */
     readonly cpus?: number;
     readonly memoryMb?: number;
+    /** NVIDIA cards handed to the container, every one or a count. Absent is
+     *  none. */
+    readonly gpus?: GpuCount;
 }
+
+/** How many NVIDIA cards a container asks for. */
+export type GpuCount = "all" | number;
 
 export interface ComposeSpec {
     readonly project: string;
@@ -422,16 +428,32 @@ function cpusValue(cpus: number): string {
 }
 
 /**
+ * The device reservation that hands a container NVIDIA cards, under
+ * `deploy.resources`. Compose turns it into a device request for the `nvidia`
+ * driver on plain compose and swarm alike. The host daemon renders the same
+ * lines (`crates/polaris-hostd/src/deploy.rs`).
+ */
+export function gpuReservationLines(gpus: GpuCount): string[] {
+    return [
+        "        reservations:",
+        "          devices:",
+        "            - driver: nvidia",
+        `              count: ${gpus === "all" ? "all" : Math.max(1, Math.floor(gpus))}`,
+        '              capabilities: ["gpu"]'
+    ];
+}
+
+/**
  * A service's `deploy:` block, or none when it needs nothing there: swarm's
  * replicas and start-first update, and the resource limits - which plain compose
  * reads from the same place, so one block serves both engines.
  */
 export function deployBlockLines(
-    service: Pick<ComposeSpecService, "replicas" | "rollingUpdate" | "cpus" | "memoryMb">
+    service: Pick<ComposeSpecService, "replicas" | "rollingUpdate" | "cpus" | "memoryMb" | "gpus">
 ): string[] {
     const replicated = service.replicas !== undefined && service.replicas > 1;
     const limited = service.cpus !== undefined || service.memoryMb !== undefined;
-    if (!replicated && !service.rollingUpdate && !limited) return [];
+    if (!replicated && !service.rollingUpdate && !limited && service.gpus === undefined) return [];
     const lines = ["    deploy:"];
     if (replicated || service.rollingUpdate) {
         lines.push(
@@ -443,6 +465,10 @@ export function deployBlockLines(
         lines.push("      resources:", "        limits:");
         if (service.cpus !== undefined) lines.push(`          cpus: "${cpusValue(service.cpus)}"`);
         if (service.memoryMb !== undefined) lines.push(`          memory: ${service.memoryMb}M`);
+    }
+    if (service.gpus !== undefined) {
+        if (!limited) lines.push("      resources:");
+        lines.push(...gpuReservationLines(service.gpus));
     }
     if (service.rollingUpdate) {
         lines.push(
@@ -636,10 +662,11 @@ function dbPullPolicy(plan: DbDeployPlan): ComposePullPolicy {
 /** A plan's limits as spec fields, leaving out the ones it does not set. */
 function limitFields(
     limits: ResourceLimits | undefined
-): Pick<ComposeSpecService, "cpus" | "memoryMb"> {
+): Pick<ComposeSpecService, "cpus" | "memoryMb" | "gpus"> {
     return {
         ...(limits?.cpus !== undefined ? { cpus: limits.cpus } : {}),
-        ...(limits?.memoryMb !== undefined ? { memoryMb: limits.memoryMb } : {})
+        ...(limits?.memoryMb !== undefined ? { memoryMb: limits.memoryMb } : {}),
+        ...(limits?.gpus !== undefined ? { gpus: limits.gpus } : {})
     };
 }
 
