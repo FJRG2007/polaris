@@ -431,6 +431,14 @@ services:
       dockerfile: crates/polaris-hostd/Dockerfile
     pull_policy: always
     restart: unless-stopped
+    # On the host's network, because the kernel keeps an SMB/NFS mount's connection
+    # in the network namespace of the process that mounted it. On a network of its
+    # own, every update that recreated this container took that namespace's
+    # interface away with it: each share it had mounted stopped answering ("has not
+    # responded in 180 seconds"), was mounted again by the new container, and every
+    # service on it was restarted - an outage on every update. The daemon only
+    # speaks over its unix socket, so it reaches nothing by a container name.
+    network_mode: host
     # Required for kernel mounts (SMB/NFS) and host filesystem access.
     privileged: true
     environment:
@@ -620,6 +628,20 @@ services:
     # so it needs the same way to reach the host that Traefik does.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Both listeners, because the edge depends on both. An update starts the new guard
+    # beside the running one and retires the old one only once this passes, so this is
+    # what stands between a release and a deployed app's requests failing mid-update.
+    # The image has node and nothing else, so node asks.
+    healthcheck:
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "Promise.all([8080,8081].map(p=>fetch('http://127.0.0.1:'+p+'/health'))).then(r=>process.exit(r.every(x=>x.ok)?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # --- Minecraft hostname routing -------------------------------------------
   # One port for every Java server. A Java client puts the address it was given

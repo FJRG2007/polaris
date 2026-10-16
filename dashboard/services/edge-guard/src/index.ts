@@ -13,6 +13,7 @@ import { createIntelSource } from "./intel.js";
 import { createControlPlaneWatch, probeHealth } from "./control-plane.js";
 import { createProxyServer } from "./proxy.js";
 import { createGuardServer } from "./server.js";
+import { exitGracefully } from "./shutdown.js";
 
 /** Bans, Tor exits and flagged addresses, published by Polaris into a shared volume
  *  and held in memory here. Unset = the feature is not deployed; the guard then
@@ -63,7 +64,7 @@ if (!startup.authorizeUrl) {
     );
 }
 
-createGuardServer(loadConfig).listen(port, () => {
+const guard = createGuardServer(loadConfig).listen(port, () => {
     console.log(`polaris-edge-guard listening on :${port}`);
 });
 
@@ -77,6 +78,10 @@ createGuardServer(loadConfig).listen(port, () => {
  * page served as an auth check or its auth check served as a page.
  */
 const proxyPort = Number(process.env.POLARIS_EDGE_PROXY_PORT ?? 8081);
-createProxyServer(loadConfig).listen(proxyPort, () => {
+const proxy = createProxyServer(loadConfig).listen(proxyPort, () => {
     console.log(`polaris-edge-guard proxy listening on :${proxyPort}`);
 });
+
+/** An update stops this container only once its replacement is answering beside it;
+ *  what is in flight here when that happens is finished, not cut (see shutdown.ts). */
+exitGracefully([guard, proxy]);

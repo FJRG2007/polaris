@@ -19,6 +19,7 @@
 import JSZip from "jszip";
 import { createHash } from "node:crypto";
 import { loadEnv } from "@polaris/config";
+import { afterPredecessor } from "@/lib/deploy/dashboard-peers";
 import { dirname, join, sep } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -233,7 +234,12 @@ export function ensureBundle(id: string): Promise<string> {
         verify(bytes, ref);
         await mkdir(dirname(target), { recursive: true });
         await unpack(bytes, id, target);
-        await dropOthers(id, hexOf(ref.digest));
+        // The previous build's folder is the one the dashboard this one replaces is
+        // still loading the app's code from while it serves, so it goes once that
+        // dashboard has been retired rather than from under it.
+        void afterPredecessor()
+            .then(() => dropOthers(id, hexOf(ref.digest)))
+            .catch(() => undefined);
         return target;
     })().finally(() => inflight.delete(id));
     inflight.set(id, work);

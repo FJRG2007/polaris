@@ -28,7 +28,7 @@
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as pause } from "node:timers/promises";
-import { rename, unlink, writeFile } from "node:fs/promises";
+import { chmod, readFile, rename, unlink, writeFile } from "node:fs/promises";
 
 /**
  * How many times a rename that was refused is tried again, and how long it waits
@@ -64,13 +64,23 @@ export function dynamicPath(fileName: string): string {
  *
  * `mode` is applied to the temporary file and carried over by the rename, so a key
  * written 0600 is never briefly readable under its final name.
+ *
+ * A file that already holds exactly `content` is left alone. Boot passes, the health
+ * probe and every deploy republish whole files, and during an update two dashboards
+ * do it at once; a rename the edge did not need is a reload it did not need, so only
+ * a change ever reaches the directory. `force` writes it anyway: a repair for an edge
+ * that never took the file it holds needs the rename to make it read it again.
  */
 export async function writeDynamicFile(
     fileName: string,
     content: string,
-    options: { mode?: number } = {}
+    options: { mode?: number; force?: boolean } = {}
 ): Promise<void> {
     const target = dynamicPath(fileName);
+    if (!options.force && (await readFile(target, "utf8").catch(() => null)) === content) {
+        if (options.mode !== undefined) await chmod(target, options.mode).catch(() => undefined);
+        return;
+    }
     const temp = `${target}.${randomUUID()}.tmp`;
     try {
         await writeFile(temp, content, { encoding: "utf8", mode: options.mode });

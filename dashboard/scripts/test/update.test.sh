@@ -33,17 +33,28 @@ eval "$(extract container_ready)"
 eval "$(extract wait_ready)"
 eval "$(extract edge_labels)"
 eval "$(extract retire)"
+eval "$(extract roll_over)"
 eval "$(extract roll_dashboard)"
+eval "$(extract container_networks)"
+eval "$(extract connect_networks)"
+eval "$(extract recreate_in_place)"
+eval "$(extract in_list)"
+eval "$(extract replace_service)"
+eval "$(sed -n '/^ROLLING_SERVICES=/p; /^SINGLE_INSTANCE_SERVICES=/p' "$update_sh")"
 eval "$(extract roll_service)"
 eval "$(extract room_to_update)"
 MIN_FREE_KB=$((5 * 1024 * 1024))
 
-for fn in compose_hash container_hash container_image container_ref image_id container_ready wait_ready edge_labels retire roll_dashboard roll_service room_to_update; do
+for fn in compose_hash container_hash container_image container_ref image_id container_ready wait_ready edge_labels retire roll_over roll_dashboard container_networks connect_networks recreate_in_place in_list replace_service roll_service room_to_update; do
     if ! command -v "$fn" >/dev/null 2>&1; then
         printf 'setup failed: %s was not extracted from %s\n' "$fn" "$update_sh" >&2
         exit 2
     fi
 done
+if [ -z "${ROLLING_SERVICES:-}" ] || [ -z "${SINGLE_INSTANCE_SERVICES:-}" ]; then
+    printf 'setup failed: the service lists were not extracted from %s\n' "$update_sh" >&2
+    exit 2
+fi
 
 READY_TIMEOUT=3
 compose=compose
@@ -100,6 +111,7 @@ docker() {
                     ;;
                 *State.Status*) printf 'running' ;;
                 *State.Health*) printf 'healthy' ;;
+                *NetworkSettings*) : ;;
                 *range*) printf 'traefik.enable=true\n' ;;
             esac
             ;;
@@ -272,15 +284,59 @@ else
     bad "roll_service: an unchanged service was recreated (started:$svc_started)"
 fi
 
-# A patch upstream. `v1.13` is a moving tag - that is how patches are meant to
-# arrive - so the same name now resolves to a different image and the service has
-# to be recreated to pick it up.
+# A patch upstream. `v1.13` is a moving tag, so the same name now resolves to a
+# different image - but the call server is one process on the host's network, and
+# replacing it drops every call in it. An update does not do that for a patch: it
+# names the patch in the log and leaves the container running.
 reset_service
 SVC_RESOLVES=sha-b
-roll_service livekit >/dev/null
+held_log=""
+log() { held_log="$held_log|$1"; }
+roll_service livekit
+log() { :; }
+if [ -z "$svc_started" ]; then
+    ok "roll_service: a patched moving tag does not interrupt the call server"
+else
+    bad "roll_service: a patched moving tag recreated the call server (started:$svc_started)"
+fi
+case "$held_log" in
+    *"newer livekit/livekit-server:v1.13 was published"*"not applied now"*) ok "roll_service: the held patch is named in the update log" ;;
+    *) bad "roll_service: the held patch was not logged (logged:$held_log)" ;;
+esac
+
+# The same holds for every service that cannot run twice.
+for held in postgres traefik mc-router caddy; do
+    reset_service
+    SVC_RESOLVES=sha-b
+    roll_service "$held" >/dev/null
+    if [ -z "$svc_started" ]; then
+        ok "roll_service: a patched moving tag leaves $held running"
+    else
+        bad "roll_service: a patched moving tag recreated $held (started:$svc_started)"
+    fi
+done
+
+# A service in no request path takes its patch: the daemon's mounts live in the
+# host's network namespace, so recreating it interrupts nothing that is deployed.
+for moved in hostd mdns; do
+    reset_service
+    SVC_RESOLVES=sha-b
+    roll_service "$moved" >/dev/null
+    case "$svc_started" in
+        *"$moved"*) ok "roll_service: a newer image recreates $moved" ;;
+        *) bad "roll_service: a moved tag did not recreate $moved (started:$svc_started)" ;;
+    esac
+done
+
+# A definition change to a service that cannot run twice is still applied: the
+# dashboard of the same release may depend on it.
+reset_service
+SVC_WANT_HASH=hash-b
+SVC_RESOLVES=sha-b
+roll_service traefik >/dev/null
 case "$svc_started" in
-    *livekit*) ok "roll_service: a genuinely newer image is picked up" ;;
-    *) bad "roll_service: a moved tag did not recreate the service (started:$svc_started)" ;;
+    *traefik*) ok "roll_service: changed wiring still recreates the edge" ;;
+    *) bad "roll_service: changed wiring did not recreate the edge (started:$svc_started)" ;;
 esac
 
 # The release changed the service's wiring. The image can be byte-identical and
@@ -325,6 +381,129 @@ if [ -z "$svc_started" ]; then
 else
     bad "roll_service: an unresolvable image recreated the service (started:$svc_started)"
 fi
+
+# --- the edge guard rolls over --------------------------------------------
+# The edge asks the guard about every guarded request, so it is replaced the way
+# the dashboard is: the new container starts beside the old one, has to pass its
+# healthcheck, and only then is the old one stopped. Both answer to the same
+# network alias meanwhile. And the new one joins the private networks of deployed
+# environments the old one had been attached to since it started, which compose
+# knows nothing about - and only those: a network the compose file no longer gives
+# the service (`polaris_apps` here) is not put back.
+g_started=""
+g_retired=""
+g_removed=""
+g_connected=""
+g_scaled=0
+G_HEALTH=healthy
+G_WANT_HASH=hash-a
+G_HAVE_HASH=hash-a
+
+compose() {
+    case "$1 ${2:-}" in
+        "ps -q")
+            case "$g_scaled" in
+                1) printf 'guard1\nguard2\n' ;;
+                2) printf 'guard2\n' ;;
+                *) printf 'guard1\n' ;;
+            esac
+            ;;
+        "config --hash") printf '%s %s\n' "${3:-}" "$G_WANT_HASH" ;;
+        "up -d")
+            g_started="$g_started $*"
+            case "$*" in *--scale*) g_scaled=1 ;; *) g_scaled=2 ;; esac
+            ;;
+        "build "*) g_started="$g_started build" ;;
+    esac
+}
+
+docker() {
+    case "$1 ${2:-}" in
+        "inspect --format")
+            case "$3" in
+                *Config.Image*) printf 'ghcr.io/x/polaris-edge-guard:latest' ;;
+                *config-hash*) printf '%s' "$G_HAVE_HASH" ;;
+                *State.Status*) printf 'running' ;;
+                *State.Health*) [ "$4" = "guard2" ] && printf '%s' "$G_HEALTH" || printf 'healthy' ;;
+                *NetworkSettings*)
+                    case "$4" in
+                        guard1) printf 'polaris_default\npolaris-proxy\npolaris_apps\npolaris-net-e0123456789\n' ;;
+                        guard2) printf 'polaris_default\npolaris-proxy\n' ;;
+                    esac
+                    ;;
+                *range*) : ;;
+                *.Image*) [ "$4" = "guard1" ] && printf 'sha-old' || printf 'sha-new' ;;
+            esac
+            ;;
+        "image inspect") printf 'sha-new' ;;
+        "network connect") g_connected="$g_connected $3>$4" ;;
+        "stop -t") g_retired="$g_retired ${4:-}" ;;
+        "rm -f") g_removed="$g_removed ${3:-}" ;;
+        "logs --tail") : ;;
+    esac
+}
+
+reset_guard() {
+    g_started=""
+    g_retired=""
+    g_removed=""
+    g_connected=""
+    g_scaled=0
+    G_HEALTH=healthy
+    G_WANT_HASH=hash-a
+    G_HAVE_HASH=hash-a
+}
+
+reset_guard
+roll_service edge-guard >/dev/null
+case "$g_started" in
+    *"--no-recreate --scale edge-guard=2 edge-guard"*) ok "edge guard: a newer image starts a second guard beside the running one" ;;
+    *) bad "edge guard: no side-by-side start (started:$g_started)" ;;
+esac
+case "$g_retired" in
+    " guard1") ok "edge guard: the previous guard is retired once the new one is healthy" ;;
+    *) bad "edge guard: wrong containers retired (retired:$g_retired)" ;;
+esac
+case "$g_connected" in
+    " polaris-net-e0123456789>guard2") ok "edge guard: the new guard joins the private networks the old one was on" ;;
+    *) bad "edge guard: private networks not carried over (connected:$g_connected)" ;;
+esac
+
+# A new guard that never becomes healthy is removed, and the one that is serving
+# stays - the update goes on rather than leaving deployed apps without a guard.
+reset_guard
+G_HEALTH=unhealthy
+if roll_service edge-guard >/dev/null; then
+    ok "edge guard: a failed rollover does not abort the update"
+else
+    bad "edge guard: a failed rollover aborted the update"
+fi
+if [ -z "$g_retired" ] && [ "$g_removed" = " guard2" ]; then
+    ok "edge guard: an unhealthy new guard is removed and the old one keeps serving"
+else
+    bad "edge guard: unhealthy rollover retired:$g_retired removed:$g_removed"
+fi
+
+# On a source build the guard is built before the rollover starts it.
+reset_guard
+G_WANT_HASH=hash-b
+build_flag="--build"
+roll_service edge-guard >/dev/null
+build_flag=""
+case "$g_started" in
+    " build "*--scale*) ok "edge guard: a source build builds the guard before rolling it over" ;;
+    *) bad "edge guard: source build order wrong (started:$g_started)" ;;
+esac
+
+# An in-place recreate keeps the private networks too: the edge itself, when a
+# release changes how it is wired, must not come back unable to reach a service
+# whose port is closed.
+reset_guard
+recreate_in_place traefik >/dev/null
+case "$g_connected" in
+    " polaris-net-e0123456789>guard2") ok "recreate_in_place: the recreated container rejoins its private networks" ;;
+    *) bad "recreate_in_place: private networks not restored (connected:$g_connected)" ;;
+esac
 
 # The dashboard this update just started redeploys its apps' workers at boot,
 # and an image being fetched has no container on it yet: to a prune from out

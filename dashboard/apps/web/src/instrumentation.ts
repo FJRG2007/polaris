@@ -40,8 +40,18 @@ export async function register(): Promise<void> {
     // Sample consumption of deployed apps and Drive devices on an interval, so the
     // dashboard can chart history and not just the live value. Self-guarding: a bad
     // tick only logs. Skipped during the build (register runs at server start).
+    //
+    // This and every other loop below that acts on its own - starting deploys,
+    // restarting containers, recreating tunnels, ordering certificates, counting
+    // visits - waits for the dashboard this one replaced to be retired. An update
+    // starts this process while the previous one still serves and still runs all
+    // of them; started here as well, each would do its work twice for the length of
+    // the rollover: two deploys of one commit, two restarts of the call server, a
+    // tunnel recreated under a name the other is serving. The previous process keeps
+    // them running until the moment it stops, so nothing is missed by waiting.
+    const { afterPredecessor, whenAlone } = await import("./lib/deploy/dashboard-peers");
     const { startMetricsCollector } = await import("./lib/metrics-collector-service");
-    startMetricsCollector();
+    void afterPredecessor().then(startMetricsCollector);
 
     // Write the Traefik dynamic routes for deployed-app domains on startup, so the
     // edge self-heals after a restart or a fresh dynamic volume. Best-effort.
@@ -49,7 +59,12 @@ export async function register(): Promise<void> {
         "./lib/deploy-service"
     );
     const { guardVacantReachable } = await import("./lib/deploy/router");
-    void syncAppRoutes()
+    //
+    // Published at once - the routes are read from the database, so both dashboards
+    // write the same file and an unchanged one is not rewritten - but the releases a
+    // change-over kept running are only retired once this is the only dashboard: a
+    // promotion the previous one is in the middle of is draining them itself.
+    void syncAppRoutes({ retireHeld: false })
         .then(async () => {
             // The edge guard container starts alongside this one and nothing sequences
             // the two, so this first sync can easily run before it answers. What that
@@ -60,17 +75,27 @@ export async function register(): Promise<void> {
             // idempotent; a repeat that was not needed costs one file write.
             if (await guardVacantReachable()) return;
             setTimeout(() => {
-                void syncAppRoutes().catch((error) =>
+                void syncAppRoutes({ retireHeld: false }).catch((error) =>
                     console.error("polaris: the route resync for the edge guard failed:", error)
                 );
             }, 30_000).unref();
         })
         .catch((error) => console.error("polaris: initial route sync failed:", error));
+    void afterPredecessor()
+        .then(() => syncAppRoutes())
+        .catch((error) =>
+            console.error("polaris: the route sync after the rollover failed:", error)
+        );
 
     // Close out deploys this process cannot possibly be running: the deploy queue is
     // in memory, so anything left mid-flight by the previous process is abandoned, and
     // a row that still reads DEPLOYING is one an operator waits on instead of retrying.
-    void recoverAbandonedDeployments().catch((error) =>
+    //
+    // Only once that previous process is gone. An update starts this one while the
+    // old dashboard is still serving, and a deploy it is running then is live, not
+    // abandoned: closing it out here failed it on screen and on GitHub while it went
+    // on to finish (see lib/deploy/dashboard-peers.ts).
+    void whenAlone(recoverAbandonedDeployments).catch((error) =>
         console.error("polaris: could not close out interrupted deploys:", error)
     );
 
@@ -113,29 +138,29 @@ export async function register(): Promise<void> {
     // Migrate any quick tunnel still forwarding straight to an app's port onto the edge,
     // so its traffic is logged (and future restarts leave an edge tunnel untouched).
     const { reconcileQuickTunnels } = await import("./lib/deploy/quick-tunnel-service");
-    void reconcileQuickTunnels().catch((error) =>
-        console.error("polaris: quick-tunnel reconcile failed:", error)
-    );
+    void afterPredecessor()
+        .then(reconcileQuickTunnels)
+        .catch((error) => console.error("polaris: quick-tunnel reconcile failed:", error));
 
     // And the server's own tunnel, for the same reason: a connector raised against an
     // origin that has since changed keeps running and forwards into nothing. Only one
     // whose origin no longer matches is recreated, so a healthy tunnel keeps its URL.
     const { reconcileTunnel } = await import("./lib/tunnel-service");
-    void reconcileTunnel();
+    void afterPredecessor().then(reconcileTunnel);
 
     // Re-establish NAS volume mounts a host reboot dropped, restarting any app whose
     // mount had to be re-created - so a NAS-backed volume survives reboots like a real
     // docker volume. Best-effort; a routine restart keeps live mounts and is a no-op.
-    void reconcileNasMounts().catch((error) =>
-        console.error("polaris: initial NAS mount reconcile failed:", error)
-    );
+    void afterPredecessor()
+        .then(reconcileNasMounts)
+        .catch((error) => console.error("polaris: initial NAS mount reconcile failed:", error));
 
     // And keep them attached afterwards: a NAS that drops or changes address
     // takes a running service's volumes with it, and the service keeps running
     // with every file answering "Host is down". The watcher mends what it can and
     // tells the service's owner what it cannot.
     const { startVolumeWatcher } = await import("./lib/deploy/volume-watch");
-    startVolumeWatcher();
+    void afterPredecessor().then(startVolumeWatcher);
 
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
@@ -149,7 +174,7 @@ export async function register(): Promise<void> {
     // waiting out an order of its own. A no-op on an instance with no Cloudflare token
     // or no deploy domain, which is why it needs no setting to turn it on.
     const { startWildcardCertRenewal } = await import("./lib/wildcard-cert-service");
-    startWildcardCertRenewal();
+    void afterPredecessor().then(startWildcardCertRenewal);
 
     // Re-publish the certificates operators supplied for their own domains. Re-judged
     // rather than restored: the one thing that changes about a certificate with nobody
@@ -173,7 +198,7 @@ export async function register(): Promise<void> {
     // Vercel-style auto-deploy: poll connected GitHub repos and redeploy on a new
     // commit. Works without a public webhook (LAN installs can't receive one).
     const { startAutoDeployPoller } = await import("./lib/deploy/auto-deploy-poller");
-    startAutoDeployPoller();
+    void afterPredecessor().then(startAutoDeployPoller);
 
     // Keep a configured DuckDNS record pointed at the current public IP so a free
     // dynamic-DNS wildcard base stays reachable as the ISP IP changes.
@@ -198,7 +223,7 @@ export async function register(): Promise<void> {
     // and a quick tunnel whose sidecar died is dropped instead of staying on the
     // sharing path.
     const { startAddressWatcher } = await import("./lib/address-health");
-    startAddressWatcher();
+    void afterPredecessor().then(startAddressWatcher);
 
     // Watch for a published Polaris build: tell the people who can install one, and
     // install it unattended when the deployment has been set to do that.
@@ -214,21 +239,21 @@ export async function register(): Promise<void> {
     // job and exited, and remove the registrations left behind by a machine that
     // died mid-job, which GitHub would otherwise keep queueing work onto.
     const { startRunnerReconciler } = await import("./lib/runners/runner-reconciler");
-    startRunnerReconciler();
+    void afterPredecessor().then(startRunnerReconciler);
 
     // Read the edge's access log on an interval and ban the addresses that have
     // earned it - the fail2ban half of the firewall, which a forwardAuth guard cannot
     // do itself because it is asked before the response (and its status) exists. Also
     // refreshes the Tor exit list and republishes the snapshot the guard enforces.
     const { startWafSentinel } = await import("./lib/waf-sentinel");
-    startWafSentinel();
+    void afterPredecessor().then(startWafSentinel);
 
     // Fold the same access log into visits, so every deployed service has analytics
     // the moment it has a domain - no script tag, no redeploy, nothing for the app to
     // cooperate with. Also rolls each finished day into totals and drops the raw rows
     // past the retention window.
     const { startAnalyticsCollector } = await import("./lib/analytics-collector");
-    startAnalyticsCollector();
+    void afterPredecessor().then(startAnalyticsCollector);
 
     // Keep the schedules Polaris has been given: backup plans, task reminders, the
     // walk that lifts a game timeout when it runs out, and the sweeps that used to
@@ -250,7 +275,7 @@ export async function register(): Promise<void> {
     // What the installed apps start with the server: Places brings its own
     // containers to this build and starts listening to its cameras.
     const { bootApps } = await import("./lib/app-extensions/registry");
-    bootApps();
+    void afterPredecessor().then(bootApps);
 
     // Re-establish messaging channels in the bridge after a bridge or web restart:
     // the bridge holds adapters in memory, so without this a channel stays
@@ -265,7 +290,7 @@ export async function register(): Promise<void> {
     // in the product says the call is healthy. Restarting it is the whole
     // repair, so Polaris does that itself and tells an administrator afterwards.
     const { startCallAddressWatch } = await import("./lib/chat/call-address-watch");
-    startCallAddressWatch();
+    void afterPredecessor().then(startCallAddressWatch);
 }
 
 /** How long each further attempt waits, in order. Backed off rather than
