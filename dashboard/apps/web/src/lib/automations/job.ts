@@ -46,34 +46,49 @@ export async function runAutomationsPass(): Promise<Record<string, number>> {
     return { started: intake ?? 0, resumed: resumed.length, stepped: runs.length, pruned };
 }
 
+/** Runs that were turned away at the door: they never ran, so only the newest few are worth keeping. */
+const TURNED_AWAY = ["limited", "skipped", "refused"];
+const PRUNE_BATCH = 50;
+let pruneCursor: string | undefined;
+
+/** Finished runs matching `where` past the newest `keep`, and older than `floor` when one is given. */
+async function pruneRuns(automationId: string, where: Record<string, unknown>, keep: number, floor: Date | null): Promise<number> {
+    const keepFrom = await prisma.automationRun.findMany({
+        where: { automationId, ...where },
+        orderBy: { queuedAt: "desc" },
+        skip: keep - 1,
+        take: 1,
+        select: { queuedAt: true }
+    });
+    if (keepFrom.length === 0) return 0;
+    const before = floor ? new Date(Math.min(keepFrom[0]!.queuedAt.getTime(), floor.getTime())) : keepFrom[0]!.queuedAt;
+    const gone = await prisma.automationRun.deleteMany({
+        where: { automationId, ...where, finishedAt: { not: null }, queuedAt: { lt: before } }
+    });
+    return gone.count;
+}
+
 /**
- * Keep 100 runs per automation and 30 days, whichever keeps more (test runs:
- * 20), and processed events for 7 days. Bounded per pass.
+ * Keep 100 runs per automation and 30 days, whichever keeps more; runs turned
+ * away (rate limited, skipped, refused) and test runs only by count, 100 and
+ * 20. Processed events for 7 days. Bounded per pass: a batch of automations,
+ * the next batch on the next pass, so every automation is reached in turn.
  */
 export async function pruneAutomationHistory(): Promise<number> {
     const now = Date.now();
     const cutoff = new Date(now - L.keepRunsDays * DAY);
     let removed = 0;
-    const old = await prisma.automationRun.findMany({
-        where: { finishedAt: { lt: cutoff } },
-        distinct: ["automationId"],
-        select: { automationId: true },
-        take: 50
+    const batch = await prisma.automation.findMany({
+        where: pruneCursor ? { id: { gt: pruneCursor } } : {},
+        orderBy: { id: "asc" },
+        select: { id: true },
+        take: PRUNE_BATCH
     });
-    for (const { automationId } of old) {
-        const keepFrom = await prisma.automationRun.findMany({
-            where: { automationId, test: false },
-            orderBy: { queuedAt: "desc" },
-            skip: L.keepRuns - 1,
-            take: 1,
-            select: { queuedAt: true }
-        });
-        if (keepFrom.length === 0) continue;
-        const before = new Date(Math.min(keepFrom[0]!.queuedAt.getTime(), cutoff.getTime()));
-        const gone = await prisma.automationRun.deleteMany({
-            where: { automationId, test: false, finishedAt: { not: null }, queuedAt: { lt: before } }
-        });
-        removed += gone.count;
+    pruneCursor = batch.length === PRUNE_BATCH ? batch[batch.length - 1]!.id : undefined;
+    for (const { id: automationId } of batch) {
+        removed += await pruneRuns(automationId, { test: false, status: { in: TURNED_AWAY } }, L.keepRuns, null);
+        removed += await pruneRuns(automationId, { test: false, status: { notIn: TURNED_AWAY } }, L.keepRuns, cutoff);
+        removed += await pruneRuns(automationId, { test: true }, L.keepTestRuns, null);
     }
     const events = await prisma.automationEvent.deleteMany({
         where: { processedAt: { lt: new Date(now - L.eventKeepDays * DAY) } }

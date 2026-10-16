@@ -155,6 +155,24 @@ export function useRunError(): (code: string | null) => string | null {
     };
 }
 
+const NODE_KEYS = {
+    "core.manual": "manual",
+    "core.schedule": "schedule",
+    "core.webhook": "webhook",
+    "core.if": "if",
+    "core.wait": "wait",
+    "core.notify": "notify",
+    "core.http": "http",
+    "core.chat": "chat"
+} as const;
+type NodeKey = (typeof NODE_KEYS)[keyof typeof NODE_KEYS];
+
+/** A node type in the reader's words. */
+export function nodeTitle(t: ReturnType<typeof useTranslations<"automations">>, type: string): string {
+    const key = (NODE_KEYS as Record<string, NodeKey>)[type];
+    return key ? t(`nodes.${key}`) : t("nodes.unknown");
+}
+
 export function Section({ title, hint, children, action }: { title: string; hint?: string; children: ReactNode; action?: ReactNode }) {
     return (
         <section className="space-y-3">

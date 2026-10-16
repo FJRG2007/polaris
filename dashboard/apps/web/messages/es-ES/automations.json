@@ -204,7 +204,16 @@
         "cancel": "Cancelar",
         "cancelled": "Cancelada",
         "finallyFailed": "También fallaron los finales",
-        "refresh": "Recargar"
+        "refresh": "Recargar",
+        "loadMore": "Cargar anteriores",
+        "showSteps": "Ver pasos",
+        "hideSteps": "Ocultar pasos",
+        "stepsFailed": "No se pudieron cargar los pasos.",
+        "noSteps": "No se ejecutó ningún paso.",
+        "showData": "Datos",
+        "hideData": "Ocultar",
+        "input": "Enviado",
+        "output": "Recibido"
     },
     "runErrors": {
         "alreadyRunning": "Ya en curso",

@@ -39,21 +39,7 @@ import {
     setLocalNetworkAction,
     updateSettingsAction
 } from "../actions";
-import { LoadFailed, RowsSkeleton, Section, useCachedAction } from "../shared";
-
-type T = ReturnType<typeof useTranslations<"automations">>;
-
-const NODE_KEYS = {
-    "core.manual": "manual",
-    "core.schedule": "schedule",
-    "core.webhook": "webhook",
-    "core.if": "if",
-    "core.wait": "wait",
-    "core.notify": "notify",
-    "core.http": "http",
-    "core.chat": "chat"
-} as const;
-type NodeKey = (typeof NODE_KEYS)[keyof typeof NODE_KEYS];
+import { LoadFailed, nodeTitle, RowsSkeleton, Section, useCachedAction } from "../shared";
 
 const TRIGGER_TYPES = ["core.manual", "core.schedule", "core.webhook"] as const;
 const STEP_TYPES = ["core.if", "core.wait", "core.notify", "core.http", "core.chat"] as const;
@@ -81,11 +67,6 @@ const DEFAULT_CONFIG: Record<string, () => unknown> = {
 
 function newNode(type: string): core.GraphNode {
     return { id: core.automationNodeId(), type, typeVersion: 1, config: DEFAULT_CONFIG[type]?.() ?? {} };
-}
-
-function nodeTitle(t: T, type: string): string {
-    const key = (NODE_KEYS as Record<string, NodeKey>)[type];
-    return key ? t(`nodes.${key}`) : t("nodes.unknown");
 }
 
 function configValid(node: core.GraphNode): boolean {
@@ -129,6 +110,8 @@ function Loaded({ detail, secrets, onChanged }: { detail: AutomationDetail; secr
     const graph = useMemo(() => (flow ? core.graphFromList(flow) : detail.draft), [flow, detail.draft]);
     const dirty = JSON.stringify(graph) !== saved;
     const readOnly = !detail.canEdit;
+
+    useEffect(() => setSaved(JSON.stringify(detail.draft)), [detail.draft]);
 
     useEffect(() => {
         if (!dirty) return;
@@ -535,6 +518,7 @@ function NodeFields({
             return (
                 <div className="space-y-3">
                     <Field label={t("fields.method")}>
+                        {/* i18n-ignore: HTTP methods, typed as is */}
                         <Select value={config.method ?? "POST"} onValueChange={(method) => set({ method })} options={[{ value: "POST", label: "POST" }, { value: "GET", label: "GET" }, { value: "any", label: t("fields.anyMethod") }]} aria-label={t("fields.method")} />
                     </Field>
                     <div className="space-y-1 text-sm">
@@ -554,7 +538,9 @@ function NodeFields({
                             onClick={async () => {
                                 const answer = await rotateHookAction(detail.id, node.id);
                                 toast.show({ title: answer.ok ? t("editor.newAddressDone") : answer.error });
-                                if (answer.ok) onChanged();
+                                if (!answer.ok) return;
+                                set({ rotation: (typeof config.rotation === "number" ? config.rotation : 0) + 1 });
+                                onChanged();
                             }}
                         >
                             {t("editor.newAddress")}
@@ -683,6 +669,7 @@ function NodeFields({
                 <div className="space-y-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                         <Field label={t("fields.preset")}>
+                            {/* i18n-ignore: a service's own name */}
                             <Select value={config.preset} onValueChange={(preset) => set({ preset })} options={core.CHAT_PRESETS.map((preset) => ({ value: preset, label: preset === "slack" ? "Slack" : preset === "discord" ? "Discord" : "Teams" }))} aria-label={t("fields.preset")} />
                         </Field>
                         <Field label={`${t("fields.secret")} *`}>

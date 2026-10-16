@@ -204,7 +204,16 @@
         "cancel": "Cancel run",
         "cancelled": "Run cancelled",
         "finallyFailed": "The final steps failed too",
-        "refresh": "Refresh"
+        "refresh": "Refresh",
+        "loadMore": "Load older runs",
+        "showSteps": "Show steps",
+        "hideSteps": "Hide steps",
+        "stepsFailed": "The steps could not be loaded.",
+        "noSteps": "No steps ran.",
+        "showData": "Data",
+        "hideData": "Hide data",
+        "input": "Sent",
+        "output": "Received"
     },
     "runErrors": {
         "alreadyRunning": "Already running",

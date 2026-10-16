@@ -10,6 +10,7 @@
  */
 
 import * as core from "@polaris/core";
+import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
 import { networkInterfaces } from "node:os";
 import { Agent, fetch as guardedFetch } from "undici";
@@ -103,7 +104,8 @@ export const localNetworkPolicy = {
     },
     /** Every resolved address of one name, or the reason the name may not be reached. */
     async vet(hostname: string): Promise<{ address: string; family: number }[] | Error> {
-        const addresses = await resolveName(hostname).catch(() => []);
+        const literal = hostname.replace(/^\[|\]$/g, "");
+        const addresses = isIP(literal) ? [{ address: literal, family: isIP(literal) }] : await resolveName(hostname).catch(() => []);
         if (addresses.length === 0) return new Error(`${hostname} does not resolve`);
         const internal = await internalAddresses();
         for (const entry of addresses) {
@@ -135,6 +137,8 @@ async function oneHop(url: string, init: RequestInit & { timeoutMs: number }, io
     if (!localNetworkPolicy.allowed(io)) return configuredRequest(url, init, { allowPrivate: false });
     const checked = safeUrl(url, Number.POSITIVE_INFINITY);
     if (!checked) throw new RefusedAddressError();
+    if (isIP(checked.hostname.replace(/^\[|\]$/g, "")) && (await localNetworkPolicy.vet(checked.hostname)) instanceof Error)
+        throw new RefusedAddressError();
     const { timeoutMs, ...rest } = init;
     return (await guardedFetch(checked, {
         ...(rest as Parameters<typeof guardedFetch>[1]),
@@ -157,7 +161,11 @@ interface Outgoing {
     headers: Headers;
     body: string | null;
     timeoutMs: number;
+    /** Headers carrying a secret, dropped when a redirect leaves the origin. */
+    secretHeaders?: readonly string[];
 }
+
+const CREDENTIAL_HEADERS = ["authorization", "proxy-authorization", "cookie"];
 
 async function send(request: Outgoing, io: NodeIo): Promise<{ response: Response; url: string }> {
     let { method, body } = request;
@@ -175,11 +183,15 @@ async function send(request: Outgoing, io: NodeIo): Promise<{ response: Response
         const location = response.headers.get("location");
         if (response.status >= 300 && response.status < 400 && location) {
             await response.body?.cancel().catch(() => undefined);
+            let next: URL;
             try {
-                url = new URL(location, url).href;
+                next = new URL(location, url);
             } catch {
                 throw new StepError("badRedirect");
             }
+            if (next.origin !== new URL(url).origin)
+                for (const name of [...CREDENTIAL_HEADERS, ...(request.secretHeaders ?? [])]) request.headers.delete(name);
+            url = next.href;
             if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === "POST")) {
                 method = "GET";
                 body = null;
@@ -268,7 +280,8 @@ export async function buildHttpRequest(config: core.HttpConfig, context: RunCont
         }
     }
     if (body !== null && core.byteLength(body) > L.eventPayloadBytes) throw new StepError("bodyTooLarge");
-    return { method, url: url.href, headers, body, timeoutMs: config.timeoutSeconds * 1000 };
+    const secretHeaders = config.auth.kind === "header" ? [config.auth.header] : [];
+    return { method, url: url.href, headers, body, timeoutMs: config.timeoutSeconds * 1000, secretHeaders };
 }
 
 const httpNode: ServerNode<core.HttpConfig> = {

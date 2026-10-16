@@ -36,10 +36,12 @@ describe("shelf access", () => {
 });
 
 describe("the local network switch", () => {
-    it("is for an org admin on an org automation", async () => {
-        roles.byOrg = { o1: ["org.read"], o2: ["org.read", runner.ORG_EDIT_PERMISSION] };
+    it("is for an org admin on an org automation, not every editor", async () => {
+        roles.byOrg = { o1: ["org.read"], o2: ["org.read", runner.ORG_EDIT_PERMISSION], o3: ["*"] };
         expect(await runner.mayAllowLocalNetwork(member, { orgId: "o1", userId: null })).toBe(false);
-        expect(await runner.mayAllowLocalNetwork(member, { orgId: "o2", userId: null })).toBe(true);
+        expect(await runner.mayAllowLocalNetwork(member, { orgId: "o2", userId: null })).toBe(false);
+        expect(await runner.mayAllowLocalNetwork(member, { orgId: "o3", userId: null })).toBe(true);
+        expect(await runner.mayAllowLocalNetwork(member, { orgId: "o4", userId: null })).toBe(false);
     });
 
     it("is for an instance administrator on their own personal automation only", async () => {

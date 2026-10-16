@@ -209,12 +209,22 @@ export async function runNowAction(automationId: unknown): Promise<Result> {
     }
 }
 
-export async function listRunsAction(automationId: unknown): Promise<Result<{ rows: service.RunRow[] }>> {
-    const parsed = id.optional().safeParse(automationId ?? undefined);
+export async function listRunsAction(automationId: unknown, after?: unknown): Promise<Result<service.RunPage>> {
+    const parsed = z.tuple([id.optional(), z.string().max(100).optional()]).safeParse([automationId ?? undefined, after ?? undefined]);
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        return { ok: true, rows: await service.listRuns(who, await openShelf(who), parsed.data) };
+        return { ok: true, ...(await service.listRuns(who, await openShelf(who), parsed.data[0], parsed.data[1])) };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
+export async function listRunStepsAction(runId: unknown): Promise<Result<{ steps: service.RunStepRow[]; canSeeData: boolean }>> {
+    const parsed = id.safeParse(runId);
+    if (!parsed.success) return invalid();
+    try {
+        return { ok: true, ...(await service.listRunSteps(await actor(), parsed.data)) };
     } catch (caught) {
         return failure(caught);
     }

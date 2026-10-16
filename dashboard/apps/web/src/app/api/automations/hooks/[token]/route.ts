@@ -9,6 +9,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
 import { rateLimit } from "@/lib/rate-limit-service";
+import { readCappedBody } from "@/lib/request-body";
 import { hookHash } from "@/lib/automations/triggers";
 import { emitAutomationEvent, kickIntake } from "@/lib/automations/outbox";
 
@@ -19,10 +20,12 @@ const PER_MINUTE = 60;
 const KEPT_HEADERS = ["content-type", "user-agent", "x-request-id", "x-github-event", "x-event-type"];
 
 async function handle(request: Request, token: string): Promise<Response> {
+    // i18n-ignore: a reply to a machine caller, not read on screen
     if (!/^[\w-]{20,100}$/.test(token)) return Response.json({ error: "not found" }, { status: 404 });
     const hash = hookHash(token);
     const limited = await rateLimit(`automation-hook:${hash}`, PER_MINUTE, 60_000);
     if (!limited.ok)
+        // i18n-ignore: a reply to a machine caller, not read on screen
         return Response.json({ error: "rate limited" }, { status: 429, headers: { "retry-after": String(Math.ceil(limited.retryAfterMs / 1000)) } });
 
     const trigger = await prisma.automationTrigger.findUnique({
@@ -34,6 +37,7 @@ async function handle(request: Request, token: string): Promise<Response> {
         }
     });
     if (!trigger || !trigger.automation.enabled || trigger.automation.publishedVersionId !== trigger.versionId)
+        // i18n-ignore: a reply to a machine caller, not read on screen
         return Response.json({ error: "not found" }, { status: 404 });
 
     const version = await prisma.automationVersion.findUnique({ where: { id: trigger.versionId }, select: { graph: true } });
@@ -41,17 +45,22 @@ async function handle(request: Request, token: string): Promise<Response> {
     const node = graph.success ? graph.data.nodes.find((entry) => entry.id === trigger.nodeId) : undefined;
     const config = core.CORE_NODE_CONFIGS["core.webhook"].safeParse(node?.config);
     const method = config.success ? config.data.method : "POST";
+    // i18n-ignore: a reply to a machine caller, not read on screen
     if (method !== "any" && request.method !== method) return Response.json({ error: "method not allowed" }, { status: 405 });
 
     const declared = Number(request.headers.get("content-length") ?? "0");
+    // i18n-ignore: a reply to a machine caller, not read on screen
     if (declared > core.AUTOMATION_LIMITS.eventPayloadBytes) return Response.json({ error: "too large" }, { status: 413 });
-    const raw = request.method === "GET" ? "" : await request.text();
-    if (core.byteLength(raw) > core.AUTOMATION_LIMITS.eventPayloadBytes) return Response.json({ error: "too large" }, { status: 413 });
+    const bytes = request.method === "GET" ? new Uint8Array(0) : await readCappedBody(request, core.AUTOMATION_LIMITS.eventPayloadBytes).catch(() => null);
+    // i18n-ignore: a reply to a machine caller, not read on screen
+    if (!bytes) return Response.json({ error: "too large" }, { status: 413 });
+    const raw = new TextDecoder().decode(bytes);
     let body: unknown = raw;
     if ((request.headers.get("content-type") ?? "").includes("json") && raw) {
         try {
             body = JSON.parse(raw);
         } catch {
+            // i18n-ignore: a reply to a machine caller, not read on screen
             return Response.json({ error: "invalid json" }, { status: 400 });
         }
     }
@@ -66,7 +75,7 @@ async function handle(request: Request, token: string): Promise<Response> {
         userId: trigger.automation.userId,
         subjectKey: hash,
         payload: { kind: "webhook", method: request.method, query: Object.fromEntries(url.searchParams), headers, body },
-        dedupeKey: request.headers.get("idempotency-key")?.slice(0, 200) ?? randomUUID()
+        dedupeKey: `${hash}:${request.headers.get("idempotency-key")?.slice(0, 200) ?? randomUUID()}`
     });
     void kickIntake().catch((caught) => console.error("polaris: automations intake failed:", caught));
     return Response.json({ accepted: true, event: eventId }, { status: 202 });

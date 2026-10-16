@@ -23,7 +23,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
-import { automationRunner } from "./runner";
+import { automationRunner, mayAllowLocalNetwork } from "./runner";
 import { serverNode } from "./node-registry";
 import { readSecretForRun } from "./secrets";
 import { StepError, StepRefusal, type NodeIo, type RunContext } from "./types";
@@ -475,6 +475,7 @@ async function executeStep(
 ): Promise<void> {
     const node = graph.nodes.find((entry) => entry.id === step.nodeId);
     if (!node) {
+        // i18n-ignore: a stored error code, read through runErrors
         await finishStep(step.id, { status: "failed", error: "nodeMissing" });
         await failLane(run, graph, lane, "failed", "nodeMissing");
         return;
@@ -488,18 +489,21 @@ async function executeStep(
     }
     const impl = await serverNode(node.type);
     if (!impl?.run) {
+        // i18n-ignore: a stored error code, read through runErrors
         await finishStep(step.id, { status: "refused", error: "appMissing", from: "ready" });
         await failLane(run, graph, lane, "refused", "appMissing");
         return;
     }
     const actor = await automationRunner(run.automation);
     if (!actor) {
+        // i18n-ignore: a stored error code, read through runErrors
         await finishStep(step.id, { status: "refused", error: "runAsGone", from: "ready" });
         await failLane(run, graph, lane, "refused", "runAsGone");
         return;
     }
     const config = impl.config.safeParse(node.config);
     if (!config.success) {
+        // i18n-ignore: a stored error code, read through runErrors
         await finishStep(step.id, { status: "failed", error: "badConfig", from: "ready" });
         await failLane(run, graph, lane, "failed", "badConfig");
         return;
@@ -521,7 +525,7 @@ async function executeStep(
         idempotencyKey: `${run.id}:${node.id}:${lane}`,
         timeZone: graph.timeZone,
         signal: controller.signal,
-        allowLocalNetwork: run.automation.allowLocalNetwork,
+        allowLocalNetwork: run.automation.allowLocalNetwork && (await mayAllowLocalNetwork(actor, run.automation)),
         secret: async (id) => {
             const value = await readSecretForRun(id, run.automation);
             secrets.push(value);

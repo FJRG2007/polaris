@@ -302,13 +302,28 @@ export interface RunRow {
     readonly canCancel: boolean;
 }
 
-export async function listRuns(actor: RunActor, shelf: Shelf, automationId?: string): Promise<RunRow[]> {
-    if (!(await mayReadShelf(actor, shelf))) return [];
+export interface RunPage {
+    readonly rows: RunRow[];
+    /** Where the next page starts, or null on the last one. */
+    readonly next: string | null;
+}
+
+const RUNS_PAGE = 50;
+
+/** A page of runs, newest first; `after` is the `next` of the page before. */
+export async function listRuns(actor: RunActor, shelf: Shelf, automationId?: string, after?: string): Promise<RunPage> {
+    if (!(await mayReadShelf(actor, shelf))) return { rows: [], next: null };
     const canEdit = await mayEditShelf(actor, shelf);
+    const cursor = after ? parseRunCursor(after) : null;
     const rows = await prisma.automationRun.findMany({
-        where: { test: false, automation: shelfWhere(shelf), ...(automationId ? { automationId } : {}) },
-        orderBy: { queuedAt: "desc" },
-        take: 100,
+        where: {
+            test: false,
+            automation: shelfWhere(shelf),
+            ...(automationId ? { automationId } : {}),
+            ...(cursor ? { OR: [{ queuedAt: { lt: cursor.queuedAt } }, { queuedAt: cursor.queuedAt, id: { lt: cursor.id } }] } : {})
+        },
+        orderBy: [{ queuedAt: "desc" }, { id: "desc" }],
+        take: RUNS_PAGE + 1,
         select: {
             id: true,
             automationId: true,
@@ -321,18 +336,90 @@ export async function listRuns(actor: RunActor, shelf: Shelf, automationId?: str
             automation: { select: { name: true } }
         }
     });
-    return rows.map((row) => ({
-        id: row.id,
-        automationId: row.automationId,
-        automationName: row.automation.name,
-        status: row.status,
-        finally: row.finally,
-        error: row.error,
-        queuedAt: row.queuedAt.toISOString(),
-        startedAt: row.startedAt?.toISOString() ?? null,
-        finishedAt: row.finishedAt?.toISOString() ?? null,
-        canCancel: canEdit && !core.runFinished(row.status)
-    }));
+    const page = rows.slice(0, RUNS_PAGE);
+    const last = page[page.length - 1];
+    return {
+        rows: page.map((row) => ({
+            id: row.id,
+            automationId: row.automationId,
+            automationName: row.automation.name,
+            status: row.status,
+            finally: row.finally,
+            error: row.error,
+            queuedAt: row.queuedAt.toISOString(),
+            startedAt: row.startedAt?.toISOString() ?? null,
+            finishedAt: row.finishedAt?.toISOString() ?? null,
+            canCancel: canEdit && !core.runFinished(row.status)
+        })),
+        next: rows.length > RUNS_PAGE && last ? `${last.queuedAt.toISOString()}_${last.id}` : null
+    };
+}
+
+function parseRunCursor(value: string): { queuedAt: Date; id: string } | null {
+    const at = value.indexOf("_");
+    const queuedAt = new Date(value.slice(0, at));
+    const id = value.slice(at + 1);
+    return at > 0 && !Number.isNaN(queuedAt.getTime()) && /^[0-9a-f-]{36}$/i.test(id) ? { queuedAt, id } : null;
+}
+
+export interface RunStepRow {
+    readonly id: string;
+    readonly nodeId: string;
+    readonly type: string | null;
+    readonly lane: "main" | "finally";
+    readonly status: string;
+    readonly error: string | null;
+    readonly startedAt: string | null;
+    readonly finishedAt: string | null;
+    /** What the step sent and got back, as stored (capped, secrets redacted). Editors only. */
+    readonly input: unknown;
+    readonly output: unknown;
+}
+
+/** One run's steps in the order they ran. */
+export async function listRunSteps(actor: RunActor, runId: string): Promise<{ steps: RunStepRow[]; canSeeData: boolean }> {
+    const run = await prisma.automationRun.findUnique({
+        where: { id: runId },
+        select: { versionId: true, automation: { select: { orgId: true, userId: true } } }
+    });
+    if (!run || !(await mayReadShelf(actor, run.automation))) throw new AutomationAccessError("notFound");
+    const canSeeData = await mayEditShelf(actor, run.automation);
+    const [steps, version] = await Promise.all([
+        prisma.automationStep.findMany({
+            where: { runId },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            take: L.stepsPerRun,
+            select: {
+                id: true,
+                nodeId: true,
+                iteration: true,
+                status: true,
+                error: true,
+                startedAt: true,
+                finishedAt: true,
+                input: canSeeData,
+                output: canSeeData
+            }
+        }),
+        prisma.automationVersion.findUnique({ where: { id: run.versionId }, select: { graph: true } })
+    ]);
+    const graph = core.automationGraphSchema.safeParse(version?.graph);
+    const types = new Map(graph.success ? graph.data.nodes.map((node) => [node.id, node.type]) : []);
+    return {
+        canSeeData,
+        steps: steps.map((step) => ({
+            id: step.id,
+            nodeId: step.nodeId,
+            type: types.get(step.nodeId) ?? null,
+            lane: step.iteration === "f" ? "finally" : "main",
+            status: step.status,
+            error: step.error,
+            startedAt: step.startedAt?.toISOString() ?? null,
+            finishedAt: step.finishedAt?.toISOString() ?? null,
+            input: canSeeData ? (step.input ?? null) : null,
+            output: canSeeData ? (step.output ?? null) : null
+        }))
+    };
 }
 
 export async function cancelRunFor(actor: RunActor, runId: string): Promise<void> {

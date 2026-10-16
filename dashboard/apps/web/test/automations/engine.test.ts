@@ -17,7 +17,7 @@ vi.mock("@polaris/db", async () => {
     db.current = make();
     return { prisma: db.current.prisma };
 });
-vi.mock("@/lib/automations/runner", () => ({ automationRunner: async () => ({ id: "u1", isAdmin: false }) }));
+vi.mock("@/lib/automations/runner", () => ({ automationRunner: async () => ({ id: "u1", isAdmin: false }), mayAllowLocalNetwork: async () => false }));
 vi.mock("@/lib/automations/secrets", () => ({ readSecretForRun: async () => "https://hooks.example.test/SECRETVALUE" }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () => [] }));

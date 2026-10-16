@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { isUuid } from "@/lib/uuid";
 import type { RunActor } from "./types";
 import { sessionCan, type SessionUser } from "@/lib/session";
@@ -35,11 +36,14 @@ export async function mayEditShelf(actor: RunActor, shelf: Shelf): Promise<boole
 
 /**
  * Whether this actor may let an automation reach the local network: an
- * administrator of the organization for an org automation, an instance
- * administrator for their own personal one.
+ * administrator of the organization (its owner or a role holding every
+ * permission, not merely one that edits its work) for an org automation, an
+ * instance administrator for their own personal one. Checked again on every
+ * run against whoever published it, so an editor who is not one cannot point
+ * an allowed automation somewhere new and publish it onto the network.
  */
 export async function mayAllowLocalNetwork(actor: RunActor, shelf: Shelf): Promise<boolean> {
-    if (shelf.orgId) return mayEditShelf(actor, shelf);
+    if (shelf.orgId) return (await resolveOrgAccess(actor, shelf.orgId))?.permissions.includes(core.ALL_ORG_PERMISSIONS) ?? false;
     return shelf.userId === actor.id && actor.isAdmin;
 }
 
