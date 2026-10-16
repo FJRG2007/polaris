@@ -14,6 +14,7 @@ import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import { getAuthMailStatus } from "@/lib/auth-mail";
+import { ssoOfferedFor } from "@/lib/saml-providers";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { passkeyRelyingPartyId } from "@polaris/core";
 import { emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
@@ -128,4 +129,13 @@ export async function pollQrSignIn(deviceCode: unknown): Promise<QrSignInStatus>
 function boundHere(rpId: string): { rpId: string | null }[] {
     const published = passkeyRelyingPartyId(loadEnv().POLARIS_APP_URL);
     return rpId === published ? [{ rpId }, { rpId: null }] : [{ rpId }];
+}
+
+/**
+ * Whether the typed account's email domain signs in through an identity
+ * provider, so the sign-in screen can offer it.
+ */
+export async function ssoOffered(identifier: string): Promise<boolean> {
+    const email = await resolveIdentifier(identifier);
+    return email ? ssoOfferedFor(email) : false;
 }

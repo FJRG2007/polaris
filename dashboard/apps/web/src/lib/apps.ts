@@ -1797,6 +1797,14 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             group: ADMIN_ACCESS_GROUP
         },
         {
+            label: "Single sign-on", // i18n-ignore
+            href: "/admin/sso",
+            adminOnly: true,
+            icon: ShieldCheck,
+            keywords: ["sso", "saml", "identity provider", "idp", "okta", "entra", "domain"],
+            group: ADMIN_ACCESS_GROUP
+        },
+        {
             label: "Inbox", // i18n-ignore
             href: "/admin/inbox",
             icon: MessagesSquare,

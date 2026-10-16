@@ -2098,6 +2098,10 @@
             "settings": {
                 "title": "Updates & settings",
                 "description": "Version, in-band self-update, and deployment settings."
+            },
+            "sso": {
+                "title": "Single sign-on",
+                "description": "SAML identity providers and the email domains that sign in through them."
             }
         }
     },
@@ -3284,6 +3288,73 @@
                 "notParkable": "Only for services that keep their data in one volume.",
                 "noVolumes": "This service keeps no files of its own."
             }
+        }
+    },
+    "sso": {
+        "title": "Single sign-on",
+        "description": "Identity providers people sign in through, by email domain.",
+        "add": "Add provider",
+        "empty": "No identity provider yet. Add one to let people sign in with their work account.",
+        "form": {
+            "newTitle": "New identity provider",
+            "name": "Name",
+            "domains": "Email domains",
+            "source": "Provider details",
+            "sourceUrl": "Metadata URL",
+            "sourceXml": "Metadata XML",
+            "sourceManual": "Enter manually",
+            "replaceHint": "Saving replaces the provider's current details with these.",
+            "metadataUrl": "Metadata URL",
+            "metadataXml": "Metadata XML",
+            "entityId": "Entity ID",
+            "ssoUrl": "Sign-in URL",
+            "certificate": "Signing certificate",
+            "mapping": "Attributes",
+            "mapEmail": "Email attribute",
+            "mapName": "Name attribute",
+            "mapFirstName": "First name attribute",
+            "mapLastName": "Last name attribute",
+            "allowSignUp": "Create accounts on first sign-in",
+            "allowSignUpHint": "Someone from these domains without an account gets one the first time they sign in.",
+            "enforced": "Require single sign-on",
+            "enforcedHint": "Password sign-in is refused for these domains. Platform administrators keep their password.",
+            "cancel": "Cancel",
+            "save": "Save",
+            "saving": "Saving..."
+        },
+        "card": {
+            "verified": "Active",
+            "unverified": "Waiting for DNS",
+            "enforced": "Required",
+            "jit": "Creates accounts",
+            "spEntityId": "Entity ID (audience)",
+            "acsUrl": "ACS URL",
+            "spMetadata": "Service provider metadata",
+            "recordsIntro": "Add these TXT records at your DNS provider, then check. Nobody signs in through this provider until every domain has its record.",
+            "recordName": "Name",
+            "recordValue": "Value",
+            "check": "Check now",
+            "checking": "Checking...",
+            "edit": "Edit",
+            "remove": "Remove",
+            "kind": "identity provider",
+            "removeHint": "People from these domains go back to signing in with a password."
+        },
+        "checks": {
+            "certificate": "Signing certificate is valid",
+            "metadata": "Sign-in URL answers",
+            "domain": "DNS record found"
+        },
+        "problems": {
+            "metadata": "That metadata could not be read as a SAML identity provider.",
+            "certificate": "That signing certificate could not be read.",
+            "certificateExpired": "That signing certificate has expired.",
+            "ssoUrl": "The provider's sign-in URL has to use https://.",
+            "fetch": "The metadata URL did not answer with a document.",
+            "domainTaken": "Another provider already handles one of these domains.",
+            "notFound": "This provider no longer exists. Reload the page.",
+            "invalid": "Check the highlighted fields.",
+            "failed": "Saving did not work. Try again in a moment."
         }
     }
 }

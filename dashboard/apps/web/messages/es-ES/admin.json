@@ -2098,6 +2098,10 @@
             "settings": {
                 "title": "Versiones y ajustes",
                 "description": "Versión, actualización automática y ajustes del despliegue."
+            },
+            "sso": {
+                "title": "Inicio de sesión único",
+                "description": "Proveedores de identidad SAML y los dominios de correo que entran con ellos."
             }
         }
     },
@@ -3284,6 +3288,73 @@
                 "notParkable": "Solo para servicios que guardan sus datos en un único volumen.",
                 "noVolumes": "Este servicio no guarda archivos propios."
             }
+        }
+    },
+    "sso": {
+        "title": "Inicio de sesión único",
+        "description": "Proveedores de identidad con los que se entra, por dominio de correo.",
+        "add": "Añadir proveedor",
+        "empty": "Aún no hay proveedor de identidad. Añade uno para entrar con la cuenta del trabajo.",
+        "form": {
+            "newTitle": "Nuevo proveedor de identidad",
+            "name": "Nombre",
+            "domains": "Dominios de correo",
+            "source": "Datos del proveedor",
+            "sourceUrl": "URL de metadatos",
+            "sourceXml": "XML de metadatos",
+            "sourceManual": "A mano",
+            "replaceHint": "Al guardar, estos datos sustituyen a los actuales del proveedor.",
+            "metadataUrl": "URL de metadatos",
+            "metadataXml": "XML de metadatos",
+            "entityId": "ID de entidad",
+            "ssoUrl": "URL de acceso",
+            "certificate": "Certificado de firma",
+            "mapping": "Atributos",
+            "mapEmail": "Atributo de correo",
+            "mapName": "Atributo de nombre",
+            "mapFirstName": "Atributo de nombre de pila",
+            "mapLastName": "Atributo de apellidos",
+            "allowSignUp": "Crear cuentas al primer acceso",
+            "allowSignUpHint": "Quien sea de estos dominios y no tenga cuenta la recibe la primera vez que entra.",
+            "enforced": "Exigir inicio único",
+            "enforcedHint": "Se rechaza entrar con contraseña en estos dominios. Los administradores conservan la suya.",
+            "cancel": "Cancelar",
+            "save": "Guardar",
+            "saving": "Guardando..."
+        },
+        "card": {
+            "verified": "Activo",
+            "unverified": "Esperando DNS",
+            "enforced": "Exigido",
+            "jit": "Crea cuentas",
+            "spEntityId": "ID de entidad (audiencia)",
+            "acsUrl": "URL de ACS",
+            "spMetadata": "Metadatos del proveedor de servicio",
+            "recordsIntro": "Añade estos registros TXT en tu proveedor de DNS y comprueba. Nadie entra con este proveedor hasta que cada dominio tenga su registro.",
+            "recordName": "Nombre",
+            "recordValue": "Valor",
+            "check": "Comprobar",
+            "checking": "Comprobando...",
+            "edit": "Editar",
+            "remove": "Quitar",
+            "kind": "proveedor de identidad",
+            "removeHint": "Quien sea de estos dominios vuelve a entrar con contraseña."
+        },
+        "checks": {
+            "certificate": "El certificado de firma es válido",
+            "metadata": "La URL de acceso responde",
+            "domain": "Registro DNS encontrado"
+        },
+        "problems": {
+            "metadata": "Esos metadatos no se pueden leer como un proveedor de identidad SAML.",
+            "certificate": "Ese certificado de firma no se puede leer.",
+            "certificateExpired": "Ese certificado de firma ha caducado.",
+            "ssoUrl": "La URL de acceso del proveedor tiene que usar https://.",
+            "fetch": "La URL de metadatos no respondió con un documento.",
+            "domainTaken": "Otro proveedor ya gestiona uno de estos dominios.",
+            "notFound": "Este proveedor ya no existe. Recarga la página.",
+            "invalid": "Revisa los campos marcados.",
+            "failed": "No se pudo guardar. Prueba de nuevo en un momento."
         }
     }
 }

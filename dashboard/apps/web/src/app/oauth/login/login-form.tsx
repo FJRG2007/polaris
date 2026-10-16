@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { KeyRound } from "lucide-react";
+import { Building2, KeyRound } from "lucide-react";
 import { QrSignInPanel } from "./qr-panel";
 import { useRouter } from "next/navigation";
 import { loginSchema } from "@polaris/core";
@@ -14,7 +14,7 @@ import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
-import { accountHasPasskey, emailLinkOffered, resolveIdentifier } from "./actions";
+import { accountHasPasskey, emailLinkOffered, resolveIdentifier, ssoOffered } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { AccountChooser } from "./account-chooser";
 import { prepareAddAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
@@ -67,6 +67,7 @@ function sessionNotice(): NamespaceKey<"auth"> | null {
     // Checked for ownership rather than indexed straight: the value is the
     // caller's to write, and "toString" would otherwise resolve through the
     // prototype into something that is not a message at all.
+    if (params.get("error") === "sso") return "login.ssoNotice";
     const outcome = params.get("signin") ?? "";
     return Object.hasOwn(CONNECTION_NOTICES, outcome) ? CONNECTION_NOTICES[outcome]! : null;
 }
@@ -114,6 +115,7 @@ export function LoginForm({
     const [canEmailLink, setCanEmailLink] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
     const [hasPasskey, setHasPasskey] = useState(false);
+    const [canSso, setCanSso] = useState(false);
     /** Set when signing in worked and this deployment still wants a second
      *  factor from the account. The whole screen becomes that step. */
     const [enrollment, setEnrollment] = useState<PendingEnrollment | null>(null);
@@ -143,6 +145,7 @@ export function LoginForm({
         if (!identifier) {
             setHasPasskey(false);
             setCanEmailLink(false);
+            setCanSso(false);
             return;
         }
         let current = true;
@@ -152,6 +155,9 @@ export function LoginForm({
             });
             void emailLinkOffered(identifier).then((offered) => {
                 if (current) setCanEmailLink(offered);
+            });
+            void ssoOffered(identifier).then((offered) => {
+                if (current) setCanSso(offered);
             });
         }, 400);
         return () => {
@@ -170,6 +176,36 @@ export function LoginForm({
     function signInWithProvider(slug: string) {
         setPending(true);
         window.location.href = `/api/connections/${slug}/signin?redirect=${encodeURIComponent(postLoginTarget())}`;
+    }
+
+    /**
+     * Hand the browser to the identity provider for the typed account's domain.
+     * The return address is a path here; the server refuses anything else.
+     */
+    async function signInWithSso() {
+        const identifier = values.identifier.trim();
+        if (!identifier) {
+            form.markTouched("identifier");
+            return;
+        }
+        setPending(true);
+        setError(null);
+        const email = await resolveIdentifier(identifier);
+        const started = email
+            ? await authClient
+                  .$fetch<{ url?: string }>("/sign-in/sso", {
+                      method: "POST",
+                      body: { email, callbackURL: postLoginTarget(), errorCallbackURL: "/oauth/login?error=sso" }
+                  })
+                  .catch(() => null)
+            : null;
+        const url = started?.data?.url;
+        if (!url) {
+            setPending(false);
+            setError(t("login.ssoFailed"));
+            return;
+        }
+        window.location.href = url;
     }
 
     /** Sign in with the device's passkey. The ceremony is the browser's; a
@@ -234,6 +270,13 @@ export function LoginForm({
         });
         setPending(false);
         if (signInError) {
+            // A domain that must use its identity provider is told so, and
+            // offered it, rather than told the password was wrong.
+            if ((signInError as { code?: string }).code === "SSO_REQUIRED") {
+                setCanSso(true);
+                setError(t("login.ssoRequired"));
+                return;
+            }
             setError(t("login.invalid"));
             return;
         }
@@ -347,6 +390,17 @@ export function LoginForm({
                             <Button type="submit" disabled={pending}>
                                 {pending ? t("login.submitting") : t("login.submit")}
                             </Button>
+                            {canSso ? (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={pending}
+                                    onClick={() => void signInWithSso()}
+                                >
+                                    <Building2 className="size-4" />
+                                    {t("login.sso")}
+                                </Button>
+                            ) : null}
                             {hasPasskey ? (
                                 <Button
                                     type="button"
