@@ -86,12 +86,15 @@ describe("the search panel's calculator", () => {
         expect(screen.getByText("Enter or Tab to use the result")).toBeTruthy();
     });
 
-    it.each(["12*", "abc", "42", "/tasks", "@ana", "1/0"])("draws nothing for %j", async (input) => {
-        const field = await openField();
-        fireEvent.change(field, { target: { value: input } });
-        expect(ghost()).toBeNull();
-        expect(screen.queryByRole("option", { name: /^Use / })).toBeNull();
-    });
+    it.each(["12*", "abc", "42", "/tasks", "@ana", "1/0", "1,000 + 1", "12,345"])(
+        "draws nothing for %j",
+        async (input) => {
+            const field = await openField();
+            fireEvent.change(field, { target: { value: input } });
+            expect(ghost()).toBeNull();
+            expect(screen.queryByRole("option", { name: /^Use / })).toBeNull();
+        }
+    );
 
     it("puts the answer in place of the sum on Tab, to go on working with it", async () => {
         const field = await openField();

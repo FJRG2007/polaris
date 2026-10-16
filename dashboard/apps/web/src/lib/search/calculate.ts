@@ -69,6 +69,9 @@ function tokenize(input: string): Token[] {
         }
         const number = /^(\d+([.,]\d*)?|[.,]\d+)/.exec(input.slice(index));
         if (number) {
+            // "1,000" is a thousand to one reader and one to another: no answer
+            // beats a wrong one. "1,5" and "3,1416" are not in doubt.
+            if (/^\d+,\d{3}$/.test(number[0])) throw new NotArithmetic();
             tokens.push({ kind: "number", value: Number(number[0].replace(",", ".")) });
             index += number[0].length;
             continue;
