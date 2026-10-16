@@ -17,7 +17,14 @@
  * watching, one timer per person however many tabs they have open, and it stops
  * the moment the last one closes. A mailbox nobody has open is never asked more
  * often than its owner chose.
+ *
+ * The same people get an inbox listener (`idle.ts`) on each of their mailboxes,
+ * which is what makes new mail appear the moment the server has it. The passes
+ * here stay as they are underneath it: they are what reads every other folder,
+ * and the only thing a server without IDLE has.
  */
+
+import { holdInboxListeners } from "./idle";
 
 /** How often a watched mailbox is asked. Fast enough that reading a message on a
  *  phone is reflected here before somebody wonders why it has not been, slow
@@ -60,6 +67,9 @@ export function watchMailboxes(userId: string): () => void {
         // Nothing here should hold the process open on its own account.
         timer.unref?.();
         held.set(userId, { count: 1, timer });
+        // The inbox listeners start now rather than on the first tick, which is
+        // twenty seconds away.
+        void listenFor(userId);
     }
 
     let released = false;
@@ -75,7 +85,19 @@ export function watchMailboxes(userId: string): () => void {
         if (watcher.count > 0) return;
         clearInterval(watcher.timer);
         watchers().delete(userId);
+        holdInboxListeners(userId, []);
     };
+}
+
+/** Start listening on this person's inboxes, without the pass a tick runs. */
+async function listenFor(userId: string): Promise<void> {
+    try {
+        const { everyAccountId } = await import("./access");
+        const ids = await everyAccountId(userId);
+        if (watchers().has(userId)) holdInboxListeners(userId, ids);
+    } catch {
+        // The first tick tries again.
+    }
 }
 
 /** Everybody with Mail open, for the scheduled sweep to read. */
@@ -103,6 +125,8 @@ async function sweepFor(userId: string): Promise<void> {
         // its owner is not currently looking at is exactly the mail somebody
         // wants to be told about.
         const ids = await everyAccountId(userId);
+        // Whoever stopped watching while that was read is not listened for.
+        if (watchers().has(userId)) holdInboxListeners(userId, ids);
         // One at a time. A person with four mailboxes opening four IMAP sessions
         // at once every twenty seconds is how a provider starts refusing them,
         // and `syncAccount` already joins a pass that is running.

@@ -135,6 +135,30 @@ export async function withImap<T>(
     account: MailConnectionSource,
     work: (client: ImapFlow) => Promise<T>
 ): Promise<T> {
+    const client = await openImap(account);
+
+    try {
+        return await work(client);
+    } catch (caught) {
+        throw asMailFailure(caught);
+    } finally {
+        // Neither of these may throw over the caller's own result: a failed
+        // logout on a connection that is being discarded is not news.
+        await client.logout().catch(() => client.close());
+    }
+}
+
+/**
+ * Open a connection and hand it over connected, for a caller that keeps it.
+ *
+ * `withImap` is the way in for a unit of work; this is for the one connection
+ * that is held open on purpose - the inbox listener in `idle.ts` - and which
+ * therefore closes it itself. `maxIdleTime` is only meaningful there.
+ */
+export async function openImap(
+    account: MailConnectionSource,
+    tuning: { readonly maxIdleTime?: number } = {}
+): Promise<ImapFlow> {
     const credential = await mailCredential(account);
     const client = new ImapFlow({
         host: account.imapHost,
@@ -149,7 +173,9 @@ export async function withImap<T>(
         clientInfo: CLIENT_INFO,
         // Nothing in this app waits on a connection between commands, so an
         // automatic IDLE would only be something the next command has to break.
+        // The inbox listener issues its IDLE itself.
         disableAutoIdle: true,
+        ...(tuning.maxIdleTime ? { maxIdleTime: tuning.maxIdleTime } : {}),
         logger: IMAP_LOGGER,
         connectionTimeout: CONNECT_TIMEOUT_MS,
         greetingTimeout: GREETING_TIMEOUT_MS,
@@ -167,16 +193,7 @@ export async function withImap<T>(
         client.close();
         throw asMailFailure(caught);
     }
-
-    try {
-        return await work(client);
-    } catch (caught) {
-        throw asMailFailure(caught);
-    } finally {
-        // Neither of these may throw over the caller's own result: a failed
-        // logout on a connection that is being discarded is not news.
-        await client.logout().catch(() => client.close());
-    }
+    return client;
 }
 
 /** Whether a host is this machine. The only place a self-signed certificate is
