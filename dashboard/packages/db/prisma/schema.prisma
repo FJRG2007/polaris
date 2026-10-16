@@ -5457,6 +5457,10 @@ model Deployment {
     // replaced is taken down once this one is serving. Named after the deployment
     // rather than its commit, so redeploying one commit still gets a fresh container.
     cutover        Boolean   @default(false)
+    // True when it was started with the service's host port closed, the port the
+    // release before it published. Its service stores the port as closed only when
+    // this is promoted, so the edge keeps dialling the release still serving.
+    closesPort     Boolean   @default(false)
     // The machine its image was built on, as the history names it, when that was
     // not the one it runs on. Null for a build where it runs, and for an image
     // pulled or a kept release run again.

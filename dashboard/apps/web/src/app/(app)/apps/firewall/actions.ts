@@ -7,11 +7,15 @@
  */
 
 import { z } from "zod";
-import { prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as intel from "@/lib/waf-intel-service";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
+import * as directPort from "@/lib/deploy/direct-port";
+import { closeDirectPorts } from "@/lib/deploy/direct-port-close";
+import { assertScopeOwner } from "@/lib/waf-service";
+import { getPublicIp } from "@/lib/domain-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
 import { requirePermission, userHasManage } from "@/lib/session";
 import { accountsAtAddress, type AddressAccounts } from "@/lib/address-accounts";
@@ -769,5 +773,87 @@ export async function blockAnomalyAction(ip: string, note: string): Promise<{ er
         return {};
     } catch (caught) {
         return { error: await failure(caught, "errors.block") };
+    }
+}
+
+const scopeInputSchema = z.object({
+    scopeType: z.enum(core.WAF_SCOPE_TYPES),
+    scopeId: z.string().trim().max(64)
+});
+
+type ScopeInput = { scopeType: WafScopeType; scopeId: string };
+
+/**
+ * The services a scope covers, for the reader - with the same checks the rule
+ * itself is read and written under: `deploy.manage`, `system.manage` for the two
+ * scopes nobody owns, and ownership of the scope. Null for an input that is not a
+ * scope, and for Polaris's own scope, which guards no deployed service.
+ */
+async function scopeServicesFor(
+    userId: string,
+    input: ScopeInput
+): Promise<Prisma.ApplicationWhereInput | null> {
+    const parsed = scopeInputSchema.safeParse(input);
+    if (!parsed.success) return null;
+    const { scopeType, scopeId } = parsed.data;
+    const operator = OPERATOR_SCOPES.has(scopeType);
+    if (operator) await requirePermission("system.manage");
+    await assertScopeOwner(userId, scopeType, scopeId);
+    return directPort.servicesOfScope(scopeType, scopeId, operator ? null : userId);
+}
+
+/**
+ * The services under a scope that the edge answers for but that still answer on a
+ * host port, round the firewall, so the screen can say so instead of implying a
+ * protection that a direct address walks round.
+ */
+export async function getDirectAccessAction(
+    input: ScopeInput
+): Promise<{ reachable?: directPort.DirectAccess[]; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    try {
+        if (!scopeInputSchema.safeParse(input).success) return { error: await say("errors.load") };
+        const where = await scopeServicesFor(user.id, input);
+        if (!where) return { reachable: [] };
+        return { reachable: await directPort.directAccessIn(where, await getPublicIp()) };
+    } catch (caught) {
+        return { error: await failure(caught, "errors.load") };
+    }
+}
+
+/**
+ * Close those ports, or the one named: each service is started again without it
+ * through the change-over, and keeps serving on its domains throughout.
+ */
+export async function closeDirectAccessAction(
+    input: ScopeInput & { applicationId?: string }
+): Promise<{ closed?: number; failed?: number; error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const one = z.string().uuid().optional().safeParse(input.applicationId);
+    if (!scopeInputSchema.safeParse(input).success || !one.success) {
+        return { error: await say("errors.save") };
+    }
+    try {
+        const scope = await scopeServicesFor(user.id, input);
+        if (!scope) return { closed: 0, failed: 0 };
+        const where = one.data ? { AND: [scope, { id: one.data }] } : scope;
+        const outcome = await closeDirectPorts(where, { mode: "operator", actorId: user.id });
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.waf.closeDirectAccess",
+            targetType: input.scopeType,
+            targetId: input.scopeId || "global",
+            metadata: {
+                closed: outcome.closed,
+                failed: outcome.failed,
+                ...(one.data ? { applicationId: one.data } : {})
+            }
+        });
+        if (outcome.failed.length > 0 && outcome.closed.length === 0) {
+            return { error: await say("direct.closeFailed") };
+        }
+        return { closed: outcome.closed.length, failed: outcome.failed.length };
+    } catch (caught) {
+        return { error: await failure(caught, "errors.save") };
     }
 }

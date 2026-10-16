@@ -322,7 +322,7 @@
         "unsaved": "Unsaved changes",
         "noAddresses": "No addresses",
         "counts": "{allowed} allowed, {blocked} blocked",
-        "loginTitle": "Require a Polaris login",
+        "loginTitle": "Require Polaris login",
         "loginDescription": "Visitors sign in to Polaris first, and the rule can name which accounts it admits.",
         "loginBadge": "Login",
         "title": "Access rules",
@@ -407,8 +407,8 @@
         "what": "Visitors must sign in to Polaris to reach anything in this scope. Existing sessions keep working if the control plane is down; new sign-ins need it reachable.",
         "across": "a scope that requires a login cannot be overruled by a narrower one, and every scope that names who it admits gets a say.",
         "statusHint": "Whether this scope demands a login at all.",
-        "stopRequiring": "Stop requiring a Polaris login",
-        "require": "Require a Polaris login",
+        "stopRequiring": "Stop requiring Polaris login",
+        "require": "Require Polaris login",
         "required": "A login is required",
         "notRequired": "No login is required",
         "aboveNote": "A scope above this one requires a login, and a narrower scope cannot waive it. The lists below still apply: every scope that names who it admits gets a say.",
@@ -609,5 +609,22 @@
             "path": "Path"
         },
         "truncated": "Showing the {shown} most recent of {total}. The counts above cover all of them."
+    },
+    "direct": {
+        "title": "Reachable round the firewall",
+        "description": "These services also answer on the machine's address and a port. Anybody who reaches that address skips the login, the address lists and the rules here.",
+        "service": "{name} on {address}",
+        "keptRelease": "Earlier deployments are kept running on their own ports. Turn off Keep previous deployments on the service to close them.",
+        "installed": "An installed app. Polaris reaches it on this port, so it stays open.",
+        "closingBadge": "Closing",
+        "close": "Close port",
+        "closeNamed": "Close the port of {name}",
+        "closeAll": "Close all",
+        "confirmTitle": "Close {count, plural, one {this port} other {these # ports}}?",
+        "confirmBody": "Each service starts again without the port and keeps serving on its domains while it changes over. One that cannot run two copies at once restarts and is offline for a few seconds. Whatever reached it on the address and port stops reaching it.",
+        "confirm": "Close",
+        "closing": "Closing. Each service changes over in the background.",
+        "closeFailed": "Could not close the port. The service keeps running as it was.",
+        "noPermission": "Only whoever runs this instance can close these."
     }
 }

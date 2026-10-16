@@ -609,5 +609,22 @@
             "path": "Ruta"
         },
         "truncated": "Se muestran las {shown} más recientes de {total}. Los recuentos de arriba las incluyen todas."
+    },
+    "direct": {
+        "title": "Accesibles sin el cortafuegos",
+        "description": "Estos servicios también responden en la dirección de la máquina y un puerto. Quien llegue a esa dirección se salta el inicio de sesión, las listas y las reglas de aquí.",
+        "service": "{name} en {address}",
+        "keptRelease": "Los despliegues anteriores siguen activos en puertos propios. Desactiva Conservar despliegues anteriores en el servicio para cerrarlos.",
+        "installed": "Una app instalada. Polaris llega a ella por este puerto, así que sigue abierto.",
+        "closingBadge": "Cerrando",
+        "close": "Cerrar puerto",
+        "closeNamed": "Cerrar el puerto de {name}",
+        "closeAll": "Cerrar todos",
+        "confirmTitle": "¿Cerrar {count, plural, one {este puerto} other {estos # puertos}}?",
+        "confirmBody": "Cada servicio arranca de nuevo sin el puerto y sigue respondiendo en sus dominios durante el cambio. Uno que no admite dos copias a la vez se reinicia y queda unos segundos sin servicio. Lo que llegaba por la dirección y el puerto deja de llegar.",
+        "confirm": "Cerrar",
+        "closing": "Cerrando. Cada servicio cambia en segundo plano.",
+        "closeFailed": "No se pudo cerrar el puerto. El servicio sigue como estaba.",
+        "noPermission": "Solo quien administra esta instancia puede cerrarlos."
     }
 }

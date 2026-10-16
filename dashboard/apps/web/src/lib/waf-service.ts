@@ -482,7 +482,7 @@ export interface WafRuleView {
  * `system.manage` (not the member-held `deploy.manage`) - so ownership always passes
  * here for them.
  */
-async function assertScopeOwner(
+export async function assertScopeOwner(
     ownerId: string,
     scopeType: WafScopeType,
     scopeId: string

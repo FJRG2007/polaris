@@ -99,16 +99,18 @@ export async function register(): Promise<void> {
     // Then close the host ports the edge should be the only way past: a service with
     // a domain answered on its machine's IP and a port as well, with its firewall and
     // login nowhere in the way. Each is moved through the change-over, so nothing
-    // goes down, and only after the close-out, which would otherwise fail these very
+    // goes down - one that cannot change over waits for its next deploy - and only after the close-out, which would otherwise fail these very
     // deploys as abandoned (see lib/deploy/direct-port.ts).
     void whenAlone(async () => {
         await recoverAbandonedDeployments().catch((error) =>
             console.error("polaris: could not close out interrupted deploys:", error)
         );
         const { closeDirectPorts } = await import("./lib/deploy/direct-port-close");
-        const { closed } = await closeDirectPorts();
-        if (closed.length > 0) {
-            console.info(`polaris: closed the direct host port of ${closed.length} service(s)`);
+        const { closed, deferred } = await closeDirectPorts({}, { mode: "boot", actorId: null });
+        if (closed.length > 0 || deferred.length > 0) {
+            console.info(
+                `polaris: closing the direct host port of ${closed.length} service(s); ${deferred.length} close on their next deploy`
+            );
         }
     }).catch((error) => console.error("polaris: could not close direct host ports:", error));
 
