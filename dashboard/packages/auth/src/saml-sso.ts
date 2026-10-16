@@ -22,6 +22,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { sso } from "@better-auth/sso";
+import { Extractor } from "samlify";
 import type { BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 
@@ -30,6 +31,18 @@ export const SSO_SIGN_IN_PATH = "/sign-in/sso";
 
 /** The code a refused password sign-in answers with, so the screen can offer SSO. */
 export const SSO_REQUIRED_CODE = "SSO_REQUIRED";
+
+/** Where a refused SAML response lands: the sign-in screen, with a generic notice. */
+export const SSO_ERROR_PATH = "/oauth/login?error=sso";
+
+/** The plugin's key for a sign-in request it issued, the one a response must answer. */
+const AUTHN_REQUEST_PREFIX = "saml-authn-request:";
+
+/** The two routes a SAML response is posted to. */
+const ASSERTION_PATHS: ReadonlySet<string> = new Set([
+    "/sso/saml2/sp/acs/:providerId",
+    "/sso/saml2/callback/:providerId"
+]);
 
 /** How far apart the two clocks may be before an assertion is out of its window. */
 const CLOCK_SKEW_MS = 3 * 60 * 1000;
@@ -108,6 +121,64 @@ export async function samlSignUpAllowed(
     return core.providerForEmail(email, [provider]) !== null;
 }
 
+/**
+ * The request id a SAML response says it answers, read with the same library
+ * the plugin parses the response with, so the two can never disagree about it.
+ */
+export function samlResponseRequestId(encoded: string): string | null {
+    try {
+        const xml = Buffer.from(encoded.replace(/\s+/g, ""), "base64").toString("utf8");
+        const { response } = Extractor.extract(xml, [
+            { key: "response", localPath: ["Response"], attributes: ["ID", "InResponseTo"] }
+        ]) as { response?: { inResponseTo?: unknown } | null };
+        const id = response?.inResponseTo;
+        return typeof id === "string" && id.length > 0 && id.length <= 256 ? id : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Refuses a SAML response that does not answer a sign-in started here, for this
+ * provider, and spends that request so the same response can never be posted
+ * twice.
+ *
+ * The plugin means to do this itself, but the version pinned here reads the
+ * request id from a field the response parser never fills, so with IdP-initiated
+ * sign-in off it refuses every sign-in, and with it on it checks nothing. Polaris
+ * therefore turns the plugin's check off and does it here, before the response is
+ * looked at. The test suite signs in end to end, so a plugin upgrade that changes
+ * this fails there rather than in production.
+ */
+async function requireAnsweredRequest(ctx: {
+    body?: unknown;
+    params?: Record<string, string>;
+    context: {
+        baseURL: string;
+        logger: { warn: (message: string, ...args: unknown[]) => void };
+        internalAdapter: { consumeVerificationValue: (identifier: string) => Promise<{ value: string } | null> };
+    };
+    redirect: (url: string) => unknown;
+}): Promise<void> {
+    const refuse = (reason: string): never => {
+        ctx.context.logger.warn(`SAML response refused: ${reason}`, { providerId: ctx.params?.providerId });
+        throw ctx.redirect(`${new URL(ctx.context.baseURL).origin}${SSO_ERROR_PATH}`);
+    };
+    const encoded = (ctx.body as { SAMLResponse?: unknown } | undefined)?.SAMLResponse;
+    if (typeof encoded !== "string") return refuse("no response");
+    const requestId = samlResponseRequestId(encoded);
+    if (!requestId) return refuse("it answers no sign-in request");
+    const consumed = await ctx.context.internalAdapter.consumeVerificationValue(`${AUTHN_REQUEST_PREFIX}${requestId}`);
+    let providerId: unknown = null;
+    try {
+        providerId = consumed ? (JSON.parse(consumed.value) as { providerId?: unknown }).providerId : null;
+    } catch {
+        providerId = null;
+    }
+    if (!consumed) return refuse("unknown, expired or already answered request");
+    if (providerId !== ctx.params?.providerId) return refuse("request was for another provider");
+}
+
 /** The SSO plugin with Polaris's rules around it. */
 export function samlSsoPlugin(): BetterAuthPlugin {
     const plugin = sso({
@@ -119,11 +190,11 @@ export function samlSsoPlugin(): BetterAuthPlugin {
         disableImplicitSignUp: false,
         providersLimit: 0,
         saml: {
+            // The plugin still records each sign-in request it issues; whether a
+            // response answers one is checked by `requireAnsweredRequest`, which
+            // also refuses every unsolicited (IdP-initiated) response.
             enableInResponseToValidation: true,
-            // Only answers to a sign-in that started here: an unsolicited
-            // response cannot be tied to a request, so it cannot be told apart
-            // from one replayed or injected.
-            allowIdpInitiated: false,
+            allowIdpInitiated: true,
             requireTimestamps: true,
             clockSkew: CLOCK_SKEW_MS,
             algorithms: { onDeprecated: "reject" }
@@ -152,6 +223,12 @@ export function samlSsoPlugin(): BetterAuthPlugin {
                                 throw new APIError("BAD_REQUEST", { message: "Invalid return address." });
                             }
                         }
+                    })
+                },
+                {
+                    matcher: (context) => ASSERTION_PATHS.has(context.path ?? ""),
+                    handler: createAuthMiddleware(async (ctx) => {
+                        await requireAnsweredRequest(ctx as never);
                     })
                 },
                 {

@@ -47,7 +47,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { samlSignUpAllowed, samlSsoPlugin, SSO_REQUIRED_CODE } = await import("../../src/saml-sso.js");
+const { samlSignUpAllowed, samlSsoPlugin, SSO_ERROR_PATH, SSO_REQUIRED_CODE } = await import("../../src/saml-sso.js");
 
 type Db = Record<string, Record<string, unknown>[]>;
 let db: Db;
@@ -129,9 +129,9 @@ async function startSignIn(email: string, callbackURL = "/drive"): Promise<{ req
 let counter = 0;
 
 /** A SAML response for `email`, its assertion signed with the fixture key unless told not to. */
-function samlResponse(email: string, requestId: string, options: { sign?: boolean; audience?: string } = {}): string {
+function samlResponse(email: string, requestId: string, options: { sign?: boolean; audience?: string; now?: Date } = {}): string {
     counter += 1;
-    const now = new Date();
+    const now = options.now ?? new Date();
     const later = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
     const before = new Date(now.getTime() - 60 * 1000).toISOString();
     const issued = now.toISOString();
@@ -191,7 +191,7 @@ describe("SAML assertion", () => {
         const { requestId, relayState } = await startSignIn("ana@acme.test");
         const response = await acs(samlResponse("ana@acme.test", requestId), relayState);
         expect(response.status).toBe(302);
-        expect(response.headers.get("location")).toBe(`${BASE}/drive`);
+        expect(new URL(response.headers.get("location") ?? "", BASE).href).toBe(`${BASE}/drive`);
         expect(signedIn(response)).toBe(true);
         expect(db.user.map((user) => user.email)).toEqual(["ana@acme.test"]);
     });
@@ -201,6 +201,31 @@ describe("SAML assertion", () => {
         const response = await acs(samlResponse("ana@acme.test", requestId, { sign: false }), relayState);
         expect(signedIn(response)).toBe(false);
         expect(response.headers.get("location") ?? "").toContain("error=");
+        expect(db.user).toHaveLength(0);
+    });
+
+    it("refuses an assertion altered after it was signed", async () => {
+        const { requestId, relayState } = await startSignIn("ana@acme.test");
+        const signed = Buffer.from(samlResponse("ana@acme.test", requestId), "base64").toString("utf8");
+        const tampered = signed.replaceAll("ana@acme.test", "boss@acme.test");
+        const response = await acs(Buffer.from(tampered).toString("base64"), relayState);
+        expect(signedIn(response)).toBe(false);
+        expect(db.user).toHaveLength(0);
+    });
+
+    it("refuses an assertion past its validity window", async () => {
+        const { requestId, relayState } = await startSignIn("ana@acme.test");
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const response = await acs(samlResponse("ana@acme.test", requestId, { now: hourAgo }), relayState);
+        expect(signedIn(response)).toBe(false);
+        expect(db.user).toHaveLength(0);
+    });
+
+    it("refuses a response to a request this deployment never made", async () => {
+        const { relayState } = await startSignIn("ana@acme.test");
+        const response = await acs(samlResponse("ana@acme.test", "_never-issued"), relayState);
+        expect(signedIn(response)).toBe(false);
+        expect(response.headers.get("location") ?? "").toContain(SSO_ERROR_PATH);
         expect(db.user).toHaveLength(0);
     });
 
