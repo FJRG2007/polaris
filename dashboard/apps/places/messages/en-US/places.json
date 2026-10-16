@@ -2307,6 +2307,8 @@
             "stay": "Keep editing"
         },
         "add": {
+            "noFloor": "On no floor",
+            "noRoom": "In no room",
             "title": {
                 "trigger": "Add a trigger",
                 "condition": "Add a condition",

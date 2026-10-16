@@ -51,26 +51,32 @@ export type AddRole = "trigger" | "condition" | "step";
 export const RoomsProvider = fields.RoomsProvider;
 
 /**
- * "By target" groups: a room's devices under the room, floor by floor, then
- * the devices in no room by what they are. With no rooms, it is only the
- * second.
+ * "By target" groups: each floor as its own level, its rooms under it with
+ * their devices, then the rooms on no floor, then the devices in no room by
+ * what they are. A level is a `section` the dialog draws once as a heading;
+ * with no floors there is none over the rooms, and with no rooms it is only
+ * the devices by what they are, under no heading at all.
  */
 export function targetGroups<T extends { id: string; kind: string; roomId?: string | null }>(
     devices: readonly T[],
     rooms: readonly RoomView[],
     kindHeading: (device: T) => string,
-    roomHeading: (room: RoomView) => string
-): { id: string; label: string; devices: T[] }[] {
+    levels: { readonly noFloor: string; readonly noRoom: string }
+): { id: string; label: string; section?: string; devices: T[] }[] {
     const known = new Set(rooms.map((room) => room.id));
     const inRoom = (device: T) => Boolean(device.roomId && known.has(device.roomId));
-    const byRoom = roomsByFloor(rooms)
-        .flatMap((floor) => floor.rooms)
-        .map((room) => ({
-            id: `room:${room.id}`,
-            label: roomHeading(room),
-            devices: devices.filter((device) => device.roomId === room.id)
-        }))
-        .filter((group) => group.devices.length > 0);
+    const floors = roomsByFloor(rooms);
+    const anyFloor = floors.some((floor) => floor.floor !== "");
+    const byRoom = floors.flatMap((floor) =>
+        floor.rooms
+            .map((room) => ({
+                id: `room:${room.id}`,
+                label: room.name,
+                ...(anyFloor ? { section: floor.floor || levels.noFloor } : {}),
+                devices: devices.filter((device) => device.roomId === room.id)
+            }))
+            .filter((group) => group.devices.length > 0)
+    );
     const rest = devices.filter((device) => !inRoom(device));
     const headings = [...new Set(rest.map(kindHeading))];
     return [
@@ -78,6 +84,7 @@ export function targetGroups<T extends { id: string; kind: string; roomId?: stri
         ...headings.map((heading) => ({
             id: heading,
             label: heading,
+            ...(byRoom.length > 0 ? { section: levels.noRoom } : {}),
             devices: rest.filter((device) => kindHeading(device) === heading)
         }))
     ];
@@ -273,10 +280,7 @@ export function AddBlockButton({
         reachable,
         rooms,
         (device) => kinds.groupText(device.kind, t),
-        (room) =>
-            room.floor
-                ? t("automations.add.roomOnFloor", { room: room.name, floor: room.floor })
-                : room.name
+        { noFloor: t("automations.add.noFloor"), noRoom: t("automations.add.noRoom") }
     );
     const targets: AddTargets | undefined =
         reachable.length > 0
@@ -284,6 +288,7 @@ export function AddBlockButton({
                   groups: grouped.map((group) => ({
                       id: group.id,
                       label: group.label,
+                      ...(group.section ? { section: group.section } : {}),
                       items: group.devices.map((device) => ({
                           value: device.id,
                           label: device.name,

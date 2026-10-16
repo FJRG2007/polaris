@@ -51,6 +51,9 @@ export interface AddGroup {
     readonly label: string;
     readonly icon?: ReactNode;
     readonly items: readonly AddItem[];
+    /** The level above it - a room's floor - drawn once as a heading over the
+     *  groups that share it. Absent is no heading. */
+    readonly section?: string;
 }
 
 /** The things a surface's blocks can point at, and which blocks apply to each. */
@@ -225,7 +228,12 @@ export function AddBlockDialog({
                 if (matches(term, item.label, item.description, each.label))
                     hits.push({
                         key: `target:${item.value}`,
-                        item: { ...item, description: item.description ?? each.label },
+                        item: {
+                            ...item,
+                            description:
+                                item.description ??
+                                (each.section ? `${each.section} - ${each.label}` : each.label)
+                        },
                         run: () => {
                             setTab("target");
                             setGroup(each.id);
@@ -448,8 +456,18 @@ export function AddBlockDialog({
                                 wide ? "w-56 shrink-0 border-r border-border" : "flex-1"
                             )}
                         >
-                            {leftGroups.map((each) => (
+                            {leftGroups.map((each, index) => (
                                 <li key={each.id}>
+                                    {each.section &&
+                                        each.section !== leftGroups[index - 1]?.section && (
+                                            <span
+                                                role="presentation"
+                                                className="block truncate px-2.5 pb-1 pt-2 text-[0.6875rem] font-medium uppercase tracking-wide text-foreground-subtle"
+                                                title={each.section}
+                                            >
+                                                {each.section}
+                                            </span>
+                                        )}
                                     <button
                                         type="button"
                                         data-add-option=""

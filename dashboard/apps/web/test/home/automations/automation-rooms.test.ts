@@ -13,6 +13,8 @@ function room(id: string, name: string, floor = ""): RoomView {
     return { id, placeId: "place-1", name, floor };
 }
 
+const LEVELS = { noFloor: "On no floor", noRoom: "In no room" };
+
 const ROOMS = [
     room("r1", "Kitchen", "Ground floor"),
     room("r2", "Bedroom 10", "First floor"),
@@ -35,9 +37,11 @@ describe("a place's rooms", () => {
         expect(floorNames(ROOMS)).toEqual(["First floor", "Ground floor"]);
     });
 
-    it("group devices by room first, then the rest by what they are", () => {
+    it("group devices floor by floor, room by room, then the rest by what they are", () => {
         const devices = [
             { id: "lamp", kind: "light", roomId: "r1" },
+            { id: "bed", kind: "light", roomId: "r3" },
+            { id: "car", kind: "outlet", roomId: "r4" },
             { id: "plug", kind: "outlet", roomId: null },
             { id: "lock", kind: "lock" },
             { id: "lost", kind: "light", roomId: "gone" }
@@ -46,22 +50,33 @@ describe("a place's rooms", () => {
             devices,
             ROOMS,
             (device) => (device.kind === "lock" ? "Doors" : "Power"),
-            (each) => (each.floor ? `${each.floor} - ${each.name}` : each.name)
+            LEVELS
         );
-        expect(groups.map((group) => [group.label, group.devices.map((each) => each.id)])).toEqual([
-            ["Ground floor - Kitchen", ["lamp"]],
-            ["Power", ["plug", "lost"]],
-            ["Doors", ["lock"]]
+        expect(
+            groups.map((group) => [group.section, group.label, group.devices.map((each) => each.id)])
+        ).toEqual([
+            ["First floor", "Bedroom 2", ["bed"]],
+            ["Ground floor", "Kitchen", ["lamp"]],
+            ["On no floor", "Garage", ["car"]],
+            ["In no room", "Power", ["plug", "lost"]],
+            ["In no room", "Doors", ["lock"]]
+        ]);
+    });
+
+    it("draw no floor level where no room is on a floor", () => {
+        const groups = targetGroups(
+            [{ id: "lamp", kind: "light", roomId: "r4" }],
+            [room("r4", "Garage")],
+            () => "Power",
+            LEVELS
+        );
+        expect(groups).toEqual([
+            { id: "room:r4", label: "Garage", devices: [{ id: "lamp", kind: "light", roomId: "r4" }] }
         ]);
     });
 
     it("group by what they are alone where there are no rooms", () => {
-        const groups = targetGroups(
-            [{ id: "plug", kind: "outlet" }],
-            [],
-            () => "Power",
-            (each) => each.name
-        );
+        const groups = targetGroups([{ id: "plug", kind: "outlet" }], [], () => "Power", LEVELS);
         expect(groups).toEqual([
             { id: "Power", label: "Power", devices: [{ id: "plug", kind: "outlet" }] }
         ]);

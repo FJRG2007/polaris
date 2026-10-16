@@ -2307,6 +2307,8 @@
             "stay": "Seguir editando"
         },
         "add": {
+            "noFloor": "Sin planta",
+            "noRoom": "Sin sala",
             "title": {
                 "trigger": "Añadir disparador",
                 "condition": "Añadir condición",

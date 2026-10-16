@@ -1381,7 +1381,7 @@ describe("a block on a set of devices", () => {
         expect(saved).toHaveLength(0);
     });
 
-    it("groups the devices of a room under it on By target", async () => {
+    it("groups the devices of a room under it, and the room under its floor, on By target", async () => {
         render(
             <AutomationEditor
                 automationId="auto-set"
@@ -1396,7 +1396,9 @@ describe("a block on a set of devices", () => {
         fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
         const dialog = await screen.findByRole("dialog");
         fireEvent.click(within(dialog).getByRole("tab", { name: "By target" }));
-        expect(within(dialog).getByText("Ground floor - Kitchen")).toBeDefined();
+        expect(within(dialog).getByText("Ground floor").getAttribute("role")).toBe("presentation");
+        expect(within(dialog).getByRole("button", { name: "Kitchen" })).toBeDefined();
+        expect(within(dialog).getByText("In no room").getAttribute("role")).toBe("presentation");
         expect(within(dialog).getByRole("button", { name: /^Fixture plug2/ })).toBeDefined();
     });
 });
