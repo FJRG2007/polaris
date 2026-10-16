@@ -19,6 +19,7 @@ import { findApp } from "@/lib/apps/catalog";
 import { BundleUnavailable, removeBundle } from "./store";
 import { loadBundle, loadedBundle, unloadBundle } from "./loader";
 import { isAppInstalled } from "@/lib/apps/install-presence";
+import { afterPredecessor } from "@/lib/deploy/dashboard-peers";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 /** How long boot waits for the bundles before it serves without them. */
@@ -50,7 +51,13 @@ async function bring(id: string): Promise<void> {
     const already = loadedBundle(id);
     const bundle = await loadBundle(id);
     state.failures.delete(id);
-    if (!already) bundle.server.extension.onBoot?.();
+    // What an app starts with the server acts on its own - recovering a copy it
+    // finds part-way, bringing its containers to this build - and the dashboard this
+    // one replaces may still be doing exactly that, so it waits for that one to go.
+    if (!already)
+        void afterPredecessor()
+            .then(() => bundle.server.extension.onBoot?.())
+            .catch((error: unknown) => console.error(`polaris: ${id} could not start:`, error));
 }
 
 function retryLater(id: string): void {

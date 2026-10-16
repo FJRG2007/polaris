@@ -17,7 +17,7 @@ import { resetEnvCache } from "@polaris/config";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { sharedServerModules } from "@/lib/app-bundles/shared-server";
 import { SHARED_CLIENT_MODULES } from "@/components/app-bundles/runtime";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 // What is installed here, as the lifecycle asks it.
 const installed = new Set<string>();
@@ -25,6 +25,10 @@ vi.mock("@/lib/apps/install-presence", () => ({
     isAppInstalled: async (id: string) => installed.has(id),
     invalidateInstallPresence: () => undefined
 }));
+
+// The dashboard an update replaces, still serving: retired once `gate` settles.
+const predecessor = vi.hoisted(() => ({ gate: Promise.resolve() as Promise<void> }));
+vi.mock("@/lib/deploy/dashboard-peers", () => ({ afterPredecessor: () => predecessor.gate }));
 
 const DASHBOARD = resolve(__dirname, "../../../..");
 const BUNDLER = pathToFileURL(join(DASHBOARD, "packages/app-host/bundler/build.mjs")).href;
@@ -262,5 +266,29 @@ describe("uninstalling an app", () => {
         await appUninstalled("home");
         expect(loadedBundle("home")).toBeUndefined();
         expect(existsSync(join(root, "data", "apps", "home"))).toBe(false);
+    });
+});
+
+describe("the previous build of an app", () => {
+    it("stays on the volume until the dashboard still loading it is retired", async () => {
+        const id = built
+            .map((bundle) => bundle.manifest.id)
+            .find((candidate) => !existsSync(join(root, "data", "apps", candidate)));
+        expect(id).toBeDefined();
+        const previous = join(root, "data", "apps", id!, "previous-build");
+        mkdirSync(previous, { recursive: true });
+        writeFileSync(join(previous, "manifest.json"), "{}");
+        let retire = (): void => undefined;
+        predecessor.gate = new Promise<void>((done) => {
+            retire = done;
+        });
+
+        await (await import("@/lib/app-bundles/store")).ensureBundle(id!);
+        expect(existsSync(previous)).toBe(true);
+
+        retire();
+        await vi.waitFor(() => expect(existsSync(previous)).toBe(false));
+        expect(readdirSync(join(root, "data", "apps", id!))).toHaveLength(1);
+        predecessor.gate = Promise.resolve();
     });
 });
