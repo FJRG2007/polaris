@@ -556,6 +556,50 @@ describe("a reading crossing a line", () => {
     });
 });
 
+describe("a reading coming into or leaving a range", () => {
+    function ranged(direction: "between" | "outside") {
+        automation("range", {
+            triggers: [
+                {
+                    id: "trigrange",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction,
+                    value: 18,
+                    upper: 22
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "range" }]
+        });
+    }
+    const figure = async (reading: string) => {
+        later(MINUTE);
+        await reads(readout("temp", "sensor", "unknown", { reading }));
+    };
+
+    it("fires on coming into the range, ends included, and not while it stays in", async () => {
+        ranged("between");
+        await figure("15");
+        await figure("18");
+        await figure("21");
+        expect(store.runsOf("range")).toHaveLength(1);
+        await figure("23");
+        await figure("22");
+        expect(store.runsOf("range")).toHaveLength(2);
+    });
+
+    it("fires on leaving the range, either way out", async () => {
+        ranged("outside");
+        await figure("20");
+        await figure("17");
+        await figure("16");
+        expect(store.runsOf("range")).toHaveLength(1);
+        await figure("20");
+        await figure("25");
+        expect(store.runsOf("range")).toHaveLength(2);
+    });
+});
+
 describe("conditions", () => {
     function guarded(conditions: auto.AutomationDefinition["conditions"]) {
         automation("guarded", {
@@ -1274,5 +1318,65 @@ describe("an air purifier", () => {
             { deviceId: "air", action: "set-mode", setting: { action: "set-mode", mode: "sleep" } },
             { deviceId: "air", action: "set-fan", setting: { action: "set-fan", speed: "speed_1" } }
         ]);
+    });
+});
+
+describe("a condition held for a while", () => {
+    function held(forMinutes: number, negate = false) {
+        automation("held", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "device",
+                                deviceId: "door",
+                                attribute: "state",
+                                is: "unlocked",
+                                negate,
+                                forMinutes
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "held" }]
+        });
+    }
+    const press = async (key: string) => {
+        await engine.runNow(store.automations.get("held")!, "Fixture person", key);
+        await engine.drain();
+        return store.runsOf("held").at(-1)?.status;
+    };
+
+    it("passes only once the device has been that way for long enough", async () => {
+        await reads(readout("door", "lock", "unlocked"));
+        held(10);
+        later(5 * MINUTE);
+        expect(await press("press-1")).toBe("skipped");
+        later(6 * MINUTE);
+        expect(await press("press-2")).not.toBe("skipped");
+    });
+
+    it("starts counting again when the device changes", async () => {
+        await reads(readout("door", "lock", "unlocked"));
+        later(30 * MINUTE);
+        await reads(readout("door", "lock", "locked"));
+        later(MINUTE);
+        await reads(readout("door", "lock", "unlocked"));
+        held(10);
+        later(2 * MINUTE);
+        expect(await press("press-1")).toBe("skipped");
+    });
+
+    it("counts how long it has not been so, for is not", async () => {
+        await reads(readout("door", "lock", "locked"));
+        held(10, true);
+        later(11 * MINUTE);
+        expect(await press("press-1")).not.toBe("skipped");
     });
 });

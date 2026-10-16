@@ -370,6 +370,7 @@ export function FigureField({
     measure,
     label,
     path,
+    field = "value",
     value,
     onChange,
     suffix,
@@ -378,6 +379,8 @@ export function FigureField({
     measure: auto.ReadingMeasure | undefined;
     label: string;
     path: readonly (string | number)[];
+    /** The block's own field this figure is, for its error and its label. */
+    field?: string;
     value: number;
     onChange: (value: number) => void;
     suffix?: string;
@@ -389,7 +392,7 @@ export function FigureField({
             <NumberField
                 label={label}
                 path={path}
-                field="value"
+                field={field}
                 value={value}
                 step="any"
                 suffix={suffix}
@@ -400,7 +403,7 @@ export function FigureField({
     }
     const level = kinds.airQualityAt(value);
     return (
-        <Field label={label} path={[...path, "value"]} required>
+        <Field label={label} path={[...path, field]} required>
             {(id, invalid) => (
                 <Select
                     id={id}

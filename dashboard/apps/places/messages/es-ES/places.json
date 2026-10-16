@@ -1854,10 +1854,10 @@
             "time": "A las {time}, {days}",
             "interval": "Cada {every}",
             "manual": "Solo cuando se lanza a mano",
-            "threshold": "{device} pasa {direction, select, above {de} other {por debajo de}} {value}",
+            "threshold": "{device} {direction, select, above {pasa de {value}} below {pasa por debajo de {value}} between {entra en {value} a {upper}} other {sale de {value} a {upper}}}",
             "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {de {from} a {to}} other {pasa a {to}}}} other {{hasFrom, select, yes {deja de estar {from}} other {cambia}}}}",
             "stays": "{device}: {value} durante {span}",
-            "is": "{device} {negate, select, yes {no está} other {está}} {value}",
+            "is": "{device} {negate, select, yes {no está} other {está}} {value}{hasFor, select, yes { durante {span}} other {}}",
             "reading": "{device}: {compare} {value}",
             "between": "Entre las {from} y las {to}",
             "on": "Días: {days}",
@@ -1956,7 +1956,9 @@
             "noControl": "No puedes usar los dispositivos de aquí, así que una automatización que guardes tampoco podría.",
             "noAutoOff": "Ese dispositivo no tiene nada que apagar solo.",
             "setting": "Elige un valor que admita este aparato.",
-            "measure": "Ese dispositivo no informa de eso."
+            "measure": "Ese dispositivo no informa de eso.",
+            "upper": "Indica el tope del rango.",
+            "upperBelow": "Ponlo por encima del inicio."
         },
         "notice": {
             "title": "Automatización: {name}"
@@ -2106,7 +2108,11 @@
             "speed": "Velocidad",
             "humidity": "Humedad",
             "worse": "Pasa a peor que",
-            "better": "Pasa a mejor que"
+            "better": "Pasa a mejor que",
+            "between": "Entra en",
+            "outside": "Sale de",
+            "upper": "Hasta",
+            "forMinutes": "Al menos"
         },
         "log": {
             "title": "Qué hizo",
@@ -2250,7 +2256,7 @@
                 "trigger": {
                     "change": "Cuando un dispositivo se enciende, se apaga, se abre, se bloquea o cambia de otra forma.",
                     "stays": "Cuando un dispositivo lleva un rato en un estado.",
-                    "threshold": "Cuando una lectura sube o baja de una cifra.",
+                    "threshold": "Cuando una lectura cruza una cifra, o entra o sale de un rango.",
                     "time": "A una hora del día, los días que elijas.",
                     "interval": "Una y otra vez, cada tantos minutos u horas.",
                     "manual": "Nunca por sí sola. Solo se ejecuta cuando alguien la inicia."

@@ -1854,10 +1854,10 @@
             "time": "At {time}, {days}",
             "interval": "Every {every}",
             "manual": "Only when run by hand",
-            "threshold": "{device} goes {direction, select, above {above} other {below}} {value}",
+            "threshold": "{device} {direction, select, above {goes above {value}} below {goes below {value}} between {comes into {value} to {upper}} other {leaves {value} to {upper}}}",
             "change": "{device}: {hasTo, select, yes {{hasFrom, select, yes {from {from} to {to}} other {becomes {to}}}} other {{hasFrom, select, yes {stops being {from}} other {changes}}}}",
             "stays": "{device} is {value} for {span}",
-            "is": "{device} {negate, select, yes {is not} other {is}} {value}",
+            "is": "{device} {negate, select, yes {is not} other {is}} {value}{hasFor, select, yes { for {span}} other {}}",
             "reading": "{device}: {compare} {value}",
             "between": "Between {from} and {to}",
             "on": "On {days}",
@@ -1956,7 +1956,9 @@
             "noControl": "You cannot operate the devices here, so an automation you save could not either.",
             "noAutoOff": "That device has nothing to switch off by itself.",
             "setting": "Choose a value this device accepts.",
-            "measure": "That device does not report that."
+            "measure": "That device does not report that.",
+            "upper": "Give the top of the range.",
+            "upperBelow": "Make it higher than the bottom."
         },
         "notice": {
             "title": "Automation: {name}"
@@ -2106,7 +2108,11 @@
             "speed": "Fan speed",
             "humidity": "Humidity",
             "worse": "Gets worse than",
-            "better": "Gets better than"
+            "better": "Gets better than",
+            "between": "Comes into",
+            "outside": "Leaves",
+            "upper": "Up to",
+            "forMinutes": "For at least"
         },
         "log": {
             "title": "What it did",
@@ -2250,7 +2256,7 @@
                 "trigger": {
                     "change": "When a device turns on, off, opens, locks or changes in some other way.",
                     "stays": "When a device has been in a state for a while.",
-                    "threshold": "When a reading goes above or below a figure.",
+                    "threshold": "When a reading crosses a figure, or enters or leaves a range.",
                     "time": "At a time of day, on the days you choose.",
                     "interval": "Over and over, every so many minutes or hours.",
                     "manual": "Never on its own. Runs only when somebody starts it."

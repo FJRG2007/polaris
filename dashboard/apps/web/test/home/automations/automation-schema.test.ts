@@ -862,3 +862,80 @@ describe("an air purifier", () => {
         expect(words.valueText("filter", "air", "soon", en)).toBe("Replace soon");
     });
 });
+
+describe("ranges and held conditions", () => {
+    const threshold = (extra: object) =>
+        input({
+            triggers: [
+                { id: "trig01", kind: "threshold", deviceId: "temp", value: 18, ...extra }
+            ] as auto.Trigger[]
+        });
+
+    it("reads an automation stored before ranges and durations exactly as it was", () => {
+        const stored = input({
+            triggers: [
+                { id: "trig01", kind: "threshold", deviceId: "temp", direction: "above", value: 25 }
+            ],
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "device",
+                                deviceId: "lock",
+                                attribute: "state",
+                                is: "locked",
+                                negate: false
+                            }
+                        ]
+                    }
+                ]
+            }
+        }) as { definition: unknown };
+        const parsed = parse(stored);
+        expect(parsed.success).toBe(true);
+        expect(parsed.success && parsed.data.definition).toEqual(stored.definition);
+    });
+
+    it("takes a range with its top, and refuses one without it or upside down", () => {
+        expect(messages(threshold({ direction: "between", upper: 22 }))).toEqual([]);
+        expect(messages(threshold({ direction: "outside" }))).toEqual(["automations.errors.upper"]);
+        expect(messages(threshold({ direction: "between", upper: 10 }))).toEqual([
+            "automations.errors.upperBelow"
+        ]);
+    });
+
+    it("takes a held condition in whole minutes", () => {
+        const held = (forMinutes: number) =>
+            messages(
+                input({
+                    conditions: {
+                        match: "all",
+                        groups: [
+                            {
+                                id: "group1",
+                                match: "all",
+                                items: [
+                                    {
+                                        id: "cond01",
+                                        kind: "device",
+                                        deviceId: "lock",
+                                        attribute: "state",
+                                        is: "locked",
+                                        negate: false,
+                                        forMinutes
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                })
+            );
+        expect(held(10)).toEqual([]);
+        expect(held(0).length).toBeGreaterThan(0);
+    });
+});

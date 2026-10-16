@@ -267,6 +267,15 @@ export function settingField(setting: StepSetting): string {
  *  so the switch that skips one is not taken here yet. */
 const blockBase = { alias: blockBaseShape.alias, note: blockBaseShape.note };
 
+/** How a threshold trigger watches a figure: across a line, or into or out of a range. */
+export const THRESHOLD_DIRECTIONS = ["above", "below", "between", "outside"] as const;
+export type ThresholdDirection = (typeof THRESHOLD_DIRECTIONS)[number];
+
+/** Whether a threshold direction needs a range rather than a line. */
+export function isRange(direction: ThresholdDirection): boolean {
+    return direction === "between" || direction === "outside";
+}
+
 export const triggerSchema = z.discriminatedUnion("kind", [
     z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), at: clock, days }),
     z.object({ id: nodeId, ...blockBase, kind: z.literal("interval"), minutes: count(1, LIMITS.minutes) }),
@@ -292,8 +301,11 @@ export const triggerSchema = z.discriminatedUnion("kind", [
         id: nodeId, ...blockBase,
         kind: z.literal("threshold"),
         deviceId: deviceRef,
-        direction: z.enum(["above", "below"]),
+        /** "between" fires on coming into `value`..`upper`, "outside" on leaving it. */
+        direction: z.enum(THRESHOLD_DIRECTIONS),
         value: amount,
+        /** The top of the range, for "between" and "outside" only. */
+        upper: amount.optional(),
         /** Which of a purifier's figures; absent for a device's one reading. */
         measure: z.enum(READING_MEASURES).optional()
     }),
@@ -307,7 +319,9 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         deviceId: deviceRef,
         attribute,
         is: needed,
-        negate: z.boolean()
+        negate: z.boolean(),
+        /** Passes only once the device has been that way for this long. */
+        forMinutes: count(1, LIMITS.minutes).optional()
     }),
     z.object({
         id: nodeId, ...blockBase,
@@ -435,7 +449,10 @@ export const definitionSchema = z
             if (trigger.kind === "stays") {
                 checkWord(context, trigger.attribute, trigger.is, [...at, "is"], false);
             }
-            if (trigger.kind === "threshold") checkFigure(context, trigger, at);
+            if (trigger.kind === "threshold") {
+                checkFigure(context, trigger, at);
+                checkRange(context, trigger, at);
+            }
         });
 
         definition.conditions.groups.forEach((group, index) =>
@@ -487,6 +504,24 @@ function checkFigure(
             code: "custom",
             path: [...path, "value"],
             message: "automations.errors.state"
+        });
+    }
+}
+
+/** A range needs its top, above its bottom; a line has none. */
+function checkRange(
+    context: z.RefinementCtx,
+    node: { readonly direction: ThresholdDirection; readonly value: number; readonly upper?: number },
+    path: (string | number)[]
+): void {
+    if (!isRange(node.direction)) return;
+    if (node.upper === undefined || !Number.isFinite(node.upper)) {
+        context.addIssue({ code: "custom", path: [...path, "upper"], message: "automations.errors.upper" });
+    } else if (node.upper <= node.value) {
+        context.addIssue({
+            code: "custom",
+            path: [...path, "upper"],
+            message: "automations.errors.upperBelow"
         });
     }
 }

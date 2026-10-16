@@ -1465,23 +1465,20 @@ function TriggerCard({
                                                   label: t("automations.fields.better")
                                               }
                                           ]
-                                        : [
-                                              {
-                                                  value: "above",
-                                                  label: t("automations.fields.above")
-                                              },
-                                              {
-                                                  value: "below",
-                                                  label: t("automations.fields.below")
-                                              }
-                                          ]
+                                        : auto.THRESHOLD_DIRECTIONS.map((value) => ({
+                                              value,
+                                              label: t(`automations.fields.${value}`)
+                                          }))
                                 }
-                                onValueChange={(direction) =>
-                                    onChange({
-                                        ...trigger,
-                                        direction: direction as "above" | "below"
-                                    })
-                                }
+                                onValueChange={(next) => {
+                                    const direction = next as auto.ThresholdDirection;
+                                    const { upper, ...rest } = trigger;
+                                    onChange(
+                                        auto.isRange(direction)
+                                            ? { ...rest, direction, upper: upper ?? Number.NaN }
+                                            : { ...rest, direction }
+                                    );
+                                }}
                             />
                         )}
                     </flow.Field>
@@ -1494,6 +1491,18 @@ function TriggerCard({
                         disabled={disabled}
                         onChange={(value) => onChange({ ...trigger, value })}
                     />
+                    {auto.isRange(trigger.direction) && (
+                        <fields.FigureField
+                            measure={trigger.measure}
+                            label={t("automations.fields.upper")}
+                            path={path}
+                            field="upper"
+                            value={trigger.upper ?? Number.NaN}
+                            suffix={fields.measureSuffix(trigger.measure, device?.reading?.unit)}
+                            disabled={disabled}
+                            onChange={(upper) => onChange({ ...trigger, upper })}
+                        />
+                    )}
                 </>
             )}
         </flow.NodeCard>
@@ -1710,6 +1719,21 @@ function ConditionCard({
                         label={t("automations.fields.value")}
                         disabled={disabled}
                         onChange={(is) => onChange({ ...condition, is })}
+                    />
+                    <fields.NumberField
+                        label={t("automations.fields.forMinutes")}
+                        path={path}
+                        field="forMinutes"
+                        value={condition.forMinutes ?? Number.NaN}
+                        min={1}
+                        step={1}
+                        suffix={t("automations.fields.minutesSuffix")}
+                        disabled={disabled}
+                        onChange={(minutes) => {
+                            const { forMinutes: _was, ...rest } = condition;
+                            // Empty is "as soon as it is so", which is no duration at all.
+                            onChange(Number.isNaN(minutes) ? rest : { ...rest, forMinutes: minutes });
+                        }}
                     />
                 </>
             )}

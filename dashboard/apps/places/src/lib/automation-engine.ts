@@ -540,9 +540,7 @@ export function createEngine(ports: EnginePorts) {
             const before = numberOf(change.from);
             const after = numberOf(change.to);
             if (before === null || after === null) return false;
-            return trigger.direction === "above"
-                ? before <= trigger.value && after > trigger.value
-                : before >= trigger.value && after < trigger.value;
+            return crossed(trigger, before, after);
         }
         return false;
     }
@@ -605,16 +603,7 @@ export function createEngine(ports: EnginePorts) {
             if (!seen) return;
             const value = attributeOf(seen, trigger.attribute);
             if (!same(value, trigger.is)) return;
-            const since =
-                trigger.attribute === "door"
-                    ? seen.doorSince
-                    : trigger.attribute === "reading"
-                      ? seen.readingSince
-                      : trigger.attribute === "mode"
-                        ? seen.modeSince
-                        : trigger.attribute === "filter"
-                          ? (seen.filterSince ?? seen.stateSince)
-                          : seen.stateSince;
+            const since = sinceOf(seen, trigger.attribute);
             // Measured from when it was switched on here, not from when the
             // device got there: a light already on for three hours when "off
             // after 30 minutes" is written goes off 30 minutes later, not now.
@@ -954,7 +943,15 @@ export function createEngine(ports: EnginePorts) {
             // "is not" both fail rather than the second passing by default.
             if (!device || !device.online) return false;
             const matches = same(attributeOf(device, condition.attribute), condition.is);
-            return condition.negate ? !matches : matches;
+            const passes = condition.negate ? !matches : matches;
+            if (!passes || !condition.forMinutes) return passes;
+            // Held for long enough: the attribute has not changed since at least
+            // that long ago. Its last change is what made it match (or stop
+            // matching, for "is not"), so that change is when the wait began.
+            const seen = await store.observation(condition.deviceId);
+            if (!seen) return false;
+            const since = sinceOf(seen, condition.attribute);
+            return now.getTime() - since.getTime() >= condition.forMinutes * 60 * 1000;
         }
         if (condition.kind === "reading") {
             const device = await ports.devices.read(automation.installedAppId, condition.deviceId);
@@ -980,6 +977,39 @@ export function createEngine(ports: EnginePorts) {
 }
 
 export type AutomationEngine = ReturnType<typeof createEngine>;
+
+/** When the attribute an observation holds last changed. */
+function sinceOf(
+    seen: Observation,
+    attribute: auto.AutomationAttribute
+): Date {
+    if (attribute === "door") return seen.doorSince;
+    if (attribute === "reading") return seen.readingSince;
+    if (attribute === "mode") return seen.modeSince;
+    if (attribute === "filter") return seen.filterSince ?? seen.stateSince;
+    return seen.stateSince;
+}
+
+/**
+ * Whether a figure going from `before` to `after` is what a threshold waits for:
+ * crossing its line, or coming into its range ("between") or leaving it
+ * ("outside"). Both ends of a range count as inside it.
+ */
+export function crossed(
+    threshold: { direction: auto.ThresholdDirection; value: number; upper?: number },
+    before: number,
+    after: number
+): boolean {
+    const { direction, value } = threshold;
+    if (direction === "above") return before <= value && after > value;
+    if (direction === "below") return before >= value && after < value;
+    const upper = threshold.upper;
+    if (upper === undefined || !(upper > value)) return false;
+    const inside = (figure: number) => figure >= value && figure <= upper;
+    return direction === "between"
+        ? !inside(before) && inside(after)
+        : inside(before) && !inside(after);
+}
 
 /**
  * The most recent moment a time-of-day trigger was due, at or before now, on
