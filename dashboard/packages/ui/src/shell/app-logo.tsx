@@ -257,6 +257,17 @@ const LOGOS: Readonly<Record<string, LogoDefinition>> = {
         )
     },
     // A sticky note with a turned-up corner and two lines.
+    // A trigger wired to the step it starts.
+    automations: {
+        palette: ["#99F6E4", "#14B8A6", "#0F766E"],
+        draw: ({ base, face }) => (
+            <>
+                <rect x="4" y="5" width="11" height="9" rx="3" fill={base} />
+                <rect x="17" y="18" width="11" height="9" rx="3" fill={face} />
+                <path d="M15 9.5h3.5a3 3 0 0 1 3 3V18" {...LINE} strokeWidth={2.6} />
+            </>
+        )
+    },
     notes: {
         palette: ["#FDE68A", "#EAB308", "#B45309"],
         draw: ({ base, face }) => (

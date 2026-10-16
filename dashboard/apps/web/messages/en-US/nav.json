@@ -151,6 +151,9 @@
         "status-pages": {
             "description": "Public pages that show whether your services are up"
         },
+        "automations": {
+            "description": "When something happens, do something, across your apps"
+        },
         "crm": {
             "description": "Companies, people and the deals you are working"
         }

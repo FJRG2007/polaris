@@ -20,6 +20,7 @@ import tools from "./tools.json";
 import tours from "./tours.json";
 import setup from "./setup.json";
 import vault from "./vault.json";
+import automations from "./automations.json";
 import watch from "./watch.json";
 import agents from "./agents.json";
 import common from "./common.json";
@@ -140,5 +141,6 @@ export default {
     setup,
     validation,
     vault,
+    automations,
     watch
 };

@@ -23,6 +23,7 @@ secrets
 # is deployed. A source tree under a `secrets` name anywhere else needs the same
 # line - test/build/docker-context.test.ts fails until it has one.
 !apps/web/src/app/(app)/apps/runners/secrets
+!apps/web/src/app/(app)/automations/secrets
 .git
 .gitignore
 *.log

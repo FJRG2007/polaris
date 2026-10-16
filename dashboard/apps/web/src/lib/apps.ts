@@ -395,6 +395,20 @@ export const POLARIS_APPS: AppEntry[] = [
     },
     {
         /**
+         * When something happens, do something: one engine every app plugs its
+         * triggers and actions into. Core, not installable - the engine is what
+         * the apps' own automation screens become windows onto.
+         */
+        id: "automations",
+        category: "work",
+        label: "Automations", // i18n-ignore
+        description: "When something happens, do something, across your apps", // i18n-ignore
+        icon: Workflow,
+        href: "/automations",
+        permission: "automations.use"
+    },
+    {
+        /**
          * Documents, spreadsheets, presentations and diagrams - the office
          * suite, in the browser and edited by several people at once.
          *
@@ -1355,6 +1369,26 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Target,
             keywords: ["create", "add", "deal"],
             hidden: true
+        }
+    ],
+    automations: [
+        {
+            label: "Automations", // i18n-ignore
+            href: "/automations",
+            icon: Workflow,
+            keywords: ["workflows", "rules", "triggers", "webhooks", "schedules", "flows"]
+        },
+        {
+            label: "Runs", // i18n-ignore
+            href: "/automations/runs",
+            icon: History,
+            keywords: ["executions", "history", "log", "failed runs"]
+        },
+        {
+            label: "Secrets", // i18n-ignore
+            href: "/automations/secrets",
+            icon: KeyRound,
+            keywords: ["tokens", "webhook urls", "credentials", "passwords"]
         }
     ],
     notes: [
