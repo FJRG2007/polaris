@@ -72,6 +72,7 @@ import {
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -451,6 +452,30 @@ export function CommandPalette({
     // "2 * (3 + 4)": answered as it is typed, and Enter copies the answer.
     // Never inside a command, where what is typed is a search of that one thing.
     const calculation = useMemo(() => (scope ? null : calculate(query)), [scope, query]);
+    const answer = useMemo(
+        () =>
+            calculation === null
+                ? null
+                : new Intl.NumberFormat(locale, { maximumSignificantDigits: 10 }).format(
+                      calculation
+                  ),
+        [calculation, locale]
+    );
+
+    // The answer drawn after what is typed, in the field itself. It is hidden,
+    // not removed, when it does not fit, so measuring it never flips it back.
+    const ghostRef = useRef<HTMLDivElement>(null);
+    const [ghostFits, setGhostFits] = useState(true);
+    useLayoutEffect(() => {
+        const box = ghostRef.current;
+        if (!box) return;
+        const measure = () => setGhostFits(box.scrollWidth <= box.clientWidth);
+        measure();
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(measure);
+        observer.observe(box);
+        return () => observer.disconnect();
+    }, [answer, query]);
 
     /** Earlier searches, narrowed to the command in hand and to what is typed. */
     const recentRows = useMemo(() => {
@@ -545,11 +570,9 @@ export function CommandPalette({
                       }
                   ];
 
-        // What the search found for what is typed is what Enter opened before the
-        // calculator existed, so the answer then follows it.
-        return found.length > 0
-            ? [...clock, ...remembered, ...commands, ...found, ...sum]
-            : [...sum, ...clock, ...remembered, ...commands];
+        // Something that works out as a sum was typed as one: its answer leads,
+        // whatever else the search turns up for the same characters.
+        return [...sum, ...clock, ...remembered, ...commands, ...found];
     }, [
         calculation,
         recentRows,
@@ -628,11 +651,21 @@ export function CommandPalette({
             );
     }
 
-    /** Put the answer on the clipboard, and say so - or that it could not be. */
+    /** The answer takes the place of the sum, caret at the end, to go on working
+     *  with it. The field keeps focus, so a phone keeps its keyboard up. */
+    function applyCalculation(value: number): void {
+        const text = calculationText(value);
+        setQuery(text);
+        setActive(0);
+        const field = fieldRef.current;
+        field?.focus();
+        requestAnimationFrame(() => field?.setSelectionRange(text.length, text.length));
+    }
+
+    /** Put the answer on the clipboard, and say so - or that it could not be. The
+     *  panel stays open: copying is a side step, not the end of the sum. */
     function copyCalculation(value: number): void {
         const text = calculationText(value);
-        openedRef.current = true;
-        setOpen(false);
         void navigator.clipboard
             .writeText(text)
             .then(() =>
@@ -649,7 +682,7 @@ export function CommandPalette({
     function go(row: Row | undefined): void {
         if (!row) return;
         if (row.kind === "calculation") {
-            copyCalculation(row.value);
+            applyCalculation(row.value);
             return;
         }
         if (row.kind === "clock") {
@@ -718,6 +751,19 @@ export function CommandPalette({
         } else if (event.key === "Enter") {
             event.preventDefault();
             go(rows[active]);
+        } else if (event.key === "Tab" && calculation !== null && !event.shiftKey) {
+            // Enter's twin for the answer, wherever the highlight is.
+            event.preventDefault();
+            applyCalculation(calculation);
+        } else if (
+            event.key.toLowerCase() === "c" &&
+            (event.ctrlKey || event.metaKey) &&
+            rows[active]?.kind === "calculation" &&
+            event.currentTarget.selectionStart === event.currentTarget.selectionEnd
+        ) {
+            // Nothing selected to copy, so the copy is the answer's.
+            event.preventDefault();
+            copyCalculation((rows[active] as { value: number }).value);
         } else if (event.key === "Tab" && suggestions.length > 0) {
             // The command being spelled out is one key away from being taken.
             event.preventDefault();
@@ -786,39 +832,59 @@ export function CommandPalette({
                                 </button>
                             </span>
                         ) : null}
-                        <Input
-                            autoFocus
-                            ref={fieldRef}
-                            type="search"
-                            value={query}
-                            onChange={(event) => onFieldChange(event.target.value)}
-                            onKeyDown={onFieldKeyDown}
-                            placeholder={
-                                scope
-                                    ? scopeWords(t, scope.id).placeholder
-                                    : t("search.placeholder")
-                            }
-                            enterKeyHint="go"
-                            autoCapitalize="none"
-                            autoCorrect="off"
-                            spellCheck={false}
-                            aria-label={
-                                scope ? scopeWords(t, scope.id).placeholder : t("search.label")
-                            }
-                            // The arrow keys move a highlight through the list
-                            // while the caret stays here, so the field has to be
-                            // the thing that says which row is current: without
-                            // it a screen reader hears nothing move.
-                            role="combobox"
-                            aria-expanded
-                            aria-autocomplete="list"
-                            aria-activedescendant={
-                                rows[active] ? rowElementId(rows[active]!) : undefined
-                            }
-                            aria-controls="polaris-search-results"
-                            bare
-                            className="h-12"
-                        />
+                        <div className="relative flex min-w-0 flex-1 items-center">
+                            <Input
+                                autoFocus
+                                ref={fieldRef}
+                                type="search"
+                                value={query}
+                                onChange={(event) => onFieldChange(event.target.value)}
+                                onKeyDown={onFieldKeyDown}
+                                placeholder={
+                                    scope
+                                        ? scopeWords(t, scope.id).placeholder
+                                        : t("search.placeholder")
+                                }
+                                enterKeyHint="go"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                aria-label={
+                                    scope ? scopeWords(t, scope.id).placeholder : t("search.label")
+                                }
+                                // The arrow keys move a highlight through the list
+                                // while the caret stays here, so the field has to be
+                                // the thing that says which row is current: without
+                                // it a screen reader hears nothing move.
+                                role="combobox"
+                                aria-expanded
+                                aria-autocomplete="list"
+                                aria-activedescendant={
+                                    rows[active] ? rowElementId(rows[active]!) : undefined
+                                }
+                                aria-controls="polaris-search-results"
+                                bare
+                                className="h-12"
+                            />
+                            {answer !== null ? (
+                                <div
+                                    ref={ghostRef}
+                                    aria-hidden="true"
+                                    data-testid="search-calculation-ghost"
+                                    className="pointer-events-none absolute inset-0 flex select-none items-center overflow-hidden whitespace-pre text-[0.8125rem]"
+                                >
+                                    <span className="invisible">{query}</span>
+                                    <span
+                                        className={cn(
+                                            "text-muted-foreground",
+                                            !ghostFits && "invisible"
+                                        )}
+                                    >
+                                        {` = ${answer}`}
+                                    </span>
+                                </div>
+                            ) : null}
+                        </div>
                         {loading || searching ? (
                             <Loader2
                                 className="size-4 shrink-0 animate-spin text-muted-foreground"
@@ -918,18 +984,20 @@ export function CommandPalette({
                                             const select = () => go(row);
                                             const hover = () => setActive(position);
                                             if (row.kind === "calculation") {
-                                                const answer = new Intl.NumberFormat(locale, {
-                                                    maximumFractionDigits: 10
-                                                }).format(row.value);
                                                 return (
                                                     <CalculationRow
                                                         key={row.id}
                                                         id={rowElementId(row)}
                                                         expression={trimmed}
-                                                        answer={answer}
-                                                        label={t("search.calculationLabel", {
-                                                            value: answer
+                                                        answer={answer ?? ""}
+                                                        label={t("search.calculationUse", {
+                                                            value: answer ?? ""
                                                         })}
+                                                        copyLabel={t("search.calculationLabel", {
+                                                            value: answer ?? ""
+                                                        })}
+                                                        copyTitle={t("search.calculationCopy")}
+                                                        onCopy={() => copyCalculation(row.value)}
                                                         selected={selected}
                                                         onSelect={select}
                                                         onHover={hover}
@@ -1018,7 +1086,13 @@ export function CommandPalette({
                         <span className={cn(scope && "hidden sm:inline")}>
                             {t("search.hintMove")}
                         </span>
-                        <span>{scope ? t("search.hintClear") : t("search.hintType")}</span>
+                        <span>
+                            {scope
+                                ? t("search.hintClear")
+                                : calculation !== null
+                                  ? t("search.hintCalculation")
+                                  : t("search.hintType")}
+                        </span>
                     </div>
                 </DialogContent>
             </Dialog>

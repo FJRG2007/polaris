@@ -7,14 +7,15 @@
  * in the table below.
  *
  *     expression := term (("+" | "-") term)*
- *     term       := unary (("*" | "/" | "%") unary | implicit unary)*
+ *     term       := unary (("*" | "/" | "%") unary | "%" "of" unary | implicit unary)*
  *     unary      := ("-" | "+") unary | power
  *     power      := primary (("^" | "**") unary)?
  *     primary    := number | constant | function "(" expression ")" | "(" expression ")"
  *
  * Power binds tighter than unary minus, so "-2^2" is -4 as on paper, and is
  * right-associative through `unary`, so "2^3^2" is 2^9. A number next to a
- * bracket, a constant or a function multiplies: "2pi", "3(4 + 1)".
+ * bracket, a constant or a function multiplies: "2pi", "3(4 + 1)". "15% of 200"
+ * is a share, 30, and a comma is a decimal point as well as a dot: "1,5 * 2" is 3.
  */
 
 const FUNCTIONS: ReadonlyMap<string, (value: number) => number> = new Map([
@@ -42,6 +43,9 @@ const LOOKS_LIKE_AN_ID = /^(?:\d[\d.]*(?:[-x][\d.]+)+|\d+(?:\/\d+){2,})$/i;
 
 /** Long enough for any sum somebody types, short enough to bound the work. */
 const MAX_LENGTH = 200;
+/** As many digits as an answer keeps: enough for any sum, few enough that the
+ *  noise of binary fractions never shows. */
+const SIGNIFICANT_DIGITS = 10;
 /** Brackets and signs nested deeper than this are not arithmetic anybody typed. */
 const MAX_DEPTH = 64;
 
@@ -63,9 +67,9 @@ function tokenize(input: string): Token[] {
             index += 1;
             continue;
         }
-        const number = /^(\d+(\.\d*)?|\.\d+)/.exec(input.slice(index));
+        const number = /^(\d+([.,]\d*)?|[.,]\d+)/.exec(input.slice(index));
         if (number) {
-            tokens.push({ kind: "number", value: Number(number[0]) });
+            tokens.push({ kind: "number", value: Number(number[0].replace(",", ".")) });
             index += number[0].length;
             continue;
         }
@@ -133,6 +137,14 @@ function evaluate(tokens: readonly Token[]): Evaluation {
     function term(): number {
         let value = unary();
         for (;;) {
+            // "15% of 200": the share, not the remainder.
+            const after = tokens[position + 1];
+            if (isOp("%") && after?.kind === "name" && after.value === "of") {
+                position += 2;
+                value = (value * unary()) / 100;
+                worked = true;
+                continue;
+            }
             if (isOp("*") || isOp("/") || isOp("%")) {
                 const op = (tokens[position++] as { value: string }).value;
                 const right = unary();
@@ -225,7 +237,7 @@ export function calculate(input: string): number | null {
         const { value, worked } = evaluate(tokenize(text));
         if (!worked || !Number.isFinite(value)) return null;
         // Floating point noise off the end: 0.1 + 0.2 is 0.3.
-        const tidy = Number(value.toPrecision(12));
+        const tidy = Number(value.toPrecision(SIGNIFICANT_DIGITS));
         return Object.is(tidy, -0) ? 0 : tidy;
     } catch (error) {
         if (error instanceof NotArithmetic) return null;
@@ -233,7 +245,14 @@ export function calculate(input: string): number | null {
     }
 }
 
+/** Plain digits, never "1e+21": what is copied or put back in the field has to
+ *  read back as the same number, here and in a sheet. */
+const PLAIN = new Intl.NumberFormat("en-US", {
+    useGrouping: false,
+    maximumSignificantDigits: SIGNIFICANT_DIGITS
+});
+
 /** The answer as it is copied: plain digits a calculator or a sheet reads back. */
 export function calculationText(value: number): string {
-    return String(value);
+    return PLAIN.format(value);
 }

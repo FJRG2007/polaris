@@ -176,6 +176,7 @@
         "hintMove": "Arriba y abajo para moverte, Intro para abrir",
         "hintClear": "Retroceso borra el comando",
         "hintType": "Escribe / para comandos, @ para personas",
+        "hintCalculation": "Intro o Tab para usar el resultado",
         "scopeRow": "Buscar en {scope}",
         "forget": "Quitar de las búsquedas recientes",
         "forgetNamed": "Quitar {label} de las búsquedas recientes",
@@ -259,6 +260,8 @@
         "calculationCopied": "{value} copiado al portapapeles",
         "calculationCopyFailed": "No se pudo copiar el resultado. Prueba otra vez.",
         "calculationLabel": "Copiar {value}",
+        "calculationUse": "Usar {value}",
+        "calculationCopy": "Copiar resultado",
         "clock": {
             "timer": "Iniciar un temporizador de {length}",
             "alarm": "Poner una alarma a las {time}",
