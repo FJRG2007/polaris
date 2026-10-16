@@ -2100,7 +2100,7 @@
                 "description": "Versión, actualización automática y ajustes del despliegue."
             },
             "sso": {
-                "title": "Inicio de sesión único",
+                "title": "Acceso único",
                 "description": "Proveedores de identidad SAML y los dominios de correo que entran con ellos."
             }
         }
@@ -3291,28 +3291,28 @@
         }
     },
     "sso": {
-        "title": "Inicio de sesión único",
+        "title": "Acceso único",
         "description": "Proveedores de identidad con los que se entra, por dominio de correo.",
-        "add": "Añadir proveedor",
+        "add": "Nuevo proveedor",
         "empty": "Aún no hay proveedor de identidad. Añade uno para entrar con la cuenta del trabajo.",
         "form": {
-            "newTitle": "Nuevo proveedor de identidad",
+            "newTitle": "Nuevo proveedor de IdP",
             "name": "Nombre",
-            "domains": "Dominios de correo",
+            "domains": "Dominios",
             "source": "Datos del proveedor",
-            "sourceUrl": "URL de metadatos",
-            "sourceXml": "XML de metadatos",
+            "sourceUrl": "URL metadatos",
+            "sourceXml": "XML metadatos",
             "sourceManual": "A mano",
             "replaceHint": "Al guardar, estos datos sustituyen a los actuales del proveedor.",
-            "metadataUrl": "URL de metadatos",
-            "metadataXml": "XML de metadatos",
-            "entityId": "ID de entidad",
+            "metadataUrl": "URL metadatos",
+            "metadataXml": "XML metadatos",
+            "entityId": "ID entidad",
             "ssoUrl": "URL de acceso",
             "certificate": "Certificado de firma",
             "mapping": "Atributos",
             "mapEmail": "Atributo de correo",
             "mapName": "Atributo de nombre",
-            "mapFirstName": "Atributo de nombre de pila",
+            "mapFirstName": "Atributo de nombre propio",
             "mapLastName": "Atributo de apellidos",
             "allowSignUp": "Crear cuentas al primer acceso",
             "allowSignUpHint": "Quien sea de estos dominios y no tenga cuenta la recibe la primera vez que entra.",
@@ -3329,7 +3329,7 @@
             "jit": "Crea cuentas",
             "spEntityId": "ID de entidad (audiencia)",
             "acsUrl": "URL de ACS",
-            "spMetadata": "Metadatos del proveedor de servicio",
+            "spMetadata": "Metadatos del SP",
             "recordsIntro": "Añade estos registros TXT en tu proveedor de DNS y comprueba. Nadie entra con este proveedor hasta que cada dominio tenga su registro.",
             "recordName": "Nombre",
             "recordValue": "Valor",
@@ -3342,8 +3342,8 @@
         },
         "checks": {
             "certificate": "El certificado de firma es válido",
-            "metadata": "La URL de acceso responde",
-            "domain": "Registro DNS encontrado"
+            "metadata": "URL de acceso responde",
+            "domain": "Registro DNS hallado"
         },
         "problems": {
             "metadata": "Esos metadatos no se pueden leer como un proveedor de identidad SAML.",
