@@ -22,8 +22,24 @@ const state = vi.hoisted(() => ({
 }));
 
 const view = {
-    limits: { members: 5, teams: null, projects: 2, services: null, databases: null, cpus: null, memoryMb: null },
-    usage: { members: 3, teams: 1, projects: 2, services: 4, databases: 0, cpus: 1.5, memoryMb: 512 }
+    limits: {
+        members: 5,
+        teams: null,
+        projects: 2,
+        services: null,
+        databases: null,
+        cpus: null,
+        memoryMb: null
+    },
+    usage: {
+        members: 3,
+        teams: 1,
+        projects: 2,
+        services: 4,
+        databases: 0,
+        cpus: 1.5,
+        memoryMb: 512
+    }
 };
 
 vi.mock("@/app/(app)/account/organizations/[slug]/limits/actions", () => ({
@@ -74,7 +90,9 @@ describe("the Limits screen", () => {
         await loaded();
         expect(screen.queryByRole("textbox")).toBeNull();
         expect(screen.queryByRole("button", { name: "Save limits" })).toBeNull();
-        expect(screen.getByText("Only an administrator of this Polaris can change these limits.")).toBeTruthy();
+        expect(
+            screen.getByText("Only an administrator of this Polaris can change these limits.")
+        ).toBeTruthy();
     });
 
     it("gives an administrator a field per row and a Save that waits for a change", async () => {

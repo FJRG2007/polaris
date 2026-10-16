@@ -28,7 +28,9 @@ vi.mock("@/lib/audit-service", () => ({
         state.audited.push(action);
     }
 }));
-vi.mock("@/lib/i18n/request", () => ({ getTranslations: async (namespace: "accountOrgs") => translatorFor("en-US", namespace) }));
+vi.mock("@/lib/i18n/request", () => ({
+    getTranslations: async (namespace: "accountOrgs") => translatorFor("en-US", namespace)
+}));
 vi.mock("@/lib/orgs/org-service", async () => {
     const errors = await import("@/lib/orgs/errors");
     return {
@@ -44,12 +46,30 @@ vi.mock("@/lib/orgs/quota-service", () => ({
         state.saved.push(limits);
     },
     getOrgQuota: async () => null,
-    orgQuotaUsage: async () => ({ members: 1, teams: 0, projects: 2, services: 3, databases: 0, cpus: 1.5, memoryMb: 512 })
+    orgQuotaUsage: async () => ({
+        members: 1,
+        teams: 0,
+        projects: 2,
+        services: 3,
+        databases: 0,
+        cpus: 1.5,
+        memoryMb: 512
+    })
 }));
 
-const { loadOrgQuotaAction, saveOrgQuotaAction } = await import("@/app/(app)/account/organizations/[slug]/limits/actions");
+const { loadOrgQuotaAction, saveOrgQuotaAction } = await import(
+    "@/app/(app)/account/organizations/[slug]/limits/actions"
+);
 
-const draft = { members: "", teams: "", projects: "5", services: "", databases: "", cpus: "2.5", memoryMb: "" };
+const draft = {
+    members: "",
+    teams: "",
+    projects: "5",
+    services: "",
+    databases: "",
+    cpus: "2.5",
+    memoryMb: ""
+};
 
 beforeEach(() => {
     state.user = { id: "owner-1", isAdmin: false };
@@ -61,7 +81,9 @@ beforeEach(() => {
 describe("setting an organization's caps", () => {
     it("refuses anybody who is not an administrator of this Polaris, and writes nothing", async () => {
         const result = await saveOrgQuotaAction(ORG, draft);
-        expect(result).toEqual({ error: "Only an administrator of this Polaris can change these limits." });
+        expect(result).toEqual({
+            error: "Only an administrator of this Polaris can change these limits."
+        });
         expect(state.saved).toEqual([]);
         expect(state.audited).toEqual([]);
     });
@@ -69,7 +91,15 @@ describe("setting an organization's caps", () => {
     it("saves an administrator's caps, blank as no cap, and records it", async () => {
         state.user = { id: "admin-1", isAdmin: true };
         const result = await saveOrgQuotaAction(ORG, draft);
-        const limits = { members: null, teams: null, projects: 5, services: null, databases: null, cpus: 2.5, memoryMb: null };
+        const limits = {
+            members: null,
+            teams: null,
+            projects: 5,
+            services: null,
+            databases: null,
+            cpus: 2.5,
+            memoryMb: null
+        };
         expect(result).toEqual({ limits });
         expect(state.saved).toEqual([limits]);
         expect(state.audited).toEqual(["org.quota"]);

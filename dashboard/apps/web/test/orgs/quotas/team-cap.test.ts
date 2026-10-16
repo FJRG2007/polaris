@@ -28,8 +28,13 @@ vi.mock("@polaris/db", () => ({
         }
     }
 }));
-vi.mock("@/lib/orgs/policy", () => ({ organizationPolicy: async () => ({ maxTeams: 50, maxMembers: 50 }) }));
-vi.mock("@/lib/orgs/role-service", () => ({ ensureSystemRoles: async () => undefined, roleIsRestricted: async () => false }));
+vi.mock("@/lib/orgs/policy", () => ({
+    organizationPolicy: async () => ({ maxTeams: 50, maxMembers: 50 })
+}));
+vi.mock("@/lib/orgs/role-service", () => ({
+    ensureSystemRoles: async () => undefined,
+    roleIsRestricted: async () => false
+}));
 vi.mock("@/lib/privacy-service", () => ({ contactLines: async () => new Map<string, string>() }));
 vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => undefined }));
 vi.mock("@/lib/successor-service", () => ({ isOrgSuccessor: async () => false }));

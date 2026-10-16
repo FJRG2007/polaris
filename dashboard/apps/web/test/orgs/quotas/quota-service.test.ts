@@ -16,10 +16,25 @@ const ORG = "00000000-0000-7000-8000-0000000000cc";
 
 const state = vi.hoisted(() => ({
     quota: null as Record<string, number | null> | null,
-    counts: { members: 0, invited: 0, emailed: 0, teams: 0, projects: 0, services: 0, databases: 0 } as Record<string, number>,
+    counts: {
+        members: 0,
+        invited: 0,
+        emailed: 0,
+        teams: 0,
+        projects: 0,
+        services: 0,
+        databases: 0
+    } as Record<string, number>,
     /** Rows `groupBy` answers with, per model. */
-    applicationGroups: [] as { replicas: number; autoscale?: string | null; _sum: { cpuLimit: number | null; memoryLimitMb: number | null } }[],
-    databaseGroups: [] as { members: number; _sum: { cpuLimit: number | null; memoryLimitMb: number | null } }[],
+    applicationGroups: [] as {
+        replicas: number;
+        autoscale?: string | null;
+        _sum: { cpuLimit: number | null; memoryLimitMb: number | null };
+    }[],
+    databaseGroups: [] as {
+        members: number;
+        _sum: { cpuLimit: number | null; memoryLimitMb: number | null };
+    }[],
     /** How many usage reads were made, so "unset is never counted" can be asserted. */
     reads: 0,
     /** null: outside a request, where reading the locale throws. */
@@ -66,11 +81,27 @@ vi.mock("@/lib/i18n/request", () => ({
 
 const quota = await import("@/lib/orgs/quota-service");
 
-const NO_CAPS = { members: null, teams: null, projects: null, services: null, databases: null, cpus: null, memoryMb: null };
+const NO_CAPS = {
+    members: null,
+    teams: null,
+    projects: null,
+    services: null,
+    databases: null,
+    cpus: null,
+    memoryMb: null
+};
 
 beforeEach(() => {
     state.quota = null;
-    state.counts = { members: 0, invited: 0, emailed: 0, teams: 0, projects: 0, services: 0, databases: 0 };
+    state.counts = {
+        members: 0,
+        invited: 0,
+        emailed: 0,
+        teams: 0,
+        projects: 0,
+        services: 0,
+        databases: 0
+    };
     state.applicationGroups = [];
     state.databaseGroups = [];
     state.reads = 0;
@@ -90,7 +121,9 @@ describe.each(["projects", "services", "databases"] as const)("the %s cap", (dim
     it("refuses an organization already past the cap, and removes nothing", async () => {
         state.quota = { ...NO_CAPS, [dimension]: 2 };
         state.counts[dimension] = 5;
-        await expect(quota.assertOrgRoom(ORG, dimension)).rejects.toBeInstanceOf(quota.OrgQuotaError);
+        await expect(quota.assertOrgRoom(ORG, dimension)).rejects.toBeInstanceOf(
+            quota.OrgQuotaError
+        );
     });
 
     it("lets one more in under the cap", async () => {
@@ -102,13 +135,17 @@ describe.each(["projects", "services", "databases"] as const)("the %s cap", (dim
     it("refuses several at once that would not all fit", async () => {
         state.quota = { ...NO_CAPS, [dimension]: 3 };
         state.counts[dimension] = 2;
-        await expect(quota.assertOrgRoom(ORG, dimension, 2)).rejects.toBeInstanceOf(quota.OrgQuotaError);
+        await expect(quota.assertOrgRoom(ORG, dimension, 2)).rejects.toBeInstanceOf(
+            quota.OrgQuotaError
+        );
         await expect(quota.assertOrgRoom(ORG, dimension, 1)).resolves.toBeUndefined();
     });
 
     it("treats a cap of zero as none allowed", async () => {
         state.quota = { ...NO_CAPS, [dimension]: 0 };
-        await expect(quota.assertOrgRoom(ORG, dimension)).rejects.toBeInstanceOf(quota.OrgQuotaError);
+        await expect(quota.assertOrgRoom(ORG, dimension)).rejects.toBeInstanceOf(
+            quota.OrgQuotaError
+        );
     });
 
     it("never refuses, or counts, an organization with no quota", async () => {
@@ -158,7 +195,9 @@ describe("the CPU and memory caps", () => {
 
     it("lets an exact fit through, fractions and all", async () => {
         state.quota = { ...NO_CAPS, cpus: 4.5 };
-        await expect(quota.assertOrgReservation(ORG, zero, { cpus: 0.5, memoryMb: 0 })).resolves.toBeUndefined();
+        await expect(
+            quota.assertOrgReservation(ORG, zero, { cpus: 0.5, memoryMb: 0 })
+        ).resolves.toBeUndefined();
     });
 
     it("refuses a new reservation past the memory cap", async () => {
@@ -178,20 +217,46 @@ describe("the CPU and memory caps", () => {
 
     it("never refuses, or adds up, an organization with no CPU or memory cap", async () => {
         state.quota = { ...NO_CAPS, projects: 1 };
-        await expect(quota.assertOrgReservation(ORG, zero, { cpus: 4096, memoryMb: 16_000_000 })).resolves.toBeUndefined();
+        await expect(
+            quota.assertOrgReservation(ORG, zero, { cpus: 4096, memoryMb: 16_000_000 })
+        ).resolves.toBeUndefined();
         expect(state.reads).toBe(0);
     });
 });
 
 describe("usage on the Limits screen", () => {
     it("counts the owner as a member, who has no member row", async () => {
-        state.counts = { members: 2, invited: 0, emailed: 0, teams: 1, projects: 4, services: 7, databases: 3 };
+        state.counts = {
+            members: 2,
+            invited: 0,
+            emailed: 0,
+            teams: 1,
+            projects: 4,
+            services: 7,
+            databases: 3
+        };
         const usage = await quota.orgQuotaUsage(ORG);
-        expect(usage).toEqual({ members: 3, teams: 1, projects: 4, services: 7, databases: 3, cpus: 0, memoryMb: 0 });
+        expect(usage).toEqual({
+            members: 3,
+            teams: 1,
+            projects: 4,
+            services: 7,
+            databases: 3,
+            cpus: 0,
+            memoryMb: 0
+        });
     });
 
     it("counts open invitations as people, the way an invitation is refused", async () => {
-        state.counts = { members: 2, invited: 1, emailed: 1, teams: 0, projects: 0, services: 0, databases: 0 };
+        state.counts = {
+            members: 2,
+            invited: 1,
+            emailed: 1,
+            teams: 0,
+            projects: 0,
+            services: 0,
+            databases: 0
+        };
         const usage = await quota.orgQuotaUsage(ORG);
         expect(usage.members).toBe(5);
     });
@@ -201,14 +266,18 @@ describe("the refusal's language", () => {
     it("is the reader's inside a request", async () => {
         state.requestLocale = "es-ES";
         const refusal = await quota.quotaRefusal("projects", 2);
-        expect(refusal.message).toBe("Tu organización llegó a su límite de 2 proyectos. Pide a un admin que lo suba.");
+        expect(refusal.message).toBe(
+            "Tu organización llegó a su límite de 2 proyectos. Pide a un admin que lo suba."
+        );
     });
 
     it("falls back to the default language outside a request, rather than failing", async () => {
         state.requestLocale = null;
         const refusal = await quota.quotaRefusal("projects", 1);
         expect(refusal).toBeInstanceOf(quota.OrgQuotaError);
-        expect(refusal.message).toBe("Your organization reached its limit of 1 project. Ask an admin to raise it.");
+        expect(refusal.message).toBe(
+            "Your organization reached its limit of 1 project. Ask an admin to raise it."
+        );
     });
 
     it("reaches a create path outside a request as the same typed refusal", async () => {

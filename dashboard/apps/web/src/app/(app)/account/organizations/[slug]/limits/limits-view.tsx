@@ -43,7 +43,10 @@ function writeCache(orgId: string, view: OrgQuotaView): void {
 
 function draftsOf(limits: quotas.OrgQuotaLimits): Drafts {
     return Object.fromEntries(
-        quotas.ORG_QUOTA_DIMENSIONS.map((dimension) => [dimension, limits[dimension] === null ? "" : String(limits[dimension])])
+        quotas.ORG_QUOTA_DIMENSIONS.map((dimension) => [
+            dimension,
+            limits[dimension] === null ? "" : String(limits[dimension])
+        ])
     ) as Drafts;
 }
 
@@ -56,7 +59,10 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
     const [loading, setLoading] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const number = useMemo(() => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }), [locale]);
+    const number = useMemo(
+        () => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }),
+        [locale]
+    );
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -83,13 +89,17 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
         void load();
     }, [orgId, load]);
 
-    const parsed = useMemo(() => (drafts ? quotas.orgQuotaInputSchema.safeParse(drafts) : null), [drafts]);
+    const parsed = useMemo(
+        () => (drafts ? quotas.orgQuotaInputSchema.safeParse(drafts) : null),
+        [drafts]
+    );
     const problems = useMemo(() => {
         const found: Partial<Record<quotas.OrgQuotaDimension, string>> = {};
         if (parsed && !parsed.success) {
             for (const issue of parsed.error.issues) {
                 const dimension = issue.path[0] as quotas.OrgQuotaDimension;
-                if (!found[dimension]) found[dimension] = t(issue.message as "quotas.issues.number");
+                if (!found[dimension])
+                    found[dimension] = t(issue.message as "quotas.issues.number");
             }
         }
         return found;
@@ -97,7 +107,9 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
     const unchanged =
         parsed?.success === true &&
         view !== null &&
-        quotas.ORG_QUOTA_DIMENSIONS.every((dimension) => parsed.data[dimension] === view.limits[dimension]);
+        quotas.ORG_QUOTA_DIMENSIONS.every(
+            (dimension) => parsed.data[dimension] === view.limits[dimension]
+        );
 
     const save = async () => {
         if (!view || !parsed?.success || unchanged) return;
@@ -140,7 +152,10 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                         aria-label={t("quotas.refresh")}
                         title={t("quotas.refresh")}
                     >
-                        <RefreshCw className={loading ? "size-4 animate-spin" : "size-4"} aria-hidden />
+                        <RefreshCw
+                            className={loading ? "size-4 animate-spin" : "size-4"}
+                            aria-hidden
+                        />
                     </Button>
                 </div>
 
@@ -157,7 +172,14 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                         }
                         const used = view.usage[dimension];
                         const limit = view.limits[dimension];
-                        const share = limit === null ? null : limit === 0 ? (used > 0 ? 100 : 0) : (used / limit) * 100;
+                        const share =
+                            limit === null
+                                ? null
+                                : limit === 0
+                                  ? used > 0
+                                      ? 100
+                                      : 0
+                                  : (used / limit) * 100;
                         const over = limit !== null && used > limit;
                         const full = limit !== null && used >= limit;
                         const fieldId = `org-limit-${dimension}`;
@@ -169,12 +191,19 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                                     <span
                                         className={cn(
                                             "min-w-0 text-sm tabular-nums",
-                                            over ? "text-danger" : full ? "text-warning-ink" : "text-muted-foreground"
+                                            over
+                                                ? "text-danger"
+                                                : full
+                                                  ? "text-warning-ink"
+                                                  : "text-muted-foreground"
                                         )}
                                     >
                                         {limit === null
                                             ? `${t("quotas.inUse", { used: amount(dimension, used) })} - ${t("quotas.noLimit")}`
-                                            : t("quotas.usedOf", { used: amount(dimension, used), limit: amount(dimension, limit) })}
+                                            : t("quotas.usedOf", {
+                                                  used: amount(dimension, used),
+                                                  limit: amount(dimension, limit)
+                                              })}
                                         {over ? ` - ${t("quotas.over")}` : ""}
                                     </span>
                                 </div>
@@ -190,7 +219,11 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                                         <div
                                             className={cn(
                                                 "h-full rounded-full",
-                                                over || share >= 100 ? "bg-danger" : share >= 80 ? "bg-warning" : "bg-primary"
+                                                over || share >= 100
+                                                    ? "bg-danger"
+                                                    : share >= 80
+                                                      ? "bg-warning"
+                                                      : "bg-primary"
                                             )}
                                             style={{ width: `${Math.min(100, share)}%` }}
                                         />
@@ -209,10 +242,17 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                                             placeholder={t("quotas.noLimit")}
                                             value={drafts[dimension]}
                                             aria-invalid={problem ? true : undefined}
-                                            aria-describedby={problem ? `${fieldId}-error` : undefined}
+                                            aria-describedby={
+                                                problem ? `${fieldId}-error` : undefined
+                                            }
                                             onChange={(event) =>
                                                 setDrafts((current) =>
-                                                    current ? { ...current, [dimension]: event.target.value } : current
+                                                    current
+                                                        ? {
+                                                              ...current,
+                                                              [dimension]: event.target.value
+                                                          }
+                                                        : current
                                                 )
                                             }
                                             onKeyDown={(event) => {
@@ -220,7 +260,10 @@ export function LimitsView({ orgId, canEdit }: { orgId: string; canEdit: boolean
                                             }}
                                         />
                                         {problem ? (
-                                            <p id={`${fieldId}-error`} className="text-danger text-xs">
+                                            <p
+                                                id={`${fieldId}-error`}
+                                                className="text-danger text-xs"
+                                            >
                                                 {problem}
                                             </p>
                                         ) : null}

@@ -24,13 +24,18 @@ export interface OrgQuotaView {
     usage: quotas.OrgQuotaUsage;
 }
 
-async function failure(caught: unknown, fallback: NamespaceKey<"accountOrgs">): Promise<{ error: string }> {
+async function failure(
+    caught: unknown,
+    fallback: NamespaceKey<"accountOrgs">
+): Promise<{ error: string }> {
     if (caught instanceof orgs.OrgError) return { error: caught.message };
     console.error(caught);
     return { error: (await getTranslations("accountOrgs"))(fallback) };
 }
 
-export async function loadOrgQuotaAction(orgId: string): Promise<{ view?: OrgQuotaView; error?: string }> {
+export async function loadOrgQuotaAction(
+    orgId: string
+): Promise<{ view?: OrgQuotaView; error?: string }> {
     const user = await requireUser();
     try {
         await orgs.requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "org.read");
@@ -56,7 +61,11 @@ export async function saveOrgQuotaAction(
     const parsed = quotas.orgQuotaInputSchema.safeParse(input);
     if (!parsed.success) {
         const message = parsed.error.issues[0]?.message ?? "quotas.issues.number";
-        return { error: message.startsWith("quotas.issues.") ? t(message as NamespaceKey<"accountOrgs">) : t("quotas.issues.number") };
+        return {
+            error: message.startsWith("quotas.issues.")
+                ? t(message as NamespaceKey<"accountOrgs">)
+                : t("quotas.issues.number")
+        };
     }
     try {
         await orgs.requireOrgPermission({ id: user.id, isAdmin: user.isAdmin }, orgId, "org.read");

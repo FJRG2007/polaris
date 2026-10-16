@@ -41,7 +41,10 @@ async function refusalWords() {
     }
 }
 
-export async function quotaRefusal(dimension: quotas.OrgQuotaDimension, limit: number): Promise<OrgQuotaError> {
+export async function quotaRefusal(
+    dimension: quotas.OrgQuotaDimension,
+    limit: number
+): Promise<OrgQuotaError> {
     const t = await refusalWords();
     return new OrgQuotaError(t(`quotas.refused.${dimension}`, { limit }), dimension, limit);
 }
@@ -90,7 +93,11 @@ export async function seatsTaken(
     const [members, invited, emailed] = await Promise.all([
         prisma.organizationMember.count({ where: { orgId } }),
         prisma.organizationInvitation.count({
-            where: { orgId, expiresAt: { gt: now }, ...(except.userId ? { userId: { not: except.userId } } : {}) }
+            where: {
+                orgId,
+                expiresAt: { gt: now },
+                ...(except.userId ? { userId: { not: except.userId } } : {})
+            }
         }),
         prisma.invite.count({
             where: {
@@ -106,7 +113,10 @@ export async function seatsTaken(
 
 /** How many of one thing the organization holds now. Members count the owner,
  *  who is never a member row. */
-export async function countOrgUsage(orgId: string, dimension: quotas.OrgQuotaCount): Promise<number> {
+export async function countOrgUsage(
+    orgId: string,
+    dimension: quotas.OrgQuotaCount
+): Promise<number> {
     switch (dimension) {
         case "members":
             return seatsTaken(orgId);
@@ -140,7 +150,10 @@ export async function reservedByOrg(
     const [applications, databases] = await Promise.all([
         prisma.application.groupBy({
             by: ["replicas", "autoscale"],
-            where: { ...inOrg(orgId), ...(exclude.applicationId ? { id: { not: exclude.applicationId } } : {}) },
+            where: {
+                ...inOrg(orgId),
+                ...(exclude.applicationId ? { id: { not: exclude.applicationId } } : {})
+            },
             _sum: { cpuLimit: true, memoryLimitMb: true }
         }),
         prisma.managedDatabase.groupBy({
@@ -173,7 +186,9 @@ export async function orgQuotaUsage(orgId: string): Promise<quotas.OrgQuotaUsage
         Promise.all(quotas.ORG_QUOTA_COUNTS.map((dimension) => countOrgUsage(orgId, dimension))),
         reservedByOrg(orgId)
     ]);
-    const usage = Object.fromEntries(quotas.ORG_QUOTA_COUNTS.map((dimension, i) => [dimension, counts[i] ?? 0]));
+    const usage = Object.fromEntries(
+        quotas.ORG_QUOTA_COUNTS.map((dimension, i) => [dimension, counts[i] ?? 0])
+    );
     return { ...(usage as Record<quotas.OrgQuotaCount, number>), ...reserved };
 }
 
@@ -228,7 +243,10 @@ export async function orgIdOfDatabase(databaseId: string): Promise<string | null
 }
 
 /** `assertOrgRoom` for a service or database about to be made in an environment. */
-export async function assertEnvironmentRoom(environmentId: string, dimension: "services" | "databases"): Promise<void> {
+export async function assertEnvironmentRoom(
+    environmentId: string,
+    dimension: "services" | "databases"
+): Promise<void> {
     await assertOrgRoom(await orgIdOfEnvironment(environmentId), dimension);
 }
 
@@ -260,7 +278,14 @@ export async function assertOrgReservation(
     const others = await reservedByOrg(orgId, exclude);
     for (const dimension of quotas.ORG_QUOTA_RESERVATIONS) {
         const limit = quota[dimension];
-        if (!quotas.roomForReservation(limit, others[dimension], previous[dimension], next[dimension])) {
+        if (
+            !quotas.roomForReservation(
+                limit,
+                others[dimension],
+                previous[dimension],
+                next[dimension]
+            )
+        ) {
             throw await quotaRefusal(dimension, limit ?? 0);
         }
     }

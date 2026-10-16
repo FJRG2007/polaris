@@ -430,12 +430,24 @@ async function requireBinned(kind: BinKind, id: string, userId: string): Promise
  */
 async function assertRoomToRestore(kind: BinKind, id: string): Promise<void> {
     const binned = { id, binnedAt: { not: null } };
-    const inProject = { select: { environment: { select: { project: { select: { orgId: true } } } } } };
+    const inProject = {
+        select: { environment: { select: { project: { select: { orgId: true } } } } }
+    };
     const limits = { cpuLimit: true, memoryLimitMb: true } as const;
     let orgId: string | null = null;
     let projects = 0;
-    let applications: { replicas: number; autoscale: string | null; cpuLimit: number | null; memoryLimitMb: number | null }[] = [];
-    let databases: { members: number; parentId: string | null; cpuLimit: number | null; memoryLimitMb: number | null }[] = [];
+    let applications: {
+        replicas: number;
+        autoscale: string | null;
+        cpuLimit: number | null;
+        memoryLimitMb: number | null;
+    }[] = [];
+    let databases: {
+        members: number;
+        parentId: string | null;
+        cpuLimit: number | null;
+        memoryLimitMb: number | null;
+    }[] = [];
     if (kind === "application") {
         const row = await prisma.application.findFirst({
             where: binned,
@@ -453,14 +465,23 @@ async function assertRoomToRestore(kind: BinKind, id: string): Promise<void> {
         orgId = row.environment.project.orgId;
         databases = [row];
     } else {
-        const project = await prisma.project.findFirst({ where: binned, select: { orgId: true, binnedAt: true } });
+        const project = await prisma.project.findFirst({
+            where: binned,
+            select: { orgId: true, binnedAt: true }
+        });
         if (!project?.binnedAt) return;
         orgId = project.orgId;
         projects = 1;
         const together = { binnedAt: project.binnedAt, environment: { projectId: id } };
         [applications, databases] = await Promise.all([
-            prisma.application.findMany({ where: together, select: { ...limits, replicas: true, autoscale: true } }),
-            prisma.managedDatabase.findMany({ where: together, select: { ...limits, members: true, parentId: true } })
+            prisma.application.findMany({
+                where: together,
+                select: { ...limits, replicas: true, autoscale: true }
+            }),
+            prisma.managedDatabase.findMany({
+                where: together,
+                select: { ...limits, members: true, parentId: true }
+            })
         ]);
     }
     if (!orgId) return;
@@ -474,11 +495,33 @@ async function assertRoomToRestore(kind: BinKind, id: string): Promise<void> {
         { cpus: 0, memoryMb: 0 },
         {
             cpus:
-                applications.reduce((sum, app) => sum + quotas.reservationOf(app.cpuLimit, quotas.copiesReserved(app.replicas, app.autoscale)), 0) +
-                dedicated.reduce((sum, db) => sum + quotas.reservationOf(db.cpuLimit, db.members), 0),
+                applications.reduce(
+                    (sum, app) =>
+                        sum +
+                        quotas.reservationOf(
+                            app.cpuLimit,
+                            quotas.copiesReserved(app.replicas, app.autoscale)
+                        ),
+                    0
+                ) +
+                dedicated.reduce(
+                    (sum, db) => sum + quotas.reservationOf(db.cpuLimit, db.members),
+                    0
+                ),
             memoryMb:
-                applications.reduce((sum, app) => sum + quotas.reservationOf(app.memoryLimitMb, quotas.copiesReserved(app.replicas, app.autoscale)), 0) +
-                dedicated.reduce((sum, db) => sum + quotas.reservationOf(db.memoryLimitMb, db.members), 0)
+                applications.reduce(
+                    (sum, app) =>
+                        sum +
+                        quotas.reservationOf(
+                            app.memoryLimitMb,
+                            quotas.copiesReserved(app.replicas, app.autoscale)
+                        ),
+                    0
+                ) +
+                dedicated.reduce(
+                    (sum, db) => sum + quotas.reservationOf(db.memoryLimitMb, db.members),
+                    0
+                )
         }
     );
 }

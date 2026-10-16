@@ -38,12 +38,17 @@ vi.mock("@polaris/db", () => ({
         domain: { updateMany: async () => ({ count: 0 }) }
     }
 }));
-vi.mock("@/lib/setting-store", () => ({ getSetting: async () => null, setSetting: async () => undefined }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    setSetting: async () => undefined
+}));
 vi.mock("@/lib/restore-points/service", () => ({
     listRestorePoints: async () => [],
     restoreKeys: { routes: (id: string) => id }
 }));
-vi.mock("@/lib/deploy-project-access", () => ({ managedProjectWhere: async () => ({ ownerId: OWNER }) }));
+vi.mock("@/lib/deploy-project-access", () => ({
+    managedProjectWhere: async () => ({ ownerId: OWNER })
+}));
 vi.mock("@/lib/deploy-service", () => ({
     syncAppRoutes: async () => undefined,
     deployApplication: async () => undefined
@@ -67,7 +72,9 @@ describe("restoring into an organization with caps", () => {
     it("refuses a service at the service cap and leaves it in the bin", async () => {
         state.quota = { services: 2 };
         state.services = 2;
-        await expect(recycleBin.restoreFromBin("application", APP, OWNER, OWNER)).rejects.toBeInstanceOf(OrgQuotaError);
+        await expect(
+            recycleBin.restoreFromBin("application", APP, OWNER, OWNER)
+        ).rejects.toBeInstanceOf(OrgQuotaError);
         expect(state.updates).toEqual([]);
     });
 

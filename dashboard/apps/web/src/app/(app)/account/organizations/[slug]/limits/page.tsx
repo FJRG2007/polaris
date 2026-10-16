@@ -12,7 +12,11 @@ import { requireOrgPage } from "@/lib/orgs/page-access";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrganizationLimitsPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function OrganizationLimitsPage({
+    params
+}: {
+    params: Promise<{ slug: string }>;
+}) {
     const { slug } = await params;
     const { org, user } = await requireOrgPage(slug);
     const t = await getTranslations("accountOrgs");
@@ -21,7 +25,9 @@ export default async function OrganizationLimitsPage({ params }: { params: Promi
         <div className="flex flex-col gap-4">
             <div>
                 <h2 className="text-base font-semibold">{t("quotas.title")}</h2>
-                <p className="text-muted-foreground text-sm">{t("quotas.intro", { org: org.name })}</p>
+                <p className="text-muted-foreground text-sm">
+                    {t("quotas.intro", { org: org.name })}
+                </p>
             </div>
             <LimitsView orgId={org.id} canEdit={user.isAdmin} />
         </div>

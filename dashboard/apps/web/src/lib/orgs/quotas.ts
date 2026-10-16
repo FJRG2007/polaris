@@ -49,7 +49,15 @@ function blankIsNull(value: unknown): unknown {
 }
 
 const countCap = (min: number) =>
-    z.preprocess(blankIsNull, z.number({ message: "quotas.issues.number" }).int("quotas.issues.whole").min(min, "quotas.issues.tooSmall").max(100_000, "quotas.issues.tooLarge").nullable());
+    z.preprocess(
+        blankIsNull,
+        z
+            .number({ message: "quotas.issues.number" })
+            .int("quotas.issues.whole")
+            .min(min, "quotas.issues.tooSmall")
+            .max(100_000, "quotas.issues.tooLarge")
+            .nullable()
+    );
 
 export const orgQuotaInputSchema = z.object({
     // The owner is always on the roster, so a roster cap below one could never be met.
@@ -67,7 +75,15 @@ export const orgQuotaInputSchema = z.object({
             .transform((value) => Math.round(value * 100) / 100)
             .nullable()
     ),
-    memoryMb: z.preprocess(blankIsNull, z.number({ message: "quotas.issues.number" }).int("quotas.issues.whole").min(0, "quotas.issues.tooSmall").max(16_777_216, "quotas.issues.tooLarge").nullable())
+    memoryMb: z.preprocess(
+        blankIsNull,
+        z
+            .number({ message: "quotas.issues.number" })
+            .int("quotas.issues.whole")
+            .min(0, "quotas.issues.tooSmall")
+            .max(16_777_216, "quotas.issues.tooLarge")
+            .nullable()
+    )
 });
 
 export type OrgQuotaInput = z.infer<typeof orgQuotaInputSchema>;
@@ -82,7 +98,12 @@ export function roomForOne(limit: number | null, current: number): boolean {
  * already reserved by everything else. Shrinking is always allowed, so an
  * organization already past its cap can still come back under it.
  */
-export function roomForReservation(limit: number | null, others: number, previous: number, next: number): boolean {
+export function roomForReservation(
+    limit: number | null,
+    others: number,
+    previous: number,
+    next: number
+): boolean {
     if (limit === null || next <= previous) return true;
     // Cores are fractional; a sum of 0.1s must not refuse an exact fit.
     return others + next <= limit + 1e-9;
