@@ -939,3 +939,29 @@ describe("ranges and held conditions", () => {
         expect(held(0).length).toBeGreaterThan(0);
     });
 });
+
+describe("the figures a device offers beside its attributes", () => {
+    const en = placesCatalogs.translator("en-US", "places");
+
+    it("gives an air conditioner its room temperature", () => {
+        expect(auto.figuresFor("climate")).toEqual([undefined]);
+        expect(words.figureOptionText("climate", undefined, en)).toBe("Its temperature");
+    });
+
+    it("gives a purifier each of its figures", () => {
+        expect(auto.figuresFor("air")).toEqual(auto.READING_MEASURES);
+        expect(words.figureOptionText("air", "pm25", en)).toBe("Reading: PM2.5");
+    });
+
+    it("gives a sensor its reading only while that reading is a number", () => {
+        expect(auto.figuresFor("sensor", "21.5")).toEqual([undefined]);
+        expect(auto.figuresFor("sensor", "21,5")).toEqual([undefined]);
+        expect(auto.figuresFor("sensor", "Open")).toEqual([]);
+        expect(auto.figuresFor("sensor", null)).toEqual([]);
+    });
+
+    it("gives a device with only a state none", () => {
+        expect(auto.figuresFor("lock")).toEqual([]);
+        expect(auto.figuresFor("outlet")).toEqual([]);
+    });
+});

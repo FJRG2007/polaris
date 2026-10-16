@@ -38,6 +38,19 @@ export function attributeText(attribute: auto.AutomationAttribute, t: PlacesTran
     return t(`automations.attributes.${attribute}`);
 }
 
+/** A figure, as the Watch picker offers it beside the attributes: "Its
+ *  temperature" on an air conditioner, "Reading: PM2.5" on a purifier. */
+export function figureOptionText(
+    kind: string,
+    measure: auto.ReadingMeasure | undefined,
+    t: PlacesTranslator
+): string {
+    if (measure) return t("automations.attributes.figure", { measure: measureText(measure, t) });
+    return kinds.deviceKind(kind) === "climate"
+        ? t("automations.attributes.temperature")
+        : t("automations.attributes.number");
+}
+
 export function stepActionText(action: auto.StepDeviceAction, t: PlacesTranslator): string {
     return action === auto.TOGGLE ? t("automations.toggle") : kinds.actionText(action, t);
 }

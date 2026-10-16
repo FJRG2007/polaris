@@ -154,6 +154,46 @@ const AIR_SAVED: AutomationView = {
     }
 };
 
+/** An air conditioner switching to Cool, which is what it is already doing. */
+const MODE_SAVED: AutomationView = {
+    ...SAVED,
+    id: "auto-mode",
+    name: "When it cools",
+    definition: {
+        ...SAVED.definition,
+        triggers: [
+            {
+                id: "trig01",
+                kind: "change",
+                deviceId: "ac",
+                attribute: "mode",
+                from: "",
+                to: "cool",
+                alias: "Cooling starts"
+            }
+        ],
+        conditions: {
+            match: "all",
+            groups: [
+                {
+                    id: "grp01",
+                    match: "all",
+                    items: [
+                        {
+                            id: "cond01",
+                            kind: "device",
+                            deviceId: "ac",
+                            attribute: "state",
+                            is: "on",
+                            negate: false
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+};
+
 const RUNS: RunView[] = [
     {
         id: "run-1",
@@ -181,6 +221,8 @@ vi.mock("@polaris-app/places/src/screens/automations/actions", () => ({
         automation:
             id === "auto-climate"
                 ? CLIMATE_SAVED
+                : id === "auto-mode"
+                  ? MODE_SAVED
                 : id === "auto-air"
                   ? AIR_SAVED
                   : id
@@ -511,7 +553,7 @@ describe("an automation on an air purifier", () => {
         );
         await painted();
         openRow("When");
-        expect(screen.getByRole("combobox", { name: /^Reading/ }).textContent).toContain("PM2.5");
+        expect(screen.getByRole("combobox", { name: /^Watch/ }).textContent).toContain("PM2.5");
         expect(screen.getByText("µg/m³")).toBeDefined();
         const value = screen.getByLabelText(/^Value/) as HTMLInputElement;
         fireEvent.change(value, { target: { value: "50" } });
@@ -535,6 +577,100 @@ describe("an automation on an air purifier", () => {
                 do: "set-fan",
                 setting: { action: "set-fan", speed: "speed_2" }
             })
+        ]);
+    });
+});
+
+describe("what a block watches on a device", () => {
+    // The list a select opens scrolls its chosen option into view, which jsdom
+    // does not do.
+    beforeEach(() => {
+        Element.prototype.scrollIntoView = vi.fn();
+    });
+
+    const editor = () => (
+        <AutomationEditor
+            automationId="auto-mode"
+            template={null}
+            deviceId={null}
+            canManage
+            canControl
+            initialTab="flow"
+        />
+    );
+
+    it("offers an air conditioner's temperature beside its state and mode", async () => {
+        render(editor());
+        await painted();
+        openRow("When");
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        const offered = (await screen.findAllByRole("option")).map((each) => each.textContent);
+        expect(offered).toEqual(["Its state", "Its mode", "Its temperature"]);
+    });
+
+    it("says a change to what the device already is waits for the next one", async () => {
+        render(editor());
+        await painted();
+        openRow("When");
+        expect(
+            screen.getByText(
+                "It is Cool now, so this starts it the next time it changes to Cool."
+            )
+        ).toBeDefined();
+    });
+
+    it("turns a change into a crossing when the temperature is picked, and saves it", async () => {
+        render(editor());
+        await painted();
+        openRow("When");
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Its temperature" }));
+        await painted();
+        fireEvent.change(screen.getByLabelText(/^Value/), { target: { value: "27" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as { definition: { triggers: unknown[] } };
+        expect(input.definition.triggers).toEqual([
+            {
+                id: "trig01",
+                kind: "threshold",
+                deviceId: "ac",
+                direction: "above",
+                value: 27,
+                alias: "Cooling starts"
+            }
+        ]);
+    });
+
+    it("turns a crossing back into a change when an attribute is picked", async () => {
+        render(editor());
+        await painted();
+        openRow("When");
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Its temperature" }));
+        await painted();
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Its mode" }));
+        await painted();
+        expect(screen.getByRole("combobox", { name: /^Watch/ }).textContent).toContain("Its mode");
+        expect(screen.getByRole("combobox", { name: /^From/ })).toBeDefined();
+    });
+
+    it("turns a device condition into a reading one on the temperature", async () => {
+        render(editor());
+        await painted();
+        openRow("If");
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Its temperature" }));
+        await painted();
+        fireEvent.change(screen.getByLabelText(/^Value/), { target: { value: "26" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as {
+            definition: { conditions: { groups: { items: unknown[] }[] } };
+        };
+        expect(input.definition.conditions.groups[0]!.items).toEqual([
+            { id: "cond01", kind: "reading", deviceId: "ac", op: "gt", value: 26 }
         ]);
     });
 });

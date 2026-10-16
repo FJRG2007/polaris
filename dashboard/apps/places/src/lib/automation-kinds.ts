@@ -75,6 +75,26 @@ export function measuresFor(kind: string): readonly ReadingMeasure[] {
     return kinds.deviceKind(kind) === "air" ? READING_MEASURES : [];
 }
 
+/**
+ * The figures a device has to compare as numbers, which the editor offers
+ * beside its attributes: each of a purifier's, the room temperature an air
+ * conditioner reads, and a sensor's one reading while that reading is a number.
+ * `undefined` is "the device's one reading". A sensor whose reading is a word
+ * ("Open") has none: its reading is an attribute, compared as a word.
+ */
+export function figuresFor(
+    kind: string,
+    reading?: string | null
+): readonly (ReadingMeasure | undefined)[] {
+    const which = kinds.deviceKind(kind);
+    if (which === "air") return READING_MEASURES;
+    if (which === "climate") return [undefined];
+    // The engine reads the first number in the text, so "21.5" and "21,5" are
+    // both a figure; a word is not.
+    if (which === "sensor" && reading && /-?\d+(?:[.,]\d+)?/.test(reading)) return [undefined];
+    return [];
+}
+
 /** The words a mode can be, whichever kind of device it is on. */
 const MODE_WORDS: readonly string[] = [
     ...new Set<string>([...kinds.CLIMATE_MODES, ...kinds.AIR_MODES])
