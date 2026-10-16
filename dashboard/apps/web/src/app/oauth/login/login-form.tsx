@@ -397,7 +397,7 @@ export function LoginForm({
                                     disabled={pending}
                                     onClick={() => void signInWithSso()}
                                 >
-                                    <Building2 className="size-4" />
+                                    <Building2 className="size-4 shrink-0" aria-hidden />
                                     {t("login.sso")}
                                 </Button>
                             ) : null}

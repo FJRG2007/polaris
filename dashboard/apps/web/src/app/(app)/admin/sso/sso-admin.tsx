@@ -362,7 +362,10 @@ function ProviderCard({
                                 ) : (
                                     <X className="size-4 shrink-0 text-danger" aria-hidden />
                                 )}
-                                <span className="min-w-0 truncate">
+                                <span
+                                    className="min-w-0 truncate"
+                                    title={entry.detail ? `${t(`sso.checks.${entry.key}`)} - ${entry.detail}` : undefined}
+                                >
                                     {t(`sso.checks.${entry.key}`)}
                                     {entry.detail ? ` - ${entry.detail}` : ""}
                                 </span>
@@ -436,7 +439,7 @@ export function SsoAdmin({ providers: initial }: { providers: SamlProviderView[]
             ) : (
                 <div>
                     <Button type="button" variant="secondary" onClick={() => setEditing("new")}>
-                        <Plus className="size-4" />
+                        <Plus className="size-4 shrink-0" aria-hidden />
                         {t("sso.add")}
                     </Button>
                 </div>
