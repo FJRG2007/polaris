@@ -221,7 +221,8 @@
         "soundboardCooldown": "Espera {seconds} s antes del siguiente sonido",
         "soundboardUnreachable": "El servidor de llamadas no respondió. Inténtalo de nuevo.",
         "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
-        "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción"
+        "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción",
+        "inviteSendLimit": "Demasiadas invitaciones. Prueba en {seconds} s."
     },
     "media": {
         "refused": {
@@ -1146,6 +1147,32 @@
         "uses": {
             "count": "{count, plural, one {1 uso} other {{count} usos}}",
             "unlimited": "Sin límite"
+        },
+        "inviteFriendsTo": "Invita a amigos a {name}",
+        "landsIn": "Quien entre llegará a",
+        "landsInSpace": "Quien entre llegará a este servidor.",
+        "searchFriends": "Buscar amigos",
+        "invite": "Invitar",
+        "sent": "Enviado",
+        "alreadyMember": "Miembro",
+        "noFriends": "Aún sin amigos. Busca un usuario exacto.",
+        "nobodyFound": "Nadie encontrado. Prueba su usuario exacto.",
+        "orSendLink": "O envía a un amigo un enlace al servidor",
+        "copy": "Copiar",
+        "copied": "Copiado",
+        "makingLink": "Creando tu enlace...",
+        "expiresIn": "Tu enlace de invitación caduca en {when}.",
+        "neverExpires": "Tu enlace de invitación no caduca.",
+        "editLink": "Editar enlace",
+        "linkSettings": "Ajustes del enlace de invitación",
+        "expireAfter": "Caduca tras",
+        "maxUses": "Número máximo de usos",
+        "cancel": "Cancelar",
+        "generateNewLink": "Generar un enlace nuevo",
+        "left": {
+            "days": "{count, plural, one {1 día} other {{count} días}}",
+            "hours": "{count, plural, one {1 hora} other {{count} horas}}",
+            "minutes": "{count, plural, one {1 minuto} other {{count} minutos}}"
         }
     },
     "groupSettings": {
@@ -1819,5 +1846,19 @@
         "graphicsSaid": "La tarjeta gráfica no pudo crear el fondo: {said}",
         "tooSlow": "Tardó demasiado en iniciarse.",
         "silent": "No se inició y no dijo por qué."
+    },
+    "inviteCard": {
+        "youWereInvited": "Te han invitado a unirte a un servidor",
+        "youSent": "Enviaste una invitación a un servidor",
+        "youReceivedBut": "Recibiste una invitación, pero...",
+        "youSentBut": "Enviaste una invitación, pero...",
+        "invalid": "Enlace inválido",
+        "tryAsking": "Pídele una invitación nueva.",
+        "trySending": "Prueba a enviar otra invitación.",
+        "online": "{count} en línea",
+        "members": "{count, plural, one {1 miembro} other {{count} miembros}}",
+        "join": "Unirse",
+        "joined": "Dentro",
+        "goTo": "Ir al servidor"
     }
 }

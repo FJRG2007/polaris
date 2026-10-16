@@ -29,7 +29,18 @@ import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { publishChatChange } from "./live";
 import { postSpaceNotice } from "./notices";
-import { ChatAccessError, spaceAccess, type ChatActor } from "./access";
+import * as messages from "./messages";
+import { openDirect } from "./chat-service";
+import { friendIds } from "@/lib/friends-service";
+import { appBaseUrl } from "@/lib/domain-service";
+import { rateLimit } from "@/lib/rate-limit-service";
+import {
+    ChatAccessError,
+    ChatRuleError,
+    searchForConversation,
+    spaceAccess,
+    type ChatActor
+} from "./access";
 
 /** One invitation, as the panel that made it draws it. */
 export interface ChatInviteView {
@@ -89,7 +100,7 @@ export async function createInvite(
     if (!standing) throw new ChatAccessError({ key: "errors.notInSpace" });
     // A private space is one whose roster was chosen. A member who could hand
     // out a link would be choosing it instead of the administrator.
-    if (space.visibility === "private" && standing === "member") {
+    if (!core.spaceInviteAllowed(standing, space.visibility)) {
         throw new ChatAccessError({ key: "errors.spaceInviteAdminOnly" });
     }
 
@@ -286,6 +297,215 @@ export async function acceptInvite(
     return { spaceId: invite.spaceId, channelId: landing };
 }
 
+// ---------------------------------------------------------------------------
+// The invite dialog: one link ready on open, sent to people one at a time
+// ---------------------------------------------------------------------------
+
+/** A link is reused while it has at least this long left, so reopening the
+ *  dialog does not mint a new code every time - and a link about to run out is
+ *  never the one handed to somebody. */
+const REUSE_MARGIN_MS = 24 * 60 * 60_000;
+
+/** Sends per person per window. Generous for inviting a room of friends one by
+ *  one, and a wall for a script walking a list. */
+export const INVITE_SENDS_PER_WINDOW = 30;
+export const INVITE_SEND_WINDOW_MS = 60_000;
+
+/**
+ * The link the invite dialog opens on.
+ *
+ * The newest of this person's own links to the same room that is unbounded in
+ * uses and has a day or more to run, or a new one with the defaults. Opened
+ * from no room in particular, it points at the space's first open room, so a
+ * recipient lands somewhere rather than on an empty space.
+ */
+export async function inviteLink(
+    actor: ChatActor,
+    input: core.ChatInviteLinkInput
+): Promise<ChatInviteView> {
+    const channelId = input.channelId ?? (await firstOpenChannel(input.spaceId));
+    const reusable = await prisma.chatSpaceInvite.findFirst({
+        where: {
+            spaceId: input.spaceId,
+            channelId,
+            createdById: actor.id,
+            revokedAt: null,
+            maxUses: null,
+            OR: [
+                { expiresAt: null },
+                { expiresAt: { gt: new Date(Date.now() + REUSE_MARGIN_MS) } }
+            ]
+        },
+        orderBy: { createdAt: "desc" },
+        select: { ...SELECT, space: { select: { visibility: true, archived: true } } }
+    });
+    if (reusable && !reusable.space.archived) {
+        // Asked again rather than trusted: somebody demoted in a private space
+        // since the link was made may no longer hand it out.
+        const standing = await spaceAccess(actor, input.spaceId);
+        if (!core.spaceInviteAllowed(standing, reusable.space.visibility)) {
+            throw new ChatAccessError({ key: "errors.spaceInviteAdminOnly" });
+        }
+        return view(reusable);
+    }
+    return createInvite(actor, {
+        spaceId: input.spaceId,
+        ...(channelId ? { channelId } : {}),
+        expiresMinutes: core.INVITE_DEFAULT_MINUTES,
+        maxUses: core.INVITE_DEFAULT_USES
+    });
+}
+
+/** Somebody the invite dialog lists. */
+export interface ChatInviteCandidate {
+    readonly id: string;
+    readonly name: string;
+    readonly username: string | null;
+    /** In the space already, so there is nothing to send them. */
+    readonly member: boolean;
+}
+
+/**
+ * Who the invite dialog offers.
+ *
+ * With nothing typed, the inviter's friends. With a search, the same reach the
+ * new-conversation picker has (`searchForConversation`): a friend by any part of
+ * their name, anybody else by their whole username, and nobody privacy, a block
+ * or a missing chat permission keeps out of a direct message.
+ */
+export async function inviteCandidates(
+    actor: ChatActor,
+    spaceId: string,
+    query: string
+): Promise<readonly ChatInviteCandidate[]> {
+    if (!(await spaceAccess(actor, spaceId))) {
+        throw new ChatAccessError({ key: "errors.notInSpace" });
+    }
+
+    const ids =
+        query.length > 0
+            ? (await searchForConversation(actor, query, 25)).people.map((person) => person.id)
+            : [...(await friendIds(actor.id))].filter((id) => id !== actor.id);
+    if (ids.length === 0) return [];
+
+    const [people, members, space] = await Promise.all([
+        prisma.user.findMany({
+            where: { id: { in: ids } },
+            orderBy: { name: "asc" },
+            take: 100,
+            select: { id: true, name: true, username: true }
+        }),
+        prisma.chatSpaceMember.findMany({
+            where: { spaceId, userId: { in: ids } },
+            select: { userId: true }
+        }),
+        prisma.chatSpace.findUnique({ where: { id: spaceId }, select: { ownerId: true } })
+    ]);
+    const inside = new Set(members.map((row) => row.userId));
+    if (space) inside.add(space.ownerId);
+    return people
+        .map((person) => ({
+            id: person.id,
+            name: person.name,
+            username: person.username,
+            member: inside.has(person.id)
+        }))
+        .sort((one, other) => Number(one.member) - Number(other.member));
+}
+
+/**
+ * Send a link to one person, as a message from the inviter in the direct
+ * conversation between them - opened through the ordinary path, so every rule
+ * that decides whether these two may message applies here too.
+ *
+ * Idempotent per (invite, person): the pair is claimed in a unique row before
+ * anything is posted, so a double click or two tabs post one message. A claim
+ * whose message never went out is released, so a retry can send it.
+ */
+export async function sendInvite(
+    actor: ChatActor,
+    input: core.ChatInviteSendInput
+): Promise<{ channelId: string; already: boolean }> {
+    const invite = await prisma.chatSpaceInvite.findUnique({
+        where: { code: input.code },
+        select: {
+            id: true,
+            code: true,
+            spaceId: true,
+            expiresAt: true,
+            maxUses: true,
+            uses: true,
+            revokedAt: true,
+            space: { select: { visibility: true, archived: true } }
+        }
+    });
+    if (!invite || invite.space.archived) {
+        throw new ChatAccessError({ key: "errors.invitationGone" });
+    }
+    if (!core.inviteUsable(invite)) throw new ChatAccessError({ key: "errors.invitationExpired" });
+    const standing = await spaceAccess(actor, invite.spaceId);
+    if (!core.spaceInviteAllowed(standing, invite.space.visibility)) {
+        throw new ChatAccessError({ key: "errors.spaceInviteAdminOnly" });
+    }
+    if (input.userId === actor.id) throw new ChatAccessError({ key: "errors.inviteNotSent" });
+
+    const earlier = await prisma.chatInviteSend.findUnique({
+        where: { inviteId_recipientId: { inviteId: invite.id, recipientId: input.userId } },
+        select: { channelId: true }
+    });
+    if (earlier) return { channelId: earlier.channelId ?? "", already: true };
+
+    const allowed = await rateLimit(
+        `chat-invite-send:${actor.id}`,
+        INVITE_SENDS_PER_WINDOW,
+        INVITE_SEND_WINDOW_MS
+    );
+    if (!allowed.ok) {
+        throw new ChatRuleError({
+            key: "errors.inviteSendLimit",
+            params: { seconds: Math.max(1, Math.ceil(allowed.retryAfterMs / 1000)) }
+        });
+    }
+
+    let claim: { id: string };
+    try {
+        claim = await prisma.chatInviteSend.create({
+            data: { inviteId: invite.id, recipientId: input.userId },
+            select: { id: true }
+        });
+    } catch (error) {
+        // The other click won the claim and is posting the message.
+        if ((error as { code?: string }).code === "P2002") return { channelId: "", already: true };
+        throw error;
+    }
+
+    try {
+        const channelId = await openDirect(actor, [input.userId]);
+        // Built on the address Polaris hands out, never on the sender's tab:
+        // a LAN name resolves on their network alone.
+        const base = (await appBaseUrl()).replace(/\/+$/, "");
+        await messages.send(
+            actor,
+            { channelId, body: `${base}/chat/i/${invite.code}`, replyToId: null },
+            [],
+            null
+        );
+        await prisma.chatInviteSend.update({ where: { id: claim.id }, data: { channelId } });
+        return { channelId, already: false };
+    } catch (error) {
+        await prisma.chatInviteSend.delete({ where: { id: claim.id } }).catch(() => undefined);
+        throw error;
+    }
+}
+
+async function firstOpenChannel(spaceId: string): Promise<string | null> {
+    const channel = await prisma.chatChannel.findFirst({
+        where: { spaceId, private: false, archived: false, kind: "text" },
+        orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        select: { id: true }
+    });
+    return channel?.id ?? null;
+}
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------

@@ -1488,8 +1488,7 @@ function RowMenu({
     const space = channel.spaceId
         ? (spaces.find((entry) => entry.id === channel.spaceId) ?? null)
         : null;
-    const mayInvite =
-        space !== null && (space.access !== "member" || space.visibility !== "private");
+    const mayInvite = space !== null && core.spaceInviteAllowed(space.access, space.visibility);
     const [error, setError] = useState("");
     // A one-to-one conversation, which is the only kind where there is one
     // person to have a name for. A group is called what the group is called.
@@ -1745,6 +1744,7 @@ function RowMenu({
             {inviting && mayInvite && (
                 <InviteDialog
                     space={space}
+                    channelId={channel.private ? null : channel.id}
                     onOpenChange={(next: boolean) => !next && setInviting(false)}
                 />
             )}

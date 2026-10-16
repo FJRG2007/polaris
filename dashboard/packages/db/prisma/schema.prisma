@@ -8945,9 +8945,26 @@ model ChatSpaceInvite {
     space     ChatSpace    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
     createdBy User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
     channel   ChatChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+    sends     ChatInviteSend[]
 
     @@index([spaceId, createdAt])
     @@index([channelId, createdAt])
+}
+
+// One invitation sent to one person from the invite dialog. The unique pair is
+// what makes sending idempotent: a double click, a retry after a dropped
+// response, or two tabs pressing Invite at once post one message, not several.
+model ChatInviteSend {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    inviteId    String   @db.Uuid
+    recipientId String   @db.Uuid
+    // The direct conversation it went into, once it has.
+    channelId   String?  @db.Uuid
+    createdAt   DateTime @default(now())
+
+    invite ChatSpaceInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+
+    @@unique([inviteId, recipientId])
 }
 
 // Somebody confirming they are an adult before reading an age-restricted

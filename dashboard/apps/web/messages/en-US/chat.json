@@ -221,7 +221,8 @@
         "soundboardCooldown": "Wait {seconds} s before the next sound",
         "soundboardUnreachable": "The call server did not answer. Try again.",
         "soundboardOwner": "The owner of the space cannot be denied the soundboard",
-        "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial"
+        "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial",
+        "inviteSendLimit": "Too many invites at once. Try again in {seconds} s."
     },
     "media": {
         "refused": {
@@ -1146,6 +1147,32 @@
         "uses": {
             "count": "{count, plural, one {1 use} other {{count} uses}}",
             "unlimited": "No limit"
+        },
+        "inviteFriendsTo": "Invite friends to {name}",
+        "landsIn": "Recipients will land in",
+        "landsInSpace": "Recipients will land in this server.",
+        "searchFriends": "Search for friends",
+        "invite": "Invite",
+        "sent": "Sent",
+        "alreadyMember": "Member",
+        "noFriends": "No friends yet. Search for a full username.",
+        "nobodyFound": "Nobody found. Try their full username.",
+        "orSendLink": "Or, send a server invite link to a friend",
+        "copy": "Copy",
+        "copied": "Copied",
+        "makingLink": "Making your link...",
+        "expiresIn": "Your invite link expires in {when}.",
+        "neverExpires": "Your invite link never expires.",
+        "editLink": "Edit invite link",
+        "linkSettings": "Server invite link settings",
+        "expireAfter": "Expire after",
+        "maxUses": "Max number of uses",
+        "cancel": "Cancel",
+        "generateNewLink": "Generate a new link",
+        "left": {
+            "days": "{count, plural, one {1 day} other {{count} days}}",
+            "hours": "{count, plural, one {1 hour} other {{count} hours}}",
+            "minutes": "{count, plural, one {1 minute} other {{count} minutes}}"
         }
     },
     "groupSettings": {
@@ -1819,5 +1846,19 @@
         "graphicsSaid": "The graphics card would not build the background: {said}",
         "tooSlow": "It took too long to start.",
         "silent": "It would not start, and said nothing about why."
+    },
+    "inviteCard": {
+        "youWereInvited": "You've been invited to join a server",
+        "youSent": "You sent an invite to join a server",
+        "youReceivedBut": "You received an invite, but...",
+        "youSentBut": "You sent an invite, but...",
+        "invalid": "Invalid invite",
+        "tryAsking": "Ask them for a new invite.",
+        "trySending": "Try sending a new invite.",
+        "online": "{count} online",
+        "members": "{count, plural, one {1 member} other {{count} members}}",
+        "join": "Join",
+        "joined": "Joined",
+        "goTo": "Go to server"
     }
 }

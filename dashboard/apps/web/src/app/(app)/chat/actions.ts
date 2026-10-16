@@ -69,7 +69,6 @@ import type {
     ChatSpaceView
 } from "@/lib/chat/chat-service";
 import {
-    ChatAccessError,
     reachableChannelIds,
     requirePostable,
     searchForConversation
@@ -1521,37 +1520,39 @@ export async function deleteWebhookAction(webhookId: unknown): Promise<{ error?:
  * makes a direct message possible still applies, so this can never open a
  * conversation with somebody who does not accept them.
  */
-export async function inviteToDirectAction(input: {
-    code: string;
-    userId: string;
-    baseUrl: string;
-}): Promise<{ channelId?: string; error?: string }> {
+export async function inviteToDirectAction(
+    input: unknown
+): Promise<{ channelId?: string; error?: string }> {
     const me = await actor();
-    const code = core.inviteCodeSchema.safeParse(input?.code);
-    const userId = z.string().uuid().safeParse(input?.userId);
-    if (!code.success || !userId.success)
-        return { error: (await getTranslations("chat"))("errors.inviteNotSent") };
+    const parsed = core.chatInviteSendSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.inviteNotSent") };
+    const result = await guard(() => invites.sendInvite(me, parsed.data));
+    return result.error ? { error: result.error } : { channelId: result.value!.channelId };
+}
 
-    const result = await guard(async () => {
-        const offer = await invites.readInvite(me, code.data);
-        if (!offer) throw new ChatAccessError({ key: "errors.invitationGone" });
-        const channelId = await chat.openDirect(me, [userId.data]);
-        // Built on the address Polaris hands out rather than on the sender's
-        // tab, which may be a name that resolves on their network alone.
-        const base = String(input?.baseUrl ?? "").replace(/\/+$/, "");
-        await messages.send(
-            me,
-            {
-                channelId,
-                body: `[Join ${offer.spaceName}](${base}/chat/i/${offer.code})`,
-                replyToId: null
-            },
-            [],
-            null
-        );
-        return channelId;
-    });
-    return result.error ? { error: result.error } : { channelId: result.value };
+/** The link the invite dialog opens on: an existing one reused, or a new one
+ *  with the defaults. There is no step before it. */
+export async function inviteLinkAction(
+    input: unknown
+): Promise<{ invite?: ChatInviteView; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatInviteLinkSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.inviteNotMade") };
+    const result = await guard(() => invites.inviteLink(me, parsed.data));
+    return result.error ? { error: result.error } : { invite: result.value };
+}
+
+/** Who the invite dialog lists: friends, or whoever the search reaches. */
+export async function inviteCandidatesAction(
+    input: unknown
+): Promise<{ people?: readonly invites.ChatInviteCandidate[]; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatInviteCandidatesSchema.safeParse(input);
+    if (!parsed.success) return { people: [] };
+    const result = await guard(() =>
+        invites.inviteCandidates(me, parsed.data.spaceId, parsed.data.query)
+    );
+    return result.error ? { error: result.error } : { people: result.value };
 }
 
 // ---------------------------------------------------------------------------
