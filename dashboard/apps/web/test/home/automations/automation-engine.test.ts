@@ -2063,4 +2063,158 @@ describe("a set of devices", () => {
         setCondition("all");
         expect(await passes()).toBe(true);
     });
+
+    const SENSORS = ["temp1", "temp2"];
+    const sensor = (id: string, reading: string) => readout(id, "sensor", "unknown", { reading });
+
+    function hotSet(behaviour: auto.Behaviour) {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp1",
+                    targets: SENSORS.map((id) => ({ kind: "device" as const, id })),
+                    behaviour,
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+    }
+
+    async function allCool() {
+        for (const id of SENSORS) await reads(sensor(id, "20"));
+        later(MINUTE);
+    }
+
+    it("fires a crossing held on any of them, once it lasted, from the device that held it", async () => {
+        hotSet("each");
+        await allCool();
+        await reads(sensor("temp2", "26"));
+        later(MINUTE);
+        await reads(sensor("temp2", "27"));
+        // Every device of the set has its line kept, not only the block's first.
+        expect(store.observations.get("temp2")?.held).toEqual({
+            reading: { "gt:25": { since: expect.any(Date), from: "20" } }
+        });
+        expect(store.observations.get("temp1")?.held ?? {}).toEqual({});
+        later(3 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause).toMatchObject({
+            kind: "threshold",
+            deviceId: "temp2",
+            from: "20",
+            to: "27",
+            minutes: 5
+        });
+    });
+
+    it("fires a crossing held on all of them once the last has lasted", async () => {
+        hotSet("all");
+        await allCool();
+        await reads(sensor("temp1", "26"));
+        later(2 * MINUTE);
+        await reads(sensor("temp2", "26"));
+        for (const id of SENSORS) {
+            expect(store.observations.get(id)?.held).toEqual({
+                reading: { "gt:25": { since: expect.any(Date), from: "20" } }
+            });
+        }
+        // The first has lasted, the last only three minutes.
+        later(3 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(2 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause.deviceId).toBe("temp2");
+    });
+
+    it("does not fire a crossing on all of them while one of them never crossed", async () => {
+        hotSet("all");
+        await allCool();
+        await reads(sensor("temp1", "26"));
+        later(MINUTE);
+        await reads(sensor("temp2", "24"));
+        later(30 * MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(0);
+    });
+
+    function warmCondition(quantifier: auto.Quantifier) {
+        automation("warm", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp1",
+                                targets: SENSORS.map((id) => ({ kind: "device" as const, id })),
+                                quantifier,
+                                op: "gt",
+                                value: 25,
+                                forMinutes: 10
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "warm" }]
+        });
+    }
+
+    async function warmPasses(): Promise<boolean> {
+        notified = [];
+        await engine.runNow(
+            store.automations.get("warm")!,
+            "Fixture person",
+            `press-${now.getTime()}`
+        );
+        await engine.drain();
+        return notified.length === 1;
+    }
+
+    it("holds a reading condition on any of them once one has been over for long enough", async () => {
+        warmCondition("any");
+        await allCool();
+        await reads(sensor("temp2", "26"));
+        // Still over, but moved: counted from the crossing, not the last value.
+        later(5 * MINUTE);
+        await reads(sensor("temp2", "27"));
+        later(4 * MINUTE);
+        expect(await warmPasses()).toBe(false);
+        later(MINUTE);
+        expect(await warmPasses()).toBe(true);
+    });
+
+    it("holds a reading condition on all of them only once each has been over for long enough", async () => {
+        warmCondition("all");
+        await allCool();
+        await reads(sensor("temp1", "26"));
+        later(5 * MINUTE);
+        await reads(sensor("temp2", "26"));
+        later(2 * MINUTE);
+        await reads(sensor("temp2", "27"));
+        later(3 * MINUTE);
+        // temp1 has lasted, temp2 only five minutes.
+        expect(await warmPasses()).toBe(false);
+        later(5 * MINUTE);
+        expect(await warmPasses()).toBe(true);
+        await reads(sensor("temp1", "24"));
+        expect(await warmPasses()).toBe(false);
+    });
 });
