@@ -727,7 +727,8 @@
             "password": "Contraseña",
             "passkey": "Llave de acceso",
             "emailLink": "Enlace por correo",
-            "qrCode": "Código QR"
+            "qrCode": "Código QR",
+            "sso": "Acceso único"
         },
         "secondFactors": {
             "totp": "App de autenticación",

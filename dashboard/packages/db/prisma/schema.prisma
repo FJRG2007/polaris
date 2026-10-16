@@ -990,7 +990,10 @@ model Account {
 }
 
 model Verification {
-    id         String   @id @default(uuid(7)) @db.Uuid
+    // Text rather than uuid: better-auth writes its own deterministic ids here
+    // for one-time markers (a SAML assertion id it has already accepted), and
+    // those are hashes, not uuids. Every id written before is still a uuid.
+    id         String   @id @default(uuid(7))
     identifier String
     value      String
     expiresAt  DateTime
@@ -14193,4 +14196,36 @@ model HostTemplateAssignment {
     @@unique([templateId, hostId])
     @@index([hostId])
     @@index([checkedAt])
+}
+
+// A SAML identity provider people sign in through. The columns down to
+// `domainVerified` are the SSO plugin's and keep its names; the plugin reads
+// them by `providerId`. `samlConfig` is the plugin's JSON configuration, written
+// only by Polaris's own admin action. The columns after them are Polaris's.
+model SsoProvider {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    // The identity provider's entity ID.
+    issuer         String
+    oidcConfig     String?
+    samlConfig     String?
+    // The administrator who configured it.
+    userId         String?  @db.Uuid
+    providerId     String   @unique
+    organizationId String?
+    // Comma-separated email domains that sign in through this provider.
+    domain         String
+    // True once every domain in `domain` has passed the DNS check. The plugin
+    // refuses a sign-in through a provider whose domain is not verified.
+    domainVerified Boolean  @default(false)
+    // What the sign-in screen and the admin list call it.
+    name           String   @default("")
+    // Whether a first sign-in creates the account (just-in-time).
+    allowSignUp    Boolean  @default(false)
+    // Whether password sign-in is refused for these domains. Administrators
+    // keep their password as the way back in if the provider breaks.
+    enforced       Boolean  @default(false)
+    // The value the DNS TXT record has to carry to verify the domains.
+    domainToken    String   @default("")
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
 }

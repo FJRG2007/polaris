@@ -19,6 +19,7 @@ import {
     Scale,
     Settings,
     ShieldCheck,
+    KeyRound,
     SlidersHorizontal,
     Sparkles,
     Users,
@@ -38,6 +39,7 @@ const SECTIONS = [
     { key: "roles", href: "/admin/roles", icon: IdCard },
     { key: "policies", href: "/admin/policies", icon: Scale },
     { key: "security", href: "/admin/security", icon: ShieldCheck },
+    { key: "sso", href: "/admin/sso", icon: KeyRound },
     { key: "activity", href: "/admin/activity", icon: Activity },
     { key: "evidence", href: "/admin/evidence", icon: ClipboardCheck },
     { key: "inbox", href: "/admin/inbox", icon: MessagesSquare },
@@ -61,10 +63,7 @@ export default async function ManagementPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("overview.title")}
-                description={t("overview.description")}
-            />
+            <PageHeader title={t("overview.title")} description={t("overview.description")} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {SECTIONS.map((section) => {
                     const Icon = section.icon;

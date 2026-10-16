@@ -17,7 +17,8 @@ const OWN_METHODS: Readonly<Record<string, NamespaceKey<"components">>> = {
     password: "signIn.methods.password",
     passkey: "signIn.methods.passkey",
     "email-link": "signIn.methods.emailLink",
-    "qr-code": "signIn.methods.qrCode"
+    "qr-code": "signIn.methods.qrCode",
+    sso: "signIn.methods.sso"
 };
 
 const SECOND_FACTORS: Readonly<Record<SecondFactor, NamespaceKey<"components">>> = {
@@ -35,7 +36,10 @@ export function signInParts(t: Words, record: SignInRecord): string[] {
     if (record.method) {
         const own = OWN_METHODS[record.method];
         parts.push(
-            own ? t(own) : (CONNECTION_PROVIDERS.find((provider) => provider.slug === record.method)?.name ?? record.method)
+            own
+                ? t(own)
+                : (CONNECTION_PROVIDERS.find((provider) => provider.slug === record.method)?.name ??
+                      record.method)
         );
     }
     if (record.secondFactor) parts.push(t(SECOND_FACTORS[record.secondFactor]));

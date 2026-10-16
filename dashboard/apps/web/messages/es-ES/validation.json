@@ -22,5 +22,20 @@
     "inviteUnavailable": "Esta invitación no es válida, ha caducado o ya se ha usado. Pide una nueva a un administrador.",
     "inviteLocation": "Esta invitación no se puede aceptar desde tu red. Pregunta a quien te la envió qué direcciones admite.",
     "invitePassword": "Esa contraseña de un solo uso no coincide.",
-    "inviteThrottled": "Demasiados intentos desde tu red. Espera unos minutos y vuelve a intentarlo."
+    "inviteThrottled": "Demasiados intentos desde tu red. Espera unos minutos y vuelve a intentarlo.",
+    "samlDomain": "Escribe un dominio como example.com.",
+    "samlAttribute": "Escribe el nombre del atributo.",
+    "samlMetadataUrl": "Escribe la dirección completa de los metadatos, con https://.",
+    "samlMetadataUrlHttps": "La dirección de los metadatos debe usar https://.",
+    "samlMetadataXml": "Pega el XML de los metadatos.",
+    "samlMetadataTooLarge": "Estos metadatos son demasiado grandes.",
+    "samlNotMetadata": "No son metadatos SAML: no tienen EntityDescriptor.",
+    "samlEntityId": "Escribe el ID de entidad del proveedor de identidad.",
+    "samlSsoUrl": "Escribe la dirección completa de inicio de sesión, con https://.",
+    "samlSsoUrlHttps": "La dirección de inicio de sesión debe usar https://.",
+    "samlCertificate": "Pega el certificado de firma.",
+    "samlCertificateTooLarge": "Este certificado es demasiado grande.",
+    "samlName": "Escribe un nombre.",
+    "samlDomainsMin": "Añade al menos un dominio.",
+    "samlDomainsMax": "Usa como máximo {count} dominios."
 }

@@ -28,6 +28,12 @@ import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } from "./connection-sign-in.js";
+import {
+    ASSERTION_PATHS,
+    refuseSessionForEnforcedDomain,
+    samlSignUpAllowed,
+    samlSsoPlugin
+} from "./saml-sso.js";
 import { followTrustedDevice, recordTrustedDevice, type DeviceOrigin } from "./two-factor.js";
 import {
     originHost,
@@ -482,8 +488,21 @@ const SIGN_IN_METHOD_BY_PATH: ReadonlyMap<string, SignInMethod> = new Map([
     ["/sign-in/email", "password"],
     [MAGIC_LINK_VERIFY_PATH, "email-link"],
     ["/passkey/verify-authentication", "passkey"],
-    [DEVICE_TOKEN_PATH, "qr-code"]
+    [DEVICE_TOKEN_PATH, "qr-code"],
+    ...[...ASSERTION_PATHS].map((path) => [path, "sso"] as const)
 ] as const);
+
+/**
+ * Whether a session on this path is a way in that never asked an identity
+ * provider, which an enforced domain refuses: every sign-in above except the
+ * provider's own, and the connected-account one.
+ */
+function bypassesIdentityProvider(path: string): boolean {
+    return (
+        path === CONNECTION_SIGN_IN_PATH ||
+        (SIGN_IN_METHOD_BY_PATH.has(path) && !ASSERTION_PATHS.has(path))
+    );
+}
 
 /**
  * The service that proved a sign-in with a linked account, which is the one
@@ -564,7 +583,8 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
     const plugins: BetterAuthPlugin[] = [
         twoFactorPlugin(options),
         deviceAuthorizationPlugin(),
-        connectionSignInPlugin()
+        connectionSignInPlugin(),
+        samlSsoPlugin()
     ];
     const webauthn = passkeyPlugin(address);
     if (webauthn) plugins.push(webauthn);
@@ -758,6 +778,28 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             freshAge: 0
         },
         hooks: { after: recordSignInMethod },
+        databaseHooks: {
+            user: {
+                create: {
+                    // A SAML sign-in creates an account only where its provider
+                    // allows it, and only for an address in that provider's
+                    // domains. Every other way an account is made passes.
+                    before: async (user, context) => samlSignUpAllowed(user.email, context)
+                }
+            },
+            session: {
+                create: {
+                    // A domain that must use its identity provider keeps no other
+                    // way in: a passkey, a scanned code, an emailed link or a
+                    // connected account is refused the same way a password is.
+                    before: async (session, context) => {
+                        if (context?.path && bypassesIdentityProvider(context.path)) {
+                            await refuseSessionForEnforcedDomain(session.userId);
+                        }
+                    }
+                }
+            }
+        },
         plugins: buildPlugins(options, address ?? new URL(env.POLARIS_APP_URL).host),
         user: {
             additionalFields: {

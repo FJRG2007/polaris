@@ -76,6 +76,7 @@ updates:
         applies-to: version-updates
         update-types: [patch]
         patterns:
+          - "@better-auth/utils"
           - "@enigmax/primitives"
           - "@sapphi-red/web-noise-suppressor"
           - "@univerjs/*"
@@ -121,6 +122,7 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+          - "@better-auth/utils"
           - "@enigmax/primitives"
           - "@sapphi-red/web-noise-suppressor"
           - "@univerjs/*"
