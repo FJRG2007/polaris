@@ -32,6 +32,7 @@ import backups from "./backups.json";
 import catalog from "./catalog.json";
 import notices from "./notices.json";
 import runners from "./runners.json";
+import tunnels from "./tunnels.json";
 import servers from "./servers.json";
 import agentRollouts from "./agentRollouts.json";
 import firewall from "./firewall.json";
@@ -135,6 +136,7 @@ export default {
     telemetry,
     tools,
     tours,
+    tunnels,
     setup,
     validation,
     vault,

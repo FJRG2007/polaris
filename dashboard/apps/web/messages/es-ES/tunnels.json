@@ -1,0 +1,90 @@
+{
+    "page": {
+        "title": "Túneles",
+        "description": "Publica un servicio que está detrás de NAT a través de uno de tus servidores con dirección pública.",
+        "create": "Nuevo túnel"
+    },
+    "empty": {
+        "title": "Aún no hay túneles",
+        "description": "Un túnel permite que un servicio en casa o detrás de un router responda en un dominio, a través de un servidor accesible desde internet."
+    },
+    "list": {
+        "via": "A través de {server}, puerto UDP {port}",
+        "service": "{service} en {project}, en {server}",
+        "handshake": "Último contacto",
+        "never": "Nunca",
+        "received": "Recibido",
+        "sent": "Enviado",
+        "statusFailed": "No se pudo leer el estado del túnel."
+    },
+    "health": {
+        "up": "Conectado",
+        "waiting": "En espera",
+        "down": "Caído",
+        "paused": "En pausa",
+        "unknown": "Sin datos"
+    },
+    "actions": {
+        "pause": "Pausar",
+        "resume": "Reanudar",
+        "remove": "Quitar",
+        "refresh": "Actualizar",
+        "open": "Abrir {hostname}"
+    },
+    "setup": {
+        "title": "Abre el puerto UDP {port} en {server}",
+        "body": "Polaris no puede abrir puertos en tu proveedor. Añade una regla de entrada en el cortafuegos o grupo de seguridad de este servidor con estos valores. Este aviso desaparece con el primer contacto.",
+        "down": "Hace rato que no hay contacto. Comprueba que el puerto UDP {port} sigue abierto en {server} y que el servidor de {service} está encendido.",
+        "protocol": "Protocolo",
+        "port": "Puerto",
+        "source": "Origen",
+        "address": "Dirección",
+        "addressUnknown": "Aún desconocida",
+        "dns": "Apunta {hostname} a {address} con un registro {record} para que lleguen las visitas."
+    },
+    "dialog": {
+        "title": "Nuevo túnel",
+        "description": "Las visitas llegan al dominio en el servidor público, que las pasa por un túnel cifrado hasta el servicio.",
+        "publicServer": "Servidor público",
+        "publicHint": "Un servidor con dirección pública. Recibe las visitas y escucha en un puerto UDP.",
+        "service": "Servicio",
+        "serviceHint": "Corre en otro servidor, normalmente detrás de NAT. Allí no se abre nada.",
+        "hostname": "Dominio",
+        "pickServer": "Elige un servidor",
+        "pickService": "Elige un servicio",
+        "searchServices": "Buscar servicios",
+        "noServices": "Sin servicios",
+        "thisMachine": "{name} (esta máquina)",
+        "serviceOption": "{service} - {project}",
+        "noOtherServer": "Todos los servicios corren en este servidor. Un túnel necesita un servicio en otro.",
+        "hostnameInvalid": "Escribe un dominio como app.example.com.",
+        "create": "Crear túnel",
+        "creating": "Creando",
+        "cancel": "Cancelar"
+    },
+    "remove": {
+        "kind": "túnel",
+        "title": "¿Quitar este túnel?",
+        "question": "{hostname} deja de responder y se quitan los dos extremos. El servicio no se toca.",
+        "confirm": "Quitar túnel"
+    },
+    "refusals": {
+        "notFound": "Este túnel ya no existe.",
+        "noServer": "Ese servidor no es tuyo.",
+        "noService": "Ese servicio no es tuyo.",
+        "sameServer": "El servicio ya corre en ese servidor. Elige un servicio de otro servidor.",
+        "hostname": "Escribe un dominio como app.example.com.",
+        "hostnameTaken": "Ese dominio ya está en uso.",
+        "full": "No quedan puertos de túnel libres en ese servidor.",
+        "noAddress": "Aún no se conoce la dirección pública de ese servidor.",
+        "unreachable": "Ahora mismo no se puede llegar a ese servidor.",
+        "edge": "El borde de ese servidor aún no acepta rutas de Polaris. Vuelve a prepararlo desde Servidores.",
+        "leftover": "El túnel está en pausa, pero no se pudo limpiar {servers}. Quítalo otra vez cuando vuelva.",
+        "leftoverPaused": "El túnel está en pausa, pero su extremo en {servers} sigue en marcha. Vuelve a pausarlo cuando vuelva.",
+        "generic": "No se pudo cambiar el túnel. Inténtalo de nuevo en un momento."
+    },
+    "retired": {
+        "leftover": "No se pudo limpiar el túnel de {hostname} en {servers}.",
+        "notMoved": "El túnel de {hostname} no arrancó donde ahora funciona su servicio. Está en pausa; reanúdalo desde Túneles."
+    }
+}

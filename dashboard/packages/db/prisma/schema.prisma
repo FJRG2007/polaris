@@ -4644,6 +4644,7 @@ model DeployTarget {
     host         Host?             @relation(fields: [hostId], references: [id], onDelete: Cascade)
     applications Application[]
     databases    ManagedDatabase[]
+    wireguardTunnels WireguardTunnel[]
     deployments  Deployment[]
     volumes      Volume[]
 
@@ -5041,6 +5042,8 @@ model Application {
     @@index([targetId])
     @@index([storageMode])
     @@index([binnedAt])
+
+    wireguardTunnels WireguardTunnel[]
 }
 
 // A command a service runs on a schedule, inside its own running container, the
@@ -14322,4 +14325,40 @@ model ServerCommand {
     @@index([serverId, status, createdAt])
     @@index([status, expiresAt])
     @@index([status, finishedAt])
+}
+
+// A WireGuard tunnel that publishes one service running behind NAT through a
+// server with a public address. Each end runs its own container; the public
+// end listens on one UDP port and the NAT end dials out with a keepalive, so no
+// port opens at home. Private keys are stored encrypted with the master key;
+// only the public keys are ever handed to the other end.
+model WireguardTunnel {
+    id                   String   @id @default(uuid(7)) @db.Uuid
+    ownerId              String   @db.Uuid
+    // The server with the public address that terminates the tunnel.
+    publicTargetId       String   @db.Uuid
+    // The service behind NAT the tunnel reaches.
+    applicationId        String   @db.Uuid
+    hostname             String
+    // UDP port the public end listens on, unique per public server.
+    listenPort           Int
+    // Address slot inside the tunnel range, unique per owner.
+    slot                 Int
+    publicKey            String
+    // JSON {c,n,k}: the public end's private key, encrypted with the master key.
+    privateKeySealed     String
+    peerPublicKey        String
+    // JSON {c,n,k}: the NAT end's private key, encrypted with the master key.
+    peerPrivateKeySealed String
+    paused               Boolean  @default(false)
+    createdAt            DateTime @default(now())
+    updatedAt            DateTime @updatedAt
+
+    publicTarget DeployTarget @relation(fields: [publicTargetId], references: [id], onDelete: Cascade)
+    application  Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+    @@unique([publicTargetId, listenPort])
+    @@unique([ownerId, slot])
+    @@unique([hostname])
+    @@index([applicationId])
 }

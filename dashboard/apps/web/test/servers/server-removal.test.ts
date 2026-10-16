@@ -96,6 +96,23 @@ vi.mock("@/lib/deploy-service", () => ({
     syncAppRoutes: async () => undefined
 }));
 
+/** Tunnels with an end on the server: what each read returns, oldest first. */
+const tunnelReads: { id: string; hostname: string }[][] = [];
+const tunnelsWithin = vi.fn(async () => tunnelReads.shift() ?? []);
+const moveTunnel = vi.fn(async () => {
+    calls.push("move tunnel");
+    return [] as string[];
+});
+const retireTunnels = vi.fn(async (_owner: string, rows: { hostname: string }[]) => {
+    calls.push("retire tunnels");
+    return rows.map((row) => ({ hostname: row.hostname, servers: "node-1" }));
+});
+vi.mock("@/lib/deploy/wireguard/tunnel-service", () => ({
+    tunnelsWithin,
+    moveTunnel,
+    retireTunnels
+}));
+
 const { getServerRemovalPlan, removeServer } = await import("../../src/lib/server-removal-service");
 
 /** One service on the server being removed, running there or merely configured. */
@@ -126,13 +143,51 @@ describe("removing a server", () => {
         appRows = [];
         deployAndWait.mockResolvedValue(null);
         enrollmentFindFirst.mockResolvedValue(null);
+        tunnelReads.length = 0;
+        deleteHost.mockImplementation(async () => {
+            calls.push("delete host");
+        });
+    });
+
+    it("starts a moved service's tunnel on its new server and retires the rest before the row goes", async () => {
+        oneService("api", true);
+        const moved = { id: "tunnel-moved", hostname: "api.example.com" };
+        const edge = { id: "tunnel-edge", hostname: "edge.example.com" };
+        tunnelReads.push([moved, edge], [edge]);
+        const result = await removeServer(OWNER, HOST, OWNER, {
+            mode: "move",
+            destinationId: OTHER_HOST
+        });
+        expect(result.error).toBeUndefined();
+        expect(tunnelsWithin).toHaveBeenNthCalledWith(1, OWNER, { hostId: HOST });
+        expect(moveTunnel).toHaveBeenCalledWith(OWNER, moved);
+        expect(retireTunnels).toHaveBeenCalledWith(OWNER, [edge]);
+        expect(calls.indexOf("deploy")).toBeLessThan(calls.indexOf("move tunnel"));
+        expect(calls.indexOf("retire tunnels")).toBeLessThan(calls.indexOf("delete host"));
+        expect(result.warnings).toContain(
+            "The tunnel for edge.example.com could not be cleaned up on node-1."
+        );
+    });
+
+    it("says when a moved service's tunnel did not start again", async () => {
+        oneService("api", true);
+        moveTunnel.mockRejectedValueOnce(new Error("daemon said no"));
+        tunnelReads.push([{ id: "tunnel-moved", hostname: "api.example.com" }], []);
+        const result = await removeServer(OWNER, HOST, OWNER, {
+            mode: "move",
+            destinationId: OTHER_HOST
+        });
+        expect(result.warnings).toContain(
+            "The tunnel for api.example.com did not start where its service now runs. It is paused; resume it from Tunnels."
+        );
+        expect(deleteHost).toHaveBeenCalledWith(OWNER, HOST);
     });
 
     it("only forgets the machine when that is what was asked", async () => {
         oneService("api", true);
         const result = await removeServer(OWNER, HOST, OWNER, { mode: "disconnect" });
         expect(result.error).toBeUndefined();
-        expect(calls).toEqual([]);
+        expect(calls).toEqual(["retire tunnels", "delete host"]);
         expect(deleteHost).toHaveBeenCalledWith(OWNER, HOST);
     });
 
@@ -184,7 +239,8 @@ describe("removing a server", () => {
             destinationId: OTHER_HOST
         });
         expect(result.moved).toEqual(["worker"]);
-        expect(calls).toEqual([]);
+        expect(calls).not.toContain("deploy");
+        expect(calls).not.toContain("stop");
     });
 
     it("refuses a move with nowhere to move to", async () => {

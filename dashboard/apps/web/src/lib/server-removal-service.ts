@@ -30,6 +30,7 @@ import { deleteHost, getHostConnection } from "@/lib/host-service";
 import { getOrCreateHostTarget, getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { deployAndWait, stopApplicationOnTarget, syncAppRoutes } from "@/lib/deploy-service";
 import { readerWords } from "@/lib/i18n/reader-words";
+import type { tunnelsWithin } from "@/lib/deploy/wireguard/tunnel-service";
 
 /** How a server is taken out. Each one includes everything the one before it does. */
 export type ServerRemovalMode = "disconnect" | "clean" | "move";
@@ -61,7 +62,10 @@ export interface ServerRemovalPlan {
  * dialog can say it in specifics ("3 services, 2 volumes stay behind") rather than
  * in the abstract.
  */
-export async function getServerRemovalPlan(ownerId: string, hostId: string): Promise<ServerRemovalPlan | null> {
+export async function getServerRemovalPlan(
+    ownerId: string,
+    hostId: string
+): Promise<ServerRemovalPlan | null> {
     const host = await prisma.host.findFirst({
         where: { id: hostId, ownerId },
         select: { id: true, name: true, sudo: true }
@@ -79,7 +83,9 @@ export async function getServerRemovalPlan(ownerId: string, hostId: string): Pro
             },
             orderBy: { name: "asc" }
         }),
-        prisma.volume.count({ where: { target: { hostId, ownerId }, kind: { in: ["volume", "bind"] } } }),
+        prisma.volume.count({
+            where: { target: { hostId, ownerId }, kind: { in: ["volume", "bind"] } }
+        }),
         prisma.runnerPool.count({ where: { hostId } }),
         prisma.enrollment.findFirst({ where: { hostId }, select: { id: true } }),
         prisma.host.findMany({
@@ -137,10 +143,17 @@ export async function removeServer(
 
     const warnings: string[] = [];
     let moved: string[] = [];
+    // Read before a move rewrites where a service's tunnel end is recorded to run:
+    // the end to take down is the one on this server.
+    const tunnels = await (
+        await import("@/lib/deploy/wireguard/tunnel-service")
+    ).tunnelsWithin(ownerId, { hostId });
 
     if (input.mode === "move") {
-        if (!input.destinationId) return { error: (await readerWords("servers"))("errors.schema.chooseDestination") };
-        if (input.destinationId === hostId) return { error: (await readerWords("api"))("refusals.servers.sameServer") };
+        if (!input.destinationId)
+            return { error: (await readerWords("servers"))("errors.schema.chooseDestination") };
+        if (input.destinationId === hostId)
+            return { error: (await readerWords("api"))("refusals.servers.sameServer") };
         const result = await moveServices(ownerId, hostId, userId, input.destinationId);
         moved = result.moved;
         if (result.error) return { error: result.error, moved };
@@ -150,6 +163,8 @@ export async function removeServer(
         warnings.push(...(await tearDown(ownerId, hostId)));
         warnings.push(...(await revokeLogin(ownerId, hostId)));
     }
+
+    warnings.push(...(await settleTunnels(ownerId, hostId, tunnels)));
 
     await deleteHost(ownerId, hostId);
     // Deployed-app routes are generated from what is left, so a removed server's
@@ -180,7 +195,11 @@ async function moveServices(
         destinationId === "local"
             ? await getOrCreateLocalTarget(ownerId)
             : await destinationHostTarget(ownerId, destinationId);
-    if (!destination) return { moved: [], error: (await readerWords("api"))("refusals.servers.destinationMissing") };
+    if (!destination)
+        return {
+            moved: [],
+            error: (await readerWords("api"))("refusals.servers.destinationMissing")
+        };
 
     const apps = await prisma.application.findMany({
         where: { target: { hostId, ownerId } },
@@ -195,8 +214,14 @@ async function moveServices(
         // not find the mounts it is meant to create. Their contents do not follow -
         // that is what the dialog warns about before any of this runs.
         await prisma.$transaction([
-            prisma.application.update({ where: { id: app.id }, data: { targetId: destination.id } }),
-            prisma.volume.updateMany({ where: { applicationId: app.id, targetId: from }, data: { targetId: destination.id } })
+            prisma.application.update({
+                where: { id: app.id },
+                data: { targetId: destination.id }
+            }),
+            prisma.volume.updateMany({
+                where: { applicationId: app.id, targetId: from },
+                data: { targetId: destination.id }
+            })
         ]);
 
         // A service that was not running anywhere has nothing to cut over: it is
@@ -210,11 +235,17 @@ async function moveServices(
         if (failure) {
             await prisma.$transaction([
                 prisma.application.update({ where: { id: app.id }, data: { targetId: from } }),
-                prisma.volume.updateMany({ where: { applicationId: app.id, targetId: destination.id }, data: { targetId: from } })
+                prisma.volume.updateMany({
+                    where: { applicationId: app.id, targetId: destination.id },
+                    data: { targetId: from }
+                })
             ]);
             return {
                 moved,
-                error: (await readerWords("api"))("refusals.servers.redeployFailed", { name: app.name, failure })
+                error: (await readerWords("api"))("refusals.servers.redeployFailed", {
+                    name: app.name,
+                    failure
+                })
             };
         }
         // Up and serving on the far side; the old containers are now the only thing
@@ -225,10 +256,54 @@ async function moveServices(
     return { moved };
 }
 
+/**
+ * The tunnels with an end on this server, before its row goes and cascades them
+ * away. One whose service moved to another server starts again there; the rest -
+ * the public end here, or a service that stays and goes with the server - are
+ * taken down on both ends and removed. What could not be done is a warning.
+ */
+async function settleTunnels(
+    ownerId: string,
+    hostId: string,
+    before: Awaited<ReturnType<typeof tunnelsWithin>>
+): Promise<string[]> {
+    const { moveTunnel, retireTunnels, tunnelsWithin } = await import(
+        "@/lib/deploy/wireguard/tunnel-service"
+    );
+    const t = await readerWords("tunnels");
+    const staying = new Set((await tunnelsWithin(ownerId, { hostId })).map((row) => row.id));
+    const warnings: string[] = [];
+    for (const row of before.filter((one) => !staying.has(one.id))) {
+        try {
+            const left = await moveTunnel(ownerId, row);
+            if (left.length > 0) {
+                warnings.push(
+                    t("retired.leftover", {
+                        hostname: row.hostname,
+                        servers: [...new Set(left)].join(", ")
+                    })
+                );
+            }
+        } catch {
+            warnings.push(t("retired.notMoved", { hostname: row.hostname }));
+        }
+    }
+    for (const left of await retireTunnels(
+        ownerId,
+        before.filter((one) => staying.has(one.id))
+    )) {
+        warnings.push(t("retired.leftover", left));
+    }
+    return warnings;
+}
+
 /** The destination as a deploy target, or null when that server is not one of the
  *  owner's. Adopting it as a target is what a first deploy there would do anyway. */
 async function destinationHostTarget(ownerId: string, hostId: string) {
-    const host = await prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { id: true, name: true } });
+    const host = await prisma.host.findFirst({
+        where: { id: hostId, ownerId },
+        select: { id: true, name: true }
+    });
     return host ? getOrCreateHostTarget(host.id, ownerId, host.name) : null;
 }
 
@@ -265,7 +340,10 @@ async function tearDown(ownerId: string, hostId: string): Promise<string[]> {
  */
 async function revokeLogin(ownerId: string, hostId: string): Promise<string[]> {
     const [host, enrollment] = await Promise.all([
-        prisma.host.findFirst({ where: { id: hostId, ownerId }, select: { username: true, sudo: true } }),
+        prisma.host.findFirst({
+            where: { id: hostId, ownerId },
+            select: { username: true, sudo: true }
+        }),
         prisma.enrollment.findFirst({
             where: { hostId },
             select: { publicKey: true },
@@ -300,24 +378,34 @@ async function revokeLogin(ownerId: string, hostId: string): Promise<string[]> {
             `f="$HOME/.ssh/authorized_keys"; [ -f "$f" ] || exit 0; grep -vF ${shellQuote(key)} "$f" > "$f.polaris" && mv "$f.polaris" "$f"`
         );
         if (dropped.code !== 0) {
-            warnings.push(`Polaris's key may still be authorized for '${user}' on the server; remove it there`);
+            warnings.push(
+                `Polaris's key may still be authorized for '${user}' on the server; remove it there`
+            );
         }
 
         if (!host.sudo) {
-            warnings.push(`The '${user}' login itself was left on the server: removing it needs root`);
+            warnings.push(
+                `The '${user}' login itself was left on the server: removing it needs root`
+            );
             return warnings;
         }
-        await execCommand(client, `sudo rm -f /etc/sudoers.d/${shellQuote(user)}`).catch(() => undefined);
+        await execCommand(client, `sudo rm -f /etc/sudoers.d/${shellQuote(user)}`).catch(
+            () => undefined
+        );
         // Last, and expected to fail on a machine that will not delete an account
         // with a live session on it - which is this one, right now.
-        const removed = await execCommand(client, `sudo userdel -r ${shellQuote(user)}`).catch(() => ({ code: 1 }));
+        const removed = await execCommand(client, `sudo userdel -r ${shellQuote(user)}`).catch(
+            () => ({ code: 1 })
+        );
         if (removed.code !== 0) {
             warnings.push(
                 `The '${user}' login is no longer authorized, but the account is still there: run "sudo userdel -r ${user}" on the server to finish`
             );
         }
     } catch {
-        warnings.push("Polaris could not reach the server to remove its login; remove it there by hand");
+        warnings.push(
+            "Polaris could not reach the server to remove its login; remove it there by hand"
+        );
     } finally {
         client?.end();
     }

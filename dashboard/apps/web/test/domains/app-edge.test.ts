@@ -11,7 +11,10 @@ const findUnique = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/traefik-dynamic", () => ({ writeDynamicFile }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts, dashboardOrigin: () => "http://web:3000" }));
-vi.mock("@polaris/db", () => ({ prisma: { domain: { findUnique } } }));
+const findTunnel = vi.hoisted(() => vi.fn());
+vi.mock("@polaris/db", () => ({
+    prisma: { domain: { findUnique }, wireguardTunnel: { findUnique: findTunnel } }
+}));
 
 import {
     appEdgeFile,
@@ -26,6 +29,7 @@ beforeEach(() => {
     writeDynamicFile.mockResolvedValue(undefined);
     dashboardHosts.mockResolvedValue(["polaris.example.com"]);
     findUnique.mockResolvedValue(null);
+    findTunnel.mockResolvedValue(null);
 });
 
 describe("app edge", () => {
@@ -52,5 +56,14 @@ describe("app edge", () => {
         findUnique.mockResolvedValueOnce({ id: "d1" });
         expect(await edgeHostnameTaken("app.example.com")).toBe(true);
         expect(await edgeHostnameTaken("status.example.com")).toBe(false);
+    });
+
+    it("counts a WireGuard tunnel's hostname as taken", async () => {
+        findTunnel.mockResolvedValueOnce({ id: "t1" });
+        expect(await edgeHostnameTaken("home.example.com")).toBe(true);
+        expect(findTunnel).toHaveBeenCalledWith({
+            where: { hostname: "home.example.com" },
+            select: { id: true }
+        });
     });
 });
