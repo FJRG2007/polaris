@@ -36,7 +36,8 @@ describe("the tunnel route file on a remote edge", () => {
     it("is written beside its target and renamed over it", () => {
         const script = remoteWriteScript(wg.renderTunnelRoutes([]), "n1", wg.TUNNEL_ROUTE_FILE);
         expect(script).toContain(`/.${wg.TUNNEL_ROUTE_FILE}.n1`);
-        expect(script).toMatch(new RegExp(`mv -f '[^']*\\.${wg.TUNNEL_ROUTE_FILE}\\.n1' '[^']*/${wg.TUNNEL_ROUTE_FILE}'`));
+        const temporary = `${wg.TUNNEL_ROUTE_FILE}\\.n1`;
+        expect(script).toMatch(new RegExp(`^mv -f '?\\S*/\\.${temporary}'? '?\\S*/${wg.TUNNEL_ROUTE_FILE}'?$`, "m"));
         expect(script).not.toContain("polaris-apps.yml");
     });
 

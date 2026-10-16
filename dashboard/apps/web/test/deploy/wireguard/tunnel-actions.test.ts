@@ -23,7 +23,10 @@ vi.mock("@/lib/session", () => ({
 }));
 vi.mock("@/lib/deploy/wireguard/tunnel-service", async () => {
     class TunnelRefusal extends Error {
-        public constructor(public readonly code: string) {
+        public constructor(
+            public readonly code: string,
+            public readonly params: Record<string, string> = {}
+        ) {
             super(code);
         }
     }
@@ -35,7 +38,9 @@ vi.mock("@/lib/deploy/wireguard/tunnel-service", async () => {
             return { id: "0190a8c4-0000-7000-8000-0000000000ff" };
         }),
         setTunnelPaused: vi.fn(async () => undefined),
-        removeTunnel: vi.fn(async () => undefined),
+        removeTunnel: vi.fn(async () => {
+            if (fake.failWith) throw fake.failWith;
+        }),
         readTunnelStatus: vi.fn(async () => ({ health: "up", lastHandshake: 1, rxBytes: 2, txBytes: 3 }))
     };
 });
@@ -97,6 +102,12 @@ describe("tunnel actions", () => {
             hostname: "app.example.com"
         });
         expect(refused.error).toBe("The service already runs on that server. Pick a service on another server.");
+
+        fake.failWith = new service.TunnelRefusal("leftover", { servers: "home-box" });
+        const left = await actions.removeTunnelAction({ id: SERVER });
+        expect(left.error).toBe(
+            "The tunnel is paused, but home-box could not be cleaned up. Remove it again once it is back."
+        );
 
         const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
         fake.failWith = new Error("ssh: connect to host 10.0.0.4 port 22: /root/.ssh/id_ed25519");

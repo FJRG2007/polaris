@@ -94,6 +94,11 @@ describe("containers", () => {
             }
         }
         expect(Buffer.from(helper.env.WG_CONFIG, "base64").toString("utf8")).toBe("[Interface]\nA = 1\n");
+        // The config file holds a private key, so it goes when the container stops.
+        expect(helper.command?.join(" ")).toContain("trap 'rm -f /etc/wireproxy/config; exit 0' TERM INT");
+        expect(helper.image).toBe(wg.HELPER_IMAGE);
+        expect(helper.pullPolicy).toBe("missing");
+        expect(wireguard.pullPolicy).toBe("missing");
     });
 
     it("opens no port on the end behind NAT", () => {
