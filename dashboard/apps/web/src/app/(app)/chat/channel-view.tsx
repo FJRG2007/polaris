@@ -2633,6 +2633,7 @@ export function ChannelView({
                                 // the message said after it was taken back,
                                 // until somebody reloads.
                                 references: [],
+                                invites: [],
                                 link: null,
                                 preview: null,
                                 previewPending: false,

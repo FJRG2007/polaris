@@ -18,6 +18,7 @@
  * was taken back.
  */
 
+import { InviteCards } from "./invite-card";
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
@@ -1096,6 +1097,7 @@ function Message({
                             <LinkArea message={message} />
                         </Spoiler>
                         <ReferenceCards message={message} inRoom={inVoice} onJumpTo={onJumpTo} />
+                        <InviteCards invites={message.invites ?? []} mine={mine} />
 
                         {message.attachments.length > 0 && (
                             <ul className="mt-1 flex flex-col gap-1">

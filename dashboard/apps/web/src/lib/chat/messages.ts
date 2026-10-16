@@ -11,6 +11,7 @@
  * rather than a channel id.
  */
 
+import { inviteCards, type ChatInviteCard } from "./invite-cards";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
@@ -133,6 +134,8 @@ export interface ChatMessageView {
      * and not about when somebody pasted it.
      */
     readonly references: readonly ChatReferenceView[];
+    /** The invitation links in it, each drawn as a card under the message. */
+    readonly invites: readonly ChatInviteCard[];
     /**
      * Whether this reader may send it into another conversation.
      *
@@ -1779,6 +1782,13 @@ export async function decorateMessages(
         if (keys.length > 0) pointedAt.set(row.id, keys);
     }
     const references = await resolveChatReferences(actor, [...pointedAt.values()].flat());
+    const invitedTo = new Map<string, string[]>();
+    for (const row of rows) {
+        if (row.deletedAt) continue;
+        const codes = core.inviteCodesIn(row.body, origin);
+        if (codes.length > 0) invitedTo.set(row.id, codes);
+    }
+    const inviteCardsFound = await inviteCards(actor, [...invitedTo.values()].flat());
     const names = new Map(
         [...authors, ...quoteAuthors].map((author) => [
             author.id,
@@ -1901,6 +1911,9 @@ export async function decorateMessages(
             references: (pointedAt.get(row.id) ?? [])
                 .map((key) => references.get(key))
                 .filter((found): found is ChatReferenceView => found !== undefined),
+            invites: (invitedTo.get(row.id) ?? [])
+                .map((code) => inviteCardsFound.get(code))
+                .filter((card): card is ChatInviteCard => card !== undefined),
             // A message whose author has since deleted their account carries no
             // setting to honour, and a deleted one has nothing left to send.
             forwardable:

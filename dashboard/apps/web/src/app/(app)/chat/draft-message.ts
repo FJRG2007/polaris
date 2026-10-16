@@ -57,6 +57,7 @@ export function draftMessage(facts: {
         // Resolved by the server on the reload a moment from now. A draft that
         // guessed would draw a card and then replace it with a different one.
         references: [],
+        invites: [],
         // Your own words, which your own setting never stands between you and.
         forwardable: true,
         // The server has not looked at any link in it yet. Left as settled
