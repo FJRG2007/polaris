@@ -212,6 +212,8 @@ export interface DirectAccess {
     readonly address: string;
     /** Null when closing it is a change-over Polaris can make here. */
     readonly held: DirectAccessHeld | null;
+    /** A deploy that closes the port is queued or running. */
+    readonly closing: boolean;
 }
 
 /** The pure part of `directAccessIn`: which services, on which port, and whether
@@ -219,7 +221,8 @@ export interface DirectAccess {
 export function directAccessOf(
     services: readonly DirectPortService[],
     keptReleases: ReadonlySet<string>,
-    machineAddress: string | null
+    machineAddress: string | null,
+    closing: ReadonlySet<string> = new Set()
 ): DirectAccess[] {
     const found: DirectAccess[] = [];
     for (const service of services) {
@@ -234,7 +237,8 @@ export function directAccessOf(
             applicationId: service.id,
             name: service.name,
             address: machineAddress ? `${machineAddress}:${port}` : String(port),
-            held: kept ? "keptRelease" : service.facts.reachedOnPort ? "installed" : null
+            held: kept ? "keptRelease" : service.facts.reachedOnPort ? "installed" : null,
+            closing: closing.has(service.id)
         });
     }
     return found.sort((a, b) => a.name.localeCompare(b.name));
@@ -254,12 +258,31 @@ export async function directAccessIn(
     const live = services.flatMap((service) =>
         service.facts.routed && service.currentDeploymentId ? [service.currentDeploymentId] : []
     );
-    const kept =
+    const open = services.flatMap((service) => (service.facts.publishPort ? [service.id] : []));
+    const [kept, closing] = await Promise.all([
         live.length === 0
             ? []
-            : await prisma.deployment.findMany({
+            : prisma.deployment.findMany({
                   where: { id: { in: live }, isolated: true, cutover: false },
                   select: { id: true }
-              });
-    return directAccessOf(services, new Set(kept.map((row) => row.id)), machineAddress);
+              }),
+        open.length === 0
+            ? []
+            : prisma.deployment.findMany({
+                  where: {
+                      deployableType: "application",
+                      deployableId: { in: open },
+                      status: { in: [...IN_FLIGHT_DEPLOY_STATUSES] },
+                      closesPort: true
+                  },
+                  select: { deployableId: true },
+                  distinct: ["deployableId"]
+              })
+    ]);
+    return directAccessOf(
+        services,
+        new Set(kept.map((row) => row.id)),
+        machineAddress,
+        new Set(closing.map((row) => row.deployableId))
+    );
 }

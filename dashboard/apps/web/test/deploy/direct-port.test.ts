@@ -84,9 +84,9 @@ describe("directAccessOf", () => {
             "203.0.113.7"
         );
         expect(found).toEqual([
-            { applicationId: "a", name: "api", address: `203.0.113.7:${hostPortForApp("a")}`, held: null },
-            { applicationId: "c", name: "game", address: "203.0.113.7:25565", held: "installed" },
-            { applicationId: "b", name: "web", address: `203.0.113.7:${hostPortForApp("b")}`, held: null }
+            { applicationId: "a", name: "api", address: `203.0.113.7:${hostPortForApp("a")}`, held: null, closing: false },
+            { applicationId: "c", name: "game", address: "203.0.113.7:25565", held: "installed", closing: false },
+            { applicationId: "b", name: "web", address: `203.0.113.7:${hostPortForApp("b")}`, held: null, closing: false }
         ]);
     });
 
@@ -115,8 +115,22 @@ describe("directAccessOf", () => {
             applicationId: "a",
             name: "web",
             address: String(hostPortForApp("release-1")),
-            held: "keptRelease"
+            held: "keptRelease",
+            closing: false
         });
+    });
+
+    it("marks a service whose close is already queued or running", () => {
+        const found = directPort.directAccessOf(
+            [service("a", "api"), service("b", "web")],
+            new Set(),
+            null,
+            new Set(["b"])
+        );
+        expect(found.map((entry) => [entry.name, entry.closing])).toEqual([
+            ["api", false],
+            ["web", true]
+        ]);
     });
 });
 

@@ -110,7 +110,7 @@ describe("reading what answers round a scope", () => {
 describe("closing them", () => {
     it("closes the scope's ports as the operator, and records it", async () => {
         const result = await closeDirectAccessAction(SCOPE);
-        expect(result).toEqual({ closed: 1, failed: 0 });
+        expect(result).toEqual({ closed: 1, failed: 0, failedIds: [] });
         expect(closeDirectPorts).toHaveBeenCalledWith(
             { AND: [{ environment: { project: { ownerId: CUSTOMER.id } } }, { environment: { projectId: PROJECT } }] },
             { mode: "operator", actorId: CUSTOMER.id }

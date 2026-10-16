@@ -5005,8 +5005,8 @@ model Application {
     // Whether the owner opened that port on purpose. A service with a domain is
     // reached through the edge, so a port left open by the old default is closed
     // for it on its next deploy and at boot; one opened deliberately stays open,
-    // unless the service's firewall guards it (a login, an address list, a rule),
-    // which a direct port would let anybody walk around.
+    // and the firewall screen lists it with the button that closes it, since a
+    // direct port lets anybody walk around the login, address lists and rules.
     publishPortChosen   Boolean   @default(false)
     // Whether a deploy of a service with volumes starts the new version beside the
     // running one, both on the same volumes for the seconds of the change-over.

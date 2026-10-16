@@ -611,7 +611,7 @@
         "truncated": "Showing the {shown} most recent of {total}. The counts above cover all of them."
     },
     "direct": {
-        "title": "Reachable round the firewall",
+        "title": "Reachable around the firewall",
         "description": "These services also answer on the machine's address and a port. Anybody who reaches that address skips the login, the address lists and the rules here.",
         "service": "{name} on {address}",
         "keptRelease": "Earlier deployments are kept running on their own ports. Turn off Keep previous deployments on the service to close them.",

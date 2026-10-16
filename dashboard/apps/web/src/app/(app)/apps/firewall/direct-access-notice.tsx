@@ -52,27 +52,34 @@ export function DirectAccessNotice({
     const [asking, setAsking] = useState<Asking | null>(null);
     const [sending, setSending] = useState(false);
 
+    const fetchReachable = useCallback(
+        () =>
+            getDirectAccessAction({ scopeType, scopeId })
+                .then((result) => result.reachable ?? null)
+                .catch(() => null),
+        [scopeType, scopeId]
+    );
+
     const load = useCallback(async () => {
-        const result = await getDirectAccessAction({ scopeType, scopeId }).catch(() => null);
-        if (result?.reachable) setReachable(result.reachable);
-    }, [scopeType, scopeId]);
+        const next = await fetchReachable();
+        if (next) setReachable(next);
+    }, [fetchReachable]);
 
     useEffect(() => {
         let live = true;
         setReachable([]);
         setClosing(new Set());
-        void getDirectAccessAction({ scopeType, scopeId })
-            .then((result) => {
-                if (live && result.reachable) setReachable(result.reachable);
-            })
-            .catch(() => undefined);
+        void fetchReachable().then((next) => {
+            if (live && next) setReachable(next);
+        });
         return () => {
             live = false;
         };
-    }, [scopeType, scopeId]);
+    }, [fetchReachable]);
 
     if (reachable.length === 0) return null;
-    const open = reachable.filter((entry) => entry.held === null && !closing.has(entry.applicationId));
+    const isClosing = (entry: DirectAccess) => entry.closing || closing.has(entry.applicationId);
+    const open = reachable.filter((entry) => entry.held === null && !isClosing(entry));
 
     const confirm = async () => {
         if (!asking) return;
@@ -93,6 +100,10 @@ export function DirectAccessNotice({
             setClosing(before);
             toast.show({ title: result.error });
             return;
+        }
+        const failedIds = "failedIds" in result ? (result.failedIds ?? []) : [];
+        if (failedIds.length > 0) {
+            setClosing((current) => new Set([...current].filter((id) => !failedIds.includes(id))));
         }
         toast.show({
             title: "failed" in result && result.failed ? t("direct.closeFailed") : t("direct.closing")
@@ -128,7 +139,7 @@ export function DirectAccessNotice({
             </div>
             <ul className="flex min-w-0 flex-col divide-y divide-warning-edge">
                 {reachable.map((entry) => {
-                    const pending = closing.has(entry.applicationId);
+                    const pending = isClosing(entry);
                     const label = t("direct.service", { name: entry.name, address: entry.address });
                     return (
                         <li

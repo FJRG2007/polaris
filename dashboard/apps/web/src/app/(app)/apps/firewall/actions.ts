@@ -829,7 +829,7 @@ export async function getDirectAccessAction(
  */
 export async function closeDirectAccessAction(
     input: ScopeInput & { applicationId?: string }
-): Promise<{ closed?: number; failed?: number; error?: string }> {
+): Promise<{ closed?: number; failed?: number; failedIds?: string[]; error?: string }> {
     const user = await requirePermission("deploy.manage");
     const one = z.string().uuid().optional().safeParse(input.applicationId);
     if (!scopeInputSchema.safeParse(input).success || !one.success) {
@@ -838,7 +838,7 @@ export async function closeDirectAccessAction(
     if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
         const scope = await scopeServicesFor(user.id, input);
-        if (!scope) return { closed: 0, failed: 0 };
+        if (!scope) return { closed: 0, failed: 0, failedIds: [] };
         const where = one.data ? { AND: [scope, { id: one.data }] } : scope;
         const outcome = await closeDirectPorts(where, { mode: "operator", actorId: user.id });
         await recordAudit({
@@ -855,7 +855,7 @@ export async function closeDirectAccessAction(
         if (outcome.failed.length > 0 && outcome.closed.length === 0) {
             return { error: await say("direct.closeFailed") };
         }
-        return { closed: outcome.closed.length, failed: outcome.failed.length };
+        return { closed: outcome.closed.length, failed: outcome.failed.length, failedIds: [...outcome.failed] };
     } catch (caught) {
         return { error: await failure(caught, "errors.save") };
     }

@@ -15,10 +15,16 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 const WEB = "00000000-0000-7000-8000-0000000000a1";
 const KEPT = "00000000-0000-7000-8000-0000000000a2";
 
-let reachable: { applicationId: string; name: string; address: string; held: string | null }[] = [];
+let reachable: {
+    applicationId: string;
+    name: string;
+    address: string;
+    held: string | null;
+    closing: boolean;
+}[] = [];
 const getDirectAccessAction = vi.fn(async () => ({ reachable }));
 const closeDirectAccessAction = vi.fn(
-    async (_input: Record<string, unknown>): Promise<{ closed?: number; failed?: number; error?: string }> => ({
+    async (_input: Record<string, unknown>): Promise<{ closed?: number; failed?: number; failedIds?: string[]; error?: string }> => ({
         closed: 1,
         failed: 0
     })
@@ -40,8 +46,8 @@ function show(canClose = true) {
 
 beforeEach(() => {
     reachable = [
-        { applicationId: WEB, name: "web", address: "203.0.113.7:21234", held: null },
-        { applicationId: KEPT, name: "docs", address: "203.0.113.7:31234", held: "keptRelease" }
+        { applicationId: WEB, name: "web", address: "203.0.113.7:21234", held: null, closing: false },
+        { applicationId: KEPT, name: "docs", address: "203.0.113.7:31234", held: "keptRelease", closing: false }
     ];
     getDirectAccessAction.mockClear();
     closeDirectAccessAction.mockClear();
@@ -53,12 +59,12 @@ describe("the direct access warning", () => {
         reachable = [];
         show();
         await waitFor(() => expect(getDirectAccessAction).toHaveBeenCalled());
-        expect(screen.queryByText("Reachable round the firewall")).toBeNull();
+        expect(screen.queryByText("Reachable around the firewall")).toBeNull();
     });
 
     it("names each service and the address it answers on", async () => {
         show();
-        expect(await screen.findByText("Reachable round the firewall")).toBeTruthy();
+        expect(await screen.findByText("Reachable around the firewall")).toBeTruthy();
         expect(screen.getByText("web on 203.0.113.7:21234")).toBeTruthy();
         expect(screen.getByText("docs on 203.0.113.7:31234")).toBeTruthy();
         // A kept release is closed from the service, not from here.
@@ -90,6 +96,29 @@ describe("the direct access warning", () => {
         await waitFor(() => expect(closeDirectAccessAction).toHaveBeenCalled());
         expect(await screen.findByRole("button", { name: "Close the port of web" })).toBeTruthy();
         expect(screen.queryByText("Closing")).toBeNull();
+    });
+
+    it("puts back only the rows that failed when some of Close all closed", async () => {
+        const API = "00000000-0000-7000-8000-0000000000a3";
+        reachable = [
+            { applicationId: API, name: "api", address: "203.0.113.7:21235", held: null, closing: false },
+            ...reachable
+        ];
+        closeDirectAccessAction.mockResolvedValueOnce({ closed: 1, failed: 1, failedIds: [WEB] });
+        show();
+        fireEvent.click(await screen.findByRole("button", { name: "Close all" }));
+        fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Close port" }));
+        await waitFor(() => expect(closeDirectAccessAction).toHaveBeenCalled());
+        expect(await screen.findByRole("button", { name: "Close the port of web" })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Close the port of api" })).toBeNull();
+        expect(screen.getAllByText("Closing")).toHaveLength(1);
+    });
+
+    it("reads as closing after a reload while the close is still in flight", async () => {
+        reachable = [{ ...reachable[0]!, closing: true }];
+        show();
+        expect(await screen.findByText("Closing")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Close the port of web" })).toBeNull();
     });
 
     it("disables the close with the reason for a reader who may not close them", async () => {
