@@ -1368,7 +1368,12 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
     // A hostname in the middle of a DNS cutover is also routed on the edge of the
     // service it is moving to, so that service answers whoever the new record has
     // reached while the old one keeps serving the rest.
-    const domains = [...rows, ...(await stagedCutoverRoutes(rows))];
+    // A failure to read them never costs the rest of the edge its routes.
+    const staged = await stagedCutoverRoutes(rows).catch((error: unknown) => {
+        console.error("polaris: the routes of domains being moved could not be read:", error);
+        return [];
+    });
+    const domains = [...rows, ...staged];
     // What each service asks of the edge, read once per service rather than per
     // hostname, and which services are under the flood check's challenge right now.
     const flooded = await floodedServices();
