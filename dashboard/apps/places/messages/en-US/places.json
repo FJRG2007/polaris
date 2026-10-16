@@ -648,7 +648,10 @@
         "uploadToGoOn": "Upload the Philips Air+ app file to go on",
         "fileTooLarge": "That file is larger than an app file can be.",
         "fileEmpty": "Nothing arrived. Choose the file again.",
-        "macNotFound": "Nothing on this network answers as {mac}. Check the device is switched on and on the same network as Polaris, or type its IP address instead."
+        "macNotFound": "Nothing on this network answers as {mac}. Check the device is switched on and on the same network as Polaris, or type its IP address instead.",
+        "brokerQuiet": "The local broker was installed but has no address on this network yet",
+        "notNuki": "Only a Nuki account can be linked locally",
+        "noLocalLink": "This Nuki account has no local link"
     },
     "connections": {
         "nuki-web": {
@@ -1607,7 +1610,8 @@
         "disconnectBody": "Its devices go with it, and so does everything they have done. Polaris keeps no copy of a building it has been told it has no business with.",
         "disconnect": "Disconnect",
         "filterSoon": "Change filter soon",
-        "filterNow": "Change filter"
+        "filterNow": "Change filter",
+        "connectLocally": "Connect {name} locally"
     },
     "devicePanel": {
         "watchOnly": "Set to be watched rather than operated.",
@@ -2168,5 +2172,26 @@
         "offline": "Offline",
         "watchOnly": "Set to be watched, not operated",
         "noControl": "You cannot operate this from here"
+    },
+    "nukiLocal": {
+        "title": "Connect your Nuki locks locally",
+        "intro": "Locks that publish over MQTT report every change here the moment it happens, instead of when Nuki's servers are next asked.",
+        "startHint": "Polaris will start a small broker on this machine for your locks to report to. It works with Smart Lock 3.0 Pro, 4th generation, Pro and Ultra.",
+        "start": "Start the local broker",
+        "starting": "Starting the broker...",
+        "steps": {
+            "s0": "In the Nuki app, open the lock and go to its MQTT settings (Features & Configuration, or Device Administration in older versions).",
+            "s1": "Switch MQTT on and type the address, username and password below. The port is always 1883.",
+            "s2": "Leave Allow locking on, so Polaris can still lock and unlock it.",
+            "s3": "Save, and keep this window open: each lock appears below once it connects."
+        },
+        "host": "Address",
+        "port": "Port",
+        "username": "Username",
+        "password": "Password",
+        "connected": "Connected - changes now arrive instantly",
+        "waiting": "Waiting for {id}",
+        "unreachable": "Polaris cannot reach the broker right now. It may still be starting; this updates on its own.",
+        "fallback": "Your Nuki account still works from anywhere, and takes over whenever a lock is off this network."
     }
 }

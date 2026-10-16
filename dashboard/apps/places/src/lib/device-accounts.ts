@@ -358,7 +358,10 @@ export async function reconnectAccount(
         where: { id: existing.id },
         data: {
             label: input.label.trim() || existing.label,
-            secret: sealCredentials(paired ?? input.fields),
+            secret: sealCredentials({
+                ...localLinkOf(readCredentials(existing.secret)),
+                ...(paired ?? input.fields)
+            }),
             status: "ok",
             statusNote: null
         },
@@ -370,6 +373,40 @@ export async function reconnectAccount(
         await signOut(existing.connection, existing.secret);
     }
     return toView(row);
+}
+
+/** The fields Polaris writes itself for a local link (`local*`), which a
+ *  new token typed over the account must not take away. */
+function localLinkOf(fields: Readonly<Record<string, string>> | null): Record<string, string> {
+    const link: Record<string, string> = {};
+    for (const [key, value] of Object.entries(fields ?? {}))
+        if (key.startsWith("local")) link[key] = value;
+    return link;
+}
+
+/**
+ * Link an account to a broker on this network, or unlink it with null. Only
+ * Polaris calls this, with the broker it runs: nothing here is typed.
+ */
+export async function linkLocal(
+    installedAppId: string,
+    id: string,
+    broker: Readonly<Record<string, string>> | null
+): Promise<void> {
+    const row = await prisma.placeDeviceAccount.findFirst({
+        where: { id, installedAppId },
+        select: { secret: true }
+    });
+    if (!row) throw new HomeError("That connection is not here");
+    const fields = readCredentials(row.secret);
+    if (!fields) throw new HomeError("That connection has to be connected again");
+    const kept = Object.fromEntries(
+        Object.entries(fields).filter(([key]) => !key.startsWith("local"))
+    );
+    await prisma.placeDeviceAccount.updateMany({
+        where: { id, installedAppId },
+        data: { secret: sealCredentials({ ...kept, ...(broker ?? {}) }) }
+    });
 }
 
 /**
