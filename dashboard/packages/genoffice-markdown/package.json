@@ -43,7 +43,7 @@
     "main": "./dist/App.js",
     "types": "./dist/App.d.ts",
     "devDependencies": {
-        "postcss": "^8.5.19",
+        "postcss": "^8.5.30",
         "postcss-selector-parser": "^6.1.4"
     }
 }
