@@ -3349,11 +3349,14 @@ async function changesOver(
 export function limitsOf(row: {
     cpuLimit: number | null;
     memoryLimitMb: number | null;
+    /** A service handed the machine's NVIDIA cards; a database never is. */
+    useGpu?: boolean;
 }): AppDeployPlan["limits"] {
-    if (row.cpuLimit === null && row.memoryLimitMb === null) return undefined;
+    if (row.cpuLimit === null && row.memoryLimitMb === null && !row.useGpu) return undefined;
     return {
         ...(row.cpuLimit !== null ? { cpus: row.cpuLimit } : {}),
-        ...(row.memoryLimitMb !== null ? { memoryMb: row.memoryLimitMb } : {})
+        ...(row.memoryLimitMb !== null ? { memoryMb: row.memoryLimitMb } : {}),
+        ...(row.useGpu ? { gpus: "all" as const } : {})
     };
 }
 

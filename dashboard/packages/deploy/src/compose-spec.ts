@@ -430,7 +430,8 @@ function cpusValue(cpus: number): string {
 /**
  * The device reservation that hands a container NVIDIA cards, under
  * `deploy.resources`. Compose turns it into a device request for the `nvidia`
- * driver on plain compose and swarm alike. The host daemon renders the same
+ * driver on plain compose; a swarm stack has no device requests, so the setting
+ * is refused there (`lib/deploy/gpu-service.ts`). The host daemon renders the same
  * lines (`crates/polaris-hostd/src/deploy.rs`).
  */
 export function gpuReservationLines(gpus: GpuCount): string[] {

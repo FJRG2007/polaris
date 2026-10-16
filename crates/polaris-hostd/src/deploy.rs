@@ -451,7 +451,7 @@ fn deploy_block(service: &ServiceSpec) -> String {
 }
 
 /// The device reservation for NVIDIA cards, under `deploy:`. Compose reads it
-/// from here on plain compose and swarm alike and hands the engine a device
+/// from here on plain compose (a swarm stack has no device requests) and hands the engine a device
 /// request for the `nvidia` driver. Joins a `resources:` key already written for
 /// the limits, so the block stays one mapping.
 fn gpu_reservation(gpus: GpuCount) -> String {
