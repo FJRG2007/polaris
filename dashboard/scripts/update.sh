@@ -149,24 +149,32 @@ wait_ready() {
     return 1
 }
 
-# Move the dashboard onto the pulled image without dropping a request: start the new
-# container beside the running one, wait for it to pass its healthcheck, then retire
-# the old one. Traefik routes both while they overlap (identical labels, one
-# load-balanced service), so requests keep being served throughout.
+# Move a service onto its new image or definition without dropping a request: start
+# the new container beside the running one, wait for it to pass its healthcheck, then
+# retire the old one. While they overlap both are reachable - the dashboard through
+# the edge's labels (identical on both, one load-balanced service), the edge guard
+# through the network alias both containers carry - so requests keep being served
+# throughout.
 #
-# The new container applies pending migrations on boot, while the old one is still
+# The new dashboard applies pending migrations on boot, while the old one is still
 # serving - which is why migrations have to stay readable by the previous build for
 # the few seconds an update overlaps. For that same window both builds run their
 # background evaluators; those are database-guarded, so the overlap is idle work
 # rather than divergence.
-roll_dashboard() {
-    image="$1"
+#
+# $1 the service, $2 the image reference it should run, $3 what to call it in the
+# log. Returns 1, with the previous container still serving, when the new one never
+# became healthy.
+roll_over() {
+    svc="$1"
+    image="$2"
+    label="$3"
     target=$(image_id "$image")
-    old=$($compose ps -q web 2>/dev/null | tr '\n' ' ')
+    old=$($compose ps -q "$svc" 2>/dev/null | tr '\n' ' ')
 
     if [ -z "$(printf '%s' "$old" | tr -d ' ')" ]; then
-        log "the dashboard is not running; starting it"
-        $compose up -d web
+        log "the $label is not running; starting it"
+        $compose up -d --no-deps "$svc"
         return 0
     fi
 
@@ -183,31 +191,38 @@ roll_dashboard() {
     # and will hand back the hash of the definition on disk right now. They have to
     # agree. A compose too old to be asked gives an empty answer and the rollover simply
     # happens, which is the harmless direction to be wrong in.
-    want=$(compose_hash web)
+    want=$(compose_hash "$svc")
     have=$(container_hash "$first")
     if [ -n "$target" ] && [ "$(container_image "$first")" = "$target" ] && [ -n "$want" ] && [ "$want" = "$have" ]; then
-        log "the dashboard already runs the published image and this release's wiring; nothing to roll over"
+        log "the $label already runs the published image and this release's wiring; nothing to roll over"
         return 0
     fi
     if [ -n "$want" ] && [ -n "$have" ] && [ "$want" != "$have" ]; then
-        log "the dashboard's container was not created from the definition on disk; recreating it"
+        log "the $label's container was not created from the definition on disk; recreating it"
     fi
 
-    log "starting the new dashboard alongside the running one"
-    $compose up -d --no-deps --no-recreate --scale web=2 web
+    log "starting the new $label alongside the running one"
+    $compose up -d --no-deps --no-recreate --scale "$svc=2" "$svc"
 
     new=""
-    for id in $($compose ps -q web 2>/dev/null); do
+    for id in $($compose ps -q "$svc" 2>/dev/null); do
         case " $old " in
             *" $id "*) continue ;;
         esac
         new="$id"
     done
     if [ -z "$new" ]; then
-        err "could not start a second dashboard container; falling back to an in-place restart"
-        $compose up -d --no-deps web
+        err "could not start a second $label container; falling back to an in-place restart"
+        recreate_in_place "$svc"
         return 0
     fi
+
+    # Compose gives the new container the networks the compose file names. The
+    # private networks of deployed environments are joined later, by the daemon,
+    # so without this the new one could not reach a service whose port is closed
+    # until the next network reconcile - which is minutes of that service being
+    # routed and not reached, after the old container that could reach it is gone.
+    connect_networks "$(container_networks "$first")" "$new"
 
     # Both containers are routed by the edge while they overlap, and the edge drops a
     # router whose definition differs between them ("Router defined multiple times
@@ -215,7 +230,7 @@ roll_dashboard() {
     # rollover instead of serving it from either container. So when a release changes
     # those labels, the previous container goes first and the gap is the price.
     if [ "$(edge_labels "$first")" != "$(edge_labels "$new")" ]; then
-        log "this release changes how the edge routes the dashboard; retiring the previous container first"
+        log "this release changes how the edge routes the $label; retiring the previous container first"
         for id in $old; do
             retire "$id"
         done
@@ -224,7 +239,7 @@ roll_dashboard() {
 
     log "waiting for it to pass its healthcheck (up to ${READY_TIMEOUT}s)"
     if ! wait_ready "$new"; then
-        err "the new dashboard did not become healthy; keeping the current one and rolling back"
+        err "the new $label did not become healthy; keeping the current one and rolling back"
         err "logs from the build that failed to start:"
         docker logs --tail 40 "$new" 2>&1 || true
         docker rm -f "$new" >/dev/null 2>&1 || true
@@ -232,12 +247,94 @@ roll_dashboard() {
     fi
 
     if [ -n "$(printf '%s' "$old" | tr -d ' ')" ]; then
-        log "the new dashboard is serving; retiring the previous one"
+        log "the new $label is serving; retiring the previous one"
         for id in $old; do
             retire "$id"
         done
     fi
     return 0
+}
+
+roll_dashboard() {
+    roll_over web "$1" dashboard
+}
+
+# The networks a container is attached to, one per line.
+container_networks() {
+    docker inspect --format '{{range $name, $net := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$1" 2>/dev/null || true
+}
+
+# Attach container $2 to every network in the list $1 it is not on yet. The host
+# network and none are not networks a container can join this way, and a network
+# that has gone since the list was read is nothing to restore.
+connect_networks() {
+    joined=" $(container_networks "$2" | tr '\n' ' ') "
+    for net in $1; do
+        case "$net" in host | none) continue ;; esac
+        case "$joined" in *" $net "*) continue ;; esac
+        docker network connect "$net" "$2" >/dev/null 2>&1 || true
+    done
+}
+
+# Recreate a service's container in place, keeping the networks the previous one
+# had been attached to after it started (see `connect_networks`).
+recreate_in_place() {
+    svc="$1"
+    before=$($compose ps -q "$svc" 2>/dev/null | head -n1)
+    nets=$([ -n "$before" ] && container_networks "$before" || true)
+    # shellcheck disable=SC2086 # deliberate word splitting: a build flag
+    $compose up -d --no-deps ${build_flag:-} "$svc" || { err "$svc could not be updated"; return 1; }
+    after=$($compose ps -q "$svc" 2>/dev/null | head -n1)
+    [ -n "$after" ] && [ -n "$nets" ] && connect_networks "$nets" "$after"
+    return 0
+}
+
+# How each supporting service can be replaced, which decides what an update may do
+# to it. Anything named in neither list is in no request path (hostd, mdns) and is
+# recreated in place.
+#
+# ROLLING_SERVICES are started beside the running container and retire it once
+# healthy (`roll_over`), so replacing them costs no request. The edge guard is
+# one: the edge asks it about every guarded request and serves rewritten pages and
+# the vacant page through it, and an in-place recreate failed requests on deployed
+# apps on every update.
+ROLLING_SERVICES="edge-guard"
+
+# SINGLE_INSTANCE_SERVICES cannot be doubled: one database, one owner of ports 80
+# and 443 or 25565, one media server on the host's network. Replacing one is an
+# interruption however it is done, so an update replaces it only when the release
+# changed its definition - which cannot be put off, because the dashboard of the
+# same release may depend on that change - and never merely because the moving tag
+# it was created from (`traefik:v3.6`, `postgres:16-alpine`) was patched upstream.
+# Such a patch is pulled, named in the update log, and goes in with the next
+# release that changes that service. A restart does not apply it: a container
+# keeps the image it was created from.
+SINGLE_INSTANCE_SERVICES="postgres traefik livekit mc-router caddy"
+
+# Whether $1 is a word of the list $2.
+in_list() {
+    case " $2 " in
+        *" $1 "*) return 0 ;;
+    esac
+    return 1
+}
+
+# Replace one supporting service the cheapest way it allows. $2 is the image
+# reference its running container was created from, which a rollover compares
+# the new container against.
+replace_service() {
+    svc="$1"
+    ref="$2"
+    if in_list "$svc" "$ROLLING_SERVICES"; then
+        if [ -n "${build_flag:-}" ]; then
+            # Built first, so the rollover starts the new build rather than the last.
+            $compose build "$svc" || err "$svc could not be built; rolling over to what is here"
+        fi
+        roll_over "$svc" "$ref" "$svc" \
+            || err "$svc: the new container did not become healthy; the previous one is still serving"
+        return 0
+    fi
+    recreate_in_place "$svc" || true
 }
 
 # Bring one supporting service onto this release, or leave it alone.
@@ -260,9 +357,12 @@ roll_dashboard() {
 #     release had added.
 #   - Its IMAGE, as the reference the running container was created from resolves
 #     to right now, after the pull above. `livekit/livekit-server:v1.13` and
-#     `traefik:v3.6` are moving tags: upstream rewrites them with patches, and
-#     that is how a patch is meant to arrive. When one has genuinely moved, the
-#     service is recreated; when it has not, it is left running.
+#     `traefik:v3.6` are moving tags: upstream rewrites them with patches. When
+#     one has genuinely moved, a service that can roll over or is in no request
+#     path is replaced; one of SINGLE_INSTANCE_SERVICES is left running, because
+#     an update must not interrupt what it carries for a patch nobody asked for.
+#
+# How a service is replaced once it has to be is `replace_service`'s answer.
 #
 # Anything this cannot answer falls back to recreating, which is the harmless
 # direction to be wrong in - except for an image it cannot resolve at all, where
@@ -281,28 +381,29 @@ roll_service() {
         return 0
     fi
 
+    ref=$(container_ref "$id")
     want=$(compose_hash "$svc")
     have=$(container_hash "$id")
     if [ -n "$want" ] && [ -n "$have" ] && [ "$want" != "$have" ]; then
         log "$svc: this release changes how it is wired; recreating it"
-        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
-        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be updated"
+        replace_service "$svc" "$ref"
         return 0
     fi
     if [ -z "$want" ] || [ -z "$have" ]; then
         log "$svc: cannot tell what it was created from; letting compose decide"
-        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
-        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be updated"
+        replace_service "$svc" "$ref"
         return 0
     fi
 
-    ref=$(container_ref "$id")
     running=$(container_image "$id")
     current=$([ -n "$ref" ] && image_id "$ref" || true)
     if [ -n "$current" ] && [ -n "$running" ] && [ "$current" != "$running" ]; then
+        if in_list "$svc" "$SINGLE_INSTANCE_SERVICES"; then
+            log "$svc: a newer ${ref} was published; not applied now, because replacing $svc interrupts it - it goes in with the next release that changes $svc"
+            return 0
+        fi
         log "$svc: a newer ${ref} was published; recreating it"
-        # shellcheck disable=SC2086 # deliberate word splitting: a build flag
-        $compose up -d --no-deps $build_flag "$svc" || err "$svc could not be updated"
+        replace_service "$svc" "$ref"
         return 0
     fi
 
