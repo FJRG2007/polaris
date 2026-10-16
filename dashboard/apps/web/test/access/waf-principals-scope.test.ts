@@ -71,6 +71,7 @@ vi.mock("@/lib/waf-intel-service", () => ({}));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/deploy-service", () => ({ syncAppRoutes: async () => undefined }));
 vi.mock("@/lib/domain-edge", () => ({ syncDashboardRoute: async () => undefined }));
+vi.mock("@/lib/domain-service", () => ({ getPublicIp: async () => null }));
 vi.mock("@/lib/address-accounts", () => ({ accountsAtAddress: async () => [] }));
 vi.mock("@/lib/waf-ssh-service", () => ({ liftHostBlocks: async () => undefined }));
 vi.mock("@/lib/waf-ban-service", () => ({ getWafJails: async () => [], setWafJails: async () => undefined }));

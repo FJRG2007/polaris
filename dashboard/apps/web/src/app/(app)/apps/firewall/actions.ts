@@ -785,9 +785,11 @@ type ScopeInput = { scopeType: WafScopeType; scopeId: string };
 
 /**
  * The services a scope covers, for the reader - with the same checks the rule
- * itself is read and written under: `deploy.manage`, `system.manage` for the two
- * scopes nobody owns, and ownership of the scope. Null for an input that is not a
- * scope, and for Polaris's own scope, which guards no deployed service.
+ * itself is read and written under. The caller has checked `deploy.manage`, and
+ * `system.manage` for the two scopes nobody owns, outside its `try` (a refusal is
+ * a redirect that must not be caught); this checks ownership of the scope. Null
+ * for an input that is not a scope, and for Polaris's own scope, which guards no
+ * deployed service.
  */
 async function scopeServicesFor(
     userId: string,
@@ -797,7 +799,6 @@ async function scopeServicesFor(
     if (!parsed.success) return null;
     const { scopeType, scopeId } = parsed.data;
     const operator = OPERATOR_SCOPES.has(scopeType);
-    if (operator) await requirePermission("system.manage");
     await assertScopeOwner(userId, scopeType, scopeId);
     return directPort.servicesOfScope(scopeType, scopeId, operator ? null : userId);
 }
@@ -811,8 +812,9 @@ export async function getDirectAccessAction(
     input: ScopeInput
 ): Promise<{ reachable?: directPort.DirectAccess[]; error?: string }> {
     const user = await requirePermission("deploy.manage");
+    if (!scopeInputSchema.safeParse(input).success) return { error: await say("errors.load") };
+    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
-        if (!scopeInputSchema.safeParse(input).success) return { error: await say("errors.load") };
         const where = await scopeServicesFor(user.id, input);
         if (!where) return { reachable: [] };
         return { reachable: await directPort.directAccessIn(where, await getPublicIp()) };
@@ -833,6 +835,7 @@ export async function closeDirectAccessAction(
     if (!scopeInputSchema.safeParse(input).success || !one.success) {
         return { error: await say("errors.save") };
     }
+    if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
         const scope = await scopeServicesFor(user.id, input);
         if (!scope) return { closed: 0, failed: 0 };
