@@ -294,7 +294,8 @@
             "notMainFlow": "Ejecutar desde aquí sirve en pasos que alcanza un disparador.",
             "noTriggerData": "Haz una prueba o fija una muestra en el disparador antes.",
             "missingData": "Haz una prueba o fija datos en los pasos anteriores:"
-        }
+        },
+        "tooLarge": "Demasiado grande para fijarlo (64 KB como mucho)."
     },
     "canvas": {
         "board": "Lienzo del automatismo",
@@ -449,6 +450,9 @@
         "testVersion": "Prueba",
         "took": "tardó {time}",
         "notFound": "Esta ejecución ya no existe o no es tuya.",
-        "emptyFiltered": "Ninguna ejecución coincide."
+        "emptyFiltered": "Ninguna ejecución coincide.",
+        "openWithData": "Abrir con estos datos",
+        "openWithDataHint": "Fija en el borrador los datos del disparador de esta ejecución para la próxima prueba.",
+        "dataPinned": "Datos del disparador fijados"
     }
 }

@@ -292,3 +292,32 @@ describe("run from here", () => {
         await expect(history.startPartialRun(actor, id, "n")).rejects.toThrow();
     });
 });
+
+describe("open in editor with this data", () => {
+    it("pins the run's trigger data on that trigger in the draft, without its id and time", async () => {
+        const id = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        const { runId } = (await history.startTestRun(actor, id)) as { runId: string };
+        await settle(runId);
+        const row = fake().tables.automationRun!.find((entry) => entry.id === runId)!;
+        row.cause = { ...(row.cause as object), body: { name: "ada" } };
+        expect(await history.pinRunData(actor, runId)).toEqual({ automationId: id, triggerNodeId: "t1" });
+        const draft = fake().tables.automation!.find((entry) => entry.id === id)!.draft as core.AutomationGraph;
+        const pinned = draft.nodes.find((entry) => entry.id === "t1")!.pinned as Record<string, unknown>;
+        expect(pinned.body).toEqual({ name: "ada" });
+        expect(pinned.id).toBeUndefined();
+        expect(pinned.at).toBeUndefined();
+    });
+
+    it("refuses a reader, a trigger that left the draft, and data too large to pin", async () => {
+        const id = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        const { runId } = (await history.startTestRun(actor, id)) as { runId: string };
+        await settle(runId);
+        const row = fake().tables.automationRun!.find((entry) => entry.id === runId)!;
+        row.cause = { body: "x".repeat(core.AUTOMATION_LIMITS.pinBytes + 1) };
+        await expect(history.pinRunData(actor, runId)).rejects.toMatchObject({ code: "tooLarge" });
+        row.triggerNodeId = "gone";
+        await expect(history.pinRunData(actor, runId)).rejects.toMatchObject({ code: "triggerGone" });
+        access.edit = false;
+        await expect(history.pinRunData(actor, runId)).rejects.toThrow();
+    });
+});

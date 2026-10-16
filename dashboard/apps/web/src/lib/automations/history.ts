@@ -428,3 +428,24 @@ export async function restoreVersion(actor: RunActor, id: string, versionId: str
     await prisma.automation.update({ where: { id }, data: { draft: parsed.data as object, draftUpdatedAt: new Date() } });
     return parsed.data;
 }
+
+/**
+ * "Open in editor with this data": the trigger data a run started with, pinned
+ * on that trigger in the draft, so the next test starts from it. The draft is
+ * otherwise as it was. Refused when the trigger is no longer in the draft or
+ * the data is too large to pin.
+ */
+export async function pinRunData(actor: RunActor, runId: string): Promise<{ automationId: string; triggerNodeId: string }> {
+    const run = await prisma.automationRun.findUnique({ where: { id: runId }, select: { automationId: true, triggerNodeId: true, cause: true } });
+    if (!run) throw new AutomationAccessError("notFound");
+    const row = await load(actor, run.automationId, true);
+    const parsed = core.automationGraphSchema.safeParse(row.draft);
+    if (!parsed.success) throw new AutomationAccessError("invalid");
+    const trigger = parsed.data.nodes.find((node) => node.id === run.triggerNodeId);
+    if (!trigger || core.nodeRole(trigger.type) !== "trigger") throw new AutomationAccessError("triggerGone");
+    const { id: _id, at: _at, ...data } = (run.cause ?? {}) as Record<string, unknown>;
+    if (core.byteLength(JSON.stringify(data)) > L.pinBytes) throw new AutomationAccessError("tooLarge");
+    const draft = { ...parsed.data, nodes: parsed.data.nodes.map((node) => (node.id === trigger.id ? { ...node, pinned: data } : node)) };
+    await prisma.automation.update({ where: { id: run.automationId }, data: { draft: draft as object, draftUpdatedAt: new Date() } });
+    return { automationId: run.automationId, triggerNodeId: trigger.id };
+}

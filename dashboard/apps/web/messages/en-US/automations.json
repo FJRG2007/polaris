@@ -294,7 +294,8 @@
             "notMainFlow": "Run from here works on steps a trigger reaches.",
             "noTriggerData": "Run a test or pin a sample on the trigger first.",
             "missingData": "Run a test or pin data on the steps before:"
-        }
+        },
+        "tooLarge": "Too large to pin (64 KB at most)."
     },
     "canvas": {
         "board": "Automation canvas",
@@ -449,6 +450,9 @@
         "testVersion": "Draft test",
         "took": "took {time}",
         "notFound": "This run is gone or not yours to see.",
-        "emptyFiltered": "No run matches this filter."
+        "emptyFiltered": "No run matches this filter.",
+        "openWithData": "Open with this data",
+        "openWithDataHint": "Pins this run's trigger data in the draft, so the next test starts from it.",
+        "dataPinned": "Trigger data pinned in the draft"
     }
 }

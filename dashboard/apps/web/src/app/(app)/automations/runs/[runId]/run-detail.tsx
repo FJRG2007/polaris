@@ -12,12 +12,12 @@ import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { nodeLabel } from "@/app/(app)/automations/[id]/canvas-editor";
-import { ArrowLeft, ChevronDown, RotateCcw, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, FlaskConical, RotateCcw, X } from "lucide-react";
 import type { RunDetail, StepView } from "@/lib/automations/history";
-import { cancelRunAction, getRunAction, rerunAction } from "@/app/(app)/automations/actions";
+import { cancelRunAction, getRunAction, pinRunDataAction, rerunAction } from "@/app/(app)/automations/actions";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { CanvasBoard, NO_SELECTION, stepKey, type CanvasSelection } from "@/app/(app)/automations/[id]/canvas-board";
-import { LoadFailed, RowsSkeleton, StatusChip, useCachedAction, useRunError, when } from "@/app/(app)/automations/shared";
+import { LoadFailed, RowsSkeleton, StatusChip, dropCache, useCachedAction, useRunError, when } from "@/app/(app)/automations/shared";
 import { Badge, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, PageHeader, Skeleton, cn, useToast } from "@polaris/ui";
 
 export function RunDetailView({ runId }: { runId: string }) {
@@ -79,6 +79,19 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
         router.push(`/automations/runs/${answer.runId}`);
     };
 
+    const [opening, setOpening] = useState(false);
+    const openWithData = async () => {
+        setOpening(true);
+        const answer = await pinRunDataAction(run.id).catch(() => null);
+        if (!answer?.ok) {
+            setOpening(false);
+            return void toast.show({ title: answer?.error ?? t("errors.generic") });
+        }
+        dropCache(`polaris.automations.one.${answer.automationId}`);
+        toast.show({ title: t("runView.dataPinned") });
+        router.push(`/automations/${answer.automationId}`);
+    };
+
     return (
         <>
             <PageHeader
@@ -97,6 +110,12 @@ function Loaded({ run, onChanged }: { run: RunDetail; onChanged: () => void }) {
                         <Button variant="outline" size="sm" asChild>
                             <Link href={`/automations/${run.automationId}`}>{t("runView.openAutomation")}</Link>
                         </Button>
+                        {run.canSeeData ? (
+                            <Button variant="outline" size="sm" disabled={opening} title={t("runView.openWithDataHint")} onClick={() => void openWithData()}>
+                                <FlaskConical aria-hidden="true" />
+                                {t("runView.openWithData")}
+                            </Button>
+                        ) : null}
                         {run.canRerun ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>

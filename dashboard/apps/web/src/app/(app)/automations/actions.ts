@@ -319,6 +319,18 @@ export async function startPartialRunAction(input: unknown): Promise<Result<{ ru
     }
 }
 
+export async function pinRunDataAction(runId: unknown): Promise<Result<{ automationId: string }>> {
+    const parsed = id.safeParse(runId);
+    if (!parsed.success) return invalid();
+    try {
+        const pinned = await history.pinRunData(await actor(), parsed.data);
+        refresh(pinned.automationId);
+        return { ok: true, automationId: pinned.automationId };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 export async function listVersionsAction(automationId: unknown): Promise<Result<{ rows: history.VersionRow[] }>> {
     const parsed = id.safeParse(automationId);
     if (!parsed.success) return invalid();

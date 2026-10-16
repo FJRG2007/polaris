@@ -31,6 +31,7 @@ export class AutomationAccessError extends Error {
             | "secretMissing"
             | "noTrigger"
             | "triggerGone"
+            | "tooLarge"
     ) {
         super(code);
         this.name = "AutomationAccessError";
