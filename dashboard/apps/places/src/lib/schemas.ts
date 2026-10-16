@@ -411,7 +411,10 @@ export type DeviceEditInput = z.infer<typeof deviceEditSchema>;
 /** A room's name and floor, as both sides of the wire check them. */
 export const roomInputSchema = z.object({
     name: z.string().trim().min(1, "Give it a name").max(60),
-    floor: z.string().trim().max(40).default("")
+    floor: z.string().trim().max(40).default(""),
+    /** The floor picked by id; wins over `floor`, empty is none. Absent is a
+     *  screen from before floors were rows, which names the floor alone. */
+    floorId: z.string().trim().max(64).optional()
 });
 
 /** A new room, at the place it is for. */
@@ -422,7 +425,7 @@ export const roomCreateSchema = roomInputSchema.extend({
 /** Every string a room carries, trimmed on both sides of the wire. */
 export function normalizeRoomInput<T extends Record<string, unknown>>(input: T): T {
     const value = { ...input } as Record<string, unknown>;
-    for (const key of ["name", "floor", "placeId"]) {
+    for (const key of ["name", "floor", "floorId", "placeId"]) {
         if (typeof value[key] === "string") value[key] = (value[key] as string).trim();
     }
     return value as T;
@@ -437,3 +440,13 @@ export function normalizeDeviceInput<T extends Record<string, unknown>>(input: T
 }
 
 export type RoomCreateInput = z.infer<typeof roomCreateSchema>;
+
+/** A floor's name, as both sides of the wire check it. */
+export const floorInputSchema = z.object({
+    name: z.string().trim().min(1, "Give it a name").max(40)
+});
+
+/** A new floor, at the place it is for. */
+export const floorCreateSchema = floorInputSchema.extend({
+    placeId: z.string().trim().min(1).max(64)
+});

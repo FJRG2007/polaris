@@ -653,7 +653,10 @@
         "notNuki": "Only a Nuki account can be linked locally",
         "noLocalLink": "This Nuki account has no local link",
         "roomGone": "Room not found",
-        "roomElsewhere": "That room is at another place"
+        "roomElsewhere": "That room is at another place",
+        "floorGone": "Floor not found",
+        "floorElsewhere": "That floor is at another place",
+        "floorTaken": "A floor with that name is already here"
     },
     "connections": {
         "nuki-web": {

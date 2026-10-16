@@ -653,7 +653,10 @@
         "notNuki": "Solo una cuenta de Nuki se puede vincular en local",
         "noLocalLink": "Esta cuenta de Nuki no tiene enlace local",
         "roomGone": "Sala inexistente",
-        "roomElsewhere": "Esa sala es de otro sitio"
+        "roomElsewhere": "Esa sala es de otro sitio",
+        "floorGone": "Planta inexistente",
+        "floorElsewhere": "Esa planta es de otro sitio",
+        "floorTaken": "Ya hay una planta con ese nombre"
     },
     "connections": {
         "nuki-web": {

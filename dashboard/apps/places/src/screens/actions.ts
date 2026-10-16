@@ -1651,6 +1651,58 @@ export async function saveRoomAction(
     return { room: result.value };
 }
 
+/** A place's floors, for the room screen and the add dialog. */
+export async function listFloorsAction(
+    placeId: string
+): Promise<{ floors?: rooms.FloorView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => rooms.listFloors(install.id, String(placeId)));
+    if (result.error) return { error: result.error };
+    return { floors: result.value };
+}
+
+/** A new floor at a place (no id), or a floor's new name. */
+export async function saveFloorAction(
+    floorId: string | null,
+    input: unknown
+): Promise<{ floor?: rooms.FloorView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const normalized = schemas.normalizeRoomInput((input ?? {}) as Record<string, unknown>);
+    const parsed = floorId
+        ? schemas.floorInputSchema.safeParse(normalized)
+        : schemas.floorCreateSchema.safeParse(normalized);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
+    const data = parsed.data;
+    const result = await guard(() =>
+        floorId
+            ? rooms.renameFloor(install.id, String(floorId), data.name)
+            : rooms.createFloor(install.id, data as { placeId: string; name: string })
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: floorId ? "places.floor.update" : "places.floor.create",
+        targetType: "placeFloor",
+        targetId: result.value?.id ?? String(floorId)
+    });
+    return { floor: result.value };
+}
+
+/** Remove a floor. Its rooms stay at the place, on none. */
+export async function deleteFloorAction(floorId: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(() => rooms.deleteFloor(install.id, String(floorId)));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.floor.delete",
+        targetType: "placeFloor",
+        targetId: String(floorId)
+    });
+    return {};
+}
+
 /** Remove a room. Its devices stay at the place, in no room. */
 export async function deleteRoomAction(roomId: string): Promise<{ error?: string }> {
     const { user, install } = await requireHome("home.manage");
