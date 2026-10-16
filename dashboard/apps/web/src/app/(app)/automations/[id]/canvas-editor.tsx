@@ -8,7 +8,7 @@
 
 import * as core from "@polaris/core";
 import { ReferenceScope } from "./references";
-import { Copy, CopyPlus, PanelRight, Pencil, Pin, PinOff, Power, PowerOff, Trash2, X } from "lucide-react";
+import { Copy, CopyPlus, PanelRight, Pencil, Pin, PinOff, Play, Power, PowerOff, Trash2, X } from "lucide-react";
 import type { SecretSummary } from "@/lib/automations/secrets";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { AutomationDetail } from "@/lib/automations/service";
@@ -63,7 +63,8 @@ export function CanvasEditor({
     secrets,
     samples,
     states,
-    onChanged
+    onChanged,
+    onRunFrom
 }: {
     graph: core.AutomationGraph;
     change: Change;
@@ -75,6 +76,8 @@ export function CanvasEditor({
     samples: Readonly<Record<string, unknown>>;
     states?: Readonly<Record<string, string>>;
     onChanged: () => void;
+    /** Start a test that really runs this node and what follows, with data standing in for what comes before. */
+    onRunFrom?: (nodeId: string) => void;
 }) {
     const t = useTranslations("automations");
     const toast = useToast();
@@ -163,7 +166,10 @@ export function CanvasEditor({
 
     const single = () => (selection.nodes.size === 1 ? graph.nodes.find((node) => selection.nodes.has(node.id)) : undefined);
 
+    const lanes = useMemo(() => core.lanesOf(graph), [graph]);
+
     const nodeMenu = (node: core.GraphNode) => {
+        const runnable = onRunFrom && (core.nodeRole(node.type) === "trigger" || lanes.get(node.id) === "main");
         const ids = selection.nodes.has(node.id) ? selection.nodes : new Set([node.id]);
         const steps = graph.nodes.filter((entry) => ids.has(entry.id) && core.nodeRole(entry.type) !== "trigger");
         const turnOn = steps.length > 0 && steps.every((entry) => entry.enabled === false);
@@ -185,15 +191,21 @@ export function CanvasEditor({
                 </ContextMenuGroup>
                 {!readOnly ? (
                     <>
-                        {core.canPin(node.type) ? (
+                        {core.canPin(node.type) || runnable ? (
                             <>
                                 <ContextMenuSeparator />
                                 <ContextMenuGroup>
-                                    <ContextMenuItem onSelect={() => togglePin(node)}>
+                                    {runnable ? (
+                                        <ContextMenuItem onSelect={() => onRunFrom(node.id)}>
+                                            <Play aria-hidden="true" />
+                                            {t("canvas.menu.runFromHere")}
+                                        </ContextMenuItem>
+                                    ) : null}
+                                    {core.canPin(node.type) ? <ContextMenuItem onSelect={() => togglePin(node)}>
                                         {node.pinned !== undefined ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
                                         {node.pinned !== undefined ? t("canvas.unpin") : t("canvas.menu.pin")}
                                         <MenuShortcut>P</MenuShortcut>
-                                    </ContextMenuItem>
+                                    </ContextMenuItem> : null}
                                 </ContextMenuGroup>
                             </>
                         ) : null}

@@ -288,7 +288,13 @@
         "basicInvalid": "Usa usuario:clave.",
         "notReady": "Aún no se puede publicar. Revisa los pasos.",
         "noTrigger": "Añade un disparador para probar.",
-        "triggerGone": "Ese disparador ya no está aquí."
+        "triggerGone": "Ese disparador ya no está aquí.",
+        "partial": {
+            "notFound": "Ese nodo no está en el borrador guardado.",
+            "notMainFlow": "Ejecutar desde aquí sirve en pasos que alcanza un disparador.",
+            "noTriggerData": "Haz una prueba o fija una muestra en el disparador antes.",
+            "missingData": "Haz una prueba o fija datos en los pasos anteriores:"
+        }
     },
     "canvas": {
         "board": "Lienzo del automatismo",
@@ -383,7 +389,8 @@
             "disable": "Apagar",
             "enable": "Encender",
             "delete": "Eliminar",
-            "deleteMany": "Eliminar {count} nodos"
+            "deleteMany": "Eliminar {count} nodos",
+            "runFromHere": "Probar desde aquí"
         },
         "noSampleToPin": "Haz antes una prueba o escribe aquí una muestra.",
         "unpinned": "Muestra soltada",
@@ -391,7 +398,8 @@
         "insertTitle": "Añadir un nodo en medio",
         "insertGone": "Esa conexión ya no existe.",
         "tidy": "Ordenar",
-        "tidied": "Ordenado. Ctrl+Z lo deshace."
+        "tidied": "Ordenado. Ctrl+Z lo deshace.",
+        "runFromStarted": "Probando desde {name}"
     },
     "stepStatus": {
         "ready": "Listo",

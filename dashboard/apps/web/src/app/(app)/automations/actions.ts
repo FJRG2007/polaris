@@ -303,6 +303,22 @@ export async function startTestRunAction(input: unknown): Promise<Result<{ runId
     }
 }
 
+const partialRunInput = z.object({ automationId: id, nodeId: z.string().min(1).max(64) });
+
+export async function startPartialRunAction(input: unknown): Promise<Result<{ runId: string }> | { ok: false; error: string; missing: readonly string[] }> {
+    const parsed = partialRunInput.safeParse(input);
+    if (!parsed.success) return invalid();
+    try {
+        const answer = await history.startPartialRun(await actor(), parsed.data.automationId, parsed.data.nodeId);
+        const t = await getTranslations("automations");
+        if ("problems" in answer) return { ok: false, error: t("errors.notReady"), problems: answer.problems };
+        if ("refusal" in answer) return { ok: false, error: t(`errors.partial.${answer.refusal}`), missing: answer.nodes };
+        return { ok: true, runId: answer.runId };
+    } catch (caught) {
+        return failure(caught);
+    }
+}
+
 export async function listVersionsAction(automationId: unknown): Promise<Result<{ rows: history.VersionRow[] }>> {
     const parsed = id.safeParse(automationId);
     if (!parsed.success) return invalid();

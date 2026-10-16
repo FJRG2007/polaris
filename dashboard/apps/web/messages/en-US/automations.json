@@ -288,7 +288,13 @@
         "basicInvalid": "Use user:password.",
         "notReady": "It is not ready to publish. Check the steps.",
         "noTrigger": "Add a trigger to test it.",
-        "triggerGone": "That trigger is no longer in this version."
+        "triggerGone": "That trigger is no longer in this version.",
+        "partial": {
+            "notFound": "That node is not in the saved draft.",
+            "notMainFlow": "Run from here works on steps a trigger reaches.",
+            "noTriggerData": "Run a test or pin a sample on the trigger first.",
+            "missingData": "Run a test or pin data on the steps before:"
+        }
     },
     "canvas": {
         "board": "Automation canvas",
@@ -383,7 +389,8 @@
             "disable": "Switch off",
             "enable": "Switch on",
             "delete": "Delete",
-            "deleteMany": "Delete {count} nodes"
+            "deleteMany": "Delete {count} nodes",
+            "runFromHere": "Run from here"
         },
         "noSampleToPin": "Run a test first, or write a sample here.",
         "unpinned": "Sample unpinned",
@@ -391,7 +398,8 @@
         "insertTitle": "Add a node in between",
         "insertGone": "That connection is gone.",
         "tidy": "Tidy up",
-        "tidied": "Tidied up. Ctrl+Z undoes it."
+        "tidied": "Tidied up. Ctrl+Z undoes it.",
+        "runFromStarted": "Testing from {name}"
     },
     "stepStatus": {
         "ready": "Ready",

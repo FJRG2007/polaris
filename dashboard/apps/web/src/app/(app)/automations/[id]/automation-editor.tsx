@@ -43,6 +43,7 @@ import {
     listVersionsAction,
     publishAction,
     restoreVersionAction,
+    startPartialRunAction,
     startTestRunAction,
     runNowAction,
     saveDraftAction,
@@ -312,6 +313,22 @@ function Loaded({ detail, secrets, onChanged }: { detail: AutomationDetail; secr
                     samples={samples}
                     states={states}
                     onChanged={onChanged}
+                    onRunFrom={
+                        readOnly || testing
+                            ? undefined
+                            : (nodeId) =>
+                                  act(async () => {
+                                      if (dirty && !(await save())) return;
+                                      const answer = await startPartialRunAction({ automationId: detail.id, nodeId });
+                                      if (!answer.ok) {
+                                          const missing = "missing" in answer ? answer.missing : [];
+                                          const names = missing.map((id) => nodeLabel(t, graph.nodes.find((node) => node.id === id))).join(", ");
+                                          return void toast.show({ title: answer.error, body: names || undefined });
+                                      }
+                                      setTestRunId(answer.runId);
+                                      toast.show({ title: t("canvas.runFromStarted", { name: nodeLabel(t, graph.nodes.find((node) => node.id === nodeId)) }) });
+                                  })
+                    }
                 />
             ) : flow ? (
                 <div className="mx-auto w-full max-w-4xl space-y-6">

@@ -249,3 +249,51 @@ describe("tidy up", () => {
         expect(tidy.notes).toEqual(messy.notes);
     });
 });
+
+describe("run from here", () => {
+    const flow = (): graph.AutomationGraph => ({
+        ...graph.emptyGraph(),
+        nodes: [
+            node("t1", "core.manual"),
+            node("t2", "core.webhook"),
+            node("h", "core.http", { method: "GET", url: "https://example.test", urlSecretId: null }),
+            node("side", "core.notify", { title: "S", body: "" }),
+            node("x", "core.notify", { title: "X", body: "" }),
+            node("after", "core.notify", { title: "A", body: "" }),
+            node("z", "core.notify", { title: "Z", body: "" })
+        ],
+        edges: [edge("t1", "h"), edge("t2", "h"), edge("h", "x"), edge("h", "side"), edge("x", "after")],
+        finally: { entry: "z", onCancel: false }
+    });
+
+    it("keeps the trigger with data, pins the steps before, and leaves out side branches and the Always lane", () => {
+        const answer = canvas.partialRunGraph(flow(), "x", { t2: { body: { a: 1 } }, h: { status: 200 } });
+        expect("graph" in answer).toBe(true);
+        const run = answer as Extract<canvas.PartialRun, { graph: unknown }>;
+        expect(run.triggerId).toBe("t2");
+        expect(run.cause).toEqual({ body: { a: 1 } });
+        expect(run.graph.nodes.map((entry) => entry.id).sort()).toEqual(["after", "h", "t2", "x"]);
+        expect(run.graph.nodes.find((entry) => entry.id === "h")!.pinned).toEqual({ status: 200 });
+        expect(run.graph.nodes.find((entry) => entry.id === "after")!.pinned).toBeUndefined();
+        expect(run.graph.finally.entry).toBeNull();
+        expect(run.graph.edges.map(canvas.edgeKey).sort()).toEqual(["h:next>x", "t2:next>h", "x:next>after"]);
+    });
+
+    it("prefers a pin, drops the node's own pin, and names the steps that have no data", () => {
+        const pinned = { ...flow(), nodes: flow().nodes.map((entry) => (entry.id === "t1" ? { ...entry, pinned: { by: "pin" } } : entry.id === "x" ? { ...entry, pinned: { sent: true } } : entry)) };
+        const run = canvas.partialRunGraph(pinned, "x", { h: { status: 200 } }) as Extract<canvas.PartialRun, { graph: unknown }>;
+        expect(run.triggerId).toBe("t1");
+        expect(run.graph.nodes.find((entry) => entry.id === "x")!.pinned).toBeUndefined();
+        expect(canvas.partialRunGraph(pinned, "x", {})).toEqual({ refusal: "missingData", nodes: ["h"] });
+        expect(canvas.partialRunGraph(flow(), "x", { h: {} })).toEqual({ refusal: "noTriggerData", nodes: ["t1", "t2"] });
+        expect(canvas.partialRunGraph(flow(), "z", {})).toEqual({ refusal: "notMainFlow", nodes: ["z"] });
+        expect(canvas.partialRunGraph(flow(), "t1", {})).toEqual({ refusal: "notFound", nodes: [] });
+    });
+
+    it("needs no data for a switched-off step or a condition before the node", () => {
+        const g = canvas.layoutGraph(sample());
+        const run = canvas.partialRunGraph(g, "a", { t1: { kind: "test" } });
+        expect("graph" in run).toBe(true);
+        expect((run as Extract<canvas.PartialRun, { graph: unknown }>).graph.nodes.map((entry) => entry.id).sort()).toEqual(["a", "if1", "t1"]);
+    });
+});

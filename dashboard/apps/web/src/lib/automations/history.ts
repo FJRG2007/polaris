@@ -283,7 +283,50 @@ export async function startTestRun(
     const triggers = core.triggerNodes(parsed.data);
     const trigger = triggerNodeId ? triggers.find((node) => node.id === triggerNodeId) : triggers[0];
     if (!trigger) throw new AutomationAccessError("noTrigger");
+    const cause = trigger.pinned !== undefined ? pinnedCause(trigger.pinned) : { kind: "test", by: actor.id };
+    return { runId: await startSnapshot(actor, id, parsed.data, trigger.id, cause) };
+}
 
+/** What each node gave in the newest test run of the draft: the data "Run from here" stands in with. */
+async function lastTestOutputs(automationId: string): Promise<Record<string, unknown>> {
+    const last = await prisma.automationRun.findFirst({ where: { automationId, test: true }, orderBy: { queuedAt: "desc" }, select: { id: true } });
+    if (!last) return {};
+    const steps = await prisma.automationStep.findMany({
+        where: { runId: last.id, status: "ok", port: { not: null } },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: L.stepsPerRun,
+        select: { nodeId: true, output: true }
+    });
+    const out: Record<string, unknown> = {};
+    for (const step of steps) if (step.output !== null && step.output !== undefined) out[step.nodeId] = step.output;
+    return out;
+}
+
+export type PartialRunAnswer = { runId: string } | { problems: core.GraphProblem[] } | { refusal: core.PartialRunRefusal; nodes: readonly string[] };
+
+/**
+ * "Run from here": a test run of the saved draft that really runs `nodeId` and
+ * what follows it, with every step before it standing in with its pinned sample
+ * or its output in the last test run (`core.partialRunGraph`). A trigger runs
+ * an ordinary test from it.
+ */
+export async function startPartialRun(actor: RunActor, id: string, nodeId: string): Promise<PartialRunAnswer> {
+    const row = await load(actor, id, true);
+    const parsed = core.automationGraphSchema.safeParse(row.draft);
+    if (!parsed.success) throw new AutomationAccessError("invalid");
+    const node = parsed.data.nodes.find((entry) => entry.id === nodeId);
+    if (!node) throw new AutomationAccessError("notFound");
+    if (core.nodeRole(node.type) === "trigger") return startTestRun(actor, id, nodeId);
+    const partial = core.partialRunGraph(parsed.data, nodeId, await lastTestOutputs(id));
+    if ("refusal" in partial) return partial;
+    const problems = core.graphProblems(partial.graph, { forPublish: true });
+    if (problems.length > 0) return { problems };
+    await checkSecrets(row, partial.graph);
+    return { runId: await startSnapshot(actor, id, partial.graph, partial.triggerId, pinnedCause(partial.cause)) };
+}
+
+/** Store `graph` as a test snapshot and start a test run of it from `triggerId`. */
+async function startSnapshot(actor: RunActor, id: string, graph: core.AutomationGraph, triggerId: string, cause: Record<string, unknown>): Promise<string> {
     // The snapshot a test runs is an immutable version too, numbered below zero
     // so the history (1, 2, ...) and the next publish never see it.
     let versionId: string | null = null;
@@ -295,7 +338,7 @@ export async function startTestRun(
         });
         try {
             const created = await prisma.automationVersion.create({
-                data: { automationId: id, number: (lowest?.number ?? 0) - 1, graph: parsed.data as object, savedById: actor.id },
+                data: { automationId: id, number: (lowest?.number ?? 0) - 1, graph: graph as object, savedById: actor.id },
                 select: { id: true }
             });
             versionId = created.id;
@@ -307,20 +350,16 @@ export async function startTestRun(
     const started = await startRun({
         automationId: id,
         versionId,
-        triggerNodeId: trigger.id,
+        triggerNodeId: triggerId,
         firingKey: `test:${randomUUID()}`,
-        cause: {
-            ...(trigger.pinned !== undefined ? pinnedCause(trigger.pinned) : { kind: "test", by: actor.id }),
-            id: trigger.id,
-            at: new Date().toISOString()
-        },
+        cause: { ...cause, id: triggerId, at: new Date().toISOString() },
         depth: 0,
         test: true
     });
     if (!started) throw new AutomationAccessError("notFound");
     await pruneTestRuns(id);
     kick(started.id);
-    return { runId: started.id };
+    return started.id;
 }
 
 /** Keep the newest test runs and the snapshots they ran, nothing older. Bounded. */

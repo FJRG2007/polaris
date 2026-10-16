@@ -241,3 +241,54 @@ describe("cursor", () => {
         expect(history.readCursor(undefined)).toBeNull();
     });
 });
+
+describe("run from here", () => {
+    const draft = () =>
+        graphOf(
+            [node("t1", "core.manual", {}, { pinned: { name: "ada" } }), http("h"), say("n")],
+            [
+                ["t1", "h"],
+                ["h", "n"]
+            ]
+        );
+
+    it("runs the node and what follows with the last test's data standing in for the steps before", async () => {
+        const id = await seed(draft());
+        const first = (await history.startTestRun(actor, id)) as { runId: string };
+        await settle(first.runId);
+        expect(sent.requests).toEqual(["https://api.example.test/ada"]);
+
+        const answer = await history.startPartialRun(actor, id, "n");
+        expect("runId" in answer).toBe(true);
+        const runId = (answer as { runId: string }).runId;
+        const run = await settle(runId);
+        expect(run.status).toBe("succeeded");
+        expect(run.test).toBe(true);
+        // The HTTP step before it was not sent again.
+        expect(sent.requests).toEqual(["https://api.example.test/ada"]);
+        const detail = await history.getRun(actor, runId);
+        const earlier = await history.getRun(actor, first.runId);
+        expect(detail.steps.find((step) => step.nodeId === "h")?.output).toEqual(earlier.steps.find((step) => step.nodeId === "h")?.output);
+        expect(detail.steps.find((step) => step.nodeId === "n")?.input).toEqual(earlier.steps.find((step) => step.nodeId === "n")?.input);
+        expect(detail.steps.find((step) => step.nodeId === "n")?.status).toBe("ok");
+        // The draft itself keeps no pin the partial run added.
+        const stored = fake().tables.automation!.find((entry) => entry.id === id)!.draft as core.AutomationGraph;
+        expect(stored.nodes.find((entry) => entry.id === "h")!.pinned).toBeUndefined();
+    });
+
+    it("names the steps before that have no data, and does not send anything", async () => {
+        const id = await seed(draft());
+        expect(await history.startPartialRun(actor, id, "n")).toEqual({ refusal: "missingData", nodes: ["h"] });
+        expect(sent.requests).toEqual([]);
+        expect(fake().tables.automationRun ?? []).toHaveLength(0);
+    });
+
+    it("runs an ordinary test from a trigger, and refuses a reader", async () => {
+        const id = await seed(draft());
+        const answer = (await history.startPartialRun(actor, id, "t1")) as { runId: string };
+        await settle(answer.runId);
+        expect(sent.requests).toEqual(["https://api.example.test/ada"]);
+        access.edit = false;
+        await expect(history.startPartialRun(actor, id, "n")).rejects.toThrow();
+    });
+});

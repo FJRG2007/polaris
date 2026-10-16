@@ -516,6 +516,62 @@ export function insertReference(text: string, start: number, end: number, path: 
     return { text: text.slice(0, from) + token + text.slice(to), caret: from + token.length };
 }
 
+export type PartialRunRefusal = "notFound" | "notMainFlow" | "noTriggerData" | "missingData";
+
+export type PartialRun =
+    | { readonly graph: graphs.AutomationGraph; readonly triggerId: string; readonly cause: unknown }
+    | { readonly refusal: PartialRunRefusal; readonly nodes: readonly string[] };
+
+/**
+ * The graph a "Run from here" test runs: the chosen node and everything after
+ * it really run; everything before it stands in with data it already has - its
+ * pinned sample, else what it gave in the last test run (`samples`). Conditions
+ * before it are worked out again from that data, which sends nothing. Branches
+ * that do not lead to the node, other triggers and the Always lane are left out,
+ * so nothing else is sent. The node's own pin is dropped: it is the one being
+ * tried. Refused when a step before it has no data, naming those steps.
+ */
+export function partialRunGraph(graph: graphs.AutomationGraph, nodeId: string, samples: Readonly<Record<string, unknown>>): PartialRun {
+    const target = graph.nodes.find((node) => node.id === nodeId);
+    if (!target || graphs.nodeRole(target.type) === "trigger") return { refusal: "notFound", nodes: [] };
+    if (lanesOf(graph).get(nodeId) !== "main") return { refusal: "notMainFlow", nodes: [nodeId] };
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+    const data = (node: graphs.GraphNode) => {
+        const value = node.pinned !== undefined ? node.pinned : samples[node.id];
+        return value === undefined || value === null ? undefined : value;
+    };
+    const upstream = upstreamOf(graph, nodeId);
+    const triggers = upstream.map((id) => byId.get(id)!).filter((node) => graphs.nodeRole(node.type) === "trigger");
+    const trigger = triggers.find((node) => data(node) !== undefined);
+    if (!trigger) return { refusal: "noTriggerData", nodes: triggers.map((node) => node.id) };
+    const fromTrigger = graphs.reachableFrom(graph, trigger.id);
+    const before = upstream.filter((id) => id !== trigger.id && fromTrigger.has(id)).map((id) => byId.get(id)!);
+    const missing = before.filter((node) => needsData(node) && data(node) === undefined).map((node) => node.id);
+    if (missing.length > 0) return { refusal: "missingData", nodes: missing };
+    const after = graphs.reachableFrom(graph, nodeId);
+    const keep = new Set<string>([trigger.id, ...before.map((node) => node.id), ...after]);
+    const filled = new Set(before.filter((node) => needsData(node)).map((node) => node.id));
+    const nodes = graph.nodes
+        .filter((node) => keep.has(node.id))
+        .map((node) => {
+            if (node.id === nodeId) {
+                const { pinned: _pinned, ...rest } = node;
+                return rest;
+            }
+            return filled.has(node.id) ? { ...node, pinned: data(node) } : node;
+        });
+    return {
+        graph: { ...graph, nodes, edges: graph.edges.filter((edge) => keep.has(edge.from.node) && keep.has(edge.to.node)), notes: [], finally: { ...graph.finally, entry: null } },
+        triggerId: trigger.id,
+        cause: data(trigger)
+    };
+}
+
+/** A step that would send something if it ran: switched on and pinnable (conditions only read). */
+function needsData(node: graphs.GraphNode): boolean {
+    return node.enabled !== false && canPin(node.type);
+}
+
 /** Whether a node of this type may hold a pinned sample: triggers and actions, not conditions. */
 export function canPin(type: string): boolean {
     return graphs.nodeRole(type) !== "condition";
