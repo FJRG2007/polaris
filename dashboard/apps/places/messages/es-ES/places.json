@@ -1845,7 +1845,9 @@
             "lt": "Menos de",
             "lte": "Como mucho",
             "eq": "Justo",
-            "ne": "No es"
+            "ne": "No es",
+            "between": "Entre",
+            "outside": "Fuera de"
         },
         "days": "{which, select, every {todos los días} weekdays {entre semana} weekends {los fines de semana} other {{list}}}",
         "units": {
@@ -1872,7 +1874,8 @@
             "set": "Poner {device} en {value}",
             "figure": "{measure} de {device}",
             "qualityThreshold": "{device} pasa a ser {direction, select, above {peor} other {mejor}} que {value}",
-            "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}"
+            "qualityReading": "{device}: {op, select, gt {peor que {value}} gte {{value} o peor} lt {mejor que {value}} lte {{value} o mejor} eq {{value}} other {no {value}}}",
+            "readingRange": "{device}: {op, select, between {de {value} a {upper}} other {fuera de {value} a {upper}}}"
         },
         "cause": {
             "automation": "La lanzó {name}",
@@ -2060,7 +2063,6 @@
             "at": "A las",
             "days": "Días",
             "every": "Cada",
-            "minutesSuffix": "min",
             "manualHint": "Solo empieza con Lanzar ya o desde otra automatización.",
             "device": "Aparato",
             "sensor": "Sensor",
@@ -2100,7 +2102,8 @@
             "units": {
                 "seconds": "Segundos",
                 "minutes": "Minutos",
-                "hours": "Horas"
+                "hours": "Horas",
+                "days": "Días"
             },
             "mode": "Modo",
             "target": "Temperatura",
@@ -2161,7 +2164,9 @@
             "lt": "Mejor que",
             "lte": "Esta o mejor",
             "eq": "Justo",
-            "ne": "No es"
+            "ne": "No es",
+            "between": "Entre",
+            "outside": "Fuera de"
         },
         "blocks": {
             "menu": "Más acciones",

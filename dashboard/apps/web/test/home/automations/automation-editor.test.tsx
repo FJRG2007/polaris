@@ -669,6 +669,50 @@ describe("what a block watches on a device", () => {
             { id: "cond01", kind: "reading", deviceId: "ac", op: "gt", value: 26 }
         ]);
     });
+
+    it("tests a reading over a range, with its top", async () => {
+        render(editor());
+        await painted();
+        openRow("If");
+        fireEvent.click(screen.getByRole("combobox", { name: /^Watch/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Its temperature" }));
+        await painted();
+        fireEvent.click(screen.getByRole("combobox", { name: /^Compare/ }));
+        fireEvent.click(await screen.findByRole("option", { name: "Between" }));
+        await painted();
+        fireEvent.change(screen.getByLabelText(/^Value/), { target: { value: "20" } });
+        fireEvent.change(screen.getByLabelText(/^Up to/), { target: { value: "24" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as {
+            definition: { conditions: { groups: { items: unknown[] }[] } };
+        };
+        expect(input.definition.conditions.groups[0]!.items).toEqual([
+            {
+                id: "cond01",
+                kind: "reading",
+                deviceId: "ac",
+                op: "between",
+                value: 20,
+                upper: 24
+            }
+        ]);
+    });
+
+    it("keeps a held-for span typed in hours as whole minutes", async () => {
+        render(editor());
+        await painted();
+        openRow("If");
+        fireEvent.click(screen.getByRole("combobox", { name: "Unit" }));
+        fireEvent.click(await screen.findByRole("option", { name: "Hours" }));
+        fireEvent.change(screen.getByLabelText(/^For at least/), { target: { value: "1.5" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await painted();
+        const input = saved[0] as {
+            definition: { conditions: { groups: { items: { forMinutes?: number }[] }[] } };
+        };
+        expect(input.definition.conditions.groups[0]!.items[0]!.forMinutes).toBe(90);
+    });
 });
 
 describe("the block editor", () => {

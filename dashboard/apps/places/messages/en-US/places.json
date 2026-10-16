@@ -1845,7 +1845,9 @@
             "lt": "Below",
             "lte": "At most",
             "eq": "Exactly",
-            "ne": "Not"
+            "ne": "Not",
+            "between": "Between",
+            "outside": "Outside"
         },
         "days": "{which, select, every {every day} weekdays {weekdays} weekends {weekends} other {{list}}}",
         "units": {
@@ -1872,7 +1874,8 @@
             "set": "Set {device} to {value}",
             "figure": "{measure} of {device}",
             "qualityThreshold": "{device} gets {direction, select, above {worse} other {better}} than {value}",
-            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}"
+            "qualityReading": "{device}: {op, select, gt {worse than {value}} gte {{value} or worse} lt {better than {value}} lte {{value} or better} eq {{value}} other {not {value}}}",
+            "readingRange": "{device}: {op, select, between {from {value} to {upper}} other {outside {value} to {upper}}}"
         },
         "cause": {
             "automation": "Started by {name}",
@@ -2060,7 +2063,6 @@
             "at": "At",
             "days": "Days",
             "every": "Every",
-            "minutesSuffix": "min",
             "manualHint": "Starts only from Run now, or from another automation.",
             "device": "Device",
             "sensor": "Sensor",
@@ -2100,7 +2102,8 @@
             "units": {
                 "seconds": "Seconds",
                 "minutes": "Minutes",
-                "hours": "Hours"
+                "hours": "Hours",
+                "days": "Days"
             },
             "mode": "Mode",
             "target": "Temperature",
@@ -2161,7 +2164,9 @@
             "lt": "Better than",
             "lte": "This or better",
             "eq": "Exactly",
-            "ne": "Not"
+            "ne": "Not",
+            "between": "Between",
+            "outside": "Outside"
         },
         "blocks": {
             "menu": "More actions",

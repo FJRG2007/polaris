@@ -1341,14 +1341,12 @@ function TriggerCard({
                 </>
             )}
             {trigger.kind === "interval" && (
-                <fields.NumberField
+                <fields.DurationField
                     label={t("automations.fields.every")}
                     path={path}
                     field="minutes"
+                    stored="minutes"
                     value={trigger.minutes}
-                    min={1}
-                    step={1}
-                    suffix={t("automations.fields.minutesSuffix")}
                     disabled={disabled}
                     onChange={(minutes) => onChange({ ...trigger, minutes })}
                 />
@@ -1460,14 +1458,12 @@ function TriggerCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...trigger, is })}
                     />
-                    <fields.NumberField
+                    <fields.DurationField
                         label={t("automations.fields.for")}
                         path={path}
                         field="minutes"
+                        stored="minutes"
                         value={trigger.minutes}
-                        min={1}
-                        step={1}
-                        suffix={t("automations.fields.minutesSuffix")}
                         disabled={disabled}
                         onChange={(minutes) => onChange({ ...trigger, minutes })}
                     />
@@ -1790,14 +1786,13 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...condition, is })}
                     />
-                    <fields.NumberField
+                    <fields.DurationField
                         label={t("automations.fields.forMinutes")}
                         path={path}
                         field="forMinutes"
+                        stored="minutes"
+                        required={false}
                         value={condition.forMinutes ?? Number.NaN}
-                        min={1}
-                        step={1}
-                        suffix={t("automations.fields.minutesSuffix")}
                         disabled={disabled}
                         onChange={(minutes) => {
                             const { forMinutes: _was, ...rest } = condition;
@@ -1856,9 +1851,17 @@ function ConditionCard({
                                     value: op,
                                     label: words.comparisonText(op, t, condition.measure)
                                 }))}
-                                onValueChange={(op) =>
-                                    onChange({ ...condition, op: op as auto.Comparison })
-                                }
+                                onValueChange={(next) => {
+                                    const op = next as auto.Comparison;
+                                    // A line has no top: one left over from a range
+                                    // would be saved and never read.
+                                    const { upper, ...rest } = condition;
+                                    onChange(
+                                        auto.isRangeTest(op)
+                                            ? { ...rest, op, upper: upper ?? Number.NaN }
+                                            : { ...rest, op }
+                                    );
+                                }}
                             />
                         )}
                     </flow.Field>
@@ -1871,6 +1874,18 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(value) => onChange({ ...condition, value })}
                     />
+                    {auto.isRangeTest(condition.op) && (
+                        <fields.FigureField
+                            measure={condition.measure}
+                            label={t("automations.fields.upper")}
+                            path={path}
+                            field="upper"
+                            value={condition.upper ?? Number.NaN}
+                            suffix={fields.measureSuffix(condition.measure, device?.reading?.unit)}
+                            disabled={disabled}
+                            onChange={(upper) => onChange({ ...condition, upper })}
+                        />
+                    )}
                 </>
             )}
             {condition.kind === "time" && (
@@ -2019,7 +2034,7 @@ function StepCard({
                     label={t("automations.fields.wait")}
                     path={path}
                     field="seconds"
-                    seconds={step.seconds}
+                    value={step.seconds}
                     disabled={disabled}
                     onChange={(seconds) => onChange({ ...step, seconds })}
                 />
@@ -2054,14 +2069,12 @@ function StepCard({
                         disabled={disabled}
                         onChange={(is) => onChange({ ...step, is })}
                     />
-                    <fields.NumberField
+                    <fields.DurationField
                         label={t("automations.fields.giveUp")}
                         path={path}
                         field="timeoutMinutes"
+                        stored="minutes"
                         value={step.timeoutMinutes}
-                        min={1}
-                        step={1}
-                        suffix={t("automations.fields.minutesSuffix")}
                         disabled={disabled}
                         onChange={(timeoutMinutes) => onChange({ ...step, timeoutMinutes })}
                     />

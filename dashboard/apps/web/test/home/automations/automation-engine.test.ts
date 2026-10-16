@@ -688,6 +688,56 @@ describe("conditions", () => {
     });
 });
 
+describe("a reading condition over a range", () => {
+    function within(op: "between" | "outside") {
+        automation("ranged", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp",
+                                op,
+                                value: 18,
+                                upper: 24
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "went" }]
+        });
+    }
+
+    async function pressAt(reading: string, press: string) {
+        devices.set("temp", readout("temp", "sensor", "unknown", { reading }));
+        await engine.runNow(store.automations.get("ranged")!, "Fixture person", press);
+        await engine.drain();
+    }
+
+    it("passes inside the range, both ends included", async () => {
+        within("between");
+        await pressAt("18 C", "press-1");
+        await pressAt("24 C", "press-2");
+        await pressAt("17.9 C", "press-3");
+        await pressAt("30 C", "press-4");
+        expect(notified).toEqual(["went", "went"]);
+    });
+
+    it("passes outside the range only", async () => {
+        within("outside");
+        await pressAt("21 C", "press-1");
+        await pressAt("12 C", "press-2");
+        await pressAt("25 C", "press-3");
+        expect(notified).toEqual(["went", "went"]);
+    });
+});
+
 describe("a delay", () => {
     beforeEach(() => {
         devices.set("plug", readout("plug", "outlet", "off"));

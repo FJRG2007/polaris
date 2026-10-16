@@ -169,7 +169,9 @@ const COMPARISON_KEYS: Readonly<Record<auto.Comparison, PlacesKey>> = {
     lt: "automations.compare.lt",
     lte: "automations.compare.lte",
     eq: "automations.compare.eq",
-    ne: "automations.compare.ne"
+    ne: "automations.compare.ne",
+    between: "automations.compare.between",
+    outside: "automations.compare.outside"
 };
 
 export function comparisonText(
@@ -277,17 +279,26 @@ export function describeCondition(
         }
         case "reading": {
             const device = deviceName(lookup, condition.deviceId, t);
-            if (condition.measure === "quality") {
-                return t("automations.say.qualityReading", {
-                    device: figureOf(device.name, condition.measure, t),
+            const figure = figureOf(device.name, condition.measure, t);
+            const value = figureValueText(condition.measure, condition.value, t);
+            if (auto.isRangeTest(condition.op)) {
+                return t("automations.say.readingRange", {
+                    device: figure,
                     op: condition.op,
-                    value: figureValueText(condition.measure, condition.value, t)
+                    value,
+                    upper:
+                        condition.upper === undefined
+                            ? "?"
+                            : figureValueText(condition.measure, condition.upper, t)
                 });
             }
+            if (condition.measure === "quality") {
+                return t("automations.say.qualityReading", { device: figure, op: condition.op, value });
+            }
             return t("automations.say.reading", {
-                device: figureOf(device.name, condition.measure, t),
+                device: figure,
                 compare: comparisonText(condition.op, t),
-                value: figureValueText(condition.measure, condition.value, t)
+                value
             });
         }
         case "time":

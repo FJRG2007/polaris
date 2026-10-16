@@ -234,7 +234,14 @@ function numberOf(text: string): number | null {
     return Number.isFinite(value) ? value : null;
 }
 
-function compare(value: number, op: auto.Comparison, against: number): boolean {
+/** Whether a figure passes a reading condition's test. Both ends of a range
+ *  are inside it, and a range with no top above its bottom passes nothing. */
+function compare(
+    value: number,
+    op: auto.Comparison,
+    against: number,
+    upper: number | undefined
+): boolean {
     switch (op) {
         case "gt":
             return value > against;
@@ -248,6 +255,12 @@ function compare(value: number, op: auto.Comparison, against: number): boolean {
             return value === against;
         case "ne":
             return value !== against;
+        case "between":
+        case "outside": {
+            if (upper === undefined || !(upper > against)) return false;
+            const inside = value >= against && value <= upper;
+            return op === "between" ? inside : !inside;
+        }
     }
 }
 
@@ -961,7 +974,7 @@ export function createEngine(ports: EnginePorts) {
             const value = numberOf(
                 condition.measure ? (device.figures?.[condition.measure] ?? "") : device.reading
             );
-            return value !== null && compare(value, condition.op, condition.value);
+            return value !== null && compare(value, condition.op, condition.value, condition.upper);
         }
         const clock = wallClock(now, timeZone);
         if (condition.kind === "weekday") {

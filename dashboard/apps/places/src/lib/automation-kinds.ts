@@ -159,8 +159,15 @@ export const LIMITS = {
 } as const;
 
 export const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const;
-export const COMPARISONS = ["gt", "gte", "lt", "lte", "eq", "ne"] as const;
+/** How a reading condition tests a figure: against one line, or inside or
+ *  outside a range (both ends inside). */
+export const COMPARISONS = ["gt", "gte", "lt", "lte", "eq", "ne", "between", "outside"] as const;
 export type Comparison = (typeof COMPARISONS)[number];
+
+/** Whether a reading condition's test needs a range rather than a line. */
+export function isRangeTest(op: Comparison): boolean {
+    return op === "between" || op === "outside";
+}
 
 // --- the schema -------------------------------------------------------------
 
@@ -359,6 +366,8 @@ export const conditionSchema = z.discriminatedUnion("kind", [
         deviceId: deviceRef,
         op: z.enum(COMPARISONS),
         value: amount,
+        /** The top of the range, for "between" and "outside" only. */
+        upper: amount.optional(),
         measure: z.enum(READING_MEASURES).optional()
     }),
     z.object({ id: nodeId, ...blockBase, kind: z.literal("time"), from: clock, to: clock }),
@@ -491,7 +500,7 @@ export const definitionSchema = z
             }
             if (trigger.kind === "threshold") {
                 checkFigure(context, trigger, at);
-                checkRange(context, trigger, at);
+                checkRange(context, isRange(trigger.direction), trigger, at);
             }
         });
 
@@ -501,7 +510,10 @@ export const definitionSchema = z
                 if (condition.kind === "device") {
                     checkWord(context, condition.attribute, condition.is, [...at, "is"], false);
                 }
-                if (condition.kind === "reading") checkFigure(context, condition, at);
+                if (condition.kind === "reading") {
+                    checkFigure(context, condition, at);
+                    checkRange(context, isRangeTest(condition.op), condition, at);
+                }
                 if (condition.kind === "time" && condition.from === condition.to) {
                     context.addIssue({
                         code: "custom",
@@ -551,14 +563,11 @@ function checkFigure(
 /** A range needs its top, above its bottom; a line has none. */
 function checkRange(
     context: z.RefinementCtx,
-    node: {
-        readonly direction: ThresholdDirection;
-        readonly value: number;
-        readonly upper?: number;
-    },
+    ranged: boolean,
+    node: { readonly value: number; readonly upper?: number },
     path: (string | number)[]
 ): void {
-    if (!isRange(node.direction)) return;
+    if (!ranged) return;
     if (node.upper === undefined || !Number.isFinite(node.upper)) {
         context.addIssue({
             code: "custom",
@@ -666,7 +675,7 @@ function trimmed(value: unknown): unknown {
     return typeof value === "string" ? value.trim() : value;
 }
 
-const NUMBER_FIELDS = ["minutes", "value", "seconds", "timeoutMinutes"];
+const NUMBER_FIELDS = ["minutes", "value", "upper", "seconds", "timeoutMinutes", "forMinutes"];
 const WORD_FIELDS = ["deviceId", "from", "to", "is", "message", "automationId"];
 const CLOCK_FIELDS = ["at", "from", "to"];
 
