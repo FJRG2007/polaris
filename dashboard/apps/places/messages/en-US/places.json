@@ -1737,7 +1737,7 @@
         "newRoom": "New room",
         "loadingRooms": "Loading rooms",
         "roomHint": "Automations can pick devices by the room they are in.",
-        "roomName": "Name of the room",
+        "roomName": "Room name",
         "roomNamePlaceholder": "Kitchen",
         "floor": "Floor",
         "floorPlaceholder": "Ground floor"
