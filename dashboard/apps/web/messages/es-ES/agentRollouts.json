@@ -1,0 +1,136 @@
+{
+    "page": {
+        "heading": "Despliegue del agente",
+        "description": "Actualiza el agente por oleadas de servidores y envía órdenes a servidores desconectados.",
+        "back": "Servidores"
+    },
+    "servers": {
+        "heading": "Servidores",
+        "columns": {
+            "server": "Servidor",
+            "agent": "Agente",
+            "seen": "Última respuesta",
+            "waiting": "En cola"
+        },
+        "noAgent": "Gestionado por SSH",
+        "noAgentHint": "Polaris maneja este servidor con su usuario SSH, así que aquí no hay agente que actualizar.",
+        "online": "En línea",
+        "offline": "Sin conexión",
+        "never": "Nunca",
+        "pinned": "Fijado en {version}",
+        "pin": "Fijar",
+        "unpin": "Soltar",
+        "pinTitle": "Fijar {name}",
+        "pinBody": "Los despliegues de cualquier otra versión no tocan este servidor hasta que lo sueltes.",
+        "pinVersion": "Versión",
+        "commands": "Órdenes",
+        "empty": "Aún no hay servidores. Añade uno desde Servidores."
+    },
+    "rollout": {
+        "heading": "Despliegue",
+        "none": "Aún no hay despliegues. Empieza uno cuando salga una versión nueva del agente.",
+        "start": "Iniciar despliegue",
+        "startTitle": "Iniciar un despliegue",
+        "startBody": "La primera oleada es un canario de pocos servidores; cada oleada siguiente es la parte de servidores alcanzada al terminarla. Una oleada empieza solo cuando todos los servidores de la anterior siguen sanos durante toda la comprobación.",
+        "version": "Versión",
+        "versionHint": "La versión que debe indicar cada agente tras actualizarse",
+        "waves": "Oleadas",
+        "wavesHint": "Servidores canario y luego porcentajes acumulados hasta 100, p. ej. 1, 10, 50, 100",
+        "health": "Sano durante (min)",
+        "status": {
+            "running": "En curso",
+            "halted": "Detenido",
+            "done": "Terminado",
+            "rolled-back": "Revertido",
+            "cancelled": "Cancelado"
+        },
+        "summary": "{version} - oleada {wave} de {waves}",
+        "progress": "{done} de {total} servidores actualizados",
+        "halted": {
+            "failed": "Detenido porque un servidor no pasó la comprobación de salud. Reinténtalo o revierte.",
+            "manual": "Detenido por un administrador. Reanuda para seguir."
+        },
+        "rolledBack": "Revertido. Los servidores alcanzados quedan fijados en {version}; desde aquí no se puede volver a instalar una versión anterior.",
+        "rolledBackNoPrevious": "Revertido. No se conocía una versión anterior, así que no se fijó nada.",
+        "resume": "Reanudar",
+        "halt": "Detener",
+        "rollback": "Revertir",
+        "rollbackTitle": "Revertir este despliegue",
+        "rollbackBody": "No se ejecutan más oleadas, se cancelan las actualizaciones pendientes y cada servidor alcanzado queda fijado en {version}.",
+        "wave": "Oleada {wave}",
+        "skippedWave": "Excluidos",
+        "state": {
+            "pending": "En espera",
+            "updating": "Actualizando",
+            "verifying": "Comprobando",
+            "healthy": "Sano",
+            "failed": "Falló",
+            "skipped": "Omitido"
+        },
+        "reason": {
+            "no-agent": "Gestionado por SSH",
+            "pinned": "Fijado",
+            "current": "Ya la tiene",
+            "timeout": "Nunca indicó la versión nueva",
+            "heartbeat": "Dejó de responder",
+            "version": "Indicó otra versión",
+            "refused": "No pudo actualizar"
+        }
+    },
+    "queue": {
+        "add": "Poner en cola",
+        "addTitle": "Orden para {name}",
+        "addBody": "Si el servidor está desconectado, la orden lo espera y sale en orden cuando vuelva a responder.",
+        "kind": "Orden",
+        "container": "Contenedor",
+        "assignment": "Id de asignación",
+        "version": "Versión",
+        "expiry": "Descartar tras",
+        "expiries": {
+            "1h": "1 hora",
+            "1d": "1 día",
+            "7d": "7 días"
+        },
+        "kinds": {
+            "container.restart": "Reiniciar contenedor",
+            "container.start": "Iniciar contenedor",
+            "container.stop": "Parar contenedor",
+            "template.apply": "Aplicar plantilla",
+            "agent.update": "Actualizar agente"
+        },
+        "status": {
+            "queued": "Esperando al servidor",
+            "delivering": "Enviando",
+            "done": "Hecho",
+            "failed": "Falló",
+            "cancelled": "Cancelada",
+            "expired": "Caducada"
+        },
+        "cancel": "Cancelar orden",
+        "expires": "Caduca {when}",
+        "empty": "Nada en cola",
+        "history": "Recientes",
+        "results": {
+            "offline": "El servidor no respondió",
+            "noAgent": "Este servidor no tiene agente que actualizar",
+            "unknownAssignment": "Esa plantilla ya no está en este servidor",
+            "unreadable": "No se pudo leer la orden",
+            "interrupted": "Se cortó mientras se enviaba",
+            "unknownServer": "El servidor se eliminó",
+            "failed": "El servidor la rechazó"
+        }
+    },
+    "errors": {
+        "rolloutOpen": "Ya hay un despliegue en curso. Termínalo o reviértelo antes.",
+        "noRollout": "No hay ningún despliegue en curso.",
+        "notHalted": "Solo se puede reanudar un despliegue detenido.",
+        "noTargets": "Ningún servidor necesita esta versión: ya la tienen, están fijados o no tienen agente.",
+        "queueFull": "Este servidor ya tiene 50 órdenes en cola. Cancela alguna antes.",
+        "unknownServer": "Ese servidor ya no está en Polaris.",
+        "unknownAssignment": "Esa plantilla no está asignada a este servidor.",
+        "notCancellable": "Esa orden ya se envió.",
+        "badWaves": "Las oleadas deben subir y acabar en 100.",
+        "invalid": "Revisa los valores e inténtalo de nuevo.",
+        "failed": "No ha funcionado. Inténtalo de nuevo en un momento."
+    }
+}

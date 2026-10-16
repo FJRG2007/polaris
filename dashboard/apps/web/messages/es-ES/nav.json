@@ -343,7 +343,8 @@
         "Security scans": "Seguridad",
         "Cloud servers": "Servidores cloud",
         "Compare": "Comparar",
-        "Insights": "Tendencias"
+        "Insights": "Tendencias",
+        "Rollouts": "Despliegues"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

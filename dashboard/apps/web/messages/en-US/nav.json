@@ -343,7 +343,8 @@
         "Security scans": "Security scans",
         "Cloud servers": "Cloud servers",
         "Compare": "Compare",
-        "Insights": "Insights"
+        "Insights": "Insights",
+        "Rollouts": "Rollouts"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

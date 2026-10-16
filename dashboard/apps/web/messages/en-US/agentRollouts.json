@@ -1,0 +1,136 @@
+{
+    "page": {
+        "heading": "Agent rollouts",
+        "description": "Update the agent one wave of servers at a time, and send commands to servers that are offline.",
+        "back": "Servers"
+    },
+    "servers": {
+        "heading": "Servers",
+        "columns": {
+            "server": "Server",
+            "agent": "Agent",
+            "seen": "Last answer",
+            "waiting": "Waiting"
+        },
+        "noAgent": "Managed over SSH",
+        "noAgentHint": "Polaris drives this server through its SSH login, so there is no agent here to update.",
+        "online": "Online",
+        "offline": "Offline",
+        "never": "Never",
+        "pinned": "Pinned to {version}",
+        "pin": "Pin",
+        "unpin": "Unpin",
+        "pinTitle": "Pin {name}",
+        "pinBody": "Rollouts of any other version leave this server alone until you unpin it.",
+        "pinVersion": "Version",
+        "commands": "Commands",
+        "empty": "No servers yet. Add one from Servers."
+    },
+    "rollout": {
+        "heading": "Rollout",
+        "none": "No rollout yet. Start one when a new agent version is out.",
+        "start": "Start rollout",
+        "startTitle": "Start a rollout",
+        "startBody": "The first wave is a canary of a few servers; each later wave is the share of servers reached once it is done. A wave starts only when every server in the one before it has stayed healthy for the whole check.",
+        "version": "Version",
+        "versionHint": "The version each agent must report once updated",
+        "waves": "Waves",
+        "wavesHint": "Canary servers, then cumulative percentages ending at 100, e.g. 1, 10, 50, 100",
+        "health": "Healthy for (minutes)",
+        "status": {
+            "running": "Running",
+            "halted": "Halted",
+            "done": "Finished",
+            "rolled-back": "Rolled back",
+            "cancelled": "Cancelled"
+        },
+        "summary": "{version} - wave {wave} of {waves}",
+        "progress": "{done} of {total} servers updated",
+        "halted": {
+            "failed": "Halted because a server failed its health check. Retry it, or roll back.",
+            "manual": "Halted by an admin. Resume to carry on."
+        },
+        "rolledBack": "Rolled back. The servers it reached are pinned to {version}; an older build cannot be installed again from here.",
+        "rolledBackNoPrevious": "Rolled back. No earlier version was known, so nothing was pinned.",
+        "resume": "Resume",
+        "halt": "Halt",
+        "rollback": "Roll back",
+        "rollbackTitle": "Roll back this rollout",
+        "rollbackBody": "No further wave runs, updates still waiting are cancelled, and every server it reached is pinned to {version}.",
+        "wave": "Wave {wave}",
+        "skippedWave": "Left out",
+        "state": {
+            "pending": "Waiting",
+            "updating": "Updating",
+            "verifying": "Checking health",
+            "healthy": "Healthy",
+            "failed": "Failed",
+            "skipped": "Skipped"
+        },
+        "reason": {
+            "no-agent": "Managed over SSH",
+            "pinned": "Pinned",
+            "current": "Already on it",
+            "timeout": "Never reported the new version",
+            "heartbeat": "Stopped answering",
+            "version": "Reported another version",
+            "refused": "Could not start the update"
+        }
+    },
+    "queue": {
+        "add": "Queue command",
+        "addTitle": "Command for {name}",
+        "addBody": "If the server is offline the command waits for it and goes out in order when it answers again.",
+        "kind": "Command",
+        "container": "Container",
+        "assignment": "Template assignment id",
+        "version": "Version",
+        "expiry": "Give up after",
+        "expiries": {
+            "1h": "1 hour",
+            "1d": "1 day",
+            "7d": "7 days"
+        },
+        "kinds": {
+            "container.restart": "Restart container",
+            "container.start": "Start container",
+            "container.stop": "Stop container",
+            "template.apply": "Apply template",
+            "agent.update": "Update agent"
+        },
+        "status": {
+            "queued": "Waiting for the server",
+            "delivering": "Sending",
+            "done": "Done",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "expired": "Expired"
+        },
+        "cancel": "Cancel command",
+        "expires": "Expires {when}",
+        "empty": "Nothing waiting",
+        "history": "Recent",
+        "results": {
+            "offline": "The server did not answer",
+            "noAgent": "This server has no agent to update",
+            "unknownAssignment": "That template is no longer on this server",
+            "unreadable": "The command could not be read",
+            "interrupted": "Cut off while it was being sent",
+            "unknownServer": "The server was removed",
+            "failed": "The server refused it"
+        }
+    },
+    "errors": {
+        "rolloutOpen": "A rollout is already in progress. Finish or roll it back first.",
+        "noRollout": "There is no rollout in progress.",
+        "notHalted": "Only a halted rollout can be resumed.",
+        "noTargets": "No server needs this version: they already run it, are pinned, or have no agent.",
+        "queueFull": "This server already has 50 commands waiting. Cancel some first.",
+        "unknownServer": "That server is no longer in Polaris.",
+        "unknownAssignment": "That template is not assigned to this server.",
+        "notCancellable": "That command has already been sent.",
+        "badWaves": "Waves must rise and end at 100.",
+        "invalid": "Check the values and try again.",
+        "failed": "That did not work. Try again in a moment."
+    }
+}

@@ -36,6 +36,7 @@ import catalog from "./catalog.json";
 import notices from "./notices.json";
 import runners from "./runners.json";
 import servers from "./servers.json";
+import agentRollouts from "./agentRollouts.json";
 import firewall from "./firewall.json";
 import analytics from "./analytics.json";
 import databases from "./databases.json";
@@ -128,6 +129,7 @@ export default {
     reference,
     runners,
     servers,
+    agentRollouts,
     shortcuts,
     system,
     tasks,
