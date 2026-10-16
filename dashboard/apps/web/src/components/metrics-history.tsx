@@ -10,6 +10,7 @@
 import {
     CONSUMPTION_METRICS,
     formatRate,
+    GPU_METRICS,
     percent,
     PLAYER_METRICS,
     ratioPercent,
@@ -32,7 +33,11 @@ const LABEL_KEYS: Readonly<Record<string, NamespaceKey<"components">>> = {
     disk: "metrics.labels.disk",
     net: "metrics.labels.netOut",
     "net-in": "metrics.labels.netIn",
-    players: "metrics.labels.players"
+    players: "metrics.labels.players",
+    gpu: "metrics.labels.gpu",
+    "gpu-mem": "metrics.labels.gpuMem",
+    "gpu-temp": "metrics.labels.gpuTemp",
+    "gpu-power": "metrics.labels.gpuPower"
 };
 import {
     LIVE_INTERVAL_MS,
@@ -403,4 +408,4 @@ export function MetricsHistory<T extends { t: number } = Point>({
 }
 
 /** Re-exported for the screens that already take them from here. */
-export { CONSUMPTION_METRICS, formatRate, percent, PLAYER_METRICS, ratioPercent, type MetricSpec };
+export { CONSUMPTION_METRICS, formatRate, GPU_METRICS, percent, PLAYER_METRICS, ratioPercent, type MetricSpec };

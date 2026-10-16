@@ -735,5 +735,25 @@
             "allServers": "All servers",
             "filter": "Show anomalies for"
         }
+    },
+    "gpu": {
+        "heading": "GPU",
+        "none": "No NVIDIA card found on this machine. Only NVIDIA cards are read; AMD and Intel are not supported.",
+        "hint": "Only NVIDIA cards are read. The history shows every card together: average use, memory added up, and the hottest temperature.",
+        "use": "Use",
+        "memory": "Memory",
+        "temperature": "Temperature",
+        "power": "Power",
+        "notMeasured": "Not measured",
+        "celsius": "{value} °C",
+        "watts": "{value} W",
+        "of": "{used} of {total}",
+        "card": "GPU {index}",
+        "containers": "Containers on the cards",
+        "noContainers": "No container is using a card right now.",
+        "onCards": "GPU {list}",
+        "more": "And {count} more.",
+        "history": "GPU history",
+        "unread": "Polaris could not read the cards just now."
     }
 }

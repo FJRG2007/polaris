@@ -329,5 +329,11 @@
             "not-allowed": "No puedes mover este dominio a ese servicio.",
             "closed": "Este cambio ya terminó."
         }
+    },
+    "gpu": {
+        "loadFailed": "Polaris no ha podido leer el ajuste de GPU de este servicio.",
+        "saveFailed": "Polaris no ha podido guardar el ajuste de GPU.",
+        "noGpu": "Su servidor no tiene ninguna tarjeta NVIDIA que Polaris pueda ver, así que no puede recibir una.",
+        "swarm": "Un servicio en un clúster swarm no puede recibir una tarjeta."
     }
 }

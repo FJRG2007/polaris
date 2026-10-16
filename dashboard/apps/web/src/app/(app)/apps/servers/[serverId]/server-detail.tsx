@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { EdgePanel } from "../edge-panel";
 import { SharedHostPanel } from "../shared-host-panel";
+import { ServerGpu } from "../server-gpu";
 import { ServerUsage } from "../server-usage";
 import { ServerStorage } from "../server-storage";
 import { ServerWorkload } from "./server-workload";
@@ -260,6 +261,10 @@ export function ServerDetail({
                     ) : null}
 
                     <ServerWorkload connectionId={connectionId} />
+
+                    {/* Its NVIDIA cards, read by the collector beside its load.
+                        One line where it has none. */}
+                    <ServerGpu metricsId={metricsId} />
 
                     <section className="flex flex-col gap-1">
                         <h2 className="text-sm font-medium">{t("detail.load")}</h2>

@@ -1231,7 +1231,11 @@
             "disk": "Disco",
             "netOut": "Tráfico de salida",
             "netIn": "Entrada de red",
-            "players": "Jugadores"
+            "players": "Jugadores",
+            "gpu": "GPU",
+            "gpuMem": "Memoria GPU",
+            "gpuTemp": "Temperatura GPU",
+            "gpuPower": "Consumo GPU"
         },
         "custom": "A medida",
         "points": "{count} puntos",
