@@ -12,6 +12,7 @@ export default function DeployLayout({ children }: { children: ReactNode }) {
                 "deployData",
                 "deployPrivateNet",
                 "deployProject",
+                "deployRegistries",
                 "deployService",
                 "deploySettings"
             ]}
