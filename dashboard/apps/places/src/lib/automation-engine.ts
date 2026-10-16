@@ -105,27 +105,79 @@ export interface Observation {
      *  while can still be told apart by where it came from. Absent until the
      *  first change is seen. */
     readonly before?: Readonly<Partial<Record<auto.AutomationAttribute, string>>>;
-    /** The values a reading had before its current one, oldest first, by trail
-     *  key (`READING_TRAIL` for the device's one reading, else the measure) -
-     *  what tells how long a figure has been past a line, when the figure moves
-     *  on every sync. At most `TRAIL_POINTS` each. */
-    readonly trails?: Readonly<Record<string, readonly Figure[]>>;
+    /** Since when a reading has passed each line a "for" waits on, by reading
+     *  (`READING_KEY` for the device's one reading, else the measure) and then
+     *  by line (`lineKey`) - what tells how long a figure has been past a line
+     *  when it moves on every sync. Only the lines an enabled automation
+     *  watches, and only while the reading passes them. */
+    readonly held?: Readonly<Record<string, Readonly<Record<string, Held>>>>;
     /** Counts every change, so each one has a name of its own even when two
      *  land in the same millisecond - and so the swap has one field to compare. */
     readonly version: number;
 }
 
-/** The trail key of a device's one reading, beside the measures' own. */
-export const READING_TRAIL = "reading";
+/** The key of a device's one reading among `held`, beside the measures' own. */
+export const READING_KEY = "reading";
 
-/** How many earlier values a trail keeps. A figure that moved more often than
- *  this inside a "for" is read as held since the oldest one kept - never longer
- *  than it really was. */
-export const TRAIL_POINTS = 96;
+/** Since when a reading has passed a line, and - when it was seen to cross it -
+ *  the value it came from. */
+export interface Held {
+    readonly since: Date;
+    readonly from?: string;
+}
 
-/** A trail with one more point, keeping the newest `TRAIL_POINTS`. */
-function extended(trail: readonly Figure[] | undefined, point: Figure): Figure[] {
-    return [...(trail ?? []), point].slice(-TRAIL_POINTS);
+/** A test on a figure that a "for" waits on: a threshold's side of its line or
+ *  a reading condition's comparison, in the comparison's terms. */
+export interface Line {
+    readonly op: auto.Comparison;
+    readonly value: number;
+    readonly upper?: number;
+}
+
+/** One name for each line, so two automations waiting on the same one share it. */
+export function lineKey(line: Line): string {
+    const ranged = line.op === "between" || line.op === "outside";
+    return `${line.op}:${line.value}${ranged ? `:${line.upper ?? ""}` : ""}`;
+}
+
+/** A threshold's line as a comparison: past it is above or below its value, or
+ *  inside or outside its range. */
+function thresholdLine(threshold: {
+    direction: auto.ThresholdDirection;
+    value: number;
+    upper?: number;
+}): Line {
+    const { direction, value, upper } = threshold;
+    const op = direction === "above" ? "gt" : direction === "below" ? "lt" : direction;
+    return { op, value, upper };
+}
+
+function passesLine(line: Line, value: string): boolean {
+    const figure = numberOf(value);
+    return figure !== null && compare(figure, line.op, line.value, line.upper);
+}
+
+/**
+ * The lines a reading passes after it changed from `before` to `after`, each
+ * with since when: from now when `before` did not pass it - a crossing - and
+ * otherwise from when the run it is part of began.
+ */
+export function heldAfter(
+    previous: Readonly<Record<string, Held>> | undefined,
+    before: Figure,
+    after: string,
+    now: Date,
+    lines: readonly Line[]
+): Record<string, Held> {
+    const next: Record<string, Held> = {};
+    for (const line of lines) {
+        const key = lineKey(line);
+        if (!passesLine(line, after)) continue;
+        next[key] = passesLine(line, before.value)
+            ? (previous?.[key] ?? { since: before.since })
+            : { since: now, from: before.value };
+    }
+    return next;
 }
 
 /** One figure as last seen, and since when. */
@@ -414,6 +466,7 @@ export function createEngine(ports: EnginePorts) {
             return [];
         }
         const changed: Transition[] = [];
+        const moved: { key: string; before: Figure; after: string }[] = [];
         const next = {
             state: previous.state,
             stateSince: previous.stateSince,
@@ -426,8 +479,10 @@ export function createEngine(ports: EnginePorts) {
             filter: previous.filter,
             filterSince: previous.filterSince,
             figures: previous.figures ? { ...previous.figures } : undefined,
-            before: { ...(previous.before ?? {}) } as Partial<Record<auto.AutomationAttribute, string>>,
-            trails: { ...(previous.trails ?? {}) } as Record<string, readonly Figure[]>,
+            before: { ...(previous.before ?? {}) } as Partial<
+                Record<auto.AutomationAttribute, string>
+            >,
+            held: { ...(previous.held ?? {}) } as Record<string, Readonly<Record<string, Held>>>,
             version: previous.version + 1
         };
         const version = next.version;
@@ -467,9 +522,10 @@ export function createEngine(ports: EnginePorts) {
                 version
             });
             next.before.reading = previous.reading;
-            next.trails[READING_TRAIL] = extended(previous.trails?.[READING_TRAIL], {
-                value: previous.reading,
-                since: previous.readingSince
+            moved.push({
+                key: READING_KEY,
+                before: { value: previous.reading, since: previous.readingSince },
+                after: device.reading
             });
             next.reading = device.reading;
             next.readingSince = now;
@@ -497,7 +553,7 @@ export function createEngine(ports: EnginePorts) {
             if (before && before.value === value) continue;
             next.figures = { ...(next.figures ?? {}), [measure]: { value, since: now } };
             if (!before) continue;
-            next.trails[measure] = extended(previous.trails?.[measure], before);
+            moved.push({ key: measure, before, after: value });
             changed.push({
                 deviceId: device.id,
                 attribute: "reading",
@@ -532,10 +588,16 @@ export function createEngine(ports: EnginePorts) {
             if (learned) await store.swapObservation(device.id, previous, next);
             return [];
         }
+        const automations = await store.enabledAutomations(installedAppId);
+        const lines = watchedLines(automations, device.id);
+        for (const { key, before, after } of moved) {
+            const held = heldAfter(previous.held?.[key], before, after, now, lines.get(key) ?? []);
+            if (Object.keys(held).length > 0) next.held[key] = held;
+            else delete next.held[key];
+        }
         if (!(await store.swapObservation(device.id, previous, next))) return [];
 
         const depth = (causeContext.getStore()?.depth ?? -1) + 1;
-        const automations = await store.enabledAutomations(installedAppId);
         for (const change of changed) {
             for (const automation of automations) {
                 for (const trigger of automation.definition.triggers) {
@@ -680,23 +742,21 @@ export function createEngine(ports: EnginePorts) {
         if (trigger.kind === "threshold" && trigger.forMinutes) {
             const seen = await store.observation(trigger.deviceId);
             if (!seen) return;
-            const points = pointsOf(seen, trigger.measure);
-            const held = heldSince(points, (figure) => beyond(trigger, figure));
+            const held = heldOf(seen, trigger.measure, thresholdLine(trigger));
             // Past the line since before anything was seen is no crossing at all.
-            if (!held || !held.crossed || held.since.getTime() < armed) return;
+            if (!held || held.from === undefined || held.since.getTime() < armed) return;
             if (now.getTime() - held.since.getTime() < trigger.forMinutes * 60 * 1000) return;
-            const from = points[points.length - 1 - held.length];
             await fire(
                 automation,
-                `held:${trigger.id}:${trigger.measure ?? READING_TRAIL}:${iso(held.since)}`,
+                `held:${trigger.id}:${trigger.measure ?? READING_KEY}:${iso(held.since)}`,
                 {
                     kind: "threshold",
                     triggerId: trigger.id,
                     deviceId: trigger.deviceId,
                     attribute: "reading",
                     ...(trigger.measure ? { measure: trigger.measure } : {}),
-                    from: from?.value ?? "",
-                    to: points[points.length - 1]?.value ?? "",
+                    from: held.from,
+                    to: held.value,
                     minutes: trigger.forMinutes,
                     at: iso(now)
                 },
@@ -1074,9 +1134,7 @@ export function createEngine(ports: EnginePorts) {
             // passing since it was first seen counts from then, never before.
             const seen = await store.observation(condition.deviceId);
             if (!seen) return false;
-            const held = heldSince(pointsOf(seen, condition.measure), (figure) =>
-                compare(figure, condition.op, condition.value, condition.upper)
-            );
+            const held = heldOf(seen, condition.measure, condition);
             return (
                 held !== null &&
                 now.getTime() - held.since.getTime() >= condition.forMinutes * 60 * 1000
@@ -1108,48 +1166,53 @@ function sinceOf(seen: Observation, attribute: auto.AutomationAttribute): Date {
     return seen.stateSince;
 }
 
-/** A reading's values as kept, oldest first, ending with the one it has now. */
-function pointsOf(seen: Observation, measure: auto.ReadingMeasure | undefined): Figure[] {
+/**
+ * Since when a reading has passed a line, counting back from the value it has
+ * now: null when that one does not. A run no change was seen to start - the
+ * line was not watched when it began - counts from the value it has now, never
+ * before, and is no crossing.
+ */
+function heldOf(
+    seen: Observation,
+    measure: auto.ReadingMeasure | undefined,
+    line: Line
+): (Held & { value: string }) | null {
     const current = measure
         ? seen.figures?.[measure]
         : { value: seen.reading, since: seen.readingSince };
-    if (!current) return [];
-    return [...(seen.trails?.[measure ?? READING_TRAIL] ?? []), current];
+    if (!current || !passesLine(line, current.value)) return null;
+    const held = seen.held?.[measure ?? READING_KEY]?.[lineKey(line)];
+    return { ...(held ?? { since: current.since }), value: current.value };
 }
 
-/**
- * Since when every value of a reading has passed `test`, counting back from the
- * one it has now: null when that one does not. `crossed` is whether a value
- * that failed was seen before them - the change that made it pass - and
- * `length` how many kept values passed in a row.
- */
-export function heldSince(
-    points: readonly Figure[],
-    test: (figure: number) => boolean
-): { since: Date; crossed: boolean; length: number } | null {
-    const passes = (point: Figure) => {
-        const figure = numberOf(point.value);
-        return figure !== null && test(figure);
+/** The lines enabled automations wait on with a "for" on one device, by the
+ *  reading they read. */
+function watchedLines(
+    automations: readonly AutomationRecord[],
+    deviceId: string
+): Map<string, Line[]> {
+    const lines = new Map<string, Line[]>();
+    const add = (measure: auto.ReadingMeasure | undefined, line: Line) => {
+        const key = measure ?? READING_KEY;
+        lines.set(key, [...(lines.get(key) ?? []), line]);
     };
-    let index = points.length - 1;
-    if (index < 0 || !passes(points[index]!)) return null;
-    while (index > 0 && passes(points[index - 1]!)) index -= 1;
-    return { since: points[index]!.since, crossed: index > 0, length: points.length - index };
-}
-
-/** Whether a figure is past a threshold's line, or inside ("between") or
- *  outside ("outside") its range - where a crossing leaves it. */
-export function beyond(
-    threshold: { direction: auto.ThresholdDirection; value: number; upper?: number },
-    figure: number
-): boolean {
-    const { direction, value } = threshold;
-    if (direction === "above") return figure > value;
-    if (direction === "below") return figure < value;
-    const upper = threshold.upper;
-    if (upper === undefined || !(upper > value)) return false;
-    const inside = figure >= value && figure <= upper;
-    return direction === "between" ? inside : !inside;
+    for (const { definition } of automations) {
+        for (const trigger of definition.triggers) {
+            if (trigger.kind === "threshold" && trigger.forMinutes && trigger.deviceId === deviceId)
+                add(trigger.measure, thresholdLine(trigger));
+        }
+        for (const group of definition.conditions.groups) {
+            for (const condition of group.items) {
+                if (
+                    condition.kind === "reading" &&
+                    condition.forMinutes &&
+                    condition.deviceId === deviceId
+                )
+                    add(condition.measure, condition);
+            }
+        }
+    }
+    return lines;
 }
 
 /**

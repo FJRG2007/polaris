@@ -119,12 +119,17 @@ export function stepActionsFor(kind: string): readonly StepDeviceAction[] {
     return own.includes("turn-on") && own.includes("turn-off") ? [...own, TOGGLE] : own;
 }
 
+/** What a door or window sensor reads, and a motion sensor: open first, then
+ *  movement first. */
+export const OPEN_PAIR = ["Open", "Closed"] as const;
+export const MOTION_PAIR = ["Movement", "Still"] as const;
+
 /** The two-state words sensors send, in pairs, so a picker can offer the other
  *  half of whatever one is reading now. */
 export const READING_PAIRS: readonly (readonly [string, string])[] = [
-    ["Open", "Closed"],
+    OPEN_PAIR,
     ["Locked", "Unlocked"],
-    ["Movement", "Still"],
+    MOTION_PAIR,
     ["Somebody there", "Empty"],
     ["Home", "Away"],
     ["Wet", "Dry"],

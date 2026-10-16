@@ -44,15 +44,12 @@ function sensorSays(device: DeviceView, pair: readonly [string, string]): boolea
     return pair.includes(value);
 }
 
-const OPEN_PAIR = ["Open", "Closed"] as const;
-const MOTION_PAIR = ["Movement", "Still"] as const;
-
 /** Open or closed: a lock's door sensor, or a door or window sensor. */
 function doorWatch(device: DeviceView, open: boolean): Watch | null {
     if (auto.attributesFor(device.kind).includes("door") && device.doorState !== "none")
         return { attribute: "door", value: open ? "open" : "closed" };
-    if (sensorSays(device, OPEN_PAIR))
-        return { attribute: "reading", value: open ? "Open" : "Closed" };
+    if (sensorSays(device, auto.OPEN_PAIR))
+        return { attribute: "reading", value: auto.OPEN_PAIR[open ? 0 : 1] };
     return null;
 }
 
@@ -63,8 +60,8 @@ function lockWatch(device: DeviceView, locked: boolean): Watch | null {
 }
 
 function motionWatch(device: DeviceView, moving: boolean): Watch | null {
-    return sensorSays(device, MOTION_PAIR)
-        ? { attribute: "reading", value: moving ? "Movement" : "Still" }
+    return sensorSays(device, auto.MOTION_PAIR)
+        ? { attribute: "reading", value: auto.MOTION_PAIR[moving ? 0 : 1] }
         : null;
 }
 
@@ -77,15 +74,14 @@ const TRIGGER_WATCH: Readonly<Record<TriggerPurpose, (device: DeviceView) => Wat
     still: (device) => motionWatch(device, false)
 };
 
-const CONDITION_WATCH: Readonly<Record<ConditionPurpose, (device: DeviceView) => Watch | null>> =
-    {
-        open: (device) => doorWatch(device, true),
-        shut: (device) => doorWatch(device, false),
-        isLocked: (device) => lockWatch(device, true),
-        isUnlocked: (device) => lockWatch(device, false),
-        moving: (device) => motionWatch(device, true),
-        quiet: (device) => motionWatch(device, false)
-    };
+const CONDITION_WATCH: Readonly<Record<ConditionPurpose, (device: DeviceView) => Watch | null>> = {
+    open: (device) => doorWatch(device, true),
+    shut: (device) => doorWatch(device, false),
+    isLocked: (device) => lockWatch(device, true),
+    isUnlocked: (device) => lockWatch(device, false),
+    moving: (device) => motionWatch(device, true),
+    quiet: (device) => motionWatch(device, false)
+};
 
 export function isTriggerPurpose(value: string): value is TriggerPurpose {
     return (TRIGGER_PURPOSES as readonly string[]).includes(value);

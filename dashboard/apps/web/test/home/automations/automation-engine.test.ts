@@ -747,15 +747,99 @@ describe("a change or a crossing that has to last", () => {
         expect(notified).toEqual(["went"]);
     });
 
-    it("keeps a bounded trail of earlier values", async () => {
-        await reads(sensor("0"));
-        for (let index = 1; index <= 150; index += 1) {
+    it("fires a crossing held for hours while the figure moved every minute", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 120
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("24"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        for (let index = 1; index < 120; index += 1) {
             later(MINUTE);
-            await reads(sensor(String(index)));
+            await reads(sensor(index % 2 ? "27" : "26"));
+            await engine.evaluateSchedules(INSTALL);
         }
-        const trail = store.observations.get("temp")?.trails?.reading ?? [];
-        expect(trail).toHaveLength(96);
-        expect(trail[trail.length - 1]?.value).toBe("149");
+        expect(store.runsOf("hot")).toHaveLength(0);
+        later(MINUTE);
+        await engine.evaluateSchedules(INSTALL);
+        expect(store.runsOf("hot")).toHaveLength(1);
+        expect(store.runsOf("hot")[0]?.cause).toMatchObject({ from: "24", minutes: 120 });
+    });
+
+    it("holds a reading condition for hours while the figure moved every minute", async () => {
+        automation("muggy", {
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            {
+                                id: "cond01",
+                                kind: "reading",
+                                deviceId: "temp",
+                                op: "gt",
+                                value: 25,
+                                forMinutes: 180
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "went" }]
+        });
+        await reads(sensor("20"));
+        later(MINUTE);
+        await reads(sensor("26"));
+        for (let index = 1; index <= 180; index += 1) {
+            later(MINUTE);
+            await reads(sensor(index % 2 ? "27" : "26"));
+        }
+        await engine.runNow(store.automations.get("muggy")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(notified).toEqual(["went"]);
+    });
+
+    it("keeps only the lines an automation waits on, and only while they pass", async () => {
+        automation("hot", {
+            triggers: [
+                {
+                    id: "trighot",
+                    kind: "threshold",
+                    deviceId: "temp",
+                    direction: "above",
+                    value: 25,
+                    forMinutes: 5
+                }
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "hot" }]
+        });
+        await reads(sensor("24"));
+        for (let index = 0; index < 150; index += 1) {
+            later(MINUTE);
+            await reads(sensor(String(26 + (index % 3))));
+        }
+        expect(store.observations.get("temp")?.held).toEqual({
+            reading: { "gt:25": { since: expect.any(Date), from: "24" } }
+        });
+        later(MINUTE);
+        await reads(sensor("20"));
+        expect(store.observations.get("temp")?.held).toEqual({});
+        await reads(readout("other", "sensor", "unknown", { reading: "30" }));
+        later(MINUTE);
+        await reads(readout("other", "sensor", "unknown", { reading: "31" }));
+        expect(store.observations.get("other")?.held).toEqual({});
     });
 });
 
