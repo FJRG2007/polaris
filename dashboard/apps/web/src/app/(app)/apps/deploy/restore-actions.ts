@@ -192,8 +192,8 @@ export async function binItemAction(
         return {};
     } catch (error) {
         // A restore past the organization's caps says which one, in the reader's words.
-        // i18n-ignore a catalog key, said in the reader's words by the screen
         if (error instanceof OrgQuotaError)
+            // i18n-ignore a catalog key, said in the reader's words by the screen
             return { error: "binRestoreFailed", message: error.message };
         console.error("polaris: recycle bin action failed:", error);
         // i18n-ignore a catalog key, said in the reader's words by the screen
