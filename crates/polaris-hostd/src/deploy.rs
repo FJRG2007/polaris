@@ -115,7 +115,29 @@ pub struct ServiceSpec {
     /// The most memory, in MB, the container may use. Absent is no limit.
     #[serde(default)]
     pub memory_mb: Option<u32>,
+    /// NVIDIA cards handed to the container: `"all"` or a count. Rendered as a
+    /// device reservation, which the engine turns into a device request for the
+    /// `nvidia` driver. Absent is no card.
+    #[serde(default)]
+    pub gpus: Option<GpuCount>,
 }
+
+/// How many NVIDIA cards a container asks for.
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum GpuCount {
+    All(GpuAll),
+    Count(u32),
+}
+
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum GpuAll {
+    All,
+}
+
+/// The most cards one container may ask for by count.
+const MAX_GPU_COUNT: u32 = 64;
 
 /// The range a CPU limit may take, in cores.
 const CPU_LIMIT_RANGE: std::ops::RangeInclusive<f64> = 0.05..=256.0;
@@ -309,6 +331,14 @@ pub fn validate_spec(spec: &DeploySpec, config: &Config) -> Result<(), String> {
                 ));
             }
         }
+        if let Some(GpuCount::Count(count)) = service.gpus {
+            if count == 0 || count > MAX_GPU_COUNT {
+                return Err(format!(
+                    "gpu count for {} must be between 1 and {MAX_GPU_COUNT}",
+                    service.name
+                ));
+            }
+        }
         if let Some(memory) = service.memory_mb {
             if !MEMORY_LIMIT_RANGE.contains(&memory) {
                 return Err(format!(
@@ -383,7 +413,7 @@ fn deploy_block(service: &ServiceSpec) -> String {
     let rolling_update = service.rolling_update;
     let replicated = replicas.is_some_and(|count| count > 1);
     let limited = service.cpus.is_some() || service.memory_mb.is_some();
-    if !replicated && !rolling_update && !limited {
+    if !replicated && !rolling_update && !limited && service.gpus.is_none() {
         return String::new();
     }
     let mut out = String::from("    deploy:\n");
@@ -406,12 +436,32 @@ fn deploy_block(service: &ServiceSpec) -> String {
             out.push_str(&format!("          memory: {memory}M\n"));
         }
     }
+    if let Some(gpus) = service.gpus {
+        if !limited {
+            out.push_str("      resources:\n");
+        }
+        out.push_str(&gpu_reservation(gpus));
+    }
     if rolling_update {
         out.push_str(
             "      update_config:\n        order: start-first\n        failure_action: rollback\n        monitor: 30s\n      rollback_config:\n        order: start-first\n",
         );
     }
     out
+}
+
+/// The device reservation for NVIDIA cards, under `deploy:`. Compose reads it
+/// from here on plain compose and swarm alike and hands the engine a device
+/// request for the `nvidia` driver. Joins a `resources:` key already written for
+/// the limits, so the block stays one mapping.
+fn gpu_reservation(gpus: GpuCount) -> String {
+    let count = match gpus {
+        GpuCount::All(_) => "all".to_string(),
+        GpuCount::Count(count) => count.to_string(),
+    };
+    format!(
+        "        reservations:\n          devices:\n            - driver: nvidia\n              count: {count}\n              capabilities: [\"gpu\"]\n"
+    )
 }
 
 /// Render a validated spec into a compose file. Every string is emitted as a
@@ -1539,6 +1589,35 @@ mod tests {
         let too_many =
             spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","cpus":1000.0}]}"#);
         assert!(validate_spec(&too_many, &config).is_err());
+    }
+
+    #[test]
+    fn a_gpu_request_renders_as_an_nvidia_device_reservation() {
+        let config = test_config();
+        let all =
+            spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","gpus":"all"}]}"#);
+        assert!(validate_spec(&all, &config).is_ok());
+        let rendered = render_compose(&all, &config);
+        assert!(rendered.contains("    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: all\n              capabilities: [\"gpu\"]\n"));
+
+        // Beside limits, under the same `resources:` mapping.
+        let both = spec(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","memoryMb":512,"gpus":2}]}"#,
+        );
+        assert!(validate_spec(&both, &config).is_ok());
+        let rendered = render_compose(&both, &config);
+        assert!(rendered.contains("      resources:\n        limits:\n          memory: 512M\n        reservations:\n          devices:\n            - driver: nvidia\n              count: 2\n"));
+        assert_eq!(rendered.matches("resources:").count(), 1);
+
+        let none = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx"}]}"#);
+        assert!(!render_compose(&none, &config).contains("nvidia"));
+
+        let zero = spec(r#"{"project":"p","services":[{"name":"web","image":"nginx","gpus":0}]}"#);
+        assert!(validate_spec(&zero, &config).is_err());
+        let bad: Result<DeploySpec, _> = serde_json::from_str(
+            r#"{"project":"p","services":[{"name":"web","image":"nginx","gpus":"some"}]}"#,
+        );
+        assert!(bad.is_err());
     }
 
     #[test]

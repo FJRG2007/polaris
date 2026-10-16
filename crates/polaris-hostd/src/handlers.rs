@@ -15,6 +15,7 @@ use serde::Deserialize;
 use crate::config::Config;
 use crate::deploy::{self, DeploySpec};
 use crate::docker;
+use crate::gpu;
 use crate::host_security;
 use crate::http::{Request, Response};
 use crate::networks;
@@ -266,6 +267,7 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/dirs") => deploy_dirs_list(state),
         ("POST", "/v1/deploy/dirs/remove") => deploy_dirs_remove(state, req, body),
         ("POST", "/v1/host/security") => host_security_run(req, body),
+        ("GET", "/v1/host/gpu") => host_gpu(),
         ("POST", "/v1/host/security/image") => host_security_image(req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
@@ -1346,6 +1348,29 @@ fn host_security_run<R: Read>(req: &Request, body: &mut R) -> Response {
             "the host scan took too long and was stopped",
         ),
         Err(_) => Response::text(502, "Bad Gateway", "could not start the host scan"),
+    }
+}
+
+/// What the host's NVIDIA cards are doing, as the script's own lines for the
+/// dashboard to parse. `present: false` on a host without the driver, which is
+/// answered from memory and starts nothing.
+fn host_gpu() -> Response {
+    if !gpu::has_nvidia() {
+        return Response::json(200, "OK", &serde_json::json!({ "present": false }));
+    }
+    match gpu::read() {
+        Ok(Ok(output)) => Response::json(
+            200,
+            "OK",
+            &serde_json::json!({ "present": true, "output": output }),
+        ),
+        Ok(Err(gpu::GpuError::Busy)) => {
+            Response::text(409, "Conflict", "a GPU reading is still running")
+        }
+        Ok(Err(gpu::GpuError::TimedOut)) => {
+            Response::text(504, "Gateway Timeout", "the GPU reading took too long")
+        }
+        Err(_) => Response::text(502, "Bad Gateway", "could not read the GPU"),
     }
 }
 
