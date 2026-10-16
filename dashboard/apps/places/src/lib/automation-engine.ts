@@ -413,7 +413,9 @@ export function pickHeld(
  */
 function answers(trigger: auto.Trigger, seen: Observation): boolean {
     if (seen.online !== "offline") return true;
-    return (trigger.kind === "change" || trigger.kind === "stays") && trigger.attribute === "online";
+    return (
+        (trigger.kind === "change" || trigger.kind === "stays") && trigger.attribute === "online"
+    );
 }
 
 export function createEngine(ports: EnginePorts) {
