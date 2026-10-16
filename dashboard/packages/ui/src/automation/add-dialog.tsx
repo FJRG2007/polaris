@@ -468,7 +468,10 @@ export function AddBlockDialog({
                                                 {each.icon}
                                             </span>
                                         )}
-                                        <span className="min-w-0 flex-1 truncate" title={each.label}>
+                                        <span
+                                            className="min-w-0 flex-1 truncate"
+                                            title={each.label}
+                                        >
                                             {each.label}
                                         </span>
                                         {!wide && (

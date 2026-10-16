@@ -108,9 +108,7 @@ export function useDraftHistory<T>(
         setHistory(historyOf(value));
     }, []);
     const replace = useCallback((value: T) => {
-        setHistory((current) =>
-            current ? { ...current, present: value } : historyOf(value)
-        );
+        setHistory((current) => (current ? { ...current, present: value } : historyOf(value)));
     }, []);
     const undo = useCallback(() => {
         lastGroupable.current = 0;

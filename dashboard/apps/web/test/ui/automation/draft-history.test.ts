@@ -48,7 +48,11 @@ describe("block clipboard", () => {
     afterEach(() => clipboard.clearClipboard());
 
     it("hands a block back only to the surface and list it came from", () => {
-        clipboard.copyBlock({ surface: "places", role: "trigger", block: { id: "a", kind: "manual" } });
+        clipboard.copyBlock({
+            surface: "places",
+            role: "trigger",
+            block: { id: "a", kind: "manual" }
+        });
         expect(clipboard.hasBlock("places", "trigger")).toBe(true);
         expect(clipboard.hasBlock("places", "step")).toBe(false);
         expect(clipboard.pastedBlock("mail", "trigger")).toBeNull();
