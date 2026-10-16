@@ -1290,9 +1290,15 @@ async function repointConnectors(applicationId: string, ownerId: string): Promis
  *
  * Once an edge has taken the routes, a release a change-over kept running only
  * because its edge could not be told before is retired here (`retireHeldReleases`).
+ * `retireHeld: false` skips that: a dashboard booting beside the one it replaces
+ * cannot see that one's promotions in flight, and the releases they are draining
+ * are not its to take down.
  */
-export async function syncAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
+export async function syncAppRoutes(
+    options: { readonly retireHeld?: boolean } = {}
+): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
     const result = await publishAppRoutes();
+    if (options.retireHeld === false) return result;
     await retireHeldReleases(result.unreachedHosts).catch((error) => {
         console.error("polaris: could not retire the releases an edge was moved off:", error);
     });

@@ -315,6 +315,21 @@ describe("a change-over redeploy of a routed service", () => {
         expect(db.deployments.get("dep-new")?.status).toBe("running");
     });
 
+    it("leaves a held release to the dashboard that kept it, when asked only to publish", async () => {
+        // A dashboard booting beside the one it replaces cannot see that one's
+        // promotions in flight, so its boot sync writes the routes and retires nothing.
+        routerSync.fail = true;
+        db.deployments.get("dep-new")!.createdAt = new Date("2026-10-01T11:00:00Z");
+        await service.executeDeployment("dep-new", TARGET as never, "owner-1", release(true));
+        routerSync.fail = false;
+        ops.length = 0;
+
+        await service.syncAppRoutes({ retireHeld: false });
+
+        expect(ops).toEqual([`route shop.example.test -> ${nameOf("dep-new")}`]);
+        expect(db.deployments.get("dep-old")?.status).toBe("running");
+    });
+
     it("never retires a release newer than the one serving", async () => {
         db.deployments.get("dep-new")!.status = "running";
         db.deployments.get("dep-new")!.createdAt = new Date("2026-10-01T11:00:00Z");

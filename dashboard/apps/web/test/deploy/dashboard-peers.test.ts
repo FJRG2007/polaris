@@ -4,7 +4,16 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { othersAmong, whenAlone } from "@/lib/deploy/dashboard-peers";
+import { afterPredecessor, othersAmong, whenAlone } from "@/lib/deploy/dashboard-peers";
+
+// No daemon to ask, as in the limited edition, which is never rolled over.
+vi.mock("@polaris/hostd-client", () => ({
+    HostdClient: class {
+        dockerRequest(): Promise<never> {
+            return Promise.reject(new Error("no daemon"));
+        }
+    }
+}));
 
 describe("othersAmong", () => {
     it("finds a second dashboard and ignores this one", () => {
@@ -55,5 +64,13 @@ describe("whenAlone", () => {
         await whenAlone(work, { peers: async () => true, recheckMs: 10, giveUpMs: 30, sleep: instant });
         expect(work).toHaveBeenCalledOnce();
         warn.mockRestore();
+    });
+});
+
+describe("afterPredecessor", () => {
+    it("is one wait for every boot task, and settles when nobody else can be asked", async () => {
+        const first = afterPredecessor();
+        expect(afterPredecessor()).toBe(first);
+        await expect(first).resolves.toBeUndefined();
     });
 });

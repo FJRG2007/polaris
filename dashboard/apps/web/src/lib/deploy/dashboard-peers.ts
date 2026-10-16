@@ -89,3 +89,20 @@ export async function whenAlone(
     console.warn("polaris: another dashboard has been running beside this one for 30 minutes; going ahead");
     return work();
 }
+
+/** One wait for the whole process, kept on the process rather than in this module:
+ *  Next can evaluate a module once per bundle layer, and every copy should share it. */
+const shared = globalThis as { [key: symbol]: Promise<void> | undefined };
+const PREDECESSOR = Symbol.for("polaris.dashboard-peers.predecessor");
+
+/**
+ * Resolves once the dashboard this one replaced has been retired - at once when
+ * there never was one. Shared by every boot task that must not run beside it:
+ * whatever the previous dashboard is still doing during the rollover (a deploy, a
+ * copy, a tunnel, a timer of its own) is its to finish, and the same loop started
+ * here as well would do it twice. Never rejects.
+ */
+export function afterPredecessor(): Promise<void> {
+    shared[PREDECESSOR] ??= whenAlone(async () => undefined).catch(() => undefined);
+    return shared[PREDECESSOR];
+}
