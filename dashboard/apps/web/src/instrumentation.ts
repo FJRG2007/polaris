@@ -205,6 +205,11 @@ export async function register(): Promise<void> {
     const { startUpdateWatcher } = await import("./lib/update-watcher");
     startUpdateWatcher();
 
+    // Move the open agent rollout along wave by wave, record each server's
+    // heartbeat, and deliver the commands waiting for servers that answer again.
+    const { startRolloutLoop } = await import("./lib/agent-rollouts/service");
+    startRolloutLoop();
+
     // Keep each runner pool's ephemeral runners up: replace the ones that took a
     // job and exited, and remove the registrations left behind by a machine that
     // died mid-job, which GitHub would otherwise keep queueing work onto.
