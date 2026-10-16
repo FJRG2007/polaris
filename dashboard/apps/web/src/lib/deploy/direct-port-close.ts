@@ -22,7 +22,7 @@
  *   cannot change over restarts, so every port they can close is closed.
  */
 
-import { isReleaseImage } from "@polaris/core";
+import { isReleaseImage } from "@polaris/deploy";
 import { prisma, type Prisma } from "@polaris/db";
 import { IN_FLIGHT_DEPLOY_STATUSES } from "@/lib/deploy/status";
 import { setApplicationPublishPort } from "@/lib/deploy-service";
