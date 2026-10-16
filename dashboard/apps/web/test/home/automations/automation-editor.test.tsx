@@ -243,6 +243,17 @@ function openMenu(name: string): void {
     fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, ctrlKey: false });
 }
 
+/** Opens a stage's add dialog and picks a kind of block from "By type". */
+async function addFromDialog(button: string, kind: string, group?: string): Promise<void> {
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    const dialog = await screen.findByRole("dialog");
+    const byType = within(dialog).queryByRole("tab", { name: "By type" });
+    if (byType) fireEvent.click(byType);
+    if (group) fireEvent.click(within(dialog).getByRole("button", { name: group }));
+    fireEvent.click(within(dialog).getByRole("button", { name: new RegExp(`^${kind}`) }));
+    await painted();
+}
+
 beforeEach(() => {
     replaced.length = 0;
     pushed.length = 0;
@@ -360,10 +371,8 @@ describe("an empty automation", () => {
             />
         );
         await painted();
-        openMenu("Add step");
-        fireEvent.click(await screen.findByRole("menuitem", { name: "Wait a while" }));
-        openMenu("Add step");
-        fireEvent.click(await screen.findByRole("menuitem", { name: "Notify me" }));
+        await addFromDialog("Add step", "Wait a while", "Time");
+        await addFromDialog("Add step", "Notify me", "Other");
         expect(screen.getByLabelText(/Message/)).toBeDefined();
 
         const moves = screen.getAllByRole("button", { name: "Move up" });
@@ -389,8 +398,7 @@ describe("an empty automation", () => {
             />
         );
         await painted();
-        openMenu("Add step");
-        fireEvent.click(await screen.findByRole("menuitem", { name: "Operate a device" }));
+        await addFromDialog("Add step", "Operate a device");
         expect(
             screen.getByText("You cannot operate devices, so a step cannot use them.")
         ).toBeDefined();
@@ -857,6 +865,113 @@ describe("the block editor", () => {
             fireEvent.click(within(sheet).getByRole("button", { name: "Close panel" }));
             await painted();
             expect(screen.queryByRole("dialog")).toBeNull();
+        } finally {
+            window.matchMedia = original;
+        }
+    });
+});
+
+describe("the add dialog", () => {
+    const editor = (template: string | null = null) => (
+        <AutomationEditor
+            automationId={null}
+            template={template}
+            deviceId={template ? "plug" : null}
+            canManage
+            canControl
+            initialTab="flow"
+        />
+    );
+
+    it("starts from a device and adds a block with that device already chosen", async () => {
+        render(editor());
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
+        const dialog = await screen.findByRole("dialog");
+        expect(
+            within(dialog).getByRole("tab", { name: "By target" }).getAttribute("aria-selected")
+        ).toBe("true");
+        fireEvent.change(within(dialog).getByRole("searchbox"), {
+            target: { value: "fixture plug" }
+        });
+        fireEvent.click(within(dialog).getByRole("button", { name: /^Fixture plug/ }));
+        // The device's own blocks only: an outlet is watched, it measures nothing.
+        expect(within(dialog).queryByRole("button", { name: /^A reading crosses/ })).toBeNull();
+        fireEvent.click(within(dialog).getByRole("button", { name: /^A device changes/ }));
+        await painted();
+        expect(screen.queryByRole("dialog", { name: "Add a trigger" })).toBeNull();
+        expect(rowsIn("When")[0]!.textContent).toContain("Fixture plug");
+    });
+
+    it("searches every kind, whatever the case, and says when nothing matches", async () => {
+        render(editor());
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+        const dialog = await screen.findByRole("dialog");
+        const search = within(dialog).getByRole("searchbox");
+        fireEvent.change(search, { target: { value: "NOTIFI" } });
+        expect(within(dialog).getByRole("button", { name: /^Notify me/ })).toBeDefined();
+        expect(within(dialog).queryByRole("tab")).toBeNull();
+        fireEvent.change(search, { target: { value: "zzz" } });
+        expect(within(dialog).getByText("Nothing here matches zzz.")).toBeDefined();
+    });
+
+    it("moves through the results with the arrows and back up to the search", async () => {
+        render(editor());
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+        const dialog = await screen.findByRole("dialog");
+        const search = within(dialog).getByRole("searchbox");
+        fireEvent.change(search, { target: { value: "a" } });
+        fireEvent.keyDown(search, { key: "ArrowDown" });
+        const options = within(dialog)
+            .getAllByRole("button")
+            .filter((each) => each.hasAttribute("data-add-option"));
+        expect(document.activeElement).toBe(options[0]);
+        fireEvent.keyDown(options[0]!, { key: "ArrowDown" });
+        expect(document.activeElement).toBe(options[1]);
+        fireEvent.keyDown(options[1]!, { key: "ArrowUp" });
+        fireEvent.keyDown(options[0]!, { key: "ArrowUp" });
+        expect(document.activeElement).toBe(search);
+    });
+
+    it("offers the copied block first, and pastes it at the end", async () => {
+        render(editor("autoOff"));
+        await painted();
+        const before = rowCount("Then");
+        openRow("Then");
+        fireEvent.keyDown(window, { key: "c", ctrlKey: true });
+        await painted();
+        fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+        const dialog = await screen.findByRole("dialog");
+        fireEvent.click(within(dialog).getByRole("button", { name: /^Paste the copied step/ }));
+        await painted();
+        expect(rowCount("Then")).toBe(before + 1);
+        fireEvent.click(screen.getByRole("button", { name: "Add trigger" }));
+        const triggers = await screen.findByRole("dialog");
+        expect(within(triggers).queryByRole("button", { name: /^Paste/ })).toBeNull();
+    });
+
+    it("shows one pane at a time from the bottom on a phone, with a way back", async () => {
+        const original = window.matchMedia;
+        window.matchMedia = ((query: string) => ({
+            matches: false,
+            media: query,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined
+        })) as unknown as typeof window.matchMedia;
+        try {
+            render(editor());
+            await painted();
+            fireEvent.click(screen.getByRole("button", { name: "Add step" }));
+            const dialog = await screen.findByRole("dialog", { name: "Add a step" });
+            expect(dialog.className).toContain("bottom-0");
+            fireEvent.click(within(dialog).getByRole("tab", { name: "By type" }));
+            expect(within(dialog).queryByRole("button", { name: /^Notify me/ })).toBeNull();
+            fireEvent.click(within(dialog).getByRole("button", { name: "Other" }));
+            expect(within(dialog).getByRole("button", { name: /^Notify me/ })).toBeDefined();
+            fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+            expect(within(dialog).queryByRole("button", { name: /^Notify me/ })).toBeNull();
         } finally {
             window.matchMedia = original;
         }

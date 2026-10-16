@@ -2219,6 +2219,56 @@
             "discard": "Salir sin guardar",
             "discardNew": "Salir sin crearla",
             "stay": "Seguir editando"
+        },
+        "add": {
+            "title": {
+                "trigger": "Añadir disparador",
+                "condition": "Añadir condición",
+                "step": "Nuevo paso"
+            },
+            "search": "Buscar",
+            "byTarget": "Por objetivo",
+            "byType": "Por tipo",
+            "blocks": "Bloques",
+            "back": "Volver",
+            "close": "Cerrar",
+            "noMatch": "Nada coincide con {term}.",
+            "nothingForTarget": "Todavía no se puede añadir nada para este.",
+            "more": "{count} más. Afina la búsqueda para verlos.",
+            "groups": {
+                "devices": "Equipos",
+                "time": "Hora",
+                "other": "Otros"
+            },
+            "paste": {
+                "trigger": "Pegar el disparador copiado",
+                "condition": "Pegar la condición copiada",
+                "step": "Pegar el paso copiado"
+            },
+            "pasteAbout": "El bloque que copiaste o cortaste, añadido al final.",
+            "about": {
+                "trigger": {
+                    "change": "Cuando un dispositivo se enciende, se apaga, se abre, se bloquea o cambia de otra forma.",
+                    "stays": "Cuando un dispositivo lleva un rato en un estado.",
+                    "threshold": "Cuando una lectura sube o baja de una cifra.",
+                    "time": "A una hora del día, los días que elijas.",
+                    "interval": "Una y otra vez, cada tantos minutos u horas.",
+                    "manual": "Nunca por sí sola. Solo se ejecuta cuando alguien la inicia."
+                },
+                "condition": {
+                    "device": "Solo mientras un dispositivo está en un estado.",
+                    "reading": "Solo mientras una lectura se compara con una cifra.",
+                    "time": "Solo entre dos horas del día.",
+                    "weekday": "Solo los días de la semana que elijas."
+                },
+                "step": {
+                    "device": "Encender, apagar, bloquear, abrir o ajustar un dispositivo.",
+                    "wait": "Esperar a que un dispositivo esté en un estado, o rendirse tras un rato.",
+                    "delay": "Pausa antes del siguiente paso.",
+                    "notify": "Enviarte una notificación.",
+                    "run": "Iniciar otra automatización de este lugar."
+                }
+            }
         }
     },
     "overview": {

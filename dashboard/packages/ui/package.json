@@ -31,6 +31,10 @@
             "types": "./src/automation/blocks.tsx",
             "import": "./src/automation/blocks.tsx"
         },
+        "./automation-add": {
+            "types": "./src/automation/add-dialog.tsx",
+            "import": "./src/automation/add-dialog.tsx"
+        },
         "./automation-history": {
             "types": "./src/automation/history.ts",
             "import": "./src/automation/history.ts"

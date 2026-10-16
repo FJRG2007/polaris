@@ -2219,6 +2219,56 @@
             "discard": "Leave without saving",
             "discardNew": "Leave without it",
             "stay": "Keep editing"
+        },
+        "add": {
+            "title": {
+                "trigger": "Add a trigger",
+                "condition": "Add a condition",
+                "step": "Add a step"
+            },
+            "search": "Search",
+            "byTarget": "By target",
+            "byType": "By type",
+            "blocks": "Blocks",
+            "back": "Back",
+            "close": "Close",
+            "noMatch": "Nothing here matches {term}.",
+            "nothingForTarget": "Nothing can be added for this one yet.",
+            "more": "{count} more. Narrow the search to see them.",
+            "groups": {
+                "devices": "Devices",
+                "time": "Time",
+                "other": "Other"
+            },
+            "paste": {
+                "trigger": "Paste the copied trigger",
+                "condition": "Paste the copied condition",
+                "step": "Paste the copied step"
+            },
+            "pasteAbout": "The block you copied or cut, added at the end.",
+            "about": {
+                "trigger": {
+                    "change": "When a device turns on, off, opens, locks or changes in some other way.",
+                    "stays": "When a device has been in a state for a while.",
+                    "threshold": "When a reading goes above or below a figure.",
+                    "time": "At a time of day, on the days you choose.",
+                    "interval": "Over and over, every so many minutes or hours.",
+                    "manual": "Never on its own. Runs only when somebody starts it."
+                },
+                "condition": {
+                    "device": "Only while a device is in a given state.",
+                    "reading": "Only while a reading compares to a figure.",
+                    "time": "Only between two times of day.",
+                    "weekday": "Only on the days of the week you choose."
+                },
+                "step": {
+                    "device": "Turn on, off, lock, open or set a device.",
+                    "wait": "Wait until a device is in a state, or give up after a while.",
+                    "delay": "Pause before the next step.",
+                    "notify": "Send a notification to you.",
+                    "run": "Start another automation of this place."
+                }
+            }
         }
     },
     "overview": {

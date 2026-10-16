@@ -43,6 +43,7 @@ import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
 import { AutomationCanvas } from "./automation-canvas";
+import { AddBlockButton, withTarget } from "./add-block";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
@@ -547,6 +548,12 @@ export function AutomationEditor({
                 : blocksOf(draft.definition, role).length - 1
         );
     };
+
+    /** The add dialog's paste entry, when the clipboard holds a block for `role`. */
+    const pasteFor = (role: BlockRole) =>
+        draft && clipboard.hasBlock(SURFACE, role)
+            ? () => pasteBlock(role, blocksOf(draft.definition, role).length - 1)
+            : undefined;
 
     const leave = blocks.useLeaveGuard(dirty && !readOnly, (href) => router.push(href));
     const onSelected = (run: (role: BlockRole, index: number) => void) =>
@@ -1143,16 +1150,18 @@ export function AutomationEditor({
                             >
                                 {rowsOf("trigger", t("automations.editor.when"))}
                                 {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
-                                    <flow.AddMenu
+                                    <AddBlockButton
+                                        role="trigger"
                                         label={t("automations.editor.addTrigger")}
-                                        options={auto.TRIGGER_KINDS.map((kind) => ({
-                                            value: kind,
-                                            label: words.triggerKindText(kind, t)
-                                        }))}
-                                        onPick={(kind) =>
+                                        devices={devices}
+                                        onPaste={pasteFor("trigger")}
+                                        onPick={(kind, target) =>
                                             addBlock(
                                                 "trigger",
-                                                auto.blankTrigger(kind as auto.TriggerKind)
+                                                withTarget(
+                                                    auto.blankTrigger(kind as auto.TriggerKind),
+                                                    target
+                                                )
                                             )
                                         }
                                     />
@@ -1172,19 +1181,21 @@ export function AutomationEditor({
                                 {rowsOf("group", t("automations.editor.if"))}
                                 {!readOnly &&
                                     definition.conditions.groups.length < auto.LIMITS.groups && (
-                                        <flow.AddMenu
+                                        <AddBlockButton
+                                            role="condition"
                                             label={t("automations.editor.addCondition")}
-                                            options={auto.CONDITION_KINDS.map((kind) => ({
-                                                value: kind,
-                                                label: words.conditionKindText(kind, t)
-                                            }))}
-                                            onPick={(kind) =>
+                                            devices={devices}
+                                            onPaste={pasteFor("group")}
+                                            onPick={(kind, target) =>
                                                 addBlock("group", {
                                                     id: auto.nodeIdOf(),
                                                     match: "all",
                                                     items: [
-                                                        auto.blankCondition(
-                                                            kind as auto.ConditionKind
+                                                        withTarget(
+                                                            auto.blankCondition(
+                                                                kind as auto.ConditionKind
+                                                            ),
+                                                            target
                                                         )
                                                     ]
                                                 })
@@ -1204,14 +1215,20 @@ export function AutomationEditor({
                             >
                                 {rowsOf("step", t("automations.editor.then"))}
                                 {!readOnly && definition.actions.length < auto.LIMITS.steps && (
-                                    <flow.AddMenu
+                                    <AddBlockButton
+                                        role="step"
                                         label={t("automations.editor.addStep")}
-                                        options={auto.STEP_KINDS.map((kind) => ({
-                                            value: kind,
-                                            label: words.stepKindText(kind, t)
-                                        }))}
-                                        onPick={(kind) =>
-                                            addBlock("step", auto.blankStep(kind as auto.StepKind))
+                                        devices={devices}
+                                        canControl={canControl}
+                                        onPaste={pasteFor("step")}
+                                        onPick={(kind, target) =>
+                                            addBlock(
+                                                "step",
+                                                withTarget(
+                                                    auto.blankStep(kind as auto.StepKind),
+                                                    target
+                                                )
+                                            )
                                         }
                                     />
                                 )}
@@ -1575,16 +1592,17 @@ function ConditionGroupCard({
                 <p className="text-xs text-danger">{t("automations.errors.emptyGroup")}</p>
             )}
             {!disabled && group.items.length < auto.LIMITS.conditionsPerGroup && (
-                <flow.AddMenu
+                <AddBlockButton
+                    role="condition"
                     label={t("automations.editor.addToGroup")}
-                    options={auto.CONDITION_KINDS.map((kind) => ({
-                        value: kind,
-                        label: words.conditionKindText(kind, t)
-                    }))}
-                    onPick={(kind) =>
+                    devices={devices}
+                    onPick={(kind, target) =>
                         onChange({
                             ...group,
-                            items: [...group.items, auto.blankCondition(kind as auto.ConditionKind)]
+                            items: [
+                                ...group.items,
+                                withTarget(auto.blankCondition(kind as auto.ConditionKind), target)
+                            ]
                         })
                     }
                 />
