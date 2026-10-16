@@ -35,7 +35,9 @@ export interface EmitInput {
 export async function emitAutomationEvent(type: string, input: EmitInput): Promise<string | null> {
     try {
         if (core.byteLength(JSON.stringify(input.payload)) > L.eventPayloadBytes) {
-            console.warn(`polaris: an automation event of type ${type} was too large and was dropped`);
+            console.warn(
+                `polaris: an automation event of type ${type} was too large and was dropped`
+            );
             return null;
         }
         const row = await prisma.automationEvent.create({
@@ -66,12 +68,24 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
         where: { processedAt: null, OR: [{ claimedUntil: null }, { claimedUntil: { lt: now } }] },
         orderBy: { createdAt: "asc" },
         take: limit,
-        select: { id: true, type: true, orgId: true, userId: true, subjectKey: true, payload: true, depth: true }
+        select: {
+            id: true,
+            type: true,
+            orgId: true,
+            userId: true,
+            subjectKey: true,
+            payload: true,
+            depth: true
+        }
     });
     const started: StartedRun[] = [];
     for (const event of candidates) {
         const claimed = await prisma.automationEvent.updateMany({
-            where: { id: event.id, processedAt: null, OR: [{ claimedUntil: null }, { claimedUntil: { lt: now } }] },
+            where: {
+                id: event.id,
+                processedAt: null,
+                OR: [{ claimedUntil: null }, { claimedUntil: { lt: now } }]
+            },
             data: { claimedUntil: new Date(Date.now() + CLAIM_MS) }
         });
         if (claimed.count !== 1) continue;
@@ -81,12 +95,21 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
             select: {
                 nodeId: true,
                 versionId: true,
-                automation: { select: { id: true, enabled: true, publishedVersionId: true, orgId: true, userId: true } }
+                automation: {
+                    select: {
+                        id: true,
+                        enabled: true,
+                        publishedVersionId: true,
+                        orgId: true,
+                        userId: true
+                    }
+                }
             }
         });
         for (const trigger of triggers) {
             const automation = trigger.automation;
-            if (!automation.enabled || automation.publishedVersionId !== trigger.versionId) continue;
+            if (!automation.enabled || automation.publishedVersionId !== trigger.versionId)
+                continue;
             // An event that names a shelf only starts that shelf's automations.
             if (event.orgId && automation.orgId !== event.orgId) continue;
             if (!event.orgId && event.userId && automation.userId !== event.userId) continue;
@@ -95,12 +118,19 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
                 versionId: trigger.versionId,
                 triggerNodeId: trigger.nodeId,
                 firingKey: `${event.id}:${trigger.nodeId}`,
-                cause: { ...((event.payload ?? {}) as Record<string, unknown>), id: trigger.nodeId, at: now.toISOString() },
+                cause: {
+                    ...((event.payload ?? {}) as Record<string, unknown>),
+                    id: trigger.nodeId,
+                    at: now.toISOString()
+                },
                 depth: event.depth
             });
             if (run) started.push(run);
         }
-        await prisma.automationEvent.update({ where: { id: event.id }, data: { processedAt: new Date() } });
+        await prisma.automationEvent.update({
+            where: { id: event.id },
+            data: { processedAt: new Date() }
+        });
     }
     return started;
 }
@@ -111,7 +141,12 @@ export async function processAutomationEvents(limit = 50): Promise<StartedRun[]>
  * will reach the event itself; the scheduled pass is the backstop.
  */
 export async function kickIntake(): Promise<StartedRun[]> {
-    const started = (await withLease(INTAKE_LEASE, INTAKE_LEASE_MS, () => processAutomationEvents())) ?? [];
-    for (const run of started) if (run.status === "running") void advanceRun(run.id).catch((caught) => console.error("polaris: an automation run failed to step:", caught));
+    const started =
+        (await withLease(INTAKE_LEASE, INTAKE_LEASE_MS, () => processAutomationEvents())) ?? [];
+    for (const run of started)
+        if (run.status === "running")
+            void advanceRun(run.id).catch((caught) =>
+                console.error("polaris: an automation run failed to step:", caught)
+            );
     return started;
 }

@@ -36,8 +36,17 @@ export async function runAutomationsPass(): Promise<Record<string, number>> {
         return scheduled.length + matched.length;
     });
     const resumed = await resumeDueWaits();
-    const runs = [...new Set([...resumed, ...(await runnableRuns(PARALLEL_RUNS))])].slice(0, PARALLEL_RUNS);
-    await Promise.all(runs.map((id) => advanceRun(id).catch((caught) => console.error("polaris: an automation run failed to step:", caught))));
+    const runs = [...new Set([...resumed, ...(await runnableRuns(PARALLEL_RUNS))])].slice(
+        0,
+        PARALLEL_RUNS
+    );
+    await Promise.all(
+        runs.map((id) =>
+            advanceRun(id).catch((caught) =>
+                console.error("polaris: an automation run failed to step:", caught)
+            )
+        )
+    );
     let pruned = 0;
     if (Date.now() - lastPrune >= PRUNE_EVERY_MS) {
         lastPrune = Date.now();
@@ -52,7 +61,12 @@ const PRUNE_BATCH = 50;
 let pruneCursor: string | undefined;
 
 /** Finished runs matching `where` past the newest `keep`, and older than `floor` when one is given. */
-async function pruneRuns(automationId: string, where: Record<string, unknown>, keep: number, floor: Date | null): Promise<number> {
+async function pruneRuns(
+    automationId: string,
+    where: Record<string, unknown>,
+    keep: number,
+    floor: Date | null
+): Promise<number> {
     const keepFrom = await prisma.automationRun.findMany({
         where: { automationId, ...where },
         orderBy: { queuedAt: "desc" },
@@ -61,7 +75,9 @@ async function pruneRuns(automationId: string, where: Record<string, unknown>, k
         select: { queuedAt: true }
     });
     if (keepFrom.length === 0) return 0;
-    const before = floor ? new Date(Math.min(keepFrom[0]!.queuedAt.getTime(), floor.getTime())) : keepFrom[0]!.queuedAt;
+    const before = floor
+        ? new Date(Math.min(keepFrom[0]!.queuedAt.getTime(), floor.getTime()))
+        : keepFrom[0]!.queuedAt;
     const gone = await prisma.automationRun.deleteMany({
         where: { automationId, ...where, finishedAt: { not: null }, queuedAt: { lt: before } }
     });
@@ -86,8 +102,18 @@ export async function pruneAutomationHistory(): Promise<number> {
     });
     pruneCursor = batch.length === PRUNE_BATCH ? batch[batch.length - 1]!.id : undefined;
     for (const { id: automationId } of batch) {
-        removed += await pruneRuns(automationId, { test: false, status: { in: TURNED_AWAY } }, L.keepRuns, null);
-        removed += await pruneRuns(automationId, { test: false, status: { notIn: TURNED_AWAY } }, L.keepRuns, cutoff);
+        removed += await pruneRuns(
+            automationId,
+            { test: false, status: { in: TURNED_AWAY } },
+            L.keepRuns,
+            null
+        );
+        removed += await pruneRuns(
+            automationId,
+            { test: false, status: { notIn: TURNED_AWAY } },
+            L.keepRuns,
+            cutoff
+        );
         removed += await pruneRuns(automationId, { test: true }, L.keepTestRuns, null);
     }
     const events = await prisma.automationEvent.deleteMany({

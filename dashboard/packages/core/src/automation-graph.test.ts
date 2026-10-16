@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import * as graph from "./automation-graph.js";
 
-const node = (id: string, type: string, config: unknown = {}): graph.GraphNode => ({ id, type, typeVersion: 1, config });
+const node = (id: string, type: string, config: unknown = {}): graph.GraphNode => ({
+    id,
+    type,
+    typeVersion: 1,
+    config
+});
 const manual = node("t1", "core.manual");
 const notify = (id: string) => node(id, "core.notify", { title: "Hi", body: "" });
 const cond = (left: string, op: graph.CompareOperator, right = ""): graph.ConditionGroup => ({
@@ -24,9 +29,11 @@ describe("admitRun", () => {
         expect(graph.admitRun({ ...base, mode: "parallel", active: 2 })).toBe("skip");
     });
     it("holds back every mode past the rate limit", () => {
-        for (const mode of graph.AUTOMATION_MODES) expect(graph.admitRun({ ...base, mode, recent: 20 })).toBe("limit");
+        for (const mode of graph.AUTOMATION_MODES)
+            expect(graph.admitRun({ ...base, mode, recent: 20 })).toBe("limit");
     });
-    it("defaults new automations to single", () => expect(graph.DEFAULT_AUTOMATION_MODE).toBe("single"));
+    it("defaults new automations to single", () =>
+        expect(graph.DEFAULT_AUTOMATION_MODE).toBe("single"));
 });
 
 describe("references", () => {
@@ -42,7 +49,12 @@ describe("references", () => {
         expect(graph.resolvePath(context, "trigger.body.toString")).toBeUndefined();
     });
     it("inserts references into JSON as values, not text", () => {
-        expect(graph.jsonWithReferences({ a: "{{trigger.body.n}}", b: ["x {{trigger.body.name}}"] }, context)).toEqual({
+        expect(
+            graph.jsonWithReferences(
+                { a: "{{trigger.body.n}}", b: ["x {{trigger.body.name}}"] },
+                context
+            )
+        ).toEqual({
             a: 3,
             b: ["x Ana"]
         });
@@ -54,8 +66,12 @@ describe("conditions", () => {
     it("compares numbers as numbers and text as text", () => {
         expect(graph.checkCondition(cond("{{trigger.n}}", "gt", "4"), context)).toBe(true);
         expect(graph.checkCondition(cond("{{trigger.n}}", "eq", "5.0"), context)).toBe(true);
-        expect(graph.checkCondition(cond("{{trigger.text}}", "contains", "world"), context)).toBe(true);
-        expect(graph.checkCondition(cond("{{trigger.tags}}", "contains", "red"), context)).toBe(true);
+        expect(graph.checkCondition(cond("{{trigger.text}}", "contains", "world"), context)).toBe(
+            true
+        );
+        expect(graph.checkCondition(cond("{{trigger.tags}}", "contains", "red"), context)).toBe(
+            true
+        );
         expect(graph.checkCondition(cond("{{trigger.none}}", "empty"), context)).toBe(true);
         expect(graph.checkCondition(cond("abc", "lt", "4"), context)).toBe(false);
     });
@@ -101,10 +117,14 @@ describe("graph checks", () => {
             edges: [{ from: { node: "t1", port: "next" }, to: { node: "a" } }],
             finally: { entry: "a" }
         });
-        expect(graph.graphProblems(shared).map((problem) => problem.code)).toContain("finallyShared");
+        expect(graph.graphProblems(shared).map((problem) => problem.code)).toContain(
+            "finallyShared"
+        );
     });
     it("checks each core node's config and asks for a trigger before publishing", () => {
-        const g = graph.automationGraphSchema.parse({ nodes: [node("h", "core.http", { url: "" })] });
+        const g = graph.automationGraphSchema.parse({
+            nodes: [node("h", "core.http", { url: "" })]
+        });
         const codes = graph.graphProblems(g, { forPublish: true }).map((problem) => problem.code);
         expect(codes).toEqual(expect.arrayContaining(["badConfig", "noTrigger"]));
     });
@@ -113,7 +133,10 @@ describe("graph checks", () => {
 describe("list view", () => {
     const flow: graph.ListFlow = {
         timeZone: "Europe/Madrid",
-        triggers: [manual, node("t2", "core.schedule", { kind: "every", amount: 5, unit: "minutes" })],
+        triggers: [
+            manual,
+            node("t2", "core.schedule", { kind: "every", amount: 5, unit: "minutes" })
+        ],
         steps: [
             {
                 node: node("if1", "core.if", { condition: cond("1", "eq", "1") }),
@@ -137,7 +160,13 @@ describe("list view", () => {
     it("keeps an empty branch and an If at the end", () => {
         const built = graph.graphFromList({
             ...flow,
-            steps: [{ node: node("if1", "core.if", { condition: cond("1", "eq", "1") }), then: [], else: [{ node: notify("b") }] }]
+            steps: [
+                {
+                    node: node("if1", "core.if", { condition: cond("1", "eq", "1") }),
+                    then: [],
+                    else: [{ node: notify("b") }]
+                }
+            ]
         });
         expect(graph.listFromGraph(built)?.steps[0]?.else?.[0]?.node.id).toBe("b");
     });
@@ -156,17 +185,25 @@ describe("list view", () => {
 describe("schedules", () => {
     it("finds the next daily time in the automation's zone", () => {
         const after = new Date("2026-03-28T10:00:00Z");
-        const next = graph.nextScheduleDue({ kind: "daily", times: ["08:30", "12:00"], days: [] }, after, "Europe/Madrid");
+        const next = graph.nextScheduleDue(
+            { kind: "daily", times: ["08:30", "12:00"], days: [] },
+            after,
+            "Europe/Madrid"
+        );
         expect(next?.toISOString()).toBe("2026-03-28T11:00:00.000Z");
     });
     it("steps an interval and reads cron", () => {
         const after = new Date("2026-01-01T00:00:00Z");
-        expect(graph.nextScheduleDue({ kind: "every", amount: 2, unit: "hours" }, after, "UTC")?.toISOString()).toBe(
-            "2026-01-01T02:00:00.000Z"
-        );
-        expect(graph.nextScheduleDue({ kind: "cron", expression: "15 * * * *" }, after, "UTC")?.toISOString()).toBe(
-            "2026-01-01T00:15:00.000Z"
-        );
+        expect(
+            graph
+                .nextScheduleDue({ kind: "every", amount: 2, unit: "hours" }, after, "UTC")
+                ?.toISOString()
+        ).toBe("2026-01-01T02:00:00.000Z");
+        expect(
+            graph
+                .nextScheduleDue({ kind: "cron", expression: "15 * * * *" }, after, "UTC")
+                ?.toISOString()
+        ).toBe("2026-01-01T00:15:00.000Z");
     });
 });
 
@@ -177,15 +214,30 @@ describe("stored data", () => {
         expect(graph.capStored({ a: 1 }, 1000)).toEqual({ a: 1 });
     });
     it("redacts secrets anywhere in a value", () => {
-        expect(graph.redactSecrets({ url: "https://h/hook/SECRETVALUE", list: ["Bearer SECRETVALUE"] }, ["SECRETVALUE"])).toEqual({
+        expect(
+            graph.redactSecrets(
+                { url: "https://h/hook/SECRETVALUE", list: ["Bearer SECRETVALUE"] },
+                ["SECRETVALUE"]
+            )
+        ).toEqual({
             url: "https://h/hook/[secret]",
             list: ["Bearer [secret]"]
         });
-        expect(graph.maskSecretUrl("https://hooks.slack.com/services/T0/B0/abcd1234")).toBe("https://hooks.slack.com/...1234");
+        expect(graph.maskSecretUrl("https://hooks.slack.com/services/T0/B0/abcd1234")).toBe(
+            "https://hooks.slack.com/...1234"
+        );
     });
     it("normalizes names and validates secret values", () => {
-        expect(graph.automationCreateSchema.parse({ name: "  Door   alert " }).name).toBe("Door alert");
-        expect(graph.secretCreateSchema.safeParse({ name: "x", kind: "url", value: "not a url" }).success).toBe(false);
-        expect(graph.secretCreateSchema.safeParse({ name: "x", kind: "basic", value: "user:pass" }).success).toBe(true);
+        expect(graph.automationCreateSchema.parse({ name: "  Door   alert " }).name).toBe(
+            "Door alert"
+        );
+        expect(
+            graph.secretCreateSchema.safeParse({ name: "x", kind: "url", value: "not a url" })
+                .success
+        ).toBe(false);
+        expect(
+            graph.secretCreateSchema.safeParse({ name: "x", kind: "basic", value: "user:pass" })
+                .success
+        ).toBe(true);
     });
 });

@@ -43,7 +43,12 @@ export async function mayEditShelf(actor: RunActor, shelf: Shelf): Promise<boole
  * an allowed automation somewhere new and publish it onto the network.
  */
 export async function mayAllowLocalNetwork(actor: RunActor, shelf: Shelf): Promise<boolean> {
-    if (shelf.orgId) return (await resolveOrgAccess(actor, shelf.orgId))?.permissions.includes(core.ALL_ORG_PERMISSIONS) ?? false;
+    if (shelf.orgId)
+        return (
+            (await resolveOrgAccess(actor, shelf.orgId))?.permissions.includes(
+                core.ALL_ORG_PERMISSIONS
+            ) ?? false
+        );
     return shelf.userId === actor.id && actor.isAdmin;
 }
 

@@ -323,7 +323,10 @@ export function checkCompare(leaf: CompareLeaf, context: unknown): boolean {
 export function checkCondition(node: ConditionNode, context: unknown): boolean {
     if (node.kind === "compare") return checkCompare(node, context);
     const results = node.items.map((item) => checkCondition(item, context));
-    const held = node.join === "all" ? results.every(Boolean) : results.length === 0 || results.some(Boolean);
+    const held =
+        node.join === "all"
+            ? results.every(Boolean)
+            : results.length === 0 || results.some(Boolean);
     return node.negate ? !held : held;
 }
 
@@ -356,14 +359,19 @@ export const scheduleConfigSchema = z.discriminatedUnion("kind", [
     }),
     z.object({
         kind: z.literal("cron"),
-        expression: z.string().trim().min(1).max(120).refine((value) => {
-            try {
-                parseCron(value);
-                return true;
-            } catch {
-                return false;
-            }
-        }, "cronInvalid")
+        expression: z
+            .string()
+            .trim()
+            .min(1)
+            .max(120)
+            .refine((value) => {
+                try {
+                    parseCron(value);
+                    return true;
+                } catch {
+                    return false;
+                }
+            }, "cronInvalid")
     })
 ]);
 export type ScheduleConfig = z.infer<typeof scheduleConfigSchema>;
@@ -379,7 +387,11 @@ export const httpConfigSchema = z
                 z.object({ kind: z.literal("none") }),
                 z.object({ kind: z.literal("bearer"), secretId: secretRef }),
                 z.object({ kind: z.literal("basic"), secretId: secretRef }),
-                z.object({ kind: z.literal("header"), secretId: secretRef, header: text(100).min(1) })
+                z.object({
+                    kind: z.literal("header"),
+                    secretId: secretRef,
+                    header: text(100).min(1)
+                })
             ])
             .default({ kind: "none" }),
         query: pairs.default([]),
@@ -393,7 +405,12 @@ export const httpConfigSchema = z
                 z.object({ kind: z.literal("text"), text: text(AUTOMATION_LIMITS.textLength * 4) })
             ])
             .default({ kind: "none" }),
-        timeoutSeconds: z.number().int().min(1).max(AUTOMATION_LIMITS.httpTimeoutMs / 1000).default(15),
+        timeoutSeconds: z
+            .number()
+            .int()
+            .min(1)
+            .max(AUTOMATION_LIMITS.httpTimeoutMs / 1000)
+            .default(15),
         /** Treat an answer outside 2xx as success rather than failing the step. */
         acceptAnyStatus: z.boolean().default(false)
     })
@@ -452,7 +469,10 @@ export const CORE_NODE_CONFIGS = {
     }),
     "core.if": z.object({ condition: conditionTreeSchema }),
     "core.wait": waitConfigSchema,
-    "core.notify": z.object({ title: text(200).min(1), body: text(AUTOMATION_LIMITS.textLength).default("") }),
+    "core.notify": z.object({
+        title: text(200).min(1),
+        body: text(AUTOMATION_LIMITS.textLength).default("")
+    }),
     "core.http": httpConfigSchema,
     "core.chat": chatPresetConfigSchema.extend({ preset: z.enum(CHAT_PRESETS) })
 } as const;
@@ -496,9 +516,14 @@ export function nodeRole(type: string): NodeRole | null {
 }
 
 /** The next time a schedule is due after `after`, in the automation's time zone. */
-export function nextScheduleDue(config: ScheduleConfig, after: Date, timeZone: string): Date | null {
+export function nextScheduleDue(
+    config: ScheduleConfig,
+    after: Date,
+    timeZone: string
+): Date | null {
     if (config.kind === "every") {
-        const unit = config.unit === "minutes" ? 60_000 : config.unit === "hours" ? 3_600_000 : DAY_MS;
+        const unit =
+            config.unit === "minutes" ? 60_000 : config.unit === "hours" ? 3_600_000 : DAY_MS;
         return new Date(after.getTime() + config.amount * unit);
     }
     if (config.kind === "cron") return nextCronRun(parseCron(config.expression), after, timeZone);
@@ -506,7 +531,12 @@ export function nextScheduleDue(config: ScheduleConfig, after: Date, timeZone: s
 }
 
 /** The soonest of several clock times on some weekdays, through the cron reader so DST is handled once. */
-export function nextDailyDue(times: readonly string[], days: readonly number[], after: Date, timeZone: string): Date | null {
+export function nextDailyDue(
+    times: readonly string[],
+    days: readonly number[],
+    after: Date,
+    timeZone: string
+): Date | null {
     const weekdays = days.length === 0 ? "*" : [...new Set(days)].sort().join(",");
     let soonest: Date | null = null;
     for (const time of times) {
@@ -521,11 +551,19 @@ export function nextDailyDue(times: readonly string[], days: readonly number[], 
 // The graph
 // ---------------------------------------------------------------------------
 
-const nodeId = z.string().min(1).max(64).regex(/^[\w-]+$/);
+const nodeId = z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[\w-]+$/);
 
 export const graphNodeSchema = z.object({
     id: nodeId,
-    type: z.string().min(1).max(100).regex(/^[a-z][\w-]*(\.[\w-]+)+$/),
+    type: z
+        .string()
+        .min(1)
+        .max(100)
+        .regex(/^[a-z][\w-]*(\.[\w-]+)+$/),
     typeVersion: z.number().int().min(1).max(1000).default(1),
     /** Validated against the node type's own schema separately: an app's node may be unavailable here. */
     config: z.unknown().default({}),
@@ -576,7 +614,8 @@ export type GraphProblem =
 /** Nodes reachable from `start` along edges, `start` included. */
 export function reachableFrom(graph: AutomationGraph, start: string): Set<string> {
     const out = new Map<string, string[]>();
-    for (const edge of graph.edges) out.set(edge.from.node, [...(out.get(edge.from.node) ?? []), edge.to.node]);
+    for (const edge of graph.edges)
+        out.set(edge.from.node, [...(out.get(edge.from.node) ?? []), edge.to.node]);
     const seen = new Set<string>();
     const stack = [start];
     while (stack.length) {
@@ -599,14 +638,19 @@ export function finallyNodes(graph: AutomationGraph): Set<string> {
 
 /** Successors of one node through one port, in edge order. */
 export function successors(graph: AutomationGraph, node: string, port: string): string[] {
-    return graph.edges.filter((edge) => edge.from.node === node && edge.from.port === port).map((edge) => edge.to.node);
+    return graph.edges
+        .filter((edge) => edge.from.node === node && edge.from.port === port)
+        .map((edge) => edge.to.node);
 }
 
 /**
  * Everything wrong with a graph that would make it run differently from how it
  * reads. `forPublish` adds what a draft may lack but a live version may not.
  */
-export function graphProblems(graph: AutomationGraph, options: { forPublish?: boolean } = {}): GraphProblem[] {
+export function graphProblems(
+    graph: AutomationGraph,
+    options: { forPublish?: boolean } = {}
+): GraphProblem[] {
     const problems: GraphProblem[] = [];
     const byId = new Map<string, GraphNode>();
     for (const node of graph.nodes) {
@@ -615,7 +659,11 @@ export function graphProblems(graph: AutomationGraph, options: { forPublish?: bo
         if (isCoreNodeType(node.type)) {
             const parsed = CORE_NODE_CONFIGS[node.type].safeParse(node.config);
             if (!parsed.success)
-                problems.push({ code: "badConfig", node: node.id, issue: parsed.error.issues[0]?.message ?? "invalid" });
+                problems.push({
+                    code: "badConfig",
+                    node: node.id,
+                    issue: parsed.error.issues[0]?.message ?? "invalid"
+                });
         }
     }
     for (const edge of graph.edges) {
@@ -625,11 +673,13 @@ export function graphProblems(graph: AutomationGraph, options: { forPublish?: bo
         if (!to) problems.push({ code: "unknownEdgeNode", node: edge.to.node });
         if (from && !nodePorts(from.type).includes(edge.from.port))
             problems.push({ code: "unknownPort", node: from.id, port: edge.from.port });
-        if (to && nodeRole(to.type) === "trigger") problems.push({ code: "intoTrigger", node: to.id });
+        if (to && nodeRole(to.type) === "trigger")
+            problems.push({ code: "intoTrigger", node: to.id });
     }
     // Kahn's algorithm: whatever is left with an inbound edge sits on a cycle.
     const inbound = new Map<string, number>(graph.nodes.map((node) => [node.id, 0]));
-    for (const edge of graph.edges) if (inbound.has(edge.to.node)) inbound.set(edge.to.node, inbound.get(edge.to.node)! + 1);
+    for (const edge of graph.edges)
+        if (inbound.has(edge.to.node)) inbound.set(edge.to.node, inbound.get(edge.to.node)! + 1);
     const queue = [...inbound].filter(([, count]) => count === 0).map(([id]) => id);
     while (queue.length) {
         const at = queue.shift()!;
@@ -646,12 +696,15 @@ export function graphProblems(graph: AutomationGraph, options: { forPublish?: bo
     const entry = graph.finally.entry;
     if (entry) {
         const node = byId.get(entry);
-        if (!node || nodeRole(node.type) === "trigger") problems.push({ code: "finallyEntry", node: entry });
+        if (!node || nodeRole(node.type) === "trigger")
+            problems.push({ code: "finallyEntry", node: entry });
         else if (!cyclic) {
             const lane = finallyNodes(graph);
             const main = new Set<string>();
-            for (const trigger of triggerNodes(graph)) for (const id of reachableFrom(graph, trigger.id)) main.add(id);
-            for (const id of lane) if (main.has(id)) problems.push({ code: "finallyShared", node: id });
+            for (const trigger of triggerNodes(graph))
+                for (const id of reachableFrom(graph, trigger.id)) main.add(id);
+            for (const id of lane)
+                if (main.has(id)) problems.push({ code: "finallyShared", node: id });
             for (const edge of graph.edges)
                 if (lane.has(edge.to.node) && edge.to.node !== entry && !lane.has(edge.from.node))
                     problems.push({ code: "finallyShared", node: edge.to.node });
@@ -659,7 +712,8 @@ export function graphProblems(graph: AutomationGraph, options: { forPublish?: bo
                 if (edge.to.node === entry) problems.push({ code: "finallyShared", node: entry });
         }
     }
-    if (options.forPublish && triggerNodes(graph).length === 0) problems.push({ code: "noTrigger" });
+    if (options.forPublish && triggerNodes(graph).length === 0)
+        problems.push({ code: "noTrigger" });
     return problems;
 }
 
@@ -682,7 +736,12 @@ export interface ListFlow {
     finallyOnCancel: boolean;
 }
 
-function chain(steps: readonly ListStep[], after: string | null, nodes: GraphNode[], edges: GraphEdge[]): string | null {
+function chain(
+    steps: readonly ListStep[],
+    after: string | null,
+    nodes: GraphNode[],
+    edges: GraphEdge[]
+): string | null {
     // Built back to front so each step knows the node it continues into.
     let next = after;
     for (let index = steps.length - 1; index >= 0; index--) {
@@ -691,8 +750,10 @@ function chain(steps: readonly ListStep[], after: string | null, nodes: GraphNod
         if (step.node.type === "core.if") {
             const thenStart = chain(step.then ?? [], next, nodes, edges);
             const elseStart = chain(step.else ?? [], next, nodes, edges);
-            if (thenStart) edges.push({ from: { node: step.node.id, port: "then" }, to: { node: thenStart } });
-            if (elseStart) edges.push({ from: { node: step.node.id, port: "else" }, to: { node: elseStart } });
+            if (thenStart)
+                edges.push({ from: { node: step.node.id, port: "then" }, to: { node: thenStart } });
+            if (elseStart)
+                edges.push({ from: { node: step.node.id, port: "else" }, to: { node: elseStart } });
         } else if (next) {
             edges.push({ from: { node: step.node.id, port: "next" }, to: { node: next } });
         }
@@ -706,7 +767,9 @@ export function graphFromList(flow: ListFlow): AutomationGraph {
     const nodes: GraphNode[] = [...flow.triggers];
     const edges: GraphEdge[] = [];
     const first = chain(flow.steps, null, nodes, edges);
-    if (first) for (const trigger of flow.triggers) edges.push({ from: { node: trigger.id, port: "next" }, to: { node: first } });
+    if (first)
+        for (const trigger of flow.triggers)
+            edges.push({ from: { node: trigger.id, port: "next" }, to: { node: first } });
     const entry = chain(flow.finally, null, nodes, edges);
     return {
         schema: 1,
@@ -723,12 +786,24 @@ function edgeKey(edge: GraphEdge): string {
 
 function sameGraphShape(a: AutomationGraph, b: AutomationGraph): boolean {
     const keys = (graph: AutomationGraph) => graph.edges.map(edgeKey).sort().join("|");
-    const ids = (graph: AutomationGraph) => graph.nodes.map((node) => node.id).sort().join("|");
-    return keys(a) === keys(b) && ids(a) === ids(b) && (a.finally.entry ?? "") === (b.finally.entry ?? "");
+    const ids = (graph: AutomationGraph) =>
+        graph.nodes
+            .map((node) => node.id)
+            .sort()
+            .join("|");
+    return (
+        keys(a) === keys(b) &&
+        ids(a) === ids(b) &&
+        (a.finally.entry ?? "") === (b.finally.entry ?? "")
+    );
 }
 
 /** The node where both branches of an If meet again, or null when they both run off the end. */
-function meeting(graph: AutomationGraph, left: string | undefined, right: string | undefined): string | null {
+function meeting(
+    graph: AutomationGraph,
+    left: string | undefined,
+    right: string | undefined
+): string | null {
     if (!left || !right) return null;
     const distances = (start: string) => {
         const seen = new Map<string, number>([[start, 0]]);
@@ -755,7 +830,12 @@ function meeting(graph: AutomationGraph, left: string | undefined, right: string
     return best?.id ?? null;
 }
 
-function walk(graph: AutomationGraph, start: string | undefined, stop: string | null, budget: { left: number }): ListStep[] | null {
+function walk(
+    graph: AutomationGraph,
+    start: string | undefined,
+    stop: string | null,
+    budget: { left: number }
+): ListStep[] | null {
     const byId = new Map(graph.nodes.map((node) => [node.id, node]));
     const steps: ListStep[] = [];
     let at = start;
@@ -816,7 +896,11 @@ export function capStored(value: unknown, maxBytes: number): unknown {
     if (value === undefined) return null;
     const json = JSON.stringify(value) ?? "null";
     if (byteLength(json) <= maxBytes) return value;
-    return { [TRUNCATED_MARKER]: true, bytes: byteLength(json), preview: json.slice(0, Math.floor(maxBytes / 4)) };
+    return {
+        [TRUNCATED_MARKER]: true,
+        bytes: byteLength(json),
+        preview: json.slice(0, Math.floor(maxBytes / 4))
+    };
 }
 
 export function byteLength(text: string): number {
@@ -827,12 +911,15 @@ export function byteLength(text: string): number {
 export function redactSecrets(value: unknown, secrets: readonly string[]): unknown {
     const live = secrets.filter((secret) => secret.length >= 4);
     if (live.length === 0) return value;
-    const mask = (text: string) => live.reduce((out, secret) => out.split(secret).join("[secret]"), text);
+    const mask = (text: string) =>
+        live.reduce((out, secret) => out.split(secret).join("[secret]"), text);
     const walkValue = (item: unknown): unknown => {
         if (typeof item === "string") return mask(item);
         if (Array.isArray(item)) return item.map(walkValue);
         if (item && typeof item === "object")
-            return Object.fromEntries(Object.entries(item).map(([key, inner]) => [mask(key), walkValue(inner)]));
+            return Object.fromEntries(
+                Object.entries(item).map(([key, inner]) => [mask(key), walkValue(inner)])
+            );
         return item;
     };
     return walkValue(value);
@@ -863,7 +950,10 @@ export function normalizeAutomationName(value: string): string {
 }
 
 export const automationCreateSchema = z.object({
-    name: z.string().transform(normalizeAutomationName).pipe(z.string().min(1, "nameRequired").max(AUTOMATION_LIMITS.nameLength)),
+    name: z
+        .string()
+        .transform(normalizeAutomationName)
+        .pipe(z.string().min(1, "nameRequired").max(AUTOMATION_LIMITS.nameLength)),
     description: z.string().trim().max(AUTOMATION_LIMITS.descriptionLength).default(""),
     /** Null for the personal shelf. */
     orgId: z.string().uuid().nullable().default(null)
@@ -881,7 +971,10 @@ export const automationSettingsSchema = z
 
 export const secretCreateSchema = z
     .object({
-        name: z.string().transform(normalizeAutomationName).pipe(z.string().min(1, "nameRequired").max(80)),
+        name: z
+            .string()
+            .transform(normalizeAutomationName)
+            .pipe(z.string().min(1, "nameRequired").max(80)),
         kind: z.enum(SECRET_KINDS),
         value: z.string().trim().min(1, "valueRequired").max(AUTOMATION_LIMITS.secretLength),
         orgId: z.string().uuid().nullable().default(null)

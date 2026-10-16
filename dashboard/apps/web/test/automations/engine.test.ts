@@ -9,7 +9,10 @@ import { createFakeDb } from "./fixtures/fake-prisma";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({ current: null as ReturnType<typeof createFakeDb> | null }));
-const sent = vi.hoisted(() => ({ requests: [] as { url: string; init: RequestInit }[], status: 200 }));
+const sent = vi.hoisted(() => ({
+    requests: [] as { url: string; init: RequestInit }[],
+    status: 200
+}));
 const notify = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("@polaris/db", async () => {
@@ -17,8 +20,13 @@ vi.mock("@polaris/db", async () => {
     db.current = make();
     return { prisma: db.current.prisma };
 });
-vi.mock("@/lib/automations/runner", () => ({ automationRunner: async () => ({ id: "u1", isAdmin: false }), mayAllowLocalNetwork: async () => false }));
-vi.mock("@/lib/automations/secrets", () => ({ readSecretForRun: async () => "https://hooks.example.test/SECRETVALUE" }));
+vi.mock("@/lib/automations/runner", () => ({
+    automationRunner: async () => ({ id: "u1", isAdmin: false }),
+    mayAllowLocalNetwork: async () => false
+}));
+vi.mock("@/lib/automations/secrets", () => ({
+    readSecretForRun: async () => "https://hooks.example.test/SECRETVALUE"
+}));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () => [] }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_MASTER_KEY: "k".repeat(64) }) }));
@@ -30,7 +38,10 @@ vi.mock("@/lib/safe-fetch", () => ({
     readCapped: async (response: Response) => new Uint8Array(await response.arrayBuffer()),
     configuredRequest: async (url: string, init: RequestInit) => {
         sent.requests.push({ url, init });
-        return new Response(JSON.stringify({ ok: true }), { status: sent.status, headers: { "content-type": "application/json" } });
+        return new Response(JSON.stringify({ ok: true }), {
+            status: sent.status,
+            headers: { "content-type": "application/json" }
+        });
     }
 }));
 
@@ -39,7 +50,12 @@ const outbox = await import("@/lib/automations/outbox");
 const triggers = await import("@/lib/automations/triggers");
 
 const fake = () => db.current!;
-const node = (id: string, type: string, config: unknown = {}, extra: Partial<core.GraphNode> = {}): core.GraphNode => ({
+const node = (
+    id: string,
+    type: string,
+    config: unknown = {},
+    extra: Partial<core.GraphNode> = {}
+): core.GraphNode => ({
     id,
     type,
     typeVersion: 1,
@@ -48,14 +64,27 @@ const node = (id: string, type: string, config: unknown = {}, extra: Partial<cor
 });
 const say = (id: string) => node(id, "core.notify", { title: `step ${id}`, body: "" });
 const http = (id: string, extra: Partial<core.GraphNode> = {}) =>
-    node(id, "core.http", { method: "POST", url: "", urlSecretId: "00000000-0000-7000-8000-000000009999" }, extra);
-const wait = (id: string) => node(id, "core.wait", { kind: "duration", duration: { amount: 1, unit: "hours" } });
+    node(
+        id,
+        "core.http",
+        { method: "POST", url: "", urlSecretId: "00000000-0000-7000-8000-000000009999" },
+        extra
+    );
+const wait = (id: string) =>
+    node(id, "core.wait", { kind: "duration", duration: { amount: 1, unit: "hours" } });
 const ifBig = (id: string) =>
     node(id, "core.if", {
-        condition: { kind: "group", join: "all", items: [{ kind: "compare", left: "{{trigger.n}}", op: "gt", right: "2" }] }
+        condition: {
+            kind: "group",
+            join: "all",
+            items: [{ kind: "compare", left: "{{trigger.n}}", op: "gt", right: "2" }]
+        }
     });
 
-async function seed(flow: Omit<core.ListFlow, "timeZone" | "triggers" | "finallyOnCancel"> & { onCancel?: boolean }, automation: Record<string, unknown> = {}) {
+async function seed(
+    flow: Omit<core.ListFlow, "timeZone" | "triggers" | "finallyOnCancel"> & { onCancel?: boolean },
+    automation: Record<string, unknown> = {}
+) {
     const graph = core.graphFromList({
         timeZone: "UTC",
         triggers: [node("t1", "core.manual")],
@@ -65,15 +94,37 @@ async function seed(flow: Omit<core.ListFlow, "timeZone" | "triggers" | "finally
     });
     expect(core.graphProblems(graph, { forPublish: true })).toEqual([]);
     const row = await fake().prisma.automation.create({
-        data: { name: "Test", draft: graph, enabled: true, runAsId: "u1", userId: "u1", ...automation }
+        data: {
+            name: "Test",
+            draft: graph,
+            enabled: true,
+            runAsId: "u1",
+            userId: "u1",
+            ...automation
+        }
     });
-    const version = await fake().prisma.automationVersion.create({ data: { automationId: row.id, number: 1, graph } });
-    await fake().prisma.automation.update({ where: { id: row.id }, data: { publishedVersionId: version.id } });
+    const version = await fake().prisma.automationVersion.create({
+        data: { automationId: row.id, number: 1, graph }
+    });
+    await fake().prisma.automation.update({
+        where: { id: row.id },
+        data: { publishedVersionId: version.id }
+    });
     return { automationId: row.id as string, versionId: version.id as string, graph };
 }
 
-const fire = (seeded: { automationId: string; versionId: string }, key: string, cause: Record<string, unknown> = {}) =>
-    engine.startRun({ ...seeded, triggerNodeId: "t1", firingKey: key, cause: { id: "t1", ...cause }, depth: 0 });
+const fire = (
+    seeded: { automationId: string; versionId: string },
+    key: string,
+    cause: Record<string, unknown> = {}
+) =>
+    engine.startRun({
+        ...seeded,
+        triggerNodeId: "t1",
+        firingKey: key,
+        cause: { id: "t1", ...cause },
+        depth: 0
+    });
 
 const run = (id: string) => fake().tables.automationRun!.find((row) => row.id === id)!;
 const steps = (id: string) => fake().tables.automationStep!.filter((row) => row.runId === id);
@@ -90,34 +141,57 @@ beforeEach(() => {
 describe("a run to the end", () => {
     it("takes the If branch the trigger data picks and runs the Finally lane once", async () => {
         const seeded = await seed({
-            steps: [{ node: ifBig("if1"), then: [{ node: say("a") }], else: [{ node: say("b") }] }, { node: say("c") }],
+            steps: [
+                { node: ifBig("if1"), then: [{ node: say("a") }], else: [{ node: say("b") }] },
+                { node: say("c") }
+            ],
             finally: [{ node: say("z") }]
         });
         const started = await fire(seeded, "k1", { n: 5 });
         await engine.advanceRun(started!.id);
-        expect(run(started!.id)).toMatchObject({ status: "succeeded", finally: "done", lockToken: null });
+        expect(run(started!.id)).toMatchObject({
+            status: "succeeded",
+            finally: "done",
+            lockToken: null
+        });
         expect(step(started!.id, "if1")).toMatchObject({ status: "ok", port: "then" });
         expect(step(started!.id, "b")).toBeUndefined();
-        expect(steps(started!.id).filter((row) => row.status === "ok").map((row) => row.nodeId)).toEqual(["t1", "if1", "a", "c", "z"]);
+        expect(
+            steps(started!.id)
+                .filter((row) => row.status === "ok")
+                .map((row) => row.nodeId)
+        ).toEqual(["t1", "if1", "a", "c", "z"]);
         expect(notify).toHaveBeenCalledTimes(3);
     });
 
     it("runs the Finally lane after a failure, keeps the failure, and never stores the secret", async () => {
         sent.status = 500;
-        const seeded = await seed({ steps: [{ node: http("h") }, { node: say("after") }], finally: [{ node: say("z") }] });
+        const seeded = await seed({
+            steps: [{ node: http("h") }, { node: say("after") }],
+            finally: [{ node: say("z") }]
+        });
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started!.id);
-        expect(run(started!.id)).toMatchObject({ status: "failed", finally: "done", error: "httpStatus:500" });
+        expect(run(started!.id)).toMatchObject({
+            status: "failed",
+            finally: "done",
+            error: "httpStatus:500"
+        });
         expect(step(started!.id, "after")).toBeUndefined();
         expect(step(started!.id, "z")).toMatchObject({ status: "ok" });
         expect(JSON.stringify(steps(started!.id))).not.toContain("SECRETVALUE");
         expect(sent.requests[0]!.url).toContain("SECRETVALUE");
-        expect(new Headers(sent.requests[0]!.init.headers).get("idempotency-key")).toBe(`${started!.id}:h:0`);
+        expect(new Headers(sent.requests[0]!.init.headers).get("idempotency-key")).toBe(
+            `${started!.id}:h:0`
+        );
     });
 
     it("carries on past a failing step that says so", async () => {
         sent.status = 500;
-        const seeded = await seed({ steps: [{ node: http("h", { onError: "continue" }) }, { node: say("after") }], finally: [] });
+        const seeded = await seed({
+            steps: [{ node: http("h", { onError: "continue" }) }, { node: say("after") }],
+            finally: []
+        });
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started!.id);
         expect(run(started!.id).status).toBe("succeeded");
@@ -148,7 +222,10 @@ describe("firings and modes", () => {
     });
 
     it("restart cancels the active run; queued starts the next when the first ends", async () => {
-        const restart = await seed({ steps: [{ node: wait("w") }], finally: [] }, { mode: "restart" });
+        const restart = await seed(
+            { steps: [{ node: wait("w") }], finally: [] },
+            { mode: "restart" }
+        );
         const old = await fire(restart, "k1");
         await engine.advanceRun(old!.id);
         const fresh = await fire(restart, "k2");
@@ -167,7 +244,10 @@ describe("firings and modes", () => {
 
 describe("waits and cancelling", () => {
     it("resumes a due wait from the rows alone", async () => {
-        const seeded = await seed({ steps: [{ node: wait("w") }, { node: say("a") }], finally: [] });
+        const seeded = await seed({
+            steps: [{ node: wait("w") }, { node: say("a") }],
+            finally: []
+        });
         const started = await fire(seeded, "k1");
         await engine.advanceRun(started!.id);
         expect(run(started!.id)).toMatchObject({ status: "waiting", lockToken: null });
@@ -187,7 +267,11 @@ describe("waits and cancelling", () => {
         expect(run(a!.id)).toMatchObject({ status: "cancelled", finally: "none" });
         expect(step(a!.id, "z")).toBeUndefined();
 
-        const asked = await seed({ steps: [{ node: wait("w") }], finally: [{ node: say("z") }], onCancel: true });
+        const asked = await seed({
+            steps: [{ node: wait("w") }],
+            finally: [{ node: say("z") }],
+            onCancel: true
+        });
         const b = await fire(asked, "k1");
         await engine.advanceRun(b!.id);
         await engine.cancelRun(b!.id);
@@ -199,12 +283,18 @@ describe("waits and cancelling", () => {
 
 describe("a run cut off part-way", () => {
     async function cutOffAt(nodeToCut: core.GraphNode) {
-        const seeded = await seed({ steps: [{ node: nodeToCut }, { node: say("after") }], finally: [{ node: say("z") }] });
+        const seeded = await seed({
+            steps: [{ node: nodeToCut }, { node: say("after") }],
+            finally: [{ node: say("z") }]
+        });
         const started = await fire(seeded, "k1");
         // What a process that died inside the step leaves: the step running, the lease expired.
         const row = step(started!.id, nodeToCut.id)!;
         row.status = "running";
-        Object.assign(run(started!.id), { lockedUntil: new Date(Date.now() - 1000), lockToken: "dead" });
+        Object.assign(run(started!.id), {
+            lockedUntil: new Date(Date.now() - 1000),
+            lockToken: "dead"
+        });
         return started!.id;
     }
 
@@ -226,7 +316,10 @@ describe("a run cut off part-way", () => {
     it("leaves a run alone while another process holds a live lease, and claims nothing after SIGTERM", async () => {
         const seeded = await seed({ steps: [{ node: say("a") }], finally: [] });
         const started = await fire(seeded, "k1");
-        Object.assign(run(started!.id), { lockedUntil: new Date(Date.now() + 60_000), lockToken: "other" });
+        Object.assign(run(started!.id), {
+            lockedUntil: new Date(Date.now() + 60_000),
+            lockToken: "other"
+        });
         await engine.advanceRun(started!.id);
         expect(run(started!.id).status).toBe("running");
         Object.assign(run(started!.id), { lockedUntil: null, lockToken: null });
@@ -241,8 +334,20 @@ describe("the outbox and the clock", () => {
         const seeded = await seed({ steps: [{ node: say("a") }], finally: [] });
         await triggers.armVersion(seeded.automationId, seeded.versionId, seeded.graph);
         const subjectKey = triggers.manualSubject(seeded.automationId, "t1");
-        expect(await outbox.emitAutomationEvent("core.manual", { subjectKey, payload: { by: "u1" }, dedupeKey: "d1" })).not.toBeNull();
-        expect(await outbox.emitAutomationEvent("core.manual", { subjectKey, payload: { by: "u1" }, dedupeKey: "d1" })).toBeNull();
+        expect(
+            await outbox.emitAutomationEvent("core.manual", {
+                subjectKey,
+                payload: { by: "u1" },
+                dedupeKey: "d1"
+            })
+        ).not.toBeNull();
+        expect(
+            await outbox.emitAutomationEvent("core.manual", {
+                subjectKey,
+                payload: { by: "u1" },
+                dedupeKey: "d1"
+            })
+        ).toBeNull();
         const started = await outbox.processAutomationEvents();
         expect(started).toHaveLength(1);
         expect(await outbox.processAutomationEvents()).toHaveLength(0);
@@ -251,11 +356,18 @@ describe("the outbox and the clock", () => {
 
     it("fires a due schedule once and skips an occurrence missed by more than the catch-up window", async () => {
         const graph = core.automationGraphSchema.parse({
-            nodes: [node("s1", "core.schedule", { kind: "every", amount: 5, unit: "minutes" }), say("a")],
+            nodes: [
+                node("s1", "core.schedule", { kind: "every", amount: 5, unit: "minutes" }),
+                say("a")
+            ],
             edges: [{ from: { node: "s1", port: "next" }, to: { node: "a" } }]
         });
-        const row = await fake().prisma.automation.create({ data: { name: "S", draft: graph, enabled: true, runAsId: "u1", userId: "u1" } });
-        const version = await fake().prisma.automationVersion.create({ data: { automationId: row.id, number: 1, graph } });
+        const row = await fake().prisma.automation.create({
+            data: { name: "S", draft: graph, enabled: true, runAsId: "u1", userId: "u1" }
+        });
+        const version = await fake().prisma.automationVersion.create({
+            data: { automationId: row.id, number: 1, graph }
+        });
         await triggers.armVersion(row.id, version.id, graph);
         const armed = fake().tables.automationTrigger![0]!;
         armed.nextDueAt = new Date(Date.now() - 1000);
@@ -268,10 +380,17 @@ describe("the outbox and the clock", () => {
     });
 
     it("keeps a schedule's due time when a re-publish did not change it", () => {
-        const graph = core.automationGraphSchema.parse({ nodes: [node("s1", "core.schedule", { kind: "every", amount: 1, unit: "days" })] });
+        const graph = core.automationGraphSchema.parse({
+            nodes: [node("s1", "core.schedule", { kind: "every", amount: 1, unit: "days" })]
+        });
         const due = new Date("2030-01-01T00:00:00Z");
         const first = triggers.armedTriggers("a1", graph, [], new Date());
-        const kept = triggers.armedTriggers("a1", graph, [{ nodeId: "s1", nextDueAt: due, state: first[0]!.state }], new Date());
+        const kept = triggers.armedTriggers(
+            "a1",
+            graph,
+            [{ nodeId: "s1", nextDueAt: due, state: first[0]!.state }],
+            new Date()
+        );
         expect(kept[0]!.nextDueAt).toEqual(due);
     });
 

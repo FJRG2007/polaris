@@ -25,7 +25,10 @@ export function SecretsView() {
     const t = useTranslations("automations");
     const locale = useLocale();
     const toast = useToast();
-    const { data, error, refresh, replace } = useCachedAction("polaris.automations.secrets", listSecretsAction);
+    const { data, error, refresh, replace } = useCachedAction(
+        "polaris.automations.secrets",
+        listSecretsAction
+    );
     const [creating, setCreating] = useState(false);
     const [removing, setRemoving] = useState<SecretSummary | null>(null);
     const [pending, start] = useTransition();
@@ -33,7 +36,10 @@ export function SecretsView() {
     const remove = (secret: SecretSummary) =>
         start(async () => {
             // Optimistic, put back when the server says no.
-            replace((current) => ({ ...current, rows: current.rows.filter((row) => row.id !== secret.id) }));
+            replace((current) => ({
+                ...current,
+                rows: current.rows.filter((row) => row.id !== secret.id)
+            }));
             setRemoving(null);
             const answer = await deleteSecretAction(secret.id);
             if (!answer.ok) {
@@ -56,7 +62,10 @@ export function SecretsView() {
                 <p className="text-sm text-muted-foreground">{t("secrets.readOnly")}</p>
             ) : null}
             {error !== null && !data ? (
-                <LoadFailed message={error || t("secrets.loadFailed")} onRetry={() => void refresh()} />
+                <LoadFailed
+                    message={error || t("secrets.loadFailed")}
+                    onRetry={() => void refresh()}
+                />
             ) : !data ? (
                 <RowsSkeleton />
             ) : data.rows.length === 0 ? (
@@ -86,7 +95,11 @@ export function SecretsView() {
                                     {" - "}
                                     <code>{row.hint}</code>
                                     {" - "}
-                                    {row.lastUsedAt ? t("secrets.lastUsed", { when: when(row.lastUsedAt, locale) }) : t("secrets.neverUsed")}
+                                    {row.lastUsedAt
+                                        ? t("secrets.lastUsed", {
+                                              when: when(row.lastUsedAt, locale)
+                                          })
+                                        : t("secrets.neverUsed")}
                                 </p>
                             </div>
                             {data.canEdit ? (
@@ -129,7 +142,13 @@ export function SecretsView() {
     );
 }
 
-function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (row: SecretSummary) => void }) {
+function CreateDialog({
+    onClose,
+    onCreated
+}: {
+    onClose: () => void;
+    onCreated: (row: SecretSummary) => void;
+}) {
     const t = useTranslations("automations");
     const [name, setName] = useState("");
     const [kind, setKind] = useState<core.SecretKind>("url");
@@ -137,8 +156,14 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
     const [error, setError] = useState<string | null>(null);
     const [pending, start] = useTransition();
     const parsed = core.secretCreateSchema.safeParse({ name, kind, value });
-    const valueCode = value.trim() && !parsed.success ? parsed.error.issues.find((issue) => issue.path[0] === "value")?.message : undefined;
-    const valueIssue = valueCode === "urlInvalid" || valueCode === "basicInvalid" ? t(`errors.${valueCode}`) : null;
+    const valueCode =
+        value.trim() && !parsed.success
+            ? parsed.error.issues.find((issue) => issue.path[0] === "value")?.message
+            : undefined;
+    const valueIssue =
+        valueCode === "urlInvalid" || valueCode === "basicInvalid"
+            ? t(`errors.${valueCode}`)
+            : null;
 
     const submit = () =>
         start(async () => {
@@ -162,14 +187,23 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
                 >
                     <label className="block space-y-1 text-sm">
                         <span>{t("secrets.name")} *</span>
-                        <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={t("secrets.namePlaceholder")} maxLength={80} autoFocus />
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder={t("secrets.namePlaceholder")}
+                            maxLength={80}
+                            autoFocus
+                        />
                     </label>
                     <label className="block space-y-1 text-sm">
                         <span>{t("secrets.kind")}</span>
                         <Select
                             value={kind}
                             onValueChange={(next) => setKind(next as core.SecretKind)}
-                            options={core.SECRET_KINDS.map((entry) => ({ value: entry, label: t(`secrets.kinds.${entry}`) }))}
+                            options={core.SECRET_KINDS.map((entry) => ({
+                                value: entry,
+                                label: t(`secrets.kinds.${entry}`)
+                            }))}
                             aria-label={t("secrets.kind")}
                         />
                     </label>
@@ -184,7 +218,9 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
                             maxLength={core.AUTOMATION_LIMITS.secretLength}
                             aria-invalid={valueIssue ? true : undefined}
                         />
-                        {valueIssue ? <span className="block text-xs text-destructive">{valueIssue}</span> : null}
+                        {valueIssue ? (
+                            <span className="block text-xs text-destructive">{valueIssue}</span>
+                        ) : null}
                     </label>
                     {error ? (
                         <p role="alert" className="text-sm text-destructive">
@@ -195,7 +231,11 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {t("create.cancel")}
                         </Button>
-                        <Button type="submit" disabled={!parsed.success || pending} aria-disabled={!parsed.success}>
+                        <Button
+                            type="submit"
+                            disabled={!parsed.success || pending}
+                            aria-disabled={!parsed.success}
+                        >
                             {t("secrets.create")}
                         </Button>
                     </DialogFooter>

@@ -20,7 +20,16 @@ const L = core.AUTOMATION_LIMITS;
 
 /** A refusal the screens put into words by its code. */
 export class AutomationAccessError extends Error {
-    constructor(readonly code: "notFound" | "forbidden" | "limit" | "invalid" | "notPublished" | "noManualTrigger" | "secretMissing") {
+    constructor(
+        readonly code:
+            | "notFound"
+            | "forbidden"
+            | "limit"
+            | "invalid"
+            | "notPublished"
+            | "noManualTrigger"
+            | "secretMissing"
+    ) {
         super(code);
         this.name = "AutomationAccessError";
     }
@@ -42,7 +51,10 @@ export interface AutomationRow {
     readonly updatedAt: string;
 }
 
-export async function listAutomations(actor: RunActor, shelf: Shelf): Promise<{ rows: AutomationRow[]; canEdit: boolean }> {
+export async function listAutomations(
+    actor: RunActor,
+    shelf: Shelf
+): Promise<{ rows: AutomationRow[]; canEdit: boolean }> {
     if (!(await mayReadShelf(actor, shelf))) return { rows: [], canEdit: false };
     const rows = await prisma.automation.findMany({
         where: shelfWhere(shelf),
@@ -130,7 +142,11 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
         for (const node of draft.nodes)
             if (node.type === "core.webhook") {
                 const config = core.CORE_NODE_CONFIGS["core.webhook"].safeParse(node.config);
-                hooks[node.id] = hookPath(row.id, node.id, config.success ? config.data.rotation : 0);
+                hooks[node.id] = hookPath(
+                    row.id,
+                    node.id,
+                    config.success ? config.data.rotation : 0
+                );
             }
     const lanAllowed = await mayAllowLocalNetwork(actor, row);
     return {
@@ -139,7 +155,9 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
         description: row.description,
         enabled: row.enabled,
         published: row.publishedVersionId !== null,
-        mode: (core.AUTOMATION_MODES as readonly string[]).includes(row.mode) ? (row.mode as core.AutomationMode) : "single",
+        mode: (core.AUTOMATION_MODES as readonly string[]).includes(row.mode)
+            ? (row.mode as core.AutomationMode)
+            : "single",
         maxRuns: row.maxRuns,
         rateLimit: row.rateLimit,
         allowLocalNetwork: row.allowLocalNetwork,
@@ -152,7 +170,10 @@ export async function getAutomation(actor: RunActor, id: string): Promise<Automa
 }
 
 export async function shelfOf(id: string): Promise<Shelf> {
-    const row = await prisma.automation.findUnique({ where: { id }, select: { orgId: true, userId: true } });
+    const row = await prisma.automation.findUnique({
+        where: { id },
+        select: { orgId: true, userId: true }
+    });
     if (!row) throw new AutomationAccessError("notFound");
     return row;
 }
@@ -164,9 +185,15 @@ export async function createAutomation(
 ): Promise<string> {
     const shelf: Shelf = { orgId: input.orgId, userId: input.orgId ? null : actor.id };
     if (!(await mayEditShelf(actor, shelf))) throw new AutomationAccessError("forbidden");
-    if ((await prisma.automation.count({ where: shelfWhere(shelf) })) >= L.perShelf) throw new AutomationAccessError("limit");
+    if ((await prisma.automation.count({ where: shelfWhere(shelf) })) >= L.perShelf)
+        throw new AutomationAccessError("limit");
     const graph = core.emptyGraph(timeZone);
-    graph.nodes.push({ id: core.automationNodeId(), type: "core.manual", typeVersion: 1, config: {} });
+    graph.nodes.push({
+        id: core.automationNodeId(),
+        type: "core.manual",
+        typeVersion: 1,
+        config: {}
+    });
     const row = await prisma.automation.create({
         data: {
             orgId: shelf.orgId,
@@ -187,21 +214,32 @@ export async function createAutomation(
 async function checkSecrets(shelf: Shelf, graph: core.AutomationGraph): Promise<void> {
     const ids = new Set<string>();
     const collect = (value: unknown, key?: string) => {
-        if (typeof value === "string" && (key === "secretId" || key === "urlSecretId")) ids.add(value);
-        else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) collect(v, k);
+        if (typeof value === "string" && (key === "secretId" || key === "urlSecretId"))
+            ids.add(value);
+        else if (value && typeof value === "object")
+            for (const [k, v] of Object.entries(value)) collect(v, k);
     };
     for (const node of graph.nodes) collect(node.config);
     if (ids.size === 0) return;
-    const found = await prisma.automationSecret.count({ where: { id: { in: [...ids] }, ...shelfWhere(shelf) } });
+    const found = await prisma.automationSecret.count({
+        where: { id: { in: [...ids] }, ...shelfWhere(shelf) }
+    });
     if (found !== ids.size) throw new AutomationAccessError("secretMissing");
 }
 
-export async function saveDraft(actor: RunActor, id: string, graph: core.AutomationGraph): Promise<core.GraphProblem[]> {
+export async function saveDraft(
+    actor: RunActor,
+    id: string,
+    graph: core.AutomationGraph
+): Promise<core.GraphProblem[]> {
     const row = await load(actor, id, true);
     const problems = core.graphProblems(graph);
     if (problems.some((problem) => problem.code !== "badConfig")) return problems;
     await checkSecrets(row, graph);
-    await prisma.automation.update({ where: { id }, data: { draft: graph as object, draftUpdatedAt: new Date() } });
+    await prisma.automation.update({
+        where: { id },
+        data: { draft: graph as object, draftUpdatedAt: new Date() }
+    });
     return problems;
 }
 
@@ -219,7 +257,12 @@ export async function publishAutomation(actor: RunActor, id: string): Promise<co
         select: { number: true }
     });
     const version = await prisma.automationVersion.create({
-        data: { automationId: id, number: (last?.number ?? 0) + 1, graph: parsed.data as object, savedById: actor.id },
+        data: {
+            automationId: id,
+            number: (last?.number ?? 0) + 1,
+            graph: parsed.data as object,
+            savedById: actor.id
+        },
         select: { id: true }
     });
     await prisma.automation.update({
@@ -235,7 +278,10 @@ export async function setEnabled(actor: RunActor, id: string, enabled: boolean):
     if (enabled && !row.publishedVersionId) throw new AutomationAccessError("notPublished");
     await prisma.automation.update({ where: { id }, data: { enabled } });
     if (!enabled) return disarm(id);
-    const version = await prisma.automationVersion.findUnique({ where: { id: row.publishedVersionId! }, select: { graph: true } });
+    const version = await prisma.automationVersion.findUnique({
+        where: { id: row.publishedVersionId! },
+        select: { graph: true }
+    });
     const graph = core.automationGraphSchema.safeParse(version?.graph);
     if (graph.success) await armVersion(id, row.publishedVersionId!, graph.data);
 }
@@ -243,7 +289,13 @@ export async function setEnabled(actor: RunActor, id: string, enabled: boolean):
 export async function updateSettings(
     actor: RunActor,
     id: string,
-    settings: { name: string; description: string; mode: core.AutomationMode; maxRuns: number; rateLimit: number }
+    settings: {
+        name: string;
+        description: string;
+        mode: core.AutomationMode;
+        maxRuns: number;
+        rateLimit: number;
+    }
 ): Promise<void> {
     await load(actor, id, true);
     await prisma.automation.update({ where: { id }, data: settings });
@@ -311,7 +363,12 @@ export interface RunPage {
 const RUNS_PAGE = 50;
 
 /** A page of runs, newest first; `after` is the `next` of the page before. */
-export async function listRuns(actor: RunActor, shelf: Shelf, automationId?: string, after?: string): Promise<RunPage> {
+export async function listRuns(
+    actor: RunActor,
+    shelf: Shelf,
+    automationId?: string,
+    after?: string
+): Promise<RunPage> {
     if (!(await mayReadShelf(actor, shelf))) return { rows: [], next: null };
     const canEdit = await mayEditShelf(actor, shelf);
     const cursor = after ? parseRunCursor(after) : null;
@@ -320,7 +377,14 @@ export async function listRuns(actor: RunActor, shelf: Shelf, automationId?: str
             test: false,
             automation: shelfWhere(shelf),
             ...(automationId ? { automationId } : {}),
-            ...(cursor ? { OR: [{ queuedAt: { lt: cursor.queuedAt } }, { queuedAt: cursor.queuedAt, id: { lt: cursor.id } }] } : {})
+            ...(cursor
+                ? {
+                      OR: [
+                          { queuedAt: { lt: cursor.queuedAt } },
+                          { queuedAt: cursor.queuedAt, id: { lt: cursor.id } }
+                      ]
+                  }
+                : {})
         },
         orderBy: [{ queuedAt: "desc" }, { id: "desc" }],
         take: RUNS_PAGE + 1,
@@ -359,7 +423,9 @@ function parseRunCursor(value: string): { queuedAt: Date; id: string } | null {
     const at = value.indexOf("_");
     const queuedAt = new Date(value.slice(0, at));
     const id = value.slice(at + 1);
-    return at > 0 && !Number.isNaN(queuedAt.getTime()) && /^[0-9a-f-]{36}$/i.test(id) ? { queuedAt, id } : null;
+    return at > 0 && !Number.isNaN(queuedAt.getTime()) && /^[0-9a-f-]{36}$/i.test(id)
+        ? { queuedAt, id }
+        : null;
 }
 
 export interface RunStepRow {
@@ -377,12 +443,16 @@ export interface RunStepRow {
 }
 
 /** One run's steps in the order they ran. */
-export async function listRunSteps(actor: RunActor, runId: string): Promise<{ steps: RunStepRow[]; canSeeData: boolean }> {
+export async function listRunSteps(
+    actor: RunActor,
+    runId: string
+): Promise<{ steps: RunStepRow[]; canSeeData: boolean }> {
     const run = await prisma.automationRun.findUnique({
         where: { id: runId },
         select: { versionId: true, automation: { select: { orgId: true, userId: true } } }
     });
-    if (!run || !(await mayReadShelf(actor, run.automation))) throw new AutomationAccessError("notFound");
+    if (!run || !(await mayReadShelf(actor, run.automation)))
+        throw new AutomationAccessError("notFound");
     const canSeeData = await mayEditShelf(actor, run.automation);
     const [steps, version] = await Promise.all([
         prisma.automationStep.findMany({
@@ -401,10 +471,15 @@ export async function listRunSteps(actor: RunActor, runId: string): Promise<{ st
                 output: canSeeData
             }
         }),
-        prisma.automationVersion.findUnique({ where: { id: run.versionId }, select: { graph: true } })
+        prisma.automationVersion.findUnique({
+            where: { id: run.versionId },
+            select: { graph: true }
+        })
     ]);
     const graph = core.automationGraphSchema.safeParse(version?.graph);
-    const types = new Map(graph.success ? graph.data.nodes.map((node) => [node.id, node.type]) : []);
+    const types = new Map(
+        graph.success ? graph.data.nodes.map((node) => [node.id, node.type]) : []
+    );
     return {
         canSeeData,
         steps: steps.map((step) => ({
@@ -423,7 +498,10 @@ export async function listRunSteps(actor: RunActor, runId: string): Promise<{ st
 }
 
 export async function cancelRunFor(actor: RunActor, runId: string): Promise<void> {
-    const run = await prisma.automationRun.findUnique({ where: { id: runId }, select: { automationId: true } });
+    const run = await prisma.automationRun.findUnique({
+        where: { id: runId },
+        select: { automationId: true }
+    });
     if (!run) throw new AutomationAccessError("notFound");
     await load(actor, run.automationId, true);
     await cancelRun(runId, "cancelledByPerson");

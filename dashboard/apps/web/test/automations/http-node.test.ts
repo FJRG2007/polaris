@@ -7,7 +7,10 @@ import * as core from "@polaris/core";
 import { describe, expect, it, vi } from "vitest";
 
 const resolved = vi.hoisted(() => ({ addresses: [] as { address: string; family: number }[] }));
-const sent = vi.hoisted(() => ({ hops: [] as { url: string; headers: Headers }[], answers: [] as Response[] }));
+const sent = vi.hoisted(() => ({
+    hops: [] as { url: string; headers: Headers }[],
+    answers: [] as Response[]
+}));
 
 vi.mock("undici", () => ({
     Agent: class {},
@@ -52,9 +55,24 @@ const context = {
 
 describe("local network policy", () => {
     it("opens only the private LAN ranges", () => {
-        for (const address of ["10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.10", "fd12::1", "::ffff:192.168.0.2"])
+        for (const address of [
+            "10.1.2.3",
+            "172.16.0.1",
+            "172.31.255.255",
+            "192.168.1.10",
+            "fd12::1",
+            "::ffff:192.168.0.2"
+        ])
             expect(http.isLanAddress(address)).toBe(true);
-        for (const address of ["127.0.0.1", "169.254.169.254", "fe80::1", "::1", "172.32.0.1", "8.8.8.8", "100.64.0.1"])
+        for (const address of [
+            "127.0.0.1",
+            "169.254.169.254",
+            "fe80::1",
+            "::1",
+            "172.32.0.1",
+            "8.8.8.8",
+            "100.64.0.1"
+        ])
             expect(http.isLanAddress(address)).toBe(false);
     });
 
@@ -69,7 +87,9 @@ describe("local network policy", () => {
             expect(await http.localNetworkPolicy.vet("nas.lan")).toBeInstanceOf(Error);
         }
         resolved.addresses = [{ address: "192.168.1.20", family: 4 }];
-        expect(await http.localNetworkPolicy.vet("nas.lan")).toEqual([{ address: "192.168.1.20", family: 4 }]);
+        expect(await http.localNetworkPolicy.vet("nas.lan")).toEqual([
+            { address: "192.168.1.20", family: 4 }
+        ]);
         // One bad answer among good ones refuses the name (a rebinding answer cannot slip in).
         resolved.addresses = [
             { address: "192.168.1.20", family: 4 },
@@ -87,7 +107,10 @@ describe("building a request", () => {
             query: [{ name: "who", value: "{{trigger.name}}" }],
             headers: [{ name: "Host", value: "evil" }],
             auth: { kind: "bearer", secretId: "00000000-0000-7000-8000-000000000001" },
-            body: { kind: "json", json: '{"count":"{{trigger.count}}","label":"n={{trigger.count}}"}' }
+            body: {
+                kind: "json",
+                json: '{"count":"{{trigger.count}}","label":"n={{trigger.count}}"}'
+            }
         });
         const request = await http.buildHttpRequest(config, context, io);
         expect(request.url).toBe("https://api.example.test/items?who=Ana");
@@ -99,29 +122,48 @@ describe("building a request", () => {
 
     it("refuses an address that is not http(s)", async () => {
         const config = core.httpConfigSchema.parse({ url: "file:///etc/passwd" });
-        await expect(http.buildHttpRequest(config, context, io)).rejects.toMatchObject({ code: "badUrl" });
+        await expect(http.buildHttpRequest(config, context, io)).rejects.toMatchObject({
+            code: "badUrl"
+        });
     });
 });
 
 describe("sending", () => {
     const run = (config: core.HttpConfig, allowLocalNetwork: boolean) =>
-        http.HTTP_SERVER_NODES[0]!.run!(config, context, { ...io, allowLocalNetwork }) as Promise<unknown>;
+        http.HTTP_SERVER_NODES[0]!.run!(config, context, {
+            ...io,
+            allowLocalNetwork
+        }) as Promise<unknown>;
 
     it("refuses loopback and metadata address literals with the local network switch on", async () => {
-        for (const url of ["http://127.0.0.1:5432/", "http://169.254.169.254/latest/meta-data/", "http://[::1]/", "http://172.18.0.5/"]) {
+        for (const url of [
+            "http://127.0.0.1:5432/",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://[::1]/",
+            "http://172.18.0.5/"
+        ]) {
             sent.hops = [];
-            await expect(run(core.httpConfigSchema.parse({ method: "GET", url }), true)).rejects.toMatchObject({ code: "addressRefused" });
+            await expect(
+                run(core.httpConfigSchema.parse({ method: "GET", url }), true)
+            ).rejects.toMatchObject({ code: "addressRefused" });
             expect(sent.hops).toEqual([]);
         }
         sent.hops = [];
-        await run(core.httpConfigSchema.parse({ method: "GET", url: "http://192.168.1.20/" }), true);
+        await run(
+            core.httpConfigSchema.parse({ method: "GET", url: "http://192.168.1.20/" }),
+            true
+        );
         expect(sent.hops.map((hop) => hop.url)).toEqual(["http://192.168.1.20/"]);
     });
 
     it("refuses a redirect to a loopback literal with the local network switch on", async () => {
         sent.hops = [];
-        sent.answers = [new Response(null, { status: 302, headers: { location: "http://127.0.0.1/" } })];
-        await expect(run(core.httpConfigSchema.parse({ method: "GET", url: "http://192.168.1.20/" }), true)).rejects.toMatchObject({
+        sent.answers = [
+            new Response(null, { status: 302, headers: { location: "http://127.0.0.1/" } })
+        ];
+        await expect(
+            run(core.httpConfigSchema.parse({ method: "GET", url: "http://192.168.1.20/" }), true)
+        ).rejects.toMatchObject({
             code: "addressRefused"
         });
         expect(sent.hops).toHaveLength(1);
@@ -131,19 +173,45 @@ describe("sending", () => {
         const config = core.httpConfigSchema.parse({
             method: "GET",
             url: "https://api.example.test/a",
-            auth: { kind: "header", header: "X-Api-Key", secretId: "00000000-0000-7000-8000-000000000001" }
+            auth: {
+                kind: "header",
+                header: "X-Api-Key",
+                secretId: "00000000-0000-7000-8000-000000000001"
+            }
         });
         sent.hops = [];
         sent.answers = [
             new Response(null, { status: 302, headers: { location: "/b" } }),
-            new Response(null, { status: 302, headers: { location: "https://other.example.test/c" } })
+            new Response(null, {
+                status: 302,
+                headers: { location: "https://other.example.test/c" }
+            })
         ];
         await run(config, false);
-        expect(sent.hops.map((hop) => hop.headers.get("x-api-key"))).toEqual(["tok3n-value", "tok3n-value", null]);
+        expect(sent.hops.map((hop) => hop.headers.get("x-api-key"))).toEqual([
+            "tok3n-value",
+            "tok3n-value",
+            null
+        ]);
 
         sent.hops = [];
-        sent.answers = [new Response(null, { status: 307, headers: { location: "https://other.example.test/" } })];
-        await run(core.httpConfigSchema.parse({ method: "GET", url: "https://api.example.test/", auth: { kind: "bearer", secretId: "00000000-0000-7000-8000-000000000001" } }), false);
-        expect(sent.hops.map((hop) => hop.headers.get("authorization"))).toEqual(["Bearer tok3n-value", null]);
+        sent.answers = [
+            new Response(null, {
+                status: 307,
+                headers: { location: "https://other.example.test/" }
+            })
+        ];
+        await run(
+            core.httpConfigSchema.parse({
+                method: "GET",
+                url: "https://api.example.test/",
+                auth: { kind: "bearer", secretId: "00000000-0000-7000-8000-000000000001" }
+            }),
+            false
+        );
+        expect(sent.hops.map((hop) => hop.headers.get("authorization"))).toEqual([
+            "Bearer tok3n-value",
+            null
+        ]);
     });
 });

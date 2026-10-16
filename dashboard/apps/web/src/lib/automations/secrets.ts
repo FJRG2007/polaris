@@ -71,7 +71,12 @@ export async function createSecret(
         },
         select: { id: true, name: true, kind: true, hint: true, lastUsedAt: true, createdAt: true }
     });
-    return { ...row, kind: row.kind as core.SecretKind, lastUsedAt: null, createdAt: row.createdAt.toISOString() };
+    return {
+        ...row,
+        kind: row.kind as core.SecretKind,
+        lastUsedAt: null,
+        createdAt: row.createdAt.toISOString()
+    };
 }
 
 export async function deleteSecret(shelf: Shelf, id: string): Promise<boolean> {
@@ -87,7 +92,11 @@ export async function readSecretForRun(id: string, shelf: Shelf): Promise<string
     });
     if (!row) throw new StepRefusal("secretMissing");
     const value = decryptSecret(
-        { ciphertext: Buffer.from(row.encrypted), nonce: Buffer.from(row.nonce), keyId: row.keyId ?? "" },
+        {
+            ciphertext: Buffer.from(row.encrypted),
+            nonce: Buffer.from(row.nonce),
+            keyId: row.keyId ?? ""
+        },
         loadEnv().POLARIS_MASTER_KEY
     );
     await prisma.automationSecret

@@ -47,7 +47,9 @@ export function useCachedAction<T extends object>(key: string, load: () => Promi
                 setError(answer.error);
                 return;
             }
-            setData((before) => (JSON.stringify(before) === JSON.stringify(answer) ? before : answer));
+            setData((before) =>
+                JSON.stringify(before) === JSON.stringify(answer) ? before : answer
+            );
             writeCache(key, answer);
         } catch {
             setError("");
@@ -88,7 +90,10 @@ export function RowsSkeleton({ rows = 4 }: { rows?: number }) {
 export function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
     const t = useTranslations("automations");
     return (
-        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 p-4 text-sm">
+        <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 p-4 text-sm"
+        >
             <span className="min-w-0">{message}</span>
             <Button variant="outline" size="sm" onClick={onRetry}>
                 {t("list.retry")}
@@ -108,7 +113,19 @@ const TONES: Record<string, "neutral" | "primary" | "success" | "warning" | "dan
     limited: "warning"
 };
 
-const STATUSES = ["queued", "running", "waiting", "succeeded", "failed", "stopped", "cancelled", "refused", "limited", "skipped", "timedOut"] as const;
+const STATUSES = [
+    "queued",
+    "running",
+    "waiting",
+    "succeeded",
+    "failed",
+    "stopped",
+    "cancelled",
+    "refused",
+    "limited",
+    "skipped",
+    "timedOut"
+] as const;
 type Status = (typeof STATUSES)[number];
 
 export function StatusChip({ status }: { status: string }) {
@@ -149,8 +166,10 @@ export function useRunError(): (code: string | null) => string | null {
     return (code) => {
         if (!code) return null;
         const bare = code.replace(/^finally:/, "");
-        if (bare.startsWith("httpStatus:")) return t("runErrors.httpStatus", { status: bare.slice("httpStatus:".length) });
-        if ((RUN_ERRORS as readonly string[]).includes(bare)) return t(`runErrors.${bare as (typeof RUN_ERRORS)[number]}`);
+        if (bare.startsWith("httpStatus:"))
+            return t("runErrors.httpStatus", { status: bare.slice("httpStatus:".length) });
+        if ((RUN_ERRORS as readonly string[]).includes(bare))
+            return t(`runErrors.${bare as (typeof RUN_ERRORS)[number]}`);
         return t("runErrors.other");
     };
 }
@@ -168,12 +187,25 @@ const NODE_KEYS = {
 type NodeKey = (typeof NODE_KEYS)[keyof typeof NODE_KEYS];
 
 /** A node type in the reader's words. */
-export function nodeTitle(t: ReturnType<typeof useTranslations<"automations">>, type: string): string {
+export function nodeTitle(
+    t: ReturnType<typeof useTranslations<"automations">>,
+    type: string
+): string {
     const key = (NODE_KEYS as Record<string, NodeKey>)[type];
     return key ? t(`nodes.${key}`) : t("nodes.unknown");
 }
 
-export function Section({ title, hint, children, action }: { title: string; hint?: string; children: ReactNode; action?: ReactNode }) {
+export function Section({
+    title,
+    hint,
+    children,
+    action
+}: {
+    title: string;
+    hint?: string;
+    children: ReactNode;
+    action?: ReactNode;
+}) {
     return (
         <section className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
@@ -189,5 +221,7 @@ export function Section({ title, hint, children, action }: { title: string; hint
 }
 
 export function when(iso: string | null, locale: string): string {
-    return iso ? new Date(iso).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" }) : "";
+    return iso
+        ? new Date(iso).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" })
+        : "";
 }

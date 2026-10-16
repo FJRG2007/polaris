@@ -15,7 +15,10 @@ vi.mock("@polaris/db", async () => {
     db.current = make();
     return { prisma: db.current.prisma };
 });
-vi.mock("@/lib/automations/runner", () => ({ automationRunner: async () => null, mayAllowLocalNetwork: async () => false }));
+vi.mock("@/lib/automations/runner", () => ({
+    automationRunner: async () => null,
+    mayAllowLocalNetwork: async () => false
+}));
 vi.mock("@/lib/automations/secrets", () => ({ readSecretForRun: async () => "" }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/app-extensions/registry", () => ({ appAutomationNodes: async () => [] }));
@@ -26,22 +29,39 @@ const { pruneAutomationHistory } = await import("@/lib/automations/job");
 const L = core.AUTOMATION_LIMITS;
 const DAY = 24 * 60 * 60 * 1000;
 
-async function runs(automationId: string, count: number, daysAgo: number, extra: Record<string, unknown> = {}) {
+async function runs(
+    automationId: string,
+    count: number,
+    daysAgo: number,
+    extra: Record<string, unknown> = {}
+) {
     const at = new Date(Date.now() - daysAgo * DAY);
     for (let index = 0; index < count; index++)
         await db.current!.prisma.automationRun!.create!({
-            data: { automationId, status: "succeeded", queuedAt: new Date(at.getTime() - index * 1000), finishedAt: at, ...extra }
+            data: {
+                automationId,
+                status: "succeeded",
+                queuedAt: new Date(at.getTime() - index * 1000),
+                finishedAt: at,
+                ...extra
+            }
         });
 }
 
 const left = (automationId: string, where: Record<string, unknown> = {}) =>
-    db.current!.tables.automationRun!.filter((row) => row.automationId === automationId && Object.entries(where).every(([key, value]) => row[key] === value)).length;
+    db.current!.tables.automationRun!.filter(
+        (row) =>
+            row.automationId === automationId &&
+            Object.entries(where).every(([key, value]) => row[key] === value)
+    ).length;
 
 describe("pruning automation history", () => {
     it("reaches every automation across passes, and holds each kind of run to its limit", async () => {
         const ids: string[] = [];
         for (let index = 0; index < 60; index++) {
-            const row = await db.current!.prisma.automation!.create!({ data: { name: `a${index}` } });
+            const row = await db.current!.prisma.automation!.create!({
+                data: { name: `a${index}` }
+            });
             ids.push(row.id as string);
             await runs(row.id as string, 3, 40);
         }

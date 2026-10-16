@@ -44,13 +44,18 @@ export interface RetirementFacts {
 
 export type RetirementVerdict =
     | { readonly retire: true }
-    | { readonly retire: false; readonly reason: "rowsLeft" | "runsWaiting" | "noMarker" | "tooSoon" | "noLaterBoot" };
+    | {
+          readonly retire: false;
+          readonly reason: "rowsLeft" | "runsWaiting" | "noMarker" | "tooSoon" | "noLaterBoot";
+      };
 
 export function legacyRetirementVerdict(facts: RetirementFacts): RetirementVerdict {
     if (facts.movedRows < facts.sourceRows) return { retire: false, reason: "rowsLeft" };
     if (facts.oldRunsWaiting > 0) return { retire: false, reason: "runsWaiting" };
-    if (!facts.markerAt || facts.bootsAtMarker === null) return { retire: false, reason: "noMarker" };
-    if (facts.now.getTime() - facts.markerAt.getTime() < RETIRE_AFTER_MS) return { retire: false, reason: "tooSoon" };
+    if (!facts.markerAt || facts.bootsAtMarker === null)
+        return { retire: false, reason: "noMarker" };
+    if (facts.now.getTime() - facts.markerAt.getTime() < RETIRE_AFTER_MS)
+        return { retire: false, reason: "tooSoon" };
     if (facts.boots <= facts.bootsAtMarker) return { retire: false, reason: "noLaterBoot" };
     return { retire: true };
 }
@@ -64,10 +69,17 @@ export async function noteEngineBoot(): Promise<void> {
     try {
         await prisma.setting.upsert({
             where: { key: ENGINE_FIRST_BOOT_KEY },
-            create: { key: ENGINE_FIRST_BOOT_KEY, value: new Date().toISOString(), scope: "global" },
+            create: {
+                key: ENGINE_FIRST_BOOT_KEY,
+                value: new Date().toISOString(),
+                scope: "global"
+            },
             update: {}
         });
-        const boots = await prisma.setting.findUnique({ where: { key: ENGINE_BOOTS_KEY }, select: { value: true } });
+        const boots = await prisma.setting.findUnique({
+            where: { key: ENGINE_BOOTS_KEY },
+            select: { value: true }
+        });
         const count = Number(boots?.value ?? "0") || 0;
         await prisma.setting.upsert({
             where: { key: ENGINE_BOOTS_KEY },

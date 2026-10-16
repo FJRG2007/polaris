@@ -15,7 +15,13 @@ import { lookup } from "node:dns/promises";
 import { networkInterfaces } from "node:os";
 import { Agent, fetch as guardedFetch } from "undici";
 import { StepError, type NodeIo, type RunContext, type ServerNode } from "../types";
-import { configuredRequest, readCapped, RefusedAddressError, resolveName, safeUrl } from "@/lib/safe-fetch";
+import {
+    configuredRequest,
+    readCapped,
+    RefusedAddressError,
+    resolveName,
+    safeUrl
+} from "@/lib/safe-fetch";
 
 const L = core.AUTOMATION_LIMITS;
 
@@ -41,7 +47,7 @@ function ipv4ToInt(address: string): number {
 
 function inV4(address: string, base: number, bits: number): boolean {
     const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
-    return ((ipv4ToInt(address) & mask) >>> 0) === ((base & mask) >>> 0);
+    return (ipv4ToInt(address) & mask) >>> 0 === (base & mask) >>> 0;
 }
 
 function unmapped(address: string): string {
@@ -52,14 +58,23 @@ function unmapped(address: string): string {
 /** Whether an address is in one of the LAN ranges the switch opens. */
 export function isLanAddress(raw: string): boolean {
     const address = unmapped(raw);
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(address)) return LAN_V4.some(([base, bits]) => inV4(address, base, bits));
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(address))
+        return LAN_V4.some(([base, bits]) => inV4(address, base, bits));
     // fc00::/7 - unique local addresses.
     return /^f[cd][0-9a-f]{0,2}:/i.test(address);
 }
 
 /** Names Polaris's own containers answer to, from its own configuration. */
 function internalHostnames(): string[] {
-    const names = new Set<string>(["postgres", "redis", "traefik", "hostd", "polaris-hostd", "polaris-web", "livekit"]);
+    const names = new Set<string>([
+        "postgres",
+        "redis",
+        "traefik",
+        "hostd",
+        "polaris-hostd",
+        "polaris-web",
+        "livekit"
+    ]);
     for (const key of ["DATABASE_URL", "REDIS_URL", "POLARIS_HOSTD_URL", "LIVEKIT_URL"]) {
         const value = process.env[key];
         if (!value) continue;
@@ -75,7 +90,8 @@ function internalHostnames(): string[] {
 /** The addresses of Polaris's own services and of this container, resolved now. */
 async function internalAddresses(): Promise<Set<string>> {
     const out = new Set<string>();
-    for (const list of Object.values(networkInterfaces())) for (const entry of list ?? []) out.add(unmapped(entry.address));
+    for (const list of Object.values(networkInterfaces()))
+        for (const entry of list ?? []) out.add(unmapped(entry.address));
     await Promise.all(
         internalHostnames().map(async (name) => {
             const found = await lookup(name, { all: true }).catch(() => []);
@@ -105,13 +121,17 @@ export const localNetworkPolicy = {
     /** Every resolved address of one name, or the reason the name may not be reached. */
     async vet(hostname: string): Promise<{ address: string; family: number }[] | Error> {
         const literal = hostname.replace(/^\[|\]$/g, "");
-        const addresses = isIP(literal) ? [{ address: literal, family: isIP(literal) }] : await resolveName(hostname).catch(() => []);
+        const addresses = isIP(literal)
+            ? [{ address: literal, family: isIP(literal) }]
+            : await resolveName(hostname).catch(() => []);
         if (addresses.length === 0) return new Error(`${hostname} does not resolve`);
         const internal = await internalAddresses();
         for (const entry of addresses) {
             const address = unmapped(entry.address);
-            if (internal.has(address)) return new Error(`${hostname} is one of Polaris's own services`);
-            if (core.isPrivateIp(address) && !isLanAddress(address)) return new Error(`${hostname} resolves to a blocked address`);
+            if (internal.has(address))
+                return new Error(`${hostname} is one of Polaris's own services`);
+            if (core.isPrivateIp(address) && !isLanAddress(address))
+                return new Error(`${hostname} resolves to a blocked address`);
         }
         return addresses.map((entry) => ({ address: entry.address, family: entry.family }));
     }
@@ -133,11 +153,19 @@ const lanDispatcher = new Agent({
 });
 
 /** One hop, through the guarded fetch or, for an allowed automation, the LAN-vetted dispatcher. */
-async function oneHop(url: string, init: RequestInit & { timeoutMs: number }, io: NodeIo): Promise<Response> {
-    if (!localNetworkPolicy.allowed(io)) return configuredRequest(url, init, { allowPrivate: false });
+async function oneHop(
+    url: string,
+    init: RequestInit & { timeoutMs: number },
+    io: NodeIo
+): Promise<Response> {
+    if (!localNetworkPolicy.allowed(io))
+        return configuredRequest(url, init, { allowPrivate: false });
     const checked = safeUrl(url, Number.POSITIVE_INFINITY);
     if (!checked) throw new RefusedAddressError();
-    if (isIP(checked.hostname.replace(/^\[|\]$/g, "")) && (await localNetworkPolicy.vet(checked.hostname)) instanceof Error)
+    if (
+        isIP(checked.hostname.replace(/^\[|\]$/g, "")) &&
+        (await localNetworkPolicy.vet(checked.hostname)) instanceof Error
+    )
         throw new RefusedAddressError();
     const { timeoutMs, ...rest } = init;
     return (await guardedFetch(checked, {
@@ -152,8 +180,23 @@ async function oneHop(url: string, init: RequestInit & { timeoutMs: number }, io
 // Sending
 // ---------------------------------------------------------------------------
 
-const DROPPED_HEADERS = new Set(["host", "content-length", "transfer-encoding", "connection", "cookie"]);
-const KEPT_RESPONSE_HEADERS = ["content-type", "content-length", "location", "retry-after", "etag", "last-modified", "date", "x-request-id"];
+const DROPPED_HEADERS = new Set([
+    "host",
+    "content-length",
+    "transfer-encoding",
+    "connection",
+    "cookie"
+]);
+const KEPT_RESPONSE_HEADERS = [
+    "content-type",
+    "content-length",
+    "location",
+    "retry-after",
+    "etag",
+    "last-modified",
+    "date",
+    "x-request-id"
+];
 
 interface Outgoing {
     method: string;
@@ -173,7 +216,11 @@ async function send(request: Outgoing, io: NodeIo): Promise<{ response: Response
     for (let hop = 0; hop <= L.httpRedirects; hop++) {
         let response: Response;
         try {
-            response = await oneHop(url, { method, headers: request.headers, body, timeoutMs: request.timeoutMs }, io);
+            response = await oneHop(
+                url,
+                { method, headers: request.headers, body, timeoutMs: request.timeoutMs },
+                io
+            );
         } catch (caught) {
             if (caught instanceof RefusedAddressError) throw new StepError("addressRefused");
             const name = (caught as { name?: string } | null)?.name;
@@ -190,9 +237,13 @@ async function send(request: Outgoing, io: NodeIo): Promise<{ response: Response
                 throw new StepError("badRedirect");
             }
             if (next.origin !== new URL(url).origin)
-                for (const name of [...CREDENTIAL_HEADERS, ...(request.secretHeaders ?? [])]) request.headers.delete(name);
+                for (const name of [...CREDENTIAL_HEADERS, ...(request.secretHeaders ?? [])])
+                    request.headers.delete(name);
             url = next.href;
-            if (response.status === 303 || ((response.status === 301 || response.status === 302) && method === "POST")) {
+            if (
+                response.status === 303 ||
+                ((response.status === 301 || response.status === 302) && method === "POST")
+            ) {
                 method = "GET";
                 body = null;
                 request.headers.delete("content-type");
@@ -228,16 +279,32 @@ function keptHeaders(response: Response): Record<string, string> {
     return out;
 }
 
-async function answer(response: Response, method: string, acceptAnyStatus: boolean): Promise<{ output: unknown }> {
+async function answer(
+    response: Response,
+    method: string,
+    acceptAnyStatus: boolean
+): Promise<{ output: unknown }> {
     const body = await readBody(response, method);
-    const output = { status: response.status, ok: response.ok, headers: keptHeaders(response), body };
-    if (!response.ok && !acceptAnyStatus) throw new StepError(`httpStatus:${response.status}`, output);
+    const output = {
+        status: response.status,
+        ok: response.ok,
+        headers: keptHeaders(response),
+        body
+    };
+    if (!response.ok && !acceptAnyStatus)
+        throw new StepError(`httpStatus:${response.status}`, output);
     return { output };
 }
 
 /** The request an HTTP node describes, with references filled in and secrets applied. */
-export async function buildHttpRequest(config: core.HttpConfig, context: RunContext, io: NodeIo): Promise<Outgoing> {
-    const base = config.urlSecretId ? await io.secret(config.urlSecretId) : core.interpolate(config.url, context).trim();
+export async function buildHttpRequest(
+    config: core.HttpConfig,
+    context: RunContext,
+    io: NodeIo
+): Promise<Outgoing> {
+    const base = config.urlSecretId
+        ? await io.secret(config.urlSecretId)
+        : core.interpolate(config.url, context).trim();
     let url: URL;
     try {
         url = new URL(base);
@@ -245,7 +312,8 @@ export async function buildHttpRequest(config: core.HttpConfig, context: RunCont
         throw new StepError("badUrl");
     }
     if (url.protocol !== "https:" && url.protocol !== "http:") throw new StepError("badUrl");
-    for (const pair of config.query) url.searchParams.append(pair.name, core.interpolate(pair.value, context));
+    for (const pair of config.query)
+        url.searchParams.append(pair.name, core.interpolate(pair.value, context));
 
     const headers = new Headers();
     for (const pair of config.headers) {
@@ -256,10 +324,15 @@ export async function buildHttpRequest(config: core.HttpConfig, context: RunCont
             throw new StepError("badHeader");
         }
     }
-    if (config.auth.kind === "bearer") headers.set("authorization", `Bearer ${await io.secret(config.auth.secretId)}`);
+    if (config.auth.kind === "bearer")
+        headers.set("authorization", `Bearer ${await io.secret(config.auth.secretId)}`);
     if (config.auth.kind === "basic")
-        headers.set("authorization", `Basic ${Buffer.from(await io.secret(config.auth.secretId)).toString("base64")}`);
-    if (config.auth.kind === "header") headers.set(config.auth.header, await io.secret(config.auth.secretId));
+        headers.set(
+            "authorization",
+            `Basic ${Buffer.from(await io.secret(config.auth.secretId)).toString("base64")}`
+        );
+    if (config.auth.kind === "header")
+        headers.set(config.auth.header, await io.secret(config.auth.secretId));
     headers.set("idempotency-key", io.idempotencyKey);
     headers.set("user-agent", "Polaris-Automations");
 
@@ -271,17 +344,27 @@ export async function buildHttpRequest(config: core.HttpConfig, context: RunCont
             headers.set("content-type", "application/json");
         } else if (config.body.kind === "form") {
             const form = new URLSearchParams();
-            for (const pair of config.body.fields) form.append(pair.name, core.interpolate(pair.value, context));
+            for (const pair of config.body.fields)
+                form.append(pair.name, core.interpolate(pair.value, context));
             body = form.toString();
             headers.set("content-type", "application/x-www-form-urlencoded");
         } else if (config.body.kind === "text") {
             body = core.interpolate(config.body.text, context);
-            if (!headers.has("content-type")) headers.set("content-type", "text/plain; charset=utf-8");
+            if (!headers.has("content-type"))
+                headers.set("content-type", "text/plain; charset=utf-8");
         }
     }
-    if (body !== null && core.byteLength(body) > L.eventPayloadBytes) throw new StepError("bodyTooLarge");
+    if (body !== null && core.byteLength(body) > L.eventPayloadBytes)
+        throw new StepError("bodyTooLarge");
     const secretHeaders = config.auth.kind === "header" ? [config.auth.header] : [];
-    return { method, url: url.href, headers, body, timeoutMs: config.timeoutSeconds * 1000, secretHeaders };
+    return {
+        method,
+        url: url.href,
+        headers,
+        body,
+        timeoutMs: config.timeoutSeconds * 1000,
+        secretHeaders
+    };
 }
 
 const httpNode: ServerNode<core.HttpConfig> = {
@@ -291,7 +374,12 @@ const httpNode: ServerNode<core.HttpConfig> = {
     timeoutMs: L.httpTimeoutMs + 5_000,
     run: async (config, context, io) => {
         const request = await buildHttpRequest(config, context, io);
-        io.recordInput({ method: request.method, url: request.url, headers: [...request.headers.keys()], bytes: request.body?.length ?? 0 });
+        io.recordInput({
+            method: request.method,
+            url: request.url,
+            headers: [...request.headers.keys()],
+            bytes: request.body?.length ?? 0
+        });
         const { response } = await send(request, io);
         return answer(response, request.method, config.acceptAnyStatus);
     }
@@ -315,14 +403,31 @@ const chatNode: ServerNode<ChatConfig> = {
             url: core.interpolate(config.link, context).trim() || null,
             at: new Date().toISOString()
         };
-        io.recordInput({ preset: config.preset, title: payload.title, body: payload.body, url: payload.url });
-        const headers = new Headers({ "content-type": "application/json", "user-agent": "Polaris-Automations" });
+        io.recordInput({
+            preset: config.preset,
+            title: payload.title,
+            body: payload.body,
+            url: payload.url
+        });
+        const headers = new Headers({
+            "content-type": "application/json",
+            "user-agent": "Polaris-Automations"
+        });
         const { response } = await send(
-            { method: "POST", url, headers, body: JSON.stringify(bodyFor(config.preset, payload)), timeoutMs: 15_000 },
+            {
+                method: "POST",
+                url,
+                headers,
+                body: JSON.stringify(bodyFor(config.preset, payload)),
+                timeoutMs: 15_000
+            },
             io
         );
         return answer(response, "POST", false);
     }
 };
 
-export const HTTP_SERVER_NODES: readonly ServerNode[] = [httpNode as ServerNode, chatNode as ServerNode];
+export const HTTP_SERVER_NODES: readonly ServerNode[] = [
+    httpNode as ServerNode,
+    chatNode as ServerNode
+];

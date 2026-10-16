@@ -8,7 +8,11 @@ import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
 
-export default async function AutomationRunsPage({ searchParams }: { searchParams: Promise<{ automation?: string }> }) {
+export default async function AutomationRunsPage({
+    searchParams
+}: {
+    searchParams: Promise<{ automation?: string }>;
+}) {
     const t = await getTranslations("automations");
     const { automation } = await searchParams;
     return (

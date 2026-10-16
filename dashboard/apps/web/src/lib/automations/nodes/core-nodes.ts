@@ -33,7 +33,11 @@ const waitNode: ServerNode<WaitConfig> = {
         const now = new Date();
         if (config.kind === "duration") {
             io.recordInput({ seconds: core.durationSeconds(config.duration) });
-            return { wait: { until: new Date(now.getTime() + core.durationSeconds(config.duration) * 1000) } };
+            return {
+                wait: {
+                    until: new Date(now.getTime() + core.durationSeconds(config.duration) * 1000)
+                }
+            };
         }
         const until = core.nextDailyDue([config.time], config.days, now, io.timeZone);
         io.recordInput({ time: config.time, days: config.days, timeZone: io.timeZone });
@@ -51,7 +55,9 @@ const notifyNode: ServerNode<NotifyConfig> = {
     run: async (config, context, io) => {
         const { notify } = await import("@/lib/notifications/dispatch");
         const title = core.interpolate(config.title, context).slice(0, 200);
-        const body = core.interpolate(config.body, context).slice(0, core.AUTOMATION_LIMITS.textLength);
+        const body = core
+            .interpolate(config.body, context)
+            .slice(0, core.AUTOMATION_LIMITS.textLength);
         io.recordInput({ title, body });
         await notify({
             userId: io.actor.id,

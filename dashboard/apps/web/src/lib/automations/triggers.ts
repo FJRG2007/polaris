@@ -53,24 +53,52 @@ export function armedTriggers(
         if (node.enabled === false) continue;
         const configKey = JSON.stringify(node.config ?? {});
         if (node.type === "core.manual") {
-            out.push({ nodeId: node.id, eventType: "core.manual", subjectKey: manualSubject(automationId, node.id), hookHash: null, nextDueAt: null, state: { config: configKey } });
+            out.push({
+                nodeId: node.id,
+                eventType: "core.manual",
+                subjectKey: manualSubject(automationId, node.id),
+                hookHash: null,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
         } else if (node.type === "core.webhook") {
             const config = core.CORE_NODE_CONFIGS["core.webhook"].parse(node.config);
             const hash = hookHash(hookToken(automationId, node.id, config.rotation));
-            out.push({ nodeId: node.id, eventType: "core.webhook", subjectKey: hash, hookHash: hash, nextDueAt: null, state: { config: configKey } });
+            out.push({
+                nodeId: node.id,
+                eventType: "core.webhook",
+                subjectKey: hash,
+                hookHash: hash,
+                nextDueAt: null,
+                state: { config: configKey }
+            });
         } else if (node.type === "core.schedule") {
             const config = core.scheduleConfigSchema.parse(node.config);
             const before = existing.find((row) => row.nodeId === node.id);
             const same = (before?.state as { config?: string } | null)?.config === configKey;
-            const nextDueAt = same && before?.nextDueAt ? before.nextDueAt : core.nextScheduleDue(config, now, graph.timeZone);
-            out.push({ nodeId: node.id, eventType: "core.schedule", subjectKey: null, hookHash: null, nextDueAt, state: { config: configKey } });
+            const nextDueAt =
+                same && before?.nextDueAt
+                    ? before.nextDueAt
+                    : core.nextScheduleDue(config, now, graph.timeZone);
+            out.push({
+                nodeId: node.id,
+                eventType: "core.schedule",
+                subjectKey: null,
+                hookHash: null,
+                nextDueAt,
+                state: { config: configKey }
+            });
         }
     }
     return out;
 }
 
 /** Arm a version's triggers, removing the ones it no longer has. */
-export async function armVersion(automationId: string, versionId: string, graph: core.AutomationGraph): Promise<void> {
+export async function armVersion(
+    automationId: string,
+    versionId: string,
+    graph: core.AutomationGraph
+): Promise<void> {
     const existing = await prisma.automationTrigger.findMany({
         where: { automationId },
         select: { nodeId: true, nextDueAt: true, state: true },
@@ -118,14 +146,23 @@ export async function fireDueSchedules(limit = 100): Promise<StartedRun[]> {
     });
     const started: StartedRun[] = [];
     for (const row of due) {
-        const graph = await prisma.automationVersion.findUnique({ where: { id: row.versionId }, select: { graph: true } });
+        const graph = await prisma.automationVersion.findUnique({
+            where: { id: row.versionId },
+            select: { graph: true }
+        });
         const parsed = core.automationGraphSchema.safeParse(graph?.graph);
-        const node = parsed.success ? parsed.data.nodes.find((entry) => entry.id === row.nodeId) : undefined;
+        const node = parsed.success
+            ? parsed.data.nodes.find((entry) => entry.id === row.nodeId)
+            : undefined;
         const config = node ? core.scheduleConfigSchema.safeParse(node.config) : null;
         const dueAt = row.nextDueAt!;
         const next =
             parsed.success && config?.success
-                ? core.nextScheduleDue(config.data, new Date(Math.max(now.getTime(), dueAt.getTime())), parsed.data.timeZone)
+                ? core.nextScheduleDue(
+                      config.data,
+                      new Date(Math.max(now.getTime(), dueAt.getTime())),
+                      parsed.data.timeZone
+                  )
                 : null;
         const moved = await prisma.automationTrigger.updateMany({
             where: { id: row.id, nextDueAt: dueAt },

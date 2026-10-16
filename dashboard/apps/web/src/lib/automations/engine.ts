@@ -55,7 +55,10 @@ const GRAPH_CACHE = 200;
 export async function loadGraph(versionId: string): Promise<core.AutomationGraph | null> {
     const cached = graphs.get(versionId);
     if (cached) return cached;
-    const version = await prisma.automationVersion.findUnique({ where: { id: versionId }, select: { graph: true } });
+    const version = await prisma.automationVersion.findUnique({
+        where: { id: versionId },
+        select: { graph: true }
+    });
     if (!version) return null;
     const parsed = core.automationGraphSchema.safeParse(version.graph);
     if (!parsed.success) return null;
@@ -125,7 +128,14 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
     const admission: core.Admission =
         firing.depth > L.depth
             ? "skip"
-            : core.admitRun({ mode, maxRuns: automation.maxRuns, rateLimit: automation.rateLimit, active, queued, recent });
+            : core.admitRun({
+                  mode,
+                  maxRuns: automation.maxRuns,
+                  rateLimit: automation.rateLimit,
+                  active,
+                  queued,
+                  recent
+              });
 
     const status =
         firing.depth > L.depth
@@ -177,7 +187,11 @@ export async function startRun(firing: Firing): Promise<StartedRun | null> {
 
     if (admission === "restart") {
         const others = await prisma.automationRun.findMany({
-            where: { automationId: automation.id, status: { in: [...core.ACTIVE_RUN_STATUSES] }, id: { not: run.id } },
+            where: {
+                automationId: automation.id,
+                status: { in: [...core.ACTIVE_RUN_STATUSES] },
+                id: { not: run.id }
+            },
             select: { id: true },
             take: L.maxRunsCeiling
         });
@@ -197,7 +211,10 @@ function capCause(cause: Record<string, unknown>): Record<string, unknown> {
 }
 
 /** Write the trigger's own step (it already happened) and make its successors ready. */
-async function beginRun(runId: string, firing: Pick<Firing, "versionId" | "triggerNodeId" | "cause">): Promise<void> {
+async function beginRun(
+    runId: string,
+    firing: Pick<Firing, "versionId" | "triggerNodeId" | "cause">
+): Promise<void> {
     const graph = await loadGraph(firing.versionId);
     const now = new Date();
     await prisma.automationStep.createMany({
@@ -219,10 +236,19 @@ async function beginRun(runId: string, firing: Pick<Firing, "versionId" | "trigg
     await enqueue(runId, core.successors(graph, firing.triggerNodeId, "next"), MAIN);
 }
 
-async function enqueue(runId: string, nodeIds: readonly string[], iteration: string): Promise<void> {
+async function enqueue(
+    runId: string,
+    nodeIds: readonly string[],
+    iteration: string
+): Promise<void> {
     if (nodeIds.length === 0) return;
     await prisma.automationStep.createMany({
-        data: [...new Set(nodeIds)].map((nodeId) => ({ runId, nodeId, iteration, status: "ready" })),
+        data: [...new Set(nodeIds)].map((nodeId) => ({
+            runId,
+            nodeId,
+            iteration,
+            status: "ready"
+        })),
         skipDuplicates: true
     });
 }
@@ -267,17 +293,34 @@ export async function cancelRun(runId: string, reason = "cancelled"): Promise<bo
         data: { status: "skipped", finishedAt: new Date() }
     });
     const graph = await loadGraph(run.versionId);
-    if (graph?.finally.entry && graph.finally.onCancel && run.finally === "none" && run.status !== "queued") {
+    if (
+        graph?.finally.entry &&
+        graph.finally.onCancel &&
+        run.finally === "none" &&
+        run.status !== "queued"
+    ) {
         const moved = await prisma.automationRun.updateMany({
             where: { id: runId, finally: "none" },
-            data: { status: "running", outcome: "cancelled", finally: "pending", error: reason, dueAt: null }
+            data: {
+                status: "running",
+                outcome: "cancelled",
+                finally: "pending",
+                error: reason,
+                dueAt: null
+            }
         });
         if (moved.count === 1) await enqueue(runId, [graph.finally.entry], FINALLY);
         return true;
     }
     await prisma.automationRun.updateMany({
         where: { id: runId, status: { notIn: [...core.FINISHED_RUN_STATUSES] } },
-        data: { status: "cancelled", error: reason, finishedAt: new Date(), lockedUntil: null, lockToken: null }
+        data: {
+            status: "cancelled",
+            error: reason,
+            finishedAt: new Date(),
+            lockedUntil: null,
+            lockToken: null
+        }
     });
     await prisma.automationStep.updateMany({
         where: { runId, iteration: FINALLY, status: { in: ["ready", "waiting"] } },
@@ -333,7 +376,11 @@ export async function advanceRun(runId: string): Promise<void> {
     const token = randomBytes(9).toString("hex");
     const now = new Date();
     const claimed = await prisma.automationRun.updateMany({
-        where: { id: runId, status: "running", OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }] },
+        where: {
+            id: runId,
+            status: "running",
+            OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }]
+        },
         data: { lockedUntil: new Date(now.getTime() + L.leaseMs), lockToken: token }
     });
     if (claimed.count !== 1) return;
@@ -354,7 +401,12 @@ async function stepLoop(runId: string, token: string): Promise<void> {
         if (!run || run.status !== "running" || run.lockToken !== token) return;
         const graph = await loadGraph(run.versionId);
         if (!graph) {
-            await finalize(run, "failed", run.finally === "none" ? "none" : "failed", "graphUnreadable");
+            await finalize(
+                run,
+                "failed",
+                run.finally === "none" ? "none" : "failed",
+                "graphUnreadable"
+            );
             return;
         }
         const startedAt = (run.startedAt ?? run.queuedAt).getTime();
@@ -381,7 +433,9 @@ async function stepLoop(runId: string, token: string): Promise<void> {
         if (!ready) {
             const waiting = steps.filter((step) => step.status === "waiting" && step.waitUntil);
             if (waiting.length > 0) {
-                const dueAt = new Date(Math.min(...waiting.map((step) => step.waitUntil!.getTime())));
+                const dueAt = new Date(
+                    Math.min(...waiting.map((step) => step.waitUntil!.getTime()))
+                );
                 await prisma.automationRun.updateMany({
                     where: { id: runId, lockToken: token },
                     data: { status: "waiting", dueAt }
@@ -417,7 +471,10 @@ async function recoverInterrupted(
     const node = graph.nodes.find((entry) => entry.id === step.nodeId);
     const impl = node ? await serverNode(node.type) : null;
     if (impl?.meta.idempotent) {
-        await prisma.automationStep.updateMany({ where: { id: step.id, status: "running" }, data: { status: "ready" } });
+        await prisma.automationStep.updateMany({
+            where: { id: step.id, status: "running" },
+            data: { status: "ready" }
+        });
         return;
     }
     await prisma.automationStep.updateMany({
@@ -425,7 +482,10 @@ async function recoverInterrupted(
         data: { status: "interrupted", error: "interrupted", finishedAt: new Date() }
     });
     if (node?.onError === "continue") {
-        await prisma.automationStep.updateMany({ where: { id: step.id }, data: { port: core.nodePorts(node.type)[0]! } });
+        await prisma.automationStep.updateMany({
+            where: { id: step.id },
+            data: { port: core.nodePorts(node.type)[0]! }
+        });
         await enqueue(run.id, core.successors(graph, node.id, core.nodePorts(node.type)[0]!), lane);
         return;
     }
@@ -483,7 +543,11 @@ async function executeStep(
     const ports = core.nodePorts(node.type);
     if (node.enabled === false) {
         // A switched-off node passes its token through its first port.
-        const done = await finishStep(step.id, { status: "skipped", port: ports[0]!, from: "ready" });
+        const done = await finishStep(step.id, {
+            status: "skipped",
+            port: ports[0]!,
+            from: "ready"
+        });
         if (done) await enqueue(run.id, core.successors(graph, node.id, ports[0]!), lane);
         return;
     }
@@ -525,7 +589,8 @@ async function executeStep(
         idempotencyKey: `${run.id}:${node.id}:${lane}`,
         timeZone: graph.timeZone,
         signal: controller.signal,
-        allowLocalNetwork: run.automation.allowLocalNetwork && (await mayAllowLocalNetwork(actor, run.automation)),
+        allowLocalNetwork:
+            run.automation.allowLocalNetwork && (await mayAllowLocalNetwork(actor, run.automation)),
         secret: async (id) => {
             const value = await readSecretForRun(id, run.automation);
             secrets.push(value);
@@ -535,10 +600,15 @@ async function executeStep(
             input = value;
         }
     };
-    const store = (value: unknown) => core.capStored(core.redactSecrets(value, secrets), L.stepDataBytes) as object;
+    const store = (value: unknown) =>
+        core.capStored(core.redactSecrets(value, secrets), L.stepDataBytes) as object;
 
     try {
-        const result = await withTimeout(impl.run(config.data, context, io), impl.timeoutMs ?? L.stepActiveMs, controller);
+        const result = await withTimeout(
+            impl.run(config.data, context, io),
+            impl.timeoutMs ?? L.stepActiveMs,
+            controller
+        );
         if ("wait" in result) {
             const until = result.wait.until;
             if (until.getTime() - Date.now() > L.longestWaitMs) throw new StepError("waitTooLong");
@@ -550,15 +620,25 @@ async function executeStep(
         }
         const port = result.port ?? "next";
         const output = store(result.output);
-        const done = await finishStep(step.id, { status: "ok", port, output, input: store(input), from: "running" });
+        const done = await finishStep(step.id, {
+            status: "ok",
+            port,
+            output,
+            input: store(input),
+            from: "running"
+        });
         if (!done) return;
         await count(run.id, output);
         await enqueue(run.id, core.successors(graph, node.id, port), lane);
     } catch (caught) {
         const refused = caught instanceof StepRefusal;
         const code = caught instanceof StepError ? caught.code : "failed";
-        if (!(caught instanceof StepError)) console.error(`polaris: automation step ${node.type} failed:`, caught);
-        const output = caught instanceof StepError && caught.output !== undefined ? store(caught.output) : undefined;
+        if (!(caught instanceof StepError))
+            console.error(`polaris: automation step ${node.type} failed:`, caught);
+        const output =
+            caught instanceof StepError && caught.output !== undefined
+                ? store(caught.output)
+                : undefined;
         if (node.onError === "continue" && !refused) {
             const port = ports[0]!;
             const done = await finishStep(step.id, {
@@ -593,7 +673,14 @@ async function count(runId: string, output: unknown): Promise<void> {
 
 async function finishStep(
     stepId: string,
-    change: { status: string; port?: string; error?: string; output?: object; input?: object; from?: string }
+    change: {
+        status: string;
+        port?: string;
+        error?: string;
+        output?: object;
+        input?: object;
+        from?: string;
+    }
 ): Promise<boolean> {
     const done = await prisma.automationStep.updateMany({
         where: { id: stepId, ...(change.from ? { status: change.from } : {}) },
@@ -622,7 +709,12 @@ async function failLane(
         data: { status: "skipped", finishedAt: new Date() }
     });
     if (lane === FINALLY) {
-        await finalize(run, (run.outcome as core.RunStatus | null) ?? "succeeded", "failed", run.error ?? `finally:${error}`);
+        await finalize(
+            run,
+            (run.outcome as core.RunStatus | null) ?? "succeeded",
+            "failed",
+            run.error ?? `finally:${error}`
+        );
         return;
     }
     await enterFinallyOrFinish(run, graph, outcome, error);
@@ -635,8 +727,16 @@ async function endLane(
     steps: readonly { status: string; port: string | null }[]
 ): Promise<void> {
     if (lane === FINALLY) {
-        const failed = steps.some((step) => ["failed", "refused", "timedOut", "interrupted"].includes(step.status) && !step.port);
-        await finalize(run, (run.outcome as core.RunStatus | null) ?? "succeeded", failed ? "failed" : "done", run.error);
+        const failed = steps.some(
+            (step) =>
+                ["failed", "refused", "timedOut", "interrupted"].includes(step.status) && !step.port
+        );
+        await finalize(
+            run,
+            (run.outcome as core.RunStatus | null) ?? "succeeded",
+            failed ? "failed" : "done",
+            run.error
+        );
         return;
     }
     await enterFinallyOrFinish(run, graph, "succeeded", null);
@@ -660,7 +760,12 @@ async function enterFinallyOrFinish(
     await finalize(run, outcome, run.finally === "none" ? "none" : "done", error);
 }
 
-async function finalize(run: RunRow, status: core.RunStatus, finallyState: core.FinallyState, error: string | null): Promise<void> {
+async function finalize(
+    run: RunRow,
+    status: core.RunStatus,
+    finallyState: core.FinallyState,
+    error: string | null
+): Promise<void> {
     await prisma.automationRun.updateMany({
         where: { id: run.id, status: { notIn: [...core.FINISHED_RUN_STATUSES] } },
         data: {
@@ -672,9 +777,15 @@ async function finalize(run: RunRow, status: core.RunStatus, finallyState: core.
             dueAt: null
         }
     });
-    await prisma.automation.update({ where: { id: run.automationId }, data: { lastStatus: status } });
+    await prisma.automation.update({
+        where: { id: run.automationId },
+        data: { lastStatus: status }
+    });
     const promoted = await promoteQueued(run.automationId);
-    if (promoted) void advanceRun(promoted).catch((caught) => console.error("polaris: a queued automation run failed to start:", caught));
+    if (promoted)
+        void advanceRun(promoted).catch((caught) =>
+            console.error("polaris: a queued automation run failed to start:", caught)
+        );
 }
 
 // ---------------------------------------------------------------------------
@@ -691,7 +802,10 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
     });
     const runs = new Set<string>();
     for (const step of due) {
-        const run = await prisma.automationRun.findUnique({ where: { id: step.runId }, select: { versionId: true } });
+        const run = await prisma.automationRun.findUnique({
+            where: { id: step.runId },
+            select: { versionId: true }
+        });
         const graph = run ? await loadGraph(run.versionId) : null;
         const done = await finishStep(step.id, {
             status: "ok",
@@ -700,7 +814,8 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
             from: "waiting"
         });
         if (!done) continue;
-        if (graph) await enqueue(step.runId, core.successors(graph, step.nodeId, "next"), step.iteration);
+        if (graph)
+            await enqueue(step.runId, core.successors(graph, step.nodeId, "next"), step.iteration);
         await prisma.automationRun.updateMany({
             where: { id: step.runId, status: "waiting" },
             data: { status: "running", dueAt: null }
@@ -713,7 +828,10 @@ export async function resumeDueWaits(limit = 100): Promise<string[]> {
 /** Runs that are ready to step and held by nobody (or by a process that died). */
 export async function runnableRuns(limit = 8): Promise<string[]> {
     const rows = await prisma.automationRun.findMany({
-        where: { status: "running", OR: [{ lockedUntil: null }, { lockedUntil: { lt: new Date() } }] },
+        where: {
+            status: "running",
+            OR: [{ lockedUntil: null }, { lockedUntil: { lt: new Date() } }]
+        },
         orderBy: { queuedAt: "asc" },
         take: limit,
         select: { id: true }

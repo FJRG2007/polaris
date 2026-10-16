@@ -18,7 +18,9 @@ import type { RunActor } from "@/lib/automations/types";
 import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { mayEditShelf, type Shelf } from "@/lib/automations/runner";
 
-type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string; problems?: core.GraphProblem[] };
+type Result<T = object> =
+    | ({ ok: true } & T)
+    | { ok: false; error: string; problems?: core.GraphProblem[] };
 
 async function actor(): Promise<RunActor> {
     const user = await requirePermission("automations.use");
@@ -32,7 +34,8 @@ async function openShelf(who: RunActor): Promise<Shelf> {
 
 async function failure(caught: unknown): Promise<{ ok: false; error: string }> {
     const t = await getTranslations("automations");
-    if (caught instanceof service.AutomationAccessError) return { ok: false, error: t(`errors.${caught.code}`) };
+    if (caught instanceof service.AutomationAccessError)
+        return { ok: false, error: t(`errors.${caught.code}`) };
     if (caught instanceof secrets.SecretLimitError) return { ok: false, error: t("errors.limit") };
     console.error("polaris: an automations action failed:", caught);
     return { ok: false, error: t("errors.generic") };
@@ -49,7 +52,9 @@ function refresh(automationId?: string): void {
     if (automationId) revalidatePath(`/automations/${automationId}`);
 }
 
-export async function listAutomationsAction(): Promise<Result<{ rows: service.AutomationRow[]; canEdit: boolean }>> {
+export async function listAutomationsAction(): Promise<
+    Result<{ rows: service.AutomationRow[]; canEdit: boolean }>
+> {
     try {
         const who = await actor();
         return { ok: true, ...(await service.listAutomations(who, await openShelf(who))) };
@@ -58,21 +63,29 @@ export async function listAutomationsAction(): Promise<Result<{ rows: service.Au
     }
 }
 
-export async function getAutomationAction(automationId: unknown): Promise<Result<{ automation: service.AutomationDetail; secrets: secrets.SecretSummary[] }>> {
+export async function getAutomationAction(
+    automationId: unknown
+): Promise<Result<{ automation: service.AutomationDetail; secrets: secrets.SecretSummary[] }>> {
     const parsed = id.safeParse(automationId);
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
         const automation = await service.getAutomation(who, parsed.data);
         const shelf = await service.shelfOf(parsed.data);
-        return { ok: true, automation, secrets: automation.canEdit ? await secrets.listSecrets(shelf) : [] };
+        return {
+            ok: true,
+            automation,
+            secrets: automation.canEdit ? await secrets.listSecrets(shelf) : []
+        };
     } catch (caught) {
         return failure(caught);
     }
 }
 
 /** The shelves this account may create an automation on: its own, and the organizations it administers. */
-export async function creatableShelvesAction(): Promise<Result<{ orgs: { id: string; name: string }[]; openOrgId: string | null }>> {
+export async function creatableShelvesAction(): Promise<
+    Result<{ orgs: { id: string; name: string }[]; openOrgId: string | null }>
+> {
     try {
         const who = await actor();
         const orgs = await listAdministeredOrgs(who);
@@ -82,16 +95,26 @@ export async function creatableShelvesAction(): Promise<Result<{ orgs: { id: str
     }
 }
 
-export async function createAutomationAction(input: unknown, timeZone: unknown): Promise<Result<{ id: string }>> {
+export async function createAutomationAction(
+    input: unknown,
+    timeZone: unknown
+): Promise<Result<{ id: string }>> {
     const parsed = core.automationCreateSchema.safeParse(input);
     const zone = z.string().min(1).max(64).safeParse(timeZone);
     if (!parsed.success) {
         const t = await getTranslations("automations");
         const message = parsed.error.issues[0]?.message;
-        return { ok: false, error: message === "nameRequired" ? t("errors.nameRequired") : t("errors.invalid") };
+        return {
+            ok: false,
+            error: message === "nameRequired" ? t("errors.nameRequired") : t("errors.invalid")
+        };
     }
     try {
-        const newId = await service.createAutomation(await actor(), parsed.data, zone.success ? zone.data : "UTC");
+        const newId = await service.createAutomation(
+            await actor(),
+            parsed.data,
+            zone.success ? zone.data : "UTC"
+        );
         refresh();
         return { ok: true, id: newId };
     } catch (caught) {
@@ -118,7 +141,11 @@ export async function saveDraftAction(automationId: unknown, graph: unknown): Pr
     try {
         const problems = await service.saveDraft(await actor(), parsedId.data, parsed.data);
         if (problems.some((problem) => problem.code !== "badConfig"))
-            return { ok: false, error: (await getTranslations("automations"))("errors.invalid"), problems };
+            return {
+                ok: false,
+                error: (await getTranslations("automations"))("errors.invalid"),
+                problems
+            };
         refresh(parsedId.data);
         return { ok: true };
     } catch (caught) {
@@ -131,7 +158,12 @@ export async function publishAction(automationId: unknown): Promise<Result> {
     if (!parsed.success) return invalid();
     try {
         const problems = await service.publishAutomation(await actor(), parsed.data);
-        if (problems.length > 0) return { ok: false, error: (await getTranslations("automations"))("errors.notReady"), problems };
+        if (problems.length > 0)
+            return {
+                ok: false,
+                error: (await getTranslations("automations"))("errors.notReady"),
+                problems
+            };
         refresh(parsed.data);
         return { ok: true };
     } catch (caught) {
@@ -154,7 +186,10 @@ export async function updateSettingsAction(automationId: unknown, input: unknown
     }
 }
 
-export async function setLocalNetworkAction(automationId: unknown, allow: unknown): Promise<Result> {
+export async function setLocalNetworkAction(
+    automationId: unknown,
+    allow: unknown
+): Promise<Result> {
     const parsed = z.tuple([id, z.boolean()]).safeParse([automationId, allow]);
     if (!parsed.success) return invalid();
     try {
@@ -173,7 +208,9 @@ export async function rotateHookAction(automationId: unknown, nodeId: unknown): 
         const who = await actor();
         const detail = await service.getAutomation(who, parsed.data[0]);
         const graph = structuredClone(detail.draft);
-        const node = graph.nodes.find((entry) => entry.id === parsed.data[1] && entry.type === "core.webhook");
+        const node = graph.nodes.find(
+            (entry) => entry.id === parsed.data[1] && entry.type === "core.webhook"
+        );
         if (!node) return invalid();
         const config = core.CORE_NODE_CONFIGS["core.webhook"].parse(node.config);
         node.config = { ...config, rotation: config.rotation + 1 };
@@ -209,18 +246,28 @@ export async function runNowAction(automationId: unknown): Promise<Result> {
     }
 }
 
-export async function listRunsAction(automationId: unknown, after?: unknown): Promise<Result<service.RunPage>> {
-    const parsed = z.tuple([id.optional(), z.string().max(100).optional()]).safeParse([automationId ?? undefined, after ?? undefined]);
+export async function listRunsAction(
+    automationId: unknown,
+    after?: unknown
+): Promise<Result<service.RunPage>> {
+    const parsed = z
+        .tuple([id.optional(), z.string().max(100).optional()])
+        .safeParse([automationId ?? undefined, after ?? undefined]);
     if (!parsed.success) return invalid();
     try {
         const who = await actor();
-        return { ok: true, ...(await service.listRuns(who, await openShelf(who), parsed.data[0], parsed.data[1])) };
+        return {
+            ok: true,
+            ...(await service.listRuns(who, await openShelf(who), parsed.data[0], parsed.data[1]))
+        };
     } catch (caught) {
         return failure(caught);
     }
 }
 
-export async function listRunStepsAction(runId: unknown): Promise<Result<{ steps: service.RunStepRow[]; canSeeData: boolean }>> {
+export async function listRunStepsAction(
+    runId: unknown
+): Promise<Result<{ steps: service.RunStepRow[]; canSeeData: boolean }>> {
     const parsed = id.safeParse(runId);
     if (!parsed.success) return invalid();
     try {
@@ -242,26 +289,36 @@ export async function cancelRunAction(runId: unknown): Promise<Result> {
     }
 }
 
-export async function listSecretsAction(): Promise<Result<{ rows: secrets.SecretSummary[]; canEdit: boolean }>> {
+export async function listSecretsAction(): Promise<
+    Result<{ rows: secrets.SecretSummary[]; canEdit: boolean }>
+> {
     try {
         const who = await actor();
         const shelf = await openShelf(who);
         const user = await requirePermission("automations.use");
         const { sessionCan } = await import("@/lib/session");
-        const canEdit = (await mayEditShelf(who, shelf)) && (await sessionCan(user, "automations.secrets"));
+        const canEdit =
+            (await mayEditShelf(who, shelf)) && (await sessionCan(user, "automations.secrets"));
         return { ok: true, rows: await secrets.listSecrets(shelf), canEdit };
     } catch (caught) {
         return failure(caught);
     }
 }
 
-export async function createSecretAction(input: unknown): Promise<Result<{ row: secrets.SecretSummary }>> {
+export async function createSecretAction(
+    input: unknown
+): Promise<Result<{ row: secrets.SecretSummary }>> {
     const parsed = core.secretCreateSchema.safeParse(input);
     if (!parsed.success) {
         const t = await getTranslations("automations");
         const code = parsed.error.issues[0]?.message;
         const known = ["nameRequired", "valueRequired", "urlInvalid", "basicInvalid"] as const;
-        return { ok: false, error: known.includes(code as (typeof known)[number]) ? t(`errors.${code as (typeof known)[number]}`) : t("errors.invalid") };
+        return {
+            ok: false,
+            error: known.includes(code as (typeof known)[number])
+                ? t(`errors.${code as (typeof known)[number]}`)
+                : t("errors.invalid")
+        };
     }
     try {
         const user = await requirePermission("automations.secrets");
@@ -284,7 +341,8 @@ export async function deleteSecretAction(secretId: unknown): Promise<Result> {
         const who = { id: user.id, isAdmin: user.isAdmin };
         const shelf = await openShelf(who);
         if (!(await mayEditShelf(who, shelf))) throw new service.AutomationAccessError("forbidden");
-        if (!(await secrets.deleteSecret(shelf, parsed.data))) throw new service.AutomationAccessError("notFound");
+        if (!(await secrets.deleteSecret(shelf, parsed.data)))
+            throw new service.AutomationAccessError("notFound");
         revalidatePath("/automations/secrets");
         return { ok: true };
     } catch (caught) {

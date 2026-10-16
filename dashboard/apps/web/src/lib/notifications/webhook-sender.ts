@@ -73,7 +73,9 @@ function slackBody(payload: WebhookPayload): unknown {
     if (payload.url) {
         blocks.push({
             type: "context",
-            elements: [{ type: "mrkdwn", text: `<${payload.url}|${payload.openLabel ?? OPEN_IN_POLARIS}>` }]
+            elements: [
+                { type: "mrkdwn", text: `<${payload.url}|${payload.openLabel ?? OPEN_IN_POLARIS}>` }
+            ]
         });
     }
     return {
