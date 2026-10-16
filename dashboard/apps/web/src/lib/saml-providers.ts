@@ -85,7 +85,11 @@ const SELECT = {
 } as const;
 
 export async function listSamlProviders(): Promise<SamlProviderView[]> {
-    const rows = await prisma.ssoProvider.findMany({ select: SELECT, orderBy: { createdAt: "asc" }, take: 100 });
+    const rows = await prisma.ssoProvider.findMany({
+        select: SELECT,
+        orderBy: { createdAt: "asc" },
+        take: 100
+    });
     return rows.map(view);
 }
 
@@ -93,19 +97,30 @@ export async function listSamlProviders(): Promise<SamlProviderView[]> {
 async function fetchMetadata(address: string): Promise<string> {
     const url = safeUrl(address);
     if (!url || url.protocol !== "https:") throw new SamlProviderError("fetch");
-    const response = await follow(url, "application/samlmetadata+xml, application/xml, text/xml").catch(() => null);
+    const response = await follow(
+        url,
+        "application/samlmetadata+xml, application/xml, text/xml"
+    ).catch(() => null);
     if (!response || !response.ok) throw new SamlProviderError("fetch");
     const bytes = await readCapped(response, core.SAML_MAX_METADATA_LENGTH);
     if (!bytes) throw new SamlProviderError("fetch");
     return new TextDecoder().decode(bytes);
 }
 
-async function idpDetails(source: core.SamlSource, samlConfig: string | null): Promise<auth.IdpDetails> {
+async function idpDetails(
+    source: core.SamlSource,
+    samlConfig: string | null
+): Promise<auth.IdpDetails> {
     try {
         if (source.kind === "current") {
             const stored = auth.storedIdpDetails(samlConfig);
-            if (!stored?.entityId || !stored.ssoUrl || !stored.certificate) throw new SamlProviderError("metadata");
-            return { entityId: stored.entityId, ssoUrl: stored.ssoUrl, certificate: stored.certificate };
+            if (!stored?.entityId || !stored.ssoUrl || !stored.certificate)
+                throw new SamlProviderError("metadata");
+            return {
+                entityId: stored.entityId,
+                ssoUrl: stored.ssoUrl,
+                certificate: stored.certificate
+            };
         }
         if (source.kind === "manual") return auth.manualIdpDetails(source);
         const xml = source.kind === "metadataXml" ? source.xml : await fetchMetadata(source.url);
@@ -117,10 +132,16 @@ async function idpDetails(source: core.SamlSource, samlConfig: string | null): P
 }
 
 /** Refuses a domain another provider already routes, so an address has one way in. */
-async function assertDomainsFree(domains: readonly string[], providerId: string | null): Promise<void> {
-    const others = (await auth.samlDomainPolicies()).filter((entry) => entry.providerId !== providerId);
+async function assertDomainsFree(
+    domains: readonly string[],
+    providerId: string | null
+): Promise<void> {
+    const others = (await auth.samlDomainPolicies()).filter(
+        (entry) => entry.providerId !== providerId
+    );
     for (const domain of domains) {
-        if (others.some((other) => other.domains.includes(domain))) throw new SamlProviderError("domainTaken");
+        if (others.some((other) => other.domains.includes(domain)))
+            throw new SamlProviderError("domainTaken");
     }
 }
 
@@ -143,7 +164,12 @@ export async function saveSamlProvider(
     const idp = await idpDetails(input.source, existing?.samlConfig ?? null);
     const id = providerId ?? `saml-${randomBytes(12).toString("hex").slice(0, 20)}`;
     const domain = input.domains.join(",");
-    const samlConfig = auth.samlPluginConfig({ appUrl: appUrl(), providerId: id, idp, mapping: input.mapping });
+    const samlConfig = auth.samlPluginConfig({
+        appUrl: appUrl(),
+        providerId: id,
+        idp,
+        mapping: input.mapping
+    });
     const sameDomains = existing?.domain === domain;
     const data = {
         name: input.name,
@@ -157,7 +183,12 @@ export async function saveSamlProvider(
     const row = existing
         ? await prisma.ssoProvider.update({ where: { providerId: id }, data, select: SELECT })
         : await prisma.ssoProvider.create({
-              data: { ...data, providerId: id, userId: adminId, domainToken: randomBytes(18).toString("base64url") },
+              data: {
+                  ...data,
+                  providerId: id,
+                  userId: adminId,
+                  domainToken: randomBytes(18).toString("base64url")
+              },
               select: SELECT
           });
     return view(row);
@@ -184,7 +215,12 @@ export interface SamlCheckResult {
  *  of a server error or an address that is gone. A bare GET carries no request,
  *  so a working provider may well refuse it with a 400 or a 401. */
 function signInAddressAnswers(response: { status: number } | null): boolean {
-    return response !== null && response.status < 500 && response.status !== 404 && response.status !== 410;
+    return (
+        response !== null &&
+        response.status < 500 &&
+        response.status !== 404 &&
+        response.status !== 410
+    );
 }
 
 async function hasRecord(record: { name: string; value: string }): Promise<boolean> {
@@ -226,7 +262,10 @@ export async function checkSamlProvider(providerId: string): Promise<SamlCheckRe
         checks.push({ key: "domain", ok, detail: record.name });
     }
     if (allDomains !== row.domainVerified) {
-        await prisma.ssoProvider.update({ where: { providerId }, data: { domainVerified: allDomains } });
+        await prisma.ssoProvider.update({
+            where: { providerId },
+            data: { domainVerified: allDomains }
+        });
     }
     return { checks, provider: { ...current, domainVerified: allDomains } };
 }

@@ -6,7 +6,11 @@ import { Check, Plus, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import type { SamlCheck, SamlProviderView } from "@/lib/saml-providers";
-import { checkSamlProviderAction, deleteSamlProviderAction, saveSamlProviderAction } from "./actions";
+import {
+    checkSamlProviderAction,
+    deleteSamlProviderAction,
+    saveSamlProviderAction
+} from "./actions";
 import {
     Badge,
     Button,
@@ -79,21 +83,39 @@ function inputFor(draft: Draft): unknown {
         draft.kind === "current"
             ? { kind: draft.kind }
             : draft.kind === "metadataUrl"
-            ? { kind: draft.kind, url: draft.url }
+              ? { kind: draft.kind, url: draft.url }
               : draft.kind === "metadataXml"
                 ? { kind: draft.kind, xml: draft.xml }
-                : { kind: draft.kind, entityId: draft.entityId, ssoUrl: draft.ssoUrl, certificate: draft.certificate };
+                : {
+                      kind: draft.kind,
+                      entityId: draft.entityId,
+                      ssoUrl: draft.ssoUrl,
+                      certificate: draft.certificate
+                  };
     return {
         name: draft.name,
         domains: draft.domains.split(/[\s,]+/).filter(Boolean),
         source,
-        mapping: { email: draft.email, name: draft.displayName, firstName: draft.firstName, lastName: draft.lastName },
+        mapping: {
+            email: draft.email,
+            name: draft.displayName,
+            firstName: draft.firstName,
+            lastName: draft.lastName
+        },
         allowSignUp: draft.allowSignUp,
         enforced: draft.enforced
     };
 }
 
-function Field({ label, error, children }: { label: string; error?: string | null; children: React.ReactNode }) {
+function Field({
+    label,
+    error,
+    children
+}: {
+    label: string;
+    error?: string | null;
+    children: React.ReactNode;
+}) {
     return (
         <label className="flex min-w-0 flex-col gap-1 text-sm">
             <span className="font-medium">{label}</span>
@@ -108,7 +130,10 @@ function Copyable({ label, value }: { label: string; value: string }) {
         <div className="flex min-w-0 flex-col gap-1">
             <span className="text-xs text-muted-foreground">{label}</span>
             <div className="flex min-w-0 items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs" title={value}>
+                <code
+                    className="min-w-0 flex-1 truncate rounded bg-muted px-2 py-1 text-xs"
+                    title={value}
+                >
                     {value}
                 </code>
                 <CopyButton value={value} label={label} />
@@ -142,7 +167,8 @@ function ProviderForm({
     };
     // Saving what is already saved does nothing, so an untouched edit cannot be sent.
     const changed = provider === null || JSON.stringify(draft) !== JSON.stringify(initial);
-    const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((prev) => ({ ...prev, [key]: value }));
+    const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+        setDraft((prev) => ({ ...prev, [key]: value }));
 
     async function save() {
         if (!parsed.success || !changed) return;
@@ -151,7 +177,12 @@ function ProviderForm({
         const outcome = await saveSamlProviderAction(inputFor(draft), provider?.providerId ?? null);
         setPending(false);
         if (outcome.ok) onDone(outcome.value);
-        else setError(outcome.message ? validationMessage(tv, outcome.message) : t(PROBLEMS[outcome.problem]));
+        else
+            setError(
+                outcome.message
+                    ? validationMessage(tv, outcome.message)
+                    : t(PROBLEMS[outcome.problem])
+            );
     }
 
     const touched = (value: string) => value.trim().length > 0;
@@ -162,10 +193,19 @@ function ProviderForm({
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label={`${t("sso.form.name")} *`} error={touched(draft.name) ? issueFor("name") : null}>
-                        <Input value={draft.name} onChange={(event) => set("name", event.target.value)} />
+                    <Field
+                        label={`${t("sso.form.name")} *`}
+                        error={touched(draft.name) ? issueFor("name") : null}
+                    >
+                        <Input
+                            value={draft.name}
+                            onChange={(event) => set("name", event.target.value)}
+                        />
                     </Field>
-                    <Field label={`${t("sso.form.domains")} *`} error={touched(draft.domains) ? issueFor("domains") : null}>
+                    <Field
+                        label={`${t("sso.form.domains")} *`}
+                        error={touched(draft.domains) ? issueFor("domains") : null}
+                    >
                         <Input
                             value={draft.domains}
                             placeholder="example.com"
@@ -180,7 +220,14 @@ function ProviderForm({
                         value={draft.kind}
                         onValueChange={(kind) => set("kind", kind)}
                         options={[
-                            ...(provider ? [{ value: "current" as const, label: t("sso.form.sourceCurrent") }] : []),
+                            ...(provider
+                                ? [
+                                      {
+                                          value: "current" as const,
+                                          label: t("sso.form.sourceCurrent")
+                                      }
+                                  ]
+                                : []),
                             { value: "metadataUrl", label: t("sso.form.sourceUrl") },
                             { value: "metadataXml", label: t("sso.form.sourceXml") },
                             { value: "manual", label: t("sso.form.sourceManual") }
@@ -191,9 +238,14 @@ function ProviderForm({
                     ) : null}
                 </div>
                 {draft.kind === "current" ? (
-                    <p className="min-w-0 break-all text-xs text-muted-foreground">{provider?.entityId}</p>
+                    <p className="min-w-0 break-all text-xs text-muted-foreground">
+                        {provider?.entityId}
+                    </p>
                 ) : draft.kind === "metadataUrl" ? (
-                    <Field label={`${t("sso.form.metadataUrl")} *`} error={touched(draft.url) ? issueFor("source") : null}>
+                    <Field
+                        label={`${t("sso.form.metadataUrl")} *`}
+                        error={touched(draft.url) ? issueFor("source") : null}
+                    >
                         <Input
                             value={draft.url}
                             placeholder="https://"
@@ -201,8 +253,15 @@ function ProviderForm({
                         />
                     </Field>
                 ) : draft.kind === "metadataXml" ? (
-                    <Field label={`${t("sso.form.metadataXml")} *`} error={touched(draft.xml) ? issueFor("source") : null}>
-                        <Textarea rows={6} value={draft.xml} onChange={(event) => set("xml", event.target.value)} />
+                    <Field
+                        label={`${t("sso.form.metadataXml")} *`}
+                        error={touched(draft.xml) ? issueFor("source") : null}
+                    >
+                        <Textarea
+                            rows={6}
+                            value={draft.xml}
+                            onChange={(event) => set("xml", event.target.value)}
+                        />
                     </Field>
                 ) : (
                     <div className="grid gap-3">
@@ -210,7 +269,10 @@ function ProviderForm({
                             label={`${t("sso.form.entityId")} *`}
                             error={touched(draft.entityId) ? issueFor("source.entityId") : null}
                         >
-                            <Input value={draft.entityId} onChange={(event) => set("entityId", event.target.value)} />
+                            <Input
+                                value={draft.entityId}
+                                onChange={(event) => set("entityId", event.target.value)}
+                            />
                         </Field>
                         <Field
                             label={`${t("sso.form.ssoUrl")} *`}
@@ -224,11 +286,14 @@ function ProviderForm({
                         </Field>
                         <Field
                             label={`${t("sso.form.certificate")} *`}
-                            error={touched(draft.certificate) ? issueFor("source.certificate") : null}
+                            error={
+                                touched(draft.certificate) ? issueFor("source.certificate") : null
+                            }
                         >
                             <Textarea
                                 rows={5}
                                 value={draft.certificate}
+                                // i18n-ignore: PEM boundary marker, identical in every locale
                                 placeholder="-----BEGIN CERTIFICATE-----"
                                 onChange={(event) => set("certificate", event.target.value)}
                             />
@@ -242,26 +307,46 @@ function ProviderForm({
                             label={`${t("sso.form.mapEmail")} *`}
                             error={touched(draft.email) ? issueFor("mapping.email") : null}
                         >
-                            <Input value={draft.email} onChange={(event) => set("email", event.target.value)} />
+                            <Input
+                                value={draft.email}
+                                onChange={(event) => set("email", event.target.value)}
+                            />
                         </Field>
                         <Field
                             label={`${t("sso.form.mapName")} *`}
                             error={touched(draft.displayName) ? issueFor("mapping.name") : null}
                         >
-                            <Input value={draft.displayName} onChange={(event) => set("displayName", event.target.value)} />
+                            <Input
+                                value={draft.displayName}
+                                onChange={(event) => set("displayName", event.target.value)}
+                            />
                         </Field>
-                        <Field label={t("sso.form.mapFirstName")} error={issueFor("mapping.firstName")}>
-                            <Input value={draft.firstName} onChange={(event) => set("firstName", event.target.value)} />
+                        <Field
+                            label={t("sso.form.mapFirstName")}
+                            error={issueFor("mapping.firstName")}
+                        >
+                            <Input
+                                value={draft.firstName}
+                                onChange={(event) => set("firstName", event.target.value)}
+                            />
                         </Field>
-                        <Field label={t("sso.form.mapLastName")} error={issueFor("mapping.lastName")}>
-                            <Input value={draft.lastName} onChange={(event) => set("lastName", event.target.value)} />
+                        <Field
+                            label={t("sso.form.mapLastName")}
+                            error={issueFor("mapping.lastName")}
+                        >
+                            <Input
+                                value={draft.lastName}
+                                onChange={(event) => set("lastName", event.target.value)}
+                            />
                         </Field>
                     </div>
                 </div>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <p className="text-sm font-medium">{t("sso.form.allowSignUp")}</p>
-                        <p className="text-xs text-muted-foreground">{t("sso.form.allowSignUpHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("sso.form.allowSignUpHint")}
+                        </p>
                     </div>
                     <Switch
                         checked={draft.allowSignUp}
@@ -272,7 +357,9 @@ function ProviderForm({
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <p className="text-sm font-medium">{t("sso.form.enforced")}</p>
-                        <p className="text-xs text-muted-foreground">{t("sso.form.enforcedHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("sso.form.enforcedHint")}
+                        </p>
                     </div>
                     <Switch
                         checked={draft.enforced}
@@ -282,7 +369,12 @@ function ProviderForm({
                 </div>
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 <div className="flex flex-wrap justify-end gap-2">
-                    <Button type="button" variant="ghost" disabled={pending} onClick={() => onDone(null)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={pending}
+                        onClick={() => onDone(null)}
+                    >
                         {t("sso.form.cancel")}
                     </Button>
                     <Button
@@ -333,7 +425,9 @@ function ProviderCard({
                 <CardTitle className="min-w-0 truncate">{provider.name}</CardTitle>
                 <div className="flex flex-wrap gap-1">
                     <Badge variant={provider.domainVerified ? "success" : "warning"}>
-                        {provider.domainVerified ? t("sso.card.verified") : t("sso.card.unverified")}
+                        {provider.domainVerified
+                            ? t("sso.card.verified")
+                            : t("sso.card.unverified")}
                     </Badge>
                     {provider.enforced ? <Badge>{t("sso.card.enforced")}</Badge> : null}
                     {provider.allowSignUp ? <Badge>{t("sso.card.jit")}</Badge> : null}
@@ -342,9 +436,18 @@ function ProviderCard({
             <CardBody className="flex flex-col gap-4">
                 <p className="text-sm text-muted-foreground">{provider.domains.join(", ")}</p>
                 <div className="grid gap-3">
-                    <Copyable label={t("sso.card.spEntityId")} value={provider.serviceProvider.entityId} />
-                    <Copyable label={t("sso.card.acsUrl")} value={provider.serviceProvider.acsUrl} />
-                    <Copyable label={t("sso.card.spMetadata")} value={provider.serviceProvider.metadataUrl} />
+                    <Copyable
+                        label={t("sso.card.spEntityId")}
+                        value={provider.serviceProvider.entityId}
+                    />
+                    <Copyable
+                        label={t("sso.card.acsUrl")}
+                        value={provider.serviceProvider.acsUrl}
+                    />
+                    <Copyable
+                        label={t("sso.card.spMetadata")}
+                        value={provider.serviceProvider.metadataUrl}
+                    />
                 </div>
                 {provider.domainVerified ? null : (
                     <div className="flex flex-col gap-2">
@@ -360,7 +463,10 @@ function ProviderCard({
                 {checks ? (
                     <ul className="flex flex-col gap-1 text-sm">
                         {checks.map((entry, index) => (
-                            <li key={`${entry.key}-${index}`} className="flex min-w-0 items-center gap-2">
+                            <li
+                                key={`${entry.key}-${index}`}
+                                className="flex min-w-0 items-center gap-2"
+                            >
                                 {entry.ok ? (
                                     <Check className="size-4 shrink-0 text-success" aria-hidden />
                                 ) : (
@@ -368,7 +474,11 @@ function ProviderCard({
                                 )}
                                 <span
                                     className="min-w-0 truncate"
-                                    title={entry.detail ? `${t(`sso.checks.${entry.key}`)} - ${entry.detail}` : undefined}
+                                    title={
+                                        entry.detail
+                                            ? `${t(`sso.checks.${entry.key}`)} - ${entry.detail}`
+                                            : undefined
+                                    }
                                 >
                                     {t(`sso.checks.${entry.key}`)}
                                     {entry.detail ? ` - ${entry.detail}` : ""}
@@ -438,7 +548,11 @@ export function SsoAdmin({ providers: initial }: { providers: SamlProviderView[]
                         provider={provider}
                         onEdit={() => setEditing(provider.providerId)}
                         onChecked={replace}
-                        onDeleted={() => setProviders((list) => list.filter((entry) => entry.providerId !== provider.providerId))}
+                        onDeleted={() =>
+                            setProviders((list) =>
+                                list.filter((entry) => entry.providerId !== provider.providerId)
+                            )
+                        }
                     />
                 )
             )}

@@ -100,12 +100,16 @@ export interface SignInRecord {
 
 export function parseSignInMethod(value: string | null | undefined): SignInMethod | null {
     const known: readonly string[] = SIGN_IN_METHODS;
-    return value !== null && value !== undefined && known.includes(value) ? (value as SignInMethod) : null;
+    return value !== null && value !== undefined && known.includes(value)
+        ? (value as SignInMethod)
+        : null;
 }
 
 export function parseSecondFactor(value: string | null | undefined): SecondFactor | null {
     const known: readonly string[] = SECOND_FACTORS;
-    return value !== null && value !== undefined && known.includes(value) ? (value as SecondFactor) : null;
+    return value !== null && value !== undefined && known.includes(value)
+        ? (value as SecondFactor)
+        : null;
 }
 
 /**

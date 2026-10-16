@@ -36,7 +36,10 @@ export function signInParts(t: Words, record: SignInRecord): string[] {
     if (record.method) {
         const own = OWN_METHODS[record.method];
         parts.push(
-            own ? t(own) : (CONNECTION_PROVIDERS.find((provider) => provider.slug === record.method)?.name ?? record.method)
+            own
+                ? t(own)
+                : (CONNECTION_PROVIDERS.find((provider) => provider.slug === record.method)?.name ??
+                      record.method)
         );
     }
     if (record.secondFactor) parts.push(t(SECOND_FACTORS[record.secondFactor]));

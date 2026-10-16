@@ -43,7 +43,8 @@ export const SAML_MESSAGES = {
     domainsMax: `Use at most ${SAML_MAX_DOMAINS} domains.`
 } as const;
 
-const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/;
+const DOMAIN_PATTERN =
+    /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/;
 
 /** One domain the way it is stored: trimmed, lower case, no leading "@" or trailing dot. */
 export function normalizeSamlDomain(value: string): string {
@@ -113,13 +114,19 @@ export const samlSourceSchema = z.discriminatedUnion("kind", [
     }),
     z.object({
         kind: z.literal("manual"),
-        entityId: z.string().trim().min(1, SAML_MESSAGES.entityId).max(1024, "Use at most 1024 characters."),
+        entityId: z
+            .string()
+            .trim()
+            .min(1, SAML_MESSAGES.entityId)
+            .max(1024, "Use at most 1024 characters."),
         ssoUrl: z
             .string()
             .trim()
             .max(2048, "Use at most 2048 characters.")
             .url(SAML_MESSAGES.ssoUrl)
-            .refine((value) => value.startsWith("https://"), { message: SAML_MESSAGES.ssoUrlHttps }),
+            .refine((value) => value.startsWith("https://"), {
+                message: SAML_MESSAGES.ssoUrlHttps
+            }),
         certificate: z
             .string()
             .trim()
@@ -170,14 +177,21 @@ export type SamlProviderInput = z.infer<typeof samlProviderInputSchema>;
 export const SAML_PROVIDER_ID_PATTERN = /^saml-[a-z0-9]{12,32}$/;
 
 /** The addresses an administrator copies into the identity provider. */
-export function samlServiceProviderUrls(appUrl: string, providerId: string): {
+export function samlServiceProviderUrls(
+    appUrl: string,
+    providerId: string
+): {
     entityId: string;
     acsUrl: string;
     metadataUrl: string;
 } {
     const base = `${appUrl.replace(/\/+$/, "")}/api/auth`;
     const metadataUrl = `${base}/sso/saml2/sp/metadata?providerId=${encodeURIComponent(providerId)}`;
-    return { entityId: metadataUrl, acsUrl: `${base}/sso/saml2/sp/acs/${encodeURIComponent(providerId)}`, metadataUrl };
+    return {
+        entityId: metadataUrl,
+        acsUrl: `${base}/sso/saml2/sp/acs/${encodeURIComponent(providerId)}`,
+        metadataUrl
+    };
 }
 
 /** The DNS TXT record that proves the domains belong to whoever configured them. */
@@ -194,7 +208,10 @@ export interface SamlDomainPolicy {
 }
 
 /** The provider an address signs in through, or null when its domain has none. */
-export function providerForEmail<T extends SamlDomainPolicy>(email: string, providers: readonly T[]): T | null {
+export function providerForEmail<T extends SamlDomainPolicy>(
+    email: string,
+    providers: readonly T[]
+): T | null {
     const domain = emailDomain(email);
     if (!domain) return null;
     return providers.find((provider) => samlDomainMatches(domain, provider.domains)) ?? null;
@@ -228,7 +245,8 @@ const PLACEHOLDER_ORIGIN = "http://polaris.invalid";
  * to can never take somebody off this deployment.
  */
 export function sameOriginPath(target: string | null | undefined): string | null {
-    if (!target || !target.startsWith("/") || /^[\\/]{2}/.test(target) || target.includes("\\")) return null;
+    if (!target || !target.startsWith("/") || /^[\\/]{2}/.test(target) || target.includes("\\"))
+        return null;
     let resolved: URL;
     try {
         resolved = new URL(target, PLACEHOLDER_ORIGIN);

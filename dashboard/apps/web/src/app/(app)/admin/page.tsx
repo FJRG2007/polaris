@@ -63,10 +63,7 @@ export default async function ManagementPage() {
 
     return (
         <>
-            <PageHeader
-                title={t("overview.title")}
-                description={t("overview.description")}
-            />
+            <PageHeader title={t("overview.title")} description={t("overview.description")} />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {SECTIONS.map((section) => {
                     const Icon = section.icon;

@@ -30,9 +30,7 @@ export class IdpConfigError extends Error {
 
 /** A certificate as PEM, whether it was pasted with its armour or as bare base64. */
 export function normalizeCertificate(value: string): string {
-    const body = value
-        .replace(/-----(BEGIN|END) CERTIFICATE-----/g, "")
-        .replace(/\s+/g, "");
+    const body = value.replace(/-----(BEGIN|END) CERTIFICATE-----/g, "").replace(/\s+/g, "");
     const lines = body.match(/.{1,64}/g) ?? [];
     return `-----BEGIN CERTIFICATE-----\n${lines.join("\n")}\n-----END CERTIFICATE-----\n`;
 }
@@ -72,14 +70,23 @@ export function readIdpMetadata(xml: string): IdpDetails {
         throw new IdpConfigError("metadata");
     }
     if (typeof entityId !== "string" || !entityId.trim()) throw new IdpConfigError("metadata");
-    if (typeof ssoUrl !== "string" || !ssoUrl.startsWith("https://")) throw new IdpConfigError("ssoUrl");
+    if (typeof ssoUrl !== "string" || !ssoUrl.startsWith("https://"))
+        throw new IdpConfigError("ssoUrl");
     if (!certificate) throw new IdpConfigError("certificate");
     return { entityId: entityId.trim(), ssoUrl, certificate: readCertificate(certificate).pem };
 }
 
 /** The details from a manual entry, checked the same way metadata is. */
-export function manualIdpDetails(source: { entityId: string; ssoUrl: string; certificate: string }): IdpDetails {
-    return { entityId: source.entityId, ssoUrl: source.ssoUrl, certificate: readCertificate(source.certificate).pem };
+export function manualIdpDetails(source: {
+    entityId: string;
+    ssoUrl: string;
+    certificate: string;
+}): IdpDetails {
+    return {
+        entityId: source.entityId,
+        ssoUrl: source.ssoUrl,
+        certificate: readCertificate(source.certificate).pem
+    };
 }
 
 /** The plugin's stored configuration for one provider, as JSON. */
@@ -99,7 +106,9 @@ export function samlPluginConfig(input: {
         idpMetadata: {
             entityID: input.idp.entityId,
             cert: input.idp.certificate,
-            singleSignOnService: [{ Binding: core.SAML_REDIRECT_BINDING, Location: input.idp.ssoUrl }]
+            singleSignOnService: [
+                { Binding: core.SAML_REDIRECT_BINDING, Location: input.idp.ssoUrl }
+            ]
         },
         spMetadata: { entityID: sp.entityId },
         identifierFormat: core.SAML_EMAIL_NAME_ID,
@@ -114,7 +123,9 @@ export function samlPluginConfig(input: {
 }
 
 /** The identity provider details a stored configuration carries, for the admin screen. */
-export function storedIdpDetails(samlConfig: string | null): (IdpDetails & { mapping: core.SamlMapping }) | null {
+export function storedIdpDetails(
+    samlConfig: string | null
+): (IdpDetails & { mapping: core.SamlMapping }) | null {
     if (!samlConfig) return null;
     try {
         const parsed = JSON.parse(samlConfig) as {

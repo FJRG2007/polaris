@@ -47,17 +47,25 @@ describe("identity provider details", () => {
 
     it("refuses metadata that is not, or that signs in over plain http", () => {
         expect(problem(() => readIdpMetadata("<html></html>"))).toBe("metadata");
-        expect(problem(() => readIdpMetadata(metadata("http://idp.fixture.test/sso")))).toBe("ssoUrl");
+        expect(problem(() => readIdpMetadata(metadata("http://idp.fixture.test/sso")))).toBe(
+            "ssoUrl"
+        );
     });
 
     it("accepts a certificate with or without its armour, and refuses junk or an expired one", () => {
         expect(readCertificate(BARE).pem).toBe(readCertificate(CERT).pem);
         expect(problem(() => readCertificate("not a certificate"))).toBe("certificate");
-        expect(problem(() => readCertificate(CERT, new Date("2999-01-01")))).toBe("certificateExpired");
+        expect(problem(() => readCertificate(CERT, new Date("2999-01-01")))).toBe(
+            "certificateExpired"
+        );
     });
 
     it("builds the plugin configuration with this deployment's own addresses", () => {
-        const idp = manualIdpDetails({ entityId: "https://idp.fixture.test/metadata", ssoUrl: "https://idp.fixture.test/sso", certificate: CERT });
+        const idp = manualIdpDetails({
+            entityId: "https://idp.fixture.test/metadata",
+            ssoUrl: "https://idp.fixture.test/sso",
+            certificate: CERT
+        });
         const json = samlPluginConfig({
             appUrl: "https://polaris.example.test/",
             providerId: "saml-fixture000001",
@@ -65,7 +73,9 @@ describe("identity provider details", () => {
             mapping: { email: "mail", name: "cn", firstName: undefined, lastName: undefined }
         });
         const config = JSON.parse(json);
-        expect(config.callbackUrl).toBe("https://polaris.example.test/api/auth/sso/saml2/sp/acs/saml-fixture000001");
+        expect(config.callbackUrl).toBe(
+            "https://polaris.example.test/api/auth/sso/saml2/sp/acs/saml-fixture000001"
+        );
         expect(config.audience).toBe(config.spMetadata.entityID);
         expect(config.mapping).toEqual({ id: "nameID", email: "mail", name: "cn" });
         expect(storedIdpDetails(json)?.mapping.email).toBe("mail");

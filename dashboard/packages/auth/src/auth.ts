@@ -28,7 +28,12 @@ import { newDeviceWaitMessage, sessionDeviceStanding } from "./devices.js";
 import { deviceAuthorization, magicLink, twoFactor } from "better-auth/plugins";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } from "./connection-sign-in.js";
-import { ASSERTION_PATHS, refuseSessionForEnforcedDomain, samlSignUpAllowed, samlSsoPlugin } from "./saml-sso.js";
+import {
+    ASSERTION_PATHS,
+    refuseSessionForEnforcedDomain,
+    samlSignUpAllowed,
+    samlSsoPlugin
+} from "./saml-sso.js";
 import { followTrustedDevice, recordTrustedDevice, type DeviceOrigin } from "./two-factor.js";
 import {
     originHost,
@@ -493,7 +498,10 @@ const SIGN_IN_METHOD_BY_PATH: ReadonlyMap<string, SignInMethod> = new Map([
  * provider's own, and the connected-account one.
  */
 function bypassesIdentityProvider(path: string): boolean {
-    return path === CONNECTION_SIGN_IN_PATH || (SIGN_IN_METHOD_BY_PATH.has(path) && !ASSERTION_PATHS.has(path));
+    return (
+        path === CONNECTION_SIGN_IN_PATH ||
+        (SIGN_IN_METHOD_BY_PATH.has(path) && !ASSERTION_PATHS.has(path))
+    );
 }
 
 /**

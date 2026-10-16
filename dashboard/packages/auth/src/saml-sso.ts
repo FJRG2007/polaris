@@ -73,7 +73,13 @@ export async function samlDomainPolicies(): Promise<
     (core.SamlDomainPolicy & { allowSignUp: boolean })[]
 > {
     const rows = await prisma.ssoProvider.findMany({
-        select: { providerId: true, domain: true, enforced: true, domainVerified: true, allowSignUp: true }
+        select: {
+            providerId: true,
+            domain: true,
+            enforced: true,
+            domainVerified: true,
+            allowSignUp: true
+        }
     });
     return rows.map((row) => ({
         providerId: row.providerId,
@@ -114,7 +120,10 @@ async function refusePasswordForEnforcedDomain(email: string): Promise<void> {
 export async function refuseSessionForEnforcedDomain(userId: string): Promise<void> {
     const providers = await samlDomainPolicies();
     if (!providers.some((provider) => provider.enforced && provider.domainVerified)) return;
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, isAdmin: true } });
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, isAdmin: true }
+    });
     if (user && core.passwordSignInRefused(user, providers)) {
         throw new APIError("FORBIDDEN", {
             code: SSO_REQUIRED_CODE,
@@ -175,22 +184,30 @@ async function requireAnsweredRequest(ctx: {
     context: {
         baseURL: string;
         logger: { warn: (message: string, ...args: unknown[]) => void };
-        internalAdapter: { consumeVerificationValue: (identifier: string) => Promise<{ value: string } | null> };
+        internalAdapter: {
+            consumeVerificationValue: (identifier: string) => Promise<{ value: string } | null>;
+        };
     };
     redirect: (url: string) => unknown;
 }): Promise<void> {
     const refuse = (reason: string): never => {
-        ctx.context.logger.warn(`SAML response refused: ${reason}`, { providerId: ctx.params?.providerId });
+        ctx.context.logger.warn(`SAML response refused: ${reason}`, {
+            providerId: ctx.params?.providerId
+        });
         throw ctx.redirect(`${new URL(ctx.context.baseURL).origin}${SSO_ERROR_PATH}`);
     };
     const encoded = (ctx.body as { SAMLResponse?: unknown } | undefined)?.SAMLResponse;
     if (typeof encoded !== "string") return refuse("no response");
     const requestId = samlResponseRequestId(encoded);
     if (!requestId) return refuse("it answers no sign-in request");
-    const consumed = await ctx.context.internalAdapter.consumeVerificationValue(`${AUTHN_REQUEST_PREFIX}${requestId}`);
+    const consumed = await ctx.context.internalAdapter.consumeVerificationValue(
+        `${AUTHN_REQUEST_PREFIX}${requestId}`
+    );
     let providerId: unknown = null;
     try {
-        providerId = consumed ? (JSON.parse(consumed.value) as { providerId?: unknown }).providerId : null;
+        providerId = consumed
+            ? (JSON.parse(consumed.value) as { providerId?: unknown }).providerId
+            : null;
     } catch {
         providerId = null;
     }
@@ -239,7 +256,9 @@ export function samlSsoPlugin(): BetterAuthPlugin {
                             const value = body[field];
                             if (value === undefined) continue;
                             if (typeof value !== "string" || core.sameOriginPath(value) === null) {
-                                throw new APIError("BAD_REQUEST", { message: "Invalid return address." });
+                                throw new APIError("BAD_REQUEST", {
+                                    message: "Invalid return address."
+                                });
                             }
                         }
                     })

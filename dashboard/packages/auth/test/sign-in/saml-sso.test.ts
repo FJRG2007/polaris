@@ -43,17 +43,25 @@ vi.mock("@polaris/db", () => ({
         ssoProvider: { findMany: async () => state.policies },
         user: {
             findUnique: async ({ where }: { where: { email?: string; id?: string } }) => {
-                const email = where.email ?? (db.user.find((user) => user.id === where.id)?.email as string | undefined);
+                const email =
+                    where.email ??
+                    (db.user.find((user) => user.id === where.id)?.email as string | undefined);
                 return email === undefined ? null : { email, isAdmin: state.admins.has(email) };
             }
         }
     }
 }));
 
-const { refuseSessionForEnforcedDomain, samlSignUpAllowed, samlSsoPlugin, SSO_ERROR_PATH, SSO_REQUIRED_CODE } = await import(
-    "../../src/saml-sso.js"
+const {
+    refuseSessionForEnforcedDomain,
+    samlSignUpAllowed,
+    samlSsoPlugin,
+    SSO_ERROR_PATH,
+    SSO_REQUIRED_CODE
+} = await import("../../src/saml-sso.js");
+const { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } = await import(
+    "../../src/connection-sign-in.js"
 );
-const { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } = await import("../../src/connection-sign-in.js");
 
 type Db = Record<string, Record<string, unknown>[]>;
 let db: Db;
@@ -66,11 +74,14 @@ function createTestAuth() {
         database: memoryAdapter(db),
         emailAndPassword: { enabled: true },
         databaseHooks: {
-            user: { create: { before: async (user, context) => samlSignUpAllowed(user.email, context) } },
+            user: {
+                create: { before: async (user, context) => samlSignUpAllowed(user.email, context) }
+            },
             session: {
                 create: {
                     before: async (session, context) => {
-                        if (context?.path === CONNECTION_SIGN_IN_PATH) await refuseSessionForEnforcedDomain(session.userId);
+                        if (context?.path === CONNECTION_SIGN_IN_PATH)
+                            await refuseSessionForEnforcedDomain(session.userId);
                     }
                 }
             }
@@ -109,7 +120,10 @@ function setProvider(policy: Partial<Policy> = {}): void {
                     entityID: IDP_ENTITY,
                     cert: CERT,
                     singleSignOnService: [
-                        { Binding: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect", Location: "https://idp.fixture.test/sso" }
+                        {
+                            Binding: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+                            Location: "https://idp.fixture.test/sso"
+                        }
                     ]
                 },
                 spMetadata: { entityID: SP_ENTITY },
@@ -131,11 +145,16 @@ function post(path: string, body: Record<string, unknown>): Promise<Response> {
 }
 
 /** Starts a sign-in and returns the request id and relay state the IdP is handed. */
-async function startSignIn(email: string, callbackURL = "/drive"): Promise<{ requestId: string; relayState: string }> {
+async function startSignIn(
+    email: string,
+    callbackURL = "/drive"
+): Promise<{ requestId: string; relayState: string }> {
     const response = await post("/sign-in/sso", { email, callbackURL });
     expect(response.status).toBe(200);
     const url = new URL(((await response.json()) as { url: string }).url);
-    const request = inflateRawSync(Buffer.from(url.searchParams.get("SAMLRequest") ?? "", "base64")).toString("utf8");
+    const request = inflateRawSync(
+        Buffer.from(url.searchParams.get("SAMLRequest") ?? "", "base64")
+    ).toString("utf8");
     const requestId = /ID="([^"]+)"/.exec(request)?.[1] ?? "";
     expect(requestId).not.toBe("");
     return { requestId, relayState: url.searchParams.get("RelayState") ?? "" };
@@ -144,7 +163,11 @@ async function startSignIn(email: string, callbackURL = "/drive"): Promise<{ req
 let counter = 0;
 
 /** A SAML response for `email`, its assertion signed with the fixture key unless told not to. */
-function samlResponse(email: string, requestId: string, options: { sign?: boolean; audience?: string; now?: Date } = {}): string {
+function samlResponse(
+    email: string,
+    requestId: string,
+    options: { sign?: boolean; audience?: string; now?: Date } = {}
+): string {
     counter += 1;
     const now = options.now ?? new Date();
     const later = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
@@ -172,10 +195,16 @@ function samlResponse(email: string, requestId: string, options: { sign?: boolea
     signer.addReference({
         xpath: "//*[local-name(.)='Assertion']",
         digestAlgorithm: "http://www.w3.org/2001/04/xmlenc#sha256",
-        transforms: ["http://www.w3.org/2000/09/xmldsig#enveloped-signature", "http://www.w3.org/2001/10/xml-exc-c14n#"]
+        transforms: [
+            "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+            "http://www.w3.org/2001/10/xml-exc-c14n#"
+        ]
     });
     signer.computeSignature(xml, {
-        location: { reference: "//*[local-name(.)='Assertion']/*[local-name(.)='Issuer']", action: "after" }
+        location: {
+            reference: "//*[local-name(.)='Assertion']/*[local-name(.)='Issuer']",
+            action: "after"
+        }
     });
     return Buffer.from(signer.getSignedXml()).toString("base64");
 }
@@ -191,7 +220,12 @@ function acs(SAMLResponse: string, RelayState: string): Promise<Response> {
 }
 
 function signedIn(response: Response): boolean {
-    return response.headers.getSetCookie().some((cookie) => cookie.startsWith("better-auth.session_token=") && !cookie.includes("Max-Age=0"));
+    return response.headers
+        .getSetCookie()
+        .some(
+            (cookie) =>
+                cookie.startsWith("better-auth.session_token=") && !cookie.includes("Max-Age=0")
+        );
 }
 
 beforeEach(() => {
@@ -213,7 +247,10 @@ describe("SAML assertion", () => {
 
     it("refuses an unsigned assertion", async () => {
         const { requestId, relayState } = await startSignIn("ana@acme.test");
-        const response = await acs(samlResponse("ana@acme.test", requestId, { sign: false }), relayState);
+        const response = await acs(
+            samlResponse("ana@acme.test", requestId, { sign: false }),
+            relayState
+        );
         expect(signedIn(response)).toBe(false);
         expect(response.headers.get("location") ?? "").toContain("error=");
         expect(db.user).toHaveLength(0);
@@ -221,7 +258,9 @@ describe("SAML assertion", () => {
 
     it("refuses an assertion altered after it was signed", async () => {
         const { requestId, relayState } = await startSignIn("ana@acme.test");
-        const signed = Buffer.from(samlResponse("ana@acme.test", requestId), "base64").toString("utf8");
+        const signed = Buffer.from(samlResponse("ana@acme.test", requestId), "base64").toString(
+            "utf8"
+        );
         const tampered = signed.replaceAll("ana@acme.test", "boss@acme.test");
         const response = await acs(Buffer.from(tampered).toString("base64"), relayState);
         expect(signedIn(response)).toBe(false);
@@ -231,7 +270,10 @@ describe("SAML assertion", () => {
     it("refuses an assertion past its validity window", async () => {
         const { requestId, relayState } = await startSignIn("ana@acme.test");
         const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        const response = await acs(samlResponse("ana@acme.test", requestId, { now: hourAgo }), relayState);
+        const response = await acs(
+            samlResponse("ana@acme.test", requestId, { now: hourAgo }),
+            relayState
+        );
         expect(signedIn(response)).toBe(false);
         expect(db.user).toHaveLength(0);
     });
@@ -246,7 +288,10 @@ describe("SAML assertion", () => {
 
     it("refuses an assertion meant for another service provider", async () => {
         const { requestId, relayState } = await startSignIn("ana@acme.test");
-        const response = await acs(samlResponse("ana@acme.test", requestId, { audience: "https://other.example/sp" }), relayState);
+        const response = await acs(
+            samlResponse("ana@acme.test", requestId, { audience: "https://other.example/sp" }),
+            relayState
+        );
         expect(signedIn(response)).toBe(false);
         expect(db.user).toHaveLength(0);
     });
@@ -280,15 +325,27 @@ describe("just-in-time accounts", () => {
 describe("sign-in requests", () => {
     it("refuses a return address that leaves the deployment", async () => {
         for (const callbackURL of ["https://evil.example/x", "//evil.example", "/\\evil.example"]) {
-            expect((await post("/sign-in/sso", { email: "ana@acme.test", callbackURL })).status).toBe(400);
+            expect(
+                (await post("/sign-in/sso", { email: "ana@acme.test", callbackURL })).status
+            ).toBe(400);
         }
         expect(
-            (await post("/sign-in/sso", { email: "ana@acme.test", callbackURL: "/drive", errorCallbackURL: "https://evil.example" })).status
+            (
+                await post("/sign-in/sso", {
+                    email: "ana@acme.test",
+                    callbackURL: "/drive",
+                    errorCallbackURL: "https://evil.example"
+                })
+            ).status
         ).toBe(400);
     });
 
     it("keeps the plugin's provider management endpoints closed", async () => {
-        const response = await post("/sso/register", { providerId: "saml-x", issuer: "x", domain: "evil.test" });
+        const response = await post("/sso/register", {
+            providerId: "saml-x",
+            issuer: "x",
+            domain: "evil.test"
+        });
         expect(response.status).toBe(404);
     });
 });
@@ -299,9 +356,13 @@ describe("enforced domains", () => {
     }
 
     beforeEach(async () => {
-        await auth.api.signUpEmail({ body: { email: "outside@other.test", password: "Fixture-Password-123", name: "Outside" } });
+        await auth.api.signUpEmail({
+            body: { email: "outside@other.test", password: "Fixture-Password-123", name: "Outside" }
+        });
         setProvider({ enforced: true, allowSignUp: true });
-        await auth.api.signUpEmail({ body: { email: "root@acme.test", password: "Fixture-Password-123", name: "Root" } });
+        await auth.api.signUpEmail({
+            body: { email: "root@acme.test", password: "Fixture-Password-123", name: "Root" }
+        });
     });
 
     it("refuses a password for an address in an enforced domain", async () => {
@@ -324,12 +385,20 @@ describe("enforced domains", () => {
     async function connectionSignIn(email: string): Promise<unknown> {
         const userId = db.user.find((user) => user.email === email)?.id as string;
         const api = auth.api as unknown as {
-            polarisConnectionSignIn(input: { body: { userId: string; provider: string; challenge: boolean }; headers: Headers }): Promise<unknown>;
+            polarisConnectionSignIn(input: {
+                body: { userId: string; provider: string; challenge: boolean };
+                headers: Headers;
+            }): Promise<unknown>;
         };
-        return api.polarisConnectionSignIn({ body: { userId, provider: "github", challenge: false }, headers: new Headers() }).then(
-            () => null,
-            (error: { body?: { code?: string } }) => error.body?.code ?? "failed"
-        );
+        return api
+            .polarisConnectionSignIn({
+                body: { userId, provider: "github", challenge: false },
+                headers: new Headers()
+            })
+            .then(
+                () => null,
+                (error: { body?: { code?: string } }) => error.body?.code ?? "failed"
+            );
     }
 
     it("refuses every other way in for an address in an enforced domain", async () => {

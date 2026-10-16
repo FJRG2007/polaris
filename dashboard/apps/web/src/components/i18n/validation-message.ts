@@ -75,8 +75,14 @@ export const KNOWN_VALIDATION_MESSAGES: readonly string[] = [...EXACT.keys()];
  * `error(field)` can be passed straight through.
  */
 export function validationMessage(t: NamespaceTranslator<"validation">, message: string): string;
-export function validationMessage(t: NamespaceTranslator<"validation">, message: string | undefined): string | undefined;
-export function validationMessage(t: NamespaceTranslator<"validation">, message: string | undefined): string | undefined {
+export function validationMessage(
+    t: NamespaceTranslator<"validation">,
+    message: string | undefined
+): string | undefined;
+export function validationMessage(
+    t: NamespaceTranslator<"validation">,
+    message: string | undefined
+): string | undefined {
     if (message === undefined) return undefined;
     const key = EXACT.get(message);
     if (key) return t(key);

@@ -195,7 +195,11 @@ export function LoginForm({
             ? await authClient
                   .$fetch<{ url?: string }>("/sign-in/sso", {
                       method: "POST",
-                      body: { email, callbackURL: postLoginTarget(), errorCallbackURL: "/oauth/login?error=sso" }
+                      body: {
+                          email,
+                          callbackURL: postLoginTarget(),
+                          errorCallbackURL: "/oauth/login?error=sso"
+                      }
                   })
                   .catch(() => null)
             : null;

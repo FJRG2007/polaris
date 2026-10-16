@@ -59,7 +59,11 @@ export async function emailLinkOffered(identifier: string): Promise<boolean> {
     const value = identifier.trim().toLowerCase();
     if (!value) return false;
     if ((await getAuthMailStatus()).channelId === null) return false;
-    const throttle = await rateLimit(`email-link-hint:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
+    const throttle = await rateLimit(
+        `email-link-hint:${value}`,
+        PASSKEY_HINT_LIMIT,
+        PASSKEY_HINT_WINDOW_MS
+    );
     if (!throttle.ok) return false;
     const email = await resolveIdentifier(value);
     if (!email) return false;
@@ -87,7 +91,11 @@ export async function accountHasPasskey(identifier: string): Promise<boolean> {
     if (!value) return false;
     const rpId = await currentRelyingPartyId();
     if (!rpId) return false;
-    const throttle = await rateLimit(`passkey-hint:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
+    const throttle = await rateLimit(
+        `passkey-hint:${value}`,
+        PASSKEY_HINT_LIMIT,
+        PASSKEY_HINT_WINDOW_MS
+    );
     if (!throttle.ok) return false;
     const email = await resolveIdentifier(value);
     if (!email) return false;
@@ -138,7 +146,11 @@ function boundHere(rpId: string): { rpId: string | null }[] {
 export async function ssoOffered(identifier: string): Promise<boolean> {
     const value = identifier.trim().toLowerCase();
     if (!value) return false;
-    const throttle = await rateLimit(`sso-hint:${value}`, PASSKEY_HINT_LIMIT, PASSKEY_HINT_WINDOW_MS);
+    const throttle = await rateLimit(
+        `sso-hint:${value}`,
+        PASSKEY_HINT_LIMIT,
+        PASSKEY_HINT_WINDOW_MS
+    );
     if (!throttle.ok) return false;
     const email = await resolveIdentifier(value);
     return email ? ssoOfferedFor(email) : false;

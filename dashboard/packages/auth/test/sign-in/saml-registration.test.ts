@@ -38,7 +38,13 @@ describe("createAuth", () => {
 
     it("guards password sign-in, return addresses, responses and provider management", () => {
         const plugin = ssoPlugin();
-        for (const path of ["/sign-in/email", "/sign-in/magic-link", "/sign-in/sso", "/sso/saml2/sp/acs/:providerId", "/sso/register"]) {
+        for (const path of [
+            "/sign-in/email",
+            "/sign-in/magic-link",
+            "/sign-in/sso",
+            "/sso/saml2/sp/acs/:providerId",
+            "/sso/register"
+        ]) {
             expect(hooked(plugin, path), path).toBe(true);
         }
     });

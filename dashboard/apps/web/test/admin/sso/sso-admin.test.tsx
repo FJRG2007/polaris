@@ -36,9 +36,11 @@ const PROVIDER = {
     ssoUrl: "https://idp.example.com/sso",
     mapping: { email: "email", name: "displayName", firstName: "givenName", lastName: "surname" },
     serviceProvider: {
-        entityId: "https://polaris.test/api/auth/sso/saml2/sp/metadata?providerId=saml-abcdef123456",
+        entityId:
+            "https://polaris.test/api/auth/sso/saml2/sp/metadata?providerId=saml-abcdef123456",
         acsUrl: "https://polaris.test/api/auth/sso/saml2/sp/acs/saml-abcdef123456",
-        metadataUrl: "https://polaris.test/api/auth/sso/saml2/sp/metadata?providerId=saml-abcdef123456"
+        metadataUrl:
+            "https://polaris.test/api/auth/sso/saml2/sp/metadata?providerId=saml-abcdef123456"
     },
     records: [{ name: "_polaris-sso.example.com", value: "polaris-sso=token" }]
 };
@@ -87,7 +89,10 @@ describe("single sign-on screen", () => {
     });
 
     it("edits a provider without asking for its certificate again, and only once something changed", async () => {
-        saveSamlProviderAction.mockResolvedValue({ ok: true, value: { ...PROVIDER, enforced: true } });
+        saveSamlProviderAction.mockResolvedValue({
+            ok: true,
+            value: { ...PROVIDER, enforced: true }
+        });
         render(<SsoAdmin providers={[PROVIDER]} />);
         fireEvent.click(screen.getByRole("button", { name: "Edit" }));
         const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
@@ -122,7 +127,10 @@ describe("single sign-on screen", () => {
     it("shows the provider as the check left it, without a reload", async () => {
         checkSamlProviderAction.mockResolvedValue({
             ok: true,
-            value: { checks: [{ key: "domain", ok: true }], provider: { ...PROVIDER, domainVerified: true } }
+            value: {
+                checks: [{ key: "domain", ok: true }],
+                provider: { ...PROVIDER, domainVerified: true }
+            }
         });
         render(<SsoAdmin providers={[PROVIDER]} />);
         expect(screen.getByText("Waiting for DNS")).toBeTruthy();

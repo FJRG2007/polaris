@@ -14,7 +14,9 @@ import { requireAdmin } from "@/lib/session";
 import * as saml from "@/lib/saml-providers";
 import { recordAudit } from "@/lib/audit-service";
 
-type Outcome<T> = { ok: true; value: T } | { ok: false; problem: saml.SamlProblem | "invalid" | "failed"; message?: string };
+type Outcome<T> =
+    | { ok: true; value: T }
+    | { ok: false; problem: saml.SamlProblem | "invalid" | "failed"; message?: string };
 
 const providerIdSchema = z.string().regex(core.SAML_PROVIDER_ID_PATTERN);
 
@@ -34,10 +36,13 @@ export async function saveSamlProviderAction(
 ): Promise<Outcome<saml.SamlProviderView>> {
     const admin = await requireAdmin();
     const parsed = core.samlProviderInputSchema.safeParse(input);
-    if (!parsed.success) return { ok: false, problem: "invalid", message: parsed.error.issues[0]?.message };
+    if (!parsed.success)
+        return { ok: false, problem: "invalid", message: parsed.error.issues[0]?.message };
     const id = providerId === null ? null : providerIdSchema.safeParse(providerId);
     if (id && !id.success) return { ok: false, problem: "notFound" };
-    const outcome = await attempt("save", () => saml.saveSamlProvider(parsed.data, admin.id, id ? id.data : null));
+    const outcome = await attempt("save", () =>
+        saml.saveSamlProvider(parsed.data, admin.id, id ? id.data : null)
+    );
     if (outcome.ok) {
         await recordAudit({
             actorId: admin.id,
@@ -54,7 +59,9 @@ export async function saveSamlProviderAction(
     return outcome;
 }
 
-export async function checkSamlProviderAction(providerId: string): Promise<Outcome<saml.SamlCheckResult>> {
+export async function checkSamlProviderAction(
+    providerId: string
+): Promise<Outcome<saml.SamlCheckResult>> {
     await requireAdmin();
     const id = providerIdSchema.safeParse(providerId);
     if (!id.success) return { ok: false, problem: "notFound" };
@@ -72,7 +79,11 @@ export async function deleteSamlProviderAction(providerId: string): Promise<Outc
         return null;
     });
     if (outcome.ok) {
-        await recordAudit({ actorId: admin.id, action: "instance.sso.deleted", metadata: { providerId: id.data } });
+        await recordAudit({
+            actorId: admin.id,
+            action: "instance.sso.deleted",
+            metadata: { providerId: id.data }
+        });
         revalidatePath("/admin/sso");
     }
     return outcome;
