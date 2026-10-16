@@ -25,6 +25,7 @@ import {
     MessagesSquare,
     ScanFace,
     Video,
+    RadioTower,
     Wrench,
     type LucideIcon
 } from "lucide-react";
@@ -1253,7 +1254,7 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         internal: true,
         ownedBy: "home",
         category: "Home",
-        icon: Video,
+        icon: RadioTower,
         summary: "Lets devices on this network report to Polaris the moment they change.",
         description:
             "A small message broker on this network. Devices such as Nuki Smart Locks publish every change to it as it happens, so Places hears them at once instead of asking their maker's servers.", // i18n-ignore
