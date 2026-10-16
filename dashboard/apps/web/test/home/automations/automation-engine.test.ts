@@ -144,6 +144,8 @@ let woken: number[];
 let mayOperate: boolean;
 let refuse: Map<string, Error>;
 let engine: AutomationEngine;
+/** Which room each device is in and which floor each room is on. */
+let scope: auto.TargetScope;
 
 /** A new engine on the same store: what a restarted dashboard is. */
 function boot(): AutomationEngine {
@@ -179,6 +181,7 @@ function boot(): AutomationEngine {
                 await made.observe(INSTALL, devices.get(deviceId)!);
             }
         },
+        places: async () => scope,
         mayOperate: async () => mayOperate,
         notify: async (_automation, message) => {
             notified.push(message);
@@ -258,6 +261,7 @@ beforeEach(() => {
     woken = [];
     mayOperate = true;
     refuse = new Map();
+    scope = { devices: [], rooms: [] };
     engine = boot();
 });
 
@@ -2264,5 +2268,210 @@ describe("a set of devices", () => {
         expect(await warmPasses()).toBe(true);
         await reads(sensor("temp1", "24"));
         expect(await warmPasses()).toBe(false);
+    });
+});
+
+describe("a room or a floor", () => {
+    function inRooms(entries: [string, string, string][]) {
+        scope = {
+            devices: entries.map(([id, kind, roomId]) => ({ id, kind, roomId })),
+            rooms: [
+                { id: "kitchen", floorId: "ground" },
+                { id: "hall", floorId: "ground" },
+                { id: "bedroom", floorId: "upstairs" }
+            ]
+        };
+    }
+
+    function whenOn(target: { kind: "room" | "floor"; id: string }, behaviour?: auto.Behaviour) {
+        automation("where", {
+            triggers: [
+                {
+                    id: "trigwhere",
+                    kind: "change",
+                    deviceId: "lamp1",
+                    targets: [target],
+                    ...(behaviour ? { behaviour } : {}),
+                    attribute: "state",
+                    from: "",
+                    to: "on"
+                } as auto.Trigger
+            ],
+            actions: [{ id: "stepnote", kind: "notify", message: "where" }]
+        });
+    }
+
+    it("fires for whatever is in the room now, not for the device it was saved with", async () => {
+        inRooms([
+            ["lamp1", "light", "bedroom"],
+            ["lamp2", "light", "kitchen"]
+        ]);
+        whenOn({ kind: "room", id: "kitchen" });
+        await reads(readout("lamp1", "light", "off"));
+        await reads(readout("lamp2", "light", "off"));
+        later(MINUTE);
+        await reads(readout("lamp1", "light", "on"));
+        expect(store.runsOf("where")).toHaveLength(0);
+        await reads(readout("lamp2", "light", "on"));
+        expect(store.runsOf("where").map((run) => run.cause.deviceId)).toEqual(["lamp2"]);
+    });
+
+    it("counts a device moved into the room from then on", async () => {
+        inRooms([["lamp1", "light", "bedroom"]]);
+        whenOn({ kind: "room", id: "kitchen" });
+        await reads(readout("lamp1", "light", "off"));
+        later(MINUTE);
+        inRooms([["lamp1", "light", "kitchen"]]);
+        await reads(readout("lamp1", "light", "on"));
+        expect(store.runsOf("where")).toHaveLength(1);
+    });
+
+    it("reads a floor as every room on it, and the set counts as one", async () => {
+        inRooms([
+            ["lamp1", "light", "kitchen"],
+            ["lamp2", "light", "hall"],
+            ["lamp3", "light", "bedroom"]
+        ]);
+        whenOn({ kind: "floor", id: "ground" }, "all");
+        for (const id of ["lamp1", "lamp2", "lamp3"]) await reads(readout(id, "light", "off"));
+        later(MINUTE);
+        await reads(readout("lamp1", "light", "on"));
+        await reads(readout("lamp3", "light", "on"));
+        expect(store.runsOf("where")).toHaveLength(0);
+        await reads(readout("lamp2", "light", "on"));
+        expect(store.runsOf("where")).toHaveLength(1);
+    });
+
+    it("leaves out what in the room cannot answer, and holds nothing where it is empty", async () => {
+        inRooms([
+            ["lamp1", "light", "kitchen"],
+            ["temp1", "sensor", "kitchen"]
+        ]);
+        automation("warm", {
+            triggers: [{ id: "trigmanual", kind: "manual" }],
+            conditions: {
+                match: "all",
+                groups: [
+                    {
+                        id: "grpwhere",
+                        match: "all",
+                        items: [
+                            {
+                                id: "condwhere",
+                                kind: "device",
+                                deviceId: "lamp1",
+                                targets: [{ kind: "room", id: "kitchen" }],
+                                quantifier: "all",
+                                attribute: "state",
+                                is: "on",
+                                negate: false
+                            }
+                        ]
+                    }
+                ]
+            },
+            actions: [{ id: "stepnote", kind: "notify", message: "warm" }]
+        });
+        const resolved = auto.resolveDefinition(store.automations.get("warm")!.definition, scope);
+        const condition = resolved.conditions.groups[0]!.items[0]!;
+        expect(auto.deviceTargets(condition as { deviceId: string })).toEqual(["lamp1"]);
+        scope = { devices: [], rooms: scope.rooms };
+        const empty = auto.resolveDefinition(store.automations.get("warm")!.definition, scope);
+        expect((empty.conditions.groups[0]!.items[0] as { deviceId: string }).deviceId).toBe("");
+    });
+});
+
+describe("a step on a set of devices", () => {
+    it("tells every device of the set, and fails with the one that refused", async () => {
+        for (const id of ["lamp1", "lamp2", "lamp3"]) await reads(readout(id, "light", "off"));
+        refuse.set("lamp2", new StepRefusal("That device is not answering"));
+        automation("lights", {
+            actions: [
+                {
+                    id: "stepon",
+                    kind: "device",
+                    deviceId: "lamp1",
+                    targets: ["lamp1", "lamp2", "lamp3"].map((id) => ({
+                        kind: "device" as const,
+                        id
+                    })),
+                    do: "turn-on"
+                }
+            ]
+        });
+        await engine.runNow(store.automations.get("lights")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(acted.map((each) => each.deviceId)).toEqual(["lamp1", "lamp3"]);
+        expect(store.runsOf("lights")[0]?.status).toBe("failed");
+    });
+
+    it("tells whatever is in the room when the step runs", async () => {
+        await reads(readout("lamp1", "light", "off"));
+        await reads(readout("lamp2", "light", "off"));
+        scope = {
+            devices: [
+                { id: "lamp1", kind: "light", roomId: "kitchen" },
+                { id: "lamp2", kind: "light", roomId: "hall" }
+            ],
+            rooms: [
+                { id: "kitchen", floorId: "" },
+                { id: "hall", floorId: "" }
+            ]
+        };
+        automation("kitchen", {
+            actions: [
+                {
+                    id: "stepon",
+                    kind: "device",
+                    deviceId: "lamp2",
+                    targets: [{ kind: "room", id: "kitchen" }],
+                    do: "turn-on"
+                }
+            ]
+        });
+        await engine.runNow(store.automations.get("kitchen")!, "Fixture person", "press-1");
+        await engine.drain();
+        expect(acted.map((each) => each.deviceId)).toEqual(["lamp1"]);
+    });
+
+    it("waits for any of them by default, or for all of them", async () => {
+        const doors = ["door1", "door2"];
+        for (const quantifier of ["any", "all"] as const) {
+            for (const id of doors) await reads(readout(id, "lock", "unlocked", { door: "open" }));
+            notified = [];
+            automation(`wait-${quantifier}`, {
+                actions: [
+                    {
+                        id: "stepwait",
+                        kind: "wait",
+                        deviceId: "door1",
+                        targets: doors.map((id) => ({ kind: "device" as const, id })),
+                        quantifier,
+                        attribute: "door",
+                        is: "closed",
+                        timeoutMinutes: 10,
+                        onTimeout: "stop"
+                    },
+                    { id: "stepnote", kind: "notify", message: quantifier }
+                ]
+            });
+            await engine.runNow(
+                store.automations.get(`wait-${quantifier}`)!,
+                "Fixture person",
+                `press-${quantifier}`
+            );
+            await engine.drain();
+            later(MINUTE);
+            await reads(readout("door2", "lock", "unlocked", { door: "closed" }));
+            later(2 * MINUTE);
+            await engine.drain();
+            expect(notified).toEqual(quantifier === "any" ? ["any"] : []);
+            if (quantifier === "all") {
+                await reads(readout("door1", "lock", "unlocked", { door: "closed" }));
+                later(2 * MINUTE);
+                await engine.drain();
+                expect(notified).toEqual(["all"]);
+            }
+        }
     });
 });

@@ -20,6 +20,29 @@ import { placesRefusalText } from "./refusal-text";
 /** What the sentences need to know about a device, by id. */
 export interface DeviceLookup {
     (id: string): { readonly name: string; readonly kind: string } | undefined;
+    /** A room's or a floor's name, where the screen has the place's rooms. */
+    readonly place?: (kind: "room" | "floor", id: string) => string | undefined;
+}
+
+/** A lookup over a place's devices and, where given, its rooms and floors. */
+export function lookupOf(
+    devices: readonly { readonly id: string; readonly name: string; readonly kind: string }[],
+    rooms: readonly {
+        readonly id: string;
+        readonly name: string;
+        readonly floor: string;
+        readonly floorId?: string;
+    }[] = []
+): DeviceLookup {
+    const byId = new Map(devices.map((device) => [device.id, device]));
+    const roomNames = new Map(rooms.map((room) => [room.id, room.name]));
+    const floorNames = new Map(
+        rooms.flatMap((room) => (room.floorId && room.floor ? [[room.floorId, room.floor]] : []))
+    );
+    return Object.assign((id: string) => byId.get(id), {
+        place: (kind: "room" | "floor", id: string) =>
+            (kind === "room" ? roomNames : floorNames).get(id)
+    });
 }
 
 export function triggerKindText(kind: auto.TriggerKind, t: PlacesTranslator): string {
@@ -232,6 +255,19 @@ function setName(
     t: PlacesTranslator
 ): { name: string; kind: string } {
     const first = deviceName(lookup, block.deviceId, t);
+    const places = auto.placeTargets(block);
+    if (places.length > 0) {
+        const name = t("automations.say.inPlace", {
+            place: places
+                .map((ref) => lookup.place?.(ref.kind, ref.id) ?? t("automations.fields.placeGone"))
+                .join(", ")
+        });
+        const named = (block.targets ?? []).filter((ref) => ref.kind === "device").length;
+        return {
+            name: named > 0 ? t("automations.say.deviceSet", { first: name, count: named }) : name,
+            kind: first.kind
+        };
+    }
     const more = auto.deviceTargets(block).length - 1;
     if (more < 1) return first;
     return {
@@ -356,7 +392,7 @@ export function describeStep(
 ): string {
     switch (step.kind) {
         case "device": {
-            const device = deviceName(lookup, step.deviceId, t);
+            const device = setName(lookup, step, t);
             if (step.setting) {
                 return t("automations.say.set", {
                     device: device.name,
@@ -371,7 +407,7 @@ export function describeStep(
         case "delay":
             return t("automations.say.delay", { span: durationText(step.seconds, t) });
         case "wait": {
-            const device = deviceName(lookup, step.deviceId, t);
+            const device = setName(lookup, step, t);
             return t("automations.say.wait", {
                 device: device.name,
                 value: valueText(step.attribute, device.kind, step.is, t),

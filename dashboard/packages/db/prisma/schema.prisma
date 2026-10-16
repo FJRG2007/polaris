@@ -10600,15 +10600,41 @@ model Place {
     devices     PlaceDevice[]
     automations PlaceAutomation[]
     rooms       PlaceRoom[]
+    floors      PlaceFloor[]
 
+    @@index([installedAppId])
+}
+
+// A floor at a place, which rooms are on.
+//
+// A row of its own so a floor can exist before any room is put on it, be
+// renamed once for every room on it, and be named by an automation that stays
+// pointed at it through a rename. Deleting a floor leaves its rooms at the
+// place, on none.
+model PlaceFloor {
+    id             String @id @default(uuid(7)) @db.Uuid
+    // The Home install this belongs to, per the InstalledApp precedent of not
+    // linking installs by foreign key.
+    installedAppId String @db.Uuid
+    placeId        String @db.Uuid
+    name           String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    place Place       @relation(fields: [placeId], references: [id], onDelete: Cascade)
+    rooms PlaceRoom[]
+
+    @@unique([placeId, name])
     @@index([installedAppId])
 }
 
 // A room at a place, which devices can be put in.
 //
-// The floor is the room's own word ("Ground floor") rather than a table: a
-// house names its floors once, and the screen offers the names already used.
-// Deleting a room leaves its devices at the place, in no room.
+// The floor it is on is a `PlaceFloor`; `floor` keeps that floor's name beside
+// it, as every room carried before floors were rows of their own, so a build
+// that reads only the name still reads the right one. Deleting a room leaves
+// its devices at the place, in no room.
 model PlaceRoom {
     id             String  @id @default(uuid(7)) @db.Uuid
     // The Home install this belongs to, per the InstalledApp precedent of not
@@ -10616,17 +10642,20 @@ model PlaceRoom {
     installedAppId String  @db.Uuid
     placeId        String  @db.Uuid
     name           String
-    /// Which floor it is on, as its owner says it. Null is not said.
+    /// The name of the floor it is on, kept equal to that floor's. Null is on none.
     floor          String?
+    floorId        String? @db.Uuid
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    place   Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
-    devices PlaceDevice[]
+    place      Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
+    placeFloor PlaceFloor?   @relation(fields: [floorId], references: [id], onDelete: SetNull)
+    devices    PlaceDevice[]
 
     @@index([placeId])
     @@index([installedAppId])
+    @@index([floorId])
 }
 
 // A camera Polaris watches.

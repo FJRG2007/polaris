@@ -25,6 +25,7 @@ import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
 import * as people from "../lib/people";
 import * as rooms from "../lib/rooms";
+import * as automations from "../lib/automations";
 import * as devices from "../lib/devices";
 import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
@@ -1649,6 +1650,69 @@ export async function saveRoomAction(
         targetId: result.value?.id ?? String(roomId)
     });
     return { room: result.value };
+}
+
+/** A place's floors, for the room screen and the add dialog. */
+export async function listFloorsAction(
+    placeId: string
+): Promise<{ floors?: rooms.FloorView[]; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => rooms.listFloors(install.id, String(placeId)));
+    if (result.error) return { error: result.error };
+    return { floors: result.value };
+}
+
+/** A new floor at a place (no id), or a floor's new name. */
+export async function saveFloorAction(
+    floorId: string | null,
+    input: unknown
+): Promise<{ floor?: rooms.FloorView; error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const normalized = schemas.normalizeRoomInput((input ?? {}) as Record<string, unknown>);
+    const parsed = floorId
+        ? schemas.floorInputSchema.safeParse(normalized)
+        : schemas.floorCreateSchema.safeParse(normalized);
+    if (!parsed.success)
+        return { error: await schemaSay(parsed.error.issues[0]?.message, "actions.checkDetails") };
+    const data = parsed.data;
+    const result = await guard(() =>
+        floorId
+            ? rooms.renameFloor(install.id, String(floorId), data.name)
+            : rooms.createFloor(install.id, data as { placeId: string; name: string })
+    );
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: floorId ? "places.floor.update" : "places.floor.create",
+        targetType: "placeFloor",
+        targetId: result.value?.id ?? String(floorId)
+    });
+    return { floor: result.value };
+}
+
+/** How many automations name each room and floor of a place, for the remove
+ *  confirmation to say what stops. */
+export async function placeUsesAction(
+    placeId: string
+): Promise<{ uses?: Record<string, number>; error?: string }> {
+    const { install } = await requireHome("home.read");
+    const result = await guard(() => automations.placeUses(install.id, String(placeId)));
+    if (result.error) return { error: result.error };
+    return { uses: result.value };
+}
+
+/** Remove a floor. Its rooms stay at the place, on none. */
+export async function deleteFloorAction(floorId: string): Promise<{ error?: string }> {
+    const { user, install } = await requireHome("home.manage");
+    const result = await guard(() => rooms.deleteFloor(install.id, String(floorId)));
+    if (result.error) return { error: result.error };
+    await recordAudit({
+        actorId: user.id,
+        action: "places.floor.delete",
+        targetType: "placeFloor",
+        targetId: String(floorId)
+    });
+    return {};
 }
 
 /** Remove a room. Its devices stay at the place, in no room. */

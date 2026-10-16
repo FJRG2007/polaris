@@ -4,12 +4,22 @@
  * the browser and the server read rooms alike.
  */
 
-/** A room at a place. `floor` is empty where none was said. */
+/** A room at a place. `floor` is its floor's name and `floorId` that floor,
+ *  both empty where it is on none. */
 export interface RoomView {
     readonly id: string;
     readonly placeId: string;
     readonly name: string;
     readonly floor: string;
+    /** Absent from a room read before floors were rows of their own. */
+    readonly floorId?: string;
+}
+
+/** A floor at a place. */
+export interface FloorView {
+    readonly id: string;
+    readonly placeId: string;
+    readonly name: string;
 }
 
 /** Rooms by floor: each floor's name with its rooms by name, the unsaid floor last. */

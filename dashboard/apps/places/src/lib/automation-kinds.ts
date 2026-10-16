@@ -226,8 +226,9 @@ export const LIMITS = {
 
 export type { Behaviour, Quantifier };
 
-/** What a block's set can name. Rooms and floors join devices here. */
-export const TARGET_KINDS = ["device"] as const;
+/** What a block's set can name: a device, or every device in a room or on a
+ *  floor that answers what the block asks. */
+export const TARGET_KINDS = ["device", "room", "floor"] as const;
 export type TargetKind = (typeof TARGET_KINDS)[number];
 
 const targetsSchema = z
@@ -250,6 +251,134 @@ export function deviceTargets(block: {
         ...(block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id)
     ].filter((id) => id.length > 0);
     return [...new Set(ids)];
+}
+
+/** The rooms and floors a block names, in the order it names them. */
+export function placeTargets(block: {
+    readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+}): { kind: "room" | "floor"; id: string }[] {
+    return (block.targets ?? []).flatMap((ref) =>
+        ref.kind === "room" || ref.kind === "floor" ? [{ kind: ref.kind, id: ref.id }] : []
+    );
+}
+
+/** What a room or a floor is resolved against: the devices at the place with
+ *  the room each is in, and the floor each room is on. */
+export interface TargetScope {
+    readonly devices: readonly {
+        readonly id: string;
+        readonly kind: string;
+        readonly controllable?: boolean;
+        readonly roomId?: string | null;
+    }[];
+    readonly rooms: readonly { readonly id: string; readonly floorId?: string }[];
+}
+
+type TargetBlock = {
+    readonly kind: string;
+    readonly deviceId: string;
+    readonly targets?: readonly { readonly kind: string; readonly id: string }[];
+};
+
+/** Whether a device answers what a block asks of it: the attribute it watches,
+ *  the figure it compares, or the step it takes. */
+function answersBlock(block: TargetBlock, device: TargetScope["devices"][number]): boolean {
+    const asked = block as TargetBlock & {
+        attribute?: AutomationAttribute;
+        measure?: ReadingMeasure;
+        do?: StepDeviceAction;
+    };
+    if (block.kind === "threshold" || block.kind === "reading") {
+        return (
+            measures(device.kind) &&
+            (asked.measure === undefined || measuresFor(device.kind).includes(asked.measure))
+        );
+    }
+    if (asked.do !== undefined) {
+        return device.controllable !== false && stepActionsFor(device.kind).includes(asked.do);
+    }
+    return attributesFor(device.kind).includes(asked.attribute ?? "state");
+}
+
+/**
+ * The devices a block is about once its rooms and floors are read: the devices
+ * it names, then each device in a room or on a floor it names that answers what
+ * it asks, each once. A block naming no room nor floor is `deviceTargets`. One
+ * that does keeps `deviceId` only for a build from before rooms could be named,
+ * so a device that has since left the room is not counted for it.
+ */
+export function resolvedTargets(block: TargetBlock, scope: TargetScope): string[] {
+    const places = placeTargets(block);
+    if (places.length === 0) return deviceTargets(block);
+    const floorOf = new Map(scope.rooms.map((room) => [room.id, room.floorId ?? ""]));
+    const ids = (block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id);
+    for (const place of places) {
+        for (const device of scope.devices) {
+            const roomId = device.roomId ?? "";
+            if (!roomId) continue;
+            const inside =
+                place.kind === "room" ? roomId === place.id : floorOf.get(roomId) === place.id;
+            if (inside && answersBlock(block, device)) ids.push(device.id);
+        }
+    }
+    return [...new Set(ids.filter((id) => id.length > 0))];
+}
+
+/** A block with its rooms and floors read into the devices they hold, as the
+ *  engine runs it: its first as its device, the rest as its set. A room with
+ *  nothing in it that answers leaves the block about no device at all. */
+export function resolveTargets<T extends TargetBlock>(block: T, scope: TargetScope): T {
+    if (placeTargets(block).length === 0) return block;
+    const ids = resolvedTargets(block, scope);
+    const { targets: _was, ...rest } = block;
+    return {
+        ...rest,
+        deviceId: ids[0] ?? "",
+        ...(ids.length > 1 ? { targets: ids.map((id) => ({ kind: "device" as const, id })) } : {})
+    } as unknown as T;
+}
+
+/** The rooms and floors an automation names, anywhere in it. */
+export function namedPlaces(
+    definition: AutomationDefinition
+): { kind: "room" | "floor"; id: string }[] {
+    const blocks: unknown[] = [
+        ...definition.triggers,
+        ...definition.conditions.groups.flatMap((group) => group.items),
+        ...definition.actions
+    ];
+    return blocks.flatMap((block) =>
+        placeTargets(block as { targets?: { kind: string; id: string }[] })
+    );
+}
+
+/** Whether anything in an automation names a room or a floor. */
+export function namesPlaces(definition: AutomationDefinition): boolean {
+    return namedPlaces(definition).length > 0;
+}
+
+/** An automation with every room and floor it names read into devices. */
+export function resolveDefinition(
+    definition: AutomationDefinition,
+    scope: TargetScope
+): AutomationDefinition {
+    if (!namesPlaces(definition)) return definition;
+    const each = <T>(block: T): T =>
+        block && typeof block === "object" && "deviceId" in block
+            ? (resolveTargets(block as unknown as TargetBlock, scope) as unknown as T)
+            : block;
+    return {
+        ...definition,
+        triggers: definition.triggers.map(each),
+        conditions: {
+            ...definition.conditions,
+            groups: definition.conditions.groups.map((group) => ({
+                ...group,
+                items: group.items.map(each)
+            }))
+        },
+        actions: definition.actions.map(each)
+    };
 }
 
 /** A block pointed at `ids`: the first as its device, all of them as its set
@@ -521,6 +650,8 @@ export const actionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("device"),
         deviceId: deviceRef,
+        /** More devices, a room or a floor, each told the same. */
+        targets: targetsSchema,
         do: z.enum(STEP_DEVICE_ACTIONS, {
             errorMap: () => ({ message: "automations.errors.action" })
         }),
@@ -538,6 +669,9 @@ export const actionSchema = z.discriminatedUnion("kind", [
         ...blockBase,
         kind: z.literal("wait"),
         deviceId: deviceRef,
+        targets: targetsSchema,
+        /** For a set: until any of its devices is that way, or all of them. */
+        quantifier: quantifierSchema.optional(),
         attribute,
         is: needed,
         timeoutMinutes: count(1, LIMITS.waitMinutes),
@@ -892,6 +1026,8 @@ export interface AutomationIssue {
 
 /** What the device checks need to know about a device. */
 export type AutomationDevice = Pick<DeviceView, "id" | "kind" | "name" | "controllable"> & {
+    /** The room it is in, which a block naming a room or a floor reads. */
+    readonly roomId?: string | null;
     /** What an air conditioner accepts, where it is known. */
     readonly climate?: kinds.ClimateSettings | null;
     /** What a purifier accepts, where it is known. */
@@ -907,10 +1043,49 @@ export type AutomationDevice = Pick<DeviceView, "id" | "kind" | "name" | "contro
 export function deviceIssues(
     definition: AutomationDefinition,
     devices: readonly AutomationDevice[],
-    context: { readonly automationIds: readonly string[]; readonly selfId: string | null }
+    context: {
+        readonly automationIds: readonly string[];
+        readonly selfId: string | null;
+        /** The place's rooms, which a room or a floor is checked against.
+         *  Absent leaves rooms and floors unchecked. */
+        readonly rooms?: TargetScope["rooms"];
+        /** The place's floors, which a floor is checked against; absent reads a
+         *  floor as there only while a room is on it. */
+        readonly floors?: readonly { readonly id: string }[];
+    }
 ): AutomationIssue[] {
     const byId = new Map(devices.map((device) => [device.id, device]));
     const issues: AutomationIssue[] = [];
+
+    /** The devices of a block that are its own to check: the ones it names. A
+     *  block naming a room keeps its first device only for older builds. */
+    const named = (block: TargetBlock): string[] =>
+        placeTargets(block).length > 0
+            ? (block.targets ?? []).filter((ref) => ref.kind === "device").map((ref) => ref.id)
+            : deviceTargets(block);
+    /** A room or a floor that is gone, or that holds nothing answering the block. */
+    const places = (block: TargetBlock, path: (string | number)[]) => {
+        const rooms = context.rooms;
+        if (!rooms || placeTargets(block).length === 0) return;
+        const scope: TargetScope = { devices, rooms };
+        (block.targets ?? []).forEach((ref, index) => {
+            if (ref.kind !== "room" && ref.kind !== "floor") return;
+            const field = [...path, "targets", index, "id"];
+            const known =
+                ref.kind === "room"
+                    ? rooms.some((room) => room.id === ref.id)
+                    : context.floors
+                      ? context.floors.some((floor) => floor.id === ref.id)
+                      : rooms.some((room) => room.floorId === ref.id);
+            if (!known) {
+                issues.push({ path: field, message: "automations.errors.placeGone" });
+                return;
+            }
+            const alone = { ...block, targets: [{ kind: ref.kind, id: ref.id }] };
+            if (resolvedTargets(alone, scope).length === 0)
+                issues.push({ path: field, message: "automations.errors.placeEmpty" });
+        });
+    };
 
     /** Where a complaint about one device of a block goes: its own field for the
      *  first, its place in the set for the rest. */
@@ -941,19 +1116,13 @@ export function deviceIssues(
             issues.push({ path: [...path, "attribute"], message: "automations.errors.attribute" });
         }
     };
-    const watched = (
-        block: { deviceId: string; targets?: readonly { kind: string; id: string }[] },
-        which: AutomationAttribute,
-        path: (string | number)[]
-    ) => {
-        for (const deviceId of deviceTargets(block)) watchedOne(block, deviceId, which, path);
+    const watched = (block: TargetBlock, which: AutomationAttribute, path: (string | number)[]) => {
+        for (const deviceId of named(block)) watchedOne(block, deviceId, which, path);
+        places(block, path);
     };
-    const sensor = (
-        block: { deviceId: string; targets?: readonly { kind: string; id: string }[] },
-        path: (string | number)[],
-        measure?: ReadingMeasure
-    ) => {
-        for (const deviceId of deviceTargets(block)) {
+    const sensor = (block: TargetBlock, path: (string | number)[], measure?: ReadingMeasure) => {
+        places(block, path);
+        for (const deviceId of named(block)) {
             const device = byId.get(deviceId);
             const field = fieldOf(block, deviceId, path);
             if (!device) issues.push({ path: field, message: "automations.errors.deviceGone" });
@@ -982,16 +1151,16 @@ export function deviceIssues(
     );
     definition.actions.forEach((step, index) => {
         const at = ["definition", "actions", index];
-        if (step.kind === "wait") watchedOne(step, step.deviceId, step.attribute, at);
-        if (step.kind === "device") {
-            const device = byId.get(step.deviceId);
+        if (step.kind === "wait") watched(step, step.attribute, at);
+        if (step.kind === "device") places(step, at);
+        for (const deviceId of step.kind === "device" ? named(step) : []) {
+            if (step.kind !== "device") break;
+            const device = byId.get(deviceId);
+            const field = fieldOf(step, deviceId, at);
             if (!device) {
-                issues.push({
-                    path: [...at, "deviceId"],
-                    message: "automations.errors.deviceGone"
-                });
+                issues.push({ path: field, message: "automations.errors.deviceGone" });
             } else if (!device.controllable) {
-                issues.push({ path: [...at, "deviceId"], message: "automations.errors.watchOnly" });
+                issues.push({ path: field, message: "automations.errors.watchOnly" });
             } else if (!stepActionsFor(device.kind).includes(step.do)) {
                 issues.push({ path: [...at, "do"], message: "automations.errors.cannotDo" });
             } else if (step.setting) {
@@ -1059,6 +1228,8 @@ export function readsDevices(definition: AutomationDefinition): boolean {
  */
 export function devicesReadBy(definition: AutomationDefinition): string[] | "all" {
     if (definition.actions.some((step) => step.kind === "wait")) return "all";
+    // A room is whatever is in it when it is read, which the watch cannot know.
+    if (namesPlaces(definition)) return "all";
     const ids = new Set<string>();
     for (const trigger of definition.triggers) if ("deviceId" in trigger) ids.add(trigger.deviceId);
     for (const group of definition.conditions.groups) {
@@ -1181,7 +1352,9 @@ export function blankStep(kind: StepKind): Step {
 function single<T extends object>(block: T): T {
     if (!("targets" in block)) return block;
     const { targets: _was, ...rest } = block as T & { targets?: unknown };
-    return rest as T;
+    // A room or a floor stays: it is read again for whatever the new device asks.
+    const places = placeTargets(block as { targets?: { kind: string; id: string }[] });
+    return (places.length > 0 ? { ...rest, targets: places } : rest) as T;
 }
 
 /** A trigger pointed at `device`, with what it looks at reset to what that device has. */
@@ -1217,7 +1390,8 @@ export function conditionOn(given: Condition, device: DeviceView): Condition {
 }
 
 /** The same for a step: an action the device does not offer becomes its first one. */
-export function stepOn(step: Step, device: DeviceView): Step {
+export function stepOn(given: Step, device: DeviceView): Step {
+    const step = single(given);
     if (step.kind === "device") {
         const offered = stepActionsFor(device.kind);
         const action = offered.includes(step.do) ? step.do : (offered[0] ?? step.do);

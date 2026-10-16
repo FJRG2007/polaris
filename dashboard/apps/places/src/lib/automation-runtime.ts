@@ -107,6 +107,24 @@ export function automationEngine(): AutomationEngine {
     engine ??= createEngine({
         now: () => new Date(),
         store: prismaAutomationStore,
+        async places(installedAppId, placeId) {
+            const [devices, rooms] = await Promise.all([
+                prisma.placeDevice.findMany({
+                    where: { installedAppId, placeId, roomId: { not: null } },
+                    select: { id: true, kind: true, controllable: true, roomId: true },
+                    take: 1000
+                }),
+                prisma.placeRoom.findMany({
+                    where: { installedAppId, placeId },
+                    select: { id: true, floorId: true },
+                    take: 500
+                })
+            ]);
+            return {
+                devices,
+                rooms: rooms.map((room) => ({ id: room.id, floorId: room.floorId ?? "" }))
+            };
+        },
         devices: {
             async read(installedAppId, deviceId) {
                 const row = await prisma.placeDevice.findFirst({

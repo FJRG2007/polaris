@@ -653,7 +653,10 @@
         "notNuki": "Solo una cuenta de Nuki se puede vincular en local",
         "noLocalLink": "Esta cuenta de Nuki no tiene enlace local",
         "roomGone": "Sala inexistente",
-        "roomElsewhere": "Esa sala es de otro sitio"
+        "roomElsewhere": "Esa sala es de otro sitio",
+        "floorGone": "Planta inexistente",
+        "floorElsewhere": "Esa planta es de otro sitio",
+        "floorTaken": "Ya hay una planta con ese nombre"
     },
     "connections": {
         "nuki-web": {
@@ -1588,6 +1591,7 @@
         }
     },
     "devicesView": {
+        "rooms": "Salas",
         "disconnectName": "Desconectar {name}",
         "refused": "{name} rechaza lo que Polaris usa para abrirla, así que sus dispositivos no se están leyendo. Probablemente se revocó.",
         "unreachable": "No se pudo contactar con {name}, así que sus dispositivos siguen como estaban la última vez que respondió.",
@@ -1685,6 +1689,37 @@
             "nothingToStop": "No hay nada en marcha",
             "stopName": "Parar {name}"
         }
+    },
+    "roomsDialog": {
+        "title": "Salas y plantas",
+        "description": "Nombra las salas y plantas de este sitio para usarlas en automatizaciones.",
+        "floors": "Plantas",
+        "rooms": "Salas",
+        "noFloors": "Aún sin plantas.",
+        "noRooms": "Aún sin salas.",
+        "noFloor": "Sin planta",
+        "floorName": "Nombre de planta",
+        "roomName": "Nombre de sala",
+        "floorOf": "Planta de {room}",
+        "saveName": "Guardar {name}",
+        "removeName": "Quitar {name}",
+        "newFloor": "Nueva planta",
+        "newFloorPlaceholder": "Planta baja",
+        "addFloor": "Añadir planta",
+        "newRoom": "Nueva sala",
+        "newRoomPlaceholder": "Cocina",
+        "newRoomFloor": "Planta de la sala nueva",
+        "addRoom": "Añadir sala",
+        "unreadable": "No se pudieron leer las salas. Reinténtalo.",
+        "floorKind": "planta",
+        "roomKind": "sala",
+        "removeFloorTitle": "Quitar planta",
+        "removeRoomTitle": "Quitar sala",
+        "removeQuestion": "¿Quitar <em>{name}</em>?",
+        "removeFloorBody": "Sus salas siguen, sin planta.",
+        "removeRoomBody": "Sus dispositivos siguen aquí, sin sala.",
+        "removeUsed": "{count, plural, one {# automatización la usa y dejará de actuar sobre ella.} other {# automatizaciones la usan y dejarán de actuar sobre ella.}}",
+        "remove": "Quitar"
     },
     "deviceDialog": {
         "connected": "Conectado a través de la cuenta en la que está.",
@@ -1869,6 +1904,7 @@
             "hours": "{count, plural, one {# hora} other {# horas}}"
         },
         "say": {
+            "inPlace": "cualquiera en {place}",
             "time": "A las {time}, {days}",
             "interval": "Cada {every}",
             "manual": "Solo cuando se lanza a mano",
@@ -1943,6 +1979,8 @@
             "toggleUnknown": "No se sabía su estado, así que no había nada que cambiar."
         },
         "errors": {
+            "placeGone": "Esa sala o planta ya no está.",
+            "placeEmpty": "Nada de ahí puede hacer esto.",
             "broken": "Algo en esta tarjeta no está bien. Quítala y vuelve a añadirla.",
             "time": "Escribe la hora como 07:30.",
             "days": "Elige al menos un día.",
@@ -2075,6 +2113,11 @@
             "edgeHelp": "Conexión entre dos nodos."
         },
         "fields": {
+            "where": "Qué dispositivos",
+            "whereChosen": "Los elegidos aquí",
+            "wholeFloor": "Todo en {floor}",
+            "wholeRoom": "Todo en {room}",
+            "placeGone": "Una sala que ya no está",
             "at": "A las",
             "days": "Días",
             "every": "Cada",
@@ -2265,6 +2308,8 @@
             "stay": "Seguir editando"
         },
         "add": {
+            "noFloor": "Sin planta",
+            "noRoom": "Sin sala",
             "title": {
                 "trigger": "Añadir disparador",
                 "condition": "Añadir condición",

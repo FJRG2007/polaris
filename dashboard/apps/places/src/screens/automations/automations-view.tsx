@@ -32,6 +32,7 @@ import { hostUi } from "@polaris/app-host/client";
 import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
+import type { RoomView } from "../../lib/room-kinds";
 
 const { runAction } = hostUi.runAction;
 const { RelativeTime } = hostUi.relativeTime;
@@ -43,6 +44,8 @@ const CACHE_MS = 30_000;
 interface Listing {
     readonly automations: auto.AutomationView[];
     readonly devices: DeviceView[];
+    /** Absent from a listing cached before rooms could be named. */
+    readonly rooms?: RoomView[];
 }
 
 export function AutomationsView({ placeId, canManage }: { placeId: string; canManage: boolean }) {
@@ -66,7 +69,11 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
                 setListing((current) => current ?? { automations: [], devices: [] });
                 return;
             }
-            const next = { automations: result.automations ?? [], devices: result.devices ?? [] };
+            const next = {
+                automations: result.automations ?? [],
+                devices: result.devices ?? [],
+                rooms: result.rooms ?? []
+            };
             setListing(next);
             writeSnapshot(automationsCacheKey(placeId), next);
         })();
@@ -76,8 +83,7 @@ export function AutomationsView({ placeId, canManage }: { placeId: string; canMa
     }, [placeId]);
 
     const lookup = useMemo<words.DeviceLookup>(() => {
-        const byId = new Map((listing?.devices ?? []).map((device) => [device.id, device]));
-        return (id) => byId.get(id);
+        return words.lookupOf(listing?.devices ?? [], listing?.rooms ?? []);
     }, [listing]);
 
     const shown = useMemo(

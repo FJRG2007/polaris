@@ -44,7 +44,7 @@ import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
 import { AutomationCanvas } from "./automation-canvas";
-import { AddBlockButton, RoomsProvider } from "./add-block";
+import { AddBlockButton, RoomsProvider, blockIcon } from "./add-block";
 import type { RoomView } from "../../lib/room-kinds";
 import { swap, within } from "@polaris/ui/automation-graph";
 import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
@@ -192,14 +192,19 @@ const NO_ROOMS: readonly RoomView[] = [];
 
 /** A block with its set changed: its devices, and how they count - which goes
  *  with the set when it is down to one device again. */
-function setOf<T extends auto.Trigger | auto.Condition>(
+function setOf<T extends auto.Trigger | auto.Condition | auto.Step>(
     block: T,
     ids: readonly string[],
     count: auto.Behaviour | auto.Quantifier | undefined
 ): T {
     if (!("deviceId" in block)) return block;
-    const field = block.kind === "device" || block.kind === "reading" ? "quantifier" : "behaviour";
     const next = { ...auto.withTargets(block, ids) } as Record<string, unknown>;
+    // A device step tells every device, so it has nothing to count by.
+    if ("do" in block) return next as T;
+    const field =
+        block.kind === "device" || block.kind === "reading" || block.kind === "wait"
+            ? "quantifier"
+            : "behaviour";
     delete next[field];
     if (ids.length > 1 && count) next[field] = count;
     return next as T;
@@ -364,7 +369,10 @@ export function AutomationEditor({
 
     const devices = loaded?.context.devices ?? [];
     const byId = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
-    const lookup = useCallback<words.DeviceLookup>((id) => byId.get(id), [byId]);
+    const lookup = useMemo<words.DeviceLookup>(
+        () => words.lookupOf(devices, loaded?.context.rooms ?? NO_ROOMS),
+        [devices, loaded]
+    );
     const siblings = useMemo(
         () => (loaded?.context.siblings ?? []).filter((sibling) => sibling.id !== automationId),
         [loaded, automationId]
@@ -392,7 +400,9 @@ export function AutomationEditor({
             }));
         return auto.deviceIssues(parsed.data.definition, devices, {
             automationIds: loaded?.context.siblings.map((sibling) => sibling.id) ?? [],
-            selfId: automationId
+            selfId: automationId,
+            rooms: loaded?.context.rooms ?? NO_ROOMS,
+            floors: loaded?.context.floors
         });
     }, [normalized, devices, loaded, automationId]);
 
@@ -871,11 +881,6 @@ export function AutomationEditor({
         />
     );
 
-    const ICONS: Record<BlockRole, ReactNode> = {
-        trigger: <Zap />,
-        group: <Filter />,
-        step: <Play />
-    };
     const sentenceOf = (role: BlockRole, block: Block): string => {
         if (role === "trigger") return words.describeTrigger(block as auto.Trigger, lookup, t);
         if (role === "step")
@@ -935,7 +940,7 @@ export function AutomationEditor({
                         <blocks.BlockRow
                             handle={handle}
                             number={role === "step" ? index + 1 : undefined}
-                            icon={ICONS[role]}
+                            icon={blockIcon(role, block)}
                             title={title}
                             chips={chipsOf(role, block)}
                             note={block.note}
@@ -977,7 +982,7 @@ export function AutomationEditor({
             <blocks.BlockPanel
                 open
                 title={selectedTitle}
-                icon={ICONS[selected.role]}
+                icon={blockIcon(selected.role, selectedBlock)}
                 strings={blockStrings}
                 sizeKey={PANEL_KEY}
                 onClose={() => setSelected(null)}
@@ -1422,16 +1427,25 @@ function TriggerCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={pickDevice}
                     />
-                    <fields.TargetSetField
-                        ids={auto.deviceTargets(trigger)}
-                        devices={devices}
-                        first={device}
+                    <fields.PlaceTargetField
+                        block={trigger}
                         role="trigger"
-                        count={trigger.behaviour}
                         path={path}
                         disabled={disabled}
-                        onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
+                        onChange={onChange}
                     />
+                    {!fields.placeValue(trigger) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(trigger)}
+                            devices={devices}
+                            first={device}
+                            role="trigger"
+                            count={trigger.behaviour}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
+                        />
+                    )}
                     {device && trigger.kind === "change" && (
                         <fields.WatchPicker
                             device={device}
@@ -1547,16 +1561,25 @@ function TriggerCard({
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.triggerOn(trigger, next))}
                     />
-                    <fields.TargetSetField
-                        ids={auto.deviceTargets(trigger)}
-                        devices={sensors}
-                        first={device}
+                    <fields.PlaceTargetField
+                        block={trigger}
                         role="trigger"
-                        count={trigger.behaviour}
                         path={path}
                         disabled={disabled}
-                        onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
+                        onChange={onChange}
                     />
+                    {!fields.placeValue(trigger) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(trigger)}
+                            devices={sensors}
+                            first={device}
+                            role="trigger"
+                            count={trigger.behaviour}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids, count) => onChange(setOf(trigger, ids, count))}
+                        />
+                    )}
                     {device && (
                         <fields.WatchPicker
                             device={device}
@@ -1815,16 +1838,25 @@ function ConditionCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
-                    <fields.TargetSetField
-                        ids={auto.deviceTargets(condition)}
-                        devices={devices}
-                        first={device}
+                    <fields.PlaceTargetField
+                        block={condition}
                         role="condition"
-                        count={condition.quantifier}
                         path={path}
                         disabled={disabled}
-                        onChange={(ids, count) => onChange(setOf(condition, ids, count))}
+                        onChange={onChange}
                     />
+                    {!fields.placeValue(condition) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(condition)}
+                            devices={devices}
+                            first={device}
+                            role="condition"
+                            count={condition.quantifier}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids, count) => onChange(setOf(condition, ids, count))}
+                        />
+                    )}
                     {device && (
                         <fields.WatchPicker
                             device={device}
@@ -1888,16 +1920,25 @@ function ConditionCard({
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
-                    <fields.TargetSetField
-                        ids={auto.deviceTargets(condition)}
-                        devices={sensors}
-                        first={device}
+                    <fields.PlaceTargetField
+                        block={condition}
                         role="condition"
-                        count={condition.quantifier}
                         path={path}
                         disabled={disabled}
-                        onChange={(ids, count) => onChange(setOf(condition, ids, count))}
+                        onChange={onChange}
                     />
+                    {!fields.placeValue(condition) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(condition)}
+                            devices={sensors}
+                            first={device}
+                            role="condition"
+                            count={condition.quantifier}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids, count) => onChange(setOf(condition, ids, count))}
+                        />
+                    )}
                     {device && (
                         <fields.WatchPicker
                             device={device}
@@ -2074,6 +2115,24 @@ function StepCard({
                         }
                         onChange={(next) => onChange(auto.stepOn(step, next))}
                     />
+                    <fields.PlaceTargetField
+                        block={step}
+                        path={path}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
+                    {!fields.placeValue(step) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(step)}
+                            devices={operableDevices}
+                            first={device}
+                            role="step"
+                            count={undefined}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids) => onChange(setOf(step, ids, undefined))}
+                        />
+                    )}
                     <flow.Field label={t("automations.fields.do")} path={[...path, "do"]}>
                         {(id, invalid) => (
                             <Select
@@ -2134,6 +2193,25 @@ function StepCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={(next) => onChange(auto.stepOn(step, next))}
                     />
+                    <fields.PlaceTargetField
+                        block={step}
+                        role="condition"
+                        path={path}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
+                    {!fields.placeValue(step) && (
+                        <fields.TargetSetField
+                            ids={auto.deviceTargets(step)}
+                            devices={watched}
+                            first={device}
+                            role="condition"
+                            count={step.quantifier}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(ids, count) => onChange(setOf(step, ids, count))}
+                        />
+                    )}
                     {device && (
                         <fields.AttributePicker
                             kind={device.kind}

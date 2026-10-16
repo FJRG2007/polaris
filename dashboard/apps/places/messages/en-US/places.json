@@ -653,7 +653,10 @@
         "notNuki": "Only a Nuki account can be linked locally",
         "noLocalLink": "This Nuki account has no local link",
         "roomGone": "Room not found",
-        "roomElsewhere": "That room is at another place"
+        "roomElsewhere": "That room is at another place",
+        "floorGone": "Floor not found",
+        "floorElsewhere": "That floor is at another place",
+        "floorTaken": "A floor with that name is already here"
     },
     "connections": {
         "nuki-web": {
@@ -1588,6 +1591,7 @@
         }
     },
     "devicesView": {
+        "rooms": "Rooms",
         "disconnectName": "Disconnect {name}",
         "refused": "{name} is refusing what Polaris opens it with, so its devices are not being read. It was probably revoked.",
         "unreachable": "{name} could not be reached, so its devices are as they were when it last answered.",
@@ -1685,6 +1689,37 @@
             "nothingToStop": "Nothing is running",
             "stopName": "Stop {name}"
         }
+    },
+    "roomsDialog": {
+        "title": "Rooms and floors",
+        "description": "Name the rooms and floors of this place so automations can use them.",
+        "floors": "Floors",
+        "rooms": "Rooms",
+        "noFloors": "No floors yet.",
+        "noRooms": "No rooms yet.",
+        "noFloor": "No floor",
+        "floorName": "Name of the floor",
+        "roomName": "Name of the room",
+        "floorOf": "Floor of {room}",
+        "saveName": "Save {name}",
+        "removeName": "Remove {name}",
+        "newFloor": "New floor",
+        "newFloorPlaceholder": "Ground floor",
+        "addFloor": "Add a floor",
+        "newRoom": "New room",
+        "newRoomPlaceholder": "Kitchen",
+        "newRoomFloor": "Floor of the new room",
+        "addRoom": "Add room",
+        "unreadable": "The rooms could not be read. Try again.",
+        "floorKind": "floor",
+        "roomKind": "room",
+        "removeFloorTitle": "Remove floor",
+        "removeRoomTitle": "Remove room",
+        "removeQuestion": "Remove <em>{name}</em>?",
+        "removeFloorBody": "Its rooms stay, on no floor.",
+        "removeRoomBody": "Its devices stay at this place, in no room.",
+        "removeUsed": "{count, plural, one {# automation names it and will stop acting on it.} other {# automations name it and will stop acting on it.}}",
+        "remove": "Remove"
     },
     "deviceDialog": {
         "connected": "Connected through the account it is on.",
@@ -1869,6 +1904,7 @@
             "hours": "{count, plural, one {# hour} other {# hours}}"
         },
         "say": {
+            "inPlace": "anything in {place}",
             "time": "At {time}, {days}",
             "interval": "Every {every}",
             "manual": "Only when run by hand",
@@ -1943,6 +1979,8 @@
             "toggleUnknown": "Its state was not known, so there was nothing to switch over."
         },
         "errors": {
+            "placeGone": "That room or floor is no longer here.",
+            "placeEmpty": "Nothing there can do this yet.",
             "broken": "Something in this card is not right. Remove it and add it again.",
             "time": "Write a time as 07:30.",
             "days": "Choose at least one day.",
@@ -2075,6 +2113,11 @@
             "edgeHelp": "Connection between two nodes."
         },
         "fields": {
+            "where": "Which devices",
+            "whereChosen": "The ones chosen here",
+            "wholeFloor": "All on {floor}",
+            "wholeRoom": "All in {room}",
+            "placeGone": "A room no longer here",
             "at": "At",
             "days": "Days",
             "every": "Every",
@@ -2265,6 +2308,8 @@
             "stay": "Keep editing"
         },
         "add": {
+            "noFloor": "On no floor",
+            "noRoom": "In no room",
             "title": {
                 "trigger": "Add a trigger",
                 "condition": "Add a condition",

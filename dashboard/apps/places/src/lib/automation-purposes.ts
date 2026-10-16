@@ -147,3 +147,50 @@ export function purposeCondition(
         negate: false
     };
 }
+
+/** The purpose a watch of `attribute` for `value` reads as, whichever device
+ *  it is on; null for one that is no purpose's. */
+function purposeOfWatch(attribute: string, value: string): TriggerPurpose | null {
+    if (attribute === "door") {
+        if (value === "open") return "opened";
+        return value === "closed" ? "closed" : null;
+    }
+    if (attribute === "state") {
+        if (value === "locked") return "locked";
+        return value === "unlocked" ? "unlocked" : null;
+    }
+    if (attribute === "battery") return value === "low" ? "batteryLow" : null;
+    if (attribute === "online") return value === "offline" ? "unavailable" : null;
+    if (attribute !== "reading") return null;
+    if (value === auto.OPEN_PAIR[0]) return "opened";
+    if (value === auto.OPEN_PAIR[1]) return "closed";
+    if (value === auto.MOTION_PAIR[0]) return "motion";
+    if (value === auto.MOTION_PAIR[1]) return "still";
+    return null;
+}
+
+const CONDITION_OF: Readonly<Record<TriggerPurpose, ConditionPurpose>> = {
+    opened: "open",
+    closed: "shut",
+    locked: "isLocked",
+    unlocked: "isUnlocked",
+    motion: "moving",
+    still: "quiet",
+    batteryLow: "batteryIsLow",
+    unavailable: "isUnavailable"
+};
+
+/** The purpose a stored trigger reads as - it is saved as a plain change, so
+ *  this is how its row is drawn as what it is for. Null for any other. */
+export function triggerPurposeOf(trigger: auto.Trigger): TriggerPurpose | null {
+    if (trigger.kind !== "change" || !trigger.to) return null;
+    return purposeOfWatch(trigger.attribute, trigger.to);
+}
+
+/** The purpose a stored condition reads as; null for any other, and for one
+ *  turned around ("is not"). */
+export function conditionPurposeOf(condition: auto.Condition): ConditionPurpose | null {
+    if (condition.kind !== "device" || condition.negate) return null;
+    const purpose = purposeOfWatch(condition.attribute, condition.is);
+    return purpose ? CONDITION_OF[purpose] : null;
+}

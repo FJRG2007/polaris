@@ -27,7 +27,7 @@ import * as automations from "../../lib/automations";
 import { currentPlace } from "../../lib/current-place";
 import { autoOffName, issueText } from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
-import type { RoomView } from "../../lib/room-kinds";
+import type { FloorView, RoomView } from "../../lib/room-kinds";
 
 const { recordAudit } = host.auditService;
 const { sessionCan } = host.session;
@@ -42,22 +42,26 @@ export interface AutomationFieldIssue {
 export async function listAutomationsAction(): Promise<{
     automations?: auto.AutomationView[];
     devices?: DeviceView[];
+    /** The place's rooms, which a block naming a room or a floor is told by. */
+    rooms?: RoomView[];
     placeId?: string;
     error?: string;
 }> {
     const { install } = await requireHome("home.read");
     const result = await guard(async () => {
         const { current } = await currentPlace(install.id);
-        const [list, found] = await Promise.all([
+        const [list, found, roomList] = await Promise.all([
             automations.listAutomations(install.id, current.id),
-            devices.listDevices(install.id, current.id)
+            devices.listDevices(install.id, current.id),
+            rooms.listRooms(install.id, current.id)
         ]);
-        return { list, found, placeId: current.id };
+        return { list, found, roomList, placeId: current.id };
     });
     if (result.error) return { error: result.error };
     return {
         automations: result.value?.list,
         devices: result.value?.found,
+        rooms: result.value?.roomList,
         placeId: result.value?.placeId
     };
 }
@@ -71,19 +75,23 @@ export interface EditorContext {
     /** The place's rooms, which the add dialog groups devices by. Absent reads
      *  as none. */
     readonly rooms?: RoomView[];
+    /** The place's floors, a floor with no room on it among them. */
+    readonly floors?: FloorView[];
 }
 
 async function editorContext(installedAppId: string, placeId: string): Promise<EditorContext> {
-    const [found, list, roomList] = await Promise.all([
+    const [found, list, roomList, floorList] = await Promise.all([
         devices.listDevices(installedAppId, placeId),
         automations.listAutomations(installedAppId, placeId),
-        rooms.listRooms(installedAppId, placeId)
+        rooms.listRooms(installedAppId, placeId),
+        rooms.listFloors(installedAppId, placeId)
     ]);
     return {
         placeId,
         devices: found,
         siblings: list.map((automation) => ({ id: automation.id, name: automation.name })),
-        rooms: roomList
+        rooms: roomList,
+        floors: floorList
     };
 }
 
