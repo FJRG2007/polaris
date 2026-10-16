@@ -17,6 +17,8 @@
 
 import { HomeError } from "../home-error";
 import * as nuki from "../integrations/nuki-api";
+import * as mqtt from "../integrations/nuki-mqtt";
+import { toSnapshot as fromTopics } from "./nuki-local";
 import * as vocabulary from "./nuki-vocabulary";
 import type { DeviceAction } from "../device-kinds";
 import {
@@ -65,6 +67,78 @@ function token(credentials: Credentials): string {
     const value = credentials.token;
     if (!value) throw new HomeError("That connection is missing its token");
     return value;
+}
+
+// ---------------------------------------------------------------------------
+// The local link
+// ---------------------------------------------------------------------------
+
+/**
+ * The id a lock publishes under on a broker, from the one Nuki Web gives it.
+ *
+ * Web's `smartlockId` is the device type written in front of the Nuki ID, in
+ * hex: 17988169541 is 0x4302DAF45, a type 4 lock whose Nuki ID - the one
+ * printed on it, and the one its MQTT topics are named by - is 302DAF45. The
+ * low 32 bits are the Nuki ID for every type, type 0 included.
+ */
+export function nukiIdOf(smartlockId: number | string): string {
+    return (BigInt(smartlockId) & 0xffffffffn).toString(16).toUpperCase().padStart(8, "0");
+}
+
+/** The broker on this network the account's locks also publish to, when
+ *  Polaris has linked one (`localHost` and the rest are written by Polaris
+ *  itself, never typed). Null for an account that only has the cloud. */
+export function localBrokerOf(credentials: Credentials): mqtt.NukiBroker | null {
+    const host = credentials.localHost?.trim();
+    if (!host) return null;
+    const port = Number(credentials.localPort || 1883);
+    return {
+        host,
+        port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 1883,
+        username: credentials.localUsername ?? "",
+        password: credentials.localPassword ?? "",
+        prefix: credentials.localPrefix?.trim() || "nuki"
+    };
+}
+
+/** What the broker holds, by Nuki ID in upper case, or nothing when it cannot
+ *  be read - the cloud reading stands on its own. */
+async function brokerContents(
+    broker: mqtt.NukiBroker | null
+): Promise<Map<string, { readonly id: string; readonly topics: mqtt.DeviceTopics }>> {
+    const byId = new Map<string, { readonly id: string; readonly topics: mqtt.DeviceTopics }>();
+    if (!broker) return byId;
+    try {
+        for (const [id, topics] of await mqtt.readBroker(broker))
+            byId.set(id.toUpperCase(), { id, topics });
+    } catch {
+        // A broker that is down leaves the cloud's answer as the answer.
+    }
+    return byId;
+}
+
+/**
+ * The cloud's reading of a lock with the broker's laid over it.
+ *
+ * The broker is the lock speaking on this network a moment ago; the cloud is
+ * what it last told Nuki's servers. Where the lock is on the broker, its state,
+ * door and battery are taken from there. Name, model and whether it is online
+ * stay the account's.
+ */
+export function overlay(
+    snapshot: DeviceSnapshot,
+    topics: mqtt.DeviceTopics | undefined
+): DeviceSnapshot {
+    if (!topics) return snapshot;
+    const local = fromTopics(snapshot.externalId, topics);
+    if (!local || !local.online) return snapshot;
+    return {
+        ...snapshot,
+        state: local.state,
+        doorState: local.doorState ?? snapshot.doorState,
+        batteryPercent: local.batteryPercent ?? snapshot.batteryPercent,
+        batteryCritical: local.batteryCritical
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -174,14 +248,17 @@ export const nukiWebDriver: DeviceDriver = {
     },
 
     async list(credentials) {
-        const locks = await speaking(() => nuki.listSmartlocks(token(credentials)));
+        const [locks, local] = await Promise.all([
+            speaking(() => nuki.listSmartlocks(token(credentials))),
+            brokerContents(localBrokerOf(credentials))
+        ]);
         const snapshots: DeviceSnapshot[] = [];
         for (const lock of locks) {
             const kind = vocabulary.nukiKind(lock.type);
             // A Box is on the account and is not a door. Skipped rather than
             // listed as a device that can do nothing.
             if (!kind) continue;
-            snapshots.push({
+            const snapshot: DeviceSnapshot = {
                 externalId: String(lock.smartlockId),
                 kind,
                 name: lock.name.trim() || "Nuki device",
@@ -197,7 +274,8 @@ export const nukiWebDriver: DeviceDriver = {
                 // Their `serverState` 4 is a device they cannot reach either.
                 // Anything else is a device that answered, whatever it answered.
                 online: (lock.serverState ?? 0) !== 4
-            });
+            };
+            snapshots.push(overlay(snapshot, local.get(nukiIdOf(lock.smartlockId))?.topics));
         }
         return snapshots;
     },
@@ -226,9 +304,43 @@ export const nukiWebDriver: DeviceDriver = {
         await new Promise((resolve) => setTimeout(resolve, PROBE_SETTLE_MS));
     },
 
+    /**
+     * Hear the locks change the moment they do, over the broker Polaris linked
+     * on this network. Any message is a reason to read the account (`changed`
+     * with no ids), which lays the broker's state over the cloud's. Refused
+     * when there is no local link, and device-push asks again later.
+     */
+    async listen(credentials, changed, signal) {
+        const broker = localBrokerOf(credentials);
+        if (!broker) throw new DriverError("This Nuki account has no local link", "refused");
+        try {
+            await mqtt.watchBroker(broker, () => changed([]), signal);
+        } catch (caught) {
+            if (caught instanceof mqtt.NukiMqttError)
+                throw new DriverError(caught.message, caught.kind);
+            throw caught;
+        }
+    },
+
+    /** Over the broker when the lock is on it - on this network, in
+     *  milliseconds - and through the account otherwise, or when the broker
+     *  could not take it. */
     async act(credentials, device, action) {
         const code = ACTION_CODES[action];
         if (code === undefined) throw new HomeError("A Nuki device cannot be told to do that");
+        const broker = localBrokerOf(credentials);
+        if (broker) {
+            const held = (await brokerContents(broker)).get(nukiIdOf(device.externalId));
+            if (held && fromTopics(held.id, held.topics)?.online) {
+                try {
+                    // Under the id the lock itself publishes, in its own case.
+                    await mqtt.sendAction(broker, held.id, code);
+                    return;
+                } catch {
+                    // The account below is the way that is left.
+                }
+            }
+        }
         await speaking(() => nuki.performAction(token(credentials), device.externalId, code));
     }
 };
