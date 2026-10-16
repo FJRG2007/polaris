@@ -32,7 +32,7 @@ export default async function OrganizationMailboxesPage({
     // authorization that could connect it is one only they can grant. What this
     // screen hands out takes a password.
     return (
-        <Messages namespaces={["mailCompose"]}>
+        <Messages namespaces={["mail", "mailCompose"]}>
             <MailboxesView
                 orgId={org.id}
                 orgSlug={org.slug}

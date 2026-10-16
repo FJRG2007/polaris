@@ -5,13 +5,14 @@
  */
 
 import type { ReactNode } from "react";
+import { Messages } from "@/components/i18n/messages";
 import { ProvideAppHostUi } from "@/components/app-host/client";
 
 export default function PublicCalendarLayout({ children }: { children: ReactNode }) {
     return (
-        <>
+        <Messages namespaces={["shortcuts"]}>
             <ProvideAppHostUi />
             {children}
-        </>
+        </Messages>
     );
 }

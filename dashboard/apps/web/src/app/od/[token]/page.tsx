@@ -72,7 +72,7 @@ export default async function LinkedOfficePage({
     return (
         <PublicShell signedIn={signedIn} className="max-w-none">
             {/* The editors are Office's, and say Office's words. */}
-            <Messages namespaces={["office", "publicPages"]}>
+            <Messages namespaces={["office", "publicPages", "diagram", "shortcuts"]}>
                 <LinkedDocument
                     documentId={found.id}
                     kind={found.kind}

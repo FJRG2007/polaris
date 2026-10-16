@@ -109,7 +109,7 @@ export default async function InstalledAppPage({
         }).catch(() => null)
     ]);
     return (
-        <Messages namespaces={["installed", "catalog"]}>
+        <Messages namespaces={["installed", "catalog", "marketplace"]}>
             <InstalledAppDashboard
                 app={app}
                 // The full list is the Settings screen's; a reader who may not

@@ -19,6 +19,7 @@
 import { getSession } from "@/lib/session";
 import { noteActivity } from "@/lib/session-guard";
 import { RichText } from "@/components/rich-text/rich-text";
+import { Messages } from "@/components/i18n/messages";
 import { readPublishedNote } from "@/lib/notes/share-service";
 import { RICH_TEXT_PROSE } from "@/components/rich-text/prose";
 import { getTranslations } from "@/lib/i18n/request";
@@ -66,25 +67,27 @@ export default async function PublicNotePage({ params }: { params: Promise<{ tok
 
     return (
         <PublicShell signedIn={signedIn} className="max-w-3xl">
-            <Card>
-                <CardHeader className="flex flex-col gap-1">
-                    <CardTitle className="text-xl">{note.title}</CardTitle>
-                    <span className="text-xs text-muted-foreground">
-                        {t("note.lastChanged", { time: format.dateTime(note.updatedAt) })}
-                    </span>
-                </CardHeader>
-                <CardBody className="flex flex-col gap-6">
-                    <RichText value={note.body} className={RICH_TEXT_PROSE} />
-                    {note.children.map((child, index) => (
-                        <section key={`${child.title}-${index}`} className="flex flex-col gap-2">
-                            <h2 className="border-t border-border pt-4 text-base font-semibold tracking-tight">
-                                {child.title}
-                            </h2>
-                            <RichText value={child.body} className={RICH_TEXT_PROSE} />
-                        </section>
-                    ))}
-                </CardBody>
-            </Card>
+            <Messages namespaces={["chat"]}>
+                <Card>
+                    <CardHeader className="flex flex-col gap-1">
+                        <CardTitle className="text-xl">{note.title}</CardTitle>
+                        <span className="text-xs text-muted-foreground">
+                            {t("note.lastChanged", { time: format.dateTime(note.updatedAt) })}
+                        </span>
+                    </CardHeader>
+                    <CardBody className="flex flex-col gap-6">
+                        <RichText value={note.body} className={RICH_TEXT_PROSE} />
+                        {note.children.map((child, index) => (
+                            <section key={`${child.title}-${index}`} className="flex flex-col gap-2">
+                                <h2 className="border-t border-border pt-4 text-base font-semibold tracking-tight">
+                                    {child.title}
+                                </h2>
+                                <RichText value={child.body} className={RICH_TEXT_PROSE} />
+                            </section>
+                        ))}
+                    </CardBody>
+                </Card>
+            </Messages>
         </PublicShell>
     );
 }
