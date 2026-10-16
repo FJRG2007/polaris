@@ -264,13 +264,15 @@ container_networks() {
     docker inspect --format '{{range $name, $net := .NetworkSettings.Networks}}{{$name}}{{"\n"}}{{end}}' "$1" 2>/dev/null || true
 }
 
-# Attach container $2 to every network in the list $1 it is not on yet. The host
-# network and none are not networks a container can join this way, and a network
-# that has gone since the list was read is nothing to restore.
+# Attach container $2 to every deployed environment's private network in the list
+# $1 it is not on yet - the `polaris-net-` ones the daemon attaches the stack to
+# after it starts. Every other network is the compose file's to decide: one a
+# release took a service off stays off. A network that has gone since the list was
+# read is nothing to restore.
 connect_networks() {
     joined=" $(container_networks "$2" | tr '\n' ' ') "
     for net in $1; do
-        case "$net" in host | none) continue ;; esac
+        case "$net" in polaris-net-*) ;; *) continue ;; esac
         case "$joined" in *" $net "*) continue ;; esac
         docker network connect "$net" "$2" >/dev/null 2>&1 || true
     done

@@ -31,7 +31,7 @@ export async function runFixAction(input: unknown): Promise<{ ok: boolean; check
     const parsed = fixActionSchema.safeParse(input);
     if (!parsed.success) return { ok: false };
     try {
-        if (parsed.data === "republishRoutes") await syncAppRoutes();
+        if (parsed.data === "republishRoutes") await syncAppRoutes({ force: true });
         else {
             if (getCapabilities().edition !== "full") return { ok: false };
             if ((await reclaimHostSpace({ whenIdle: true })) === null)

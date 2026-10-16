@@ -32,6 +32,10 @@ const applicationFindMany = vi.fn(async (args: unknown) => {
     void args;
     return appPages.shift() ?? [];
 });
+const deploymentFindMany = vi.fn(async (args: unknown) => {
+    void args;
+    return inFlight;
+});
 const notifyDeployFinished = vi.fn(async () => undefined);
 const noteOnDeploy = vi.fn(async (id: string, line: string) => {
     void id;
@@ -43,7 +47,7 @@ vi.mock("@polaris/db", () => ({
         deployment: {
             findFirst: vi.fn(async () => found),
             findUnique: vi.fn(async () => found),
-            findMany: vi.fn(async () => inFlight),
+            findMany: deploymentFindMany,
             updateMany: deploymentUpdateMany
         },
         application: { findMany: applicationFindMany, updateMany },
@@ -57,13 +61,16 @@ vi.mock("@/lib/deploy/log-file", () => ({
     noteOnDeploy
 }));
 
-const { cancelDeployment, recoverAbandonedDeployments } = await import("@/lib/deploy-service");
+const { cancelDeployment, startedInThisProcess, recoverAbandonedDeployments } = await import(
+    "@/lib/deploy-service"
+);
 const { TERMINAL_DEPLOY_STATUSES } = await import("@/lib/deploy/status");
 const { CANCELED_REASON, RESTARTED_REASON } = await import("@/lib/deploy/failure-reason");
 
 beforeEach(() => {
     found = { status: "deploying" };
     inFlight = [{ id: "dep-1" }, { id: "dep-2" }];
+    deploymentFindMany.mockClear();
     deploymentUpdateMany.mockClear();
     deploymentUpdateMany.mockResolvedValue({ count: 1 });
     updateMany.mockClear();
@@ -118,6 +125,23 @@ describe("cancelling a deploy", () => {
 });
 
 describe("recovering after a restart", () => {
+    // First, because the process stops telling its own deploys apart once it has
+    // closed out the abandoned ones.
+    it("leaves alone a deploy this process started while the previous one retired", async () => {
+        startedInThisProcess("dep-own");
+        await recoverAbandonedDeployments();
+        const [args] = deploymentFindMany.mock.calls[0] as [{ where: { id: { notIn: string[] } } }];
+        expect(args.where.id.notIn).toEqual(["dep-own"]);
+
+        deploymentFindMany.mockClear();
+        startedInThisProcess("dep-later");
+        await recoverAbandonedDeployments();
+        const [again] = deploymentFindMany.mock.calls[0] as [
+            { where: { id: { notIn: string[] } } }
+        ];
+        expect(again.where.id.notIn).toEqual([]);
+    });
+
     it("closes out whatever was still in flight, since nothing is driving it any more", async () => {
         await recoverAbandonedDeployments();
         const [args] = deploymentUpdateMany.mock.calls[0] as [

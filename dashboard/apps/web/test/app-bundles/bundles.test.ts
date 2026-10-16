@@ -28,7 +28,10 @@ vi.mock("@/lib/apps/install-presence", () => ({
 
 // The dashboard an update replaces, still serving: retired once `gate` settles.
 const predecessor = vi.hoisted(() => ({ gate: Promise.resolve() as Promise<void> }));
-vi.mock("@/lib/deploy/dashboard-peers", () => ({ afterPredecessor: () => predecessor.gate }));
+vi.mock("@/lib/deploy/dashboard-peers", () => ({
+    afterPredecessor: () => predecessor.gate,
+    predecessorRetired: () => false
+}));
 
 const DASHBOARD = resolve(__dirname, "../../../..");
 const BUNDLER = pathToFileURL(join(DASHBOARD, "packages/app-host/bundler/build.mjs")).href;

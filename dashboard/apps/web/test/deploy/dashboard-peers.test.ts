@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { afterPredecessor, othersAmong, whenAlone } from "@/lib/deploy/dashboard-peers";
+import { othersAmong, whenAlone, afterPredecessor, predecessorRetired } from "@/lib/deploy/dashboard-peers";
 
 // No daemon to ask, as in the limited edition, which is never rolled over.
 vi.mock("@polaris/hostd-client", () => ({
@@ -72,5 +72,10 @@ describe("afterPredecessor", () => {
         const first = afterPredecessor();
         expect(afterPredecessor()).toBe(first);
         await expect(first).resolves.toBeUndefined();
+    });
+
+    it("reads as retired once that wait has settled", async () => {
+        await afterPredecessor();
+        expect(predecessorRetired()).toBe(true);
     });
 });

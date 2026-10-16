@@ -26,7 +26,13 @@ import { getPorts, type TargetRow } from "./deploy/runtime";
 import { networksForService } from "./deploy/service-networks";
 import { prepareDeployNames, recordLiveNames } from "./deploy/private-names";
 import { decryptCredentials, encryptCredentials } from "@polaris/storage";
-import { deployLogPath, enqueueOnTarget, executeDeployment, limitsOf } from "./deploy-service";
+import {
+    limitsOf,
+    deployLogPath,
+    enqueueOnTarget,
+    executeDeployment,
+    startedInThisProcess
+} from "./deploy-service";
 import { NO_REASON } from "./deploy/failure-reason";
 import {
     clusterNodeNames,
@@ -655,6 +661,7 @@ export async function deployDatabase(
                 triggeredById: userId ?? ownerId
             }
         });
+        startedInThisProcess(deployment.id);
         await auditDatabaseDeploy(userId, db.id, deployment.id);
         try {
             await provisionInInstance(db.id, ownerId);
@@ -794,6 +801,7 @@ export async function deployDatabase(
             triggeredById: userId ?? ownerId
         }
     });
+    startedInThisProcess(deployment.id);
     await auditDatabaseDeploy(userId, db.id, deployment.id);
 
     enqueueOnTarget(db.targetId, async () => {

@@ -31,7 +31,8 @@ vi.mock("@/lib/deploy-service", () => ({
     deployLogPath: vi.fn(),
     enqueueOnTarget: vi.fn(),
     executeDeployment: vi.fn(),
-    limitsOf: vi.fn()
+    limitsOf: vi.fn(),
+    startedInThisProcess: vi.fn()
 }));
 vi.mock("@/lib/deploy/service-networks", () => ({ networksForService: vi.fn() }));
 

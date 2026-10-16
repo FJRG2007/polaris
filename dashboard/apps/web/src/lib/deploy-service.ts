@@ -1293,11 +1293,14 @@ async function repointConnectors(applicationId: string, ownerId: string): Promis
  * `retireHeld: false` skips that: a dashboard booting beside the one it replaces
  * cannot see that one's promotions in flight, and the releases they are draining
  * are not its to take down.
+ *
+ * `force` rewrites this machine's file even when it already holds these routes, for a
+ * repair of an edge that is not serving what the file says.
  */
 export async function syncAppRoutes(
-    options: { readonly retireHeld?: boolean } = {}
+    options: { readonly retireHeld?: boolean; readonly force?: boolean } = {}
 ): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
-    const result = await publishAppRoutes();
+    const result = await publishAppRoutes(options.force);
     if (options.retireHeld === false) return result;
     await retireHeldReleases(result.unreachedHosts).catch((error) => {
         console.error("polaris: could not retire the releases an edge was moved off:", error);
@@ -1373,7 +1376,9 @@ async function stagedCutoverRoutes(rows: readonly RouteDomain[]): Promise<RouteD
     }));
 }
 
-async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
+async function publishAppRoutes(
+    force = false
+): Promise<{ readonly unreachedHosts: ReadonlySet<string> }> {
     const rows = await prisma.domain.findMany({
         where: { enabled: true },
         select: ROUTE_DOMAIN_SELECT
@@ -1680,7 +1685,7 @@ async function publishAppRoutes(): Promise<{ readonly unreachedHosts: ReadonlySe
             });
         }
     }
-    await new LocalRouter(await deployZoneHosts()).sync(localRoutes);
+    await new LocalRouter(await deployZoneHosts(), force).sync(localRoutes);
     // After the local edge, and never able to take it down with them: a server that
     // is asleep, moved or refusing a connection is a server whose own edge goes on
     // serving whatever it was already serving, and no reason for the routes on this
@@ -3723,6 +3728,7 @@ export async function deployApplication(
             trigger: rollback ? (rollback.kind ?? "rollback") : (meta?.trigger ?? "manual")
         }
     });
+    startedInThisProcess(deployment.id);
     // Put it in the commit's deployment box before anything else happens, so a
     // deploy that then sits on a busy target's queue is visible on GitHub as
     // queued rather than as nothing at all. Awaited rather than left running: the
@@ -5033,9 +5039,30 @@ async function repointBatch(
  *
  * The queue lives in memory, so nothing survives a restart: a row left QUEUED or
  * DEPLOYING has no runner behind it and never will. Left alone it reads as a deploy
- * still going, which is the state an operator waits on instead of retrying.
+ * still going, which is the state an operator waits on instead of retrying. What this
+ * process started itself before it got here (`startedHere`) is its own and live.
  */
 export async function recoverAbandonedDeployments(): Promise<void> {
+    try {
+        await closeOutAbandoned([...(startedHere.ids ?? [])]);
+    } finally {
+        startedHere.ids = null;
+    }
+}
+
+/** The deployments this process created before it closed out the abandoned ones;
+ *  null once it has, when nothing needs telling apart any more. On the process, since
+ *  Next can evaluate this module once per bundle layer. */
+const startedHere = ((globalThis as Record<symbol, unknown>)[
+    Symbol.for("polaris.deploy.started-here")
+] ??= { ids: new Set<string>() }) as { ids: Set<string> | null };
+
+/** Record a deployment row as this process's own work. */
+export function startedInThisProcess(deploymentId: string): void {
+    startedHere.ids?.add(deploymentId);
+}
+
+async function closeOutAbandoned(own: readonly string[]): Promise<void> {
     await repointCancelledReleases().catch((error) => {
         console.error("polaris: could not repair services pointing at a cancelled deploy:", error);
     });
@@ -5043,7 +5070,7 @@ export async function recoverAbandonedDeployments(): Promise<void> {
     // that reached GitHub is sitting in a repository reading "in progress", and
     // nothing will ever move it - the runner behind it died with the last process.
     const abandoned = await prisma.deployment.findMany({
-        where: { status: { in: ["queued", "deploying"] } },
+        where: { status: { in: ["queued", "deploying"] }, id: { notIn: [...own] } },
         select: { id: true }
     });
     if (abandoned.length === 0) return;

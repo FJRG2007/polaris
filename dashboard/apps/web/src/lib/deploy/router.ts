@@ -909,8 +909,12 @@ export class LocalRouter implements Router {
 
     /** `vacantZones` are the deploy zones whose unclaimed names get the "nothing is
      *  running here" page. The caller resolves them, because the zone layout is Polaris
-     *  state and this module is the seam that must work for a remote edge too. */
-    public constructor(private readonly vacantZones: readonly string[] = []) {}
+     *  state and this module is the seam that must work for a remote edge too.
+     *  `force` rewrites the file even when it already holds these routes. */
+    public constructor(
+        private readonly vacantZones: readonly string[] = [],
+        private readonly force = false
+    ) {}
 
     public async sync(routes: readonly AppRoute[]): Promise<void> {
         // Only worth asking when something would actually be pointed at the proxy.
@@ -949,7 +953,8 @@ export class LocalRouter implements Router {
                 vacantAvailable,
                 frameAvailable: frameAvailable && proxyAvailable,
                 vacantZones: this.vacantZones
-            })
+            }),
+            { force: this.force }
         );
     }
 }

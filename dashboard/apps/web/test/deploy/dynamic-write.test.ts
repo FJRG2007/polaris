@@ -162,6 +162,19 @@ describe("writing a file the edge watches", () => {
         expect(await readFile(join(dynamic, file), "utf8")).toBe("http: changed\n");
     });
 
+    it("rewrites an unchanged file when forced, so an edge that missed it reads it again", async () => {
+        const write = await writer();
+        const file = "polaris-forced.yml";
+        await write(file, "http: same\n");
+        control.renames = 0;
+
+        await write(file, "http: same\n", { force: true });
+
+        expect(control.renames).toBe(1);
+        expect(await readFile(join(dynamic, file), "utf8")).toBe("http: same\n");
+        expect(await leftovers()).toEqual([]);
+    });
+
     it("writes a restricted file through the same path", async () => {
         const write = await writer();
         await write("polaris-secret.key", "PRIVATE", { mode: 0o600 });

@@ -92,8 +92,9 @@ export async function whenAlone(
 
 /** One wait for the whole process, kept on the process rather than in this module:
  *  Next can evaluate a module once per bundle layer, and every copy should share it. */
-const shared = globalThis as { [key: symbol]: Promise<void> | undefined };
-const PREDECESSOR = Symbol.for("polaris.dashboard-peers.predecessor");
+const shared = ((globalThis as Record<symbol, unknown>)[
+    Symbol.for("polaris.dashboard-peers.state")
+] ??= {}) as { wait?: Promise<void>; retired?: boolean };
 
 /**
  * Resolves once the dashboard this one replaced has been retired - at once when
@@ -103,6 +104,17 @@ const PREDECESSOR = Symbol.for("polaris.dashboard-peers.predecessor");
  * here as well would do it twice. Never rejects.
  */
 export function afterPredecessor(): Promise<void> {
-    shared[PREDECESSOR] ??= whenAlone(async () => undefined).catch(() => undefined);
-    return shared[PREDECESSOR];
+    shared.wait ??= whenAlone(async () => undefined)
+        .catch(() => undefined)
+        .then(() => {
+            shared.retired = true;
+        });
+    return shared.wait;
+}
+
+/** Whether `afterPredecessor` has already resolved, for work that would rather run
+ *  where its caller can see it fail than wait when there is nothing to wait for. */
+export function predecessorRetired(): boolean {
+    void afterPredecessor();
+    return shared.retired === true;
 }

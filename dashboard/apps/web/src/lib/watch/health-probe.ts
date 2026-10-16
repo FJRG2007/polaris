@@ -337,7 +337,7 @@ async function persistHealth(
  */
 async function republishAppRoutes(): Promise<void> {
     const { syncAppRoutes } = await import("@/lib/deploy-service");
-    await syncAppRoutes();
+    await syncAppRoutes({ force: true });
 }
 
 /** Carried between passes, so an address that stays unrouted is not repaired every minute. */

@@ -68,15 +68,16 @@ export function dynamicPath(fileName: string): string {
  * A file that already holds exactly `content` is left alone. Boot passes, the health
  * probe and every deploy republish whole files, and during an update two dashboards
  * do it at once; a rename the edge did not need is a reload it did not need, so only
- * a change ever reaches the directory.
+ * a change ever reaches the directory. `force` writes it anyway: a repair for an edge
+ * that never took the file it holds needs the rename to make it read it again.
  */
 export async function writeDynamicFile(
     fileName: string,
     content: string,
-    options: { mode?: number } = {}
+    options: { mode?: number; force?: boolean } = {}
 ): Promise<void> {
     const target = dynamicPath(fileName);
-    if ((await readFile(target, "utf8").catch(() => null)) === content) {
+    if (!options.force && (await readFile(target, "utf8").catch(() => null)) === content) {
         if (options.mode !== undefined) await chmod(target, options.mode).catch(() => undefined);
         return;
     }

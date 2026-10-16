@@ -386,9 +386,10 @@ fi
 # The edge asks the guard about every guarded request, so it is replaced the way
 # the dashboard is: the new container starts beside the old one, has to pass its
 # healthcheck, and only then is the old one stopped. Both answer to the same
-# network alias meanwhile. And the new one joins every network the old one had
-# been attached to since it started - the private networks of deployed
-# environments, which compose knows nothing about.
+# network alias meanwhile. And the new one joins the private networks of deployed
+# environments the old one had been attached to since it started, which compose
+# knows nothing about - and only those: a network the compose file no longer gives
+# the service (`polaris_apps` here) is not put back.
 g_started=""
 g_retired=""
 g_removed=""
@@ -426,7 +427,7 @@ docker() {
                 *State.Health*) [ "$4" = "guard2" ] && printf '%s' "$G_HEALTH" || printf 'healthy' ;;
                 *NetworkSettings*)
                     case "$4" in
-                        guard1) printf 'polaris_default\npolaris-proxy\npolaris-env-abc\n' ;;
+                        guard1) printf 'polaris_default\npolaris-proxy\npolaris_apps\npolaris-net-e0123456789\n' ;;
                         guard2) printf 'polaris_default\npolaris-proxy\n' ;;
                     esac
                     ;;
@@ -464,7 +465,7 @@ case "$g_retired" in
     *) bad "edge guard: wrong containers retired (retired:$g_retired)" ;;
 esac
 case "$g_connected" in
-    " polaris-env-abc>guard2") ok "edge guard: the new guard joins the private networks the old one was on" ;;
+    " polaris-net-e0123456789>guard2") ok "edge guard: the new guard joins the private networks the old one was on" ;;
     *) bad "edge guard: private networks not carried over (connected:$g_connected)" ;;
 esac
 
@@ -500,7 +501,7 @@ esac
 reset_guard
 recreate_in_place traefik >/dev/null
 case "$g_connected" in
-    " polaris-env-abc>guard2") ok "recreate_in_place: the recreated container rejoins its private networks" ;;
+    " polaris-net-e0123456789>guard2") ok "recreate_in_place: the recreated container rejoins its private networks" ;;
     *) bad "recreate_in_place: private networks not restored (connected:$g_connected)" ;;
 esac
 
