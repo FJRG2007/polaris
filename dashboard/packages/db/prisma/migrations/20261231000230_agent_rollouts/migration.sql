@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS "AgentRollout" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "AgentRollout_openKey_key" ON "AgentRollout"("openKey");
 CREATE INDEX IF NOT EXISTS "AgentRollout_status_idx" ON "AgentRollout"("status");
+CREATE INDEX IF NOT EXISTS "AgentRollout_finishedAt_idx" ON "AgentRollout"("finishedAt");
 
 CREATE TABLE IF NOT EXISTS "AgentRolloutTarget" (
     "id" UUID NOT NULL,
@@ -66,3 +67,4 @@ CREATE TABLE IF NOT EXISTS "ServerCommand" (
 
 CREATE INDEX IF NOT EXISTS "ServerCommand_serverId_status_createdAt_idx" ON "ServerCommand"("serverId", "status", "createdAt");
 CREATE INDEX IF NOT EXISTS "ServerCommand_status_expiresAt_idx" ON "ServerCommand"("status", "expiresAt");
+CREATE INDEX IF NOT EXISTS "ServerCommand_status_finishedAt_idx" ON "ServerCommand"("status", "finishedAt");

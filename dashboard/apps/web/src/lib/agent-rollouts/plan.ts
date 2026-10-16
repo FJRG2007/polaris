@@ -147,6 +147,8 @@ export interface TargetSnapshot {
     readonly state: TargetState;
     readonly startedAt: Date | null;
     readonly healthySince: Date | null;
+    /** What the server ran before the update, when it was known. */
+    readonly fromVersion?: string | null;
 }
 
 export interface Observation {
@@ -171,7 +173,9 @@ export interface TargetStep {
  * Move one updating or verifying server along. It counts as healthy only once
  * it reports the rollout's version and has kept answering for the whole health
  * window; losing the heartbeat or the version on the way fails it, and so does
- * never reporting the version at all.
+ * never reporting the version at all. A server that comes back on a version
+ * that is neither the one it left nor the rollout's has installed something
+ * else, and fails at once rather than waiting out the update timeout.
  */
 export function stepTarget(
     target: TargetSnapshot,
@@ -191,6 +195,14 @@ export function stepTarget(
     if (target.state === "updating") {
         if (observed.version === config.version && fresh) {
             return { state: "verifying", healthySince: now, reason: null };
+        }
+        if (
+            fresh &&
+            observed.version !== null &&
+            target.fromVersion != null &&
+            observed.version !== target.fromVersion
+        ) {
+            return { state: "failed", healthySince: null, reason: "version" };
         }
         const started = target.startedAt?.getTime() ?? now.getTime();
         if (now.getTime() - started > (config.updateTimeoutMs ?? UPDATE_TIMEOUT_MS)) {

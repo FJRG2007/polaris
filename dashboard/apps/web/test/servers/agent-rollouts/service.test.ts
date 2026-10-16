@@ -17,6 +17,7 @@ const state = {
     hostd: true,
     localVersion: "1.0.0" as string | null,
     update: "started" as "started" | "unreachable" | "failed",
+    localHosts: new Set<string>(),
     calls: [] as string[]
 };
 
@@ -43,7 +44,7 @@ vi.mock("@/lib/server-templates/service", () => ({
 }));
 vi.mock("@/lib/local-machine", () => ({
     localMachineIdentity: async () => ({}),
-    isLocalMachine: () => false
+    isLocalMachine: (host: { id: string }) => state.localHosts.has(host.id)
 }));
 function driver(online: () => boolean) {
     return {
@@ -83,6 +84,7 @@ beforeEach(() => {
         hostd: true,
         localVersion: "1.0.0",
         update: "started",
+        localHosts: new Set(),
         calls: []
     });
 });
@@ -171,6 +173,88 @@ describe("the command queue", () => {
         expect(service.serverOfConnection("local")).toBe("local");
         expect(service.serverOfConnection("my-stored-connection")).toBeNull();
     });
+
+    it("queues a command for an enrolled copy of this box as the local server, and delivers it", async () => {
+        state.localHosts.add(HOST);
+        state.localOnline = false;
+        const command = { kind: "container.stop" as const, container: "api" };
+        expect(await service.queueIfOffline(HOST, command, OWNER)).toBe(true);
+        expect(commands()[0]).toMatchObject({ serverId: "local", status: "queued" });
+        state.localOnline = true;
+        await service.tick(minutes(1));
+        expect(state.calls).toEqual(["stop api"]);
+        expect(commands()[0]!.status).toBe("done");
+    });
+
+    it("keeps the commands of a server that exists but is past the probe list, and expires a removed one's", async () => {
+        const late = "0192d3a4-5b6c-7d8e-9f00-aaaaaaaaaaaa";
+        fakeDb.tables.host!.push({ id: late, name: "late", ownerId: OWNER, createdAt: minutes(-1) });
+        await service.enqueueCommand(restart("api", late), OWNER, minutes(0));
+        const spy = vi.spyOn(fakeDb.prisma.host, "findMany");
+        spy.mockImplementationOnce((async () => [{ id: HOST, name: "web-1", ownerId: OWNER }]) as never);
+        await service.tick(minutes(1));
+        spy.mockRestore();
+        expect(commands()[0]!.status).toBe("queued");
+        fakeDb.tables.host!.splice(fakeDb.tables.host!.findIndex((row) => row.id === late), 1);
+        await service.tick(minutes(2));
+        expect(commands()[0]).toMatchObject({ status: "expired", result: "unknownServer" });
+    });
+
+    it("applies a template picked from the server's own assignments, and refuses another server's", async () => {
+        const mine = "0192d3a4-5b6c-7d8e-9f00-bbbbbbbbbbbb";
+        const theirs = "0192d3a4-5b6c-7d8e-9f00-cccccccccccc";
+        const other = "0192d3a4-5b6c-7d8e-9f00-dddddddddddd";
+        fakeDb.tables.host!.push({ id: other, name: "db-1", ownerId: OWNER, createdAt: minutes(-50) });
+        fakeDb.tables.hostTemplateAssignment!.push(
+            { id: mine, hostId: HOST, template: { name: "Base" }, createdAt: minutes(0) },
+            { id: theirs, hostId: other, template: { name: "Other" }, createdAt: minutes(0) }
+        );
+        const apply = (assignmentId: string) =>
+            service.enqueueCommand(
+                { id: uuid(), serverId: HOST, expiry: "1d", command: { kind: "template.apply", assignmentId } },
+                OWNER
+            );
+        await expect(apply(theirs)).rejects.toMatchObject({ code: "unknownAssignment" });
+        await apply(mine);
+        const screen = await service.rolloutScreen(minutes(1));
+        const web = screen.servers.find((server) => server.id === HOST)!;
+        expect(web.assignments).toEqual([{ id: mine, name: "Base" }]);
+        expect(web.waiting[0]).toMatchObject({ kind: "template.apply", target: "Base" });
+        expect(screen.servers[0]!.assignments).toEqual([]);
+    });
+
+    it("reads a server's finished commands on their own, newest first", async () => {
+        const first = await service.enqueueCommand(restart("api"), OWNER, minutes(0));
+        const second = await service.enqueueCommand(restart("worker"), OWNER, minutes(1));
+        fakeDb.tables.serverCommand!.find((row) => row.id === first.id)!.createdAt = minutes(0);
+        fakeDb.tables.serverCommand!.find((row) => row.id === second.id)!.createdAt = minutes(1);
+        await service.cancelCommand(first.id);
+        await service.cancelCommand(second.id);
+        expect((await service.commandHistory(HOST)).map((row) => row.target)).toEqual(["worker", "api"]);
+        expect(await service.commandHistory("local")).toEqual([]);
+    });
+
+    it("forgets finished commands, finished rollouts and removed servers' agents after the retention window", async () => {
+        const old = await service.enqueueCommand(restart("api"), OWNER, minutes(0));
+        await service.enqueueCommand(restart("worker"), OWNER, minutes(0));
+        await service.cancelCommand(old.id);
+        fakeDb.tables.serverCommand!.find((row) => row.id === old.id)!.finishedAt = minutes(0);
+        fakeDb.tables.agentRollout!.push({ id: "r-old", openKey: null, status: "done", finishedAt: minutes(0) });
+        fakeDb.tables.agentRolloutTarget!.push({ id: "t-old", rolloutId: "r-old", serverId: "local", wave: 0 });
+        const removed = "0192d3a4-5b6c-7d8e-9f00-eeeeeeeeeeee";
+        fakeDb.tables.serverAgent!.push(
+            { serverId: removed, version: null, heartbeatAt: minutes(0), pinnedVersion: null, updatedAt: minutes(0) },
+            { serverId: HOST, version: null, heartbeatAt: minutes(0), pinnedVersion: "1.0.0", updatedAt: minutes(0) }
+        );
+        await service.pruneFinished(minutes(29 * 24 * 60));
+        expect(commands()).toHaveLength(2);
+        expect(fakeDb.tables.serverAgent).toHaveLength(2);
+        await service.pruneFinished(minutes(31 * 24 * 60));
+        expect(commands().map((row) => row.status)).toEqual(["queued"]);
+        expect(fakeDb.tables.agentRollout).toHaveLength(0);
+        expect(fakeDb.tables.agentRolloutTarget).toHaveLength(0);
+        expect(fakeDb.tables.serverAgent!.map((row) => row.serverId)).toEqual([HOST]);
+    });
 });
 
 describe("a rollout", () => {
@@ -213,6 +297,51 @@ describe("a rollout", () => {
         expect(rollout().status).toBe("running");
         expect(targetOf("local").state).toBe("pending");
         await expect(service.resumeRollout()).rejects.toMatchObject({ code: "notHalted" });
+    });
+
+    it("fails a server at once, with the reason, when its update cannot be queued", async () => {
+        await service.tick(minutes(0));
+        await start();
+        for (let index = 0; index < 50; index++) {
+            await service.enqueueCommand(restart(`c${index}`, "local"), OWNER, minutes(0));
+        }
+        await service.advanceRollout(await service.listServers(), minutes(1));
+        expect(targetOf("local")).toMatchObject({ state: "failed", error: "refused" });
+        expect(rollout()).toMatchObject({ status: "halted", haltReason: "failed" });
+        expect(commands().filter((row) => row.kind === "agent.update")).toHaveLength(0);
+    });
+
+    it("queues one update however many ticks overlap", async () => {
+        await service.tick(minutes(0));
+        await start();
+        const servers = await service.listServers();
+        await Promise.all([
+            service.advanceRollout(servers, minutes(1)),
+            service.advanceRollout(servers, minutes(1))
+        ]);
+        expect(commands().filter((row) => row.kind === "agent.update")).toHaveLength(1);
+        expect(targetOf("local").state).toBe("updating");
+    });
+
+    it("fails a server that comes back on a version other than the rollout's", async () => {
+        await service.tick(minutes(0));
+        await start();
+        await service.tick(minutes(1));
+        await service.tick(minutes(2));
+        state.localVersion = "1.5.0";
+        await service.tick(minutes(3));
+        expect(targetOf("local")).toMatchObject({ state: "failed", error: "version" });
+        expect(rollout().status).toBe("halted");
+    });
+
+    it("reports a failure to create a rollout as it is, not as one already open", async () => {
+        await service.tick(minutes(0));
+        const spy = vi.spyOn(fakeDb.prisma.agentRollout, "create");
+        spy.mockRejectedValueOnce(new Error("connection lost"));
+        await expect(start()).rejects.toThrow("connection lost");
+        spy.mockRestore();
+        await start();
+        await expect(start("3.0.0")).rejects.toMatchObject({ code: "rolloutOpen" });
     });
 
     it("halts a server that stops answering during its health check", async () => {

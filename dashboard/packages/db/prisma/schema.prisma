@@ -14277,6 +14277,7 @@ model AgentRollout {
     targets AgentRolloutTarget[]
 
     @@index([status])
+    @@index([finishedAt])
 }
 
 model AgentRolloutTarget {
@@ -14320,4 +14321,5 @@ model ServerCommand {
 
     @@index([serverId, status, createdAt])
     @@index([status, expiresAt])
+    @@index([status, finishedAt])
 }

@@ -1,7 +1,7 @@
 /**
  * An in-memory stand-in for the tables the rollout service touches, answering
- * the subset of Prisma's query shapes it uses: equality, `in`, `notIn`, `lte`,
- * `gt`, `increment`, a `rollout` relation filter and unique keys that refuse a
+ * the subset of Prisma's query shapes it uses: equality, `in`, `notIn`, `not`,
+ * `lt`, `lte`, `gt`, `increment`, a `rollout` relation filter and unique keys that refuse a
  * second row. Enough to run the service's real conditional writes end to end.
  */
 
@@ -66,6 +66,8 @@ export function createFakeDb() {
             const ops = condition as Record<string, unknown>;
             if ("in" in ops && !(ops.in as unknown[]).includes(value)) return false;
             if ("notIn" in ops && (ops.notIn as unknown[]).includes(value)) return false;
+            if ("not" in ops && value === ops.not) return false;
+            if ("lt" in ops && !(value != null && (value as Date | number) < (ops.lt as Date | number))) return false;
             if ("lte" in ops && !((value as Date | number) <= (ops.lte as Date | number))) return false;
             if ("gt" in ops && !((value as Date | number) > (ops.gt as Date | number))) return false;
             return true;
@@ -106,7 +108,7 @@ export function createFakeDb() {
         const row: Row = { id: randomUUID(), ...DEFAULTS[table]?.(), ...rest };
         for (const key of UNIQUE[table] ?? []) {
             if (row[key] != null && tables[table]!.some((one) => one[key] === row[key])) {
-                throw new Error(`Unique constraint failed on ${table}.${key}`);
+                throw Object.assign(new Error(`Unique constraint failed on ${table}.${key}`), { code: "P2002" });
             }
         }
         tables[table]!.push(row);
@@ -148,6 +150,17 @@ export function createFakeDb() {
                 const hit = rows().filter((row) => matches(row, where, table));
                 hit.forEach((row) => apply(row, data));
                 return { count: hit.length };
+            },
+            deleteMany: async ({ where }: { where?: Row } = {}) => {
+                const keep = rows().filter((row) => !matches(row, where, table));
+                const count = rows().length - keep.length;
+                tables[table]!.splice(0, rows().length, ...keep);
+                if (table === "agentRollout") {
+                    const live = new Set(keep.map((row) => row.id));
+                    const targets = tables.agentRolloutTarget!.filter((row) => live.has(row.rolloutId));
+                    tables.agentRolloutTarget!.splice(0, tables.agentRolloutTarget!.length, ...targets);
+                }
+                return { count };
             },
             upsert: async ({ where, create, update }: { where: Row; create: Row; update: Row }) => {
                 const found = rows().find((row) => matches(row, where, table));

@@ -75,8 +75,9 @@ export interface QueuedRow {
 
 /**
  * Split a server's waiting commands into the ones to expire, the ones to give up
- * on and the ones to deliver now, oldest first (ties by id, which is
- * time-ordered). A command cut off mid-delivery goes out again while it has
+ * on and the ones to deliver now, oldest first (ties by id, which only keeps
+ * the order stable: ids are random, so two commands created in the same
+ * millisecond have no order of their own). A command cut off mid-delivery goes out again while it has
  * attempts left; every kind is safe to repeat.
  */
 export function drainOrder<T extends QueuedRow>(

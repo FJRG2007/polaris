@@ -117,6 +117,15 @@ export async function enqueueCommandAction(
     }
 }
 
+export async function commandHistoryAction(serverId: string): Promise<Result<rollouts.CommandView[]>> {
+    await requirePermission("system.manage");
+    try {
+        return { ok: true, value: await rollouts.commandHistory(queue.serverIdSchema.parse(serverId)) };
+    } catch (error) {
+        return refused(error);
+    }
+}
+
 export async function cancelCommandAction(id: string): Promise<Result> {
     const user = await requirePermission("system.manage");
     try {

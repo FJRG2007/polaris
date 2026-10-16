@@ -36,6 +36,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CommandView, RolloutScreen, ServerAgentView } from "@/lib/agent-rollouts/service";
 import {
     cancelCommandAction,
+    commandHistoryAction,
     enqueueCommandAction,
     rolloutControlAction,
     rolloutScreenAction,
@@ -47,6 +48,8 @@ import {
 type T = NamespaceTranslator<"agentRollouts">;
 
 const REFRESH_MS = 30_000;
+/** Servers drawn at first, and added per "Show more". */
+const SERVER_PAGE = 50;
 const OPEN = new Set(["running", "halted"]);
 const STATES: readonly plan.TargetState[] = ["pending", "updating", "verifying", "healthy", "failed", "skipped"];
 const REASONS = ["no-agent", "pinned", "current", "timeout", "heartbeat", "version", "refused"] as const;
@@ -496,6 +499,7 @@ function ServersSection({
     const t = useTranslations("agentRollouts");
     const [pinning, setPinning] = useState<ServerAgentView | null>(null);
     const [queueing, setQueueing] = useState<ServerAgentView | null>(null);
+    const [shown, setShown] = useState(SERVER_PAGE);
     return (
         <section aria-labelledby="servers-heading" className="flex min-w-0 flex-col gap-3">
             <h2 id="servers-heading" className="text-sm font-semibold">
@@ -509,18 +513,30 @@ function ServersSection({
             ) : data.servers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("servers.empty")}</p>
             ) : (
-                <ul className="flex min-w-0 flex-col gap-2">
-                    {data.servers.map((server) => (
-                        <ServerRow
-                            key={server.id}
-                            server={server}
-                            busy={busy}
-                            onPin={() => (server.pinnedVersion ? onPin(server, null) : setPinning(server))}
-                            onQueue={() => setQueueing(server)}
-                            onCancel={(command) => onCancel(server, command)}
-                        />
-                    ))}
-                </ul>
+                <>
+                    <ul className="flex min-w-0 flex-col gap-2">
+                        {data.servers.slice(0, shown).map((server) => (
+                            <ServerRow
+                                key={server.id}
+                                server={server}
+                                busy={busy}
+                                onPin={() => (server.pinnedVersion ? onPin(server, null) : setPinning(server))}
+                                onQueue={() => setQueueing(server)}
+                                onCancel={(command) => onCancel(server, command)}
+                            />
+                        ))}
+                    </ul>
+                    {data.servers.length > shown ? (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="self-start"
+                            onClick={() => setShown((count) => count + SERVER_PAGE)}
+                        >
+                            {t("servers.more")}
+                        </Button>
+                    ) : null}
+                </>
             )}
             {pinning ? (
                 <PinDialog
@@ -642,19 +658,64 @@ function ServerRow({
                             ))}
                         </ul>
                     )}
-                    {server.history.length > 0 ? (
-                        <>
-                            <span className="text-xs font-medium text-muted-foreground">{t("queue.history")}</span>
-                            <ul className="flex min-w-0 flex-col gap-1">
-                                {server.history.map((command) => (
-                                    <CommandRow key={command.id} command={command} busy={busy} />
-                                ))}
-                            </ul>
-                        </>
-                    ) : null}
+                    <CommandHistory serverId={server.id} busy={busy} />
                 </div>
             ) : null}
         </li>
+    );
+}
+
+/** A server's finished commands, read when someone opens them. */
+function CommandHistory({ serverId, busy }: { serverId: string; busy: boolean }) {
+    const t = useTranslations("agentRollouts");
+    const [open, setOpen] = useState(false);
+    const [rows, setRows] = useState<CommandView[] | null>(null);
+    const [failure, setFailure] = useState<string | null>(null);
+    const listId = `history-${serverId}`;
+    const toggle = () => {
+        if (open) {
+            setOpen(false);
+            return;
+        }
+        setOpen(true);
+        setFailure(null);
+        commandHistoryAction(serverId)
+            .catch(() => ({ ok: false as const, error: "failed" }))
+            .then((answer) => (answer.ok ? setRows(answer.value) : setFailure(answer.error)));
+    };
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            <Button
+                size="sm"
+                variant="ghost"
+                className="self-start"
+                aria-expanded={open}
+                aria-controls={listId}
+                onClick={toggle}
+            >
+                <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />
+                {t("queue.history")}
+            </Button>
+            {open ? (
+                <div id={listId} className="flex min-w-0 flex-col gap-1">
+                    {failure ? (
+                        <p role="alert" className="text-xs text-danger">
+                            {errorText(t, failure)}
+                        </p>
+                    ) : rows === null ? (
+                        <Skeleton className="h-8 w-full rounded-md" />
+                    ) : rows.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t("queue.historyEmpty")}</p>
+                    ) : (
+                        <ul className="flex min-w-0 flex-col gap-1">
+                            {rows.map((command) => (
+                                <CommandRow key={command.id} command={command} busy={busy} />
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
@@ -763,7 +824,11 @@ function QueueDialog({
     const tc = useTranslations("common");
     // Minted once per dialog, so a submit that is sent twice is still one command.
     const [id] = useState(() => crypto.randomUUID());
-    const kinds = queue.COMMAND_KINDS.filter((kind) => kind !== "agent.update" || server.version !== null);
+    const kinds = queue.COMMAND_KINDS.filter(
+        (kind) =>
+            (kind !== "agent.update" || server.version !== null) &&
+            (kind !== "template.apply" || server.assignments.length > 0)
+    );
     const [kind, setKind] = useState<queue.CommandKind>("container.restart");
     const [value, setValue] = useState("");
     const [expiry, setExpiry] = useState<queue.ExpiryChoice>("1d");
@@ -793,19 +858,27 @@ function QueueDialog({
                             value={kind}
                             onValueChange={(next) => {
                                 setKind(next as queue.CommandKind);
-                                setValue("");
+                                setValue(next === "template.apply" ? (server.assignments[0]?.id ?? "") : "");
                             }}
                             options={kinds.map((one) => ({ value: one, label: t(`queue.kinds.${one}`) }))}
                         />
                     </label>
                     <label className="flex flex-col gap-1">
                         <span className="text-xs text-muted-foreground">{fieldLabel} *</span>
-                        <Input
-                            value={value}
-                            maxLength={128}
-                            onChange={(event) => setValue(event.target.value)}
-                            aria-invalid={invalid}
-                        />
+                        {kind === "template.apply" ? (
+                            <Select
+                                value={value}
+                                onValueChange={setValue}
+                                options={server.assignments.map((one) => ({ value: one.id, label: one.name }))}
+                            />
+                        ) : (
+                            <Input
+                                value={value}
+                                maxLength={128}
+                                onChange={(event) => setValue(event.target.value)}
+                                aria-invalid={invalid}
+                            />
+                        )}
                         {invalid ? <span className="text-xs text-danger">{t("errors.invalid")}</span> : null}
                     </label>
                     <label className="flex flex-col gap-1">

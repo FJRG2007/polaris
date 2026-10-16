@@ -24,7 +24,8 @@
         "pinBody": "Rollouts of any other version leave this server alone until you unpin it.",
         "pinVersion": "Version",
         "commands": "Commands",
-        "empty": "No servers yet. Add one from Servers."
+        "empty": "No servers yet. Add one from Servers.",
+        "more": "Show more"
     },
     "rollout": {
         "heading": "Rollout",
@@ -83,7 +84,7 @@
         "addBody": "If the server is offline the command waits for it and goes out in order when it answers again.",
         "kind": "Command",
         "container": "Container",
-        "assignment": "Template assignment id",
+        "assignment": "Template",
         "version": "Version",
         "expiry": "Give up after",
         "expiries": {
@@ -110,6 +111,7 @@
         "expires": "Expires {when}",
         "empty": "Nothing waiting",
         "history": "Recent",
+        "historyEmpty": "Nothing finished yet",
         "results": {
             "offline": "The server did not answer",
             "noAgent": "This server has no agent to update",

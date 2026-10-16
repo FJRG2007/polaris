@@ -16,6 +16,20 @@ const COMMAND = "0192d3a4-5b6c-7d8e-9f00-000000000001";
 let answer: Promise<{ ok: true; value: RolloutScreen }>;
 const cancel = vi.fn(async () => ({ ok: true as const, value: undefined }));
 const control = vi.fn(async () => ({ ok: true as const, value: undefined }));
+const history = vi.fn(async (_serverId: string) => ({
+    ok: true as const,
+    value: [
+        {
+            id: "0192d3a4-5b6c-7d8e-9f00-000000000002",
+            kind: "container.stop",
+            target: "worker",
+            status: "done",
+            result: "done",
+            createdAt: "2026-10-16T11:00:00.000Z",
+            expiresAt: "2026-10-17T11:00:00.000Z"
+        }
+    ]
+}));
 
 vi.mock("../../../src/app/(app)/apps/servers/rollouts/actions", () => ({
     rolloutScreenAction: () => answer,
@@ -23,7 +37,8 @@ vi.mock("../../../src/app/(app)/apps/servers/rollouts/actions", () => ({
     rolloutControlAction: (action: string) => control(action),
     setPinAction: async () => ({ ok: true, value: undefined }),
     enqueueCommandAction: async () => ({ ok: true, value: { status: "queued" } }),
-    cancelCommandAction: (id: string) => cancel(id)
+    cancelCommandAction: (id: string) => cancel(id),
+    commandHistoryAction: (serverId: string) => history(serverId)
 }));
 
 const { RolloutsView, parseWaveInput } = await import(
@@ -40,7 +55,7 @@ const data: RolloutScreen = {
             online: true,
             pinnedVersion: null,
             waiting: [],
-            history: []
+            assignments: []
         },
         {
             id: "0192d3a4-5b6c-7d8e-9f00-112233445566",
@@ -60,7 +75,7 @@ const data: RolloutScreen = {
                     expiresAt: "2026-10-17T12:00:00.000Z"
                 }
             ],
-            history: []
+            assignments: []
         }
     ],
     rollout: {
@@ -90,6 +105,7 @@ beforeEach(() => {
     sessionStorage.clear();
     cancel.mockClear();
     control.mockClear();
+    history.mockClear();
 });
 afterEach(cleanup);
 
@@ -128,6 +144,32 @@ describe("the Rollouts screen", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel command" }));
         await waitFor(() => expect(cancel).toHaveBeenCalledWith(COMMAND));
         expect(screen.queryByText(/Waiting for the server/)).toBeNull();
+    });
+});
+
+describe("a server's commands", () => {
+    it("reads its finished commands only when they are opened", async () => {
+        answer = Promise.resolve({ ok: true, value: data });
+        render(<RolloutsView />, { wrapper: MessagesWrapper });
+        await screen.findByText(/Waiting for the server/);
+        expect(history).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+        expect(await screen.findByText(/worker/)).toBeTruthy();
+        expect(history).toHaveBeenCalledWith("0192d3a4-5b6c-7d8e-9f00-112233445566");
+    });
+
+    it("draws the first page of a long server list and the rest on request", async () => {
+        const many = Array.from({ length: 60 }, (_, index) => ({
+            ...data.servers[0]!,
+            id: `0192d3a4-5b6c-7d8e-9f00-${String(index).padStart(12, "0")}`,
+            name: `box-${index}`
+        }));
+        answer = Promise.resolve({ ok: true, value: { ...data, servers: many } });
+        render(<RolloutsView />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("box-49")).toBeTruthy();
+        expect(screen.queryByText("box-50")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+        expect(await screen.findByText("box-59")).toBeTruthy();
     });
 });
 

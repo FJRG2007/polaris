@@ -127,6 +127,19 @@ describe("stepTarget", () => {
         ).toMatchObject({ state: "failed", reason: "timeout" });
     });
 
+    it("fails at once a server that installed a version other than the rollout's", () => {
+        const target = { state: "updating" as const, startedAt: start, healthySince: null, fromVersion: "1.0.0" };
+        expect(
+            plan.stepTarget(target, { version: "1.5.0", heartbeatAt: at(3) }, at(3), config)
+        ).toMatchObject({ state: "failed", reason: "version" });
+        expect(plan.stepTarget(target, { version: "1.0.0", heartbeatAt: at(3) }, at(3), config).state).toBe(
+            "updating"
+        );
+        expect(plan.stepTarget(target, { version: "1.5.0", heartbeatAt: at(-10) }, at(3), config).state).toBe(
+            "updating"
+        );
+    });
+
     it("is healthy only after the whole health window", () => {
         const target = { state: "verifying" as const, startedAt: start, healthySince: at(2) };
         expect(plan.stepTarget(target, { version: "2.0.0", heartbeatAt: at(9) }, at(9), config).state).toBe(

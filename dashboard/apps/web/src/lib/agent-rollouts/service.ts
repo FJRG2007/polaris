@@ -35,6 +35,8 @@ const PROBE_CONCURRENCY = 6;
 const DRAIN_PER_TICK = 10;
 /** Finished commands shown per server. */
 const HISTORY = 10;
+/** How long a finished command, a finished rollout and a removed server's agent are kept. */
+const RETENTION_MS = 30 * 86_400_000;
 
 /** A refusal a person can be shown: the code is turned into a sentence on screen. */
 export class RolloutRefusal extends Error {
@@ -64,6 +66,11 @@ export interface ServerRef {
 /** Every server Polaris manages, the box it runs on first, without listing that
  *  box twice when it was also enrolled over SSH. */
 export async function listServers(): Promise<ServerRef[]> {
+    return (await loadServers()).servers;
+}
+
+/** The servers, and the Host rows that turned out to be the local one. */
+async function loadServers(): Promise<{ servers: ServerRef[]; localHostIds: string[] }> {
     const [hosts, identity] = await Promise.all([
         prisma.host.findMany({
             select: { id: true, name: true, ownerId: true, address: true, dockerId: true },
@@ -76,19 +83,25 @@ export async function listServers(): Promise<ServerRef[]> {
     const remote = hosts
         .filter((host) => !isLocalMachine(host, identity))
         .map((host) => ({ id: host.id, name: host.name, ownerId: host.ownerId }));
-    return [local, ...remote];
+    const localHostIds = hosts.filter((host) => isLocalMachine(host, identity)).map((host) => host.id);
+    return { servers: [local, ...remote], localHostIds };
 }
 
+/** The server a queue id names. A Host row that is this very machine is the
+ *  local server, which is the only one of the two the loop looks at. */
 async function findServer(serverId: string): Promise<ServerRef> {
-    if (serverId === LOCAL_SERVER) {
-        return { id: LOCAL_SERVER, name: localMachineNameNow(), ownerId: null };
-    }
-    const host = await prisma.host.findUnique({
-        where: { id: serverId },
-        select: { id: true, name: true, ownerId: true }
-    });
+    const local: ServerRef = { id: LOCAL_SERVER, name: localMachineNameNow(), ownerId: null };
+    if (serverId === LOCAL_SERVER) return local;
+    const [host, identity] = await Promise.all([
+        prisma.host.findUnique({
+            where: { id: serverId },
+            select: { id: true, name: true, ownerId: true, address: true, dockerId: true }
+        }),
+        localMachineIdentity()
+    ]);
     if (!host) throw new RolloutRefusal("unknownServer");
-    return host;
+    if (isLocalMachine(host, identity)) return local;
+    return { id: host.id, name: host.name, ownerId: host.ownerId };
 }
 
 /** Ask one server whether it is there, and what agent it runs. */
@@ -163,30 +176,29 @@ export interface EnqueueInput {
  * mints the id, so a submit sent twice is still one command.
  */
 export async function enqueueCommand(input: EnqueueInput, actorId: string | null, now = new Date()) {
+    const server = await findServer(input.serverId);
     const existing = await prisma.serverCommand.findUnique({ where: { id: input.id } });
     if (existing) {
-        if (existing.serverId !== input.serverId) throw new RolloutRefusal("unknownServer");
+        if (existing.serverId !== server.id) throw new RolloutRefusal("unknownServer");
         return existing;
     }
-    await findServer(input.serverId);
     if (input.command.kind === "template.apply") {
         const assignment = await prisma.hostTemplateAssignment.findUnique({
             where: { id: input.command.assignmentId },
             select: { hostId: true }
         });
-        if (!assignment || assignment.hostId !== input.serverId) {
-            throw new RolloutRefusal("unknownAssignment");
-        }
+        const owner = assignment ? await findServer(assignment.hostId).catch(() => null) : null;
+        if (!owner || owner.id !== server.id) throw new RolloutRefusal("unknownAssignment");
     }
     const waiting = await prisma.serverCommand.count({
-        where: { serverId: input.serverId, status: { in: ["queued", "delivering"] } }
+        where: { serverId: server.id, status: { in: ["queued", "delivering"] } }
     });
     if (!queue.hasRoom(waiting)) throw new RolloutRefusal("queueFull");
     try {
         return await prisma.serverCommand.create({
             data: {
                 id: input.id,
-                serverId: input.serverId,
+                serverId: server.id,
                 kind: input.command.kind,
                 payload: queue.payloadOf(input.command),
                 actorId,
@@ -213,7 +225,7 @@ export async function queueIfOffline(
 ): Promise<boolean> {
     const server = await findServer(serverId).catch(() => null);
     if (!server || (await probe(server)).online) return false;
-    await enqueueCommand({ id: randomUUID(), serverId, expiry: "1d", command }, actorId);
+    await enqueueCommand({ id: randomUUID(), serverId: server.id, expiry: "1d", command }, actorId);
     return true;
 }
 
@@ -394,9 +406,14 @@ export async function startRollout(input: StartInput, actorId: string) {
                 }
             }
         });
-    } catch {
-        throw new RolloutRefusal("rolloutOpen");
+    } catch (error) {
+        if (isUniqueViolation(error)) throw new RolloutRefusal("rolloutOpen");
+        throw error;
     }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+    return (error as { code?: string } | null)?.code === "P2002";
 }
 
 async function openRollout() {
@@ -508,7 +525,12 @@ export async function advanceRollout(servers: readonly ServerRef[], now = new Da
                     data: { state, error: known.has(target.serverId) ? "pinned" : "no-agent", finishedAt: now }
                 });
             } else {
-                await enqueueCommand(
+                state = "updating";
+                const claimed = await prisma.agentRolloutTarget.updateMany({
+                    where: { id: target.id, state: "pending" },
+                    data: { state, startedAt: now }
+                });
+                const queued = claimed.count === 0 || await enqueueCommand(
                     {
                         id: randomUUID(),
                         serverId: target.serverId,
@@ -517,16 +539,31 @@ export async function advanceRollout(servers: readonly ServerRef[], now = new Da
                     },
                     rollout.actorId,
                     now
-                ).catch(() => null);
-                state = "updating";
-                await prisma.agentRolloutTarget.updateMany({
-                    where: { id: target.id, state: "pending" },
-                    data: { state, startedAt: now }
-                });
+                ).then(
+                    () => true,
+                    (error: unknown) => {
+                        if (!(error instanceof RolloutRefusal)) {
+                            console.error(`polaris: rollout update for ${target.serverId} not queued:`, error);
+                        }
+                        return false;
+                    }
+                );
+                if (!queued) {
+                    state = "failed";
+                    await prisma.agentRolloutTarget.updateMany({
+                        where: { id: target.id, state: "updating" },
+                        data: { state, error: "refused", finishedAt: now }
+                    });
+                }
             }
         } else if (state === "updating" || state === "verifying") {
             const step = plan.stepTarget(
-                { state, startedAt: target.startedAt, healthySince: target.healthySince },
+                {
+                    state,
+                    startedAt: target.startedAt,
+                    healthySince: target.healthySince,
+                    fromVersion: target.fromVersion
+                },
                 { version: agent?.version ?? null, heartbeatAt: agent?.heartbeatAt ?? null },
                 now,
                 config
@@ -575,9 +612,13 @@ export async function tick(now = new Date()): Promise<void> {
             where: { status: { in: ["queued", "delivering"] } }
         });
         const byId = new Map(servers.map((server) => [server.id, server]));
+        const removed = await removedServers(
+            waiting.map((row) => row.serverId).filter((serverId) => !byId.has(serverId))
+        );
         for (const { serverId } of waiting) {
             const server = byId.get(serverId);
             if (!server) {
+                if (!removed.has(serverId)) continue;
                 // The server was removed: nothing it was waiting for can arrive.
                 await prisma.serverCommand.updateMany({
                     where: { serverId, status: "queued" },
@@ -594,7 +635,34 @@ export async function tick(now = new Date()): Promise<void> {
             }
         }
         await advanceRollout(servers, now);
+        await pruneFinished(now);
     });
+}
+
+/** Of these server ids, the ones that no longer name a server at all. */
+async function removedServers(serverIds: readonly string[]): Promise<Set<string>> {
+    const ids = serverIds.filter((serverId) => serverId !== LOCAL_SERVER);
+    if (ids.length === 0) return new Set();
+    const hosts = await prisma.host.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    const present = new Set(hosts.map((host) => host.id));
+    return new Set(ids.filter((serverId) => !present.has(serverId)));
+}
+
+/** Forget what finished longer ago than the retention window, and the agent
+ *  records of servers that were removed. */
+export async function pruneFinished(now = new Date()): Promise<void> {
+    const cutoff = new Date(now.getTime() - RETENTION_MS);
+    await prisma.serverCommand.deleteMany({
+        where: { status: { in: ["done", "failed", "expired", "cancelled"] }, finishedAt: { lt: cutoff } }
+    });
+    await prisma.agentRollout.deleteMany({ where: { openKey: null, finishedAt: { lt: cutoff } } });
+    const agents = await prisma.serverAgent.findMany({
+        where: { serverId: { not: LOCAL_SERVER }, updatedAt: { lt: cutoff } },
+        select: { serverId: true },
+        take: PROBE_CAP
+    });
+    const gone = await removedServers(agents.map((agent) => agent.serverId));
+    if (gone.size > 0) await prisma.serverAgent.deleteMany({ where: { serverId: { in: [...gone] } } });
 }
 
 let started = false;
@@ -638,7 +706,8 @@ export interface ServerAgentView {
     readonly online: boolean;
     readonly pinnedVersion: string | null;
     readonly waiting: CommandView[];
-    readonly history: CommandView[];
+    /** The templates applied to this server, which a template command picks from. */
+    readonly assignments: { id: string; name: string }[];
 }
 
 export interface RolloutView {
@@ -665,15 +734,18 @@ export interface RolloutScreen {
     readonly rollout: RolloutView | null;
 }
 
-function commandView(row: {
-    id: string;
-    kind: string;
-    payload: string;
-    status: string;
-    result: string | null;
-    createdAt: Date;
-    expiresAt: Date;
-}): CommandView {
+function commandView(
+    row: {
+        id: string;
+        kind: string;
+        payload: string;
+        status: string;
+        result: string | null;
+        createdAt: Date;
+        expiresAt: Date;
+    },
+    templates: ReadonlyMap<string, string> = new Map()
+): CommandView {
     const spec = queue.readCommand(row.kind, row.payload);
     const target =
         !spec
@@ -682,7 +754,7 @@ function commandView(row: {
               ? spec.container
               : "version" in spec
                 ? spec.version
-                : spec.assignmentId;
+                : (templates.get(spec.assignmentId) ?? spec.assignmentId);
     return {
         id: row.id,
         kind: row.kind,
@@ -694,28 +766,50 @@ function commandView(row: {
     };
 }
 
-/** Everything the screen draws, in one read per table. */
+/** The templates applied to each server, keyed by the server's queue id. */
+async function assignmentsByServer(
+    servers: readonly ServerRef[],
+    localHostIds: readonly string[]
+): Promise<Map<string, { id: string; name: string }[]>> {
+    const hostIds = [...servers.filter((server) => server.id !== LOCAL_SERVER).map((server) => server.id), ...localHostIds];
+    const local = new Set(localHostIds);
+    const rows = hostIds.length
+        ? await prisma.hostTemplateAssignment.findMany({
+              where: { hostId: { in: hostIds } },
+              select: { id: true, hostId: true, template: { select: { name: true } } },
+              orderBy: { createdAt: "asc" },
+              take: hostIds.length * queue.QUEUE_LIMIT
+          })
+        : [];
+    const byServer = new Map<string, { id: string; name: string }[]>();
+    for (const row of rows) {
+        const serverId = local.has(row.hostId) ? LOCAL_SERVER : row.hostId;
+        byServer.set(serverId, [...(byServer.get(serverId) ?? []), { id: row.id, name: row.template.name }]);
+    }
+    return byServer;
+}
+
+/** Everything the screen draws, in one read per table. Every waiting command is
+ *  read, since each server holds at most QUEUE_LIMIT of them and any of them may
+ *  be cancelled; finished ones are read per server, when asked for. */
 export async function rolloutScreen(now = new Date()): Promise<RolloutScreen> {
-    const servers = await listServers();
+    const { servers, localHostIds } = await loadServers();
     const ids = servers.map((server) => server.id);
-    const [agents, waiting, finished, rollout] = await Promise.all([
+    const [agents, waiting, assignments, rollout] = await Promise.all([
         prisma.serverAgent.findMany({ where: { serverId: { in: ids } } }),
         prisma.serverCommand.findMany({
             where: { serverId: { in: ids }, status: { in: ["queued", "delivering"] } },
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-            take: queue.QUEUE_LIMIT * Math.min(ids.length, 20)
+            take: queue.QUEUE_LIMIT * ids.length
         }),
-        prisma.serverCommand.findMany({
-            where: { serverId: { in: ids }, status: { notIn: ["queued", "delivering"] } },
-            orderBy: { createdAt: "desc" },
-            take: HISTORY * Math.min(ids.length, 20)
-        }),
+        assignmentsByServer(servers, localHostIds),
         prisma.agentRollout.findFirst({
             orderBy: { createdAt: "desc" },
             include: { targets: { orderBy: [{ wave: "asc" }, { serverId: "asc" }] } }
         })
     ]);
     const agentOf = new Map(agents.map((agent) => [agent.serverId, agent]));
+    const templates = new Map([...assignments.values()].flat().map((one) => [one.id, one.name]));
     return {
         servers: servers.map((server) => {
             const agent = agentOf.get(server.id);
@@ -729,11 +823,10 @@ export async function rolloutScreen(now = new Date()): Promise<RolloutScreen> {
                     heartbeat !== null &&
                     now.getTime() - heartbeat.getTime() <= plan.HEARTBEAT_STALE_MS,
                 pinnedVersion: agent?.pinnedVersion ?? null,
-                waiting: waiting.filter((row) => row.serverId === server.id).map(commandView),
-                history: finished
+                waiting: waiting
                     .filter((row) => row.serverId === server.id)
-                    .slice(0, HISTORY)
-                    .map(commandView)
+                    .map((row) => commandView(row, templates)),
+                assignments: assignments.get(server.id) ?? []
             };
         }),
         rollout: rollout
@@ -757,4 +850,26 @@ export async function rolloutScreen(now = new Date()): Promise<RolloutScreen> {
               }
             : null
     };
+}
+
+/** One server's most recent finished commands. */
+export async function commandHistory(serverId: string): Promise<CommandView[]> {
+    const server = await findServer(serverId);
+    const rows = await prisma.serverCommand.findMany({
+        where: { serverId: server.id, status: { notIn: ["queued", "delivering"] } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: HISTORY
+    });
+    const assignmentIds = rows.flatMap((row) => {
+        const spec = queue.readCommand(row.kind, row.payload);
+        return spec?.kind === "template.apply" ? [spec.assignmentId] : [];
+    });
+    const assignments = assignmentIds.length
+        ? await prisma.hostTemplateAssignment.findMany({
+              where: { id: { in: assignmentIds } },
+              select: { id: true, template: { select: { name: true } } }
+          })
+        : [];
+    const templates = new Map(assignments.map((one) => [one.id, one.template.name]));
+    return rows.map((row) => commandView(row, templates));
 }

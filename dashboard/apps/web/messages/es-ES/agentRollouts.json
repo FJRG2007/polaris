@@ -24,7 +24,8 @@
         "pinBody": "Los despliegues de cualquier otra versión no tocan este servidor hasta que lo sueltes.",
         "pinVersion": "Versión",
         "commands": "Órdenes",
-        "empty": "Aún no hay servidores. Añade uno desde Servidores."
+        "empty": "Aún no hay servidores. Añade uno desde Servidores.",
+        "more": "Mostrar más"
     },
     "rollout": {
         "heading": "Despliegue",
@@ -83,7 +84,7 @@
         "addBody": "Si el servidor está desconectado, la orden lo espera y sale en orden cuando vuelva a responder.",
         "kind": "Orden",
         "container": "Contenedor",
-        "assignment": "Id de asignación",
+        "assignment": "Plantilla",
         "version": "Versión",
         "expiry": "Descartar tras",
         "expiries": {
@@ -110,6 +111,7 @@
         "expires": "Caduca {when}",
         "empty": "Nada en cola",
         "history": "Recientes",
+        "historyEmpty": "Nada terminado todavía",
         "results": {
             "offline": "El servidor no respondió",
             "noAgent": "Este servidor no tiene agente que actualizar",
