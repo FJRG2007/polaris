@@ -42,6 +42,7 @@ import { AddressRulesPage, LoginRulePage } from "./access-rules";
 import { emptyRule, RuleEditor, type RulePosition } from "./rule-editor";
 import { PredefinedRuleList, type PredefinedRuleRow } from "./predefined-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { DirectAccessNotice } from "./direct-access-notice";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { localizeManaged } from "./waf-words";
 import {
@@ -567,6 +568,15 @@ export function WafEditor({
     return (
         <div className="flex flex-col gap-4">
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+
+            {scopeType !== "polaris" ? (
+                <DirectAccessNotice
+                    scopeType={scopeType}
+                    scopeId={scopeId}
+                    // The close action is held to what saving this scope's rule is.
+                    canClose={scopeType === "global" ? canOperate : true}
+                />
+            ) : null}
 
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative min-w-0 flex-1">

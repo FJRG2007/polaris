@@ -244,6 +244,7 @@ export async function cloneEnvironment(
                     // a copy that answered on a port its original keeps closed, or
                     // without the original's rate limits, is not a copy.
                     publishPort: application.publishPort,
+                    publishPortChosen: application.publishPortChosen,
                     edgeConfig: application.edgeConfig
                 }
             });

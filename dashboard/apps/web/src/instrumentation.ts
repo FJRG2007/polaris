@@ -95,9 +95,24 @@ export async function register(): Promise<void> {
     // old dashboard is still serving, and a deploy it is running then is live, not
     // abandoned: closing it out here failed it on screen and on GitHub while it went
     // on to finish (see lib/deploy/dashboard-peers.ts).
-    void whenAlone(recoverAbandonedDeployments).catch((error) =>
-        console.error("polaris: could not close out interrupted deploys:", error)
-    );
+    //
+    // Then close the host ports the edge should be the only way past: a service with
+    // a domain answered on its machine's IP and a port as well, with its firewall and
+    // login nowhere in the way. Each is moved through the change-over, so nothing
+    // goes down - one that cannot change over waits for its next deploy - and only after the close-out, which would otherwise fail these very
+    // deploys as abandoned (see lib/deploy/direct-port.ts).
+    void whenAlone(async () => {
+        await recoverAbandonedDeployments().catch((error) =>
+            console.error("polaris: could not close out interrupted deploys:", error)
+        );
+        const { closeDirectPorts } = await import("./lib/deploy/direct-port-close");
+        const { closed, deferred } = await closeDirectPorts({}, { mode: "boot", actorId: null });
+        if (closed.length > 0 || deferred.length > 0) {
+            console.info(
+                `polaris: closing the direct host port of ${closed.length} service(s); ${deferred.length} close on their next deploy`
+            );
+        }
+    }).catch((error) => console.error("polaris: could not close direct host ports:", error));
 
     // The key the media server signs with, minted here rather than by the
     // installer: .env is only ever written by a script and an installed Polaris

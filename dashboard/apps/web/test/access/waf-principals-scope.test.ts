@@ -44,11 +44,15 @@ vi.mock("@polaris/db", () => ({
         group: model("group", [{ id: GROUP, name: "Customers of Acme" }]),
         userRole: {
             findMany: async (args: { where: { userId: string; roleId: { in: string[] } } }) =>
-                args.where.roleId.in.filter((id) => held.includes(`role:${id}`)).map((roleId) => ({ roleId }))
+                args.where.roleId.in
+                    .filter((id) => held.includes(`role:${id}`))
+                    .map((roleId) => ({ roleId }))
         },
         groupMember: {
             findMany: async (args: { where: { userId: string; groupId: { in: string[] } } }) =>
-                args.where.groupId.in.filter((id) => held.includes(`group:${id}`)).map((groupId) => ({ groupId }))
+                args.where.groupId.in
+                    .filter((id) => held.includes(`group:${id}`))
+                    .map((groupId) => ({ groupId }))
         },
         user: model("user", [
             { id: OTHER, name: "Other Customer", email: "other@example.com" },
@@ -60,7 +64,10 @@ vi.mock("@/lib/session", () => ({
     requirePermission: async () => caller,
     userHasManage: async () => true
 }));
-const findPeople = vi.fn(async () => ({ people: [{ id: OTHER, name: "Other Customer" }], withheld: 0 }));
+const findPeople = vi.fn(async () => ({
+    people: [{ id: OTHER, name: "Other Customer" }],
+    withheld: 0
+}));
 const findAccountsAsAdmin = vi.fn(async () => [{ id: OTHER, name: "Other Customer" }]);
 vi.mock("@/lib/people-search", () => ({ findPeople, findAccountsAsAdmin, SHORTEST_SEARCH: 2 }));
 vi.mock("@/lib/rich-text/mention-service", () => ({
@@ -71,9 +78,13 @@ vi.mock("@/lib/waf-intel-service", () => ({}));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/deploy-service", () => ({ syncAppRoutes: async () => undefined }));
 vi.mock("@/lib/domain-edge", () => ({ syncDashboardRoute: async () => undefined }));
+vi.mock("@/lib/domain-service", () => ({ getPublicIp: async () => null }));
 vi.mock("@/lib/address-accounts", () => ({ accountsAtAddress: async () => [] }));
 vi.mock("@/lib/waf-ssh-service", () => ({ liftHostBlocks: async () => undefined }));
-vi.mock("@/lib/waf-ban-service", () => ({ getWafJails: async () => [], setWafJails: async () => undefined }));
+vi.mock("@/lib/waf-ban-service", () => ({
+    getWafJails: async () => [],
+    setWafJails: async () => undefined
+}));
 vi.mock("@/lib/waf-analytics-service", () => ({}));
 let stored: string[] = [];
 const getWafRule = vi.fn(async (_owner: string, _type: string, _id: string) => ({
@@ -83,14 +94,18 @@ const getWafRule = vi.fn(async (_owner: string, _type: string, _id: string) => (
 const setWafRule = vi.fn(async () => undefined);
 vi.mock("@/lib/waf-service", () => ({ getWafRule, setWafRule }));
 vi.mock("@/lib/privacy-service", () => ({
-    discoverableBy: async (_viewer: unknown, ids: string[]) => new Set(ids.filter((id) => findable.includes(id)))
+    discoverableBy: async (_viewer: unknown, ids: string[]) =>
+        new Set(ids.filter((id) => findable.includes(id)))
 }));
 vi.mock("@/lib/blocks", () => ({
-    blockedBetween: async (_id: string, ids: string[]) => new Set(ids.filter((id) => blocked.includes(id)))
+    blockedBetween: async (_id: string, ids: string[]) =>
+        new Set(ids.filter((id) => blocked.includes(id)))
 }));
 vi.mock("@/lib/waf-anomaly-service", () => ({}));
 
-const { listWafPrincipalsAction, findWafPeopleAction, setWafRuleAction } = await import("../../src/app/(app)/apps/firewall/actions");
+const { listWafPrincipalsAction, findWafPeopleAction, setWafRuleAction } = await import(
+    "../../src/app/(app)/apps/firewall/actions"
+);
 
 const SCOPE = { scopeType: "project" as const, scopeId: "00000000-0000-7000-8000-0000000000e1" };
 
@@ -111,13 +126,17 @@ describe("the roles and groups a rule can name", () => {
         caller = ADMIN;
         const { principals } = await listWafPrincipalsAction();
         expect(principals?.some((option) => option.type === "user")).toBe(false);
-        expect(asked.filter((query) => query.model === "user").every((query) => query.args.where?.id)).toBe(true);
+        expect(
+            asked.filter((query) => query.model === "user").every((query) => query.args.where?.id)
+        ).toBe(true);
     });
 
     it("offers a customer only the roles and groups they are in", async () => {
         caller = CUSTOMER;
         await listWafPrincipalsAction();
-        const [role, group] = asked.filter((query) => query.model === "role" || query.model === "group");
+        const [role, group] = asked.filter(
+            (query) => query.model === "role" || query.model === "group"
+        );
         expect(role?.args.where).toEqual({ users: { some: { userId: CUSTOMER.id } } });
         expect(group?.args.where).toEqual({ members: { some: { userId: CUSTOMER.id } } });
     });
@@ -125,7 +144,9 @@ describe("the roles and groups a rule can name", () => {
     it("offers an administrator every role and group, bounded", async () => {
         caller = ADMIN;
         await listWafPrincipalsAction();
-        const [role, group] = asked.filter((query) => query.model === "role" || query.model === "group");
+        const [role, group] = asked.filter(
+            (query) => query.model === "role" || query.model === "group"
+        );
         expect(role?.args.where).toEqual({});
         expect(group?.args.where).toEqual({});
         expect(role?.args.take).toBeLessThanOrEqual(200);
@@ -139,7 +160,9 @@ describe("the roles and groups a rule can name", () => {
         const other = principals?.find((option) => option.ref === `user:${OTHER}`);
         expect(other?.label).toBe("Other Customer");
         expect(other?.sublabel).toBeUndefined();
-        expect(principals?.find((option) => option.ref === `user:${CUSTOMER.id}`)?.sublabel).toBe("me@example.com");
+        expect(principals?.find((option) => option.ref === `user:${CUSTOMER.id}`)?.sublabel).toBe(
+            "me@example.com"
+        );
     });
 
     it("names nobody the stored rule does not, whatever the request carries", async () => {
@@ -180,7 +203,11 @@ describe("finding a person to name", () => {
     it("finds a customer only who they could find anywhere else, and themselves", async () => {
         caller = CUSTOMER;
         const { results } = await findWafPeopleAction("  me ");
-        expect(findPeople).toHaveBeenCalledWith({ id: CUSTOMER.id }, "me", expect.objectContaining({ limit: 20 }));
+        expect(findPeople).toHaveBeenCalledWith(
+            { id: CUSTOMER.id },
+            "me",
+            expect.objectContaining({ limit: 20 })
+        );
         expect(results?.map((person) => person.id)).toEqual([CUSTOMER.id, OTHER]);
         expect(findAccountsAsAdmin).not.toHaveBeenCalled();
     });
@@ -219,7 +246,9 @@ describe("saving who a rule names", () => {
         caller = CUSTOMER;
         held = [`role:${ROLE}`, `group:${GROUP}`];
         findable = [OTHER];
-        expect(await save([`role:${ROLE}`, `group:${GROUP}`, `user:${CUSTOMER.id}`], [`user:${OTHER}`])).toEqual({});
+        expect(
+            await save([`role:${ROLE}`, `group:${GROUP}`, `user:${CUSTOMER.id}`], [`user:${OTHER}`])
+        ).toEqual({});
         expect(setWafRule).toHaveBeenCalledTimes(1);
     });
 
@@ -251,7 +280,9 @@ describe("saving who a rule names", () => {
 
     it("lets an administrator name anybody", async () => {
         caller = ADMIN;
-        expect(await save([`user:${OTHER}`, `role:00000000-0000-7000-8000-0000000000b2`])).toEqual({});
+        expect(await save([`user:${OTHER}`, `role:00000000-0000-7000-8000-0000000000b2`])).toEqual(
+            {}
+        );
         expect(getWafRule).not.toHaveBeenCalled();
         expect(setWafRule).toHaveBeenCalledTimes(1);
     });

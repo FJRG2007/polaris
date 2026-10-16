@@ -33,6 +33,7 @@ import { resolveMountTarget } from "./storage-service";
 import * as sourceUpload from "./deploy/source-upload";
 import { edgeLoginKeys } from "@/lib/edge-signing-key";
 import { hostPortForApp } from "@/lib/deploy/host-port";
+import { closingInFlight, mustCloseDirectPort } from "@/lib/deploy/direct-port";
 import { appBaseUrl, getPublicIp } from "./domain-service";
 import { balancedOver, copiesOf } from "./deploy/replicas";
 import { resolveWaf, resolveWafBatch } from "./waf-service";
@@ -1167,7 +1168,8 @@ export async function getApplicationEdgeSettings(
     });
     return {
         config: parseAppEdgeConfig(app.edgeConfig),
-        publishPort: app.publishPort,
+        // Closed already when the release that closes it is on its way.
+        publishPort: app.publishPort && !(await closingInFlight(app.id)),
         flooded: (await floodedServices()).has(app.id),
         catalog: Boolean(catalog),
         servedThroughPolaris: app.target.kind !== "local" && app.domains.length > 0,
@@ -1235,10 +1237,42 @@ export async function setApplicationPublishPort(
             "Polaris serves this service's domains from here and reaches it on its server's port. Switch its domains to be served by its own server first."
         );
     }
-    if (view.publishPort === publish) return { redeployed: false };
+    // Opened again while the release that closes it is still on its way, the two
+    // would race: whichever is promoted last decides what the service runs.
+    if (publish && view.local && (await closingInFlight(applicationId))) {
+        throw new Error(
+            "This service's port is closing. Open it again once that deploy has finished."
+        );
+    }
+    if (view.publishPort === publish) {
+        await prisma.application.update({
+            where: { id: applicationId },
+            data: { publishPortChosen: publish }
+        });
+        return { redeployed: false };
+    }
+    // Closing the port of a running service on this machine is a change-over, not
+    // a switch: the setting flips when the release without the port is promoted
+    // (`promoteRelease`). Flipped now, every route written while that release
+    // starts would dial a container by a name the running one may not answer on -
+    // it was started published, off the proxy network - and the service would be
+    // down for the length of the deploy. A deploy that fails leaves it as it was.
+    if (!publish && view.local) {
+        const live = await prisma.application.update({
+            where: { id: applicationId },
+            data: { publishPortChosen: false },
+            select: { currentDeploymentId: true }
+        });
+        if (live.currentDeploymentId) {
+            await restartFromKeptImage(applicationId, ownerId, actorId, "settings", undefined, {
+                closePort: true
+            });
+            return { redeployed: true };
+        }
+    }
     const app = await prisma.application.update({
         where: { id: applicationId },
-        data: { publishPort: publish },
+        data: { publishPort: publish, publishPortChosen: publish },
         select: { currentDeploymentId: true }
     });
     await syncAppRoutes();
@@ -2839,6 +2873,7 @@ export async function duplicateApplication(
             keepReleases: app.keepReleases,
             // A copy is reached the way the original is, and guarded the same way.
             publishPort: app.publishPort,
+            publishPortChosen: app.publishPortChosen,
             edgeConfig: app.edgeConfig
         }
     });
@@ -2888,7 +2923,10 @@ async function declaredProtocol(
 async function buildAppPlan(
     applicationId: string,
     ownerId: string,
-    release?: { id: string; commitSha: string | null; cutover: boolean }
+    release?: { id: string; commitSha: string | null; cutover: boolean },
+    /** Plan the service with its host port closed, whatever the setting says: the
+     *  release that closes it, which stores the setting once it is promoted. */
+    closePort = false
 ): Promise<{
     plan: AppDeployPlan;
     target: TargetRow & { name: string };
@@ -2907,6 +2945,8 @@ async function buildAppPlan(
     imageRefChange?: string;
     /** The private names this plan gives the service, or null where it gives none. */
     liveNames: string[] | null;
+    /** The plan keeps a published host port off the host (see `closePort`). */
+    closesPort: boolean;
 }> {
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
@@ -2922,6 +2962,16 @@ async function buildAppPlan(
     const project = app.environment.project;
     const base = deployReleases.serviceRef(project.slug, app.slug, app.id);
     const kept = release !== undefined && deployReleases.keepsReleases(app);
+    // A service the edge answers for is reached through it alone: a port left open
+    // by the old default is closed on this deploy, which is the change-over that
+    // moves it - the new container comes up without the port and the old one,
+    // still holding it, stays up until the new one serves (see `direct-port.ts`).
+    // Planned closed here and stored closed only at promotion, so the routes
+    // written meanwhile still reach the release that is serving.
+    const closesPort =
+        app.publishPort &&
+        (closePort || (await closingInFlight(app.id)) || (await mustCloseDirectPort(app.id)));
+    if (closesPort) app.publishPort = false;
     // Beside the running release only for the change-over, answering to the
     // service's own name as well (see `runsCutover`).
     const cutover = release !== undefined && !kept && release.cutover;
@@ -3340,6 +3390,7 @@ async function buildAppPlan(
         keepsHistory: deployReleases.keepsReleases(app),
         liveNames: names.enabled && !kept ? names.live : null,
         cutover: release ? cutover : await changesOver(app, ownerId),
+        closesPort,
         unresolved: references.unresolved,
         imageRefChange: imageRef !== storedImage ? imageRef : undefined
     };
@@ -3616,13 +3667,15 @@ export async function deployApplication(
         prebuilt?: { image: string; archive: string; bytes: number };
         /** More to say on the audit entry, such as the API key that asked. */
         audit?: Record<string, unknown>;
+        /** Close the service's host port with this release (see `buildAppPlan`). */
+        closePort?: boolean;
     },
     /** Run a kept release image instead of building: a rollback, or the live
      *  release started again with changed variables. */
     rollback?: RollbackSource
 ): Promise<string> {
     await refuseWhileCopying(applicationId);
-    const built = await buildAppPlan(applicationId, ownerId);
+    const built = await buildAppPlan(applicationId, ownerId, undefined, meta?.closePort === true);
     const { plan, target, buildCommands, keepsHistory } = built;
     // A kept image was made from the image the service ran before, so a service
     // that now needs another one pulls it instead of running the kept one.
@@ -3714,6 +3767,8 @@ export async function deployApplication(
             authorAvatarUrl,
             isolated: keepsHistory || cutover,
             cutover,
+            // Promoted, it stores the service's port as closed (`promoteRelease`).
+            closesPort: built.closesPort,
             // Where its image is built, when that is not where it runs - so the
             // history says which machine did the work.
             builtOn: builder?.name ?? null,
@@ -3762,9 +3817,14 @@ export async function deployApplication(
                 return null;
             });
         }
-        ({ plan: planned, liveNames } = await buildAppPlan(applicationId, ownerId, release));
+        ({ plan: planned, liveNames } = await buildAppPlan(
+            applicationId,
+            ownerId,
+            release,
+            built.closesPort
+        ));
     } else if (scaled?.cutover) {
-        planned = (await buildAppPlan(applicationId, ownerId, scaled)).plan;
+        planned = (await buildAppPlan(applicationId, ownerId, scaled, built.closesPort)).plan;
     }
     // The names this release carries are held until it is promoted - only then do
     // they count as live (see `promoteRelease`). A scale step in place adds copies
@@ -3862,8 +3922,11 @@ export async function restartFromKeptImage(
     userId: string | null,
     reason: "variables" | "settings" | "scale" = "variables",
     /** More to say on the deploy's audit entry, such as the API key that asked. */
-    audit?: Record<string, unknown>
+    audit?: Record<string, unknown>,
+    /** Close the service's host port with this release (see `buildAppPlan`). */
+    options?: { readonly closePort?: boolean }
 ): Promise<string> {
+    const closePort = options?.closePort === true;
     const app = await prisma.application.findFirst({
         where: { id: applicationId, environment: { project: { ownerId } } },
         select: { currentDeploymentId: true }
@@ -3884,13 +3947,17 @@ export async function restartFromKeptImage(
           })
         : null;
     if (!live?.imageKept || !isReleaseImage(live.imageTag)) {
-        return deployApplication(applicationId, ownerId, userId, { trigger: reason, audit });
+        return deployApplication(applicationId, ownerId, userId, {
+            trigger: reason,
+            audit,
+            closePort
+        });
     }
     return deployApplication(
         applicationId,
         ownerId,
         userId,
-        { audit },
+        { audit, closePort },
         {
             deploymentId: live.id,
             imageTag: live.imageTag,
@@ -5365,10 +5432,21 @@ async function promoteRelease(
     deploymentId: string,
     dep: { readonly deployableId: string }
 ): Promise<void> {
-    const app = await prisma.application.findUnique({
-        where: { id: dep.deployableId },
-        select: { keepReleases: true, target: { select: { hostId: true } } }
-    });
+    const [app, promoted] = await Promise.all([
+        prisma.application.findUnique({
+            where: { id: dep.deployableId },
+            select: {
+                keepReleases: true,
+                target: { select: { hostId: true } },
+                environment: { select: { project: { select: { ownerId: true } } } }
+            }
+        }),
+        prisma.deployment.findUnique({ where: { id: deploymentId }, select: { closesPort: true } })
+    ]);
+    // A release that closes the service's host port stores it closed here, before
+    // the switch below, so the routes that switch writes dial the new release by
+    // name rather than a port it never published.
+    const closesPort = promoted?.closesPort === true;
     // What was serving until now, read before it is marked superseded: a change-over
     // takes it down once the new release has the traffic.
     const replaced = await prisma.deployment.findMany({
@@ -5383,7 +5461,11 @@ async function promoteRelease(
     await prisma.application.update({
         where: { id: dep.deployableId },
         // A release that just came up is awake, whatever its service was before.
-        data: { currentDeploymentId: deploymentId, asleepSince: null }
+        data: {
+            currentDeploymentId: deploymentId,
+            asleepSince: null,
+            ...(closesPort ? { publishPort: false, publishPortChosen: false } : {})
+        }
     });
     // Its private names count as live from here: it is the one serving them.
     await promoteStagedNames(dep.deployableId, deploymentId).catch((error) => {
@@ -5435,6 +5517,10 @@ async function promoteRelease(
     void sweepReleaseImagesFor(dep.deployableId).catch((error: unknown) => {
         console.error("polaris: could not sweep the release images:", error);
     });
+    // A tunnel connector pointed at the port follows the service to its name.
+    if (closesPort && app) {
+        await repointConnectors(dep.deployableId, app.environment.project.ownerId);
+    }
     // Cloudflare would keep serving the previous release's assets from its cache.
     void import("./cdn").then(({ purgeAfterPromotion }) => purgeAfterPromotion(dep.deployableId));
 }

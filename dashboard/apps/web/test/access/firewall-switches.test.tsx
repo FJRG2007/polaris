@@ -52,7 +52,9 @@ vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
     getWafRuleMatchesAction: async () => ({ matches: {} }),
     setTorBlockedAction: async () => ({}),
     findWafPeopleAction: async () => ({ results: [] }),
-    listWafPrincipalsAction: async () => ({ principals: [] })
+    listWafPrincipalsAction: async () => ({ principals: [] }),
+    getDirectAccessAction: async () => ({ reachable: [] }),
+    closeDirectAccessAction: async () => ({ closed: 0, failed: 0 })
 }));
 
 const { WafEditor } = await import("../../src/app/(app)/apps/firewall/waf-editor");
