@@ -107,45 +107,91 @@ export function AttributePicker({
     );
 }
 
-/** Which of a purifier's figures a threshold or a reading compares. Nothing is
- *  drawn for a device with one reading. */
-export function MeasurePicker({
-    kind,
+/** What a block looks at on a device: one of its attributes, compared as a
+ *  word, or one of its figures, compared as a number. */
+export type WatchChoice =
+    | { readonly attribute: auto.AutomationAttribute }
+    | { readonly figure: auto.ReadingMeasure | undefined };
+
+/** A figure travels through the picker as this and the measure, or nothing for
+ *  the device's one reading. */
+const FIGURE = "figure:";
+
+/**
+ * The Watch picker for every block that reads a device: its attributes and its
+ * figures in one list, so the temperature is beside the mode rather than behind
+ * another kind of block. A figure is compared as a number and an attribute as a
+ * word, so the editor turns a block into the other kind when the choice crosses
+ * over; this only reports which was picked.
+ */
+export function WatchPicker({
+    device,
     value,
     onChange,
     path,
     disabled
 }: {
-    kind: string;
-    value: auto.ReadingMeasure | undefined;
-    onChange: (measure: auto.ReadingMeasure) => void;
+    device: DeviceView;
+    value: WatchChoice;
+    onChange: (choice: WatchChoice) => void;
     path: readonly (string | number)[];
     disabled?: boolean;
 }) {
     const t = usePlacesT();
-    const offered = auto.measuresFor(kind);
-    if (offered.length === 0) return null;
+    const attributes = auto.attributesFor(device.kind);
+    const figures = [...auto.figuresFor(device.kind, device.reading?.value)];
+    // A block saved on a figure the device no longer offers (a sensor now
+    // reading a word) keeps it in the list rather than showing a blank.
+    if ("figure" in value && !figures.includes(value.figure)) figures.push(value.figure);
+    const options: SelectOption[] = [
+        ...attributes.map((attribute) => ({
+            value: attribute,
+            label: words.attributeText(attribute, t)
+        })),
+        ...figures.map((measure) => ({
+            value: `${FIGURE}${measure ?? ""}`,
+            label: words.figureOptionText(device.kind, measure, t)
+        }))
+    ];
+    if (options.length < 2) return null;
+    const figure = "figure" in value;
     return (
-        <Field label={t("automations.fields.measure")} path={[...path, "measure"]} required>
+        <Field
+            label={t("automations.fields.watch")}
+            path={[...path, figure ? "measure" : "attribute"]}
+            required={figure}
+        >
             {(id, invalid) => (
                 <Select
                     id={id}
-                    value={value ?? ""}
+                    value={figure ? `${FIGURE}${value.figure ?? ""}` : value.attribute}
                     disabled={disabled}
-                    placeholder={t("automations.fields.chooseValue")}
                     className={invalid ? "border-danger-edge" : undefined}
-                    options={offered.map((measure) => ({
-                        value: measure,
-                        label: words.measureText(measure, t)
-                    }))}
+                    options={options}
                     onValueChange={(next) => {
-                        const measure = offered.find((entry) => entry === next);
-                        if (measure) onChange(measure);
+                        if (next.startsWith(FIGURE)) {
+                            const name = next.slice(FIGURE.length);
+                            const index = figures.findIndex((entry) => (entry ?? "") === name);
+                            if (index >= 0) onChange({ figure: figures[index] });
+                            return;
+                        }
+                        const attribute = attributes.find((entry) => entry === next);
+                        if (attribute) onChange({ attribute });
                     }}
                 />
             )}
         </Field>
     );
+}
+
+/** What a device's attribute is right now, where the editor can tell: a state,
+ *  a door, a mode or a reading's word. Empty where it cannot. */
+export function currentValue(device: DeviceView, attribute: auto.AutomationAttribute): string {
+    if (attribute === "state") return device.state;
+    if (attribute === "door") return device.doorState;
+    if (attribute === "mode") return device.climate?.mode ?? device.air?.mode ?? "";
+    if (attribute === "reading") return device.reading?.value ?? "";
+    return "";
 }
 
 /** What a figure is counted in, for the field beside it. */

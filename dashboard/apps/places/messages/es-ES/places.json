@@ -1813,7 +1813,10 @@
             "door": "Su puerta",
             "reading": "Su lectura",
             "mode": "Su modo",
-            "filter": "Sus filtros"
+            "filter": "Sus filtros",
+            "temperature": "Su temperatura",
+            "figure": "Lectura: {measure}",
+            "number": "Su lectura como número"
         },
         "triggers": {
             "change": "Un aparato cambia",
@@ -2112,7 +2115,8 @@
             "between": "Entra en",
             "outside": "Sale de",
             "upper": "Hasta",
-            "forMinutes": "Al menos"
+            "forMinutes": "Al menos",
+            "alreadyThere": "Ahora está en {value}: salta la próxima vez que cambie a {value}."
         },
         "log": {
             "title": "Qué hizo",

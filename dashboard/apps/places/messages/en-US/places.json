@@ -1813,7 +1813,10 @@
             "door": "Its door",
             "reading": "Its reading",
             "mode": "Its mode",
-            "filter": "Its filters"
+            "filter": "Its filters",
+            "temperature": "Its temperature",
+            "figure": "Reading: {measure}",
+            "number": "Its reading as a number"
         },
         "triggers": {
             "change": "A device changes",
@@ -2112,7 +2115,8 @@
             "between": "Comes into",
             "outside": "Leaves",
             "upper": "Up to",
-            "forMinutes": "For at least"
+            "forMinutes": "For at least",
+            "alreadyThere": "It is {value} now, so this starts it the next time it changes to {value}."
         },
         "log": {
             "title": "What it did",

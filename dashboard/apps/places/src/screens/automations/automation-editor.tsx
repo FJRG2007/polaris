@@ -165,6 +165,21 @@ function pathKey(path: readonly (string | number)[]): string {
     return path.join(".");
 }
 
+/** A block's own name, note and switch, kept when the Watch picker turns it into
+ *  the other kind - picking the temperature is not starting the block over. */
+function baseOf(block: { alias?: string; note?: string; enabled?: boolean }) {
+    return {
+        ...(block.alias !== undefined ? { alias: block.alias } : {}),
+        ...(block.note !== undefined ? { note: block.note } : {}),
+        ...(block.enabled !== undefined ? { enabled: block.enabled } : {})
+    };
+}
+
+/** The engine's comparison: a sensor's words come in whatever case it sends. */
+function sameWord(a: string, b: string): boolean {
+    return a !== "" && a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 /** A new automation as a template starts it. */
 export function startingDraft(
     template: string | null,
@@ -1354,19 +1369,41 @@ function TriggerCard({
                         empty={t("automations.fields.noDevices")}
                         onChange={pickDevice}
                     />
-                    {device && (
+                    {device && trigger.kind === "change" && (
+                        <fields.WatchPicker
+                            device={device}
+                            value={{ attribute: trigger.attribute }}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(choice) =>
+                                onChange(
+                                    "figure" in choice
+                                        ? {
+                                              ...baseOf(trigger),
+                                              id: trigger.id,
+                                              kind: "threshold",
+                                              deviceId: trigger.deviceId,
+                                              direction: "above",
+                                              value: Number.NaN,
+                                              ...(choice.figure ? { measure: choice.figure } : {})
+                                          }
+                                        : {
+                                              ...trigger,
+                                              attribute: choice.attribute,
+                                              from: "",
+                                              to: ""
+                                          }
+                                )
+                            }
+                        />
+                    )}
+                    {device && trigger.kind === "stays" && (
                         <fields.AttributePicker
                             kind={device.kind}
                             value={trigger.attribute}
                             path={path}
                             disabled={disabled}
-                            onChange={(attribute) =>
-                                onChange(
-                                    trigger.kind === "change"
-                                        ? { ...trigger, attribute, from: "", to: "" }
-                                        : { ...trigger, attribute, is: "" }
-                                )
-                            }
+                            onChange={(attribute) => onChange({ ...trigger, attribute, is: "" })}
                         />
                     )}
                 </>
@@ -1395,6 +1432,20 @@ function TriggerCard({
                         disabled={disabled}
                         onChange={(to) => onChange({ ...trigger, to })}
                     />
+                    {device &&
+                        trigger.to &&
+                        sameWord(fields.currentValue(device, trigger.attribute), trigger.to) && (
+                            <p className="text-xs text-muted-foreground sm:col-span-2">
+                                {t("automations.fields.alreadyThere", {
+                                    value: words.valueText(
+                                        trigger.attribute,
+                                        device.kind,
+                                        trigger.to,
+                                        t
+                                    )
+                                })}
+                            </p>
+                        )}
                 </>
             )}
             {trigger.kind === "stays" && (
@@ -1433,13 +1484,32 @@ function TriggerCard({
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.triggerOn(trigger, next))}
                     />
-                    <fields.MeasurePicker
-                        kind={device?.kind ?? ""}
-                        value={trigger.measure}
-                        path={path}
-                        disabled={disabled}
-                        onChange={(measure) => onChange({ ...trigger, measure })}
-                    />
+                    {device && (
+                        <fields.WatchPicker
+                            device={device}
+                            value={{ figure: trigger.measure }}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(choice) => {
+                                if ("attribute" in choice) {
+                                    onChange({
+                                        ...baseOf(trigger),
+                                        id: trigger.id,
+                                        kind: "change",
+                                        deviceId: trigger.deviceId,
+                                        attribute: choice.attribute,
+                                        from: "",
+                                        to: ""
+                                    });
+                                    return;
+                                }
+                                const { measure: _was, ...rest } = trigger;
+                                onChange(
+                                    choice.figure ? { ...rest, measure: choice.figure } : rest
+                                );
+                            }}
+                        />
+                    )}
                     <flow.Field
                         label={t("automations.fields.direction")}
                         path={[...path, "direction"]}
@@ -1672,12 +1742,26 @@ function ConditionCard({
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
                     {device && (
-                        <fields.AttributePicker
-                            kind={device.kind}
-                            value={condition.attribute}
+                        <fields.WatchPicker
+                            device={device}
+                            value={{ attribute: condition.attribute }}
                             path={path}
                             disabled={disabled}
-                            onChange={(attribute) => onChange({ ...condition, attribute, is: "" })}
+                            onChange={(choice) =>
+                                onChange(
+                                    "figure" in choice
+                                        ? {
+                                              ...baseOf(condition),
+                                              id: condition.id,
+                                              kind: "reading",
+                                              deviceId: condition.deviceId,
+                                              op: "gt",
+                                              value: Number.NaN,
+                                              ...(choice.figure ? { measure: choice.figure } : {})
+                                          }
+                                        : { ...condition, attribute: choice.attribute, is: "" }
+                                )
+                            }
                         />
                     )}
                     <flow.Field label={t("automations.fields.test")} path={[...path, "negate"]}>
@@ -1736,13 +1820,32 @@ function ConditionCard({
                         empty={t("automations.fields.noSensors")}
                         onChange={(next) => onChange(auto.conditionOn(condition, next))}
                     />
-                    <fields.MeasurePicker
-                        kind={device?.kind ?? ""}
-                        value={condition.measure}
-                        path={path}
-                        disabled={disabled}
-                        onChange={(measure) => onChange({ ...condition, measure })}
-                    />
+                    {device && (
+                        <fields.WatchPicker
+                            device={device}
+                            value={{ figure: condition.measure }}
+                            path={path}
+                            disabled={disabled}
+                            onChange={(choice) => {
+                                if ("attribute" in choice) {
+                                    onChange({
+                                        ...baseOf(condition),
+                                        id: condition.id,
+                                        kind: "device",
+                                        deviceId: condition.deviceId,
+                                        attribute: choice.attribute,
+                                        is: "",
+                                        negate: false
+                                    });
+                                    return;
+                                }
+                                const { measure: _was, ...rest } = condition;
+                                onChange(
+                                    choice.figure ? { ...rest, measure: choice.figure } : rest
+                                );
+                            }}
+                        />
+                    )}
                     <flow.Field label={t("automations.fields.compare")} path={[...path, "op"]}>
                         {(id) => (
                             <Select
